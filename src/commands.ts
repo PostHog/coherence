@@ -120,6 +120,7 @@ export interface Command {
 export const COMMANDS: Command[] = [
   // ── derive ───────────────────────────────────────────────────────────────────────────
   { name: "graph", group: "derive", usage: "[--check]", summary: "emit `graph.json` + `_graph.html` (the outline) to `outputDir`", writesArtifacts: true },
+  { name: "scope", group: "derive", usage: "[--check]", summary: "emit deterministic `scope.json` + `_scope.html` around the project's center of gravity", writesArtifacts: true },
   { name: "overview", group: "derive", usage: "[--check]", summary: "emit `_overview.html` + `AGENTS.md`", writesArtifacts: true },
   { name: "docs", group: "derive", usage: "[--check]", summary: "graph + overview + this command index; `--check` fails on any stale artifact", writesArtifacts: true },
   { name: "claude", group: "derive", usage: "[--check]", summary: "regenerate the owned fenced block inside `CLAUDE.md`", writesArtifacts: true },

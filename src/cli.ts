@@ -67,6 +67,8 @@ import {
   recordConsequence, renderConsequences, type ConsequenceRelation,
 } from "./consequence.ts";
 import { observeOrientation, renderOrientation } from "./orient.ts";
+import { buildScopeModel } from "./scope-model.ts";
+import { renderScope } from "./render-scope.ts";
 
 const cmd = process.argv[2];
 const argv = process.argv.slice(3);
@@ -184,6 +186,28 @@ async function doGraph(): Promise<string[]> {
   await writeFile(out("_graph.html"), html);
   const c = graph.nodes.reduce<Record<string, number>>((a, n) => ((a[n.kind] = (a[n.kind] ?? 0) + 1), a), {});
   console.log(`graph: ${c.component ?? 0} components, ${c.file ?? 0} files, ${c.symbol ?? 0} symbols`);
+  return [];
+}
+
+async function doScope(): Promise<string[]> {
+  const graph = await buildGraph(cfg);
+  const promise = await buildPromiseModel(cfg, graph, await readStatus(cfg));
+  const model = buildScopeModel(graph, promise);
+  // Scope's model and renderer deliberately read no clock, checkout path, or browser
+  // state. Exact comparison is therefore the determinism oracle: unlike the older graph
+  // artifact, there is no normalization seam through which meaningful drift can vanish.
+  const json = JSON.stringify(model, null, 2) + "\n";
+  const html = renderScope(model);
+  if (check) {
+    const stale: string[] = [];
+    if (json !== await read(out("scope.json"))) stale.push("scope.json");
+    if (html !== await read(out("_scope.html"))) stale.push("_scope.html");
+    return stale;
+  }
+  await writeOutputs();
+  await writeFile(out("scope.json"), json);
+  await writeFile(out("_scope.html"), html);
+  console.log(`scope: ${model.nodes.length} component(s), center ${model.center ?? "none"} → _scope.html`);
   return [];
 }
 
@@ -317,6 +341,9 @@ if (commandFor(cmd)?.writesArtifacts) {
 if (cmd === "graph") {
   const stale = await doGraph();
   if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "graph current"); await exit(stale.length ? 1 : 0); }
+} else if (cmd === "scope") {
+  const stale = await doScope();
+  if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "scope current"); await exit(stale.length ? 1 : 0); }
 } else if (cmd === "overview") {
   const stale = await doOverview();
   if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "overview current"); await exit(stale.length ? 1 : 0); }

@@ -70,6 +70,7 @@ rendering, and journaling remain independently addressable modules beneath this 
 - defect writes refuse pre-existing symlink redirection
 - defect provenance is data, never terminal control
 - a streamed journal entry renders exactly once across appends and compaction
+- Scope projects the canonical promise population with deterministic gravity and honest absence
 
 ## refutations
 
@@ -92,6 +93,8 @@ rendering, and journaling remain independently addressable modules beneath this 
 - consequence navigation contains only explicit assessed edges: the live blind-handoff trial reconstructed the mission from explicit edges, but `.coherence/consequences/` was ignored, making that successful navigation disappear on clone. The same repository guard now commits a typed edge to a real Git endpoint, clones it, and requires both strict replay and a dangling-free orientation.
 - harness source remains searchable text rather than silently becoming binary: two new render/validation regexes carried literal NUL bytes, and `rg` classified `src/consequence.ts` as binary instead of returning navigable source matches. The ranges now use escaped source notation and the focused guard enumerates every live TypeScript source, so the same byte turns the claim red rather than degrading repository navigation silently.
 - high-frequency lifecycle hooks start without the analysis dependency stack: the live PostToolUse hook failed before reading its event with `ERR_MODULE_NOT_FOUND` for `web-tree-sitter`; the eager chain was `hook-cli → hooks → due → commands → phrasebook → oracle-domain → web-tree-sitter`. `npm ci` repaired the checkout but left the failure class intact. Moving executable phrasebook data injection to the CLI composition root dissolved the eager edge, and the isolated no-`node_modules` runtime canary now passes.
+- Scope projects the canonical promise population with deterministic gravity and honest absence: the first canvas's dark-mode screenshot (2026-09-04) showed black titles over dense white hatch fills, with long labels extending beyond circular nodes. Scope now places text on opaque rounded cards with separate title bars, explicit foreground colors, and isolated status badges. The renderer guard pins those contrast and text-region requirements; browser inspection checks the actual project titles.
+- Scope projects the canonical promise population with deterministic gravity and honest absence: supplied a PromiseModel whose component population exceeded the Graph and a reliance whose target did not exist; the projection previously had enough information to draw a plausible partial canvas. The parity guard now refuses both inputs, while the render guard distinguishes an empty model and a component with no guarantees from a passing component.
 - fast verification rejects a statically vanished Vitest oracle without executing tests: changed `resolveStaticOracle`'s complete zero-match branch from `absent` to `unknown` (2026-08-20), laundering the motivating Mnemion rename into an ordinary fast-tier skip — the focused boundary guard failed and captured the dangerous verdict: `claims: 1 · 0 green · 0 red · 1 skipped`, followed by `✓ coherent`. Restored; the same fixture now reds `VANISHED ORACLE (static)` without Vitest installed or invoked.
 - fast verification rejects a statically vanished Vitest oracle without executing tests: 0.36.2 made incompleteness project-wide, so Mnemion's finite data-driven titles made an unrelated renamed clipboard oracle UNKNOWN forever. Reproduced against current main: renaming the literal clipboard test left fast verify green. The scanner now retains concrete runner names and owner paths from Git `HEAD`; losing a name from a deleted or still-complete former owner reds before unrelated current uncertainty is consulted, while a former owner that itself became dynamic remains UNKNOWN. No prefix guess or partial JavaScript evaluator is allowed to manufacture global completeness.
 - fast oracle absence requires a complete direct-declaration population: before release, conventional files whose tests came only from a bare side-effect import, top-level `import()`, or `require()` each produced `fullNames=[]`, `incomplete=[]`, and `absent`, so fast verification could call a live runtime-owned oracle vanished. Release audit then found the same false absence behind a transitive local Vitest alias and a live `build/live.test.ts`, while a conventional file symlink was followed outside the declared traversal boundary. The scanner now resolves exact alias chains, marks registration-time module loads incomplete, mirrors Vitest v4's `node_modules`/`.git` default exclusions, and refuses every symlink/custom collection surface into UNKNOWN; loads inside test callbacks remain ordinary subject execution.
@@ -195,6 +198,8 @@ rendering, and journaling remain independently addressable modules beneath this 
 - boundary "defect writes refuse pre-existing symlink redirection" at recordDefect via guard "defect containment — pre-existing directory and session symlinks refuse external append targets"
 - boundary "defect provenance is data, never terminal control" at readDefects via guard "defect provenance — commit ids have Git shape and cannot carry terminal controls"
 - boundary "a streamed journal entry renders exactly once across appends and compaction" at tailJournal via guard "tail — an appended record arrives exactly once, a compaction fold re-emits nothing and drops nothing, and a half-written line waits for its bytes"
+- boundary "Scope projects the canonical promise population with deterministic gravity and honest absence" at buildScopeModel via guard "scope model — graph/promise population mismatch refuses rather than drawing partial truth"
+- boundary "Scope projects the canonical promise population with deterministic gravity and honest absence" at renderScope via guard "scope cards — titles have an opaque title bar and explicit contrast, with full text retained in the inspector"
 
 ## why
 
@@ -206,6 +211,14 @@ see nothing else, while the main agent has already shown its report to the user 
 never interrupted by shared-worktree state that may belong to another agent. Main Stop
 keeps the calibration observation and emits no bytes; only SubagentStop carries the
 journal and patch signal forward.
+
+**Scope projects the canonical promise population with deterministic gravity and honest
+absence.** A visualization is especially capable of making missing state look calm: a
+partial component population still forms a convincing picture, and an unmeasured component
+can inherit the visual language of a passing one. Scope therefore receives its subjects
+only from the canonical graph/promise join, refuses when their component populations or
+reliance targets disagree, and serializes stable geometry from that model. The renderer
+may move the viewport but never the project; absence remains visible ink.
 
 **significant behavioral growth acquires an anchor or patch-specific decision.** The cost
 of adding an invariant is immediate while the cost of omitting it appears later, so the

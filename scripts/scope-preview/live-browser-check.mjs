@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import { appendFile, writeFile, rename } from 'node:fs/promises';
+import { join } from 'node:path';
+import { chromium, webkit } from 'playwright';
+import { tmpProject, cleanup, cfg } from '../../test/_helpers.ts';
+import { startScopeServer } from './server.mjs';
+
+const row = (id, title, extra = {}) => ({ id, chose: title, kind: 'decision', session: 'live-fixture', agent: 'fixture', job: '-',
+  at: `2026-09-04T12:00:0${id.length % 10}.000Z`, because: 'Live test evidence', over: [], branch: null, commit: null, dirty: false, ...extra });
+const seed = row('seed', 'Live seed');
+const root = await tmpProject({ '.coherence/decisions/fixture.jsonl': [seed, row('question', 'Live question', { kind: 'conjecture' })].map(r => JSON.stringify(r)).join('\n') + '\n' });
+const live = await startScopeServer({ cfg: cfg(root), htmlPath: new URL('../../public/_scope-library.html', import.meta.url), intervalMs: 40 });
+const engine = process.env.SCOPE_BROWSER_ENGINE === 'webkit' ? webkit : chromium;
+const browser = await engine.launch(engine === chromium && process.env.SCOPE_BROWSER_CHANNEL ? { channel: process.env.SCOPE_BROWSER_CHANNEL } : {});
+try {
+  const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+  page.setDefaultTimeout(8000);
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(live.url);
+  await page.waitForFunction(() => document.querySelector('.feed-status')?.textContent === 'Journal live');
+  await page.getByRole('tab', { name: 'Journal', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Scope session' }).selectOption('live-fixture');
+  await page.getByRole('textbox', { name: 'Search journal' }).fill('Live');
+  await page.locator('.journal-row').filter({ hasText: 'Live seed' }).click();
+  const path = join(root, '.coherence/decisions/fixture.jsonl');
+  await appendFile(path, JSON.stringify(row('added', 'Live appended')) + '\n');
+  await page.waitForFunction(() => document.querySelectorAll('.journal-row').length === 3);
+  assert.equal(await page.locator('.journal-detail h2').innerText(), 'Live seed', 'selected record survives append');
+  assert.equal(await page.getByRole('combobox', { name: 'Scope session' }).inputValue(), 'live-fixture');
+  assert.equal(await page.getByRole('textbox', { name: 'Search journal' }).inputValue(), 'Live');
+  await page.getByRole('button', { name: 'Pause updates' }).click();
+  await appendFile(path, JSON.stringify(row('paused', 'Live while paused')) + '\n');
+  await page.waitForTimeout(400);
+  assert.equal(await page.locator('.journal-row').count(), 3, 'paused display must not repopulate');
+  await page.getByRole('button', { name: 'Resume updates' }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.journal-row').length === 4);
+  await writeFile(join(root, '.coherence/decisions/copy.jsonl'), JSON.stringify(seed) + '\n');
+  await appendFile(path, JSON.stringify(row('answer', 'Live answer', { kind: 'resolution', supersedes: 'question' })) + '\n');
+  await page.waitForFunction(() => document.querySelectorAll('.journal-row').length === 5);
+  await rename(path, join(root, '.coherence/decisions/moved.jsonl'));
+  await page.getByRole('combobox', { name: 'Journal view' }).selectOption('outstanding');
+  await page.locator('.empty-reading').waitFor();
+  await page.getByRole('combobox', { name: 'Journal view' }).selectOption('timeline');
+  live.server.closeAllConnections();
+  await page.waitForFunction(() => document.querySelector('.feed-status')?.textContent.includes('reconnecting'));
+  await appendFile(join(root, '.coherence/decisions/moved.jsonl'), JSON.stringify(row('reconnected', 'Live after reconnect')) + '\n');
+  await page.waitForFunction(() => document.querySelectorAll('.journal-row').length === 6 && document.querySelector('.feed-status')?.textContent === 'Journal live');
+  assert.equal(await page.locator('.journal-detail h2').innerText(), 'Live seed');
+  assert.equal(await page.locator('.journal-row').filter({ hasText: 'Live seed' }).count(), 1, 'compaction must not duplicate displayed records');
+  assert.deepEqual(errors, []);
+  console.log('Live browser checks passed: append, preserved filters and selection, pause/resume, resolution, compaction overlap and reconnect.');
+} finally { await browser.close(); await live.close(); await cleanup(root); }

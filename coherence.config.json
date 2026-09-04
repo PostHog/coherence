@@ -77,6 +77,12 @@
       "reading-surface": "What a human or an agent then reads: public/_*.html, AGENTS.md, CLAUDE.md, the terminal reports. Derived text with no authority of its own; it can mislead, but it cannot turn a red green."
     },
     "transitions": {
+      "renderScope": {
+        "from": "derived-model",
+        "to": "reading-surface",
+        "security": false,
+        "translates": "The canonical Scope projection becomes a self-contained inspection canvas. Repository-authored labels and evidence are escaped; geometry and badges display model facts without grading them. Missing guarantees remain unmeasured, and the title-bar guard protects the named reading surface rather than asserting code safety."
+      },
       "buildGraph": {
         "from": "project-source",
         "to": "derived-model",
@@ -397,6 +403,7 @@
       }
     },
     "nonTransition": {
+      "buildScopeModel": "A pure projection within the derived-model chart: joins the existing graph and promise populations, refuses mismatched subjects or dangling reliance, and derives gravity without a filesystem read or new verdict.",
       "builtinLanguagePacks": "Aggregates the five in-harness pack tables for inspection and the purity oracle. No crossing: harness constants in, harness constants out — it exists so the pack-purity guard has one perimeter to sweep and so conformance checking has a future home.",
       "withTree": "Memory hygiene within the shell chart: owns a parse tree's whole wasm lifetime and frees it in a finally, so node captures cannot outlive their tree and a leak is unrepresentable. No fact crosses a chart here."
     }

@@ -1,0 +1,24 @@
+{
+  "name": "coherence-scope-preview",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "snapshot": "node snapshot.mjs",
+    "serve": "node serve.mjs",
+    "build": "node build.mjs",
+    "test": "node --test *.test.mjs",
+    "test:browser": "node browser-check.mjs",
+    "test:live": "node live-browser-check.mjs"
+  },
+  "dependencies": {
+    "@radix-ui/react-tabs": "1.1.21",
+    "@xyflow/react": "12.11.6",
+    "cytoscape": "3.34.2",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "playwright": "1.62.1"
+  }
+}

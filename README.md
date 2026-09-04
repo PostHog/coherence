@@ -2346,7 +2346,7 @@ both is exactly what drifted.
      edit by hand — add the command to the registry and re-run. Everything OUTSIDE these
      markers is authored prose. -->
 
-_45 commands. This index is derived from the registry the dispatch is checked
+_46 commands. This index is derived from the registry the dispatch is checked
 against (`test/commands.test.ts` enumerates the live `cmd === …` chain and asserts the two
 sets are equal), so it cannot fall behind the CLI. The reasoning for the commands that have
 any is in **In detail** below — that half is authored, and does not cover all of them._
@@ -2354,6 +2354,7 @@ any is in **In detail** below — that half is authored, and does not cover all 
 **Derive the artifacts**
 
 - `coherence graph [--check]` — emit `graph.json` + `_graph.html` (the outline) to `outputDir`
+- `coherence scope [--check]` — emit deterministic `scope.json` + `_scope.html` around the project's center of gravity
 - `coherence overview [--check]` — emit `_overview.html` + `AGENTS.md`
 - `coherence docs [--check]` — graph + overview + this command index; `--check` fails on any stale artifact
 - `coherence claude [--check]` — regenerate the owned fenced block inside `CLAUDE.md`
