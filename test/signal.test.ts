@@ -6,10 +6,10 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import {
   anchorsAddedByChange, attestationFinding, findAttestation, signalState, formatSignal, signal, type ChangeSignal,
-} from "../src/signal.ts";
+} from "../src/diagnostics/signal.ts";
 import { loadConfig } from "../src/config.ts";
-import type { DecisionRecord } from "../src/decisions.ts";
-import type { NoveltyVerdict } from "../src/novelty.ts";
+import type { DecisionRecord } from "../src/evidence/decisions.ts";
+import type { NoveltyVerdict } from "../src/diagnostics/novelty.ts";
 import { tmpProject, cleanup, runCaptured, graph, comp } from "./_helpers.ts";
 
 const verdict = (level: NoveltyVerdict["level"]): NoveltyVerdict => ({ level, surface: 12, proviso: false });

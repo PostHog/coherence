@@ -1,5 +1,5 @@
 // sinks-python.test.ts — the PYTHON GRADE of the interpolation-surface ratchet
-// (src/lint-sinks.ts, header: PYTHON GRADE). The JS path reads `${…}` template-literal
+// (src/diagnostics/lint-sinks.ts, header: PYTHON GRADE). The JS path reads `${…}` template-literal
 // interpolations; this pins that a `.py` f-string flows through the SAME machinery:
 //   · a `{expr}` inside a SQL-shaped f-string is a `sql-ident` site — python's sql signal
 //     is the literal's own text (select…from), because the f-string's delimiters consume
@@ -13,7 +13,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { lintSinks } from "../src/lint-sinks.ts";
+import { lintSinks } from "../src/diagnostics/lint-sinks.ts";
 import { tmpProject, cleanup, cfg, runCaptured } from "./_helpers.ts";
 
 test("python sinks — an f-string into a SQL context is a site, a safe-pattern expression is not, and the ratchet reds the new site", async (t) => {

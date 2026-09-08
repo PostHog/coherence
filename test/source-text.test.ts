@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { sourceTextIsNavigable } from "../src/tree.ts";
+import { sourceTextIsNavigable } from "../src/derivation/tree.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SOURCE = join(ROOT, "src");

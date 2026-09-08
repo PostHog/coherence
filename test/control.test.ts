@@ -13,10 +13,10 @@ import {
   lifecycleHookCommand,
   managedLifecycleEvent,
   setLifecycleHook,
-} from "../src/control.ts";
-import { checkHooks } from "../src/hooks.ts";
+} from "../src/lifecycle/control.ts";
+import { checkHooks } from "../src/lifecycle/hooks.ts";
 import { loadConfig } from "../src/config.ts";
-import { openSession } from "../src/decisions.ts";
+import { openSession } from "../src/evidence/decisions.ts";
 import { cfg, cleanup, runCaptured, tmpProject } from "./_helpers.ts";
 
 type Json = Record<string, any>;

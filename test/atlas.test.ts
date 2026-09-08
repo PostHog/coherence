@@ -5,7 +5,7 @@
 // empty over-claim that fails-closed (`atlas --check` reds instead of rendering tier-1).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { atlas } from "../src/atlas.ts";
+import { atlas } from "../src/diagnostics/atlas.ts";
 import { graph, comp, cfg, tmpProject, cleanup, runCaptured } from "./_helpers.ts";
 import type { Config } from "../src/types.ts";
 
@@ -118,10 +118,10 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
-import { crossingHeat, heatCell } from "../src/atlas.ts";
-import { _resetEvolutionMemo, type Commit } from "../src/evolution.ts";
+import { crossingHeat, heatCell } from "../src/diagnostics/atlas.ts";
+import { _resetEvolutionMemo, type Commit } from "../src/diagnostics/evolution.ts";
 import { sym } from "./_helpers.ts";
-import type { StatusRecord } from "../src/status.ts";
+import type { StatusRecord } from "../src/evidence/status.ts";
 
 const commit = (hash: string, files: string[]): Commit => ({ hash, subject: hash, files });
 

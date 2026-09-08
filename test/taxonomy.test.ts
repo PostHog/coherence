@@ -6,11 +6,11 @@ import { execFileSync } from "node:child_process";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { TAXONOMY, LAB_TAXONOMY } from "../src/taxonomy-catalog.ts";
-import { captureTaxonomy, classifyTaxonomy, profileTaxonomy, resolveTaxonomySubject, taxonomyStaleness, taxonomyHash } from "../src/taxonomy.ts";
-import { recordTaxonomy, readTaxonomyRecords, taxonomyView } from "../src/taxonomy-ledger.ts";
-import { runTaxonomyCommand } from "../src/taxonomy-cli.ts";
-import { buildGraph } from "../src/derive.ts";
+import { TAXONOMY, LAB_TAXONOMY } from "../src/taxonomy/taxonomy-catalog.ts";
+import { captureTaxonomy, classifyTaxonomy, profileTaxonomy, resolveTaxonomySubject, taxonomyStaleness, taxonomyHash } from "../src/taxonomy/taxonomy.ts";
+import { recordTaxonomy, readTaxonomyRecords, taxonomyView } from "../src/taxonomy/taxonomy-ledger.ts";
+import { runTaxonomyCommand } from "../src/taxonomy/taxonomy-cli.ts";
+import { buildGraph } from "../src/derivation/derive.ts";
 import { tmpProject, cfg, cleanup } from "./_helpers.ts";
 
 const fixture = {

@@ -1,4 +1,4 @@
-// economy.test.ts — THE CONTEXT CLOSURE (src/economy.ts): what a reader must load to
+// economy.test.ts — THE CONTEXT CLOSURE (src/diagnostics/economy.ts): what a reader must load to
 // change one thing safely. Two layers, the split decompose.ts's header sets out and
 // evolution.ts's repeats, because injection is blind exactly where the git plumbing is:
 //   1. the closure math — adjacency, closure, median/p90, the trend orientation, the hub
@@ -20,9 +20,9 @@ import { join, dirname } from "node:path";
 import {
   economy, importAdjacency, closureOf, economyStats, closureSeries, fileAttribution,
   economyFindings, type Closure,
-} from "../src/economy.ts";
-import { _resetEvolutionMemo, type Commit } from "../src/evolution.ts";
-import type { StatusRecord } from "../src/status.ts";
+} from "../src/diagnostics/economy.ts";
+import { _resetEvolutionMemo, type Commit } from "../src/diagnostics/evolution.ts";
+import type { StatusRecord } from "../src/evidence/status.ts";
 import { cfg, cleanup, comp, fileNode, graph, imp, runCaptured, tmpProject } from "./_helpers.ts";
 
 const commit = (hash: string, files: string[], subject = hash): Commit => ({ hash, subject, files });

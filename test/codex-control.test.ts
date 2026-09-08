@@ -22,7 +22,7 @@ import {
   resolveCodexProjectRoot,
   setLifecycleHook,
   setLifecycleHookForHost,
-} from "../src/control.ts";
+} from "../src/lifecycle/control.ts";
 import { cfg, cleanup, tmpProject } from "./_helpers.ts";
 
 type Json = Record<string, any>;

@@ -17,11 +17,11 @@
 // test. 10 pass / 3 fail, each control firing its own test and no other.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseSpec } from "../src/walk.ts";
-import { mergeClaimRecords, type ClaimRecord } from "../src/status.ts";
-import { runVerify } from "../src/verify.ts";
-import { parseBoundary } from "../src/boundary.ts";
-import { renderClaude } from "../src/render-claude.ts";
+import { parseSpec } from "../src/derivation/walk.ts";
+import { mergeClaimRecords, type ClaimRecord } from "../src/evidence/status.ts";
+import { runVerify } from "../src/verification/verify.ts";
+import { parseBoundary } from "../src/verification/boundary.ts";
+import { renderClaude } from "../src/readings/render-claude.ts";
 import { tmpProject, cleanup, runCaptured, cfg, comp, graph } from "./_helpers.ts";
 
 const rec = (claim: string, kind: ClaimRecord["kind"], o: Partial<ClaimRecord> = {}): ClaimRecord =>

@@ -14,8 +14,8 @@
 // names are architecture; per-machine deployment values are not.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildGraph } from "../src/derive.ts";
-import { renderOverview } from "../src/render-overview.ts";
+import { buildGraph } from "../src/derivation/derive.ts";
+import { renderOverview } from "../src/readings/render-overview.ts";
 import type { Graph } from "../src/types.ts";
 import { cfg, cleanup, tmpProject } from "./_helpers.ts";
 

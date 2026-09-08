@@ -4,11 +4,11 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFile, symlink, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { runVerify } from "../src/verify.ts";
+import { runVerify } from "../src/verification/verify.ts";
 import {
   indexStaticVitestOracles,
   resolveStaticOracle,
-} from "../src/static-oracles.ts";
+} from "../src/verification/static-oracles.ts";
 import { cfg, cleanup, comp, graph, runCaptured, sym, tmpProject } from "./_helpers.ts";
 
 const vitestCfg = (root: string) => cfg(root, { test: ["npx", "vitest", "-t"], oracleDomain: false });

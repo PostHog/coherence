@@ -1,4 +1,4 @@
-// floor.test.ts — the NON-VACUITY FLOOR and the adoption on-ramp (src/floor.ts).
+// floor.test.ts — the NON-VACUITY FLOOR and the adoption on-ramp (src/verification/floor.ts).
 //
 // The defect the floor closes, reproduced by hand twice before it existed (2026-07-31):
 // gut `buildGraph` to return an empty graph and verify printed `claims: 0 · 0 green ·
@@ -17,9 +17,9 @@ import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { runVerify, neverRedRank } from "../src/verify.ts";
-import { readSurface, vacuityRefusal, ratchetVacuityRefusal, adoptionLadder, readJsonOrRefuse, Unrunnable } from "../src/floor.ts";
-import type { StatusRecord } from "../src/status.ts";
+import { runVerify, neverRedRank } from "../src/verification/verify.ts";
+import { readSurface, vacuityRefusal, ratchetVacuityRefusal, adoptionLadder, readJsonOrRefuse, Unrunnable } from "../src/verification/floor.ts";
+import type { StatusRecord } from "../src/evidence/status.ts";
 import { commandFor, dispatchTokens } from "../src/commands.ts";
 import { tmpProject, cleanup, runCaptured, cfg, comp, sym, graph } from "./_helpers.ts";
 

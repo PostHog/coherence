@@ -4,9 +4,9 @@ import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { closeWork, createWork, transitionWork } from "../src/work.ts";
-import { appendDecision } from "../src/decisions.ts";
-import { observeOrientation, renderOrientation } from "../src/orient.ts";
+import { closeWork, createWork, transitionWork } from "../src/coordination/work.ts";
+import { appendDecision } from "../src/evidence/decisions.ts";
+import { observeOrientation, renderOrientation } from "../src/coordination/orient.ts";
 import { cfg, cleanup, tmpProject } from "./_helpers.ts";
 
 const authority = { kind: "user-directed" as const, grantedBy: "user", boundary: "build the requested gyroscope" };

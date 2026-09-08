@@ -7,8 +7,8 @@
 // unchanged: declared parity suppresses, and high-df idiom tokens never pair.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { analyzeParityOracle } from "../src/oracle-domain.ts";
-import { collectSites, pairSites, shownPairs, declaredParitySymbols } from "../src/redundancy.ts";
+import { analyzeParityOracle } from "../src/verification/oracle-domain.ts";
+import { collectSites, pairSites, shownPairs, declaredParitySymbols } from "../src/diagnostics/redundancy.ts";
 import { tmpProject, cleanup, cfg, graph, comp } from "./_helpers.ts";
 
 test("python parity — a .py oracle that iterates the live domain passes; a literal list fails; a vanished oracle cannot pass", async () => {

@@ -107,7 +107,7 @@ try {
   const consumerCommit = run(git, ["rev-parse", "HEAD"], { cwd: consumer }).stdout.trim();
 
   const installed = join(consumer, "node_modules", "@danilocampos", "coherence");
-  assert.equal(existsSync(join(installed, "dist", "defects.js")), true, "packed dist/defects.js is absent");
+  assert.equal(existsSync(join(installed, "dist/evidence/defects.js")), true, "packed dist/evidence/defects.js is absent");
   assert.equal(existsSync(join(installed, "dist", "cli.js")), true, "packed dist/cli.js is absent");
   assert.equal(existsSync(join(installed, "dist", "hook-cli.js")), true, "packed dist/hook-cli.js is absent");
   const coherence = join(consumer, "node_modules", ".bin", "coherence");

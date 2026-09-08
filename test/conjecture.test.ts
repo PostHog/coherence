@@ -22,8 +22,8 @@ import {
   appendDecision, readJournal, resolve, renderJournal, newSessionId, resolvableConjecture,
   withInstrumentCandidate, readsAsInstrumentDoubt, INSTRUMENT_CANDIDATE, INSTRUMENT_MARKER,
   LABEL_SOFT_MAX,
-} from "../src/decisions.ts";
-import { agentInstructions, stopReport } from "../src/hooks.ts";
+} from "../src/evidence/decisions.ts";
+import { agentInstructions, stopReport } from "../src/lifecycle/hooks.ts";
 import { runCaptured, cleanup } from "./_helpers.ts";
 import type { Config } from "../src/types.ts";
 

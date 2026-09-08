@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyzeDecisionPositions } from "../src/decision-position.ts";
-import type { DecisionAuthority, DecisionRecord } from "../src/decisions.ts";
+import { analyzeDecisionPositions } from "../src/evidence/decision-position.ts";
+import type { DecisionAuthority, DecisionRecord } from "../src/evidence/decisions.ts";
 
 function decision(id: string, subject: string | undefined, chose: string, authority?: DecisionAuthority): DecisionRecord {
   return {

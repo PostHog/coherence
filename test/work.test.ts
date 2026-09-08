@@ -20,7 +20,7 @@ import {
   workSessionPath,
   type CreateWorkInput,
   type WorkRecord,
-} from "../src/work.ts";
+} from "../src/coordination/work.ts";
 import { cfg, cleanup, tmpProject } from "./_helpers.ts";
 
 const T = (n: number) => `2026-08-20T12:${String(n).padStart(2, "0")}:00.000Z`;

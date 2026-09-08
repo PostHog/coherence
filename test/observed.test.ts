@@ -22,11 +22,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { readJournal, resolve, renderJournal, newSessionId, appendDecision, readsAsInstrumentDoubt } from "../src/decisions.ts";
+import { readJournal, resolve, renderJournal, newSessionId, appendDecision, readsAsInstrumentDoubt } from "../src/evidence/decisions.ts";
 import {
   recordObservation, formatObserved, priorFor, isOutsideBand, observationText,
   type Observation,
-} from "../src/observed.ts";
+} from "../src/evidence/observed.ts";
 import { cleanup } from "./_helpers.ts";
 import type { Config } from "../src/types.ts";
 

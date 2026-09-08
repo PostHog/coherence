@@ -3,7 +3,7 @@
 // null, never clobber) a file that hasn't opted in by carrying the markers.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spliceBlock, extractBlock, renderClaude, resolveClaudeMdPath, CLAUDE_BEGIN, CLAUDE_END } from "../src/render-claude.ts";
+import { spliceBlock, extractBlock, renderClaude, resolveClaudeMdPath, CLAUDE_BEGIN, CLAUDE_END } from "../src/readings/render-claude.ts";
 import { graph, comp, sym, cfg } from "./_helpers.ts";
 
 test("spliceBlock — refuses (null) a file with no fence markers (never clobber)", () => {
@@ -93,7 +93,7 @@ test("renderClaude — emits a fenced block carrying the boundary table derived 
 test("renderClaude — a `via guard` boundary appears in the invariants table with its oracle (grammar is via (test|guard), not test-only)", () => {
   // Regression pin: render-claude once carried a private BOUNDARY_RE that matched
   // `via test` ONLY, so guard-anchored boundaries silently vanished from the table
-  // AND the boundary-claim count. The shared grammar in src/boundary.ts fixes both.
+  // AND the boundary-claim count. The shared grammar in src/verification/boundary.ts fixes both.
   const g = graph([
     comp(".", {
       label: "Hive",

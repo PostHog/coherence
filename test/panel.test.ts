@@ -5,8 +5,8 @@
 // shell over these; what can rot is here.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildModel, lightFor, humanAge, wrapText, renderFrame, initialUI, mastheadHeight } from "../src/panel.ts";
-import type { StatusRecord, ClaimRecord } from "../src/status.ts";
+import { buildModel, lightFor, humanAge, wrapText, renderFrame, initialUI, mastheadHeight } from "../src/readings/panel.ts";
+import type { StatusRecord, ClaimRecord } from "../src/evidence/status.ts";
 import { comp, graph } from "./_helpers.ts";
 
 const NOW = new Date("2026-07-10T12:00:00.000Z");

@@ -2,6 +2,7 @@ import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { layoutScope } from './layout.mjs';
+import { scopeScene } from './scene.mjs';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const input = new URL('../../public/scope.json', import.meta.url);
@@ -10,9 +11,9 @@ const model = JSON.parse(await readFile(input, 'utf8'));
 const readings = JSON.parse(await readFile(new URL('../../public/scope-readings.json', import.meta.url), 'utf8'));
 // Saved geometry is auditable independently of the browser. Interactive controls
 // are explicitly a local view, not a mutation of the canonical snapshot.
-const initial = layoutScope(model);
+const initial = layoutScope(scopeScene(model).model);
 const result = await build({ absWorkingDir: here, entryPoints: ['app.jsx'], bundle: true,
-  write: false, outfile: 'preview.js', minify: true, legalComments: 'inline',
+  write: false, outfile: 'preview.js', minify: true, legalComments: 'inline', jsx: 'automatic',
   define: { 'process.env.NODE_ENV': '"production"' },
 });
 const js = result.outputFiles.find(f => f.path.endsWith('.js')).text;

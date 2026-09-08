@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import {
   surfaceOfSource, surfaceSignals, noveltyVerdict, isTestPath, scanSurface,
   type FileSurface,
-} from "../src/novelty.ts";
+} from "../src/diagnostics/novelty.ts";
 import { tmpProject, cleanup } from "./_helpers.ts";
 
 const fs = (exports: string[] = [], domains: Array<[string, string[]]> = []): FileSurface => ({

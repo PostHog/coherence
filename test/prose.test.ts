@@ -16,7 +16,7 @@ import {
   normalizeWords, shinglesOf, unitsFromLines, proseOfMarkdown, headerLines, proseOfHeader,
   pairProse, unitSubject, prosePairSubject, proseFindings, renderProse, shownProse,
   collectProse, prose, PROSE_DEFAULTS, SHINGLE, type ProseUnit,
-} from "../src/prose.ts";
+} from "../src/diagnostics/prose.ts";
 import { tmpProject, cleanup, cfg, runCaptured } from "./_helpers.ts";
 
 const u = (file: string, text: string, line = 1): ProseUnit =>

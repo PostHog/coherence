@@ -11,8 +11,8 @@ import { fileURLToPath } from "node:url";
 import { tmpProject, cleanup, cfg } from "./_helpers.ts";
 import {
   HOOK_TEXT_DIR, hookTextPaths, readHookText, substituteHookTokens, composeHookText,
-} from "../src/hook-text.ts";
-import { agentInstructions } from "../src/hooks.ts";
+} from "../src/lifecycle/hook-text.ts";
+import { agentInstructions } from "../src/lifecycle/hooks.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..");

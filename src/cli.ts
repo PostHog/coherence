@@ -11,65 +11,65 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { loadConfig } from "./config.ts";
-import { buildGraph } from "./derive.ts";
-import { renderOutline } from "./render-outline.ts";
-import { renderOverview } from "./render-overview.ts";
-import { renderClaude, spliceBlock, extractBlock, resolveClaudeMdPath, CLAUDE_BEGIN, CLAUDE_END } from "./render-claude.ts";
+import { buildGraph } from "./derivation/derive.ts";
+import { renderOutline } from "./readings/render-outline.ts";
+import { renderOverview } from "./readings/render-overview.ts";
+import { renderClaude, spliceBlock, extractBlock, resolveClaudeMdPath, CLAUDE_BEGIN, CLAUDE_END } from "./readings/render-claude.ts";
 import { renderCommandsBlock, renderPhrasebookBlock, usageBanner, commandFor, COMMANDS_BEGIN, COMMANDS_END, PHRASEBOOK_BEGIN, PHRASEBOOK_END } from "./commands.ts";
-import { runVerify, applyVerdicts } from "./verify.ts";
-import { decompose } from "./decompose.ts";
-import { drift } from "./drift.ts";
+import { runVerify, applyVerdicts } from "./verification/verify.ts";
+import { decompose } from "./diagnostics/decompose.ts";
+import { drift } from "./diagnostics/drift.ts";
 import { scaffold } from "./scaffold.ts";
-import { structuralLog, changedFiles, affectedComponents } from "./structural.ts";
-import { lintSinks } from "./lint-sinks.ts";
-import { conventions } from "./conventions.ts";
-import { mass } from "./mass.ts";
-import { atlas } from "./atlas.ts";
-import { contracts } from "./contracts.ts";
-import { whyLint } from "./why-lint.ts";
-import { runPanel } from "./panel.ts";
-import { buildPromiseModel } from "./promise.ts";
-import { renderContract } from "./render-contract.ts";
-import { readStatus } from "./status.ts";
-import { readSurface, vacuityRefusal, Unrunnable } from "./floor.ts";
-import { CLAIM_FORMS, loadDictionary } from "./phrasebook.ts";
+import { structuralLog, changedFiles, affectedComponents } from "./diagnostics/structural.ts";
+import { lintSinks } from "./diagnostics/lint-sinks.ts";
+import { conventions } from "./diagnostics/conventions.ts";
+import { mass } from "./diagnostics/mass.ts";
+import { atlas } from "./diagnostics/atlas.ts";
+import { contracts } from "./diagnostics/contracts.ts";
+import { whyLint } from "./diagnostics/why-lint.ts";
+import { runPanel } from "./readings/panel.ts";
+import { buildPromiseModel } from "./readings/promise.ts";
+import { renderContract } from "./readings/render-contract.ts";
+import { readStatus } from "./evidence/status.ts";
+import { readSurface, vacuityRefusal, Unrunnable } from "./verification/floor.ts";
+import { CLAIM_FORMS, loadDictionary } from "./verification/phrasebook.ts";
 import {
   appendDecision, renderJournal, readJournal, resolvableConjecture, compactJournal,
   type DecisionAuthority, type DecisionScope,
-} from "./decisions.ts";
-import { runJournal } from "./journal.ts";
-import { DefectLedgerError, readDefects, recordDefect, renderDefects } from "./defects.ts";
+} from "./evidence/decisions.ts";
+import { runJournal } from "./evidence/journal.ts";
+import { DefectLedgerError, readDefects, recordDefect, renderDefects } from "./evidence/defects.ts";
 import {
   closeExperiment, createExperiment, experimentStats, readExperiments, renderExperiments,
   ExperimentLedgerError,
   type ExperimentActionResult, type ExperimentCriterionResult, type ExperimentLedger,
-} from "./experiment.ts";
-import { recordObservation, formatObserved } from "./observed.ts";
-import { printHooks, reviewHooks, reportHooks, checkHooks, installHooks, uninstallHooks, runHook } from "./hooks.ts";
-import type { HookHost } from "./control.ts";
-import { redundancy } from "./redundancy.ts";
-import { prose } from "./prose.ts";
-import { economy } from "./economy.ts";
-import { signal } from "./signal.ts";
-import { regulate } from "./regulate.ts";
-import { formatDoctrine } from "./doctrine.ts";
-import { contextFromProject, renderContext } from "./context.ts";
-import { premise } from "./premise.ts";
-import { calibrate, type CalibrationOutcome } from "./calibration.ts";
-import { buildIndexModel, INDEX_HTML, INDEX_JSON } from "./index-model.ts";
-import { renderIndex, formatIndexSummary } from "./render-index.ts";
+} from "./evidence/experiment.ts";
+import { recordObservation, formatObserved } from "./evidence/observed.ts";
+import { printHooks, reviewHooks, reportHooks, checkHooks, installHooks, uninstallHooks, runHook } from "./lifecycle/hooks.ts";
+import type { HookHost } from "./lifecycle/control.ts";
+import { redundancy } from "./diagnostics/redundancy.ts";
+import { prose } from "./diagnostics/prose.ts";
+import { economy } from "./diagnostics/economy.ts";
+import { signal } from "./diagnostics/signal.ts";
+import { regulate } from "./coordination/regulate.ts";
+import { formatDoctrine } from "./coordination/doctrine.ts";
+import { contextFromProject, renderContext } from "./readings/context.ts";
+import { premise } from "./diagnostics/premise.ts";
+import { calibrate, type CalibrationOutcome } from "./diagnostics/calibration.ts";
+import { buildIndexModel, INDEX_HTML, INDEX_JSON } from "./readings/index-model.ts";
+import { renderIndex, formatIndexSummary } from "./readings/render-index.ts";
 import {
   closeWork, createWork, handoffWork, renderWork, transitionWork, WorkLedgerError,
   type WorkAuthorityKind, type WorkRisk, type WorkState,
-} from "./work.ts";
+} from "./coordination/work.ts";
 import {
   ConsequenceLedgerError, CONSEQUENCE_RELATIONS, parseConsequenceRef,
   recordConsequence, renderConsequences, type ConsequenceRelation,
-} from "./consequence.ts";
-import { observeOrientation, renderOrientation } from "./orient.ts";
-import { buildScopeModel } from "./scope-model.ts";
-import { renderScope } from "./render-scope.ts";
-import { runTaxonomyCommand } from "./taxonomy-cli.ts";
+} from "./coordination/consequence.ts";
+import { observeOrientation, renderOrientation } from "./coordination/orient.ts";
+import { buildScopeModel } from "./readings/scope-model.ts";
+import { renderScope } from "./readings/render-scope.ts";
+import { runTaxonomyCommand } from "./taxonomy/taxonomy-cli.ts";
 
 const cmd = process.argv[2];
 const argv = process.argv.slice(3);
@@ -193,7 +193,7 @@ async function doGraph(): Promise<string[]> {
 async function doScope(): Promise<string[]> {
   const graph = await buildGraph(cfg);
   const promise = await buildPromiseModel(cfg, graph, await readStatus(cfg));
-  const model = buildScopeModel(graph, promise);
+  const model = buildScopeModel(graph, promise, cfg);
   // Scope's model and renderer deliberately read no clock, checkout path, or browser
   // state. Exact comparison is therefore the determinism oracle: unlike the older graph
   // artifact, there is no normalization seam through which meaningful drift can vanish.
@@ -1266,7 +1266,7 @@ if (cmd === "taxonomy") {
   // The claim grammar, rendered straight from the CLAIM_FORMS registry — the generated
   // authority behind the README's hand-kept table. A line matching no form is SKIPPED
   // (dialect gap), never red — so a typo'd verb is a silent no-op; check verify's skipped count.
-  console.log("The claim phrasebook — the `## works when` grammar (src/phrasebook.ts).");
+  console.log("The claim phrasebook — the `## works when` grammar (src/verification/phrasebook.ts).");
   console.log("First match wins; the order below is the precedence. A line matching none is skipped (dialect gap).\n");
   for (const f of CLAIM_FORMS) {
     console.log(`● ${f.name}  [${f.tier}]`);

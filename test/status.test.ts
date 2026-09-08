@@ -6,11 +6,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { mergeClaimRecords, readStatus, recordVerify, recordAtlas, recordMass, type ClaimRecord } from "../src/status.ts";
+import { mergeClaimRecords, readStatus, recordVerify, recordAtlas, recordMass, type ClaimRecord } from "../src/evidence/status.ts";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { readFile, mkdir, readdir } from "node:fs/promises";
-import { runVerify } from "../src/verify.ts";
+import { runVerify } from "../src/verification/verify.ts";
 import { tmpProject, cleanup, runCaptured, cfg, comp, graph } from "./_helpers.ts";
 
 const rec = (node: string, claim: string, kind: ClaimRecord["kind"], o: Partial<ClaimRecord> = {}): ClaimRecord =>
@@ -18,7 +18,7 @@ const rec = (node: string, claim: string, kind: ClaimRecord["kind"], o: Partial<
 
 test("status publication — concurrent processes preserve independent reports and readers see complete JSON", async () => {
   const root = await tmpProject({ ".coherence/status.json": '{"version":1}\n' });
-  const module = new URL("../src/status.ts", import.meta.url).href;
+  const module = new URL("../src/evidence/status.ts", import.meta.url).href;
   const helper = new URL("./_helpers.ts", import.meta.url).href;
   const source = (kind: string) => `import {recordAtlas,recordMass,recordVerify,recordDrift,recordEconomy} from ${JSON.stringify(module)}; import {cfg} from ${JSON.stringify(helper)};
     for(let i=0;i<12;i++) { const c=cfg(process.cwd()); if(${JSON.stringify(kind)}==="atlas")

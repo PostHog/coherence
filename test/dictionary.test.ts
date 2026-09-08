@@ -13,9 +13,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { runVerify } from "../src/verify.ts";
-import { loadDictionary } from "../src/phrasebook.ts";
-import { renderOverview } from "../src/render-overview.ts";
+import { runVerify } from "../src/verification/verify.ts";
+import { loadDictionary } from "../src/verification/phrasebook.ts";
+import { renderOverview } from "../src/readings/render-overview.ts";
 import { tmpProject, cleanup, runCaptured, cfg, comp, sym, graph } from "./_helpers.ts";
 
 const withProject = async (files: Record<string, string>, fn: (root: string) => Promise<void>) => {

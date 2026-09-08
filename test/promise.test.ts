@@ -6,13 +6,13 @@
 // status file); the IO readers (zones off a spec) run against a temp project.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseBoundary, normalizeBoundaryClaim, claimKey, type ClaimKey } from "../src/boundary.ts";
-import { parseZones } from "../src/walk.ts";
-import { CLAIM_FORMS } from "../src/phrasebook.ts";
-import { assemblePromiseModel, deriveGates, residenceOf, readZones } from "../src/promise.ts";
-import type { Zone } from "../src/promise-model.ts";
-import type { ClaimRecord, StatusRecord } from "../src/status.ts";
-import type { FileStat } from "../src/tree.ts";
+import { parseBoundary, normalizeBoundaryClaim, claimKey, type ClaimKey } from "../src/verification/boundary.ts";
+import { parseZones } from "../src/derivation/walk.ts";
+import { CLAIM_FORMS } from "../src/verification/phrasebook.ts";
+import { assemblePromiseModel, deriveGates, residenceOf, readZones } from "../src/readings/promise.ts";
+import type { Zone } from "../src/readings/promise-model.ts";
+import type { ClaimRecord, StatusRecord } from "../src/evidence/status.ts";
+import type { FileStat } from "../src/derivation/tree.ts";
 import { comp, fileNode, imp, graph, cfg, tmpProject, cleanup } from "./_helpers.ts";
 
 const EMPTY: StatusRecord = { version: 1 };

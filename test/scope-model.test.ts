@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildScopeModel } from "../src/scope-model.ts";
-import type { PromiseComponent, PromiseGate, PromiseModel } from "../src/promise-model.ts";
+import { buildScopeModel } from "../src/readings/scope-model.ts";
+import type { PromiseComponent, PromiseGate, PromiseModel } from "../src/readings/promise-model.ts";
 import type { Graph } from "../src/types.ts";
 
 const gate = (inv: string, crossing: PromiseGate["crossing"] = null): PromiseGate => ({
@@ -50,6 +50,27 @@ test("scope model — canonical component, reliance, and guarantee populations s
   assert.equal(scope.nodes[1].mass.inboundReliance, 1);
 });
 
+test("scope model — original spec explanation and unanchored declarations survive projection", () => {
+  const input = fixture([component("api")]);
+  const spec = {
+    prose: "An architectural paragraph.\n\nAnother paragraph, unchanged.",
+    why: "**authenticate.** Because access matters.\n\nUnmatched rationale remains available.",
+    invariants: ["authenticate", "unanchored"],
+    refutations: ["authenticate: removed check; test red", "unmatched observation"],
+    claims: ['boundary "authenticate" at auth via guard "auth test"', "config exists at this node"],
+    claimKinds: { "config exists at this node": "structural" },
+  };
+  Object.assign(input.graph.nodes[0], spec);
+  const scope = buildScopeModel(input.graph, input.promise);
+  for (const key of Object.keys(spec) as (keyof typeof spec)[])
+    assert.deepEqual(scope.nodes[0][key], spec[key], key);
+  assert.equal(scope.nodes[0].intent, input.promise.components[0].intent);
+  assert.deepEqual(scope.guarantees, [], "authored declarations never manufacture evidence");
+  const empty = fixture([component("empty")]);
+  const emptyScope = buildScopeModel(empty.graph, empty.promise);
+  assert.deepEqual(JSON.parse(JSON.stringify(emptyScope)), emptyScope, "absent spec fields survive JSON transport unchanged");
+});
+
 test("scope model — graph/promise population mismatch refuses rather than drawing partial truth", () => {
   const input = fixture([component("api"), component("core")]);
   input.graph.nodes.pop();
@@ -57,6 +78,50 @@ test("scope model — graph/promise population mismatch refuses rather than draw
 
   const dangling = fixture([component("api", { relies: [{ to: "missing", crossing: null, via: null }] })]);
   assert.throws(() => buildScopeModel(dangling.graph, dangling.promise), /reliance target is not a component/);
+});
+
+test("scope semantics — containment and atlas meanings preserve ownership without inventing dependencies or verdicts", () => {
+  const input = fixture([component("."), component("core", { gates: [gate("checked")] }), component("other")]);
+  input.graph.nodes.find(n => n.id === "c:core")!.parent = "c:.";
+  input.graph.nodes.push(
+    { id: "f:core.ts", kind: "file", label: "core.ts", parent: "c:core" },
+    { id: "s:core.ts#checkedAt", kind: "symbol", label: "checkedAt", parent: "f:core.ts" },
+    { id: "f:other.ts", kind: "file", label: "other.ts", parent: "c:other" },
+    { id: "s:core.ts#ambiguous", kind: "symbol", label: "ambiguous", parent: "f:core.ts" },
+    { id: "s:other.ts#ambiguous", kind: "symbol", label: "ambiguous", parent: "f:other.ts" },
+  );
+  const atlas = { charts: { source: "Untrusted text", verdict: "Permitted conclusion" }, transitions: {
+    checkedAt: { from: "source", to: "verdict", translates: "Exact authored meaning.", security: true },
+    ambiguous: { from: "source", to: "verdict", translates: "Do not guess an owner." },
+    absent: { from: "source", to: "verdict", translates: "Keep unresolved declarations." },
+  } };
+  const model = buildScopeModel(input.graph, input.promise, { atlas });
+  assert.deepEqual(model.containment, [{ parent: ".", child: "core" }]);
+  assert.deepEqual(model.charts, atlas.charts);
+  const declared = model.transitions.find(t => t.symbol === "checkedAt")!;
+  assert.equal(declared.component, "core");
+  assert.equal(declared.translates, atlas.transitions.checkedAt.translates);
+  assert.deepEqual(declared.guarantees, ["g:core:0"]);
+  assert.equal(model.transitions.find(t => t.symbol === "ambiguous")!.component, null);
+  assert.match(model.transitions.find(t => t.symbol === "ambiguous")!.ownerWhy!, /AMBIGUOUS/);
+  assert.equal(model.transitions.find(t => t.symbol === "absent")!.component, null);
+  assert.deepEqual(model.relations, [], "neither containment nor atlas charts fabricate an import");
+  assert.equal(model.guarantees.length, 1, "declared semantics do not manufacture guarantees");
+  input.graph.nodes.find(n => n.id === "c:core")!.parent = "c:missing";
+  assert.throws(() => buildScopeModel(input.graph, input.promise, { atlas }), /containment parent/);
+});
+
+test("scope roles — declared test imports are not runtime gravity or proof of a named oracle", () => {
+  const input = fixture([component(".", { mass: { files: 0, lines: 0 } }),
+    component("core"), component("test", { mass: { files: 100, lines: 10000 }, relies: [{ to: "core", crossing: null, via: null }] })]);
+  input.graph.nodes.find(n => n.id === "c:core")!.parent = "c:.";
+  const model = buildScopeModel(input.graph, input.promise, { testDir: "test" });
+  assert.equal(model.nodes.find(n => n.id === ".")!.role, "project");
+  assert.equal(model.nodes.find(n => n.id === "test")!.role, "evidence");
+  assert.equal(model.center, "core");
+  assert.equal(model.relations[0].kind, "evidence-import");
+  assert.deepEqual(model.guarantees, [], "importing an implementation proves no guarantee");
+  assert.equal(buildScopeModel(input.graph, input.promise).nodes.find(n => n.id === "test")!.role, "assembly", "without testDir, the name is not a classification");
 });
 
 test("scope model — weighted graph medoid puts the project's mass at the center", () => {
@@ -75,7 +140,7 @@ test("scope model — weighted graph medoid puts the project's mass at the cente
 test("scope model — empty, single, disconnected, and cyclic populations have honest stable geometry", () => {
   const empty = fixture([]);
   assert.deepEqual(buildScopeModel(empty.graph, empty.promise), {
-    root: "fixture", center: null, nodes: [], relations: [], guarantees: [],
+    root: "fixture", center: null, nodes: [], relations: [], guarantees: [], containment: [], charts: null, transitions: [],
   });
 
   const one = fixture([component("only")]);

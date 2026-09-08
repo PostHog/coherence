@@ -1,6 +1,6 @@
 // config.ts — load coherence.config.json from a project root, over sane defaults.
 import { join } from "node:path";
-import { readJsonOrRefuse } from "./floor.ts";
+import { readJsonOrRefuse } from "./verification/floor.ts";
 import type { Config } from "./types.ts";
 
 const DEFAULTS: Omit<Config, "root"> = {

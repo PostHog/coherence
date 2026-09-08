@@ -5,7 +5,7 @@ import {
   hookReadCandidates, recordHookReads, readTrace, readTraceDetailed, predictedReadSet,
   calibrationPaths, calibrationStats, formatCalibration, readCalibrationSamples, recordCalibrationSample,
   type CalibrationSample,
-} from "../src/calibration.ts";
+} from "../src/diagnostics/calibration.ts";
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
@@ -39,11 +39,11 @@ test("write-bearing hooks provide per-session patch attribution", () => {
 
 test("calibration uses session writes instead of a concurrent shared-worktree union", () => {
   const traced = calibrationPaths([
-    { at: "t", session: "agent-abc", tool: "Read", mode: "read", path: "src/context.ts", observation: exactObservation },
-    { at: "t", session: "agent-abc", tool: "Edit", mode: "write", path: "src/signal.ts", observation: exactObservation },
-  ], ["src/signal.ts", "src/someone-elses-change.ts"]);
+    { at: "t", session: "agent-abc", tool: "Read", mode: "read", path: "src/readings/context.ts", observation: exactObservation },
+    { at: "t", session: "agent-abc", tool: "Edit", mode: "write", path: "src/diagnostics/signal.ts", observation: exactObservation },
+  ], ["src/diagnostics/signal.ts", "src/someone-elses-change.ts"]);
   assert.deepEqual(traced, {
-    changed: ["src/signal.ts"], observed: ["src/context.ts"], attribution: "session-writes",
+    changed: ["src/diagnostics/signal.ts"], observed: ["src/readings/context.ts"], attribution: "session-writes",
   });
   assert.equal(calibrationPaths(traced.observed.map((path) => ({
     at: "t", session: "agent-abc", tool: "Read", mode: "read" as const, path,
@@ -65,15 +65,15 @@ test("calibration keeps Codex parent-only writes aggregate and legacy rows unsco
     attribution: "parent-fallback" as const,
   };
   assert.deepEqual(calibrationPaths([
-    { at: "t", session: "codex-thread", tool: "Read", mode: "read", path: "src/context.ts", observation: parent },
-    { at: "t", session: "codex-thread", tool: "apply_patch", mode: "write", path: "src/signal.ts", observation: parent },
-  ], ["src/signal.ts", "src/someone-elses-change.ts"]), {
-    changed: ["src/signal.ts"], observed: ["src/context.ts"], attribution: "parent-session-aggregate",
+    { at: "t", session: "codex-thread", tool: "Read", mode: "read", path: "src/readings/context.ts", observation: parent },
+    { at: "t", session: "codex-thread", tool: "apply_patch", mode: "write", path: "src/diagnostics/signal.ts", observation: parent },
+  ], ["src/diagnostics/signal.ts", "src/someone-elses-change.ts"]), {
+    changed: ["src/diagnostics/signal.ts"], observed: ["src/readings/context.ts"], attribution: "parent-session-aggregate",
   });
   assert.equal(calibrationPaths([
-    { at: "t", session: "legacy", tool: "Edit", mode: "write", path: "src/signal.ts" },
-    { at: "t", session: "legacy", tool: "Read", mode: "read", path: "src/context.ts" },
-  ], ["src/signal.ts"]).attribution, "legacy-unscoped");
+    { at: "t", session: "legacy", tool: "Edit", mode: "write", path: "src/diagnostics/signal.ts" },
+    { at: "t", session: "legacy", tool: "Read", mode: "read", path: "src/readings/context.ts" },
+  ], ["src/diagnostics/signal.ts"]).attribution, "legacy-unscoped");
 });
 
 test("hook recording keeps only real files inside the repo", async () => {

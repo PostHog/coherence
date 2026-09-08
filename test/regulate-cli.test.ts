@@ -9,8 +9,8 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { tmpProject, cleanup } from "./_helpers.ts";
 import { loadConfig } from "../src/config.ts";
-import { setLifecycleHook } from "../src/control.ts";
-import { ANTI_ENTROPY_DOCTRINE } from "../src/doctrine.ts";
+import { setLifecycleHook } from "../src/lifecycle/control.ts";
+import { ANTI_ENTROPY_DOCTRINE } from "../src/coordination/doctrine.ts";
 
 const run = promisify(execFile);
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "cli.ts");

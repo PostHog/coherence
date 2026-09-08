@@ -4,8 +4,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { tmpProject, cleanup, cfg } from "./_helpers.ts";
-import { buildGraph, resolveLanguageAdapter } from "../src/derive.ts";
-import { Unrunnable } from "../src/floor.ts";
+import { buildGraph, resolveLanguageAdapter } from "../src/derivation/derive.ts";
+import { Unrunnable } from "../src/verification/floor.ts";
 
 const TOY_ADAPTER = `// toy.mjs — a minimal LanguageAdapter for .toy files.
 export default {

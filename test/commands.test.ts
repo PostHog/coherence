@@ -28,8 +28,8 @@ import {
   COMMANDS, commandNames, commandFor, dispatchTokens, usageBanner, renderCommandsBlock,
   COMMANDS_BEGIN, COMMANDS_END, renderPhrasebookBlock, PHRASEBOOK_BEGIN, PHRASEBOOK_END,
 } from "../src/commands.ts";
-import { CLAIM_FORMS } from "../src/phrasebook.ts";
-import { spliceBlock, extractBlock } from "../src/render-claude.ts";
+import { CLAIM_FORMS } from "../src/verification/phrasebook.ts";
+import { spliceBlock, extractBlock } from "../src/readings/render-claude.ts";
 import { tmpProject, cleanup } from "./_helpers.ts";
 
 const CLI_PATH = fileURLToPath(new URL("../src/cli.ts", import.meta.url));

@@ -4,7 +4,7 @@
 // pure core; renderDiff returns the loss count that --strict turns into a nonzero exit.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { diffGraphs, renderDiff, allBoundaries, affectedComponents } from "../src/structural.ts";
+import { diffGraphs, renderDiff, allBoundaries, affectedComponents } from "../src/diagnostics/structural.ts";
 import { graph, comp, tmpProject, cleanup, cfg } from "./_helpers.ts";
 import { runCaptured } from "./_helpers.ts";
 

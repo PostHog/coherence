@@ -10,8 +10,8 @@ import { join } from "node:path";
 import {
   contextFor, contextFromProject, gitContextPaths, looksLikeTestPath, normalizeContextPath,
   renderContext, renderContextProjection, repositoryContextPaths,
-} from "../src/context.ts";
-import type { DecisionRecord } from "../src/decisions.ts";
+} from "../src/readings/context.ts";
+import type { DecisionRecord } from "../src/evidence/decisions.ts";
 import { cfg, cleanup, comp, fileNode, graph, imp, sym, tmpProject } from "./_helpers.ts";
 
 const BOUNDARY = 'boundary "validated writes" at seal crossing input -> store via test "seal rejects every invalid kind"';

@@ -8,8 +8,8 @@ actions an owner can take from a work order.
 Before finishing that change:
 
 - compare the new behavior with `agentInstructions` and `assignedWorkInstructions` in
-  `src/hooks.ts`; bounded startup context may omit a capability only by explicit choice;
-- when emitted meaning changes, bump `HOOK_BODY_PROTOCOL_VERSION` in `src/control.ts`;
+  `src/lifecycle/hooks.ts`; bounded startup context may omit a capability only by explicit choice;
+- when emitted meaning changes, bump `HOOK_BODY_PROTOCOL_VERSION` in `src/lifecycle/control.ts`;
 - regenerate both tracked controls with `{{cli}} hooks install --host codex` and
   `{{cli}} hooks install --host claude`;
 - update the exact hook/control tests, packed-consumer smoke, README, and generated docs,

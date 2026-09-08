@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { activityPath, recordActivity } from "../src/activity.ts";
+import { activityPath, recordActivity } from "../src/lifecycle/activity.ts";
 import {
   closeExperiment,
   createExperiment,
@@ -22,8 +22,8 @@ import {
   type CloseExperimentInput,
   type ExperimentActionResult,
   type ExperimentCriterionResult,
-} from "../src/experiment.ts";
-import { recordHookReads } from "../src/read-trace.ts";
+} from "../src/evidence/experiment.ts";
+import { recordHookReads } from "../src/lifecycle/read-trace.ts";
 import { cfg, cleanup, tmpProject } from "./_helpers.ts";
 
 const T = (n: number) => `2026-08-04T12:${String(n).padStart(2, "0")}:00.000Z`;

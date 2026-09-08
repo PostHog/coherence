@@ -1,4 +1,4 @@
-// mass.test.ts — the MASS RATCHET (src/mass.ts). What is actually at risk here is not the
+// mass.test.ts — the MASS RATCHET (src/diagnostics/mass.ts). What is actually at risk here is not the
 // arithmetic (summing line counts is not where a bug hides) but the three places the
 // ratchet could quietly LIE:
 //   · ABSENCE READ AS ZERO — no lockfile reported as "0 transitive deps" would turn a
@@ -12,9 +12,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { mass, excursions, lastNumber, massFindings, structuralDims, reconcileMass, type MassDim } from "../src/mass.ts";
-import { buildGraph } from "../src/derive.ts";
-import type { StatusRecord } from "../src/status.ts";
+import { mass, excursions, lastNumber, massFindings, structuralDims, reconcileMass, type MassDim } from "../src/diagnostics/mass.ts";
+import { buildGraph } from "../src/derivation/derive.ts";
+import type { StatusRecord } from "../src/evidence/status.ts";
 import { tmpProject, cleanup, cfg, comp, fileNode, sym, graph, runCaptured } from "./_helpers.ts";
 import type { Config } from "../src/types.ts";
 

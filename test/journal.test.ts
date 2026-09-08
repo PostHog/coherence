@@ -19,11 +19,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { readdirSync, readFileSync, unlinkSync, writeFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { appendDecision, decisionsDir, readJournal, timelineOrder, deriveSessions, INSTRUMENT_MARKER } from "../src/decisions.ts";
+import { appendDecision, decisionsDir, readJournal, timelineOrder, deriveSessions, INSTRUMENT_MARKER } from "../src/evidence/decisions.ts";
 import {
   newTailState, tailJournal, formatEntryLine, formatWhen, entryDetail, renderStreamFrame, initialStreamUI, shownEntry,
   visibleRecords, displayRecords, sessionsByRecency, openConjectures, runJournal, type StreamModel,
-} from "../src/journal.ts";
+} from "../src/evidence/journal.ts";
 import { runCaptured, cleanup } from "./_helpers.ts";
 import type { Config } from "../src/types.ts";
 

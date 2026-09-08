@@ -1,5 +1,5 @@
 // run-named-test.test.ts — the serial oracle runner's own contract, now INSIDE the
-// evidence perimeter (src/run-named-test.ts; scripts/run-named-test.mjs is a thin entry).
+// evidence perimeter (src/verification/run-named-test.ts; scripts/run-named-test.mjs is a thin entry).
 // The property that matters is the one the whole executable tier leans on: a name that
 // exists NOWHERE exits nonzero — a claim citing a vanished oracle must fail, not pass
 // quietly. This is the runner-side half of what the serial canary probes at verify time.
@@ -10,7 +10,7 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runNamedTest, unescapeTestName } from "../src/run-named-test.ts";
+import { runNamedTest, unescapeTestName } from "../src/verification/run-named-test.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 

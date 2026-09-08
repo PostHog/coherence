@@ -22,7 +22,7 @@
 // path with a name declared and asserts byte-equality.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildGraph } from "../src/derive.ts";
+import { buildGraph } from "../src/derivation/derive.ts";
 import { tmpProject, cleanup, cfg } from "./_helpers.ts";
 
 /** A tree with enough shape to produce components, files and an import edge — so the
@@ -33,6 +33,21 @@ const FILES = {
   "main.ts": "import { helper } from './lib.ts';\nexport const run = () => helper();\n",
   "lib.ts": "export const helper = () => 1;\n",
 };
+
+test("spec containment — deepest declared ancestor is canonical parent, never an invented import", async () => {
+  const root = await tmpProject({ ...FILES,
+    "src/source.spec.md": "# Source\n\nSource assembly.\n",
+    "src/deep/worker/worker.spec.md": "# Worker\n\nWorker assembly.\n",
+    "src/deep/worker/worker.ts": "export const worker = 1;\n",
+  });
+  try {
+    const graph = await buildGraph(cfg(root));
+    assert.equal(graph.nodes.find(n => n.id === "c:src")?.parent, "c:.");
+    assert.equal(graph.nodes.find(n => n.id === "c:src/deep/worker")?.parent, "c:src");
+    assert.equal(graph.nodes.find(n => n.id === "c:.")?.parent, undefined);
+    assert.equal(graph.edges.some(e => e.source.startsWith("c:") || e.target.startsWith("c:")), false);
+  } finally { await cleanup(root); }
+});
 
 /** The artifact as `coherence graph` would write it, minus the two fields the staleness
  *  gate already normalizes away: the clock and the absolute checkout path. What remains is

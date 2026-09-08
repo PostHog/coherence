@@ -17,9 +17,20 @@ function checkGeometry(model, config = defaults) {
     const radius = view.rings.find(r => r.ring === n.ring)?.radius ?? 0;
     assert.ok(Math.abs(Math.hypot(n.x, n.y) - radius) < 0.00001);
     for (const other of view.nodes) if (n.id < other.id) {
-      assert.ok(Math.abs(n.x - other.x) >= config.width || Math.abs(n.y - other.y) >= config.height,
+      assert.ok(Math.abs(n.x - other.x) >= config.width + config.gap - 1e-7 || Math.abs(n.y - other.y) >= config.height + config.gap - 1e-7,
         `overlap: ${n.id}, ${other.id}; ${JSON.stringify(config)}`);
     }
+  }
+  if (view.nodes.length > 1) {
+    const nearest = Math.min(...view.nodes.flatMap((a, i) => view.nodes.slice(i + 1).map(b =>
+      Math.max(Math.abs(a.x - b.x) / (config.width + config.gap), Math.abs(a.y - b.y) / (config.height + config.gap)))));
+    assert.ok(Math.abs(nearest - 1) < 1e-7, 'one pair meets the requested clearance: no avoidable uniform orbital padding');
+  }
+  for (const n of view.nodes) {
+    assert.ok(n.x - config.width / 2 >= view.bounds.x - 1e-7);
+    assert.ok(n.x + config.width / 2 <= view.bounds.x + view.bounds.width + 1e-7);
+    assert.ok(n.y - config.height / 2 >= view.bounds.y - 1e-7);
+    assert.ok(n.y + config.height / 2 <= view.bounds.y + view.bounds.height + 1e-7);
   }
 }
 
@@ -39,7 +50,7 @@ test('library geometry repeats exactly and ignores previous hand-written coordin
 });
 
 test('all exposed parameter extremes retain non-overlap and centered rings', () => {
-  for (const gap of [48, 80, 180]) for (const rotation of [-180, -35, 0, 90, 180]) for (const sweep of [200, 270, 330]) {
+  for (const gap of [16, 24, 48, 80, 180]) for (const rotation of [-180, -35, -20, 0, 90, 180]) for (const sweep of [140, 180, 200, 270, 330]) {
     checkGeometry(actual, { ...defaults, gap, rotation, sweep });
   }
 });
@@ -59,4 +70,12 @@ test('missing evidence is never a pass; stale and failures outrank passes', () =
   assert.equal(lightOf([]), 'unmeasured');
   for (const state of ['unknown', 'stale', 'fail']) assert.equal(lightOf([{ verdict: 'pass' }, { verdict: state }]), state);
   assert.equal(lightOf([{ verdict: 'pass' }]), 'pass');
+});
+
+test('a withheld reliance path never overrides canonical connectedness', () => {
+  const view = layoutScope({ center: 'center', nodes: [{ id: 'center', ring: 0, disconnected: false },
+    { id: 'peer', ring: 1, disconnected: false }], relations: [], guarantees: [] });
+  assert.equal(view.nodes.find(n => n.id === 'peer').disconnected, false);
+  assert.equal(view.rings[0].disconnected, false);
+  assert.equal(view.connections.length, 0, 'do not invent the withheld path either');
 });

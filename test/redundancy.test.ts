@@ -12,7 +12,7 @@ import {
   sitesOfSource, sitesOfMarkdown, alternationsIn, pairSites, collectSites,
   declaredParitySymbols, renderRedundancy, redundancy, REDUNDANCY_DEFAULTS,
   type DomainSite,
-} from "../src/redundancy.ts";
+} from "../src/diagnostics/redundancy.ts";
 import { tmpProject, cleanup, cfg, graph, comp, runCaptured } from "./_helpers.ts";
 
 const site = (over: Partial<DomainSite> & { keys: string[] }): DomainSite =>

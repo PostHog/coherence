@@ -7,11 +7,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpProject, cleanup } from "./_helpers.ts";
 import { loadConfig } from "../src/config.ts";
-import { recordHookReads } from "../src/read-trace.ts";
-import { readCalibrationSamples } from "../src/calibration.ts";
-import { appendDecision, readJournal } from "../src/decisions.ts";
-import { hookStatus, reportHooks } from "../src/hooks.ts";
-import { createWork, transitionWork } from "../src/work.ts";
+import { recordHookReads } from "../src/lifecycle/read-trace.ts";
+import { readCalibrationSamples } from "../src/diagnostics/calibration.ts";
+import { appendDecision, readJournal } from "../src/evidence/decisions.ts";
+import { hookStatus, reportHooks } from "../src/lifecycle/hooks.ts";
+import { createWork, transitionWork } from "../src/coordination/work.ts";
 
 const HOOK_CLI = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "hook-cli.ts");
 
@@ -226,7 +226,7 @@ test("SessionStart teaches the executable swarm loop and exact owned lifecycle",
       criteria: ["PostToolUse runs without parser packages"],
       authority: { kind: "user-directed", grantedBy: "user", boundary: "build the complete gyroscope" },
       risk: "high",
-      writeScopes: ["src/hooks.ts"],
+      writeScopes: ["src/lifecycle/hooks.ts"],
       now: "2026-01-01T00:00:00.000Z",
     });
     createWork(config, {

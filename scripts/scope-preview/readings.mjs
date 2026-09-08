@@ -1,15 +1,15 @@
 // Node-only snapshot adapter. Readers own meaning; the browser receives data, not
 // filesystem access, hook execution, or a second resolution implementation.
 import { relative } from 'node:path';
-import { LIFECYCLE_HOOK_EVENTS, inspectLifecycleHook } from '../../src/control.ts';
-import { agentInstructions, currentObservation } from '../../src/hooks.ts';
-import { readHookText, composeHookText } from '../../src/hook-text.ts';
-import { resolve as resolveJournal } from '../../src/decisions.ts';
-import { newTailState, tailJournal } from '../../src/journal.ts';
-import { readDefects } from '../../src/defects.ts';
-import { readExperiments } from '../../src/experiment.ts';
-import { taxonomyView } from '../../src/taxonomy-ledger.ts';
-import { TAXONOMY } from '../../src/taxonomy-catalog.ts';
+import { LIFECYCLE_HOOK_EVENTS, inspectLifecycleHook } from '../../src/lifecycle/control.ts';
+import { agentInstructions, currentObservation } from '../../src/lifecycle/hooks.ts';
+import { readHookText, composeHookText } from '../../src/lifecycle/hook-text.ts';
+import { resolve as resolveJournal } from '../../src/evidence/decisions.ts';
+import { newTailState, tailJournal } from '../../src/evidence/journal.ts';
+import { readDefects } from '../../src/evidence/defects.ts';
+import { readExperiments } from '../../src/evidence/experiment.ts';
+import { taxonomyView } from '../../src/taxonomy/taxonomy-ledger.ts';
+import { TAXONOMY } from '../../src/taxonomy/taxonomy-catalog.ts';
 
 export function readScopeReadings(cfg) {
   // Use the canonical stream's content identity even for full snapshots: during

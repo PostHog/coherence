@@ -12,9 +12,9 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
-import { analyze, readCommitLog, componentMap } from "../src/decompose.ts";
-import { decompose } from "../src/decompose.ts";
-import type { Commit } from "../src/decompose.ts";
+import { analyze, readCommitLog, componentMap } from "../src/diagnostics/decompose.ts";
+import { decompose } from "../src/diagnostics/decompose.ts";
+import type { Commit } from "../src/diagnostics/decompose.ts";
 import { cfg, comp, graph, fileNode, imp, runCaptured, cleanup } from "./_helpers.ts";
 
 // A nonexistent root: componentMap's `git rev-parse --show-prefix` fails → prefix "" → the

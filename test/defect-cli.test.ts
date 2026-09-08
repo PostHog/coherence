@@ -7,7 +7,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { readFile, readdir, writeFile } from "node:fs/promises";
-import { defectSessionPath, defectsDir } from "../src/defects.ts";
+import { defectSessionPath, defectsDir } from "../src/evidence/defects.ts";
 import { cfg, cleanup, tmpProject } from "./_helpers.ts";
 
 const exec = promisify(execFile);

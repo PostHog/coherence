@@ -23,8 +23,8 @@ import {
   openSession, appendDecision, readJournal, resolve, renderJournal, decisionsDir, newSessionId,
   derivedSessionId, slug, compactJournal, planCompaction, COMPACT_QUIET_MS,
   LABEL_SOFT_MAX,
-} from "../src/decisions.ts";
-import { composeStopFeedback, printHooks, stopFeedbackActive } from "../src/hooks.ts";
+} from "../src/evidence/decisions.ts";
+import { composeStopFeedback, printHooks, stopFeedbackActive } from "../src/lifecycle/hooks.ts";
 import { runCaptured, cleanup } from "./_helpers.ts";
 import type { Config } from "../src/types.ts";
 

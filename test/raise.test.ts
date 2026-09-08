@@ -26,16 +26,16 @@ import { join } from "node:path";
 import {
   appendDecision, readJournal, resolve, renderJournal, newSessionId, resolvableConjecture,
   readsAsInstrumentDoubt,
-} from "../src/decisions.ts";
+} from "../src/evidence/decisions.ts";
 import {
   raiseFindings, formatRaise, findingKey, priorsByFinding, interleaveByAdvisory,
   RAISE_CAP, type Finding,
-} from "../src/raise.ts";
+} from "../src/diagnostics/raise.ts";
 import {
   pairFindings, pairSubject, siteSubject, stableSiteName, shownPairs, pairSites,
   sitesOfSource, redundancy, REDUNDANCY_DEFAULTS, type DomainSite, type RedundancyPair,
-} from "../src/redundancy.ts";
-import { neverRedFinding, refutationFinding, warnedKindFinding, runVerify } from "../src/verify.ts";
+} from "../src/diagnostics/redundancy.ts";
+import { neverRedFinding, refutationFinding, warnedKindFinding, runVerify } from "../src/verification/verify.ts";
 import { cleanup, tmpProject, runCaptured, cfg, comp, graph } from "./_helpers.ts";
 import type { Config } from "../src/types.ts";
 
@@ -46,7 +46,7 @@ async function root(): Promise<Config> {
 const T = (n: number) => `2026-07-29T1${Math.floor(n / 60)}:${String(n % 60).padStart(2, "0")}:00.000Z`;
 
 const site = (o: Partial<DomainSite> = {}): DomainSite => ({
-  name: "NOISE_DIRS", kind: "list", file: "src/oracle-domain.ts", line: 61,
+  name: "NOISE_DIRS", kind: "list", file: "src/verification/oracle-domain.ts", line: 61,
   keys: [".git", "dist", "node_modules"], typeLink: null, ...o,
 });
 
@@ -66,13 +66,13 @@ test("identity — a pair keeps ONE question after its score, rank and line all 
   // a fresh question on an edit that touched neither site. Reproduced here by moving every
   // volatile field at once and leaving both sites where they are.
   const cfg = await root();
-  const before = pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/sidecar.ts", line: 17 }));
+  const before = pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/diagnostics/sidecar.ts", line: 17 }));
   const first = raise(cfg, pairFindings([before]), { now: T(1) });
   assert.equal(first.opened.length, 1);
 
   const after = pair(
     site({ line: 61 }),
-    site({ name: "ALWAYS_IGNORE", file: "src/sidecar.ts", line: 22 }), // five lines inserted above it
+    site({ name: "ALWAYS_IGNORE", file: "src/diagnostics/sidecar.ts", line: 22 }), // five lines inserted above it
     { score: 5.25, exclusive: 2 },                                     // and the score fell by 46%
   );
   const second = raise(cfg, pairFindings([after]), { now: T(2) });
@@ -87,14 +87,14 @@ test("identity — the key contains no score, no line, and no token count", asyn
   // Asserted on the STRING rather than on behaviour: a key that happens to dedupe today
   // because two runs produced the same score is not the same thing as a key that cannot
   // contain one. This is the property, stated directly.
-  const k = pairSubject(pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/sidecar.ts", line: 17 })));
-  assert.equal(k, "src/oracle-domain.ts#list:NOISE_DIRS|src/sidecar.ts#list:ALWAYS_IGNORE");
+  const k = pairSubject(pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/diagnostics/sidecar.ts", line: 17 })));
+  assert.equal(k, "src/diagnostics/sidecar.ts#list:ALWAYS_IGNORE|src/verification/oracle-domain.ts#list:NOISE_DIRS");
   for (const volatile of ["9.8", "61", "17", "@", "3"]) {
     assert.ok(!k.includes(volatile), `'${volatile}' must not be in a finding key`);
   }
   // ...and it is order-free: the same two sites are one question whichever way round the
   // detector happened to emit them.
-  const flipped = pairSubject(pair(site({ name: "ALWAYS_IGNORE", file: "src/sidecar.ts" }), site()));
+  const flipped = pairSubject(pair(site({ name: "ALWAYS_IGNORE", file: "src/diagnostics/sidecar.ts" }), site()));
   assert.equal(flipped, k, "A|B and B|A are the same pair");
 });
 
@@ -134,7 +134,7 @@ test("identity — a claim's run count is in the SENTENCE and never in the key",
 test("identity — two different findings are two questions, and neither is swallowed", async () => {
   const cfg = await root();
   const findings = [
-    ...pairFindings([pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/sidecar.ts" }))]),
+    ...pairFindings([pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/diagnostics/sidecar.ts" }))]),
     neverRedFinding("sim", 'boundary "one write site per shared scalar"', 12),
     neverRedFinding("sim", 'boundary "systems cannot write shared globals"', 12),
     warnedKindFinding("sim", 'boundary "one write site per shared scalar"', "measured", "doctrine 2a"),
@@ -225,7 +225,7 @@ test("volume — only what the advisory SHOWS may raise: `--all`'s tail must not
   // `--all` drops redundancy's score floor to zero so the precision of the tail can be
   // judged rather than trusted. A flag whose job is to show more must not also mean write
   // more, or the one command a curious person runs first is the one that fills the journal.
-  const strong = pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/sidecar.ts" }), { score: 9.8 });
+  const strong = pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/diagnostics/sidecar.ts" }), { score: 9.8 });
   const weak = pair(
     site({ name: "A", file: "a.ts" }), site({ name: "B", file: "b.ts" }), { score: 0.4 },
   );
@@ -250,7 +250,7 @@ test("volume — an explicit --raise that raised nothing SAYS so", async () => {
 
 test("dismissal — a dismissed finding is NEVER raised again", async () => {
   const cfg = await root();
-  const f = pairFindings([pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/sidecar.ts" }))]);
+  const f = pairFindings([pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/diagnostics/sidecar.ts" }))]);
   const opened = raise(cfg, f, { now: T(1) }).opened[0].rec;
 
   appendDecision(cfg, {
@@ -261,7 +261,7 @@ test("dismissal — a dismissed finding is NEVER raised again", async () => {
 
   // Ten more runs, each with a different score — the case that made dedupe necessary at all.
   for (let i = 3; i < 13; i++) {
-    const r = raise(cfg, pairFindings([pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/sidecar.ts" }), { score: i })]), { now: T(i) });
+    const r = raise(cfg, pairFindings([pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/diagnostics/sidecar.ts" }), { score: i })]), { now: T(i) });
     assert.equal(r.opened.length, 0);
     assert.equal(r.settled[0]?.how, "dismissed", "and the report says WHY it is quiet");
   }
@@ -360,7 +360,7 @@ test("dismissal — a RETRACTED question may be asked again; a dismissed one may
 test("the entry carries a candidate list and a test somebody can go and run", async () => {
   const cfg = await root();
   const p = pair(
-    site(), site({ name: "ALWAYS_IGNORE", file: "src/sidecar.ts", line: 17 }),
+    site(), site({ name: "ALWAYS_IGNORE", file: "src/diagnostics/sidecar.ts", line: 17 }),
     { onlyA: [".next", "coverage"], onlyB: [] },
   );
   const rec = raise(cfg, pairFindings([p]), { now: T(1) }).opened[0].rec;
@@ -525,6 +525,6 @@ test("priorsByFinding — a record with no `finding` is invisible to the advisor
     because: "", discriminatedBy: "-", session: "s-human", now: T(1),
   });
   assert.equal(priorsByFinding(readJournal(cfg).records).size, 0);
-  assert.equal(raise(cfg, pairFindings([pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/sidecar.ts" }))]), { now: T(2) }).opened.length, 1);
+  assert.equal(raise(cfg, pairFindings([pair(site(), site({ name: "ALWAYS_IGNORE", file: "src/diagnostics/sidecar.ts" }))]), { now: T(2) }).opened.length, 1);
   await cleanup(cfg.root);
 });

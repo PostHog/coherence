@@ -6,7 +6,7 @@ import {
   ConsequenceLedgerError, consequenceSessionPath, parseConsequenceRef,
   readConsequences, recordConsequence, relationProblem, renderConsequences,
   traceConsequences,
-} from "../src/consequence.ts";
+} from "../src/coordination/consequence.ts";
 import { cfg, cleanup, tmpProject } from "./_helpers.ts";
 
 test("explicit consequence edges make the record lifecycle navigable in both directions", async () => {

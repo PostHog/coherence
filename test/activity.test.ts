@@ -6,10 +6,10 @@ import { join } from "node:path";
 import {
   activityAttribution, activityPath, activityRow, classifyActivityCommand,
   currentSessionSummary, readActivity, recordActivity, type ActivityContext,
-} from "../src/activity.ts";
-import { recordHookReads } from "../src/read-trace.ts";
-import { hookStatus } from "../src/hooks.ts";
-import { CODEX_LIFECYCLE_HOOK_BUNDLE_FINGERPRINT } from "../src/control.ts";
+} from "../src/lifecycle/activity.ts";
+import { recordHookReads } from "../src/lifecycle/read-trace.ts";
+import { hookStatus } from "../src/lifecycle/hooks.ts";
+import { CODEX_LIFECYCLE_HOOK_BUNDLE_FINGERPRINT } from "../src/lifecycle/control.ts";
 import { cfg, cleanup, tmpProject } from "./_helpers.ts";
 
 const launcher: ActivityContext = {

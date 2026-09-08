@@ -7,9 +7,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { parseParity, PARITY_RE } from "../src/parity.ts";
-import { analyzeParityOracle } from "../src/oracle-domain.ts";
-import { runVerify } from "../src/verify.ts";
+import { parseParity, PARITY_RE } from "../src/verification/parity.ts";
+import { analyzeParityOracle } from "../src/verification/oracle-domain.ts";
+import { runVerify } from "../src/verification/verify.ts";
 import { tmpProject, cleanup, runCaptured, cfg, comp, sym, graph } from "./_helpers.ts";
 
 const withProject = async (files: Record<string, string>, fn: (root: string) => Promise<void>) => {

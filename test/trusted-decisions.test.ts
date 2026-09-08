@@ -12,10 +12,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   appendDecision, readJournal, readTrustedJournal, sessionPath,
-} from "../src/decisions.ts";
-import { observeOrientation } from "../src/orient.ts";
+} from "../src/evidence/decisions.ts";
+import { observeOrientation } from "../src/coordination/orient.ts";
 import type { Config } from "../src/types.ts";
-import { createWork } from "../src/work.ts";
+import { createWork } from "../src/coordination/work.ts";
 
 const T = (n: number) => `2026-08-20T10:${String(n).padStart(2, "0")}:00.000Z`;
 
@@ -74,7 +74,7 @@ test("trusted journal — any malformed, forged, displaced, conflicting, or dang
         work: "wrk-17", subject: "architecture:journal-admission",
         scope: {
           components: ["Harness"],
-          files: ["src/signal.ts", "src/decisions.ts", "src/signal.ts"],
+          files: ["src/diagnostics/signal.ts", "src/evidence/decisions.ts", "src/diagnostics/signal.ts"],
         },
         authority: "orchestrator-accepted", session, agent: "agent", now: T(2),
       });
@@ -98,7 +98,7 @@ test("trusted journal — any malformed, forged, displaced, conflicting, or dang
 
       assert.equal(legacy.version, undefined, "an unstructured write stays byte-compatible V1");
       assert.equal(structured.version, 2);
-      assert.deepEqual(structured.scope?.files, ["src/decisions.ts", "src/signal.ts"]);
+      assert.deepEqual(structured.scope?.files, ["src/diagnostics/signal.ts", "src/evidence/decisions.ts"]);
       const trusted = readTrustedJournal(cfg);
       assert.equal(trusted.ok, true, trusted.ok ? undefined : JSON.stringify(trusted.damage));
       if (trusted.ok) assert.equal(trusted.records.length, 4);

@@ -21,12 +21,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
-import { runVerify } from "../src/verify.ts";
+import { runVerify } from "../src/verification/verify.ts";
 import {
   parsePytestJson, resolveFromBatch, resolveBatchFormat, outputFileOf, pytestFunctionName,
   TEST_BATCH_FORMATS, detectRunner, deriveBatchCommand, selectOracleMode, DERIVED_REPORT_PATH,
   type BatchReport,
-} from "../src/test-batch.ts";
+} from "../src/verification/test-batch.ts";
 import { tmpProject, cleanup, runCaptured, cfg, comp, graph } from "./_helpers.ts";
 
 const withProject = async (files: Record<string, string>, fn: (root: string) => Promise<void>) => {

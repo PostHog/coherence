@@ -6,7 +6,7 @@
 // vocabulary files with importers in disjoint units are flagged until covered.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { contracts } from "../src/contracts.ts";
+import { contracts } from "../src/diagnostics/contracts.ts";
 import { runCaptured, cfg, comp, sym, graph, fileNode, imp } from "./_helpers.ts";
 import type { Config } from "../src/types.ts";
 

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { appendFile, writeFile, rename } from 'node:fs/promises';
+import { appendFile, writeFile, rename, mkdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, webkit } from 'playwright';
 import { tmpProject, cleanup, cfg } from '../../test/_helpers.ts';
@@ -8,7 +8,11 @@ import { startScopeServer } from './server.mjs';
 const row = (id, title, extra = {}) => ({ id, chose: title, kind: 'decision', session: 'live-fixture', agent: 'fixture', job: '-',
   at: `2026-09-04T12:00:0${id.length % 10}.000Z`, because: 'Live test evidence', over: [], branch: null, commit: null, dirty: false, ...extra });
 const seed = row('seed', 'Live seed');
-const root = await tmpProject({ '.coherence/decisions/fixture.jsonl': [seed, row('question', 'Live question', { kind: 'conjecture' })].map(r => JSON.stringify(r)).join('\n') + '\n' });
+const claim = 'boundary "live property" at run via guard "live oracle"';
+const root = await tmpProject({ 'coherence.config.json': '{}\n', 'core.spec.md': '# Core\n\n## works when\n- ' + claim + '\n',
+  'core.ts': 'export function run() { return 1; }\n', 'worker/worker.spec.md': '# Worker\n\nWorker intent.\n',
+  'worker/index.ts': 'import { run } from "../core.ts";\nexport const worker = run;\n',
+  '.coherence/decisions/fixture.jsonl': [seed, row('question', 'Live question', { kind: 'conjecture' })].map(r => JSON.stringify(r)).join('\n') + '\n' });
 const live = await startScopeServer({ cfg: cfg(root), htmlPath: new URL('../../public/_scope-library.html', import.meta.url), intervalMs: 40 });
 const engine = process.env.SCOPE_BROWSER_ENGINE === 'webkit' ? webkit : chromium;
 const browser = await engine.launch(engine === chromium && process.env.SCOPE_BROWSER_CHANNEL ? { channel: process.env.SCOPE_BROWSER_CHANNEL } : {});
@@ -18,7 +22,7 @@ try {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(live.url);
-  await page.waitForFunction(() => document.querySelector('.feed-status')?.textContent === 'Journal live');
+await page.waitForFunction(() => document.querySelector('.feed-status')?.textContent === 'Scope live');
   await page.getByRole('tab', { name: 'Journal', exact: true }).click();
   await page.getByRole('combobox', { name: 'Scope session' }).selectOption('live-fixture');
   await page.getByRole('textbox', { name: 'Search journal' }).fill('Live');
@@ -26,7 +30,7 @@ try {
   const path = join(root, '.coherence/decisions/fixture.jsonl');
   await appendFile(path, JSON.stringify(row('added', 'Live appended')) + '\n');
   await page.waitForFunction(() => document.querySelectorAll('.journal-panel .journal-row').length === 3);
-  assert.equal(await page.locator('.journal-detail h2').innerText(), 'Live seed', 'selected record survives append');
+  assert.equal(await page.locator('.journal-panel .journal-detail h2').innerText(), 'Live seed', 'selected record survives append');
   assert.equal(await page.getByRole('combobox', { name: 'Scope session' }).inputValue(), 'live-fixture');
   assert.equal(await page.getByRole('textbox', { name: 'Search journal' }).inputValue(), 'Live');
   await page.getByRole('button', { name: 'Pause updates' }).click();
@@ -45,9 +49,53 @@ try {
   live.server.closeAllConnections();
   await page.waitForFunction(() => document.querySelector('.feed-status')?.textContent.includes('reconnecting'));
   await appendFile(join(root, '.coherence/decisions/moved.jsonl'), JSON.stringify(row('reconnected', 'Live after reconnect')) + '\n');
-  await page.waitForFunction(() => document.querySelectorAll('.journal-panel .journal-row').length === 6 && document.querySelector('.feed-status')?.textContent === 'Journal live');
-  assert.equal(await page.locator('.journal-detail h2').innerText(), 'Live seed');
+  await page.waitForFunction(() => document.querySelectorAll('.journal-panel .journal-row').length === 6 && document.querySelector('.feed-status')?.textContent === 'Scope live');
+  assert.equal(await page.locator('.journal-panel .journal-detail h2').innerText(), 'Live seed');
   assert.equal(await page.locator('.journal-panel .journal-row').filter({ hasText: 'Live seed' }).count(), 1, 'compaction must not duplicate displayed records');
+  await page.getByRole('tab', { name: 'Structure', exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length === 2);
+  await page.locator('.component-index').getByRole('button', { name: 'Worker', exact: true }).click();
+  await page.getByRole('slider', { name: 'Spacing', exact: true }).focus();
+  await page.keyboard.press('End');
+  await page.locator('.react-flow__controls-zoomin').click();
+  await page.waitForTimeout(400);
+  const transform = await page.locator('.react-flow__viewport').getAttribute('style');
+  const spacing = await page.getByRole('slider', { name: 'Spacing', exact: true }).inputValue();
+  await mkdir(join(root, 'new-child'));
+  await writeFile(join(root, 'new-child/child.spec.md'), '# New child\n');
+  await writeFile(join(root, 'new-child/index.ts'), 'import { run } from "../core.ts";\nexport const newest = run;\n');
+  await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length === 3);
+  assert.equal(await page.locator('.inspector h2').innerText(), 'Worker', 'component selection survives graph additions');
+  assert.equal(await page.locator('.react-flow__viewport').getAttribute('style'), transform, 'live graph must not refit the viewport');
+  assert.equal(await page.getByRole('slider', { name: 'Spacing', exact: true }).inputValue(), spacing);
+  await writeFile(join(root, 'worker/worker.spec.md'), '# Worker\n\nChanged live intent.\n\nChanged architecture <script>literal text</script>.\n\n## invariants\n- worker property\n\n## why\n**worker property.** Changed live rationale.\n\n## refutations\n- worker property: removed protection; observed red\n');
+  await page.waitForFunction(() => document.querySelector('.inspector')?.textContent.includes('Changed live intent.'));
+  assert.match(await page.locator('.component-card').filter({ hasText: 'Worker' }).innerText(), /Changed architecture <script>literal text<\/script>/);
+  await page.locator('.invariant-evidence summary').click();
+  assert.match(await page.locator('.invariant-evidence').innerText(), /Changed live rationale/);
+  assert.match(await page.locator('.invariant-evidence').innerText(), /removed protection; observed red/);
+  assert.match(await page.locator('.invariant-evidence').innerText(), /Unanchored/);
+  assert.equal(await page.locator('.spec-inspector script').count(), 0, 'spec prose is text, never executable HTML');
+  await writeFile(join(root, '.coherence/status.json'), JSON.stringify({ verify: { claims: [{ node: 'Core', claim, kind: 'fail', at: '2026-09-08T12:00:00.000Z' }] } }));
+  await page.locator('.component-card .status.fail').waitFor();
+  await page.getByRole('button', { name: 'Pause updates' }).click();
+  await unlink(join(root, 'new-child/index.ts')); await unlink(join(root, 'new-child/child.spec.md'));
+  await page.waitForTimeout(400);
+  assert.equal(await page.locator('.react-flow__node').count(), 3, 'pause holds structure as well as readings');
+  await page.getByRole('button', { name: 'Resume updates' }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length === 2);
+  await writeFile(join(root, 'coherence.config.json'), '{');
+  await page.locator('.structure-warning').waitFor();
+  assert.equal(await page.locator('.react-flow__node').count(), 2, 'damage retains the last model with a visible warning');
+  await writeFile(join(root, 'coherence.config.json'), '{}\n');
+  await page.locator('.structure-warning').waitFor({ state: 'detached' });
+  assert.equal(await page.locator('.react-flow__viewport').getAttribute('style'), transform, 'recovery preserves viewport');
+  await unlink(join(root, 'worker/index.ts')); await unlink(join(root, 'worker/worker.spec.md'));
+  await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length === 1);
+  await page.waitForFunction(() => document.querySelector('.inspector h2')?.textContent === 'Core');
+  await page.getByRole('tab', { name: 'Journal', exact: true }).click();
+  assert.equal(await page.locator('.journal-panel .journal-detail h2').innerText(), 'Live seed');
+  assert.equal(await page.getByRole('combobox', { name: 'Scope session' }).inputValue(), 'live-fixture');
   assert.deepEqual(errors, []);
-  console.log('Live browser checks passed: append, preserved filters and selection, pause/resume, resolution, compaction overlap and reconnect.');
+  console.log('Live browser checks passed: all-tab updates, structure add/edit/remove, recorded failure, retained viewport/parameters/selection, damage/recovery, pause/resume, journal compaction and reconnect.');
 } finally { await browser.close(); await live.close(); await cleanup(root); }

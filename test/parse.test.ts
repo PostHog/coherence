@@ -2,7 +2,7 @@
 // all consume what parseSpec extracts. A parse bug silently mis-reports the whole graph.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseSpec, splitWhy, ownerOf } from "../src/walk.ts";
+import { parseSpec, splitWhy, ownerOf } from "../src/derivation/walk.ts";
 
 test("parseSpec — full spec splits intent / claims / invariants / why / prose", () => {
   const s = parseSpec(

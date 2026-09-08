@@ -5,10 +5,10 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../src/config.ts';
-import { buildGraph } from '../src/derive.ts';
+import { buildGraph } from '../src/derivation/derive.ts';
 
 assert.ok(process.argv.slice(2).every(arg => arg === '--check-preview'), 'Only --check-preview is supported');
-const root = fileURLToPath(new URL('../', import.meta.url));
+const root = fileURLToPath(new URL('..', import.meta.url));
 function cli(...args) {
   const result = spawnSync(process.execPath, ['src/cli.ts', 'taxonomy', ...args, '--json'], { cwd: root, encoding: 'utf8' });
   assert.equal(result.error, undefined);
@@ -47,8 +47,8 @@ const summary = {
     coreRolesWithoutDirectSuggestions: catalog.roles.filter(r => r.pack === 'core' && !core.some(g => g.when === r.id)).map(r => r.id),
     coreFacetsWithoutEnabledSuggestions: catalog.facets.filter(f => f.pack === 'core' && !core.some(g => g.when === f.id)).map(f => f.id) },
   probes: [probe('src'), probe('c:src'), probe('scripts/scope-preview/app.jsx'),
-    probe('src/walk.ts#parseSpec', representation), probe('src/types.ts', representation),
-    probe('src/scope-model.ts', [...representation, '--answer', 'signal:transforms-form=yes', '--role', 'role:lowerer-domain-transformer', '--facet', 'facet:deterministic']),
+    probe('src/derivation/walk.ts#parseSpec', representation), probe('src/types.ts', representation),
+    probe('src/readings/scope-model.ts', [...representation, '--answer', 'signal:transforms-form=yes', '--role', 'role:lowerer-domain-transformer', '--facet', 'facet:deterministic']),
     probe('test/taxonomy.test.ts', allNo), probe('src/cli.ts')],
 };
 if (process.argv.includes('--check-preview')) {

@@ -8,7 +8,7 @@
 // does — through the same public API, no signature changes.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { surfaceOfSource, surfaceSignals, noveltyVerdict, isTestPath, scanSurface } from "../src/novelty.ts";
+import { surfaceOfSource, surfaceSignals, noveltyVerdict, isTestPath, scanSurface } from "../src/diagnostics/novelty.ts";
 import { tmpProject, cleanup } from "./_helpers.ts";
 
 const MODULE_PY = `"""Module docstring.

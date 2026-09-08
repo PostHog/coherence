@@ -9,12 +9,12 @@ import { spawnSync } from "node:child_process";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { commandFor } from "../src/commands.ts";
-import { setLifecycleHook } from "../src/control.ts";
+import { setLifecycleHook } from "../src/lifecycle/control.ts";
 import {
   ANTI_ENTROPY_DOCTRINE,
   type DoctrineRule,
   type RegulationAction,
-} from "../src/doctrine.ts";
+} from "../src/coordination/doctrine.ts";
 import {
   formatRegulation,
   observeRegulation,
@@ -23,10 +23,10 @@ import {
   type RegulationDecision,
   type RegulationObservation,
   type RegulationReading,
-} from "../src/regulate.ts";
+} from "../src/coordination/regulate.ts";
 import { cfg, cleanup, tmpProject } from "./_helpers.ts";
-import { closeWork, createWork } from "../src/work.ts";
-import { parseConsequenceRef, recordConsequence } from "../src/consequence.ts";
+import { closeWork, createWork } from "../src/coordination/work.ts";
+import { parseConsequenceRef, recordConsequence } from "../src/coordination/consequence.ts";
 
 const rules = ANTI_ENTROPY_DOCTRINE.rules;
 

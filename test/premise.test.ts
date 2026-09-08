@@ -1,11 +1,11 @@
 // premise.test.ts — decision caches get structural expiry signals, not semantic theatre.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { appendDecision, newSessionId, type DecisionRecord } from "../src/decisions.ts";
+import { appendDecision, newSessionId, type DecisionRecord } from "../src/evidence/decisions.ts";
 import {
   auditPremiseLeases, classifyPremiseReferent, extractPremiseReferents, normalizePremisePath,
   premise, premiseStructure, renderPremiseAudit,
-} from "../src/premise.ts";
+} from "../src/diagnostics/premise.ts";
 import { cleanup, cfg, fileNode, graph, runCaptured, sym, tmpProject } from "./_helpers.ts";
 
 const decision = (over: Partial<DecisionRecord> = {}): DecisionRecord => ({
@@ -25,12 +25,12 @@ test("extraction — explicit files are strong leases and suppress heuristic pro
 
 test("extraction — fallback paths and code-shaped backticks are conservative", () => {
   const refs = extractPremiseReferents(decision({
-    chose: "call `buildGraph` from src/derive.ts:44; do not lease `ordinary` or `--fast`",
+    chose: "call `buildGraph` from src/derivation/derive.ts:44; do not lease `ordinary` or `--fast`",
     because: "`Graph.nodes` is described in README.md, while producer/consumer is prose",
   }));
   assert.deepEqual(refs, [
     { kind: "file", value: "README.md", source: "because-path", strength: "inferred" },
-    { kind: "file", value: "src/derive.ts", source: "chose-path", strength: "inferred" },
+    { kind: "file", value: "src/derivation/derive.ts", source: "chose-path", strength: "inferred" },
     { kind: "symbol", value: "buildGraph", source: "chose-symbol", strength: "inferred" },
     { kind: "symbol", value: "Graph.nodes", source: "because-symbol", strength: "inferred" },
   ]);

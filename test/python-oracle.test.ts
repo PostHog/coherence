@@ -2,7 +2,7 @@
 // as the TS arm, regex-based and conservative-to-LIVE; these fixtures pin each path.
 import { before, after, test } from "node:test";
 import assert from "node:assert/strict";
-import { analyzeOracle } from "../src/oracle-domain.ts";
+import { analyzeOracle } from "../src/verification/oracle-domain.ts";
 import { tmpProject, cleanup, cfg } from "./_helpers.ts";
 
 const FIXTURE = `

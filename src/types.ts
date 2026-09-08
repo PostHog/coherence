@@ -129,7 +129,7 @@ export interface Config {
     // (the complement of a parity claim: nobody wrote anything down, and two spellings of
     // one domain are free to drift). The detector is only as good as its floor, so every
     // knob here trades recall away for precision: a wall of candidates is worse than
-    // silence. See src/redundancy.ts.
+    // silence. See src/diagnostics/redundancy.ts.
     minShared?: number;   // tokens two sites must share to be a candidate at all (default 3)
     containment?: number; // fraction of the SMALLER token set the overlap must cover (default 0.7)
     minScore?: number;    // ranking floor for the default report (default 3.5; `--all` drops it)
@@ -141,7 +141,7 @@ export interface Config {
     // Thresholds for the `prose` advisory — duplicated prose across reading surfaces
     // (README / RELEASE-NOTES / *.spec.md / module header essays) and whether the copies
     // still agree. Precision-first for the same reason as `redundancy`: a summary that
-    // legitimately restates a fuller argument must never read as a defect. See src/prose.ts.
+    // legitimately restates a fuller argument must never read as a defect. See src/diagnostics/prose.ts.
     minWords?: number; // sentences shorter than this cannot pair — idiom, not an argument (default 12)
     floor?: number;    // Jaccard floor over 6-word shingles (default 0.5; below it, rewrite and paraphrase are indistinguishable)
     maxDf?: number;    // a shingle in more than this many sentences is idiom, not a copy signature (default 6)

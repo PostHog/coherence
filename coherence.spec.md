@@ -8,11 +8,19 @@ keeps only the files that establish how those components are built, read, and re
 
 ## works when
 
+- passes test "repository assemblies — contracts follow their chokepoint owners and composition stays thin"
+
 - coherence.config.json exists at root
 - passes test "control — this repository's own lifecycle control is PRESENT"
 - passes test "repository voice — contributor startup keeps public capability changes tied to the global hook contract"
 
+## refutations
+
+- repository assembly ownership: the first migration retained nine line-wrapped rationale paragraphs at the old Harness core while their invariants moved. Global text conservation passed, but why-lint reported detached rationale at the new owners. The adoption guard now checks per-owner rationale as well as chokepoint ownership; the original paragraph text was relocated unchanged.
+
 ## why
+
+The subsystem map must describe enforced ownership rather than presentation labels. Moving a chokepoint without its contract detaches the reading surface from the code it explains, while restoring a flat source bucket hides the boundaries again. The repository adoption guard therefore reconciles live anchors with their defining owners and keeps the composition root limited to its six entry and shared-contract modules.
 
 An agent should encounter the project's purpose and its ownership seams before source
 detail. The project hook wiring also records which repository reads informed a change and

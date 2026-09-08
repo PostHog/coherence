@@ -2,7 +2,7 @@
 //
 // WHY THIS FILE EXISTS, AND IT IS NOT A FLATTERING STORY. `claimedFilePaths` decides which
 // of a component's files a claim BLESSES, and it drives the contract's `accounted` coverage
-// numbers (src/promise.ts). Its whole doctrine is refusal: a claim token with several
+// numbers (src/readings/promise.ts). Its whole doctrine is refusal: a claim token with several
 // candidates blesses NONE, so a component with four `hooks.ts` can never read 4/4 claimed
 // off one bare-basename claim. Over-reporting coverage is the failure it exists to prevent.
 //
@@ -29,7 +29,7 @@
 // with no scene-model wrapper between the assertion and the rule.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { claimedFilePaths } from "../src/tree.ts";
+import { claimedFilePaths } from "../src/derivation/tree.ts";
 import type { GraphNode } from "../src/types.ts";
 
 const file = (path: string): GraphNode => ({ id: `f:${path}`, label: path.split("/").pop()!, kind: "file", path } as GraphNode);

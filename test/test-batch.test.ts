@@ -17,12 +17,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { readFile, utimes, writeFile } from "node:fs/promises";
-import { runVerify } from "../src/verify.ts";
+import { runVerify } from "../src/verification/verify.ts";
 import {
   parseVitestJson, resolveFromBatch, resolveBatchFormat, extractJsonObjects,
   outputFileOf, runTestBatch, TEST_BATCH_FORMATS, selectOracleMode, deriveBatchCommand,
   detectRunner, DERIVED_REPORT_PATH, type BatchReport,
-} from "../src/test-batch.ts";
+} from "../src/verification/test-batch.ts";
 import { tmpProject, cleanup, runCaptured, cfg, comp, sym, graph } from "./_helpers.ts";
 
 const withProject = async (files: Record<string, string>, fn: (root: string) => Promise<void>) => {

@@ -1,4 +1,4 @@
-// evolution.test.ts — the shared EVOLUTION store (src/evolution.ts): the ONE home for the
+// evolution.test.ts — the shared EVOLUTION store (src/diagnostics/evolution.ts): the ONE home for the
 // git derivation decompose, drift, scene and mass all read. Two layers, the same split
 // decompose.test.ts's header sets out and for the same reason:
 //   1. the pure derivations — fileChurn / componentChurn / locDeltaSeries driven through
@@ -16,7 +16,7 @@ import {
   gitPrefix, rebaseCommits,
   BULK, CHURN_WINDOW, bucketize, commitDeltas, componentChurn, fileChurn,
   locDeltaSeries, readCommitLog, _resetEvolutionMemo, type Commit, type Delta,
-} from "../src/evolution.ts";
+} from "../src/diagnostics/evolution.ts";
 import { cfg, cleanup } from "./_helpers.ts";
 
 const commit = (files: string[], hash = "h", subject = "s"): Commit => ({ hash, subject, files });

@@ -21,7 +21,7 @@
 // a nonzero exit is UNMEASURABLE (never 0), which is what makes a broken derivation fail
 // the ratchet closed instead of reading as a heroic shrink.
 import { loadConfig } from "../src/config.ts";
-import { buildGraph } from "../src/derive.ts";
+import { buildGraph } from "../src/derivation/derive.ts";
 
 const what = process.argv[2];
 if (what !== "components" && what !== "claims") {

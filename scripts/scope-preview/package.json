@@ -9,7 +9,8 @@
     "test": "node --test *.test.mjs",
     "test:browser": "node browser-check.mjs",
     "test:live": "node live-browser-check.mjs",
-    "test:taxonomy": "node taxonomy-browser-check.mjs"
+    "test:taxonomy": "node taxonomy-browser-check.mjs",
+    "test:performance": "node performance-check.mjs"
   },
   "dependencies": {
     "@radix-ui/react-tabs": "1.1.21",

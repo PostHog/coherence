@@ -5,7 +5,7 @@
 // (bold lead-in, inline reference, hyphen/space variants all count).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { whyLint } from "../src/why-lint.ts";
+import { whyLint } from "../src/diagnostics/why-lint.ts";
 import { runCaptured, comp, sym, graph } from "./_helpers.ts";
 
 test("mechanism-restatement: a sentence naming an anchored symbol + an oracle-verb is flagged", async () => {

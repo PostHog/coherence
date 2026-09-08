@@ -1,4 +1,4 @@
-// sinks.test.ts — the INTERPOLATION-SURFACE RATCHET (src/lint-sinks.ts), and specifically
+// sinks.test.ts — the INTERPOLATION-SURFACE RATCHET (src/diagnostics/lint-sinks.ts), and specifically
 // its addressing. The scanning half is a pair of regexes; the half that can actually lie is
 // how a live site is matched against the reviewed baseline:
 //   · A MOVE READ AS NEW RISK — the baseline keys a site by `context|file|expr`, so
@@ -15,7 +15,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { rename, mkdir, writeFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
-import { lintSinks, reconcile, type Finding } from "../src/lint-sinks.ts";
+import { lintSinks, reconcile, type Finding } from "../src/diagnostics/lint-sinks.ts";
 import { tmpProject, cleanup, cfg, runCaptured } from "./_helpers.ts";
 
 const at = (file: string, expr: string, context = "sql-ident", line = 1): Finding => ({ context, file, expr, line });

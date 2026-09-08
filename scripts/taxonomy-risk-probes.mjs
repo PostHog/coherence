@@ -3,8 +3,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { tmpProject, cfg, cleanup } from '../test/_helpers.ts';
-import { recordAtlas, recordMass, readStatus } from '../src/status.ts';
-import { readCalibrationSamples, calibrationStats } from '../src/calibration.ts';
+import { recordAtlas, recordMass, readStatus } from '../src/evidence/status.ts';
+import { readCalibrationSamples, calibrationStats } from '../src/diagnostics/calibration.ts';
 
 const atlas = { tiers: { enshrined: 1, checked: 0, convention: 0 }, crossings: [], drift: [], dangling: [], overclaimed: [], tier3Security: [] };
 const mass = { dims: [{ key: 'probe', value: 1, unit: 'items' }] };

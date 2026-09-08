@@ -6,7 +6,7 @@
 // every form (the README's generated authority).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CLAIM_FORMS, parseWord, reEscape } from "../src/phrasebook.ts";
+import { CLAIM_FORMS, parseWord, reEscape } from "../src/verification/phrasebook.ts";
 
 test("registry — order IS the historical precedence (typechecks → conforms to)", () => {
   assert.deepEqual(

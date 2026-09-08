@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { runVerify } from "../src/verify.ts";
+import { runVerify } from "../src/verification/verify.ts";
 import { tmpProject, cleanup, runCaptured, cfg, comp, sym, graph } from "./_helpers.ts";
 
 const withProject = async (
@@ -204,7 +204,7 @@ test("coverage — a component with no claims, or no why, fails loudly", async (
 //      must not leave a ghost row ranking a run that no longer exists.
 //   3. The report has a FLOOR. On a fast suite it says nothing at all.
 import { readFile as readFileP, writeFile as writeFileP, mkdir as mkdirP } from "node:fs/promises";
-import type { StatusRecord } from "../src/status.ts";
+import type { StatusRecord } from "../src/evidence/status.ts";
 
 /** A vitest-shaped report where each named test carries a known duration. */
 const timedReport = (tests: Array<[string, number]>) => JSON.stringify({
@@ -338,8 +338,8 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname } from "node:path";
-import { rankDocGaps } from "../src/verify.ts";
-import { _resetEvolutionMemo } from "../src/evolution.ts";
+import { rankDocGaps } from "../src/verification/verify.ts";
+import { _resetEvolutionMemo } from "../src/diagnostics/evolution.ts";
 
 test("rankDocGaps — hottest defining file first; the share is a fraction of the commits considered", () => {
   const gaps = [{ path: "cold.ts", n: 1 }, { path: "hot.ts", n: 2 }, { path: "warm.ts", n: 3 }];

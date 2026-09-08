@@ -12,9 +12,9 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
-import { readDue, formatDue, commitsSince, DUE_AFTER, DUE_CAP } from "../src/due.ts";
+import { readDue, formatDue, commitsSince, DUE_AFTER, DUE_CAP } from "../src/diagnostics/due.ts";
 import { COMMANDS } from "../src/commands.ts";
-import { agentInstructions } from "../src/hooks.ts";
+import { agentInstructions } from "../src/lifecycle/hooks.ts";
 import { tmpProject, cleanup, cfg } from "./_helpers.ts";
 
 const git = (root: string, ...args: string[]) => spawnSync("git", args, { cwd: root, encoding: "utf8" });

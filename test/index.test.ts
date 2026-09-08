@@ -18,7 +18,7 @@
 //   · a corrupt cursor read as an absent one, so the page calls itself a FIRST LOOK for a
 //     project that has an index — and re-reports every old impasse as news.
 // Each of those is a test below, and each of them has a matching prohibition in
-// src/index-model.ts's header.
+// src/readings/index-model.ts's header.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -31,13 +31,13 @@ import { execFile } from "node:child_process";
 import {
   capList, CAPS, resolveFrame, darknesses, buildJournal, buildMap, structuralView,
   INDEX_HTML, INDEX_JSON, crossingOwners, type IndexModel, type IndexCrossing,
-} from "../src/index-model.ts";
-import { renderIndex, formatIndexSummary, readMap } from "../src/render-index.ts";
-import { assemblePromiseModel } from "../src/promise.ts";
-import { diffGraphs } from "../src/structural.ts";
-import { _resetEvolutionMemo } from "../src/evolution.ts";
-import type { DecisionRecord } from "../src/decisions.ts";
-import type { StatusRecord, ClaimRecord } from "../src/status.ts";
+} from "../src/readings/index-model.ts";
+import { renderIndex, formatIndexSummary, readMap } from "../src/readings/render-index.ts";
+import { assemblePromiseModel } from "../src/readings/promise.ts";
+import { diffGraphs } from "../src/diagnostics/structural.ts";
+import { _resetEvolutionMemo } from "../src/diagnostics/evolution.ts";
+import type { DecisionRecord } from "../src/evidence/decisions.ts";
+import type { StatusRecord, ClaimRecord } from "../src/evidence/status.ts";
 import { cfg, comp, graph, sym, fileNode, tmpProject, cleanup } from "./_helpers.ts";
 
 const CLI_PATH = fileURLToPath(new URL("../src/cli.ts", import.meta.url));

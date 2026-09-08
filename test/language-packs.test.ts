@@ -2,7 +2,7 @@
 // erode silently, because a function smuggled into any pack table reds this by path.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { builtinLanguagePacks, functionFields } from "../src/language-packs.ts";
+import { builtinLanguagePacks, functionFields } from "../src/derivation/language-packs.ts";
 
 test("language packs — every built-in pack is function-free data across all five instrument tables", () => {
   const packs = builtinLanguagePacks();

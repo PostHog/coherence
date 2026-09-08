@@ -3,9 +3,9 @@ import { writeFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, webkit } from 'playwright';
 import { tmpProject, cleanup, cfg } from '../../test/_helpers.ts';
-import { buildGraph } from '../../src/derive.ts';
-import { recordTaxonomy } from '../../src/taxonomy-ledger.ts';
-import { TAXONOMY } from '../../src/taxonomy-catalog.ts';
+import { buildGraph } from '../../src/derivation/derive.ts';
+import { recordTaxonomy } from '../../src/taxonomy/taxonomy-ledger.ts';
+import { TAXONOMY } from '../../src/taxonomy/taxonomy-catalog.ts';
 import { startScopeServer } from './server.mjs';
 
 const root = await tmpProject({ 'coherence.spec.md': '# Fixture\n', 'subject.ts': 'export function session() { return 1; }\n' });
@@ -18,7 +18,8 @@ try {
   page.setDefaultTimeout(10000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(live.url);
-  await page.waitForFunction(() => document.querySelector('.feed-status')?.textContent === 'Journal live');
+  await page.waitForFunction(() => document.querySelector('.feed-status')?.textContent === 'Scope live');
+  assert.match(await page.locator('.card-taxonomy').innerText(), /No assessments recorded/);
   await page.getByRole('tab', { name: 'Taxonomy', exact: true }).click();
   assert.match(await page.locator('.taxonomy-panel').innerText(), /No classifications recorded/);
   const options = { target: 'subject.ts#session', expected: null, session: 'taxonomy-fixture', agent: 'fixture', because: 'Owns session and resource lifecycle',
@@ -27,11 +28,20 @@ try {
   await page.locator('.taxonomy-list .journal-row').waitFor();
   assert.match(await page.locator('.taxonomy-detail').innerText(), /composite/);
   assert.match(await page.locator('.taxonomy-detail').innerText(), /UNVERIFIED/);
+  await page.getByRole('tab', { name: 'Structure', exact: true }).click();
+  assert.match(await page.locator('.card-taxonomy').innerText(), /Session\/subscription owner/);
+  assert.match(await page.locator('.card-taxonomy').innerText(), /Resource driver/);
+  assert.match(await page.locator('.card-taxonomy-facets').innerText(), /lifecycle/);
+  await page.getByRole('tab', { name: 'Taxonomy', exact: true }).click();
   await page.getByRole('combobox', { name: 'Scope session' }).selectOption('taxonomy-fixture');
   await page.getByRole('textbox', { name: 'Search taxonomy' }).fill('subject.ts');
   await page.locator('.taxonomy-list .journal-row').click();
   await writeFile(join(root, 'subject.ts'), 'export function session() { return 2; }\n');
   await page.waitForFunction(() => document.querySelector('.taxonomy-detail')?.textContent.includes('Stale evidence'));
+  await page.getByRole('tab', { name: 'Structure', exact: true }).click();
+  assert.match(await page.locator('.card-taxonomy-state').innerText(), /1 stale/);
+  assert.match(await page.locator('.taxonomy-inspector').innerText(), /1 stale/);
+  await page.getByRole('tab', { name: 'Taxonomy', exact: true }).click();
   assert.equal(await page.getByRole('textbox', { name: 'Search taxonomy' }).inputValue(), 'subject.ts');
   assert.equal(await page.locator('.taxonomy-list .journal-row').count(), 1);
   const b = recordTaxonomy(config, await buildGraph(config), { ...options, expected: a.id, because: 'Reassessed changed source' });
@@ -40,6 +50,11 @@ try {
   const c = recordTaxonomy(config, await buildGraph(config), { ...options, expected: b.id, roles: [],
     answers: { 'signal:representation': 'yes' }, because: 'Representation needs operational evidence' });
   await page.waitForFunction(() => document.querySelector('.taxonomy-detail')?.textContent.includes('Representation needs operational evidence'));
+  await page.getByRole('tab', { name: 'Structure', exact: true }).click();
+  assert.match(await page.locator('.card-taxonomy').innerText(), /No selected roles/);
+  assert.match(await page.locator('.card-taxonomy-state').innerText(), /1 ambiguous/);
+  assert.equal(await page.locator('.card-taxonomy-roles').count(), 0, 'candidates never become selected card roles');
+  await page.getByRole('tab', { name: 'Taxonomy', exact: true }).click();
   await page.locator('.taxonomy-detail summary').filter({ hasText: 'Candidate responsibilities' }).click();
   assert.match(await page.locator('.taxonomy-detail').innerText(), /Required before selection: signal:parses-syntax/);
   await page.locator('.taxonomy-questions summary').click();
@@ -56,6 +71,7 @@ try {
   assert.match(await page.locator('.taxonomy-panel').innerText(), /No matching classifications/);
   await page.getByRole('combobox', { name: 'Taxonomy status' }).selectOption('');
   await page.getByRole('tab', { name: 'Structure', exact: true }).click();
+  assert.match(await page.locator('.card-taxonomy-state').innerText(), /1 no-fit/);
   await page.getByRole('tab', { name: 'Taxonomy', exact: true }).click();
   assert.equal(await page.getByRole('textbox', { name: 'Search taxonomy' }).inputValue(), 'subject.ts');
   await page.setViewportSize({ width: 390, height: 844 });
@@ -64,6 +80,9 @@ try {
   await writeFile(join(root, '.coherence/taxonomy', name), 'damaged\n');
   await page.waitForFunction(() => document.querySelector('.taxonomy-panel [role=alert]')?.textContent.includes('Taxonomy unavailable'));
   assert.equal(await page.locator('.taxonomy-list .journal-row').count(), 0);
+  await page.getByRole('tab', { name: 'Structure', exact: true }).click();
+  assert.match(await page.locator('.card-taxonomy').innerText(), /Taxonomy unavailable/);
+  assert.equal(await page.locator('.card-taxonomy-roles').count(), 0);
   assert.deepEqual(errors, []);
   console.log('Taxonomy browser checks passed: focused operational questions, explicit selection, no-fit, empty, composite, unverified suggestions, live staleness/revision, retained filters, mobile and damaged evidence.');
 } finally { await browser.close(); await live.close(); await cleanup(root); }

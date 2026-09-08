@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { tmpProject, cleanup, cfg } from '../../test/_helpers.ts';
-import { LIFECYCLE_HOOK_EVENTS, inspectLifecycleHook } from '../../src/control.ts';
-import { recordActivity } from '../../src/activity.ts';
-import { readJournal, resolve as resolveJournal } from '../../src/decisions.ts';
-import { readDefects } from '../../src/defects.ts';
-import { readExperiments } from '../../src/experiment.ts';
+import { LIFECYCLE_HOOK_EVENTS, inspectLifecycleHook } from '../../src/lifecycle/control.ts';
+import { recordActivity } from '../../src/lifecycle/activity.ts';
+import { readJournal, resolve as resolveJournal } from '../../src/evidence/decisions.ts';
+import { readDefects } from '../../src/evidence/defects.ts';
+import { readExperiments } from '../../src/evidence/experiment.ts';
 import { readScopeReadings } from './readings.mjs';
 import { journalEntries, filterEntries } from './journal-view.mjs';
 

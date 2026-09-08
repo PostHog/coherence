@@ -7,7 +7,7 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpProject, cleanup, cfg } from "./_helpers.ts";
-import { buildGraph } from "../src/derive.ts";
+import { buildGraph } from "../src/derivation/derive.ts";
 import { makeTreeSitterAdapter, ruby } from "../src/adapters/tree-sitter.ts";
 
 const HARNESS = join(dirname(fileURLToPath(import.meta.url)), "..");

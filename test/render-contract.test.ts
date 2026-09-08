@@ -16,8 +16,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { renderContract } from "../src/render-contract.ts";
-import type { PromiseModel } from "../src/promise-model.ts";
+import { renderContract } from "../src/readings/render-contract.ts";
+import type { PromiseModel } from "../src/readings/promise-model.ts";
 
 // ── the standing fixture: 3 zones (one nested) + an undeclared band ─────────────────────
 // core (most trusted) ▸ core/crypto (nested inside core) ▸ edge; plus a component with a

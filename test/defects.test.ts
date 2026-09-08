@@ -15,8 +15,8 @@ import {
   recordDefect,
   renderDefects,
   type RecordDefectInput,
-} from "../src/defects.ts";
-import { agentInstructions } from "../src/hooks.ts";
+} from "../src/evidence/defects.ts";
+import { agentInstructions } from "../src/lifecycle/hooks.ts";
 import { cfg, cleanup, tmpProject } from "./_helpers.ts";
 
 const T = (n: number) => `2026-08-20T10:${String(n).padStart(2, "0")}:00.000Z`;

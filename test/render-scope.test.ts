@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { renderScope } from "../src/render-scope.ts";
-import type { ScopeModel, ScopeNode } from "../src/scope-model.ts";
+import { renderScope } from "../src/readings/render-scope.ts";
+import type { ScopeModel, ScopeNode } from "../src/readings/scope-model.ts";
 
 const node = (id: string, x: number, y: number): ScopeNode => ({
   id, graphNodeId: `c:${id}`, label: id, intent: `${id} intent`, x, y,
@@ -11,6 +11,7 @@ const node = (id: string, x: number, y: number): ScopeNode => ({
 });
 
 const model: ScopeModel = {
+  containment: [], charts: null, transitions: [],
   root: "fixture", center: ".", nodes: [node(".", 0, 0), node("quiet", 220, 0)],
   relations: [{ id: "r:quiet->.", source: "quiet", target: ".", kind: "reliance",
     crossing: { from: "edge", to: "core" }, via: null }],
@@ -47,7 +48,7 @@ test("scope cards — titles have an opaque title bar and explicit contrast, wit
 });
 
 test("empty scope states absence instead of drawing an authoritative empty system", () => {
-  const html = renderScope({ root: "empty", center: null, nodes: [], relations: [], guarantees: [] });
+  const html = renderScope({ root: "empty", center: null, nodes: [], relations: [], guarantees: [], containment: [], charts: null, transitions: [] });
   assert.match(html, /NO COMPONENTS/);
   assert.match(html, /model contains no component subjects/);
 });

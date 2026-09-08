@@ -6,7 +6,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { BUILTIN_LANGUAGES, withTree, grammarHandle } from "../src/adapters/tree-sitter.ts";
-import { surfaceOfSource } from "../src/novelty.ts";
+import { surfaceOfSource } from "../src/diagnostics/novelty.ts";
 
 const BIG_TS = "export const x = 1;\n".repeat(4000); // ~80KB — the abort-repro shape
 
