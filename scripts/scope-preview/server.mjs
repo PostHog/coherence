@@ -7,13 +7,17 @@ import { newTailState, tailJournal } from '../../src/journal.ts';
 import { readScopeReadings } from './readings.mjs';
 
 const digestOf = value => createHash('sha256').update(value).digest('hex');
-function ledgerStamp(cfg) {
-  return ['decisions', 'defects', 'experiments', 'hooks'].map(name => {
+function ledgerStamp(cfg, evidenceFiles = []) {
+  const ledgers = ['decisions', 'defects', 'experiments', 'hooks', 'taxonomy'].map(name => {
     const dir = join(cfg.root, '.coherence', name);
     try { return readdirSync(dir).sort().map(file => {
       const s = statSync(join(dir, file)); return `${name}/${file}:${s.size}:${s.mtimeMs}`;
     }).join('|'); } catch (error) { return `${name}:${error.code}`; }
   }).join('|');
+  return ledgers + evidenceFiles.map(file => {
+    try { const s = statSync(join(cfg.root, file)); return `|${file}:${s.size}:${s.mtimeMs}`; }
+    catch (error) { return `|${file}:${error.code}`; }
+  }).join('');
 }
 
 export async function startScopeServer({ cfg, htmlPath, port = 0, intervalMs = 750 }) {
@@ -24,8 +28,10 @@ export async function startScopeServer({ cfg, htmlPath, port = 0, intervalMs = 7
   const tailState = newTailState();
   let tailDamage = tailJournal(cfg, tailState).unreadable;
   let stamp = ledgerStamp(cfg), packet = '', digest = '', origin, retryRead = false;
+  let evidenceFiles = [];
   function refresh(force = false) {
     const readings = readScopeReadings(cfg);
+    evidenceFiles = [...new Set((readings.taxonomy?.records ?? []).flatMap(r => Object.keys(r.snapshot.files)))].sort();
     const raw = JSON.stringify(readings), next = digestOf(raw);
     if (next === digest && !force) return;
     digest = next;
@@ -70,7 +76,7 @@ export async function startScopeServer({ cfg, htmlPath, port = 0, intervalMs = 7
   const timer = setInterval(() => {
     if (!clients.size) return;
     try {
-      const tail = tailJournal(cfg, tailState), nextStamp = ledgerStamp(cfg);
+      const tail = tailJournal(cfg, tailState), nextStamp = ledgerStamp(cfg, evidenceFiles);
       if (retryRead || tail.fresh.length || tail.unreadable !== tailDamage || nextStamp !== stamp) {
         refresh(retryRead); retryRead = false; stamp = nextStamp; tailDamage = tail.unreadable;
       }

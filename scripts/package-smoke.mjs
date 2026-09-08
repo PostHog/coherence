@@ -96,6 +96,7 @@ try {
   await writeFile(join(consumer, "coherence.config.json"), "{}\n");
   await writeFile(join(consumer, ".gitignore"), "node_modules/\n.coherence/\n.claude/\n.codex/\n");
   await writeFile(join(consumer, "src", "index.js"), "export const consumer = true;\n");
+  await writeFile(join(consumer, "src", "taxonomy-subject.ts"), "export function invoke() { return true; }\n");
 
   run(git, ["init", "-q", "-b", "main"], { cwd: consumer });
   run(git, ["config", "user.name", "Coherence package smoke"], { cwd: consumer });
@@ -113,6 +114,19 @@ try {
   const coherenceHook = join(consumer, "node_modules", ".bin", "coherence-hook");
   await executable(coherence);
   await executable(coherenceHook);
+
+  // Taxonomy must ship as CLI code/data, without a lab checkout or frontend package.
+  const catalog = JSON.parse(run(coherence, ["taxonomy", "catalog", "--json"], { cwd: consumer }).stdout);
+  assert.ok(catalog.roles.length > 0 && catalog.guarantees.length > 0);
+  const inspected = JSON.parse(run(coherence, ["taxonomy", "inspect", "src/taxonomy-subject.ts", "--json"], { cwd: consumer }).stdout);
+  assert.equal(inspected.classification.assessment, "unassessed");
+  const classified = JSON.parse(run(coherence, ["taxonomy", "record", "src/taxonomy-subject.ts",
+    "--expected", "none", "--session", "package-taxonomy", "--because", "Fixture callable surface",
+    "--answer", "signal:invocation=yes", "--role", "role:public-api-facade",
+    "--evidence", "src/taxonomy-subject.ts", "--json"], { cwd: consumer }).stdout);
+  assert.ok(classified.classification.suggestions.every(g => g.status === "unverified"));
+  run(coherence, ["taxonomy", "list", "--check"], { cwd: consumer });
+  run(coherence, ["taxonomy", "attest", "--status", "satisfied"], { cwd: consumer, status: 2 });
 
   // Reject malformed evidence before the recorder creates even an empty ledger directory.
   run(coherence, ["defect", "invalid record", "--session", "invalid-session"], {

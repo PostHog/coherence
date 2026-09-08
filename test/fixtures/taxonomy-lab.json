@@ -1,0 +1,1017 @@
+{
+  "catalogVersion": "semantic-component-classifier/v3-closure",
+  "evidenceQuestions": [
+    {
+      "id": "simulation-state",
+      "question": "Does it own the canonical evolving state of a simulated system at one logical instant?",
+      "projection": [
+        "symbol",
+        "hover",
+        "incomingCalls",
+        "outgoingCalls"
+      ]
+    },
+    {
+      "id": "simulation-transition",
+      "question": "Does it compute one named causal law or process that changes simulated state over a timestep?",
+      "projection": [
+        "symbol",
+        "hover",
+        "outgoingCalls",
+        "references"
+      ]
+    },
+    {
+      "id": "simulation-integrator",
+      "question": "Does it combine multiple simulation processes into one atomic committed state transition?",
+      "projection": [
+        "symbol",
+        "hover",
+        "incomingCalls",
+        "outgoingCalls"
+      ]
+    },
+    {
+      "id": "simulation-timebase",
+      "question": "Does it decide when, by how much, or under which regime logical simulation time advances?",
+      "projection": [
+        "symbol",
+        "hover",
+        "incomingCalls",
+        "outgoingCalls"
+      ]
+    },
+    {
+      "id": "simulation-event",
+      "question": "Does it apply a bounded discrete occurrence or disturbance to simulated state?",
+      "projection": [
+        "symbol",
+        "hover",
+        "outgoingCalls",
+        "references"
+      ]
+    },
+    {
+      "id": "simulation-scenario",
+      "question": "Does it construct a complete valid initial simulated world from a scenario, preset, or seed?",
+      "projection": [
+        "symbol",
+        "hover",
+        "outgoingCalls",
+        "references"
+      ]
+    },
+    {
+      "id": "simulation-parameters",
+      "question": "Does it own coefficients, thresholds, enabled processes, or regime policy governing the model rather than evolved state?",
+      "projection": [
+        "symbol",
+        "hover",
+        "incomingCalls",
+        "references"
+      ]
+    },
+    {
+      "id": "simulation-observable",
+      "question": "Does it derive a domain quantity from one canonical snapshot without affecting the simulated trajectory?",
+      "projection": [
+        "symbol",
+        "hover",
+        "incomingCalls",
+        "outgoingCalls"
+      ]
+    },
+    {
+      "id": "simulation-trajectory",
+      "question": "Does it retain time-indexed committed states or observations without becoming current-state authority?",
+      "projection": [
+        "symbol",
+        "hover",
+        "incomingCalls",
+        "references"
+      ]
+    },
+    {
+      "id": "representation",
+      "question": "Does this component primarily translate, validate, optimize, or represent a domain/program form?",
+      "projection": [
+        "symbol",
+        "hover",
+        "outgoingCalls",
+        "implementations"
+      ]
+    },
+    {
+      "id": "invocation",
+      "question": "Is its primary contract a callable or command surface used by an external caller?",
+      "projection": [
+        "symbol",
+        "hover",
+        "incomingCalls",
+        "references"
+      ]
+    },
+    {
+      "id": "execution",
+      "question": "Does it primarily schedule, dispatch, execute, or supervise continuing work?",
+      "projection": [
+        "symbol",
+        "hover",
+        "outgoingCalls",
+        "implementations"
+      ]
+    },
+    {
+      "id": "construction",
+      "question": "Does it primarily select, assemble, configure, or return another component?",
+      "projection": [
+        "symbol",
+        "hover",
+        "outgoingCalls",
+        "references"
+      ]
+    },
+    {
+      "id": "extension",
+      "question": "Does it host independently supplied implementations behind a versioning or compatibility boundary?",
+      "projection": [
+        "symbol",
+        "implementations",
+        "typeHierarchy",
+        "references"
+      ]
+    },
+    {
+      "id": "continuity",
+      "question": "Does it own logical session, connection, or subscription continuity independently of its substrate?",
+      "projection": [
+        "symbol",
+        "hover",
+        "outgoingCalls",
+        "incomingCalls"
+      ]
+    },
+    {
+      "id": "resource",
+      "question": "Does it primarily own operations and failure semantics for an external resource or process?",
+      "projection": [
+        "symbol",
+        "hover",
+        "outgoingCalls",
+        "references"
+      ]
+    },
+    {
+      "id": "bootstrap",
+      "question": "Does it own one-time top-level application initialization and startup?",
+      "projection": [
+        "symbol",
+        "incomingCalls",
+        "outgoingCalls",
+        "references"
+      ]
+    },
+    {
+      "id": "presentation",
+      "question": "Does it primarily coordinate user-visible presentation or interaction state?",
+      "projection": [
+        "symbol",
+        "hover",
+        "incomingCalls",
+        "outgoingCalls"
+      ]
+    },
+    {
+      "id": "observability",
+      "question": "Does it primarily emit, aggregate, or export operational observations?",
+      "projection": [
+        "symbol",
+        "hover",
+        "outgoingCalls",
+        "references"
+      ]
+    },
+    {
+      "id": "authority",
+      "question": "Does it primarily own canonical identity, registration, policy, or durable state authority?",
+      "projection": [
+        "symbol",
+        "hover",
+        "incomingCalls",
+        "references"
+      ]
+    },
+    {
+      "id": "decision",
+      "question": "Does it compute a pure bounded decision from explicit inputs without owning state, effects, or representation lifecycle?",
+      "projection": [
+        "symbol",
+        "hover",
+        "incomingCalls",
+        "outgoingCalls",
+        "references"
+      ]
+    }
+  ],
+  "facets": [
+    {
+      "id": "canonical-state",
+      "question": "Does it own committed evolving simulation state?"
+    },
+    {
+      "id": "state-transition",
+      "question": "Can it change the future simulated trajectory?"
+    },
+    {
+      "id": "derived-only",
+      "question": "Is it observational only, unable to affect the simulated trajectory?"
+    },
+    {
+      "id": "continuous-process",
+      "question": "Is it evaluated as a background law over logical timesteps?"
+    },
+    {
+      "id": "discrete-event",
+      "question": "Does it represent a discontinuous occurrence at a defined cycle point?"
+    },
+    {
+      "id": "deterministic",
+      "question": "Is equal explicit input required to produce equal output?"
+    },
+    {
+      "id": "stochastic",
+      "question": "Does it consume randomness as part of model behavior?"
+    },
+    {
+      "id": "seeded",
+      "question": "Is seeded reproducibility part of its contract?"
+    },
+    {
+      "id": "multi-rate",
+      "question": "Can its timestep or active process regime differ from other processes?"
+    },
+    {
+      "id": "coupled",
+      "question": "Does it read quantities affected by other simulation processes?"
+    },
+    {
+      "id": "feedback-loop",
+      "question": "Does it participate in a directed causal feedback cycle?"
+    },
+    {
+      "id": "thresholded",
+      "question": "Does behavior switch discontinuously at named thresholds or regimes?"
+    },
+    {
+      "id": "conservative",
+      "question": "Must a stock, flow, energy, mass, or other budget close within a tolerance?"
+    },
+    {
+      "id": "spatial",
+      "question": "Is state indexed by cell, location, or region?"
+    },
+    {
+      "id": "aggregate",
+      "question": "Does it aggregate spatial or component state into a system-level quantity?"
+    },
+    {
+      "id": "trajectory-bearing",
+      "question": "Does it retain observations indexed by logical simulation time?"
+    },
+    {
+      "id": "intervention-surface",
+      "question": "Can a user or external caller deliberately alter model state or policy through it?"
+    },
+    {
+      "id": "approximate-model",
+      "question": "Does it intentionally implement a simplified, calibrated, or illustrative model rather than exact physical truth?"
+    },
+    {
+      "id": "public-observation-edge",
+      "question": "Does it export a domain snapshot or observation across a public boundary?"
+    },
+    {
+      "id": "boundary",
+      "question": "Does it cross a process, network, storage, or trust boundary?"
+    },
+    {
+      "id": "state",
+      "question": "Does correctness depend on retained mutable state across calls?"
+    },
+    {
+      "id": "lifecycle",
+      "question": "Does it own explicit start, stop, cancellation, or recovery transitions?"
+    },
+    {
+      "id": "concurrency",
+      "question": "Can operations overlap or be observed concurrently?"
+    },
+    {
+      "id": "persistence",
+      "question": "Does it own durable data or a rebuildable derived representation?"
+    },
+    {
+      "id": "extensibility",
+      "question": "Can independently versioned implementations be introduced?"
+    },
+    {
+      "id": "presentation",
+      "question": "Does its contract include user-visible state or interaction?"
+    },
+    {
+      "id": "observability",
+      "question": "Does its contract include telemetry, audit, or diagnostics?"
+    }
+  ],
+  "guarantees": [
+    {
+      "id": "G-SIM-STATE-SCHEMA",
+      "level": "mandatory",
+      "when": {
+        "role": "Simulation state authority"
+      },
+      "text": "Every canonical quantity has one identity, type or unit, admissible domain, and initialization rule."
+    },
+    {
+      "id": "G-SIM-SINGLE-AUTHORITY",
+      "level": "mandatory",
+      "when": {
+        "role": "Simulation state authority"
+      },
+      "text": "No presentation, history, persistence, or process component maintains an independently authoritative state copy."
+    },
+    {
+      "id": "G-SIM-STATE-VALIDITY",
+      "level": "mandatory",
+      "when": {
+        "role": "Simulation state authority"
+      },
+      "text": "Committed states satisfy finite, range, and declared cross-field constraints."
+    },
+    {
+      "id": "G-SIM-SNAPSHOT",
+      "level": "mandatory",
+      "when": {
+        "role": "Simulation state authority"
+      },
+      "text": "Snapshots are immutable observations of one coherent logical instant."
+    },
+    {
+      "id": "G-SIM-RESET",
+      "level": "mandatory",
+      "when": {
+        "role": "Simulation state authority"
+      },
+      "text": "Reset restores declared initial state, logical time, stochastic state, and history policy."
+    },
+    {
+      "id": "G-SIM-READ-WRITE-SET",
+      "level": "mandatory",
+      "when": {
+        "role": "Transition process"
+      },
+      "text": "The process declares complete inputs and affected canonical quantities."
+    },
+    {
+      "id": "G-SIM-DELTA-DISCIPLINE",
+      "level": "mandatory",
+      "when": {
+        "role": "Transition process"
+      },
+      "text": "The process proposes a delta or next-state contribution and cannot privately commit canonical state."
+    },
+    {
+      "id": "G-SIM-DT",
+      "level": "mandatory",
+      "when": {
+        "role": "Transition process"
+      },
+      "text": "Behavior is defined in terms of an explicit logical timestep."
+    },
+    {
+      "id": "G-SIM-DETERMINISM",
+      "level": "mandatory",
+      "when": {
+        "facet": "deterministic"
+      },
+      "text": "Equal state, parameters, timestep, and random stream produce equal output."
+    },
+    {
+      "id": "G-SIM-BOUNDS",
+      "level": "mandatory",
+      "when": {
+        "facet": "state-transition"
+      },
+      "text": "Transitions cannot introduce invalid, non-finite, or domain-impossible committed state."
+    },
+    {
+      "id": "G-SIM-CAUSAL-SIGN",
+      "level": "mandatory",
+      "when": {
+        "facet": "coupled"
+      },
+      "text": "Important causal and monotonic directions have explicit falsifiable tests."
+    },
+    {
+      "id": "G-SIM-NO-HIDDEN-INPUT",
+      "level": "mandatory",
+      "when": {
+        "facet": "state-transition"
+      },
+      "text": "Wall clock, DOM, ambient randomness, and mutable globals cannot alter model evolution unnoticed."
+    },
+    {
+      "id": "G-SIM-STEP-ATOMICITY",
+      "level": "mandatory",
+      "when": {
+        "role": "Coupled-step integrator"
+      },
+      "text": "Consumers observe pre-step or post-step state, never a partially updated mixture."
+    },
+    {
+      "id": "G-SIM-COUPLING-TOTALITY",
+      "level": "mandatory",
+      "when": {
+        "role": "Coupled-step integrator"
+      },
+      "text": "Every active process participates exactly once under declared phase and ordering semantics."
+    },
+    {
+      "id": "G-SIM-ORDERING",
+      "level": "mandatory",
+      "when": {
+        "role": "Coupled-step integrator"
+      },
+      "text": "Process ordering, simultaneous-delta combination, or convergence semantics are explicit."
+    },
+    {
+      "id": "G-SIM-CYCLE-CLOSURE",
+      "level": "mandatory",
+      "when": {
+        "role": "Coupled-step integrator"
+      },
+      "text": "Feedback uses a declared old/new-state policy that prevents accidental same-cycle feedback."
+    },
+    {
+      "id": "G-SIM-TIME-ADVANCE",
+      "level": "mandatory",
+      "when": {
+        "role": "Coupled-step integrator"
+      },
+      "text": "Logical model time advances exactly with committed steps."
+    },
+    {
+      "id": "G-SIM-REPLAY",
+      "level": "mandatory",
+      "when": {
+        "facet": "seeded"
+      },
+      "text": "Repeated executions from the same versioned scenario and seed reproduce the same trajectory."
+    },
+    {
+      "id": "G-SIM-FAILURE-ATOMICITY",
+      "level": "mandatory",
+      "when": {
+        "role": "Coupled-step integrator"
+      },
+      "text": "A failed process cannot leave a partially committed simulation step."
+    },
+    {
+      "id": "G-SIM-TIMEBASE",
+      "level": "mandatory",
+      "when": {
+        "role": "Simulation timebase"
+      },
+      "text": "Logical time is independent of rendering; pause advances zero cycles and advance(n) commits exactly n cycles without silent skip or duplication."
+    },
+    {
+      "id": "G-SIM-EVENT",
+      "level": "mandatory",
+      "when": {
+        "role": "Event/disturbance process"
+      },
+      "text": "Trigger, payload, affected fields, random source, identity, and cycle application point are explicit."
+    },
+    {
+      "id": "G-SIM-SCENARIO",
+      "level": "mandatory",
+      "when": {
+        "role": "Scenario/initial-condition generator"
+      },
+      "text": "A versioned scenario and seed completely and atomically produce a valid initial world distinct from evolved state."
+    },
+    {
+      "id": "G-SIM-PARAMETERS",
+      "level": "mandatory",
+      "when": {
+        "role": "Model parameter authority"
+      },
+      "text": "Parameter units, domains, defaults, versioning, consumers, and cycle-boundary change semantics are explicit and distinct from evolving state."
+    },
+    {
+      "id": "G-SIM-DERIVED-PURITY",
+      "level": "mandatory",
+      "when": {
+        "role": "Derived observable/projector"
+      },
+      "text": "The observable is a pure deterministic projection with complete declared dependencies and no independent state authority."
+    },
+    {
+      "id": "G-SIM-TRAJECTORY",
+      "level": "mandatory",
+      "when": {
+        "role": "Trajectory/history recorder"
+      },
+      "text": "Samples identify committed logical instants, cadence, before/after convention, retention, reset/load behavior, and schema compatibility without mutating current state."
+    },
+    {
+      "id": "G-SIM-PUBLIC-OBSERVATION-SCHEMA",
+      "level": "mandatory",
+      "when": {
+        "facet": "public-observation-edge"
+      },
+      "text": "The public observation declares exact field paths, names, types, units, nullability, ranges, authority status, snapshot coherence, compatibility policy, and consumer-side negative contract tests."
+    },
+    {
+      "id": "G-SIM-DERIVED-ONLY",
+      "level": "mandatory",
+      "when": {
+        "facet": "derived-only"
+      },
+      "text": "Observation cannot mutate or influence the simulated trajectory and distinguishes undefined from numeric zero."
+    },
+    {
+      "id": "G-SIM-RNG",
+      "level": "mandatory",
+      "when": {
+        "facet": "stochastic"
+      },
+      "text": "Randomness comes only from an explicit owned stream with replayable state and declared consumption semantics."
+    },
+    {
+      "id": "G-SIM-MULTIRATE",
+      "level": "mandatory",
+      "when": {
+        "facet": "multi-rate"
+      },
+      "text": "Timestep and active-process regime changes are explicit and tested at equivalence or declared tolerance boundaries."
+    },
+    {
+      "id": "G-SIM-FEEDBACK",
+      "level": "mandatory",
+      "when": {
+        "facet": "feedback-loop"
+      },
+      "text": "Feedback direction, delay, regulation or amplification, and stability expectations have falsifiable cycle tests."
+    },
+    {
+      "id": "G-SIM-THRESHOLD",
+      "level": "mandatory",
+      "when": {
+        "facet": "thresholded"
+      },
+      "text": "Behavior immediately below, at, and above every named threshold is specified and tested."
+    },
+    {
+      "id": "G-SIM-CONSERVATION",
+      "level": "mandatory",
+      "when": {
+        "facet": "conservative"
+      },
+      "text": "Stock and flow residuals close within a declared tolerance with explicit sources and sinks."
+    },
+    {
+      "id": "G-SIM-SPATIAL",
+      "level": "mandatory",
+      "when": {
+        "facet": "spatial"
+      },
+      "text": "Spatial indexing, boundaries, neighborhood semantics, and aggregation consistency are explicit."
+    },
+    {
+      "id": "G-SIM-AGGREGATE",
+      "level": "mandatory",
+      "when": {
+        "facet": "aggregate"
+      },
+      "text": "Aggregation weights, missing values, units, and consistency with source state are explicit."
+    },
+    {
+      "id": "G-SIM-INTERVENTION",
+      "level": "mandatory",
+      "when": {
+        "facet": "intervention-surface"
+      },
+      "text": "External interventions validate authority, timing, cost, affected quantities, and interaction with replay."
+    },
+    {
+      "id": "G-SIM-APPROXIMATION",
+      "level": "mandatory",
+      "when": {
+        "facet": "approximate-model"
+      },
+      "text": "Approximation scope, calibration basis, excluded behavior, and invalid inference boundaries are explicit."
+    },
+    {
+      "id": "G-BOUNDARY",
+      "level": "mandatory",
+      "when": {
+        "facet": "boundary"
+      },
+      "text": "Boundary inputs are validated and failures preserve caller-visible semantics."
+    },
+    {
+      "id": "G-STATE",
+      "level": "mandatory",
+      "when": {
+        "facet": "state"
+      },
+      "text": "State transitions have one named authority and reject stale or invalid transitions."
+    },
+    {
+      "id": "G-LIFECYCLE",
+      "level": "mandatory",
+      "when": {
+        "facet": "lifecycle"
+      },
+      "text": "Start, stop, cancellation, failure, and recovery are explicit and idempotent where repeated."
+    },
+    {
+      "id": "G-CONCURRENCY",
+      "level": "mandatory",
+      "when": {
+        "facet": "concurrency"
+      },
+      "text": "Concurrent operations preserve ordering, ownership, and stale-work exclusion."
+    },
+    {
+      "id": "G-PERSISTENCE",
+      "level": "mandatory",
+      "when": {
+        "facet": "persistence"
+      },
+      "text": "Durable authority and rebuildable derived state are distinguished and recovery is testable."
+    },
+    {
+      "id": "G-EXTENSION",
+      "level": "mandatory",
+      "when": {
+        "facet": "extensibility"
+      },
+      "text": "Extension discovery, compatibility, isolation, and failure containment are explicit."
+    },
+    {
+      "id": "G-PRESENTATION",
+      "level": "conditional",
+      "when": {
+        "facet": "presentation"
+      },
+      "text": "User-visible state has deterministic loading, empty, success, and failure behavior."
+    },
+    {
+      "id": "G-OBSERVABILITY",
+      "level": "conditional",
+      "when": {
+        "facet": "observability"
+      },
+      "text": "Operational signals are bounded, attributable, redactable, and non-authoritative."
+    },
+    {
+      "id": "G-PURE-DECISION",
+      "level": "mandatory",
+      "when": {
+        "role": "Pure predicate/decision function"
+      },
+      "text": "The decision is total over its declared input domain, deterministic, side-effect free, and explicit about missing or invalid inputs."
+    },
+    {
+      "id": "G-CLI",
+      "level": "mandatory",
+      "when": {
+        "role": "CLI orchestrator"
+      },
+      "text": "Arguments, exit codes, output channels, interruption, and partial failure form a stable contract."
+    },
+    {
+      "id": "G-SESSION",
+      "level": "mandatory",
+      "when": {
+        "role": "Session/subscription owner"
+      },
+      "text": "Logical identity, reconnect, cancellation, and teardown remain distinct from transport ownership."
+    },
+    {
+      "id": "G-FACTORY",
+      "level": "mandatory",
+      "when": {
+        "role": "Factory/assembler"
+      },
+      "text": "Construction validates configuration and never leaks a partially initialized product."
+    },
+    {
+      "id": "G-API",
+      "level": "mandatory",
+      "when": {
+        "role": "Public API/facade"
+      },
+      "text": "The public surface preserves compatibility and translates internal failures deliberately."
+    }
+  ],
+  "roles": [
+    {
+      "id": "Simulation state authority",
+      "responsibility": "provide the single authoritative state of a simulated system at one logical instant",
+      "signals": [
+        "simulation-state"
+      ],
+      "cues": [
+        "state",
+        "model",
+        "world",
+        "planet"
+      ]
+    },
+    {
+      "id": "Transition process",
+      "responsibility": "provide one causal law by which simulated state changes over a timestep",
+      "signals": [
+        "simulation-transition"
+      ],
+      "cues": [
+        "process",
+        "rate",
+        "growth",
+        "decay",
+        "warming"
+      ]
+    },
+    {
+      "id": "Coupled-step integrator",
+      "responsibility": "combine interacting simulation processes into one atomic transition from S_t to S_t+1",
+      "signals": [
+        "simulation-integrator"
+      ],
+      "cues": [
+        "advance",
+        "step",
+        "integrate",
+        "tick"
+      ]
+    },
+    {
+      "id": "Simulation timebase",
+      "responsibility": "decide when and by how much logical simulation time advances",
+      "signals": [
+        "simulation-timebase"
+      ],
+      "cues": [
+        "pause",
+        "clock",
+        "time",
+        "rate"
+      ]
+    },
+    {
+      "id": "Event/disturbance process",
+      "responsibility": "apply a bounded discrete occurrence to simulated state at a defined cycle point",
+      "signals": [
+        "simulation-event"
+      ],
+      "cues": [
+        "event",
+        "eruption",
+        "impact",
+        "shock"
+      ]
+    },
+    {
+      "id": "Scenario/initial-condition generator",
+      "responsibility": "produce a complete valid starting simulated world from a scenario or seed",
+      "signals": [
+        "simulation-scenario"
+      ],
+      "cues": [
+        "seed",
+        "scenario",
+        "initial",
+        "preset"
+      ]
+    },
+    {
+      "id": "Model parameter authority",
+      "responsibility": "own coefficients, thresholds, and regime policy that govern model behavior",
+      "signals": [
+        "simulation-parameters"
+      ],
+      "cues": [
+        "parameter",
+        "coefficient",
+        "threshold",
+        "config"
+      ]
+    },
+    {
+      "id": "Derived observable/projector",
+      "responsibility": "derive a domain observation from canonical state without changing its trajectory",
+      "signals": [
+        "simulation-observable"
+      ],
+      "cues": [
+        "habitability",
+        "observable",
+        "derive",
+        "project"
+      ]
+    },
+    {
+      "id": "Trajectory/history recorder",
+      "responsibility": "retain time-indexed committed states or observations without becoming current-state authority",
+      "signals": [
+        "simulation-trajectory"
+      ],
+      "cues": [
+        "history",
+        "trajectory",
+        "series",
+        "samples"
+      ]
+    },
+    {
+      "id": "Parser",
+      "responsibility": "turn an input representation into a structured representation",
+      "signals": [
+        "representation"
+      ],
+      "cues": [
+        "parse",
+        "syntax",
+        "AST"
+      ]
+    },
+    {
+      "id": "Validator/type checker",
+      "responsibility": "decide whether a representation satisfies rules without becoming its runtime",
+      "signals": [
+        "representation",
+        "authority"
+      ],
+      "cues": [
+        "validate",
+        "check",
+        "diagnostic"
+      ]
+    },
+    {
+      "id": "Lowerer/domain transformer",
+      "responsibility": "translate one established representation into another",
+      "signals": [
+        "representation"
+      ],
+      "cues": [
+        "lower",
+        "transform",
+        "convert"
+      ]
+    },
+    {
+      "id": "Optimizer",
+      "responsibility": "improve a representation while preserving its required meaning",
+      "signals": [
+        "representation",
+        "execution"
+      ],
+      "cues": [
+        "optimize",
+        "plan",
+        "rewrite"
+      ]
+    },
+    {
+      "id": "Public API/facade",
+      "responsibility": "be the stable caller-facing surface for ongoing domain operations",
+      "signals": [
+        "invocation"
+      ],
+      "excludes": [
+        "bootstrap"
+      ]
+    },
+    {
+      "id": "CLI orchestrator",
+      "responsibility": "translate command-line intent into one bounded invocation and its exit behavior",
+      "signals": [
+        "invocation",
+        "bootstrap"
+      ],
+      "cues": [
+        "main",
+        "argv",
+        "command"
+      ]
+    },
+    {
+      "id": "Bootstrap/entrypoint",
+      "responsibility": "own one-time top-level initialization and application startup",
+      "signals": [
+        "bootstrap"
+      ],
+      "cues": [
+        "main",
+        "application",
+        "start"
+      ]
+    },
+    {
+      "id": "Factory/assembler",
+      "responsibility": "select, configure, assemble, or return another component",
+      "signals": [
+        "construction"
+      ],
+      "cues": [
+        "new",
+        "create",
+        "build",
+        "provider",
+        "factory"
+      ]
+    },
+    {
+      "id": "Plugin/extension host",
+      "responsibility": "load and invoke independently supplied implementations across a compatibility boundary",
+      "signals": [
+        "extension"
+      ],
+      "excludes": [
+        "construction"
+      ]
+    },
+    {
+      "id": "Runtime/executor",
+      "responsibility": "schedule, dispatch, execute, or supervise continuing work",
+      "signals": [
+        "execution"
+      ],
+      "excludes": [
+        "invocation"
+      ]
+    },
+    {
+      "id": "Session/subscription owner",
+      "responsibility": "own logical continuity, reconnect, cancellation, and termination",
+      "signals": [
+        "continuity"
+      ],
+      "excludes": [
+        "resource"
+      ]
+    },
+    {
+      "id": "Resource driver",
+      "responsibility": "own operations and failures of an external resource or process substrate",
+      "signals": [
+        "resource"
+      ],
+      "excludes": [
+        "continuity"
+      ]
+    },
+    {
+      "id": "UI controller",
+      "responsibility": "coordinate user-visible presentation and interaction state",
+      "signals": [
+        "presentation"
+      ]
+    },
+    {
+      "id": "Telemetry/observability adapter",
+      "responsibility": "emit, aggregate, or export operational observations",
+      "signals": [
+        "observability"
+      ]
+    },
+    {
+      "id": "Registry authority",
+      "responsibility": "own canonical registration, identity, lookup, or policy state",
+      "signals": [
+        "authority"
+      ],
+      "excludes": [
+        "extension"
+      ]
+    },
+    {
+      "id": "Pure predicate/decision function",
+      "responsibility": "compute one bounded deterministic decision from explicit inputs without state or side effects",
+      "signals": [
+        "decision"
+      ],
+      "cues": [
+        "match",
+        "filter",
+        "predicate",
+        "decide",
+        "eligible"
+      ]
+    }
+  ]
+}

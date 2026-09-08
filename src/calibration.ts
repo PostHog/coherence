@@ -9,7 +9,7 @@
 // This is deliberately a LOWER BOUND. Shell pipelines, editor buffers and remembered
 // context are not guessed from command strings. A narrow honest observation is more useful
 // than a complete-looking fiction.
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, readdirSync, lstatSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import type { Config, Graph } from "./types.ts";
@@ -74,6 +74,22 @@ export function predictedReadSet(graph: Graph, changed: Iterable<string>): Set<s
 const sampleId = (session: string, patch: string) =>
   "r-" + createHash("sha256").update(`${session}\0${patch}`).digest("hex").slice(0, 12);
 
+/** Invalid evidence cannot enter a denominator through either disk or the public API. */
+export function validateCalibrationSample(value: unknown): CalibrationSample {
+  const fail = (): never => { throw new Error("Calibration unavailable: malformed sample identity, time, paths, outcome or attribution"); };
+  if (!value || typeof value !== "object" || Array.isArray(value)) return fail();
+  const s = value as CalibrationSample;
+  const text = (v: unknown): v is string => typeof v === "string" && !!v.trim() && !/[\x00-\x1f\x7f-\x9f]/u.test(v);
+  const paths = (v: unknown): v is string[] => Array.isArray(v) && new Set(v).size === v.length
+    && v.every(p => text(p) && !p.startsWith("/") && !p.includes("\\") && !p.split("/").some(part => !part || part === "." || part === ".."));
+  if (!text(s.session) || !text(s.patch) || s.id !== sampleId(s.session, s.patch)
+    || typeof s.at !== "string" || !Number.isFinite(Date.parse(s.at)) || new Date(s.at).toISOString() !== s.at
+    || !paths(s.changed) || !paths(s.predicted) || !paths(s.observed)
+    || !["unknown", "clean", "defect"].includes(s.outcome)
+    || (s.attribution !== undefined && !["session-writes", "parent-session-aggregate", "legacy-unscoped", "worktree-union"].includes(s.attribution))) return fail();
+  return s;
+}
+
 /** Separate the host observation from git fallback so the attribution rule is a pure,
  * testable contract. Writes win whenever the host supplies them; mixing them with the
  * worktree union would silently charge one agent for another agent's patch. */
@@ -126,6 +142,8 @@ export async function recordCalibrationSample(
   const sample: CalibrationSample = {
     id: sampleId(session, patch), at: now, session, patch, changed, predicted, observed, outcome, attribution,
   };
+  validateCalibrationSample(sample);
+  readCalibrationSamples(cfg); // damage must not be buried by another successful append
   mkdirSync(samplesDir(cfg), { recursive: true });
   appendFileSync(samplesPath(cfg, session), JSON.stringify(sample) + "\n");
   return sample;
@@ -133,21 +151,26 @@ export async function recordCalibrationSample(
 
 export function readCalibrationSamples(cfg: Config): CalibrationSample[] {
   const latest = new Map<string, CalibrationSample>();
-  if (!existsSync(samplesDir(cfg))) return [];
-  for (const file of readdirSync(samplesDir(cfg)).filter((f) => f.endsWith(".jsonl")).sort()) {
-    for (const line of readFileSync(join(samplesDir(cfg), file), "utf8").split("\n")) {
-      if (!line.trim()) continue;
+  for (const dir of [join(cfg.root, ".coherence"), samplesDir(cfg)]) {
+    try { const stat = lstatSync(dir); if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("Calibration unavailable: redirected or invalid directory"); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return []; throw error; }
+  }
+  for (const file of readdirSync(samplesDir(cfg)).sort()) {
+    const path = join(samplesDir(cfg), file), stat = lstatSync(path);
+    if (!file.endsWith(".jsonl") || !stat.isFile() || stat.isSymbolicLink()) throw new Error(`Calibration unavailable: unexpected entry ${JSON.stringify(file)}`);
+    const bytes = readFileSync(path, "utf8");
+    if (!bytes || !bytes.endsWith("\n")) throw new Error(`Calibration unavailable: torn or empty file ${JSON.stringify(file)}`);
+    for (const [index, line] of bytes.slice(0, -1).split("\n").entries()) {
       try {
-        const s = JSON.parse(line) as CalibrationSample;
-        if (typeof s.id === "string" && Array.isArray(s.predicted) && Array.isArray(s.observed)) {
+        const s = validateCalibrationSample(JSON.parse(line));
+        if (file !== `${slug(s.session)}.jsonl`) throw new Error("displaced session record");
           const previous = latest.get(s.id);
           // Stop is a recurring observation tick. It may snapshot the same patch after a
           // human has already labeled that patch clean or defective, and "looked again"
           // is not evidence that the label became unknown. Preserve a real verdict across
           // later unknown snapshots; another explicit label may still replace it.
           if (!previous || s.outcome !== "unknown" || previous.outcome === "unknown") latest.set(s.id, s);
-        }
-      } catch { /* counted nowhere: malformed calibration is no evidence */ }
+      } catch (error) { throw new Error(`Calibration unavailable: ${JSON.stringify(file)} row ${index + 1}: ${(error as Error).message}`); }
     }
   }
   return [...latest.values()].sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
@@ -155,6 +178,8 @@ export function readCalibrationSamples(cfg: Config): CalibrationSample[] {
 
 const ratio = (n: number, d: number) => d ? n / d : 0;
 export function calibrationStats(samples: CalibrationSample[]): CalibrationStats {
+  samples.forEach(validateCalibrationSample);
+  if (new Set(samples.map(s => s.id)).size !== samples.length) throw new Error("Calibration unavailable: duplicate sample identities in statistics input");
   const rows = samples.map((s) => {
     const predicted = new Set(s.predicted), observed = new Set(s.observed);
     const overlap = [...predicted].filter((p) => observed.has(p)).length;
@@ -199,6 +224,7 @@ export async function calibrate(
   cfg: Config,
   opts: { outcome?: CalibrationOutcome; session?: string; graph?: Graph } = {},
 ): Promise<number> {
+  try {
   if (opts.outcome) {
     const session = opts.session ?? process.env.COHERENCE_SESSION ?? "unknown";
     const sample = await recordCalibrationSample(cfg, session, opts.outcome, opts.graph);
@@ -210,4 +236,8 @@ export async function calibrate(
   }
   for (const line of formatCalibration(readCalibrationSamples(cfg))) console.log(line);
   return 0;
+  } catch (error) {
+    console.error(`Calibration unavailable: ${(error as Error).message}`);
+    return 2;
+  }
 }

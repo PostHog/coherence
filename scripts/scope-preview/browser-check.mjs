@@ -113,21 +113,21 @@ try {
   if (journalSubject) {
     assert.equal(await page.getByRole('combobox', { name: 'Scope session' }).inputValue(), journalSubject.session);
     await page.getByRole('textbox', { name: 'Search journal' }).fill(journalSubject.id);
-    await page.waitForFunction(id => document.querySelector('.journal-detail').innerText.includes(id), journalSubject.id);
+    await page.waitForFunction(id => document.querySelector('.journal-panel .journal-detail').innerText.includes(id), journalSubject.id);
   }
   await page.getByRole('textbox', { name: 'Search journal' }).fill('a-string-that-is-definitely-not-a-record-782391');
-  await page.locator('.empty-reading').waitFor();
+  await page.locator('.journal-panel .empty-reading').waitFor();
   await page.getByRole('textbox', { name: 'Search journal' }).fill('');
   await page.getByRole('combobox', { name: 'Scope session' }).selectOption('');
   const capturedCount = snapshot.readings.journal.records.length + snapshot.readings.defects.length + snapshot.readings.experiments.length;
-  assert.equal(await page.locator('.journal-row').count(), Math.min(30, capturedCount));
+  assert.equal(await page.locator('.journal-panel .journal-row').count(), Math.min(30, capturedCount));
   if (capturedCount > 30) {
     await page.getByRole('button', { name: /Show 30 more/ }).click();
-    assert.equal(await page.locator('.journal-row').count(), Math.min(60, capturedCount));
+    assert.equal(await page.locator('.journal-panel .journal-row').count(), Math.min(60, capturedCount));
   }
   await page.getByRole('combobox', { name: 'Journal view' }).selectOption('outstanding');
   await page.getByRole('combobox', { name: 'Journal source' }).selectOption('experiments');
-  assert.equal(await page.locator('.journal-row').count(), Math.min(30, snapshot.readings.openExperiments.length));
+  assert.equal(await page.locator('.journal-panel .journal-row').count(), Math.min(30, snapshot.readings.openExperiments.length));
   await page.getByRole('combobox', { name: 'Journal view' }).selectOption('timeline');
   await page.getByRole('combobox', { name: 'Journal source' }).selectOption('');
   await page.screenshot({ path: join(screenshots, 'journal.png') });
@@ -149,7 +149,7 @@ try {
   await page.getByRole('button', { name: 'Center gravity' }).click();
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'mobile page overflows horizontally');
   await page.screenshot({ path: join(screenshots, 'mobile.png'), fullPage: true });
-  for (const name of ['Hooks', 'Journal']) {
+  for (const name of ['Hooks', 'Journal', 'Taxonomy']) {
     await page.getByRole('tab', { name, exact: true }).click();
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${name} overflows on mobile`);
     await page.screenshot({ path: join(screenshots, `mobile-${name.toLowerCase()}.png`) });

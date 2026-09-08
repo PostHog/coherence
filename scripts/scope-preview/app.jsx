@@ -8,6 +8,7 @@ import './style.css';
 import { defaults, layoutScope, lightOf } from './layout.mjs';
 import { HooksPanel, JournalPanel } from './panels.jsx';
 import { useLiveReadings } from './live.jsx';
+import { TaxonomyPanel } from './taxonomy-panel.jsx';
 
 const { model, initial, readings } = JSON.parse(document.getElementById('scope-data').textContent);
 const labels = { fail: '× Failing', stale: '◷ Stale evidence', unknown: '? Unknown', pass: '✓ Passing', unmeasured: '— Unmeasured' };
@@ -137,11 +138,12 @@ function ScopeShell() {
   return <Tabs.Root className="scope-shell" value={tab} onValueChange={setTab}>
     <header className="topbar"><div><span className="wordmark">Scope</span><span className="preview-tag">READ-ONLY</span></div>
       <label className="session-picker">Session<select aria-label="Scope session" value={session} onChange={e => setSession(e.target.value)}><option value="">All sessions</option>{currentReadings.sessions.map(id => <option key={id} value={id}>{id}</option>)}</select></label></header>
-    <div className="tabbar"><Tabs.List aria-label="Scope views"><Tabs.Trigger value="structure">Structure</Tabs.Trigger><Tabs.Trigger value="hooks">Hooks</Tabs.Trigger><Tabs.Trigger value="journal">Journal</Tabs.Trigger></Tabs.List>
+    <div className="tabbar"><Tabs.List aria-label="Scope views"><Tabs.Trigger value="structure">Structure</Tabs.Trigger><Tabs.Trigger value="hooks">Hooks</Tabs.Trigger><Tabs.Trigger value="journal">Journal</Tabs.Trigger><Tabs.Trigger value="taxonomy">Taxonomy</Tabs.Trigger></Tabs.List>
       <span className="feed-controls"><span className="feed-status" role="status">{live.status === 'snapshot' ? 'Snapshot' : `Journal ${live.status}${live.paused ? ' · display paused' : ''}`}</span>{live.status !== 'snapshot' && <button onClick={live.togglePause}>{live.paused ? 'Resume updates' : 'Pause updates'}</button>}<span className="snapshot-label" title={currentReadings.digest}>{currentReadings.digest.slice(0, 10)}</span></span></div>
     <Tabs.Content className="scope-tab" value="structure" forceMount><Structure selected={selected} setSelected={setSelected}/></Tabs.Content>
     <Tabs.Content className="scope-tab" value="hooks" forceMount><HooksPanel readings={currentReadings} session={session}/></Tabs.Content>
     <Tabs.Content className="scope-tab" value="journal" forceMount><JournalPanel readings={currentReadings} session={session} onSessionChange={setSession} feedStatus={live.status}/></Tabs.Content>
+    <Tabs.Content className="scope-tab" value="taxonomy" forceMount><TaxonomyPanel readings={currentReadings} session={session}/></Tabs.Content>
   </Tabs.Root>;
 }
 

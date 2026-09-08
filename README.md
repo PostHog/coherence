@@ -2318,6 +2318,118 @@ line costs nothing until it runs, has no server lifecycle to fail, and works fro
 agent that can run Bash. A mechanism that spends context to save context is
 self-defeating.
 
+## Taxonomy: discover obligations before verifying them
+
+`coherence taxonomy` ports the lab's component vocabulary into the packaged CLI:
+25 terminal roles and 27 facets. Catalog v2 retains the lab's 21 questions and 49
+obligations, adding five operational questions and four measured obligation suggestions
+(26 questions and 53 suggestions total). The catalog is empirical and incomplete,
+not an exhaustive ontology.
+Classifications are **caller-assessed**, and every activated obligation remains
+**unverified**. There is no prose attestation, verification receipt, or work-closure
+operation in this increment.
+
+```sh
+coherence taxonomy help
+coherence taxonomy profile
+coherence taxonomy catalog role:cli-orchestrator
+coherence taxonomy inspect src/cli.ts \
+  --answer signal:invocation=yes --answer signal:bootstrap=yes
+coherence taxonomy record src/cli.ts \
+  --answer signal:invocation=yes --answer signal:bootstrap=yes \
+  --role role:cli-orchestrator --facet facet:boundary \
+  --evidence src/cli.ts --because "Owns argument dispatch and exit behavior" \
+  --expected none --session YOUR_SESSION
+coherence taxonomy list
+coherence taxonomy show RECORD_ID --json
+```
+
+`profile` reports root manifest facts without executing scripts or guessing the
+project's dominant domain. `inspect` resolves a file or `file#symbol` through the
+existing source graph, proposes candidates from explicit positive signal answers,
+and shows at most six focused unanswered questions. Required operational evidence
+comes first: parser, validator, transformer and optimizer selections need a positive
+`signal:parses-syntax`, `signal:validates-rules`, `signal:transforms-form` or
+`signal:optimizes-form` answer respectively. A broad `representation=yes` is only a
+reason to ask those questions, never enough to select a role. Declarations-only
+evidence cannot coexist with a positive runtime representation operation.
+`--json` retains all candidates and
+the complete evidence snapshot. Name cues never select a role; an unanswered or
+unknown signal is not a negative observation. Competing signals remain visible
+instead of excluding an otherwise supported role. Repeat `--role` for a composite.
+Simulation-specific roles and obligations require `--domain simulation`; enabling
+that pack does not hide the core roles. Facet selections are independent positive
+assessments, not an exhaustive checklist.
+
+`unassessed` means no substantive assessment yet; `needs-evidence` means an incomplete
+interview without a supported candidate; `no-fit` means the relevant questions were
+answered without finding a catalog role. `ambiguous` retains unselected candidates,
+including any named operational evidence still required. Selecting a role does not
+claim every remaining question was answered. `inspect` shows an existing saved
+assessment beside its fresh proposal, including its status and predecessor ID; it
+does not silently copy, update or renew that assessment.
+
+Historical records are read against the catalog digest they captured. V1 stays
+available as the exact lab-parity witness; a catalog change makes older assessments
+stale, not invalid JSON and not silently reclassified v2 evidence. Reassessment is
+an explicit predecessor-checked revision. The legacy `out-of-evidence` state remains
+visible on old records. Scope displays the assessed catalog and next evidence questions.
+
+Only `record` writes. Positive assessments require a repository-relative evidence
+file or resolved `file#symbol`, plus rationale and an explicit writer session.
+Revisions replace the full assessment input, not selected fields: repeat every
+answer, role and facet you want retained. Pass the current record ID in `--expected`
+to revise; `none` is only for a new subject. Exact retries deduplicate, and an
+exclusive predecessor slot rejects concurrent competing revisions. To retain an
+unresolved assessment, record supported signals without selecting a role; no-fit
+and ambiguous states remain addressable. No JSON hand-editing is required.
+
+Commit `.coherence/taxonomy/` in adopting projects. It contains immutable,
+content-addressed records in predecessor-addressed files; the current view is
+rebuilt from them. Malformed, displaced, torn or symlink-redirected records refuse.
+Git history is the external rewrite/deletion witness, not the unkeyed record hash.
+Wholesale loss of a population owned by current HEAD refuses; partial tail deletion
+and a valid malicious rewrite are not detected by the local format alone.
+
+Freshness hashes whole subject files, their direct local graph imports, explicit
+`--evidence` / `--dependency` files, root configuration, manifests/lockfiles, and the
+catalog. Missing files, changed bytes and newly appearing captured manifests stale
+the assessment. This is a **direct-file grade**: no transitive dependency closure,
+runtime semantics, arbitrary LSP server, component-directory inventory or rename
+tracking is implied. A moved subject needs a new assessment. Byte equality can
+restore currency if the exact original evidence is restored.
+
+`list --check` and `show --check` grade only whether the selected classification
+population is nonempty, current and classified/composite. They never grade suggested
+obligations: exit 0 is not a verification receipt. Empty, ambiguous, no-fit, stale or
+superseded selections exit 1; damaged evidence and invalid requests exit 2.
+
+The [Scope library preview](scripts/scope-preview/README.md) has a Taxonomy tab
+with the same canonical projection, shared session filtering, search, evidence
+details and unverified obligation suggestions. Its optional read-only server updates
+both new revisions and source-file staleness. The browser never writes classifications.
+
+The [Coherence field exercise — Codex's take](TAXONOMY-COHERENCE-FIELD-REPORT-CODEX-TAKE.md)
+records 22 assessed subjects, unresolved catalog fits, and two reproduced evidence
+defects, with read-only adoption checks and isolated risk probes to rerun the findings.
+
+Status writers now serialize the complete read/merge/publish transaction across
+processes and atomically replace `.coherence/status.json`. All five writers must use
+the updated implementation; mixed old/new writers are not coordinated. A killed writer
+may leave `.coherence/status.lock`: new writes wait at most five seconds and then
+refuse. Confirm no writer is running before manually removing that empty directory;
+the harness never steals a lock based on age. The last complete report stays readable.
+Same-directory rename prevents partial publication, but is not a power-loss durability
+or privileged filesystem-race guarantee.
+
+Calibration now validates surviving sample identity, canonical time, paths, outcome
+and attribution before computing statistics. Invalid rows, torn framing and displaced
+session files make the population unavailable; they are not removed from the denominator.
+`calibrate` exits 2 with a named refusal, while direct statistics callers also receive
+an error for invalid input. Legacy samples without attribution remain explicitly
+shared-worktree evidence. Repair damaged history from a trustworthy source; do not
+delete rows merely to obtain a cleaner-looking report.
+
 ## Commands
 
 **The index below is generated** — from the command registry in `src/commands.ts`, the one
@@ -2346,10 +2458,19 @@ both is exactly what drifted.
      edit by hand — add the command to the registry and re-run. Everything OUTSIDE these
      markers is authored prose. -->
 
-_46 commands. This index is derived from the registry the dispatch is checked
+_47 commands. This index is derived from the registry the dispatch is checked
 against (`test/commands.test.ts` enumerates the live `cmd === …` chain and asserts the two
 sets are equal), so it cannot fall behind the CLI. The reasoning for the commands that have
 any is in **In detail** below — that half is authored, and does not cover all of them._
+
+**Perceive the project**
+
+- `coherence taxonomy <catalog|profile|inspect|record|list|show|help> [options]` — evidence-addressed role/facet classification and unverified obligation suggestions; only record writes
+- `coherence index [--since <ref>]` — the returning human's page — MAP · JOURNAL · TRAJECTORY, framed against what you last saw (`_index.html` + `index.json`)
+- `coherence panel [--no-watch | --once]` — live TUI over the graph + the status record
+- `coherence orient [--json]` — one deterministic swarm heading over strict decisions, work, links, experiments, defects, and verification
+- `coherence contract` — the promise graph — graded gates + the reliance ledger (`_contract.html`)
+- `coherence context [<file>...] [--symbol <name>] [--changed|--staged] [--max-bytes N|--all]` — emit a bounded graph/repository context packet with exact omission accounting; --all expands
 
 **Derive the artifacts**
 
@@ -2382,14 +2503,6 @@ any is in **In detail** below — that half is authored, and does not cover all 
 - `coherence experiment <create|inspect|close> ... [--session S] [--json]` (alias: `plan`) — open a plan hypothesis, freeze its predicted context/actions/criteria, then close it with criterion-total evidence
 - `coherence work <create|transition|handoff|close|inspect> ... [--json]` — append-only swarm work graph; writes require an exact session, reads stay fleet-wide
 - `coherence consequence <add|inspect> ... [--json]` — explicit assessed links across durable records; add requires an exact session
-
-**Perceive the project**
-
-- `coherence index [--since <ref>]` — the returning human's page — MAP · JOURNAL · TRAJECTORY, framed against what you last saw (`_index.html` + `index.json`)
-- `coherence panel [--no-watch | --once]` — live TUI over the graph + the status record
-- `coherence orient [--json]` — one deterministic swarm heading over strict decisions, work, links, experiments, defects, and verification
-- `coherence contract` — the promise graph — graded gates + the reliance ledger (`_contract.html`)
-- `coherence context [<file>...] [--symbol <name>] [--changed|--staged] [--max-bytes N|--all]` — emit a bounded graph/repository context packet with exact omission accounting; --all expands
 
 **Ratchets and gates**
 

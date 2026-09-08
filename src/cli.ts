@@ -69,6 +69,7 @@ import {
 import { observeOrientation, renderOrientation } from "./orient.ts";
 import { buildScopeModel } from "./scope-model.ts";
 import { renderScope } from "./render-scope.ts";
+import { runTaxonomyCommand } from "./taxonomy-cli.ts";
 
 const cmd = process.argv[2];
 const argv = process.argv.slice(3);
@@ -338,7 +339,11 @@ if (commandFor(cmd)?.writesArtifacts) {
   if (refusal) { for (const l of refusal) console.log(l); await exit(1); }
 }
 
-if (cmd === "graph") {
+if (cmd === "taxonomy") {
+  const result = await runTaxonomyCommand(cfg, argv);
+  (result.code === 2 ? console.error : console.log)(result.output);
+  await exit(result.code);
+} else if (cmd === "graph") {
   const stale = await doGraph();
   if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "graph current"); await exit(stale.length ? 1 : 0); }
 } else if (cmd === "scope") {

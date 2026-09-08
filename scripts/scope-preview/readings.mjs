@@ -8,6 +8,8 @@ import { resolve as resolveJournal } from '../../src/decisions.ts';
 import { newTailState, tailJournal } from '../../src/journal.ts';
 import { readDefects } from '../../src/defects.ts';
 import { readExperiments } from '../../src/experiment.ts';
+import { taxonomyView } from '../../src/taxonomy-ledger.ts';
+import { TAXONOMY } from '../../src/taxonomy-catalog.ts';
 
 export function readScopeReadings(cfg) {
   // Use the canonical stream's content identity even for full snapshots: during
@@ -21,9 +23,11 @@ export function readScopeReadings(cfg) {
   };
   const defects = readLedger('defects', readDefects, { records: [] });
   const experiments = readLedger('experiments', readExperiments, { records: [], experiments: [] });
+  const taxonomy = readLedger('taxonomy', taxonomyView, null);
   const sessions = [...new Set([
     ...journal.records.map(r => r.session), ...defects.records.map(r => r.session),
     ...experiments.experiments.map(e => e.opened.session),
+    ...(taxonomy?.records ?? []).map(r => r.session),
   ])].sort();
   // Resolve over the COMPLETE journal before any UI filtering. An answer from a
   // different session must not make the original question look open again.
@@ -60,7 +64,7 @@ export function readScopeReadings(cfg) {
   return { version: 1, journal: { records: journal.records, states, unreadable: journal.unreadable },
     defects: defects.records, experiments: experiments.records,
     openExperiments: experiments.experiments.filter(e => !e.closed).map(e => e.opened.id),
-    sessions, hooks: { events, hosts }, errors,
+    sessions, hooks: { events, hosts }, taxonomy: taxonomy && { ...taxonomy, catalog: TAXONOMY }, errors,
     limits: 'Offline snapshot. Session choices come from durable journal, defect and experiment records; activity-only sessions are not discovered. Hook observations are local transient evidence, not captured delivery text or proof of agent action.',
   };
 }

@@ -6,12 +6,58 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { mergeClaimRecords, readStatus, recordVerify, type ClaimRecord } from "../src/status.ts";
+import { mergeClaimRecords, readStatus, recordVerify, recordAtlas, recordMass, type ClaimRecord } from "../src/status.ts";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { readFile, mkdir, readdir } from "node:fs/promises";
 import { runVerify } from "../src/verify.ts";
 import { tmpProject, cleanup, runCaptured, cfg, comp, graph } from "./_helpers.ts";
 
 const rec = (node: string, claim: string, kind: ClaimRecord["kind"], o: Partial<ClaimRecord> = {}): ClaimRecord =>
   ({ node, claim, kind, at: "2026-01-01T00:00:00.000Z", commit: "aaaa111", tier: "full", ...o });
+
+test("status publication — concurrent processes preserve independent reports and readers see complete JSON", async () => {
+  const root = await tmpProject({ ".coherence/status.json": '{"version":1}\n' });
+  const module = new URL("../src/status.ts", import.meta.url).href;
+  const helper = new URL("./_helpers.ts", import.meta.url).href;
+  const source = (kind: string) => `import {recordAtlas,recordMass,recordVerify,recordDrift,recordEconomy} from ${JSON.stringify(module)}; import {cfg} from ${JSON.stringify(helper)};
+    for(let i=0;i<12;i++) { const c=cfg(process.cwd()); if(${JSON.stringify(kind)}==="atlas")
+      await recordAtlas(c,{tiers:{enshrined:i,checked:0,convention:0},crossings:[],drift:[],dangling:[],overclaimed:[],tier3Security:[]});
+      else if(${JSON.stringify(kind)}==="mass") await recordMass(c,{dims:[{key:"probe",value:i}]});
+      else if(${JSON.stringify(kind)}==="drift") await recordDrift(c,{devCommits:i,locality:[],spread:[],seams:[],verdict:"probe"});
+      else if(${JSON.stringify(kind)}==="economy") await recordEconomy(c,{considered:i,medianFiles:0,medianLines:0,p90Files:0,p90Lines:0,series:[]});
+      else await recordVerify(c,{tier:"fast",scope:null,sigs:[],coverage:{components:0,claimed:0,withWhy:0,symbols:0,documented:0},invTotal:0,invGaps:[],narrative:null,jobs:0,failures:i}); }`;
+  try {
+    let done = false;
+    const writers = Promise.all(["atlas", "mass", "verify", "drift", "economy"].map(kind => promisify(execFile)(process.execPath,
+      ["--input-type=module", "-e", source(kind)], { cwd: root }))).finally(() => { done = true; });
+    let reads = 0;
+    // Retain reader errors until both children finish, so cleanup never races writers.
+    let failure: unknown;
+    while (!done) { try { await readStatus(cfg(root)); reads++; } catch (error) { failure = error; } }
+    await writers;
+    assert.equal(failure, undefined); assert.ok(reads > 0);
+    const state = await readStatus(cfg(root));
+    assert.equal(state.atlas?.tiers.enshrined, 11); assert.equal(state.mass?.dims[0].value, 11);
+    assert.equal(state.verify?.failures, 11); assert.equal(state.drift?.devCommits, 11); assert.equal(state.economy?.considered, 11);
+    assert.deepEqual(await readdir(join(root, ".coherence")), ["status.json"]);
+  } finally { await cleanup(root); }
+});
+
+test("status publication — failed serialization and an abandoned lock preserve the prior record", async () => {
+  const root = await tmpProject({ ".coherence/status.json": '{"version":1}\n' });
+  try {
+    const c = cfg(root), original = await readFile(join(root, ".coherence/status.json"), "utf8");
+    const circular = { dims: [] }; Object.assign(circular, { self: circular });
+    await assert.rejects(recordMass(c, circular), /circular/i);
+    assert.equal(await readFile(join(root, ".coherence/status.json"), "utf8"), original);
+    assert.deepEqual(await readdir(join(root, ".coherence")), ["status.json"]);
+    await mkdir(join(root, ".coherence/status.lock"));
+    await assert.rejects(recordMass(c, { dims: [] }), /Status write busy/);
+    assert.equal(await readFile(join(root, ".coherence/status.json"), "utf8"), original);
+    assert.ok((await readdir(join(root, ".coherence"))).includes("status.lock"), "an abandoned lock is not stolen");
+  } finally { await cleanup(root); }
+});
 
 test("merge — a skip never clobbers a real verdict; the old verdict rides through with its own stamp", () => {
   const prev = [rec("A", 'passes test "t"', "pass")];

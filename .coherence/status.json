@@ -1,76 +1,186 @@
 {
   "version": 1,
   "verify": {
-    "at": "2026-09-04T20:36:39.147Z",
-    "commit": "cba496e",
+    "at": "2026-09-04T22:10:26.624Z",
+    "commit": "d1a2227",
     "dirty": true,
     "tier": "full",
     "scope": null,
     "cost": {
-      "totalMs": 41443.540243,
+      "totalMs": 44486.49617099999,
       "claims": [
         {
           "node": "Harness core",
           "claim": "boundary \"a parse's heap is returned before the next file\" at withTree via guard \"wasm heap — parses past the measured abort cliff survive because every tree is freed\"",
-          "ms": 11330.316291999996,
+          "ms": 11413.416458000003,
           "source": "wall"
         },
         {
           "node": "Harness core",
           "claim": "passes test \"field journey — competing duties settle into reconstructable evidence and damage recovers\"",
-          "ms": 5914.322875000002,
+          "ms": 5933.621624999998,
           "source": "wall"
         },
         {
           "node": "Harness core",
           "claim": "typechecks",
-          "ms": 1553.1489579999998,
+          "ms": 1605.040959,
+          "source": "wall"
+        },
+        {
+          "node": "Harness core",
+          "claim": "boundary \"concurrent status writers preserve complete independent reports\" at recordVerify via guard \"status publication — concurrent processes preserve independent reports and readers see complete JSON\"",
+          "ms": 1324.816708,
           "source": "wall"
         },
         {
           "node": "Harness core",
           "claim": "passes test \"repository control — work and consequence records survive a fresh clone\"",
-          "ms": 1237.0372910000006,
-          "source": "wall"
-        },
-        {
-          "node": "Harness core",
-          "claim": "boundary \"agent lifecycle preserves decisions and exposes the current change signal\" at runHook via guard \"hooks — main Stop snapshots without feedback while SubagentStop alone restates\"",
-          "ms": 1020.4631669999999,
+          "ms": 1249.7423339999987,
           "source": "wall"
         }
       ]
     },
     "lastFastAt": "2026-08-20T20:05:12.520Z",
-    "lastFullAt": "2026-09-04T20:36:39.147Z",
+    "lastFullAt": "2026-09-04T22:10:26.624Z",
     "claims": [
       {
         "node": "Coherence",
         "claim": "coherence.config.json exists at root",
         "kind": "pass",
         "detail": "coherence.config.json @ root",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 138
+        "runs": 141
       },
       {
         "node": "Coherence",
         "claim": "passes test \"control — this repository's own lifecycle control is PRESENT\"",
         "kind": "pass",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 72
+        "runs": 75
       },
       {
         "node": "Coherence",
         "claim": "passes test \"repository voice — contributor startup keeps public capability changes tied to the global hook contract\"",
         "kind": "pass",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 6
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"concurrent status writers preserve complete independent reports\" at recordVerify via guard \"status publication — concurrent processes preserve independent reports and readers see complete JSON\"",
+        "kind": "pass",
+        "detail": "concurrent status writers preserve complete independent reports @ recordVerify (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"calibration denominators contain only validated surviving evidence\" at validateCalibrationSample via guard \"calibration integrity — damaged rows and invalid direct inputs cannot enter a denominator\"",
+        "kind": "pass",
+        "detail": "calibration denominators contain only validated surviving evidence @ validateCalibrationSample (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"taxonomy representation roles require operational evidence under their recorded catalog\" at classifyTaxonomy via guard \"taxonomy interview — operational discriminators separate representation roles and preserve no-fit\"",
+        "kind": "pass",
+        "detail": "taxonomy representation roles require operational evidence under their recorded catalog @ classifyTaxonomy (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"taxonomy revisions preserve scoped evidence and refuse damaged history\" at taxonomyView via guard \"taxonomy history — old catalog assessments retain their meaning and expire without silent migration\"",
+        "kind": "pass",
+        "detail": "taxonomy revisions preserve scoped evidence and refuse damaged history @ taxonomyView (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"taxonomy suggestions never acquire verification authority\" at classifyTaxonomy via guard \"taxonomy classification — unknowns and plural responsibilities never become a single guessed role or passing guarantee\"",
+        "kind": "pass",
+        "detail": "taxonomy suggestions never acquire verification authority @ classifyTaxonomy (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 3
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"taxonomy suggestions never acquire verification authority\" at TAXONOMY via guard \"taxonomy catalog — every frozen lab subject survives the namespaced port without added authority\"",
+        "kind": "pass",
+        "detail": "taxonomy suggestions never acquire verification authority @ TAXONOMY (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 3
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"taxonomy revisions preserve scoped evidence and refuse damaged history\" at recordTaxonomy via guard \"taxonomy concurrency — two CLI writers cannot both own the initial predecessor slot\"",
+        "kind": "pass",
+        "detail": "taxonomy revisions preserve scoped evidence and refuse damaged history @ recordTaxonomy (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 3
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"taxonomy revisions preserve scoped evidence and refuse damaged history\" at readTaxonomyRecords via guard \"taxonomy damage — malformed or displaced history refuses instead of shrinking into a clean empty view\"",
+        "kind": "pass",
+        "detail": "taxonomy revisions preserve scoped evidence and refuse damaged history @ readTaxonomyRecords (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 3
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"taxonomy wire records require canonical internally consistent caller assessments\" at validateTaxonomyRecord via guard \"taxonomy damage — malformed or displaced history refuses instead of shrinking into a clean empty view\"",
+        "kind": "pass",
+        "detail": "taxonomy wire records require canonical internally consistent caller assessments @ validateTaxonomyRecord (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 3
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"taxonomy revisions preserve scoped evidence and refuse damaged history\" at captureTaxonomy via guard \"taxonomy subjects — only resolved graph addresses enter evidence; absent, compound and escaped paths refuse\"",
+        "kind": "pass",
+        "detail": "taxonomy revisions preserve scoped evidence and refuse damaged history @ captureTaxonomy (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
         "runs": 3
@@ -80,956 +190,956 @@
         "claim": "typechecks",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": true,
-        "lastFailAt": "2026-08-01T18:26:32.093Z",
-        "lastFailCommit": "4ea7565",
-        "runs": 108
+        "lastFailAt": "2026-09-04T22:06:22.303Z",
+        "lastFailCommit": "d1a2227",
+        "runs": 111
       },
       {
         "node": "Harness core",
         "claim": "cli.ts imports ./config.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 138
+        "runs": 141
       },
       {
         "node": "Harness core",
         "claim": "cli.ts imports ./derive.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 138
+        "runs": 141
       },
       {
         "node": "Harness core",
         "claim": "cli.ts imports ./verify.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 138
+        "runs": 141
       },
       {
         "node": "Harness core",
         "claim": "hooks.ts imports ./decisions.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 138
+        "runs": 141
       },
       {
         "node": "Harness core",
         "claim": "derive.ts imports ./walk.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 138
+        "runs": 141
       },
       {
         "node": "Harness core",
         "claim": "boundary \"agent lifecycle preserves decisions and exposes the current change signal\" at runHook via guard \"hooks — main Stop snapshots without feedback while SubagentStop alone restates\"",
         "kind": "pass",
         "detail": "agent lifecycle preserves decisions and exposes the current change signal @ runHook (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": true,
         "lastFailAt": "2026-08-05T00:46:11.612Z",
         "lastFailCommit": "fea5574",
-        "runs": 53
+        "runs": 56
       },
       {
         "node": "Harness core",
         "claim": "boundary \"significant behavioral growth acquires an anchor or patch-specific decision\" at signal via guard \"only a zero-anchor alarm without attestation needs a decision\"",
         "kind": "pass",
         "detail": "significant behavioral growth acquires an anchor or patch-specific decision @ signal (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 131
+        "runs": 134
       },
       {
         "node": "Harness core",
         "claim": "boundary \"a weaker regulation obligation never masks a stronger one\" at selectRegulation via guard \"regulate — ordered potential is permutation-invariant and monotone\"",
         "kind": "pass",
         "detail": "a weaker regulation obligation never masks a stronger one @ selectRegulation (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": true,
         "lastFailAt": "2026-08-05T00:33:25.330Z",
         "lastFailCommit": "fea5574",
-        "runs": 55
+        "runs": 58
       },
       {
         "node": "Harness core",
         "claim": "boundary \"regulation evaluates and repairs the selected agent host\" at observeRegulation via guard \"regulate — selected Codex host cannot be redeemed by Claude control\"",
         "kind": "pass",
         "detail": "regulation evaluates and repairs the selected agent host @ observeRegulation (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 49
+        "runs": 52
       },
       {
         "node": "Harness core",
         "claim": "boundary \"task context is bounded and names its approximations\" at renderContextProjection via guard \"renderContext — bounded projection is route-first, byte-stable, and accounts for every omission\"",
         "kind": "pass",
         "detail": "task context is bounded and names its approximations @ renderContextProjection (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"verdict-bearing decision reads fail closed on surviving journal damage\" at readTrustedJournal via guard \"trusted journal — any malformed, forged, displaced, conflicting, or dangling row refuses the verdict projection\"",
         "kind": "pass",
         "detail": "verdict-bearing decision reads fail closed on surviving journal damage @ readTrustedJournal (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"a committed decision population cannot disappear into adoption from zero\" at readTrustedJournal via guard \"trusted journal — any malformed, forged, displaced, conflicting, or dangling row refuses the verdict projection\"",
         "kind": "pass",
         "detail": "a committed decision population cannot disappear into adoption from zero @ readTrustedJournal (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 12
+        "runs": 15
       },
       {
         "node": "Harness core",
         "claim": "boundary \"decision ratification follows explicit subject and authority, never prose similarity or recency\" at analyzeDecisionPositions via guard \"local alternatives need ratification; an explicit stronger choice settles them\"",
         "kind": "pass",
         "detail": "decision ratification follows explicit subject and authority, never prose similarity or recency @ analyzeDecisionPositions (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"work state is append-only, attributable, and predecessor-checked\" at readWork via guard \"strict merged read — torn, tampered, detached, and competing histories all refuse\"",
         "kind": "pass",
         "detail": "work state is append-only, attributable, and predecessor-checked @ readWork (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"work cannot activate or complete before every dependency completes\" at validateWorkGraph via guard \"readiness and scope control — dependencies serialize potential overlap while runnable writers conflict\"",
         "kind": "pass",
         "detail": "work cannot activate or complete before every dependency completes @ validateWorkGraph (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"runnable work with overlapping write scopes is a collision, never concurrent permission\" at detectWorkScopeOverlaps via guard \"readiness and scope control — dependencies serialize potential overlap while runnable writers conflict\"",
         "kind": "pass",
         "detail": "runnable work with overlapping write scopes is a collision, never concurrent permission @ detectWorkScopeOverlaps (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"a terminal parent has no live child and explicitly synthesizes every completed direct child\" at validateWorkGraph via guard \"lifecycle — predecessor checks, handoff attribution, closure evidence, orphaning, and synthesis stay explicit\"",
         "kind": "pass",
         "detail": "a terminal parent has no live child and explicitly synthesizes every completed direct child @ validateWorkGraph (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"authored work text is single-line data, never model-instruction control\" at createWork via guard \"graph validation and input boundary — missing references, cycles, unsafe scopes, and evidence-free success are loud\"",
         "kind": "pass",
         "detail": "authored work text is single-line data, never model-instruction control @ createWork (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"swarm write identity and authority flags are singleton or refused\" at repeatedSingletonFlags via guard \"swarm writes reject repeated singleton identity and authority flags before append\"",
         "kind": "pass",
         "detail": "swarm write identity and authority flags are singleton or refused @ repeatedSingletonFlags (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"consequence navigation contains only explicit assessed edges\" at traceConsequences via guard \"co-presence never invents a causal edge\"",
         "kind": "pass",
         "detail": "consequence navigation contains only explicit assessed edges @ traceConsequences (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"specialized consequence relations admit only their declared endpoint kinds\" at relationProblem via guard \"semantic retries dedupe while specialized relation nonsense refuses\"",
         "kind": "pass",
         "detail": "specialized consequence relations admit only their declared endpoint kinds @ relationProblem (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"consequence evidence refuses surviving storage damage instead of shrinking navigation\" at readConsequences via guard \"damaged, forged, or displaced surviving rows refuse the whole projection\"",
         "kind": "pass",
         "detail": "consequence evidence refuses surviving storage damage instead of shrinking navigation @ readConsequences (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"orientation refuses damaged evidence before selecting a swarm heading\" at observeOrientation via guard \"orientation refuses a damaged trusted source instead of reading it as empty\"",
         "kind": "pass",
         "detail": "orientation refuses damaged evidence before selecting a swarm heading @ observeOrientation (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"orientation admits verification state only with valid shape and comparable provenance\" at verifyOrientation via guard \"orientation refuses parseable malformed verification and never promotes missing provenance\"",
         "kind": "pass",
         "detail": "orientation admits verification state only with valid shape and comparable provenance @ verifyOrientation (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": true,
         "lastFailAt": "2026-08-20T20:04:55.408Z",
         "lastFailCommit": "9fbbdef",
-        "runs": 17
+        "runs": 20
       },
       {
         "node": "Harness core",
         "claim": "boundary \"verification currency follows material repository state without invalidating its own receipt\" at verifyOrientation via guard \"verification currency ignores its own receipt but rejects tracked source and index changes\"",
         "kind": "pass",
         "detail": "verification currency follows material repository state without invalidating its own receipt @ verifyOrientation (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 14
+        "runs": 17
       },
       {
         "node": "Harness core",
         "claim": "boundary \"orientation selects synthesis only when parent closure can execute it\" at observeOrientation via guard \"orientation dispatches a ready sibling before asking for parent synthesis\"",
         "kind": "pass",
         "detail": "orientation selects synthesis only when parent closure can execute it @ observeOrientation (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 13
+        "runs": 16
       },
       {
         "node": "Harness core",
         "claim": "boundary \"orientation derives live blockage only from closeable work state\" at observeOrientation via guard \"orientation treats journal blockage as history, not a live work state\"",
         "kind": "pass",
         "detail": "orientation derives live blockage only from closeable work state @ observeOrientation (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "passes test \"field journey — competing duties settle into reconstructable evidence and damage recovers\"",
         "kind": "pass",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 17
+      },
+      {
+        "node": "Harness core",
+        "claim": "passes test \"repository control — work and consequence records survive a fresh clone\"",
+        "kind": "pass",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
         "runs": 14
       },
       {
         "node": "Harness core",
-        "claim": "passes test \"repository control — work and consequence records survive a fresh clone\"",
-        "kind": "pass",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
-        "tier": "full",
-        "everFailed": false,
-        "runs": 11
-      },
-      {
-        "node": "Harness core",
         "claim": "boundary \"completed work remains unverified until an explicit verification edge names it\" at observeRegulation via guard \"regulate — completed work requires an explicit verification link before release\"",
         "kind": "pass",
         "detail": "completed work remains unverified until an explicit verification edge names it @ observeRegulation (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"high-frequency lifecycle hooks start without the analysis dependency stack\" at runHook via guard \"PostToolUse starts from the source bundle with no dependency installation\"",
         "kind": "pass",
         "detail": "high-frequency lifecycle hooks start without the analysis dependency stack @ runHook (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"hook telemetry loss never kills PostToolUse\" at runHook via guard \"PostToolUse starts from the source bundle with no dependency installation\"",
         "kind": "pass",
         "detail": "hook telemetry loss never kills PostToolUse @ runHook (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"session startup injects only the exact session's current work order\" at assignedWorkInstructions via guard \"SessionStart teaches the executable swarm loop and exact owned lifecycle\"",
         "kind": "pass",
         "detail": "session startup injects only the exact session's current work order @ assignedWorkInstructions (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 4
+        "runs": 7
       },
       {
         "node": "Harness core",
         "claim": "boundary \"session startup teaches the executable swarm loop without manufacturing authority\" at runHook via guard \"SessionStart teaches the executable swarm loop and exact owned lifecycle\"",
         "kind": "pass",
         "detail": "session startup teaches the executable swarm loop without manufacturing authority @ runHook (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 4
+        "runs": 7
       },
       {
         "node": "Harness core",
         "claim": "boundary \"session startup survives a damaged decision-journal path with named degradation\" at runHook via guard \"SessionStart degrades around a damaged journal path without killing the session\"",
         "kind": "pass",
         "detail": "session startup survives a damaged decision-journal path with named degradation @ runHook (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"harness source remains searchable text rather than silently becoming binary\" at sourceTextIsNavigable via guard \"source text — every live TypeScript source remains NUL-free and searchable\"",
         "kind": "pass",
         "detail": "harness source remains searchable text rather than silently becoming binary @ sourceTextIsNavigable (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 16
+        "runs": 19
       },
       {
         "node": "Harness core",
         "claim": "boundary \"cached decisions expose structurally expired premises\" at auditPremiseLeases via guard \"audit — retracted decisions disappear and only broken strong leases fail a check\"",
         "kind": "pass",
         "detail": "cached decisions expose structurally expired premises @ auditPremiseLeases (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 131
+        "runs": 134
       },
       {
         "node": "Harness core",
         "claim": "boundary \"predicted context closure is calibrated against observed reads and outcomes\" at calibrate via guard \"calibration reports coverage, outside reads, and defect rates by prediction misses\"",
         "kind": "pass",
         "detail": "predicted context closure is calibrated against observed reads and outcomes @ calibrate (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 131
+        "runs": 134
       },
       {
         "node": "Harness core",
         "claim": "boundary \"calibration preserves the weakest host attribution of its trace\" at calibrationPaths via guard \"calibration keeps Codex parent-only writes aggregate and legacy rows unscoped\"",
         "kind": "pass",
         "detail": "calibration preserves the weakest host attribution of its trace @ calibrationPaths (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 49
+        "runs": 52
       },
       {
         "node": "Harness core",
         "claim": "boundary \"reviewed risk sites survive relocation but never duplication\" at reconcile via guard \"sinks — a moved file keeps its baselined identity and a genuinely new site still fails\"",
         "kind": "pass",
         "detail": "reviewed risk sites survive relocation but never duplication @ reconcile (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 131
+        "runs": 134
       },
       {
         "node": "Harness core",
         "claim": "boundary \"pinned mass follows a value-conserving rename but never absorbs growth\" at reconcileMass via guard \"mass — a renamed component keeps its pin; growth and novelty are never absorbed\"",
         "kind": "pass",
         "detail": "pinned mass follows a value-conserving rename but never absorbs growth @ reconcileMass (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 131
+        "runs": 134
       },
       {
         "node": "Harness core",
         "claim": "boundary \"a claim goes green only on positive evidence its oracle ran\" at execNamedTest via guard \"testMatch — a runner exiting 0 with no matching output FAILS (the renamed-test trap)\"",
         "kind": "pass",
         "detail": "a claim goes green only on positive evidence its oracle ran @ execNamedTest (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 131
+        "runs": 134
       },
       {
         "node": "Harness core",
         "claim": "boundary \"a vanished oracle reds its claim, never green-by-absence\" at resolveFromBatch via guard \"match — ZERO matching tests is its OWN state: the vanished oracle, named as such\"",
         "kind": "pass",
         "detail": "a vanished oracle reds its claim, never green-by-absence @ resolveFromBatch (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 131
+        "runs": 134
       },
       {
         "node": "Harness core",
         "claim": "boundary \"fast verification rejects a statically vanished Vitest oracle without executing tests\" at resolveStaticOracle via guard \"static oracle floor — a renamed tracked literal owner reds despite unrelated dynamic titles\"",
         "kind": "pass",
         "detail": "fast verification rejects a statically vanished Vitest oracle without executing tests @ resolveStaticOracle (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 8
+        "runs": 11
       },
       {
         "node": "Harness core",
         "claim": "boundary \"fast oracle absence requires a complete direct-declaration population\" at resolveStaticOracle via guard \"static names — a bare side-effect import may register tests and keeps absence UNKNOWN\"",
         "kind": "pass",
         "detail": "fast oracle absence requires a complete direct-declaration population @ resolveStaticOracle (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 20
+        "runs": 23
       },
       {
         "node": "Harness core",
         "claim": "boundary \"committed platform capabilities survive optional deployment-config toggles\" at cloudflareBindings via guard \"Cloudflare bindings — committed Env capability is stable across optional wrangler toggles\"",
         "kind": "pass",
         "detail": "committed platform capabilities survive optional deployment-config toggles @ cloudflareBindings (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 8
+        "runs": 11
       },
       {
         "node": "Harness core",
         "claim": "boundary \"a declared invariant unanchored by any boundary fails coverage\" at runVerify via guard \"RATCHET — a declared invariant with no anchoring boundary fails coverage\"",
         "kind": "pass",
         "detail": "a declared invariant unanchored by any boundary fails coverage @ runVerify (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 131
+        "runs": 134
       },
       {
         "node": "Harness core",
         "claim": "boundary \"a via-test oracle that iterates no live domain fails its claim\" at analyzeOracle via guard \"META-ORACLE — a `via test` boundary whose oracle loops a LITERAL fails\"",
         "kind": "pass",
         "detail": "a via-test oracle that iterates no live domain fails its claim @ analyzeOracle (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 131
+        "runs": 134
       },
       {
         "node": "Harness core",
         "claim": "boundary \"a skipped run never clobbers an oracle's recorded verdict\" at recordVerify via guard \"merge — a skip never clobbers a real verdict; the old verdict rides through with its own stamp\"",
         "kind": "pass",
         "detail": "a skipped run never clobbers an oracle's recorded verdict @ recordVerify (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 131
+        "runs": 134
       },
       {
         "node": "Harness core",
         "claim": "boundary \"a named oracle that no test runs cannot pass\" at runNamedTest via guard \"runner contract — a name that exists nowhere exits nonzero (the vanished oracle cannot pass)\"",
         "kind": "pass",
         "detail": "a named oracle that no test runs cannot pass @ runNamedTest (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 131
+        "runs": 134
       },
       {
         "node": "Harness core",
         "claim": "boundary \"an empty derivation against a remembered surface refuses, never passes\" at vacuityRefusal via guard \"FLOOR — an empty derivation against a remembered surface REFUSES, never reports coherent\"",
         "kind": "pass",
         "detail": "an empty derivation against a remembered surface refuses, never passes @ vacuityRefusal (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": true,
         "lastFailAt": "2026-07-31T23:53:29.562Z",
         "lastFailCommit": "10913ee",
-        "runs": 129
+        "runs": 132
       },
       {
         "node": "Harness core",
         "claim": "boundary \"lifecycle hook presence is one canonical runnable bit\" at inspectLifecycleHook via guard \"control — presence is the complete canonical bundle, never a partial or lookalike\"",
         "kind": "pass",
         "detail": "lifecycle hook presence is one canonical runnable bit @ inspectLifecycleHook (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": true,
         "lastFailAt": "2026-08-03T05:01:55.055Z",
         "lastFailCommit": "1162dae",
-        "runs": 72
+        "runs": 75
       },
       {
         "node": "Harness core",
         "claim": "boundary \"supported lifecycle hosts share one control contract without sharing host syntax\" at setLifecycleHookForHost via guard \"Codex control — install is exact, idempotent, preserving, and runnable across nested paths\"",
         "kind": "pass",
         "detail": "supported lifecycle hosts share one control contract without sharing host syntax @ setLifecycleHookForHost (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 49
+        "runs": 52
       },
       {
         "node": "Harness core",
         "claim": "boundary \"current-session activation requires exact installed-bundle evidence\" at currentObservation via guard \"hook status — exact current bundle activates; stale, direct, replayed, and damaged evidence does not\"",
         "kind": "pass",
         "detail": "current-session activation requires exact installed-bundle evidence @ currentObservation (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": true,
         "lastFailAt": "2026-08-05T03:36:05.871Z",
         "lastFailCommit": "790cd00",
-        "runs": 49
+        "runs": 52
       },
       {
         "node": "Harness core",
         "claim": "boundary \"customized hook text composes declared overrides and appends, degrading to canon on damage\" at composeHookText via guard \"hook text — override replaces, append follows, and damage degrades to the canonical emission\"",
         "kind": "pass",
         "detail": "customized hook text composes declared overrides and appends, degrading to canon on damage @ composeHookText (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 45
+        "runs": 48
       },
       {
         "node": "Harness core",
         "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at surfaceOfSource via guard \"python surface — module defs, enum variants, and dict keys count; underscore and nested names do not\"",
         "kind": "pass",
         "detail": "python sources feed the same instruments as typescript at their declared grade @ surfaceOfSource (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
-        "tier": "full",
-        "everFailed": false,
-        "runs": 27
-      },
-      {
-        "node": "Harness core",
-        "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at analyzeParityOracle via guard \"python parity — a .py oracle that iterates the live domain passes; a literal list fails; a vanished oracle cannot pass\"",
-        "kind": "pass",
-        "detail": "python sources feed the same instruments as typescript at their declared grade @ analyzeParityOracle (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
-        "tier": "full",
-        "everFailed": false,
-        "runs": 27
-      },
-      {
-        "node": "Harness core",
-        "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at sitesOfPython via guard \"python redundancy — two spellings of one domain in .py rank as a candidate; declared parity and idiom do not\"",
-        "kind": "pass",
-        "detail": "python sources feed the same instruments as typescript at their declared grade @ sitesOfPython (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
-        "tier": "full",
-        "everFailed": false,
-        "runs": 27
-      },
-      {
-        "node": "Harness core",
-        "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at resolveFromBatch via guard \"pytest batch — nodeid names resolve per claim, zero matches is the vanished oracle, and a torn report falls back loudly\"",
-        "kind": "pass",
-        "detail": "python sources feed the same instruments as typescript at their declared grade @ resolveFromBatch (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
-        "tier": "full",
-        "everFailed": false,
-        "runs": 27
-      },
-      {
-        "node": "Harness core",
-        "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at lintSinks via guard \"python sinks — an f-string into a SQL context is a site, a safe-pattern expression is not, and the ratchet reds the new site\"",
-        "kind": "pass",
-        "detail": "python sources feed the same instruments as typescript at their declared grade @ lintSinks (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
-        "tier": "full",
-        "everFailed": false,
-        "runs": 27
-      },
-      {
-        "node": "Harness core",
-        "claim": "boundary \"a declared language resolves to a real adapter or refuses, never a silent fallback\" at resolveLanguageAdapter via guard \"language adapter — a project path loads and shapes the graph; unknown names refuse, never fall back\"",
-        "kind": "pass",
-        "detail": "a declared language resolves to a real adapter or refuses, never a silent fallback @ resolveLanguageAdapter (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
-        "tier": "full",
-        "everFailed": false,
-        "runs": 38
-      },
-      {
-        "node": "Harness core",
-        "claim": "boundary \"a grammar-backed adapter derives the graph through the same language seam\" at makeTreeSitterAdapter via guard \"tree-sitter — a grammar-backed adapter derives ruby symbols, imports, and prose through the same seam\"",
-        "kind": "pass",
-        "detail": "a grammar-backed adapter derives the graph through the same language seam @ makeTreeSitterAdapter (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
-        "tier": "full",
-        "everFailed": false,
-        "runs": 36
-      },
-      {
-        "node": "Harness core",
-        "claim": "boundary \"instrument arms read languages through shared grammar queries, never a parallel scanner\" at lintSinks via guard \"ruby sinks — an interpolation into a SQL context is a site and the safe pattern exempts\"",
-        "kind": "pass",
-        "detail": "instrument arms read languages through shared grammar queries, never a parallel scanner @ lintSinks (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
         "runs": 30
       },
       {
         "node": "Harness core",
+        "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at analyzeParityOracle via guard \"python parity — a .py oracle that iterates the live domain passes; a literal list fails; a vanished oracle cannot pass\"",
+        "kind": "pass",
+        "detail": "python sources feed the same instruments as typescript at their declared grade @ analyzeParityOracle (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 30
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at sitesOfPython via guard \"python redundancy — two spellings of one domain in .py rank as a candidate; declared parity and idiom do not\"",
+        "kind": "pass",
+        "detail": "python sources feed the same instruments as typescript at their declared grade @ sitesOfPython (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 30
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at resolveFromBatch via guard \"pytest batch — nodeid names resolve per claim, zero matches is the vanished oracle, and a torn report falls back loudly\"",
+        "kind": "pass",
+        "detail": "python sources feed the same instruments as typescript at their declared grade @ resolveFromBatch (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 30
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at lintSinks via guard \"python sinks — an f-string into a SQL context is a site, a safe-pattern expression is not, and the ratchet reds the new site\"",
+        "kind": "pass",
+        "detail": "python sources feed the same instruments as typescript at their declared grade @ lintSinks (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 30
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"a declared language resolves to a real adapter or refuses, never a silent fallback\" at resolveLanguageAdapter via guard \"language adapter — a project path loads and shapes the graph; unknown names refuse, never fall back\"",
+        "kind": "pass",
+        "detail": "a declared language resolves to a real adapter or refuses, never a silent fallback @ resolveLanguageAdapter (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 41
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"a grammar-backed adapter derives the graph through the same language seam\" at makeTreeSitterAdapter via guard \"tree-sitter — a grammar-backed adapter derives ruby symbols, imports, and prose through the same seam\"",
+        "kind": "pass",
+        "detail": "a grammar-backed adapter derives the graph through the same language seam @ makeTreeSitterAdapter (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 39
+      },
+      {
+        "node": "Harness core",
+        "claim": "boundary \"instrument arms read languages through shared grammar queries, never a parallel scanner\" at lintSinks via guard \"ruby sinks — an interpolation into a SQL context is a site and the safe pattern exempts\"",
+        "kind": "pass",
+        "detail": "instrument arms read languages through shared grammar queries, never a parallel scanner @ lintSinks (source-property guard)",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 33
+      },
+      {
+        "node": "Harness core",
         "claim": "boundary \"a built-in language pack is data: queries, patterns, and named strategies, never code\" at builtinLanguagePacks via guard \"language packs — every built-in pack is function-free data across all five instrument tables\"",
         "kind": "pass",
         "detail": "a built-in language pack is data: queries, patterns, and named strategies, never code @ builtinLanguagePacks (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 26
+        "runs": 29
       },
       {
         "node": "Harness core",
         "claim": "boundary \"a parse's heap is returned before the next file\" at withTree via guard \"wasm heap — parses past the measured abort cliff survive because every tree is freed\"",
         "kind": "pass",
         "detail": "a parse's heap is returned before the next file @ withTree (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 24
+        "runs": 27
       },
       {
         "node": "Harness core",
         "claim": "boundary \"an undeclared root refuses the walk, never wanders\" at requireDeclaredRoot via guard \"declared root — a configless directory refuses the walk and an empty config declares it\"",
         "kind": "pass",
         "detail": "an undeclared root refuses the walk, never wanders @ requireDeclaredRoot (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 24
+        "runs": 27
       },
       {
         "node": "Harness core",
         "claim": "boundary \"experiment outcomes require criterion-total evidence\" at closeExperiment via guard \"close — total nonempty evidence is mandatory and outcome is derived, never supplied\"",
         "kind": "pass",
         "detail": "experiment outcomes require criterion-total evidence @ closeExperiment (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 49
+        "runs": 52
       },
       {
         "node": "Harness core",
         "claim": "boundary \"experiment telemetry preserves its weakest provable attribution\" at closeExperiment via guard \"Codex parent-only tool events close the loop as an aggregate, never exact owner evidence\"",
         "kind": "pass",
         "detail": "experiment telemetry preserves its weakest provable attribution @ closeExperiment (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 49
+        "runs": 52
       },
       {
         "node": "Harness core",
         "claim": "boundary \"activity evidence is accepted only when identity, scope, time, and command agree\" at isActivityRow via guard \"activity — internally inconsistent scope, time, and command rows are damage, not evidence\"",
         "kind": "pass",
         "detail": "activity evidence is accepted only when identity, scope, time, and command agree @ isActivityRow (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 49
+        "runs": 52
       },
       {
         "node": "Harness core",
         "claim": "boundary \"surviving agent-assessed defect evidence is attributable and internally consistent\" at recordDefect via guard \"defects — agent-assessed evidence is attributable, content-addressed, and strict on inconsistent rows\"",
         "kind": "pass",
         "detail": "surviving agent-assessed defect evidence is attributable and internally consistent @ recordDefect (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 20
+        "runs": 23
       },
       {
         "node": "Harness core",
         "claim": "boundary \"defect writes refuse pre-existing symlink redirection\" at recordDefect via guard \"defect containment — pre-existing directory and session symlinks refuse external append targets\"",
         "kind": "pass",
         "detail": "defect writes refuse pre-existing symlink redirection @ recordDefect (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 20
+        "runs": 23
       },
       {
         "node": "Harness core",
         "claim": "boundary \"defect provenance is data, never terminal control\" at readDefects via guard \"defect provenance — commit ids have Git shape and cannot carry terminal controls\"",
         "kind": "pass",
         "detail": "defect provenance is data, never terminal control @ readDefects (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 20
+        "runs": 23
       },
       {
         "node": "Harness core",
         "claim": "boundary \"a streamed journal entry renders exactly once across appends and compaction\" at tailJournal via guard \"tail — an appended record arrives exactly once, a compaction fold re-emits nothing and drops nothing, and a half-written line waits for its bytes\"",
         "kind": "pass",
         "detail": "a streamed journal entry renders exactly once across appends and compaction @ tailJournal (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": true,
         "lastFailAt": "2026-08-04T20:03:32.202Z",
         "lastFailCommit": "a268cdb",
-        "runs": 62
+        "runs": 65
       },
       {
         "node": "Harness core",
         "claim": "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at buildScopeModel via guard \"scope model — graph/promise population mismatch refuses rather than drawing partial truth\"",
         "kind": "pass",
         "detail": "Scope projects the canonical promise population with deterministic gravity and honest absence @ buildScopeModel (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 1
+        "runs": 4
       },
       {
         "node": "Harness core",
         "claim": "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at renderScope via guard \"scope cards — titles have an opaque title bar and explicit contrast, with full text retained in the inspector\"",
         "kind": "pass",
         "detail": "Scope projects the canonical promise population with deterministic gravity and honest absence @ renderScope (source-property guard)",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 1
+        "runs": 4
       },
       {
         "node": "Source adapters",
         "claim": "tree-sitter.ts exists at this node",
         "kind": "pass",
         "detail": "tree-sitter.ts @ this node",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 37
+        "runs": 40
       },
       {
         "node": "Source adapters",
         "claim": "cloudflare.ts exists at this node",
         "kind": "pass",
         "detail": "cloudflare.ts @ this node",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 138
+        "runs": 141
       },
       {
         "node": "Executable contracts",
         "claim": "_helpers.ts exists at this node",
         "kind": "pass",
         "detail": "_helpers.ts @ this node",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 138
+        "runs": 141
       },
       {
         "node": "Executable contracts",
         "claim": "verify.test.ts exists at this node",
         "kind": "pass",
         "detail": "verify.test.ts @ this node",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 138
+        "runs": 141
       },
       {
         "node": "Executable contracts",
         "claim": "decisions.test.ts exists at this node",
         "kind": "pass",
         "detail": "decisions.test.ts @ this node",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 138
+        "runs": 141
       },
       {
         "node": "Executable contracts",
         "claim": "commands.test.ts exists at this node",
         "kind": "pass",
         "detail": "commands.test.ts @ this node",
-        "at": "2026-09-04T20:36:39.147Z",
-        "commit": "cba496e",
+        "at": "2026-09-04T22:10:26.624Z",
+        "commit": "d1a2227",
         "tier": "full",
         "everFailed": false,
-        "runs": 138
+        "runs": 141
       }
     ],
     "coverage": {
       "components": 4,
       "claimed": 4,
       "withWhy": 4,
-      "symbols": 773,
-      "documented": 392
+      "symbols": 807,
+      "documented": 403
     },
     "invariants": {
-      "total": 63,
-      "anchored": 63,
+      "total": 69,
+      "anchored": 69,
       "gaps": []
     },
     "narrative": null,
-    "jobs": 381,
+    "jobs": 404,
     "failures": 0
   },
   "mass": {
-    "at": "2026-09-04T20:36:34.533Z",
-    "commit": "cba496e",
+    "at": "2026-09-04T22:12:18.695Z",
+    "commit": "d1a2227",
     "dirty": true,
     "dims": [
       {
         "key": "lines|total",
-        "value": 48181,
+        "value": 50167,
         "unit": "lines",
-        "baseline": 48181
+        "baseline": 50167
       },
       {
         "key": "lines|Executable contracts",
-        "value": 19727,
+        "value": 20048,
         "unit": "lines",
-        "baseline": 19727
+        "baseline": 20048
       },
       {
         "key": "lines|Harness core",
-        "value": 27884,
+        "value": 29549,
         "unit": "lines",
-        "baseline": 27884
+        "baseline": 29549
       },
       {
         "key": "lines|Source adapters",
@@ -1039,21 +1149,21 @@
       },
       {
         "key": "files|total",
-        "value": 150,
+        "value": 155,
         "unit": "files",
-        "baseline": 150
+        "baseline": 155
       },
       {
         "key": "symbols|total",
-        "value": 773,
+        "value": 807,
         "unit": "symbols",
-        "baseline": 773
+        "baseline": 807
       },
       {
         "key": "undocumented|symbols",
-        "value": 381,
+        "value": 404,
         "unit": "symbols",
-        "baseline": 381
+        "baseline": 404
       },
       {
         "key": "deps|direct",
@@ -1081,9 +1191,9 @@
       },
       {
         "key": "measure|graph-claims",
-        "value": 85,
+        "value": 95,
         "unit": "claims",
-        "baseline": 85
+        "baseline": 95
       }
     ]
   },
@@ -1148,14 +1258,86 @@
     "verdict": "LOCALITY decohering, SPREAD widening — driving toward divergence — smears dominate recent work; watch for a block-list forming"
   },
   "atlas": {
-    "at": "2026-09-04T20:36:35.687Z",
-    "commit": "cba496e",
+    "at": "2026-09-04T21:59:24.077Z",
+    "commit": "d1a2227",
     "tiers": {
       "enshrined": 0,
-      "checked": 47,
-      "convention": 7
+      "checked": 50,
+      "convention": 10
     },
     "crossings": [
+      {
+        "sym": "validateCalibrationSample",
+        "from": "record",
+        "to": "derived-model",
+        "tier": 2,
+        "security": true,
+        "note": "calibration integrity — damaged rows and invalid direct inputs cannot enter a denominator",
+        "translates": "A sample enters calibration only with consistent session/patch identity, canonical time, path sets, a declared outcome and known or legacy attribution. Malformed surviving rows and invalid direct statistics inputs refuse the whole denominator.",
+        "present": true,
+        "pending": false,
+        "heat": 0.013513513513513514
+      },
+      {
+        "sym": "taxonomyView",
+        "from": "record",
+        "to": "derived-model",
+        "tier": 3,
+        "security": true,
+        "note": "no boundary claim",
+        "translates": "Recorded assessments are projected using their retained catalog version. A newer catalog expires currency without silently changing historical role support or granting verification authority.",
+        "present": true,
+        "pending": false,
+        "heat": 0
+      },
+      {
+        "sym": "captureTaxonomy",
+        "from": "project-source",
+        "to": "derived-model",
+        "tier": 2,
+        "security": true,
+        "note": "taxonomy subjects — only resolved graph addresses enter evidence; absent, compound and escaped paths refuse",
+        "translates": "One graph-resolved file or symbol and contained evidence files become a content-digested classification subject. Whole subject files, direct graph imports, explicit evidence/dependencies and root manifests are the named freshness scope; no transitive or runtime verification is inferred.",
+        "present": true,
+        "pending": false,
+        "heat": 0
+      },
+      {
+        "sym": "recordTaxonomy",
+        "from": "derived-model",
+        "to": "record",
+        "tier": 3,
+        "security": true,
+        "note": "no boundary claim",
+        "translates": "Caller-assessed namespaced roles and facets become an immutable revision in an exclusively created predecessor slot. Concurrent writers cannot both advance one revision, and positive assessments need resolved evidence. No satisfied or passing guarantee state exists.",
+        "present": true,
+        "pending": false,
+        "heat": 0
+      },
+      {
+        "sym": "readTaxonomyRecords",
+        "from": "record",
+        "to": "derived-model",
+        "tier": 3,
+        "security": true,
+        "note": "no boundary claim",
+        "translates": "Canonical contained records reconstruct taxonomy history only when schema, content identity, predecessor ownership and filename agree. Surviving damage and wholesale loss of a committed population refuse instead of becoming empty adoption.",
+        "present": true,
+        "pending": false,
+        "heat": 0
+      },
+      {
+        "sym": "validateTaxonomyRecord",
+        "from": "record",
+        "to": "derived-model",
+        "tier": 2,
+        "security": true,
+        "note": "taxonomy damage — malformed or displaced history refuses instead of shrinking into a clean empty view",
+        "translates": "Untrusted persisted classification bytes become a typed record only when the complete canonical schema, namespaced selections, evidence digests and content identity agree. Record writes use the same validator; a forged verification basis cannot enter either path.",
+        "present": true,
+        "pending": false,
+        "heat": 0
+      },
       {
         "sym": "renderScope",
         "from": "derived-model",
@@ -1178,7 +1360,7 @@
         "translates": "The single ingress: arbitrary repository text becomes the model every downstream gate is computed over. Nothing after this re-reads the tree, so whatever the walk drops is not wrong here — it is absent everywhere, silently. floor.ts's non-vacuity refusal exists because of exactly this crossing, and grades the collapse rather than the crossing.",
         "present": true,
         "pending": false,
-        "heat": 0.08163265306122448
+        "heat": 0.08108108108108109
       },
       {
         "sym": "cloudflareBindings",
@@ -1190,7 +1372,7 @@
         "translates": "Direct module Env / Cloudflare.Env store types and wrangler configuration become one canonical platform domain. Source/config agreement deduplicates, disagreement refuses, deployment-only store metadata cannot perturb node bytes, runtime variables cross as names with a typed declared marker rather than values, and source inference receives the graph's filtered file population so generated local declarations cannot become a hidden second walk.",
         "present": true,
         "pending": false,
-        "heat": 0.013605442176870748
+        "heat": 0.013513513513513514
       },
       {
         "sym": "loadConfig",
@@ -1202,7 +1384,7 @@
         "translates": "The repository's own coherence.config.json becomes argv the harness spawns — `test`, `typecheck`, and every `mass.measures` command. Running the harness in a tree executes that tree's config; readJsonOrRefuse makes an unparseable config refuse rather than revert to defaults, but a parseable one is obeyed.",
         "present": true,
         "pending": false,
-        "heat": 0.02040816326530612
+        "heat": 0.02027027027027027
       },
       {
         "sym": "readJsonOrRefuse",
@@ -1214,7 +1396,7 @@
         "translates": "The one door every remembered fact enters through — status.json, each ratchet baseline, the journal. It separates ABSENT (legitimate: first run, nothing pinned) from UNREADABLE (never legitimate), because the `catch → return default` it replaced turned a single garbage byte into every floor on the page quietly agreeing.",
         "present": true,
         "pending": false,
-        "heat": 0.04081632653061224
+        "heat": 0.04054054054054054
       },
       {
         "sym": "readDefects",
@@ -1226,7 +1408,7 @@
         "translates": "Committed defect rows become admissible controller evidence only after their exact shape, self-consistent content address, session placement, Git object-name shape, and stable regular-file placement agree. Pre-existing symlinks, malformed or internally inconsistent surviving rows, and terminal-capable provenance refuse the whole corpus rather than entering a reading surface; Git history, not the in-row unkeyed hash, witnesses valid rewrites or deletion.",
         "present": true,
         "pending": false,
-        "heat": 0.006802721088435374
+        "heat": 0.006756756756756757
       },
       {
         "sym": "readTrustedJournal",
@@ -1238,7 +1420,7 @@
         "translates": "Surviving decision rows become verdict-bearing evidence only when repository containment, complete entry inventory, canonical append framing, version, exact shape, canonical time, content identity, terminal references, duplicate agreement, and portable session/file attribution all hold. At zero rows, current Git HEAD distinguishes deleted tracked evidence from genuine adoption. A human may still use the tolerant historical render, but damage makes the trusted projection unavailable rather than silently shrinking it.",
         "present": true,
         "pending": false,
-        "heat": 0.09523809523809523
+        "heat": 0.0945945945945946
       },
       {
         "sym": "readWork",
@@ -1274,7 +1456,7 @@
         "translates": "Independent strict decision, work, consequence, experiment, defect, and runtime-validated verification readings become one deterministic swarm heading. Any unavailable source outranks an apparently empty action list; missing verification provenance stays stale, collisions and dangling addresses remain named, and synthesis is selected only when the representing parent close can execute. The projection executes nothing.",
         "present": true,
         "pending": false,
-        "heat": 0.006802721088435374
+        "heat": 0.006756756756756757
       },
       {
         "sym": "analyzeDecisionPositions",
@@ -1334,7 +1516,7 @@
         "translates": "Repeated CLI arguments become either declared plural evidence and scope values or a refusal. Session, owner, authority, predecessor, and other singleton selectors never silently become last-wins attribution for a ledger append.",
         "present": true,
         "pending": false,
-        "heat": 0.272108843537415
+        "heat": 0.2702702702702703
       },
       {
         "sym": "traceConsequences",
@@ -1370,7 +1552,7 @@
         "translates": "Persisted verification JSON plus the live Git tree become never, stale, failing, or current only after canonical time, commit shape, dirty bit, tier, and nonnegative failure count validate. Current additionally requires matching commit addresses and no material live change; the status receipt itself is excluded so filing evidence does not self-invalidate.",
         "present": true,
         "pending": false,
-        "heat": 0.006802721088435374
+        "heat": 0.006756756756756757
       },
       {
         "sym": "sourceTextIsNavigable",
@@ -1382,7 +1564,7 @@
         "translates": "Every live TypeScript source blob becomes admissible searchable input only when it contains no NUL byte. A source that common repository tools classify as binary fails the guard instead of silently disappearing from agent navigation.",
         "present": true,
         "pending": false,
-        "heat": 0.013605442176870748
+        "heat": 0.013513513513513514
       },
       {
         "sym": "analyzeOracle",
@@ -1394,7 +1576,7 @@
         "translates": "An oracle's own source is read to decide whether it iterates a LIVE domain or a literal. A test that loops a hardcoded list proves nothing about the code and must not be allowed to green a totality claim.",
         "present": true,
         "pending": false,
-        "heat": 0.06802721088435375
+        "heat": 0.06756756756756757
       },
       {
         "sym": "runNamedTest",
@@ -1406,7 +1588,7 @@
         "translates": "A claim's oracle NAME becomes a test selection in a spawned runner. A name that exists nowhere exits nonzero — the vanished oracle cannot pass by selecting nothing.",
         "present": true,
         "pending": false,
-        "heat": 0.006802721088435374
+        "heat": 0.006756756756756757
       },
       {
         "sym": "execNamedTest",
@@ -1418,7 +1600,7 @@
         "translates": "A subprocess's exit code and stdout become a claim's verdict. Exit 0 is not evidence: the output must positively match `testMatch`, so a runner that ran nothing fails instead of greening the renamed test.",
         "present": true,
         "pending": false,
-        "heat": 0.061224489795918366
+        "heat": 0.060810810810810814
       },
       {
         "sym": "resolveFromBatch",
@@ -1430,7 +1612,7 @@
         "translates": "One batched runner's output is split back into per-claim verdicts. ZERO matching tests is its own named state, never a quiet pass — the batch's efficiency must not buy back the absence it would otherwise hide.",
         "present": true,
         "pending": false,
-        "heat": 0.027210884353741496
+        "heat": 0.02702702702702703
       },
       {
         "sym": "resolveStaticOracle",
@@ -1442,7 +1624,7 @@
         "translates": "Current conventional Vitest source names plus concrete owners from modified or deleted test paths at Git HEAD become a tri-state existence verdict without executing test configuration or modules. A current literal match proves existence only; complete current absence or loss from a deleted/still-complete former owner is VANISHED ORACLE (static). A former owner that itself becomes dynamic or damaged remains UNKNOWN, as do recognized extended, runtime-registered, custom-included, unreadable, and otherwise incomplete sources. Projects assembled beyond that grade disable staticOracleExistence or use a fresh report.",
         "present": true,
         "pending": false,
-        "heat": 0.013605442176870748
+        "heat": 0.013513513513513514
       },
       {
         "sym": "runVerify",
@@ -1454,7 +1636,7 @@
         "translates": "The graded claims plus coverage become the run's verdict. A declared invariant with no anchoring boundary is a promise with no chokepoint, and it reds coverage rather than being counted as satisfied.",
         "present": true,
         "pending": false,
-        "heat": 0.12244897959183673
+        "heat": 0.12162162162162163
       },
       {
         "sym": "vacuityRefusal",
@@ -1466,7 +1648,7 @@
         "translates": "The floor beneath every other crossing on this map: before any claim is graded, the derived surface is checked against what the record remembers. An empty derivation over a remembered one REFUSES — `0 of 0` never renders as coherent.",
         "present": true,
         "pending": false,
-        "heat": 0.04081632653061224
+        "heat": 0.04054054054054054
       },
       {
         "sym": "recordVerify",
@@ -1474,11 +1656,11 @@
         "to": "record",
         "tier": 2,
         "security": true,
-        "note": "merge — a skip never clobbers a real verdict; the old verdict rides through with its own stamp",
+        "note": "status publication — concurrent processes preserve independent reports and readers see complete JSON",
         "translates": "This run's verdicts become the memory the next run compares against — the only writer to that chart. A skip merges rather than overwrites, so a scoped run can never launder a real red into an absence.",
         "present": true,
         "pending": false,
-        "heat": 0.05442176870748299
+        "heat": 0.05405405405405406
       },
       {
         "sym": "setLifecycleHookForHost",
@@ -1490,7 +1672,7 @@
         "translates": "One host-selected lifecycle contract becomes that host's tracked project settings, stable launcher, and root mapping. Claude and Codex share the five event meanings without sharing settings syntax, matchers, launcher bytes, or bundle identity; unrelated host configuration survives the convergence.",
         "present": true,
         "pending": false,
-        "heat": 0.04081632653061224
+        "heat": 0.04054054054054054
       },
       {
         "sym": "resolveLanguageAdapter",
@@ -1502,7 +1684,7 @@
         "translates": "The config's `language` value becomes the adapter whose grammar derives the entire graph — a built-in name, or a project module imported and EXECUTED from the tree under analysis (the same declared trust as loadConfig's argv). An unknown name refuses with the live built-in list rather than falling back to the typescript grammar, because a wrong adapter walks a different tree than the one configured and every downstream gate grades the garbage with full confidence.",
         "present": true,
         "pending": false,
-        "heat": 0.08163265306122448
+        "heat": 0.08108108108108109
       },
       {
         "sym": "makeTreeSitterAdapter",
@@ -1514,7 +1696,7 @@
         "translates": "A grammar wasm — typically shipped by a tree-sitter grammar package, addressed by the project's adapter module — is loaded and EXECUTED to parse the tree under analysis into graph symbols, import edges, and prose. The wasm is sandboxed to parsing but it is still a project-supplied executable artifact, the same declared trust as the config's argv and adapter modules; a load or query failure refuses at adapter resolution rather than deriving a partial graph.",
         "present": true,
         "pending": false,
-        "heat": 0.034013605442176874
+        "heat": 0.033783783783783786
       },
       {
         "sym": "surfaceOfSource",
@@ -1526,7 +1708,7 @@
         "translates": "One file's text becomes counted behavioral surface — exported symbols, domain variants, keyed-table keys — for both languages the harness reads. The change signal's zero-anchor alarm consumes these counts, so a language this crossing cannot see grows silently; python is read at the declared regex grade rather than not at all.",
         "present": true,
         "pending": false,
-        "heat": 0.034013605442176874
+        "heat": 0.033783783783783786
       },
       {
         "sym": "analyzeParityOracle",
@@ -1538,7 +1720,7 @@
         "translates": "A parity oracle's own source decides whether it enumerates the LIVE shared domain or a hand-copied sample. TypeScript is walked by compiler; python by the same indent-block discipline as analyzePythonOracle — and in both, a literal list roots at nothing, a missing oracle is not-found, and neither can green a totality claim.",
         "present": true,
         "pending": false,
-        "heat": 0.06802721088435375
+        "heat": 0.06756756756756757
       },
       {
         "sym": "sitesOfPython",
@@ -1550,7 +1732,7 @@
         "translates": "Python enumeration sites — module dicts, Enum bodies, string-constant collections, match/elif chains — become candidate token sets for the undeclared-duplication ranker, the same shape the TS extractor emits. Advisory only; with no compiler behind .py, precision is earned at extraction because nothing downstream can rescue a false positive.",
         "present": true,
         "pending": false,
-        "heat": 0.047619047619047616
+        "heat": 0.0472972972972973
       },
       {
         "sym": "lintSinks",
@@ -1562,7 +1744,7 @@
         "translates": "Raw interpolations into dangerous contexts — JS template literals and python f-strings alike — become the ratcheted review surface. A NEW unreviewed site fails --check; the safe-pattern config grades the bare expression identically in both languages, so switching languages cannot shrink the visible surface.",
         "present": true,
         "pending": false,
-        "heat": 0.047619047619047616
+        "heat": 0.0472972972972973
       },
       {
         "sym": "reconcile",
@@ -1574,7 +1756,7 @@
         "translates": "The pinned interpolation-site review is re-addressed against today's tree. A moved file keeps its baselined identity; a COPIED site finds nothing to absorb it and is still novel, so review cannot be laundered by duplication.",
         "present": true,
         "pending": false,
-        "heat": 0.047619047619047616
+        "heat": 0.0472972972972973
       },
       {
         "sym": "reconcileMass",
@@ -1586,7 +1768,7 @@
         "translates": "The pinned mass is re-addressed after renames. A vanished pin is inherited only when family, unit and EXACT value all match — a rename that also grew absorbs nothing, so growth cannot ride in under a relabel.",
         "present": true,
         "pending": false,
-        "heat": 0.034013605442176874
+        "heat": 0.033783783783783786
       },
       {
         "sym": "auditPremiseLeases",
@@ -1598,7 +1780,7 @@
         "translates": "A standing decision's named structural addresses are re-resolved against today's graph. A decision whose premise no longer exists is reported expired rather than silently continuing to hold.",
         "present": true,
         "pending": false,
-        "heat": 0.02040816326530612
+        "heat": 0.02027027027027027
       },
       {
         "sym": "signal",
@@ -1610,7 +1792,7 @@
         "translates": "A diff's shape becomes a demand: behavioral growth with zero anchors needs an invariant or an explicit attestation. It grades process, not evidence — a tear here delays a claim, it does not fabricate one.",
         "present": true,
         "pending": false,
-        "heat": 0.006802721088435374
+        "heat": 0.006756756756756757
       },
       {
         "sym": "selectRegulation",
@@ -1622,7 +1804,7 @@
         "translates": "Live sensor observations become exactly one ordered intervention. Missing, foreign, or conflicting readings refuse; a required decision outranks a mechanical redirect; and release means only that the versioned rules evaluated no obligation. A tear here can mask stronger debt with easier work, so the selector's priority is a guarded crossing rather than formatter policy.",
         "present": true,
         "pending": false,
-        "heat": 0.006802721088435374
+        "heat": 0.006756756756756757
       },
       {
         "sym": "observeRegulation",
@@ -1634,7 +1816,7 @@
         "translates": "The selected agent host's lifecycle surface plus strict swarm orientation become the observations consumed by doctrine v2. A complete Claude path cannot satisfy a Codex reading (or vice versa); damaged coordination evidence fails closed; live work collisions and completed work without an explicit verification link become obligations rather than being inferred away.",
         "present": true,
         "pending": false,
-        "heat": 0.006802721088435374
+        "heat": 0.006756756756756757
       },
       {
         "sym": "isActivityRow",
@@ -1646,7 +1828,7 @@
         "translates": "An append-only activity row becomes admissible evidence only when its host, transport, session relation, event identity, canonical time, and optional command result agree. A torn or internally contradictory row is counted as damage instead of entering status, calibration, or experiment inference.",
         "present": true,
         "pending": false,
-        "heat": 0.006802721088435374
+        "heat": 0.006756756756756757
       },
       {
         "sym": "closeExperiment",
@@ -1658,7 +1840,7 @@
         "translates": "An assessor's action and criterion evidence becomes an immutable close row joined to the frozen owner plan. Every planned id must be answered exactly once, trace and activity prefixes must remain intact, each telemetry window names its weakest provable scope (none, owner-session, parent-session-aggregate, and legacy-unscoped for older trace), and the outcome is derived from criterion statuses; malformed, partial, rewritten, unreadable, or internally unscoped evidence refuses instead of becoming history.",
         "present": true,
         "pending": false,
-        "heat": 0.006802721088435374
+        "heat": 0.006756756756756757
       },
       {
         "sym": "recordDefect",
@@ -1670,7 +1852,7 @@
         "translates": "An agent's explicit defect assessment becomes one content-addressed session record carrying required evidence and repository provenance. Exact retries dedupe; malformed, internally inconsistent, or session-displaced surviving rows refuse the merged read, while committed Git history remains the external witness for valid rewrites or clean deletion. The crossing stores accountable testimony and labels it agent-assessed — it does not manufacture machine proof, cryptographic immutability, or causal attribution.",
         "present": true,
         "pending": false,
-        "heat": 0.006802721088435374
+        "heat": 0.006756756756756757
       },
       {
         "sym": "tailJournal",
@@ -1682,7 +1864,7 @@
         "translates": "The journal's append-only session files become a live feed and a surfable history. Identity comes from a record's own content rather than its byte position, so a compaction fold neither drops nor duplicates what a watcher sees; the crossing carries memory out to a reader and never writes a verdict back.",
         "present": true,
         "pending": false,
-        "heat": 0.013605442176870748
+        "heat": 0.013513513513513514
       },
       {
         "sym": "calibrate",
@@ -1694,7 +1876,7 @@
         "translates": "Recorded read-traces and labeled outcomes become a report on how well the context predictor did. It gates nothing — the crossing carries a measurement out to a reader, never back into a verdict.",
         "present": true,
         "pending": false,
-        "heat": 0.013605442176870748
+        "heat": 0.013513513513513514
       },
       {
         "sym": "calibrationPaths",
@@ -1706,7 +1888,7 @@
         "translates": "A host trace and the shared worktree become one calibration sample domain without upgrading scope: exact session writes, Codex parent-session aggregates, legacy unscoped rows, and shared-worktree fallback remain distinct.",
         "present": true,
         "pending": false,
-        "heat": 0.013605442176870748
+        "heat": 0.013513513513513514
       },
       {
         "sym": "contextFor",
@@ -1718,7 +1900,7 @@
         "translates": "The graph becomes the smallest packet an agent needs for one task. Bounded and byte-stable, and every approximation it makes is named in the packet — a reader must be able to see what was left out.",
         "present": true,
         "pending": false,
-        "heat": 0.006802721088435374
+        "heat": 0.006756756756756757
       },
       {
         "sym": "renderContextProjection",
@@ -1730,7 +1912,7 @@
         "translates": "A task-addressed context packet becomes a byte-bounded reading surface in stable route-first order. Mandatory framing and named limitations are never truncated; every withheld item and byte is accounted for, and a budget too small for that accounting refuses with its exact minimum.",
         "present": true,
         "pending": false,
-        "heat": 0.006802721088435374
+        "heat": 0.006756756756756757
       },
       {
         "sym": "runHook",
@@ -1742,7 +1924,7 @@
         "translates": "A lifecycle event the selected agent host hands this process becomes durable journal state or a transient read/activity row carrying host, transport, and bundle identity. It writes memory but never a verdict, so a tear loses history rather than earning a green.",
         "present": true,
         "pending": false,
-        "heat": 0.12244897959183673
+        "heat": 0.12162162162162163
       },
       {
         "sym": "assignedWorkInstructions",
@@ -1754,7 +1936,7 @@
         "translates": "Repository-authored work data becomes a model startup instruction only for the exact owner session. Authority, criteria, write scope, blockers, and collisions are control-byte neutralized before crossing into that agent's context; another session's assignment does not. An unreadable ledger becomes a named unavailable message rather than a lifecycle failure.",
         "present": true,
         "pending": false,
-        "heat": 0.12244897959183673
+        "heat": 0.12162162162162163
       },
       {
         "sym": "composeHookText",
@@ -1766,7 +1948,7 @@
         "translates": "Project-authored override and append files become part of the text injected into an agent's context at each lifecycle event: base = override ?? canonical, the append follows, and an unreadable file degrades to the canonical emission — a torn customization costs the project's voice, never the session. It can mislead an agent, but it cannot touch a verdict.",
         "present": true,
         "pending": false,
-        "heat": 0.006802721088435374
+        "heat": 0.006756756756756757
       },
       {
         "sym": "currentObservation",
@@ -1778,7 +1960,7 @@
         "translates": "One explicitly named session's activity becomes the activation reading used by session-scoped hook checks. Only launcher events from the selected host and current installed bundle count as observed; direct probes, stale bundles, and other sessions cannot earn activation. Parent-fallback may prove that exact bundle reached the parent session, but it cannot establish which child produced the event.",
         "present": true,
         "pending": false,
-        "heat": 0.12244897959183673
+        "heat": 0.12162162162162163
       },
       {
         "sym": "inspectLifecycleHook",
@@ -1790,7 +1972,7 @@
         "translates": "The selected host's project hook surface is read to produce ONE structural control bit: Claude's shared and local settings, or Codex's hooks.json plus the relevant project config.toml controls, together with that host's aligned launcher root, root mapping, and runnable target. Host-specific syntax cannot weaken singularity: a checker that accepts two firing paths, an inline competitor, a disabled feature, or managed-only exclusion is not a binary control, only a substring detector with a nicer report.",
         "present": true,
         "pending": false,
-        "heat": 0.04081632653061224
+        "heat": 0.04054054054054054
       },
       {
         "sym": "requireDeclaredRoot",
@@ -1802,13 +1984,16 @@
         "translates": "The presence or absence of coherence.config.json becomes permission to walk. Absent refuses with the one-line bootstrap ({} declares the root) rather than walking whatever directory the shell was in and grading that population with full confidence — the measured incident was a home directory.",
         "present": true,
         "pending": false,
-        "heat": 0.04081632653061224
+        "heat": 0.04054054054054054
       }
     ],
     "drift": [],
     "dangling": [],
     "overclaimed": [],
     "tier3Security": [
+      "taxonomyView",
+      "recordTaxonomy",
+      "readTaxonomyRecords",
       "buildGraph",
       "loadConfig",
       "readJsonOrRefuse",

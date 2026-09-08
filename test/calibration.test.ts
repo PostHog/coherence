@@ -6,7 +6,8 @@ import {
   calibrationPaths, calibrationStats, formatCalibration, readCalibrationSamples, recordCalibrationSample,
   type CalibrationSample,
 } from "../src/calibration.ts";
-import { appendFileSync, existsSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { cfg, graph, fileNode, imp, tmpProject, cleanup } from "./_helpers.ts";
 
@@ -127,7 +128,7 @@ test("predicted set is touched files plus import neighbours in both directions",
 });
 
 const sample = (id: string, outcome: CalibrationSample["outcome"], observed: string[]): CalibrationSample => ({
-  id, at: id, session: "s", patch: id, changed: ["a.ts"],
+  id: "r-" + createHash("sha256").update(`s\0${id}`).digest("hex").slice(0, 12), at: "2026-09-04T00:00:00.000Z", session: "s", patch: id, changed: ["a.ts"],
   predicted: ["a.ts", "b.ts"], observed, outcome, attribution: "session-writes",
 });
 
@@ -147,6 +148,34 @@ test("calibration reports coverage, outside reads, and defect rates by predictio
   assert.match(formatCalibration([sample("1", "defect", ["a.ts"])]).join("\n"), /lower bound/);
 });
 
+test("calibration integrity — damaged rows and invalid direct inputs cannot enter a denominator", async () => {
+  const good = sample("valid", "defect", ["a.ts"]);
+  const root = await tmpProject({ ".coherence/calibration/s.jsonl": JSON.stringify(good) + "\n" });
+  try {
+    const c = cfg(root), path = join(root, ".coherence/calibration/s.jsonl");
+    assert.equal(calibrationStats(readCalibrationSamples(c)).defectRateWithMisses, 1);
+    const invalid = [
+      { ...sample("invalid", "clean", ["a.ts"]), outcome: "not-an-outcome" },
+      { ...good, attribution: "exact-enough" }, { ...good, observed: [42] },
+      { ...good, predicted: ["../outside"] }, { ...good, at: "later" },
+      { ...good, id: "forged" }, { ...good, session: "other-session" },
+    ];
+    for (const row of invalid) {
+      writeFileSync(path, JSON.stringify(good) + "\n" + JSON.stringify(row) + "\n");
+      assert.throws(() => readCalibrationSamples(c), /Calibration unavailable/);
+      assert.throws(() => calibrationStats([row as CalibrationSample]), /Calibration unavailable/);
+    }
+    for (const suffix of ["{torn\n", "{torn", "\n"]) {
+      writeFileSync(path, JSON.stringify(good) + "\n" + suffix);
+      assert.throws(() => readCalibrationSamples(c), /Calibration unavailable/);
+    }
+    assert.throws(() => calibrationStats([good, good]), /duplicate sample/);
+    const { attribution, ...legacy } = good;
+    writeFileSync(path, JSON.stringify(legacy) + "\n");
+    assert.equal(calibrationStats(readCalibrationSamples(c)).sharedWorktreeSamples, 1, "legacy attribution remains weak, not discarded");
+  } finally { await cleanup(root); }
+});
+
 test("calibration — a recurring unknown snapshot never erases an explicit outcome", async () => {
   const root = await tmpProject();
   try {
@@ -154,11 +183,11 @@ test("calibration — a recurring unknown snapshot never erases an explicit outc
     const dir = join(root, ".coherence", "calibration");
     mkdirSync(dir, { recursive: true });
     const labeled = sample("same-patch", "defect", ["a.ts"]);
-    const tick = { ...labeled, at: "later", outcome: "unknown" as const };
+    const tick = { ...labeled, at: "2026-09-04T00:00:01.000Z", outcome: "unknown" as const };
     appendFileSync(join(dir, "s.jsonl"), `${JSON.stringify(labeled)}\n${JSON.stringify(tick)}\n`);
     assert.equal(readCalibrationSamples(c)[0]?.outcome, "defect");
 
-    const relabeled = { ...labeled, at: "latest", outcome: "clean" as const };
+    const relabeled = { ...labeled, at: "2026-09-04T00:00:02.000Z", outcome: "clean" as const };
     appendFileSync(join(dir, "s.jsonl"), `${JSON.stringify(relabeled)}\n`);
     assert.equal(readCalibrationSamples(c)[0]?.outcome, "clean",
       "a later explicit assessment still supersedes the prior one");

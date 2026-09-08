@@ -8,6 +8,12 @@ rendering, and journaling remain independently addressable modules beneath this 
 
 ## invariants
 
+- concurrent status writers preserve complete independent reports
+- calibration denominators contain only validated surviving evidence
+- taxonomy representation roles require operational evidence under their recorded catalog
+- taxonomy suggestions never acquire verification authority
+- taxonomy revisions preserve scoped evidence and refuse damaged history
+- taxonomy wire records require canonical internally consistent caller assessments
 - agent lifecycle preserves decisions and exposes the current change signal
 - significant behavioral growth acquires an anchor or patch-specific decision
 - a weaker regulation obligation never masks a stronger one
@@ -74,6 +80,11 @@ rendering, and journaling remain independently addressable modules beneath this 
 
 ## refutations
 
+- concurrent status writers preserve complete independent reports: the taxonomy field probe overlapped atlas and mass writes in twenty temporary repositories. Both writers returned successfully, but eighteen final files were unreadable and two lost a report. A sequential control kept both. One exclusive read/merge/publish transaction plus atomic rename replaces the independent whole-file writes; an abandoned lock refuses instead of being stolen.
+- calibration denominators contain only validated surviving evidence: one valid defect sample, one invalid outcome label and one torn row produced two labeled samples and a 0.5 defect rate. The strict reader and direct statistics boundary now refuse malformed evidence, with legacy attribution preserved at its weaker grade.
+- taxonomy representation roles require operational evidence under their recorded catalog: representation=yes alone proposed identical parser, validator, transformer and optimizer candidates for parseSpec and declarations-only types.ts, and allowed any one to be selected. V2 requires the corresponding operational observation; the exact V1 catalog remains the witness for historical records, which become stale rather than being silently reinterpreted. During the repair, authority=yes produced a validator candidate whose required validates-rules question was absent. Question relevance now derives from candidate requirements too; the guard covers authority and execution entry paths.
+- taxonomy suggestions never acquire verification authority: the lab's semantic classifier allowed a caller to mark a guarantee satisfied using prose evidence and a falsifier string, without executing the falsifier. The port removes that state and mutation entirely: every suggestion is unverified, unknown evidence cannot select a role, and conflicting signals retain plural candidates rather than forcing one winner.
+- taxonomy revisions preserve scoped evidence and refuse damaged history: integration fixtures remove a record's final newline, displace its filename, and redirect its directory through a symlink; each read/write refuses. Two actual CLI writers racing the same initial predecessor slot produce one recorded revision and one refusal. A changed direct dependency makes the retained classification stale rather than silently renewing it.
 - session startup survives a damaged decision-journal path with named degradation: with `.coherence/decisions` replaced by a regular file, SessionStart threw raw `ENOTDIR` before emitting any instructions. It now retains the exact host session, names `JOURNAL CONTROL unavailable`, performs no journal write, and exits zero.
 - session startup teaches the executable swarm loop without manufacturing authority: after the work graph, orientation, and consequence ledger shipped, canonical startup still taught only the decision journal and experiment planning; an exact assignment printed `work inspect` but no safe way to accept, block, hand off, or close it. Startup now names the read-only heading and fleet reads for everyone, reserves create/handoff for explicit coordination authority, and emits state-valid lifecycle commands with the standing predecessor only beside work owned by that exact session.
 - hook telemetry loss never kills PostToolUse: the original no-dependency canary sent `{}`, producing no read event and never exercising persistence. A real Read event with `.coherence/read-traces` replaced by a regular file threw `EEXIST` out of the hook. The runtime boundary now contains telemetry failure, stays byte-silent, and the canary carries the hostile target.
@@ -124,6 +135,16 @@ rendering, and journaling remain independently addressable modules beneath this 
 
 ## works when
 
+- boundary "concurrent status writers preserve complete independent reports" at recordVerify via guard "status publication — concurrent processes preserve independent reports and readers see complete JSON"
+- boundary "calibration denominators contain only validated surviving evidence" at validateCalibrationSample via guard "calibration integrity — damaged rows and invalid direct inputs cannot enter a denominator"
+- boundary "taxonomy representation roles require operational evidence under their recorded catalog" at classifyTaxonomy via guard "taxonomy interview — operational discriminators separate representation roles and preserve no-fit"
+- boundary "taxonomy revisions preserve scoped evidence and refuse damaged history" at taxonomyView via guard "taxonomy history — old catalog assessments retain their meaning and expire without silent migration"
+- boundary "taxonomy suggestions never acquire verification authority" at classifyTaxonomy via guard "taxonomy classification — unknowns and plural responsibilities never become a single guessed role or passing guarantee"
+- boundary "taxonomy suggestions never acquire verification authority" at TAXONOMY via guard "taxonomy catalog — every frozen lab subject survives the namespaced port without added authority"
+- boundary "taxonomy revisions preserve scoped evidence and refuse damaged history" at recordTaxonomy via guard "taxonomy concurrency — two CLI writers cannot both own the initial predecessor slot"
+- boundary "taxonomy revisions preserve scoped evidence and refuse damaged history" at readTaxonomyRecords via guard "taxonomy damage — malformed or displaced history refuses instead of shrinking into a clean empty view"
+- boundary "taxonomy wire records require canonical internally consistent caller assessments" at validateTaxonomyRecord via guard "taxonomy damage — malformed or displaced history refuses instead of shrinking into a clean empty view"
+- boundary "taxonomy revisions preserve scoped evidence and refuse damaged history" at captureTaxonomy via guard "taxonomy subjects — only resolved graph addresses enter evidence; absent, compound and escaped paths refuse"
 - typechecks
 - cli.ts imports ./config.ts
 - cli.ts imports ./derive.ts
@@ -202,6 +223,42 @@ rendering, and journaling remain independently addressable modules beneath this 
 - boundary "Scope projects the canonical promise population with deterministic gravity and honest absence" at renderScope via guard "scope cards — titles have an opaque title bar and explicit contrast, with full text retained in the inspector"
 
 ## why
+
+**concurrent status writers preserve complete independent reports.** A successful report
+write is a promise that later readers can recover it. Independent instruments must not
+erase one another merely because their finish times overlap, and a reader must never
+inherit half of a report. Availability after a killed writer is less valuable than
+inventing ownership of a still-live writer's critical section.
+
+**calibration denominators contain only validated surviving evidence.** A damaged sample
+cannot silently become a cleaner-looking population. The validity of a statistical
+denominator is part of the measurement, not an optional rendering detail; direct callers
+and persisted history owe the same evidence grade. Legacy attribution remains weak
+evidence rather than acquiring an exact owner during validation.
+
+**taxonomy representation roles require operational evidence under their recorded catalog.**
+A broad family resemblance is useful for choosing the next question, not for settling
+the answer. Parsing, validation, transformation and optimization impose different duties;
+declarations need not perform any of them. Unknown evidence and an exhausted no-fit
+must stay distinct, and new knowledge must not rewrite the meaning of an old assessment.
+
+**taxonomy wire records require canonical internally consistent caller assessments.**
+A content address detects damage only when the reader also checks what was addressed.
+The reader reconstructs the entire typed relation, including evidence membership,
+caller attribution and the absence of a verification verdict; re-addressing a malformed
+record cannot turn it into a usable assessment.
+
+**taxonomy suggestions never acquire verification authority.** A familiar component role
+can reveal useful obligations without establishing that any of them hold. The lab's
+prose-only closure confused these two products. Role plurality, unknown evidence, and
+unverified suggestions preserve the discovery benefit without borrowing the verifier's
+authority. The catalog is bounded empirical knowledge, not a complete ontology.
+
+**taxonomy revisions preserve scoped evidence and refuse damaged history.** An assessment
+is reusable only while its supporting addresses and bytes remain available. Silent history
+loss, a competing writer, or a changed dependency must cost visible uncertainty, never
+look like an unclassified clean project or a renewed decision. The freshness grade names
+its direct-file horizon; it does not imply transitive or behavioral verification.
 
 **agent lifecycle preserves decisions and exposes the current change signal.** Decisions
 and risk are cheapest to surface while the agent still holds the context that produced

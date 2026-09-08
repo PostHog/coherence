@@ -118,6 +118,7 @@ export interface Command {
 }
 
 export const COMMANDS: Command[] = [
+  { name: "taxonomy", group: "perceive", usage: "<catalog|profile|inspect|record|list|show|help> [options]", summary: "evidence-addressed role/facet classification and unverified obligation suggestions; only record writes" },
   // ── derive ───────────────────────────────────────────────────────────────────────────
   { name: "graph", group: "derive", usage: "[--check]", summary: "emit `graph.json` + `_graph.html` (the outline) to `outputDir`", writesArtifacts: true },
   { name: "scope", group: "derive", usage: "[--check]", summary: "emit deterministic `scope.json` + `_scope.html` around the project's center of gravity", writesArtifacts: true },

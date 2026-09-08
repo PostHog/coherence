@@ -8,7 +8,9 @@
 // because staleness IS health information: a green from ten commits ago is an amber
 // fact, and the fast/full tiers age independently. The record is the last known
 // truth, honestly dated — never a claim about the present.
-import { writeFile, mkdir } from "node:fs/promises";
+import { mkdir, open, rename, unlink, rmdir, lstat } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import type { Config } from "./types.ts";
@@ -154,16 +156,53 @@ export async function readStatus(cfg: Config): Promise<StatusRecord> {
   return rec ?? { version: 1 };
 }
 
-async function writeStatus(cfg: Config, rec: StatusRecord): Promise<void> {
-  await mkdir(join(cfg.root, ".coherence"), { recursive: true });
-  await writeFile(statusPath(cfg), JSON.stringify(rec, null, 2) + "\n");
+/** One cross-process critical section owns read/modify/publish. No stale-lock stealing:
+ * a killed writer leaves a named refusal, never permission to race a slow live owner.
+ * Rename publishes a complete file; it does not promise power-loss durability. */
+async function updateStatus(cfg: Config, change: (record: StatusRecord) => void): Promise<void> {
+  const dir = join(cfg.root, ".coherence"), lock = join(dir, "status.lock");
+  await mkdir(dir, { recursive: true });
+  const directory = await lstat(dir);
+  if (!directory.isDirectory() || directory.isSymbolicLink()) throw new Error("Status directory must be a real directory");
+  const deadline = Date.now() + 5000;
+  for (;;) {
+    try { await mkdir(lock); break; }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      try {
+        const standing = await lstat(lock);
+        if (!standing.isDirectory() || standing.isSymbolicLink()) throw new Error("Status lock must be a real directory");
+      } catch (inspection) { if ((inspection as NodeJS.ErrnoException).code !== "ENOENT") throw inspection; }
+      if (Date.now() >= deadline) throw new Error("Status write busy: .coherence/status.lock remains held. If its writer died, confirm no writer is running before removing this empty lock directory.");
+      await delay(20);
+    }
+  }
+  let temporary: string | null = null;
+  try {
+    try {
+      const target = await lstat(statusPath(cfg));
+      if (!target.isFile() || target.isSymbolicLink()) throw new Error("Status target must be a regular file");
+    } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+    const record = await readStatus(cfg);
+    change(record);
+    const candidate = join(dir, `status-${randomUUID()}.tmp`);
+    const file = await open(candidate, "wx", 0o600);
+    temporary = candidate;
+    try { await file.writeFile(JSON.stringify(record, null, 2) + "\n"); await file.sync(); }
+    finally { await file.close(); }
+    await rename(temporary, statusPath(cfg));
+    temporary = null;
+  } finally {
+    try { if (temporary) await unlink(temporary); }
+    finally { await rmdir(lock); }
+  }
 }
 
 /** Short HEAD + dirty flag — the provenance every section stamps itself with. */
 export function gitStamp(root: string): { commit: string | null; dirty: boolean } {
   const r = spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: root, encoding: "utf8" });
   if (r.status !== 0) return { commit: null, dirty: false };
-  const d = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
+  const d = spawnSync("git", ["status", "--porcelain", "--", ".", ":(exclude).coherence/status.lock", ":(exclude).coherence/status-*.tmp"], { cwd: root, encoding: "utf8" });
   return { commit: r.stdout.trim(), dirty: d.status === 0 && d.stdout.trim().length > 0 };
 }
 
@@ -225,57 +264,53 @@ export interface VerifyReport {
 }
 
 export async function recordVerify(cfg: Config, r: VerifyReport): Promise<void> {
-  const prev = await readStatus(cfg);
-  const { commit, dirty } = gitStamp(cfg.root);
-  const at = new Date().toISOString();
-  const fresh: ClaimRecord[] = r.sigs.map((s) => ({ node: s.node, claim: s.claim, kind: s.kind, detail: s.detail, at, commit, tier: r.tier }));
-  const scopeSet = r.scope ? new Set(r.scope) : null;
-  const claims = mergeClaimRecords(prev.verify?.claims ?? [], fresh, scopeSet);
-  // Scoped runs are authoritative only for the components they touched: their gap list
-  // replaces the touched components' prior gaps and inherits the rest.
-  const gaps = scopeSet && prev.verify
-    ? [...prev.verify.invariants.gaps.filter((g) => !scopeSet.has(g.comp)), ...r.invGaps]
-    : r.invGaps;
-  prev.verify = {
-    at, commit, dirty, tier: r.tier, scope: r.scope,
-    batched: r.batched ? true : undefined,
-    // Assigned from THIS run's report only — never merged with the previous record's vector.
-    // A cost table that carried rows from two different runs would be a ranking of nothing.
-    cost: r.cost,
-    lastFastAt: r.tier === "fast" ? at : prev.verify?.lastFastAt,
-    lastFullAt: r.tier === "full" ? at : prev.verify?.lastFullAt,
-    claims,
-    coverage: r.coverage,
-    invariants: { total: r.invTotal, anchored: Math.max(0, r.invTotal - gaps.length), gaps },
-    narrative: r.narrative,
-    jobs: r.jobs,
-    failures: r.failures,
-  };
-  await writeStatus(cfg, prev);
+  await updateStatus(cfg, prev => {
+    const { commit, dirty } = gitStamp(cfg.root);
+    const at = new Date().toISOString();
+    const fresh: ClaimRecord[] = r.sigs.map((s) => ({ node: s.node, claim: s.claim, kind: s.kind, detail: s.detail, at, commit, tier: r.tier }));
+    const scopeSet = r.scope ? new Set(r.scope) : null;
+    const claims = mergeClaimRecords(prev.verify?.claims ?? [], fresh, scopeSet);
+    // Scoped runs are authoritative only for the components they touched: their gap list
+    // replaces the touched components' prior gaps and inherits the rest.
+    const gaps = scopeSet && prev.verify
+      ? [...prev.verify.invariants.gaps.filter((g) => !scopeSet.has(g.comp)), ...r.invGaps]
+      : r.invGaps;
+    prev.verify = {
+      at, commit, dirty, tier: r.tier, scope: r.scope,
+      batched: r.batched ? true : undefined,
+      // Assigned from THIS run's report only — never merged with the previous record's vector.
+      // A cost table that carried rows from two different runs would be a ranking of nothing.
+      cost: r.cost,
+      lastFastAt: r.tier === "fast" ? at : prev.verify?.lastFastAt,
+      lastFullAt: r.tier === "full" ? at : prev.verify?.lastFullAt,
+      claims,
+      coverage: r.coverage,
+      invariants: { total: r.invTotal, anchored: Math.max(0, r.invTotal - gaps.length), gaps },
+      narrative: r.narrative,
+      jobs: r.jobs,
+      failures: r.failures,
+    };
+  });
 }
 
 export async function recordAtlas(cfg: Config, s: Omit<AtlasSection, "at" | "commit">): Promise<void> {
-  const prev = await readStatus(cfg);
-  prev.atlas = { at: new Date().toISOString(), commit: gitStamp(cfg.root).commit, ...s };
-  await writeStatus(cfg, prev);
+  await updateStatus(cfg, prev => { prev.atlas = { at: new Date().toISOString(), commit: gitStamp(cfg.root).commit, ...s }; });
 }
 
 export async function recordDrift(cfg: Config, s: Omit<DriftSection, "at" | "commit">): Promise<void> {
-  const prev = await readStatus(cfg);
-  prev.drift = { at: new Date().toISOString(), commit: gitStamp(cfg.root).commit, ...s };
-  await writeStatus(cfg, prev);
+  await updateStatus(cfg, prev => { prev.drift = { at: new Date().toISOString(), commit: gitStamp(cfg.root).commit, ...s }; });
 }
 
 export async function recordMass(cfg: Config, s: Omit<MassSection, "at" | "commit" | "dirty">): Promise<void> {
-  const prev = await readStatus(cfg);
-  const { commit, dirty } = gitStamp(cfg.root);
-  prev.mass = { at: new Date().toISOString(), commit, dirty, ...s };
-  await writeStatus(cfg, prev);
+  await updateStatus(cfg, prev => {
+    const { commit, dirty } = gitStamp(cfg.root);
+    prev.mass = { at: new Date().toISOString(), commit, dirty, ...s };
+  });
 }
 
 export async function recordEconomy(cfg: Config, s: Omit<EconomySection, "at" | "commit" | "dirty">): Promise<void> {
-  const prev = await readStatus(cfg);
-  const { commit, dirty } = gitStamp(cfg.root);
-  prev.economy = { at: new Date().toISOString(), commit, dirty, ...s };
-  await writeStatus(cfg, prev);
+  await updateStatus(cfg, prev => {
+    const { commit, dirty } = gitStamp(cfg.root);
+    prev.economy = { at: new Date().toISOString(), commit, dirty, ...s };
+  });
 }

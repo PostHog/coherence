@@ -289,6 +289,7 @@
   "html-value|src/render-scope.ts|status.label",
   "html-value|src/scaffold.ts|inv",
   "html-value|src/scaffold.ts|name",
+  "html-value|src/taxonomy-ledger.ts|taxonomyHash([record.snapshot.subject.target, record.previous])",
   "sql-ident|src/atlas.ts|claims.get(sym)!.inv",
   "sql-ident|src/boundary.ts|m[1]",
   "sql-ident|src/boundary.ts|m[6]",

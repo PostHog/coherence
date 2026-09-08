@@ -77,6 +77,30 @@
       "reading-surface": "What a human or an agent then reads: public/_*.html, AGENTS.md, CLAUDE.md, the terminal reports. Derived text with no authority of its own; it can mislead, but it cannot turn a red green."
     },
     "transitions": {
+      "validateCalibrationSample": {
+        "from": "record", "to": "derived-model", "security": true,
+        "translates": "A sample enters calibration only with consistent session/patch identity, canonical time, path sets, a declared outcome and known or legacy attribution. Malformed surviving rows and invalid direct statistics inputs refuse the whole denominator."
+      },
+      "taxonomyView": {
+        "from": "record", "to": "derived-model", "security": true,
+        "translates": "Recorded assessments are projected using their retained catalog version. A newer catalog expires currency without silently changing historical role support or granting verification authority."
+      },
+      "captureTaxonomy": {
+        "from": "project-source", "to": "derived-model", "security": true,
+        "translates": "One graph-resolved file or symbol and contained evidence files become a content-digested classification subject. Whole subject files, direct graph imports, explicit evidence/dependencies and root manifests are the named freshness scope; no transitive or runtime verification is inferred."
+      },
+      "recordTaxonomy": {
+        "from": "derived-model", "to": "record", "security": true,
+        "translates": "Caller-assessed namespaced roles and facets become an immutable revision in an exclusively created predecessor slot. Concurrent writers cannot both advance one revision, and positive assessments need resolved evidence. No satisfied or passing guarantee state exists."
+      },
+      "readTaxonomyRecords": {
+        "from": "record", "to": "derived-model", "security": true,
+        "translates": "Canonical contained records reconstruct taxonomy history only when schema, content identity, predecessor ownership and filename agree. Surviving damage and wholesale loss of a committed population refuse instead of becoming empty adoption."
+      },
+      "validateTaxonomyRecord": {
+        "from": "record", "to": "derived-model", "security": true,
+        "translates": "Untrusted persisted classification bytes become a typed record only when the complete canonical schema, namespaced selections, evidence digests and content identity agree. Record writes use the same validator; a forged verification basis cannot enter either path."
+      },
       "renderScope": {
         "from": "derived-model",
         "to": "reading-surface",
@@ -403,6 +427,8 @@
       }
     },
     "nonTransition": {
+      "classifyTaxonomy": "Within derived-model: caller-assessed independent signals produce plural candidates and unverified obligation suggestions, never verdicts.",
+      "TAXONOMY": "In-harness catalog data only. Frozen lab population/content parity is checked independently; no repository or verdict boundary is crossed by defining this vocabulary.",
       "buildScopeModel": "A pure projection within the derived-model chart: joins the existing graph and promise populations, refuses mismatched subjects or dangling reliance, and derives gravity without a filesystem read or new verdict.",
       "builtinLanguagePacks": "Aggregates the five in-harness pack tables for inspection and the purity oracle. No crossing: harness constants in, harness constants out — it exists so the pack-purity guard has one perimeter to sweep and so conformance checking has a future home.",
       "withTree": "Memory hygiene within the shell chart: owns a parse tree's whole wasm lifetime and frees it in a finally, so node captures cannot outlive their tree and a leak is unrepresentable. No fact crosses a chart here."
