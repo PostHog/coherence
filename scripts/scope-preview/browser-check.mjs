@@ -38,6 +38,14 @@ try {
     });
   });
   const snapshot = await page.locator('#scope-data').evaluate(e => JSON.parse(e.textContent));
+  assert.equal(await page.locator('.card-guarantees:visible').count(), await page.locator('.component-card').count());
+  await page.screenshot({ path: join(screenshots, 'guarantees-default.png') });
+  for (const card of await page.locator('.react-flow__node').all()) {
+    const id = await card.getAttribute('data-id');
+    const names = snapshot.model.guarantees.filter(g => g.component === id).map(g => g.invariant);
+    assert.deepEqual(await card.locator('.card-guarantees > div > p').allTextContents(), names);
+  }
+  for (const button of await page.locator('[data-card-view="description"]').all()) await button.click();
   assert.ok(await page.locator('.canvas-caption').evaluate(caption => {
     const a = caption.getBoundingClientRect();
     return [...document.querySelectorAll('.component-card')].every(card => {
@@ -127,6 +135,7 @@ try {
     const visible = await page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-id')));
     assert.deepEqual(visible.sort(), expected.model.nodes.map(n => n.id).sort());
     visible.forEach(id => seenAssemblies.add(id));
+    for (const button of await page.locator('[data-card-view="description"]').all()) await button.click();
     assert.match(await page.locator('.assembly-pagination').innerText(), new RegExp(`${expected.withheld} elsewhere`));
     assert.ok(await page.locator('.component-card').evaluateAll(cards => cards.every(card => {
       const prose = card.querySelector('.card-description');
@@ -138,6 +147,15 @@ try {
   for (let groupPage = 1; groupPage < initialScene.pages; groupPage++) await page.getByRole('button', { name: 'Previous assemblies', exact: true }).click();
   await page.getByRole('button', { name: 'Whole-project overview', exact: true }).click();
   assert.equal(await page.locator('.component-card').count(), initialScene.total);
+  for (const link of snapshot.model.guaranteeLinks.links.filter(l => l.kind === 'relies' && l.status === 'current')) {
+    const source = snapshot.model.nodes.find(n => n.id === link.owner);
+    await page.locator('.component-index button').filter({ hasText: source.label }).click();
+    const record = page.locator('.reliance-record').filter({ hasText: link.because });
+    const guarantee = snapshot.model.guarantees.find(g => g.id === link.claim);
+    assert.ok((await record.innerText()).includes(guarantee.invariant));
+    assert.ok((await record.innerText()).includes(guarantee.oracle));
+    assert.match(await record.innerText(), /Link: current · caller-assessed/);
+  }
   await page.getByRole('button', { name: 'Readable groups', exact: true }).click();
   assert.equal(await page.locator('.component-card').count(), initialScene.model.nodes.length);
   await page.locator('.evidence-surface').click();
@@ -163,7 +181,8 @@ try {
   assert.match(await page.locator('.inspector').innerText(), /Contains/);
   assert.match(await page.locator('.inspector').innerText(), /Unmeasured — no guarantees/);
   await page.getByRole('button', { name: 'Fit displayed assemblies' }).click();
-  await page.locator('.react-flow__edge').filter({ hasText: 'mutual reliance' }).first().click();
+  const mutual = snapshot.initial.connections.find(c => c.mutual);
+  await page.locator(`.react-flow__edge[data-id="${mutual.id}"]`).click();
   assert.equal(await page.locator('.inspector .reliance-record').count(), 2, 'both canonical directions stay inspectable');
 
   const before = await page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(n => n.getAttribute('style')).join('|'));

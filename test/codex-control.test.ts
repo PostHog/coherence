@@ -46,7 +46,7 @@ async function readHooks(root: string): Promise<Json> {
 }
 
 test("Codex control — canonical bundle uses the host's exact matchers, commands, and identity", () => {
-  assert.equal(HOOK_BODY_PROTOCOL_VERSION, 3, "the planning-aware hook text has a distinct activation identity");
+  assert.equal(HOOK_BODY_PROTOCOL_VERSION, 4, "the guarantee-aware hook text has a distinct activation identity");
   const settings = canonicalLifecycleHookSettings("codex") as Json;
   assert.deepEqual(Object.keys(settings.hooks), [...LIFECYCLE_HOOK_EVENTS]);
   assert.equal(settings.hooks.SessionStart[0].matcher, "startup|resume|clear|compact");

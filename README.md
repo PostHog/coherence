@@ -2433,6 +2433,52 @@ population is nonempty, current and classified/composite. They never grade sugge
 obligations: exit 0 is not a verification receipt. Empty, ambiguous, no-fit, stale or
 superseded selections exit 1; damaged evidence and invalid requests exit 2.
 
+### Connecting obligations and guarantees
+
+`coherence guarantees --json` inventories canonical boundary claims with stable
+`g-…` references, recorded oracle evidence, taxonomy obligations and explicit links.
+`coherence guarantees --check` checks **declared-link integrity only**. It does not
+run tests, prove satisfaction or require every obligation/import to have a link.
+Unlinked obligations remain visible. Damaged declarations or unavailable taxonomy
+make the check fail. Agents receive this distinction in both hosts' startup instructions.
+
+The provider's spec owns `## addresses`; the consumer's spec owns `## relies on`.
+Each entry is a single-line JSON bullet. Copy the full claim reference from
+`guarantees --json` and assessment revision from `taxonomy show` or `taxonomy list`.
+For example (placeholders below must be replaced with actual references):
+
+```markdown
+## addresses
+
+- {"claim":"g-FULL_SHA256","subject":"src/provider.ts#read","obligation":"guarantee:G-BOUNDARY","assessment":"t-FULL_SHA256","because":"This oracle addresses invalid-input refusal only."}
+
+## relies on
+
+- {"claim":"g-FULL_SHA256","provider":"src/provider","because":"This consumer requires invalid inputs to refuse, not return partial results."}
+```
+
+`addresses` must name a claim and current classified subject owned by that spec;
+the obligation must be activated by the exact recorded assessment revision.
+Subject/evidence content changes expire the assessment. A mapping is caller-assessed
+and may address only part of the obligation: explain its limit in `because`.
+`relies on` must resolve uniquely to the named provider's claim and an actual directed
+component import. This v0 direct-import grade does not infer symbol consumption or
+support a transitive dependency as though it were direct. Unlinked imports are not proof
+of missing behavior; they are missing declarations.
+
+References hash the owner directory and full parsed boundary, including crossing,
+chokepoint and oracle. Reordering claims does not change them; editing the contract or
+moving its owner does. Stale/invalid links stay inspectable and never count as current
+mappings. A current link can have a failing oracle. A passing oracle cannot prove the
+mapping adequate. Immutable verification receipts and satisfaction assessment are not
+implemented by this layer.
+
+Scope uses the same resolver for saved snapshots and live updates. Each card switches
+between the complete spec description and named guarantees, keeping taxonomy visible
+in either reading. Guarantees include unlinked obligation counts; inspectors separate each direction,
+the author's rationale, link health and recorded test evidence. Unmapped connections say
+“No guarantee linked.” No browser action writes an assessment or reruns an oracle.
+
 The [Scope library preview](scripts/scope-preview/README.md) has a Taxonomy tab
 with the same canonical projection, shared session filtering, search, evidence
 details and unverified obligation suggestions. Its optional read-only server updates
@@ -2487,7 +2533,7 @@ both is exactly what drifted.
      edit by hand — add the command to the registry and re-run. Everything OUTSIDE these
      markers is authored prose. -->
 
-_47 commands. This index is derived from the registry the dispatch is checked
+_48 commands. This index is derived from the registry the dispatch is checked
 against (`test/commands.test.ts` enumerates the live `cmd === …` chain and asserts the two
 sets are equal), so it cannot fall behind the CLI. The reasoning for the commands that have
 any is in **In detail** below — that half is authored, and does not cover all of them._
@@ -2495,6 +2541,7 @@ any is in **In detail** below — that half is authored, and does not cover all 
 **Perceive the project**
 
 - `coherence taxonomy <catalog|profile|inspect|record|list|show|help> [options]` — evidence-addressed role/facet classification and unverified obligation suggestions; only record writes
+- `coherence guarantees [--check] [--json]` — inspect spec guarantees, explicit taxonomy/consumer links and recorded evidence; check link integrity, not satisfaction
 - `coherence index [--since <ref>]` — the returning human's page — MAP · JOURNAL · TRAJECTORY, framed against what you last saw (`_index.html` + `index.json`)
 - `coherence panel [--no-watch | --once]` — live TUI over the graph + the status record
 - `coherence orient [--json]` — one deterministic swarm heading over strict decisions, work, links, experiments, defects, and verification

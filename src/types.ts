@@ -3,6 +3,7 @@
 // behind LanguageAdapter (how to read code) and PlatformAdapter (how to read infra).
 
 export interface GraphNode {
+  guaranteeLinks?: SpecGuaranteeLinks;
   id: string; parent?: string; label: string; kind: string;
   sub?: string; path?: string; line?: number; claimed?: boolean; claims?: string[];
   invariants?: string[]; // named properties the component upholds (## invariants); each anchored by a `boundary` claim
@@ -29,7 +30,8 @@ export interface Graph {
 }
 
 /** A raw spec parsed from a *.spec.md file. */
-export interface ParsedSpec { name: string; intent: string; claims: string[]; claimKinds: Record<string, string>; prose: string; why: string; invariants: string[]; refutations: string[]; }
+export interface SpecGuaranteeLinks { addresses: unknown[]; relies: unknown[]; problems: string[] }
+export interface ParsedSpec { name: string; intent: string; claims: string[]; claimKinds: Record<string, string>; prose: string; why: string; invariants: string[]; refutations: string[]; guaranteeLinks?: SpecGuaranteeLinks }
 
 /** How to read a language's code — symbols, imports, and where docblocks live. */
 export interface LanguageAdapter {

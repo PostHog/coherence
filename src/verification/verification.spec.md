@@ -6,6 +6,7 @@ Oracle discovery, execution and record lookup converge here. A passing process i
 
 ## invariants
 
+- explicit guarantee links expire with their premises and never prove satisfaction
 - a claim goes green only on positive evidence its oracle ran
 - a vanished oracle reds its claim, never green-by-absence
 - fast verification rejects a statically vanished Vitest oracle without executing tests
@@ -19,6 +20,7 @@ Oracle discovery, execution and record lookup converge here. A passing process i
 
 ## refutations
 
+- explicit guarantee links expire with their premises and never prove satisfaction: disabled the subject-staleness check in resolveGuaranteeLinks (2026-09-08). The named guard failed with actual current versus expected stale, exposing the incorrectly retained mapping. Restored the check; the focused suite passes. This control tests link expiration, not semantic satisfaction.
 - fast verification rejects a statically vanished Vitest oracle without executing tests: changed `resolveStaticOracle`'s complete zero-match branch from `absent` to `unknown` (2026-08-20), laundering the motivating Mnemion rename into an ordinary fast-tier skip — the focused boundary guard failed and captured the dangerous verdict: `claims: 1 · 0 green · 0 red · 1 skipped`, followed by `✓ coherent`. Restored; the same fixture now reds `VANISHED ORACLE (static)` without Vitest installed or invoked.
 - fast verification rejects a statically vanished Vitest oracle without executing tests: 0.36.2 made incompleteness project-wide, so Mnemion's finite data-driven titles made an unrelated renamed clipboard oracle UNKNOWN forever. Reproduced against current main: renaming the literal clipboard test left fast verify green. The scanner now retains concrete runner names and owner paths from Git `HEAD`; losing a name from a deleted or still-complete former owner reds before unrelated current uncertainty is consulted, while a former owner that itself became dynamic remains UNKNOWN. No prefix guess or partial JavaScript evaluator is allowed to manufacture global completeness.
 - fast oracle absence requires a complete direct-declaration population: before release, conventional files whose tests came only from a bare side-effect import, top-level `import()`, or `require()` each produced `fullNames=[]`, `incomplete=[]`, and `absent`, so fast verification could call a live runtime-owned oracle vanished. Release audit then found the same false absence behind a transitive local Vitest alias and a live `build/live.test.ts`, while a conventional file symlink was followed outside the declared traversal boundary. The scanner now resolves exact alias chains, marks registration-time module loads incomplete, mirrors Vitest v4's `node_modules`/`.git` default exclusions, and refuses every symlink/custom collection surface into UNKNOWN; loads inside test callbacks remain ordinary subject execution.
@@ -31,6 +33,7 @@ Oracle discovery, execution and record lookup converge here. A passing process i
 
 ## works when
 
+- boundary "explicit guarantee links expire with their premises and never prove satisfaction" at resolveGuaranteeLinks via guard "guarantee links — expired premises never become current and passing evidence never proves satisfaction"
 - boundary "a claim goes green only on positive evidence its oracle ran" at execNamedTest via guard "testMatch — a runner exiting 0 with no matching output FAILS (the renamed-test trap)"
 - boundary "a vanished oracle reds its claim, never green-by-absence" at resolveFromBatch via guard "match — ZERO matching tests is its OWN state: the vanished oracle, named as such"
 - boundary "fast verification rejects a statically vanished Vitest oracle without executing tests" at resolveStaticOracle via guard "static oracle floor — a renamed tracked literal owner reds despite unrelated dynamic titles"
@@ -43,7 +46,19 @@ Oracle discovery, execution and record lookup converge here. A passing process i
 - boundary "python sources feed the same instruments as typescript at their declared grade" at resolveFromBatch via guard "pytest batch — nodeid names resolve per claim, zero matches is the vanished oracle, and a torn report falls back loudly"
 - boundary "an undeclared root refuses the walk, never wanders" at requireDeclaredRoot via guard "declared root — a configless directory refuses the walk and an empty config declares it"
 
+## relies on
+
+- {"claim":"g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf","provider":"src/evidence","because":"runVerify publishes scoped and fast results through recordVerify. A skipped oracle must retain its prior dated verdict rather than erase the evidence used by subsequent readers."}
+
 ## why
+
+**explicit guarantee links expire with their premises and never prove satisfaction.**
+A taxonomy suggestion names an obligation, not the claim that enforces it. Spec-owned
+links preserve that caller's assessment without letting a passing oracle certify the
+mapping itself. Claim edits, missing providers, revised assessments and changed subject
+content invalidate or expire the reference. Unlinked obligations stay visible. The v0
+consumer grade requires direct import adjacency and makes no claim of proving consumption;
+recorded oracle evidence remains distinct from future immutable verification receipts.
 
 **a claim goes green only on positive evidence its oracle ran.** The verifier's whole
 authority rests on this one property, and until now no claim cited it: an audit deleted

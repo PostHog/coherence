@@ -16,12 +16,12 @@
   },
   {
     "key": "files|total",
-    "value": 156,
+    "value": 159,
     "unit": "files"
   },
   {
     "key": "lines|Agent lifecycle",
-    "value": 2352,
+    "value": 2357,
     "unit": "lines"
   },
   {
@@ -41,17 +41,17 @@
   },
   {
     "key": "lines|Executable contracts",
-    "value": 20160,
+    "value": 20288,
     "unit": "lines"
   },
   {
     "key": "lines|Harness core",
-    "value": 2160,
+    "value": 2168,
     "unit": "lines"
   },
   {
     "key": "lines|Reading surfaces",
-    "value": 5999,
+    "value": 6003,
     "unit": "lines"
   },
   {
@@ -61,7 +61,7 @@
   },
   {
     "key": "lines|Source derivation",
-    "value": 513,
+    "value": 535,
     "unit": "lines"
   },
   {
@@ -71,17 +71,17 @@
   },
   {
     "key": "lines|total",
-    "value": 50335,
+    "value": 50651,
     "unit": "lines"
   },
   {
     "key": "lines|Verification",
-    "value": 3904,
+    "value": 4053,
     "unit": "lines"
   },
   {
     "key": "measure|graph-claims",
-    "value": 100,
+    "value": 101,
     "unit": "claims"
   },
   {
@@ -91,12 +91,12 @@
   },
   {
     "key": "symbols|total",
-    "value": 808,
+    "value": 818,
     "unit": "symbols"
   },
   {
     "key": "undocumented|symbols",
-    "value": 404,
+    "value": 406,
     "unit": "symbols"
   }
 ]

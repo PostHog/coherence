@@ -70,6 +70,7 @@ import { observeOrientation, renderOrientation } from "./coordination/orient.ts"
 import { buildScopeModel } from "./readings/scope-model.ts";
 import { renderScope } from "./readings/render-scope.ts";
 import { runTaxonomyCommand } from "./taxonomy/taxonomy-cli.ts";
+import { runGuaranteesCommand, readGuaranteeTaxonomy } from "./verification/guarantees-cli.ts";
 
 const cmd = process.argv[2];
 const argv = process.argv.slice(3);
@@ -193,7 +194,7 @@ async function doGraph(): Promise<string[]> {
 async function doScope(): Promise<string[]> {
   const graph = await buildGraph(cfg);
   const promise = await buildPromiseModel(cfg, graph, await readStatus(cfg));
-  const model = buildScopeModel(graph, promise, cfg);
+  const model = buildScopeModel(graph, promise, cfg, readGuaranteeTaxonomy(cfg));
   // Scope's model and renderer deliberately read no clock, checkout path, or browser
   // state. Exact comparison is therefore the determinism oracle: unlike the older graph
   // artifact, there is no normalization seam through which meaningful drift can vanish.
@@ -339,7 +340,11 @@ if (commandFor(cmd)?.writesArtifacts) {
   if (refusal) { for (const l of refusal) console.log(l); await exit(1); }
 }
 
-if (cmd === "taxonomy") {
+if (cmd === "guarantees") {
+  const result = await runGuaranteesCommand(cfg, argv);
+  (result.code === 2 ? console.error : console.log)(result.output);
+  await exit(result.code);
+} else if (cmd === "taxonomy") {
   const result = await runTaxonomyCommand(cfg, argv);
   (result.code === 2 ? console.error : console.log)(result.output);
   await exit(result.code);

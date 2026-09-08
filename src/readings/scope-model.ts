@@ -5,6 +5,8 @@
 import type { Grade, PromiseModel } from "./promise-model.ts";
 import type { Config, Graph, GraphNode } from "../types.ts";
 import { crossingOwners } from "./index-model.ts";
+import { guaranteeRef } from "../verification/boundary.ts";
+import { resolveGuaranteeLinks, type GuaranteeLinks, type GuaranteeTaxonomy } from "../verification/guarantees.ts";
 
 export interface ScopeMass {
   ownedFiles: number;
@@ -52,6 +54,7 @@ export interface ScopeGuarantee {
 }
 
 export interface ScopeModel {
+  guaranteeLinks?: GuaranteeLinks;
   root: string;
   center: string | null;
   nodes: ScopeNode[];
@@ -120,7 +123,7 @@ export function scopeCenter(
   return winner;
 }
 
-export function buildScopeModel(graph: Graph, promise: PromiseModel, context: Pick<Config, "atlas" | "testDir"> = {}): ScopeModel {
+export function buildScopeModel(graph: Graph, promise: PromiseModel, context: Pick<Config, "atlas" | "testDir"> = {}, taxonomy?: GuaranteeTaxonomy): ScopeModel {
   const { atlas } = context;
   const components = [...promise.components].sort((a, b) => cmp(a.dir, b.dir));
   const ids = new Set(components.map((component) => component.dir));
@@ -244,8 +247,8 @@ export function buildScopeModel(graph: Graph, promise: PromiseModel, context: Pi
   });
 
   const guarantees: ScopeGuarantee[] = components.flatMap((component) =>
-    component.gates.map((gate, index) => ({
-      id: `g:${component.dir}:${index}`,
+    component.gates.map((gate) => ({
+      id: guaranteeRef(component.dir, gate),
       component: component.dir,
       invariant: gate.inv,
       chokepoint: gate.chokepoint,
@@ -277,5 +280,6 @@ export function buildScopeModel(graph: Graph, promise: PromiseModel, context: Pi
     guarantees: guarantees.filter(g => g.chokepoint === symbol || g.chokepoint === declaration.anchoredBy).map(g => g.id),
   }));
   return { root: graph.root, center, nodes, relations, guarantees, containment,
+    ...(taxonomy ? { guaranteeLinks: resolveGuaranteeLinks(graph, guarantees, relations, taxonomy) } : {}),
     charts: atlas?.charts ?? null, transitions };
 }

@@ -13,6 +13,7 @@ import { taxonomyWithin } from './card-taxonomy.mjs';
 import { specEvidence } from './spec-evidence.mjs';
 import { scopeScene } from './scene.mjs';
 import { OrbitCanvas } from './orbits.jsx';
+import { relianceReading, connectionLabel } from './guarantee-reading.mjs';
 
 const snapshot = JSON.parse(document.getElementById('scope-data').textContent);
 const emptyModel = { nodes: [], relations: [], guarantees: [], center: null };
@@ -21,12 +22,23 @@ const ports = [[Position.Left, 0, 0.5], [Position.Right, 1, 0.5], [Position.Top,
 
 const ComponentCard = memo(function ComponentCard({ data }) {
   const { subject, center, guarantees, taxonomy } = data, state = lightOf(guarantees);
-  return <article className={`component-card ${center ? 'gravity-center' : ''}`}>
-    <header title={subject.label}><strong>{subject.label}</strong>{center && <span title="Project center of gravity">✦</span>}</header>
-    <div className="card-description nodrag nowheel" tabIndex={0} aria-label={`${subject.label} spec description`}>
+  return <Tabs.Root defaultValue="guarantees" asChild><article className={`component-card ${center ? 'gravity-center' : ''}`}>
+    <header title={subject.label}><strong>{subject.label}</strong>{center && <span title="Project center of gravity">✦</span>}
+      <Tabs.List className="card-views nodrag" onClick={e => e.stopPropagation()} aria-label={`${subject.label} card reading`}>
+        <Tabs.Trigger value="description" data-card-view="description">Description</Tabs.Trigger>
+        <Tabs.Trigger value="guarantees" data-card-view="guarantees">Guarantees</Tabs.Trigger>
+      </Tabs.List></header>
+    <Tabs.Content value="description" forceMount className="card-description card-reading nodrag nowheel" tabIndex={0} aria-label={`${subject.label} spec description`}>
       <p className="spec-intent">{subject.intent || 'No authored description.'}</p>
       {subject.prose && <p className="spec-prose">{subject.prose}</p>}
-    </div>
+    </Tabs.Content>
+    <Tabs.Content value="guarantees" forceMount className="card-reading card-guarantees nodrag nowheel" tabIndex={0} aria-label="Declared guarantees">
+        <h3>GUARANTEES · {guarantees.length}</h3>
+        <small>{data.obligationsAvailable ? `${data.obligations.filter(o => o.mapping === 'unlinked').length} unlinked taxonomy obligations` : 'Obligation reading unavailable'} · satisfaction unverified</small>
+        {!!data.linkIssues && <small role="alert">{data.linkIssues} guarantee links need repair</small>}
+        {guarantees.map(g => <div key={g.id}><span className={`status ${g.verdict}`}>{labels[g.verdict]}</span><p>{g.invariant}</p></div>)}
+        {!guarantees.length && <p>No declared guarantees · not a pass.</p>}
+    </Tabs.Content>
     <div className={`card-taxonomy ${taxonomy.stale ? 'has-stale' : ''} ${taxonomy.items.length ? '' : 'no-assessments'}`} aria-label="Taxonomy within component">
       <div className="taxonomy-kicker">TAXONOMY WITHIN <span>{taxonomy.available ? `${taxonomy.items.length} subject${taxonomy.items.length === 1 ? '' : 's'}` : 'UNAVAILABLE'}</span></div>
       {!taxonomy.available ? <strong className="taxonomy-empty">{taxonomy.message}</strong>
@@ -44,7 +56,7 @@ const ComponentCard = memo(function ComponentCard({ data }) {
     {data.handles.map(handle => <Handle key={handle.id} id={handle.id} type={handle.type}
       position={handle.position} isConnectable={false} style={{ left: handle.x, top: handle.y,
         right: 'auto', bottom: 'auto', width: 0, height: 0, minWidth: 0, minHeight: 0, border: 0, transform: 'none' }}/>) }
-  </article>;
+  </article></Tabs.Root>;
 });
 const nodeTypes = { component: ComponentCard };
 // Select one of the library's four standard ports. No custom curves or routing.
@@ -53,10 +65,35 @@ function facing(from, to) {
   return Math.abs(dx) / defaults.width > Math.abs(dy) / defaults.height ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'bottom' : 'top');
 }
 
-function Reliance({ relation, byId }) {
+function Reliance({ relation, byId, model }) {
+  const rows = relianceReading(model, relation);
   return <div className="reliance-record">
     <p><strong>{byId.get(relation.source).label}</strong> → <strong>{byId.get(relation.target).label}</strong></p>
+    {!rows.length && <p>No guarantee linked. Import adjacency only.</p>}
+    {rows.map(({ link, guarantee }, i) => <div key={i} className="guarantee-evidence">
+      <p><strong>{guarantee?.invariant ?? 'Missing or changed guarantee'}</strong></p>
+      <p>Link: {link.status} · caller-assessed</p><p>{link.because}</p>
+      {guarantee && <><span className={`status ${guarantee.verdict}`}>{labels[guarantee.verdict]}</span><p>At <code>{guarantee.chokepoint}</code> · grade {guarantee.grade}<br/>Oracle: {guarantee.oracle || 'none'}</p></>}
+      {link.problems.map(p => <p role="alert" key={p}>{p}</p>)}
+    </div>)}
     <small>{relation.kind === 'evidence-import' ? 'Test imports implementation · not proof of an oracle' : relation.crossing ? `${relation.crossing.from} → ${relation.crossing.to}` : 'No declared boundary crossing'}{relation.via ? ` · via ${relation.via}` : ''}</small>
+  </div>;
+}
+
+function ObligationInspector({ model, subject }) {
+  const report = model.guaranteeLinks;
+  const rows = (report?.obligations ?? []).filter(o => o.owner === subject.id);
+  const issues = (report?.links ?? []).filter(l => l.owner === subject.id && l.status !== 'current');
+  return <div className="obligation-inspector"><h3>Taxonomy → guarantees · {rows.length} obligations</h3>
+    <p>Applicability and mappings are caller-assessed. Satisfaction remains unverified; test evidence is separate.</p>
+    {(!report || report.taxonomy === 'unavailable') && <p role="alert">Obligation reading unavailable.</p>}
+    {!rows.length && <p>No activated obligations recorded for this component. This is not coverage.</p>}
+    {rows.map(o => <details key={`${o.subject}:${o.obligation}`}><summary>{o.text} · {o.mapping}</summary>
+      <p><code>{o.subject}</code><br/>Applicability: {o.applicability} · {o.assessmentState}</p>
+      {o.claims.map(id => { const g = model.guarantees.find(g => g.id === id); return g && <p key={id}>{g.invariant}<br/><span className={`status ${g.verdict}`}>{labels[g.verdict]}</span></p>; })}
+      <p>Satisfaction: {o.satisfaction}</p>
+    </details>)}
+    {issues.map((l, i) => <p role="alert" key={i}>{l.kind}: {l.status} — {l.problems.join('; ')}</p>)}
   </div>;
 }
 
@@ -153,11 +190,12 @@ const Structure = memo(function Structure({ model, structure, readings, selected
     id: `${type}-${position}`, type, position, x: x * config.width, y: y * config.height, width: 0, height: 0,
   }))), [config.width, config.height]);
   const cardNodes = useMemo(() => layout.nodes.map(n => ({ id: n.id, type: 'component', position: { x: n.x - config.width / 2, y: n.y - config.height / 2 },
-    data: { subject: n, center: n.id === model.center, handles, guarantees: guaranteesFor(n.id), taxonomy: taxonomies.get(n.id), transitions: (model.transitions ?? []).filter(t => t.component === n.id).length },
+    data: { subject: n, center: n.id === model.center, handles, guarantees: guaranteesFor(n.id), taxonomy: taxonomies.get(n.id), transitions: (model.transitions ?? []).filter(t => t.component === n.id).length,
+      obligationsAvailable: model.guaranteeLinks?.taxonomy === 'available', obligations: (model.guaranteeLinks?.obligations ?? []).filter(o => o.owner === n.id), linkIssues: (model.guaranteeLinks?.links ?? []).filter(l => l.owner === n.id && l.status !== 'current').length },
     // Fixed geometry is already known. Supplying the library's dimensions and
     // handles avoids a second DOM measurement representation that can stay hidden.
     width: config.width, height: config.height,
-    handles, ariaLabel: n.label })), [layout, config.width, config.height, model.center, handles, guaranteeIndex, taxonomies, model.transitions]);
+    handles, ariaLabel: n.label })), [layout, config.width, config.height, model.center, handles, guaranteeIndex, taxonomies, model.transitions, model.guaranteeLinks]);
   const nodes = useMemo(() => cardNodes.map(n => ({ ...n, selected: selected === n.id && !connectionId })), [cardNodes, selected, connectionId]);
   const edges = useMemo(() => layout.connections.map(c => {
     const from = positioned.get(c.source), to = positioned.get(c.target);
@@ -167,14 +205,14 @@ const Structure = memo(function Structure({ model, structure, readings, selected
       sourceHandle: `source-${facing(from, to)}`, targetHandle: `target-${facing(to, from)}`,
       markerEnd: { type: MarkerType.ArrowClosed, color },
       ...(c.mutual ? { markerStart: { type: MarkerType.ArrowClosed, color, orient: 'auto-start-reverse' } } : {}),
-      label: c.mutual ? 'mutual reliance' : 'depends on',
+      label: connectionLabel(model, c.members),
       style: { stroke: color, strokeWidth: active ? 2 : 1.4, opacity: focusEdges && !active ? 0.18 : 1 },
       labelStyle: { fill: color, fontSize: 12, fontWeight: 600, opacity: focusEdges && !active ? 0.18 : 1 },
       labelBgStyle: { fill: '#f8f9fc', fillOpacity: 0.96 }, labelBgPadding: [8, 5], labelBgBorderRadius: 5,
       interactionWidth: 24, selected: c.id === connectionId,
       ariaLabel: `${byId.get(c.source).label} ${c.mutual ? 'and' : 'depends on'} ${byId.get(c.target).label}${c.mutual ? ' depend on each other' : ''}`,
     };
-  }), [layout, positioned, connectionId, selected, edgeType, focusEdges, byId]);
+  }), [layout, positioned, connectionId, selected, edgeType, focusEdges, byId, model.guaranteeLinks, model.guarantees]);
   const selectNode = useCallback(id => { setSelected(id); setConnectionId(null); }, [setSelected]);
   const onInit = useCallback(() => setReady(true), []);
   const onNodeClick = useCallback((_, n) => selectNode(n.id), [selectNode]);
@@ -213,13 +251,16 @@ const Structure = memo(function Structure({ model, structure, readings, selected
         <button onClick={() => { setConfig(defaults); setEdgeType('default'); setFocusEdges(true); }}>Reset view parameters</button>
       </section>
       <section className="inspector" aria-label="Inspector">
-        {selectedConnection ? <><span className="eyebrow">CONNECTION</span><h2>{selectedConnection.mutual ? 'Mutual reliance' : 'Depends on'}</h2>
-          {selectedConnection.members.map(r => <Reliance key={r.id} relation={r} byId={byId}/>)}
+        {!!model.guaranteeLinks?.issues.length && <details className="taxonomy-issues"><summary>Guarantee link issues · {model.guaranteeLinks.issues.length}</summary>{model.guaranteeLinks.issues.map((p, i) => <p key={i}>{p}</p>)}</details>}
+        {selectedConnection ? <><span className="eyebrow">CONNECTION</span><h2>Guarantees consumed</h2>
+          <p>Each direction is a separate authored reliance, not proof of consumption.</p>
+          {selectedConnection.members.map(r => <Reliance key={r.id} relation={r} byId={byId} model={model}/>)}
         </> : subject ? <><span className="eyebrow">{subject.role === 'project' ? 'PROJECT CONTAINER' : subject.role === 'evidence' ? 'EVIDENCE SURFACE · NOT RUNTIME RELIANCE' : subject.id === model.center ? 'PROJECT CENTER OF GRAVITY' : subject.disconnected ? 'UNCONNECTED COMPONENT' : `RELIANCE RING ${subject.ring}`}</span>
           <h2>{subject.label}</h2><code>{subject.id}</code><p>{subject.intent}</p>
           {subject.parent && <p className="containment-reading">Contained by <button onClick={() => selectNode(subject.parent)}>{byId.get(subject.parent)?.label ?? subject.parent}</button></p>}
           {!!model.containment?.filter(c => c.parent === subject.id).length && <div className="contained-assemblies"><h3>Contains</h3>{model.containment.filter(c => c.parent === subject.id).map(c => <button key={c.child} onClick={() => selectNode(c.child)}>{byId.get(c.child)?.label ?? c.child}</button>)}</div>}
           <TransitionInspector model={model} subject={subject}/>
+          <ObligationInspector model={model} subject={subject}/>
           <SpecInspector key={subject.id} subject={subject} guarantees={guarantees}/>
           <div className="taxonomy-inspector"><h3>Taxonomy within · {taxonomy.items.length} subjects</h3>
             <p>File/symbol assessments under this recorded owner, across all sessions. Not a classification of the whole component or a coverage percentage.</p>
@@ -233,7 +274,7 @@ const Structure = memo(function Structure({ model, structure, readings, selected
           </div>
           <details><summary>Why this gravitational mass? · {subject.mass.total}</summary>
             <p>{subject.mass.ownedSurface} source surface + {subject.mass.inboundReliance} inbound reliances + {subject.mass.boundaryAuthority} boundary crossings + {subject.mass.guaranteeResponsibility} guarantee responsibilities. Center is the canonical weighted graph medoid.</p></details>
-          <h3>Reliances</h3>{model.relations.filter(r => r.source === subject.id || r.target === subject.id).map(r => <Reliance key={r.id} relation={r} byId={byId}/>)}
+          <h3>Guarantees consumed / provided</h3>{model.relations.filter(r => r.source === subject.id || r.target === subject.id).map(r => <Reliance key={r.id} relation={r} byId={byId} model={model}/>)}
           {!model.relations.some(r => r.source === subject.id || r.target === subject.id) && <p className="muted">No declared reliances. The outer ring does not invent a connection.</p>}
         </> : <p>No component selected.</p>}
       </section>

@@ -19,6 +19,8 @@
 // Capture groups: 1=invariant, 2=chokepoint symbol, 3=crossing-from, 4=crossing-to,
 // 5=verb (test|guard), 6=oracle name. Groups 3/4 are undefined when the crossing clause is
 // absent; groups 5/6 are undefined when the via clause is absent.
+import { createHash } from "node:crypto";
+
 export const BOUNDARY_RE =
   /^boundary\s+"([^"]+)"\s+at\s+(\S+)(?:\s+crossing\s+(\S+)\s+->\s+(\S+))?(?:\s+via (test|guard)\s+"([^"]+)")?$/;
 
@@ -43,6 +45,14 @@ export function parseBoundary(claim: string): Boundary | null {
     oracle: m[6] ?? "",
     crossing: m[3] && m[4] ? { from: m[3], to: m[4] } : null,
   };
+}
+
+/** Full contract reference, unlike verdict lookup: crossing edits also expire links.
+ * List position and display names are excluded; owner relocation needs explicit review. */
+export function guaranteeRef(owner: string, boundary: Boundary): string {
+  const { inv, chokepoint, verb, oracle, crossing } = boundary;
+  return `g-${createHash("sha256").update(JSON.stringify([owner, inv, chokepoint, verb, oracle,
+    crossing ? [crossing.from, crossing.to] : null])).digest("hex")}`;
 }
 
 /** The crossing clause is PURELY DECLARATIVE (topology, never a runtime check) — so it must

@@ -1,977 +1,988 @@
 {
   "version": 1,
   "verify": {
-    "at": "2026-09-08T20:27:06.868Z",
-    "commit": "fdfc02c",
+    "at": "2026-09-08T21:09:31.978Z",
+    "commit": "ac70b95",
     "dirty": true,
     "tier": "full",
     "scope": null,
     "cost": {
-      "totalMs": 62025.68829499999,
+      "totalMs": 47299.052287000006,
       "claims": [
         {
           "node": "Source adapters",
           "claim": "boundary \"a parse's heap is returned before the next file\" at withTree via guard \"wasm heap — parses past the measured abort cliff survive because every tree is freed\"",
-          "ms": 11716.641584,
+          "ms": 11099.900042,
           "source": "wall"
         },
         {
           "node": "Harness core",
           "claim": "passes test \"field journey — competing duties settle into reconstructable evidence and damage recovers\"",
-          "ms": 6205.598667,
-          "source": "wall"
-        },
-        {
-          "node": "Verification",
-          "claim": "boundary \"an undeclared root refuses the walk, never wanders\" at requireDeclaredRoot via guard \"declared root — a configless directory refuses the walk and an empty config declares it\"",
-          "ms": 1929.9816250000003,
+          "ms": 6145.468042,
           "source": "wall"
         },
         {
           "node": "Harness core",
           "claim": "typechecks",
-          "ms": 1684.4063339999998,
+          "ms": 1650.6425410000002,
           "source": "wall"
         },
         {
-          "node": "Verification",
-          "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at analyzeParityOracle via guard \"python parity — a .py oracle that iterates the live domain passes; a literal list fails; a vanished oracle cannot pass\"",
-          "ms": 1658.0256669999944,
+          "node": "Durable evidence",
+          "claim": "boundary \"concurrent status writers preserve complete independent reports\" at recordVerify via guard \"status publication — concurrent processes preserve independent reports and readers see complete JSON\"",
+          "ms": 1409.1576669999995,
+          "source": "wall"
+        },
+        {
+          "node": "Harness core",
+          "claim": "passes test \"repository control — work and consequence records survive a fresh clone\"",
+          "ms": 1243.864125,
           "source": "wall"
         }
       ]
     },
     "lastFastAt": "2026-09-08T19:47:31.672Z",
-    "lastFullAt": "2026-09-08T20:27:06.868Z",
+    "lastFullAt": "2026-09-08T21:09:31.978Z",
     "claims": [
       {
         "node": "Coherence",
         "claim": "passes test \"repository assemblies — contracts follow their chokepoint owners and composition stays thin\"",
         "kind": "pass",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coherence",
         "claim": "coherence.config.json exists at root",
         "kind": "pass",
         "detail": "coherence.config.json @ root",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 145
+        "runs": 148
       },
       {
         "node": "Coherence",
         "claim": "passes test \"control — this repository's own lifecycle control is PRESENT\"",
         "kind": "pass",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 78
+        "runs": 81
       },
       {
         "node": "Coherence",
         "claim": "passes test \"repository voice — contributor startup keeps public capability changes tied to the global hook contract\"",
         "kind": "pass",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 9
+        "runs": 12
       },
       {
         "node": "Harness core",
         "claim": "typechecks",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": true,
-        "lastFailAt": "2026-09-08T19:47:31.672Z",
-        "lastFailCommit": "fdfc02c",
-        "runs": 115
+        "lastFailAt": "2026-09-08T20:58:47.134Z",
+        "lastFailCommit": "ac70b95",
+        "runs": 118
       },
       {
         "node": "Harness core",
         "claim": "cli.ts imports ./config.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 145
+        "runs": 148
       },
       {
         "node": "Harness core",
         "claim": "cli.ts imports ./derivation/derive.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 4
+        "runs": 7
       },
       {
         "node": "Harness core",
         "claim": "cli.ts imports ./verification/verify.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 4
+        "runs": 7
       },
       {
         "node": "Harness core",
         "claim": "boundary \"swarm write identity and authority flags are singleton or refused\" at repeatedSingletonFlags via guard \"swarm writes reject repeated singleton identity and authority flags before append\"",
         "kind": "pass",
         "detail": "swarm write identity and authority flags are singleton or refused @ repeatedSingletonFlags (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 22
+        "runs": 25
       },
       {
         "node": "Harness core",
         "claim": "passes test \"field journey — competing duties settle into reconstructable evidence and damage recovers\"",
         "kind": "pass",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 20
+        "runs": 23
       },
       {
         "node": "Harness core",
         "claim": "passes test \"repository control — work and consequence records survive a fresh clone\"",
         "kind": "pass",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 17
+        "runs": 20
       },
       {
         "node": "Source adapters",
         "claim": "tree-sitter.ts exists at this node",
         "kind": "pass",
         "detail": "tree-sitter.ts @ this node",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 44
+        "runs": 47
       },
       {
         "node": "Source adapters",
         "claim": "cloudflare.ts exists at this node",
         "kind": "pass",
         "detail": "cloudflare.ts @ this node",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 145
+        "runs": 148
       },
       {
         "node": "Source adapters",
         "claim": "boundary \"committed platform capabilities survive optional deployment-config toggles\" at cloudflareBindings via guard \"Cloudflare bindings — committed Env capability is stable across optional wrangler toggles\"",
         "kind": "pass",
         "detail": "committed platform capabilities survive optional deployment-config toggles @ cloudflareBindings (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Source adapters",
         "claim": "boundary \"a grammar-backed adapter derives the graph through the same language seam\" at makeTreeSitterAdapter via guard \"tree-sitter — a grammar-backed adapter derives ruby symbols, imports, and prose through the same seam\"",
         "kind": "pass",
         "detail": "a grammar-backed adapter derives the graph through the same language seam @ makeTreeSitterAdapter (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Source adapters",
         "claim": "boundary \"a parse's heap is returned before the next file\" at withTree via guard \"wasm heap — parses past the measured abort cliff survive because every tree is freed\"",
         "kind": "pass",
         "detail": "a parse's heap is returned before the next file @ withTree (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"a weaker regulation obligation never masks a stronger one\" at selectRegulation via guard \"regulate — ordered potential is permutation-invariant and monotone\"",
         "kind": "pass",
         "detail": "a weaker regulation obligation never masks a stronger one @ selectRegulation (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"regulation evaluates and repairs the selected agent host\" at observeRegulation via guard \"regulate — selected Codex host cannot be redeemed by Claude control\"",
         "kind": "pass",
         "detail": "regulation evaluates and repairs the selected agent host @ observeRegulation (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"work state is append-only, attributable, and predecessor-checked\" at readWork via guard \"strict merged read — torn, tampered, detached, and competing histories all refuse\"",
         "kind": "pass",
         "detail": "work state is append-only, attributable, and predecessor-checked @ readWork (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"work cannot activate or complete before every dependency completes\" at validateWorkGraph via guard \"readiness and scope control — dependencies serialize potential overlap while runnable writers conflict\"",
         "kind": "pass",
         "detail": "work cannot activate or complete before every dependency completes @ validateWorkGraph (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"runnable work with overlapping write scopes is a collision, never concurrent permission\" at detectWorkScopeOverlaps via guard \"readiness and scope control — dependencies serialize potential overlap while runnable writers conflict\"",
         "kind": "pass",
         "detail": "runnable work with overlapping write scopes is a collision, never concurrent permission @ detectWorkScopeOverlaps (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"a terminal parent has no live child and explicitly synthesizes every completed direct child\" at validateWorkGraph via guard \"lifecycle — predecessor checks, handoff attribution, closure evidence, orphaning, and synthesis stay explicit\"",
         "kind": "pass",
         "detail": "a terminal parent has no live child and explicitly synthesizes every completed direct child @ validateWorkGraph (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"authored work text is single-line data, never model-instruction control\" at createWork via guard \"graph validation and input boundary — missing references, cycles, unsafe scopes, and evidence-free success are loud\"",
         "kind": "pass",
         "detail": "authored work text is single-line data, never model-instruction control @ createWork (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"consequence navigation contains only explicit assessed edges\" at traceConsequences via guard \"co-presence never invents a causal edge\"",
         "kind": "pass",
         "detail": "consequence navigation contains only explicit assessed edges @ traceConsequences (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"specialized consequence relations admit only their declared endpoint kinds\" at relationProblem via guard \"semantic retries dedupe while specialized relation nonsense refuses\"",
         "kind": "pass",
         "detail": "specialized consequence relations admit only their declared endpoint kinds @ relationProblem (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"consequence evidence refuses surviving storage damage instead of shrinking navigation\" at readConsequences via guard \"damaged, forged, or displaced surviving rows refuse the whole projection\"",
         "kind": "pass",
         "detail": "consequence evidence refuses surviving storage damage instead of shrinking navigation @ readConsequences (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"orientation refuses damaged evidence before selecting a swarm heading\" at observeOrientation via guard \"orientation refuses a damaged trusted source instead of reading it as empty\"",
         "kind": "pass",
         "detail": "orientation refuses damaged evidence before selecting a swarm heading @ observeOrientation (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"orientation admits verification state only with valid shape and comparable provenance\" at verifyOrientation via guard \"orientation refuses parseable malformed verification and never promotes missing provenance\"",
         "kind": "pass",
         "detail": "orientation admits verification state only with valid shape and comparable provenance @ verifyOrientation (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"verification currency follows material repository state without invalidating its own receipt\" at verifyOrientation via guard \"verification currency ignores its own receipt but rejects tracked source and index changes\"",
         "kind": "pass",
         "detail": "verification currency follows material repository state without invalidating its own receipt @ verifyOrientation (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"orientation selects synthesis only when parent closure can execute it\" at observeOrientation via guard \"orientation dispatches a ready sibling before asking for parent synthesis\"",
         "kind": "pass",
         "detail": "orientation selects synthesis only when parent closure can execute it @ observeOrientation (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"orientation derives live blockage only from closeable work state\" at observeOrientation via guard \"orientation treats journal blockage as history, not a live work state\"",
         "kind": "pass",
         "detail": "orientation derives live blockage only from closeable work state @ observeOrientation (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Coordination",
         "claim": "boundary \"completed work remains unverified until an explicit verification edge names it\" at observeRegulation via guard \"regulate — completed work requires an explicit verification link before release\"",
         "kind": "pass",
         "detail": "completed work remains unverified until an explicit verification edge names it @ observeRegulation (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Source derivation",
         "claim": "boundary \"spec containment follows declared ancestry without inventing dependencies\" at buildGraph via guard \"spec containment — deepest declared ancestor is canonical parent, never an invented import\"",
         "kind": "pass",
         "detail": "spec containment follows declared ancestry without inventing dependencies @ buildGraph (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Source derivation",
         "claim": "derive.ts imports ./walk.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 4
+        "runs": 7
       },
       {
         "node": "Source derivation",
         "claim": "boundary \"harness source remains searchable text rather than silently becoming binary\" at sourceTextIsNavigable via guard \"source text — every live TypeScript source remains NUL-free and searchable\"",
         "kind": "pass",
         "detail": "harness source remains searchable text rather than silently becoming binary @ sourceTextIsNavigable (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Source derivation",
         "claim": "boundary \"a declared language resolves to a real adapter or refuses, never a silent fallback\" at resolveLanguageAdapter via guard \"language adapter — a project path loads and shapes the graph; unknown names refuse, never fall back\"",
         "kind": "pass",
         "detail": "a declared language resolves to a real adapter or refuses, never a silent fallback @ resolveLanguageAdapter (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Source derivation",
         "claim": "boundary \"a built-in language pack is data: queries, patterns, and named strategies, never code\" at builtinLanguagePacks via guard \"language packs — every built-in pack is function-free data across all five instrument tables\"",
         "kind": "pass",
         "detail": "a built-in language pack is data: queries, patterns, and named strategies, never code @ builtinLanguagePacks (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Diagnostics and ratchets",
         "claim": "boundary \"calibration denominators contain only validated surviving evidence\" at validateCalibrationSample via guard \"calibration integrity — damaged rows and invalid direct inputs cannot enter a denominator\"",
         "kind": "pass",
         "detail": "calibration denominators contain only validated surviving evidence @ validateCalibrationSample (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Diagnostics and ratchets",
         "claim": "boundary \"significant behavioral growth acquires an anchor or patch-specific decision\" at signal via guard \"only a zero-anchor alarm without attestation needs a decision\"",
         "kind": "pass",
         "detail": "significant behavioral growth acquires an anchor or patch-specific decision @ signal (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Diagnostics and ratchets",
         "claim": "boundary \"cached decisions expose structurally expired premises\" at auditPremiseLeases via guard \"audit — retracted decisions disappear and only broken strong leases fail a check\"",
         "kind": "pass",
         "detail": "cached decisions expose structurally expired premises @ auditPremiseLeases (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Diagnostics and ratchets",
         "claim": "boundary \"predicted context closure is calibrated against observed reads and outcomes\" at calibrate via guard \"calibration reports coverage, outside reads, and defect rates by prediction misses\"",
         "kind": "pass",
         "detail": "predicted context closure is calibrated against observed reads and outcomes @ calibrate (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Diagnostics and ratchets",
         "claim": "boundary \"calibration preserves the weakest host attribution of its trace\" at calibrationPaths via guard \"calibration keeps Codex parent-only writes aggregate and legacy rows unscoped\"",
         "kind": "pass",
         "detail": "calibration preserves the weakest host attribution of its trace @ calibrationPaths (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Diagnostics and ratchets",
         "claim": "boundary \"reviewed risk sites survive relocation but never duplication\" at reconcile via guard \"sinks — a moved file keeps its baselined identity and a genuinely new site still fails\"",
         "kind": "pass",
         "detail": "reviewed risk sites survive relocation but never duplication @ reconcile (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Diagnostics and ratchets",
         "claim": "boundary \"pinned mass follows a value-conserving rename but never absorbs growth\" at reconcileMass via guard \"mass — a renamed component keeps its pin; growth and novelty are never absorbed\"",
         "kind": "pass",
         "detail": "pinned mass follows a value-conserving rename but never absorbs growth @ reconcileMass (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Diagnostics and ratchets",
         "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at surfaceOfSource via guard \"python surface — module defs, enum variants, and dict keys count; underscore and nested names do not\"",
         "kind": "pass",
         "detail": "python sources feed the same instruments as typescript at their declared grade @ surfaceOfSource (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Diagnostics and ratchets",
         "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at sitesOfPython via guard \"python redundancy — two spellings of one domain in .py rank as a candidate; declared parity and idiom do not\"",
         "kind": "pass",
         "detail": "python sources feed the same instruments as typescript at their declared grade @ sitesOfPython (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Diagnostics and ratchets",
         "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at lintSinks via guard \"python sinks — an f-string into a SQL context is a site, a safe-pattern expression is not, and the ratchet reds the new site\"",
         "kind": "pass",
         "detail": "python sources feed the same instruments as typescript at their declared grade @ lintSinks (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Diagnostics and ratchets",
         "claim": "boundary \"instrument arms read languages through shared grammar queries, never a parallel scanner\" at lintSinks via guard \"ruby sinks — an interpolation into a SQL context is a site and the safe pattern exempts\"",
         "kind": "pass",
         "detail": "instrument arms read languages through shared grammar queries, never a parallel scanner @ lintSinks (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Durable evidence",
         "claim": "boundary \"concurrent status writers preserve complete independent reports\" at recordVerify via guard \"status publication — concurrent processes preserve independent reports and readers see complete JSON\"",
         "kind": "pass",
         "detail": "concurrent status writers preserve complete independent reports @ recordVerify (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Durable evidence",
         "claim": "boundary \"verdict-bearing decision reads fail closed on surviving journal damage\" at readTrustedJournal via guard \"trusted journal — any malformed, forged, displaced, conflicting, or dangling row refuses the verdict projection\"",
         "kind": "pass",
         "detail": "verdict-bearing decision reads fail closed on surviving journal damage @ readTrustedJournal (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Durable evidence",
         "claim": "boundary \"a committed decision population cannot disappear into adoption from zero\" at readTrustedJournal via guard \"trusted journal — any malformed, forged, displaced, conflicting, or dangling row refuses the verdict projection\"",
         "kind": "pass",
         "detail": "a committed decision population cannot disappear into adoption from zero @ readTrustedJournal (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Durable evidence",
         "claim": "boundary \"decision ratification follows explicit subject and authority, never prose similarity or recency\" at analyzeDecisionPositions via guard \"local alternatives need ratification; an explicit stronger choice settles them\"",
         "kind": "pass",
         "detail": "decision ratification follows explicit subject and authority, never prose similarity or recency @ analyzeDecisionPositions (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Durable evidence",
         "claim": "boundary \"a skipped run never clobbers an oracle's recorded verdict\" at recordVerify via guard \"merge — a skip never clobbers a real verdict; the old verdict rides through with its own stamp\"",
         "kind": "pass",
         "detail": "a skipped run never clobbers an oracle's recorded verdict @ recordVerify (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Durable evidence",
         "claim": "boundary \"experiment outcomes require criterion-total evidence\" at closeExperiment via guard \"close — total nonempty evidence is mandatory and outcome is derived, never supplied\"",
         "kind": "pass",
         "detail": "experiment outcomes require criterion-total evidence @ closeExperiment (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Durable evidence",
         "claim": "boundary \"experiment telemetry preserves its weakest provable attribution\" at closeExperiment via guard \"Codex parent-only tool events close the loop as an aggregate, never exact owner evidence\"",
         "kind": "pass",
         "detail": "experiment telemetry preserves its weakest provable attribution @ closeExperiment (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Durable evidence",
         "claim": "boundary \"surviving agent-assessed defect evidence is attributable and internally consistent\" at recordDefect via guard \"defects — agent-assessed evidence is attributable, content-addressed, and strict on inconsistent rows\"",
         "kind": "pass",
         "detail": "surviving agent-assessed defect evidence is attributable and internally consistent @ recordDefect (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Durable evidence",
         "claim": "boundary \"defect writes refuse pre-existing symlink redirection\" at recordDefect via guard \"defect containment — pre-existing directory and session symlinks refuse external append targets\"",
         "kind": "pass",
         "detail": "defect writes refuse pre-existing symlink redirection @ recordDefect (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Durable evidence",
         "claim": "boundary \"defect provenance is data, never terminal control\" at readDefects via guard \"defect provenance — commit ids have Git shape and cannot carry terminal controls\"",
         "kind": "pass",
         "detail": "defect provenance is data, never terminal control @ readDefects (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Durable evidence",
         "claim": "boundary \"a streamed journal entry renders exactly once across appends and compaction\" at tailJournal via guard \"tail — an appended record arrives exactly once, a compaction fold re-emits nothing and drops nothing, and a half-written line waits for its bytes\"",
         "kind": "pass",
         "detail": "a streamed journal entry renders exactly once across appends and compaction @ tailJournal (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Agent lifecycle",
         "claim": "hooks.ts imports ../evidence/decisions.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 4
+        "runs": 7
       },
       {
         "node": "Agent lifecycle",
         "claim": "boundary \"agent lifecycle preserves decisions and exposes the current change signal\" at runHook via guard \"hooks — main Stop snapshots without feedback while SubagentStop alone restates\"",
         "kind": "pass",
         "detail": "agent lifecycle preserves decisions and exposes the current change signal @ runHook (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Agent lifecycle",
         "claim": "boundary \"high-frequency lifecycle hooks start without the analysis dependency stack\" at runHook via guard \"PostToolUse starts from the source bundle with no dependency installation\"",
         "kind": "pass",
         "detail": "high-frequency lifecycle hooks start without the analysis dependency stack @ runHook (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Agent lifecycle",
         "claim": "boundary \"hook telemetry loss never kills PostToolUse\" at runHook via guard \"PostToolUse starts from the source bundle with no dependency installation\"",
         "kind": "pass",
         "detail": "hook telemetry loss never kills PostToolUse @ runHook (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Agent lifecycle",
         "claim": "boundary \"session startup injects only the exact session's current work order\" at assignedWorkInstructions via guard \"SessionStart teaches the executable swarm loop and exact owned lifecycle\"",
         "kind": "pass",
         "detail": "session startup injects only the exact session's current work order @ assignedWorkInstructions (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Agent lifecycle",
         "claim": "boundary \"session startup teaches the executable swarm loop without manufacturing authority\" at runHook via guard \"SessionStart teaches the executable swarm loop and exact owned lifecycle\"",
         "kind": "pass",
         "detail": "session startup teaches the executable swarm loop without manufacturing authority @ runHook (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Agent lifecycle",
         "claim": "boundary \"session startup survives a damaged decision-journal path with named degradation\" at runHook via guard \"SessionStart degrades around a damaged journal path without killing the session\"",
         "kind": "pass",
         "detail": "session startup survives a damaged decision-journal path with named degradation @ runHook (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Agent lifecycle",
         "claim": "boundary \"lifecycle hook presence is one canonical runnable bit\" at inspectLifecycleHook via guard \"control — presence is the complete canonical bundle, never a partial or lookalike\"",
         "kind": "pass",
         "detail": "lifecycle hook presence is one canonical runnable bit @ inspectLifecycleHook (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Agent lifecycle",
         "claim": "boundary \"supported lifecycle hosts share one control contract without sharing host syntax\" at setLifecycleHookForHost via guard \"Codex control — install is exact, idempotent, preserving, and runnable across nested paths\"",
         "kind": "pass",
         "detail": "supported lifecycle hosts share one control contract without sharing host syntax @ setLifecycleHookForHost (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Agent lifecycle",
         "claim": "boundary \"current-session activation requires exact installed-bundle evidence\" at currentObservation via guard \"hook status — exact current bundle activates; stale, direct, replayed, and damaged evidence does not\"",
         "kind": "pass",
         "detail": "current-session activation requires exact installed-bundle evidence @ currentObservation (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Agent lifecycle",
         "claim": "boundary \"customized hook text composes declared overrides and appends, degrading to canon on damage\" at composeHookText via guard \"hook text — override replaces, append follows, and damage degrades to the canonical emission\"",
         "kind": "pass",
         "detail": "customized hook text composes declared overrides and appends, degrading to canon on damage @ composeHookText (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Agent lifecycle",
         "claim": "boundary \"activity evidence is accepted only when identity, scope, time, and command agree\" at isActivityRow via guard \"activity — internally inconsistent scope, time, and command rows are damage, not evidence\"",
         "kind": "pass",
         "detail": "activity evidence is accepted only when identity, scope, time, and command agree @ isActivityRow (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Reading surfaces",
         "claim": "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at buildScopeModel via guard \"scope roles — declared test imports are not runtime gravity or proof of a named oracle\"",
         "kind": "pass",
         "detail": "Scope projects the canonical promise population with deterministic gravity and honest absence @ buildScopeModel (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 2
+        "runs": 5
       },
       {
         "node": "Reading surfaces",
         "claim": "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at buildScopeModel via guard \"scope semantics — containment and atlas meanings preserve ownership without inventing dependencies or verdicts\"",
         "kind": "pass",
         "detail": "Scope projects the canonical promise population with deterministic gravity and honest absence @ buildScopeModel (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Reading surfaces",
         "claim": "boundary \"task context is bounded and names its approximations\" at renderContextProjection via guard \"renderContext — bounded projection is route-first, byte-stable, and accounts for every omission\"",
         "kind": "pass",
         "detail": "task context is bounded and names its approximations @ renderContextProjection (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Reading surfaces",
         "claim": "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at buildScopeModel via guard \"scope model — graph/promise population mismatch refuses rather than drawing partial truth\"",
         "kind": "pass",
         "detail": "Scope projects the canonical promise population with deterministic gravity and honest absence @ buildScopeModel (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Reading surfaces",
         "claim": "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at buildScopeModel via guard \"scope model — original spec explanation and unanchored declarations survive projection\"",
         "kind": "pass",
         "detail": "Scope projects the canonical promise population with deterministic gravity and honest absence @ buildScopeModel (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Reading surfaces",
         "claim": "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at renderScope via guard \"scope cards — titles have an opaque title bar and explicit contrast, with full text retained in the inspector\"",
         "kind": "pass",
         "detail": "Scope projects the canonical promise population with deterministic gravity and honest absence @ renderScope (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Taxonomy",
         "claim": "boundary \"taxonomy representation roles require operational evidence under their recorded catalog\" at classifyTaxonomy via guard \"taxonomy interview — operational discriminators separate representation roles and preserve no-fit\"",
         "kind": "pass",
         "detail": "taxonomy representation roles require operational evidence under their recorded catalog @ classifyTaxonomy (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Taxonomy",
         "claim": "boundary \"taxonomy revisions preserve scoped evidence and refuse damaged history\" at taxonomyView via guard \"taxonomy history — old catalog assessments retain their meaning and expire without silent migration\"",
         "kind": "pass",
         "detail": "taxonomy revisions preserve scoped evidence and refuse damaged history @ taxonomyView (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Taxonomy",
         "claim": "boundary \"taxonomy suggestions never acquire verification authority\" at classifyTaxonomy via guard \"taxonomy classification — unknowns and plural responsibilities never become a single guessed role or passing guarantee\"",
         "kind": "pass",
         "detail": "taxonomy suggestions never acquire verification authority @ classifyTaxonomy (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Taxonomy",
         "claim": "boundary \"taxonomy suggestions never acquire verification authority\" at TAXONOMY via guard \"taxonomy catalog — every frozen lab subject survives the namespaced port without added authority\"",
         "kind": "pass",
         "detail": "taxonomy suggestions never acquire verification authority @ TAXONOMY (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Taxonomy",
         "claim": "boundary \"taxonomy revisions preserve scoped evidence and refuse damaged history\" at recordTaxonomy via guard \"taxonomy concurrency — two CLI writers cannot both own the initial predecessor slot\"",
         "kind": "pass",
         "detail": "taxonomy revisions preserve scoped evidence and refuse damaged history @ recordTaxonomy (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Taxonomy",
         "claim": "boundary \"taxonomy revisions preserve scoped evidence and refuse damaged history\" at readTaxonomyRecords via guard \"taxonomy damage — malformed or displaced history refuses instead of shrinking into a clean empty view\"",
         "kind": "pass",
         "detail": "taxonomy revisions preserve scoped evidence and refuse damaged history @ readTaxonomyRecords (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Taxonomy",
         "claim": "boundary \"taxonomy wire records require canonical internally consistent caller assessments\" at validateTaxonomyRecord via guard \"taxonomy damage — malformed or displaced history refuses instead of shrinking into a clean empty view\"",
         "kind": "pass",
         "detail": "taxonomy wire records require canonical internally consistent caller assessments @ validateTaxonomyRecord (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Taxonomy",
         "claim": "boundary \"taxonomy revisions preserve scoped evidence and refuse damaged history\" at captureTaxonomy via guard \"taxonomy subjects — only resolved graph addresses enter evidence; absent, compound and escaped paths refuse\"",
         "kind": "pass",
         "detail": "taxonomy revisions preserve scoped evidence and refuse damaged history @ captureTaxonomy (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
+        "tier": "full",
+        "everFailed": false,
+        "runs": 6
+      },
+      {
+        "node": "Verification",
+        "claim": "boundary \"explicit guarantee links expire with their premises and never prove satisfaction\" at resolveGuaranteeLinks via guard \"guarantee links — expired premises never become current and passing evidence never proves satisfaction\"",
+        "kind": "pass",
+        "detail": "explicit guarantee links expire with their premises and never prove satisfaction @ resolveGuaranteeLinks (source-property guard)",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
         "runs": 3
@@ -981,199 +992,199 @@
         "claim": "boundary \"a claim goes green only on positive evidence its oracle ran\" at execNamedTest via guard \"testMatch — a runner exiting 0 with no matching output FAILS (the renamed-test trap)\"",
         "kind": "pass",
         "detail": "a claim goes green only on positive evidence its oracle ran @ execNamedTest (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Verification",
         "claim": "boundary \"a vanished oracle reds its claim, never green-by-absence\" at resolveFromBatch via guard \"match — ZERO matching tests is its OWN state: the vanished oracle, named as such\"",
         "kind": "pass",
         "detail": "a vanished oracle reds its claim, never green-by-absence @ resolveFromBatch (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Verification",
         "claim": "boundary \"fast verification rejects a statically vanished Vitest oracle without executing tests\" at resolveStaticOracle via guard \"static oracle floor — a renamed tracked literal owner reds despite unrelated dynamic titles\"",
         "kind": "pass",
         "detail": "fast verification rejects a statically vanished Vitest oracle without executing tests @ resolveStaticOracle (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Verification",
         "claim": "boundary \"fast oracle absence requires a complete direct-declaration population\" at resolveStaticOracle via guard \"static names — a bare side-effect import may register tests and keeps absence UNKNOWN\"",
         "kind": "pass",
         "detail": "fast oracle absence requires a complete direct-declaration population @ resolveStaticOracle (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Verification",
         "claim": "boundary \"a declared invariant unanchored by any boundary fails coverage\" at runVerify via guard \"RATCHET — a declared invariant with no anchoring boundary fails coverage\"",
         "kind": "pass",
         "detail": "a declared invariant unanchored by any boundary fails coverage @ runVerify (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Verification",
         "claim": "boundary \"a via-test oracle that iterates no live domain fails its claim\" at analyzeOracle via guard \"META-ORACLE — a `via test` boundary whose oracle loops a LITERAL fails\"",
         "kind": "pass",
         "detail": "a via-test oracle that iterates no live domain fails its claim @ analyzeOracle (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Verification",
         "claim": "boundary \"a named oracle that no test runs cannot pass\" at runNamedTest via guard \"runner contract — a name that exists nowhere exits nonzero (the vanished oracle cannot pass)\"",
         "kind": "pass",
         "detail": "a named oracle that no test runs cannot pass @ runNamedTest (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Verification",
         "claim": "boundary \"an empty derivation against a remembered surface refuses, never passes\" at vacuityRefusal via guard \"FLOOR — an empty derivation against a remembered surface REFUSES, never reports coherent\"",
         "kind": "pass",
         "detail": "an empty derivation against a remembered surface refuses, never passes @ vacuityRefusal (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Verification",
         "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at analyzeParityOracle via guard \"python parity — a .py oracle that iterates the live domain passes; a literal list fails; a vanished oracle cannot pass\"",
         "kind": "pass",
         "detail": "python sources feed the same instruments as typescript at their declared grade @ analyzeParityOracle (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Verification",
         "claim": "boundary \"python sources feed the same instruments as typescript at their declared grade\" at resolveFromBatch via guard \"pytest batch — nodeid names resolve per claim, zero matches is the vanished oracle, and a torn report falls back loudly\"",
         "kind": "pass",
         "detail": "python sources feed the same instruments as typescript at their declared grade @ resolveFromBatch (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Verification",
         "claim": "boundary \"an undeclared root refuses the walk, never wanders\" at requireDeclaredRoot via guard \"declared root — a configless directory refuses the walk and an empty config declares it\"",
         "kind": "pass",
         "detail": "an undeclared root refuses the walk, never wanders @ requireDeclaredRoot (source-property guard)",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 3
+        "runs": 6
       },
       {
         "node": "Executable contracts",
         "claim": "_helpers.ts exists at this node",
         "kind": "pass",
         "detail": "_helpers.ts @ this node",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 145
+        "runs": 148
       },
       {
         "node": "Executable contracts",
         "claim": "verify.test.ts exists at this node",
         "kind": "pass",
         "detail": "verify.test.ts @ this node",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 145
+        "runs": 148
       },
       {
         "node": "Executable contracts",
         "claim": "decisions.test.ts exists at this node",
         "kind": "pass",
         "detail": "decisions.test.ts @ this node",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 145
+        "runs": 148
       },
       {
         "node": "Executable contracts",
         "claim": "commands.test.ts exists at this node",
         "kind": "pass",
         "detail": "commands.test.ts @ this node",
-        "at": "2026-09-08T20:27:06.868Z",
-        "commit": "fdfc02c",
+        "at": "2026-09-08T21:09:31.978Z",
+        "commit": "ac70b95",
         "tier": "full",
         "everFailed": false,
-        "runs": 145
+        "runs": 148
       }
     ],
     "coverage": {
       "components": 12,
       "claimed": 12,
       "withWhy": 12,
-      "symbols": 808,
-      "documented": 404
+      "symbols": 818,
+      "documented": 412
     },
     "invariants": {
-      "total": 71,
-      "anchored": 71,
+      "total": 72,
+      "anchored": 72,
       "gaps": []
     },
     "narrative": null,
-    "jobs": 404,
+    "jobs": 406,
     "failures": 0
   },
   "mass": {
-    "at": "2026-09-08T20:27:11.928Z",
-    "commit": "fdfc02c",
+    "at": "2026-09-08T21:10:02.457Z",
+    "commit": "ac70b95",
     "dirty": true,
     "dims": [
       {
         "key": "lines|total",
-        "value": 50335,
+        "value": 50651,
         "unit": "lines",
-        "baseline": 50335
+        "baseline": 50651
       },
       {
         "key": "lines|Agent lifecycle",
-        "value": 2352,
+        "value": 2357,
         "unit": "lines",
-        "baseline": 2352
+        "baseline": 2357
       },
       {
         "key": "lines|Coordination",
@@ -1195,21 +1206,21 @@
       },
       {
         "key": "lines|Executable contracts",
-        "value": 20160,
+        "value": 20288,
         "unit": "lines",
-        "baseline": 20160
+        "baseline": 20288
       },
       {
         "key": "lines|Harness core",
-        "value": 2160,
+        "value": 2168,
         "unit": "lines",
-        "baseline": 2160
+        "baseline": 2168
       },
       {
         "key": "lines|Reading surfaces",
-        "value": 5999,
+        "value": 6003,
         "unit": "lines",
-        "baseline": 5999
+        "baseline": 6003
       },
       {
         "key": "lines|Source adapters",
@@ -1219,9 +1230,9 @@
       },
       {
         "key": "lines|Source derivation",
-        "value": 513,
+        "value": 535,
         "unit": "lines",
-        "baseline": 513
+        "baseline": 535
       },
       {
         "key": "lines|Taxonomy",
@@ -1231,27 +1242,27 @@
       },
       {
         "key": "lines|Verification",
-        "value": 3904,
+        "value": 4053,
         "unit": "lines",
-        "baseline": 3904
+        "baseline": 4053
       },
       {
         "key": "files|total",
-        "value": 156,
+        "value": 159,
         "unit": "files",
-        "baseline": 156
+        "baseline": 159
       },
       {
         "key": "symbols|total",
-        "value": 808,
+        "value": 818,
         "unit": "symbols",
-        "baseline": 808
+        "baseline": 818
       },
       {
         "key": "undocumented|symbols",
-        "value": 404,
+        "value": 406,
         "unit": "symbols",
-        "baseline": 404
+        "baseline": 406
       },
       {
         "key": "deps|direct",
@@ -1279,9 +1290,9 @@
       },
       {
         "key": "measure|graph-claims",
-        "value": 100,
+        "value": 101,
         "unit": "claims",
-        "baseline": 100
+        "baseline": 101
       }
     ]
   },
@@ -1346,14 +1357,26 @@
     "verdict": "LOCALITY decohering, SPREAD widening — driving toward divergence — smears dominate recent work; watch for a block-list forming"
   },
   "atlas": {
-    "at": "2026-09-08T20:27:36.895Z",
-    "commit": "fdfc02c",
+    "at": "2026-09-08T21:08:45.925Z",
+    "commit": "ac70b95",
     "tiers": {
       "enshrined": 0,
-      "checked": 51,
+      "checked": 52,
       "convention": 9
     },
     "crossings": [
+      {
+        "sym": "resolveGuaranteeLinks",
+        "from": "project-source",
+        "to": "derived-model",
+        "tier": 2,
+        "security": false,
+        "note": "guarantee links — expired premises never become current and passing evidence never proves satisfaction",
+        "translates": "Spec-owned claim and obligation references join canonical graph, taxonomy and recorded oracle readings. Missing, ambiguous or expired premises remain explicit issues, never current mappings. Link integrity does not establish semantic satisfaction, and direct-import adjacency does not prove guarantee consumption.",
+        "present": true,
+        "pending": false,
+        "heat": 0
+      },
       {
         "sym": "validateCalibrationSample",
         "from": "record",
@@ -1460,7 +1483,7 @@
         "translates": "Direct module Env / Cloudflare.Env store types and wrangler configuration become one canonical platform domain. Source/config agreement deduplicates, disagreement refuses, deployment-only store metadata cannot perturb node bytes, runtime variables cross as names with a typed declared marker rather than values, and source inference receives the graph's filtered file population so generated local declarations cannot become a hidden second walk.",
         "present": true,
         "pending": false,
-        "heat": 0.0136986301369863
+        "heat": 0.013793103448275862
       },
       {
         "sym": "loadConfig",
@@ -1472,7 +1495,7 @@
         "translates": "The repository's own coherence.config.json becomes argv the harness spawns — `test`, `typecheck`, and every `mass.measures` command. Running the harness in a tree executes that tree's config; readJsonOrRefuse makes an unparseable config refuse rather than revert to defaults, but a parseable one is obeyed.",
         "present": true,
         "pending": false,
-        "heat": 0.02054794520547945
+        "heat": 0.020689655172413793
       },
       {
         "sym": "readJsonOrRefuse",
@@ -1604,7 +1627,7 @@
         "translates": "Repeated CLI arguments become either declared plural evidence and scope values or a refusal. Session, owner, authority, predecessor, and other singleton selectors never silently become last-wins attribution for a ledger append.",
         "present": true,
         "pending": false,
-        "heat": 0.2671232876712329
+        "heat": 0.2620689655172414
       },
       {
         "sym": "traceConsequences",
@@ -1784,7 +1807,7 @@
         "translates": "A grammar wasm — typically shipped by a tree-sitter grammar package, addressed by the project's adapter module — is loaded and EXECUTED to parse the tree under analysis into graph symbols, import edges, and prose. The wasm is sandboxed to parsing but it is still a project-supplied executable artifact, the same declared trust as the config's argv and adapter modules; a load or query failure refuses at adapter resolution rather than deriving a partial graph.",
         "present": true,
         "pending": false,
-        "heat": 0.03424657534246575
+        "heat": 0.034482758620689655
       },
       {
         "sym": "surfaceOfSource",

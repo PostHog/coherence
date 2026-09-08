@@ -42,6 +42,10 @@ Installation, inspection and observed activation are distinct facts. Host-specif
 - boundary "customized hook text composes declared overrides and appends, degrading to canon on damage" at composeHookText via guard "hook text — override replaces, append follows, and damage degrades to the canonical emission"
 - boundary "activity evidence is accepted only when identity, scope, time, and command agree" at isActivityRow via guard "activity — internally inconsistent scope, time, and command rows are damage, not evidence"
 
+## relies on
+
+- {"claim":"g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150","provider":"src/evidence","because":"SessionStart reads readTrustedJournal before projecting durable decisions. It requires damage to refuse the verdict-bearing projection instead of silently presenting a partial journal as trusted."}
+
 ## why
 
 **agent lifecycle preserves decisions and exposes the current change signal.** Decisions

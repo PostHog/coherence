@@ -126,6 +126,9 @@ try {
     "--evidence", "src/taxonomy-subject.ts", "--json"], { cwd: consumer }).stdout);
   assert.ok(classified.classification.suggestions.every(g => g.status === "unverified"));
   run(coherence, ["taxonomy", "list", "--check"], { cwd: consumer });
+  const guarantees = JSON.parse(run(coherence, ["guarantees", "--check", "--json"], { cwd: consumer }).stdout);
+  assert.ok(guarantees.obligations.length > 0);
+  assert.ok(guarantees.obligations.every(o => o.mapping === "unlinked" && o.satisfaction === "unverified"));
   run(coherence, ["taxonomy", "attest", "--status", "satisfied"], { cwd: consumer, status: 2 });
 
   // Reject malformed evidence before the recorder creates even an empty ledger directory.
@@ -208,6 +211,8 @@ try {
     input: `${JSON.stringify({ session_id: codexSession, agent_type: "main" })}\n`,
   });
   parseHookEmission(codexEmission.stdout, "SessionStart", codexSession);
+  assert.match(codexEmission.stdout, /guarantees --check/);
+  assert.match(claudeEmission.stdout, /guarantees --check/);
 
   // Content changed without a matching address must make both surfaces refuse the corpus.
   const tampered = JSON.parse(firstBytes.trim());

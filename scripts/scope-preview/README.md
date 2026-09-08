@@ -9,6 +9,19 @@ evidence come from that snapshot. Previous hand-written x/y positions are ignore
 
 ## Run
 
+Cards switch between Description and Guarantees with taxonomy fixed below both.
+The full spec text is retained at the same readable scale; guarantee lists scroll
+independently. WebKit caught the first attempt crowding 529px of combined content into
+a 357px description area; the browser guard still checks complete current descriptions
+fit, and additionally checks every canonical guarantee name in the alternate reading.
+Connections use explicit
+spec-owned `relies on` declarations, not inferred zone matches. The inspector shows
+each direction's claim, rationale, link health and recorded oracle evidence; missing
+links are named. Taxonomy obligations separately show applicability, mapping and
+unverified satisfaction. `coherence guarantees --check --json` reads the same canonical
+join as Scope. The live feed recomputes it on spec, source, taxonomy or status changes
+without executing tests; evidence-only updates preserve geometry and camera state.
+
 ```sh
 npm ci --prefix scripts/scope-preview
 npm run snapshot --prefix scripts/scope-preview

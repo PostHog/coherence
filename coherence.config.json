@@ -77,6 +77,12 @@
       "reading-surface": "What a human or an agent then reads: public/_*.html, AGENTS.md, CLAUDE.md, the terminal reports. Derived text with no authority of its own; it can mislead, but it cannot turn a red green."
     },
     "transitions": {
+      "resolveGuaranteeLinks": {
+        "from": "project-source",
+        "to": "derived-model",
+        "security": false,
+        "translates": "Spec-owned claim and obligation references join canonical graph, taxonomy and recorded oracle readings. Missing, ambiguous or expired premises remain explicit issues, never current mappings. Link integrity does not establish semantic satisfaction, and direct-import adjacency does not prove guarantee consumption."
+      },
       "validateCalibrationSample": {
         "from": "record", "to": "derived-model", "security": true,
         "translates": "A sample enters calibration only with consistent session/patch identity, canonical time, path sets, a declared outcome and known or legacy attribution. Malformed surviving rows and invalid direct statistics inputs refuse the whole denominator."

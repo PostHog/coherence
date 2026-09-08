@@ -11,6 +11,9 @@ import { buildPromiseModel } from '../../src/readings/promise.ts';
 import { buildScopeModel } from '../../src/readings/scope-model.ts';
 import { readStatus } from '../../src/evidence/status.ts';
 import { layoutScope } from './layout.mjs';
+import { readGuaranteeTaxonomy } from '../../src/verification/guarantees-cli.ts';
+import { recordTaxonomy } from '../../src/taxonomy/taxonomy-ledger.ts';
+import { guaranteeRef, parseBoundary } from '../../src/verification/boundary.ts';
 
 const record = id => ({ id, session: 'fixture', agent: 'fixture', job: '-', kind: 'decision',
   at: '2026-09-04T12:00:00.000Z', chose: id, because: 'test evidence', over: [], branch: null, commit: null, dirty: false });
@@ -65,6 +68,42 @@ test('live server refuses foreign origin/host, wrong capability, arbitrary paths
   } finally { await f.close(); }
 });
 
+test('live guarantee links repopulate on spec declarations and expire on assessment revisions and source edits', { timeout: 15000 }, async () => {
+  const claim = 'boundary "stable session" at session via guard "session oracle"';
+  const spec = `# Core\n\nSession owner.\n\n## works when\n- ${claim}\n`;
+  const root = await tmpProject({ 'coherence.config.json': '{}\n', 'core.spec.md': spec,
+    'core.ts': 'export function session() { return 1; }\n', 'index.html': '<div id="root"></div>' });
+  const config = await loadConfig(root), graph = await buildGraph(config);
+  const input = { target: 'core.ts', expected: null, session: 'fixture', because: 'Owns this session',
+    evidence: ['core.ts'], answers: { 'signal:continuity': 'yes' }, roles: ['role:session-subscription-owner'] };
+  const record = recordTaxonomy(config, graph, input);
+  const live = await startScopeServer({ cfg: config, htmlPath: join(root, 'index.html'), intervalMs: 30 });
+  const stream = await feed(live.url);
+  const until = async predicate => { for (;;) { const v = await stream.next(); if (predicate(v)) return v; } };
+  try {
+    const first = await stream.next();
+    assert.equal(first.structure.model.guaranteeLinks.obligations[0].mapping, 'unlinked');
+    const link = { claim: guaranteeRef('.', parseBoundary(claim)), subject: 'core.ts', assessment: record.id,
+      obligation: 'guarantee:G-SESSION', because: 'Addresses identity only' };
+    const linkedSpec = () => `${spec}\n## addresses\n- ${JSON.stringify(link)}\n`;
+    await writeFile(join(root, 'core.spec.md'), linkedSpec());
+    const linked = await until(v => v.structure.model.guaranteeLinks.links[0]?.status === 'current');
+    assert.equal(linked.structure.model.guaranteeLinks.obligations[0].mapping, 'linked');
+    const revised = recordTaxonomy(config, graph, { ...input, expected: record.id, because: 'Reassessed the same scope explicitly' });
+    const expired = await until(v => v.structure.model.guaranteeLinks.links[0]?.status === 'stale');
+    assert.ok(expired.structure.model.guaranteeLinks.links[0].problems.includes('Assessment revision changed'));
+    link.assessment = revised.id;
+    await writeFile(join(root, 'core.spec.md'), linkedSpec());
+    await until(v => v.structure.model.guaranteeLinks.links[0]?.status === 'current');
+    await writeFile(join(root, 'core.ts'), 'export function session() { return 2; }\n');
+    const changed = await until(v => v.structure.model.guaranteeLinks.links[0]?.status === 'stale');
+    assert.equal(changed.structure.model.guaranteeLinks.obligations[0].mapping, 'unlinked');
+    assert.equal(changed.structure.model.guaranteeLinks.obligations[0].satisfaction, 'unverified');
+    assert.equal(changed.structure.model.guarantees[0].verdict, 'unknown');
+    assert.deepEqual(changed.structure.model.nodes.map(n => [n.id, n.ring, n.x, n.y]), linked.structure.model.nodes.map(n => [n.id, n.ring, n.x, n.y]));
+  } finally { await stream.close(); await live.close(); await cleanup(root); }
+});
+
 test('live structure follows canonical additions, edits, status publication and removals without artifact writes', { timeout: 15000 }, async () => {
   const claim = 'boundary "named property" at run via guard "named oracle"';
   const spec = '# Core\n\nInitial intent.\n\n## works when\n- ' + claim + '\n';
@@ -74,7 +113,7 @@ test('live structure follows canonical additions, edits, status publication and 
   const live = await startScopeServer({ cfg: config, htmlPath: join(root, 'index.html'), intervalMs: 30 });
   const stream = await feed(live.url);
   const until = async predicate => { for (;;) { const value = await stream.next(); if (predicate(value)) return value; } };
-  const canonical = async () => { const c = await loadConfig(root), g = await buildGraph(c); return buildScopeModel(g, await buildPromiseModel(c, g, await readStatus(c))); };
+  const canonical = async () => { const c = await loadConfig(root), g = await buildGraph(c); return buildScopeModel(g, await buildPromiseModel(c, g, await readStatus(c)), c, readGuaranteeTaxonomy(c)); };
   try {
     const first = await stream.next();
     assert.equal(first.structure.status, 'current');

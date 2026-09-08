@@ -71,14 +71,35 @@ export function parseSpec(text: string): ParsedSpec {
   let rfe = -1;
   if (rf >= 0) { rfe = lines.length; for (let j = rf + 1; j < lines.length; j++) { if (/^##\s+/.test(lines[j])) { rfe = j; break; } const c = /^-\s+(.+?)\s*$/.exec(lines[j]); if (c) refutations.push(c[1]); } }
   const prose: string[] = [];
+  const guaranteeLinks = { addresses: [] as unknown[], relies: [] as unknown[], problems: [] as string[] };
+  const linkLines = new Set<number>(), seenSections = new Set<string>();
+  for (let j = 0; j < lines.length; j++) {
+    const section = /^##\s+(addresses|relies on)\s*$/i.exec(lines[j]);
+    if (!section) continue;
+    const kind = section[1].toLowerCase() === "addresses" ? "addresses" : "relies";
+    if (seenSections.has(kind)) guaranteeLinks.problems.push(`Duplicate ${section[1]} section`);
+    seenSections.add(kind); linkLines.add(j);
+    for (j++; j < lines.length && !/^##\s+/.test(lines[j]); j++) {
+      linkLines.add(j);
+      if (!lines[j].trim()) continue;
+      try {
+        const bullet = /^-\s+(.+)$/.exec(lines[j]);
+        if (!bullet) throw new Error("Expected a JSON object bullet");
+        guaranteeLinks[kind].push(JSON.parse(bullet[1]));
+      } catch { guaranteeLinks.problems.push(`${section[1]} line ${j + 1}: expected a valid JSON object bullet`); }
+    }
+    j--;
+  }
   for (let k = (intentLine >= 0 ? intentLine + 1 : i); k < lines.length; k++) {
+    if (linkLines.has(k)) continue;
     if (ws >= 0 && k >= ws && k < we) continue;
     if (wy >= 0 && k >= wy && k < wye) continue;
     if (iv >= 0 && k >= iv && k < ive) continue;
     if (rf >= 0 && k >= rf && k < rfe) continue;
     prose.push(lines[k]);
   }
-  return { name, intent, claims, claimKinds, prose: prose.join("\n").trim(), why, invariants, refutations };
+  return { name, intent, claims, claimKinds, prose: prose.join("\n").trim(), why, invariants, refutations,
+    ...(seenSections.size ? { guaranteeLinks } : {}) };
 }
 
 /**

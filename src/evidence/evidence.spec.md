@@ -43,6 +43,11 @@ Each ledger keeps its own evidence contract. Readers validate surviving records;
 - boundary "defect provenance is data, never terminal control" at readDefects via guard "defect provenance — commit ids have Git shape and cannot carry terminal controls"
 - boundary "a streamed journal entry renders exactly once across appends and compaction" at tailJournal via guard "tail — an appended record arrives exactly once, a compaction fold re-emits nothing and drops nothing, and a half-written line waits for its bytes"
 
+## addresses
+
+- {"claim":"g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150","subject":"src/evidence/decisions.ts#readTrustedJournal","obligation":"guarantee:G-BOUNDARY","assessment":"t-157fca4c0054ab5f39288e1bea84ccd3b8172d17ee48cea48315c735dac7cd32","because":"The strict journal projection validates surviving records and refuses the whole reading on damage. This addresses the invalid-input refusal part of the boundary obligation, not all caller-visible failure semantics."}
+- {"claim":"g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf","subject":"src/evidence/status.ts#recordVerify","obligation":"guarantee:G-PERSISTENCE","assessment":"t-43387dcec74b31d96afdd95ba168f59db2ee996d511ef3d565958514ebeadb59","because":"The merge preserves the dated prior oracle verdict when a later run skips it. This addresses retained report history, not immutable evidence or complete crash recovery."}
+
 ## why
 
 **concurrent status writers preserve complete independent reports.** A successful report

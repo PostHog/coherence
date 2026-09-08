@@ -13,6 +13,7 @@ import { gitStamp, readStatus } from '../../src/evidence/status.ts';
 import { readSurface, vacuityRefusal } from '../../src/verification/floor.ts';
 import { codeFiles } from '../../src/derivation/walk.ts';
 import { BUILTIN_LANGUAGES } from '../../src/adapters/tree-sitter.ts';
+import { resolveGuaranteeLinks } from '../../src/verification/guarantees.ts';
 
 const digestOf = value => createHash('sha256').update(value).digest('hex');
 function ledgerStamp(cfg, evidenceFiles = []) {
@@ -52,6 +53,7 @@ export async function startScopeServer({ cfg, htmlPath, port = 0, intervalMs = 7
   let readings, structure = { status: 'unavailable', model: null, message: 'Waiting for project derivation' };
   let refreshing = null, stopped = false;
   let evidenceFiles = [];
+  let currentGraph;
   async function refreshOnce() {
     try {
       const current = reloadConfig ? await loadConfig(cfg.root) : cfg;
@@ -67,6 +69,7 @@ export async function startScopeServer({ cfg, htmlPath, port = 0, intervalMs = 7
         structure = { status: 'current', model, git: probe.git,
           evidence: 'Recorded verification only. Watching never runs tests; uncommitted edits are not reverified.' };
         sourceStamp = probe.value;
+        currentGraph = graph;
       }
       cfg = current;
     } catch (error) {
@@ -84,6 +87,9 @@ export async function startScopeServer({ cfg, htmlPath, port = 0, intervalMs = 7
       ])].sort();
       stamp = ledgerStamp(cfg, evidenceFiles); tailDamage = tail.unreadable;
     }
+    if (currentGraph && structure.model) structure = { ...structure, model: { ...structure.model,
+      guaranteeLinks: resolveGuaranteeLinks(currentGraph, structure.model.guarantees, structure.model.relations,
+        { view: readings.taxonomy, error: readings.errors.find(e => e.source === 'taxonomy')?.message ?? null }) } };
     const raw = JSON.stringify({ ...readings, structure }), next = digestOf(raw);
     if (next === digest && !retryRead) return;
     digest = next;

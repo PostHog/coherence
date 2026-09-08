@@ -64,7 +64,7 @@
       "claimKinds": {},
       "mass": {
         "ownedFiles": 6,
-        "ownedLines": 2160,
+        "ownedLines": 2168,
         "ownedSurface": 18,
         "inboundReliance": 9,
         "boundaryAuthority": 0,
@@ -219,7 +219,7 @@
       "claimKinds": {},
       "mass": {
         "ownedFiles": 4,
-        "ownedLines": 513,
+        "ownedLines": 535,
         "ownedSurface": 14,
         "inboundReliance": 5,
         "boundaryAuthority": 0,
@@ -394,7 +394,7 @@
       "claimKinds": {},
       "mass": {
         "ownedFiles": 5,
-        "ownedLines": 2352,
+        "ownedLines": 2357,
         "ownedSurface": 17,
         "inboundReliance": 4,
         "boundaryAuthority": 0,
@@ -435,12 +435,12 @@
       "claimKinds": {},
       "mass": {
         "ownedFiles": 12,
-        "ownedLines": 5999,
+        "ownedLines": 6003,
         "ownedSurface": 25,
-        "inboundReliance": 2,
+        "inboundReliance": 3,
         "boundaryAuthority": 0,
         "guaranteeResponsibility": 6,
-        "total": 33
+        "total": 34
       },
       "ring": 1,
       "angle": 4.974188368183839,
@@ -482,10 +482,10 @@
         "ownedFiles": 4,
         "ownedLines": 1594,
         "ownedSurface": 15,
-        "inboundReliance": 1,
+        "inboundReliance": 2,
         "boundaryAuthority": 0,
         "guaranteeResponsibility": 8,
-        "total": 24
+        "total": 25
       },
       "ring": 1,
       "angle": 5.672320068981571,
@@ -500,8 +500,9 @@
       "label": "Verification",
       "intent": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
       "prose": "Oracle discovery, execution and record lookup converge here. A passing process is not a passing claim unless the named oracle demonstrably ran.",
-      "why": "**a claim goes green only on positive evidence its oracle ran.** The verifier's whole\nauthority rests on this one property, and until now no claim cited it: an audit deleted\nthe rule and the tree stayed \"✓ coherent\" while the unit test failed unseen. An exit\ncode is the runner's statement about itself, not about the named test — a filter that\nmatched nothing exits clean on every runner class this repo has measured — so green\nmust require output that names the run, the one reading absence cannot produce.\n\n**a vanished oracle reds its claim, never green-by-absence.** A renamed or deleted test\nleaves a claim citing a name nothing owns, and that claim then guards nothing while\nwearing green. Absence has to be its own observable verdict, distinct from ran-and-failed,\nbecause the two demand different repairs: a red test needs the code fixed, a vanished\noracle needs the contract re-tied to something that exists.\n\n**fast oracle absence requires a complete direct-declaration population.** Absence is a\nstronger statement than failure: it says the registry owns no matching name. The static\nfloor may say that only when every registration mechanism it recognizes was enumerable;\ndynamic titles, fixture DSLs, registration-time module loads, custom includes, and damaged\nsource must poison absence into UNKNOWN while still allowing positive direct matches.\nOtherwise the cheap tier would turn its own inability to see a live oracle into evidence\nthat the oracle vanished.\n\n**a declared invariant unanchored by any boundary fails coverage.** A spec may not\nassert a property that nothing enforces: that is the ratchet the whole harness turns on,\nand if it silently loosened, specs would drift back into aspiration prose. The gap has to\ncost a red at the run that opened it, while the person who opened it still holds the\ncontext to close it.\n\n**a via-test oracle that iterates no live domain fails its claim.** A totality label on a\nsampling test is worse than no label: it retires the reader's suspicion without retiring\nthe risk. Deriving the checked set from the live registry the chokepoint actually serves\nis what makes \"covers every case\" a fact about the system rather than about the fixture\nlist the author remembered.\n\n**a named oracle that no test runs cannot pass.** The serial runner is the component the\nexecutable tier leans its trust on, and it was outside the evidence perimeter — unclaimed,\nuntested, and (measured) willing to exit clean when the cited title survived only as a\nstring in a file. The runner itself must refuse a name it cannot show ran, because every\ngreen above it inherits that refusal.\n\n**an empty derivation against a remembered surface refuses, never passes.** Every verdict\nin this file rests on the graph deriving non-empty, and nothing checked that premise:\ngutting `buildGraph` left the gate printing \"claims: 0\" and \"✓ coherent\", exit 0 —\ndeeper than a vanished oracle, because it empties every check at once while announcing\nthey all passed. The record remembers how many claims the last run graded, so a run that\nsuddenly sees zero must refuse rather than report success over nothing; the only\nlegitimate zero (a project adopting from nothing) is exactly the one with no memory, and\nit gets the adoption ladder instead. The floor deliberately stops at zero: a partial\ncollapse where every component keeps a claim is observationally identical to deliberate\npruning, and deletion has to stay free or people stop deleting. What the complement\nunderneath it actually reaches is narrower than it first appears — a component stripped of\nits claims is still a node someone can red, while a component the walk never discovered\nleaves nothing behind to notice, so an N→1 slide reads as N ordinary prunings. Pinning the\npopulation as a mass dimension is the honest answer there, because the question it settles\nis not whether anything survived but whether as much survived as last time.\n\n**python sources feed the same instruments as typescript at their declared grade.**\nThe adapter seam always promised language-agnosticism, but three analyzers and two\nscanners parsed TypeScript directly, so a python project's surface grew invisibly — the\nzero-anchor alarm never fired, parity claims skipped `.py` oracles, duplicated domains\nwent unranked, batch oracles knew one report format, and f-string interpolations were not\nsites. Each instrument now reads python at a DECLARED grade: most through the shared\ngrammar queries of phase 2b (surface, sites, sinks), the oracle arms at the pinned\nindent-block grade their guards froze — in-harness, no subprocess, and since the arms\nported, no compiler dependency at all. The grade is declared, not hidden —\nprecision is preferred over recall everywhere, because an advisory that cries wolf\nretires the reader's attention without retiring risk, and with no compiler behind `.py`\na false positive can never be rescued downstream. What the regex grade deliberately does\nnot count is journaled beside each instrument, so the next reader inherits the boundary\nof the instrument instead of rediscovering it.\n\n**an undeclared root refuses the walk, never wanders.** A configless run walks whatever\ndirectory the shell happened to be in and grades that population with full confidence —\nthe incident run was `npx coherence verify` from a home directory, which is not exotic;\nit is the first thing a curious adopter types. The config file's PRESENCE is the\ndeclaration, so `{}` is a complete first rung of the adoption ladder, and the refusal\nprints exactly that one-line bootstrap. Journal, hook, and reference commands never\nwalk, so they stay available in an undeclared directory — the field does not require a\nconfig to remember decisions.\n\n**fast verification rejects a statically vanished Vitest oracle without executing\ntests.** Name ownership is cheaper than test outcome: a literal Vitest declaration either\nstill supplies a runner-style full name or it does not. The edit loop should answer that\nstructural question without buying remote credentials or a suite boot, while refusing to\nturn dynamic or damaged source into false certainty. Static presence therefore remains a\nskip. A complete current population can prove absence; independently, a concrete Git\n`HEAD` owner disappearing from a deleted or still-complete former path proves an ownership\nloss even when unrelated current source is incomplete. If that same path becomes dynamic\nor damaged, it stays explicitly unknown; everything else does too. The\nexecutable tier alone can supply pass/fail evidence. This is a direct-declaration grade,\nnot an evaluator for arbitrary runtime registration; projects beyond it disable\n`staticOracleExistence` or resolve a fresh report.",
+      "why": "**explicit guarantee links expire with their premises and never prove satisfaction.**\nA taxonomy suggestion names an obligation, not the claim that enforces it. Spec-owned\nlinks preserve that caller's assessment without letting a passing oracle certify the\nmapping itself. Claim edits, missing providers, revised assessments and changed subject\ncontent invalidate or expire the reference. Unlinked obligations stay visible. The v0\nconsumer grade requires direct import adjacency and makes no claim of proving consumption;\nrecorded oracle evidence remains distinct from future immutable verification receipts.\n\n**a claim goes green only on positive evidence its oracle ran.** The verifier's whole\nauthority rests on this one property, and until now no claim cited it: an audit deleted\nthe rule and the tree stayed \"✓ coherent\" while the unit test failed unseen. An exit\ncode is the runner's statement about itself, not about the named test — a filter that\nmatched nothing exits clean on every runner class this repo has measured — so green\nmust require output that names the run, the one reading absence cannot produce.\n\n**a vanished oracle reds its claim, never green-by-absence.** A renamed or deleted test\nleaves a claim citing a name nothing owns, and that claim then guards nothing while\nwearing green. Absence has to be its own observable verdict, distinct from ran-and-failed,\nbecause the two demand different repairs: a red test needs the code fixed, a vanished\noracle needs the contract re-tied to something that exists.\n\n**fast oracle absence requires a complete direct-declaration population.** Absence is a\nstronger statement than failure: it says the registry owns no matching name. The static\nfloor may say that only when every registration mechanism it recognizes was enumerable;\ndynamic titles, fixture DSLs, registration-time module loads, custom includes, and damaged\nsource must poison absence into UNKNOWN while still allowing positive direct matches.\nOtherwise the cheap tier would turn its own inability to see a live oracle into evidence\nthat the oracle vanished.\n\n**a declared invariant unanchored by any boundary fails coverage.** A spec may not\nassert a property that nothing enforces: that is the ratchet the whole harness turns on,\nand if it silently loosened, specs would drift back into aspiration prose. The gap has to\ncost a red at the run that opened it, while the person who opened it still holds the\ncontext to close it.\n\n**a via-test oracle that iterates no live domain fails its claim.** A totality label on a\nsampling test is worse than no label: it retires the reader's suspicion without retiring\nthe risk. Deriving the checked set from the live registry the chokepoint actually serves\nis what makes \"covers every case\" a fact about the system rather than about the fixture\nlist the author remembered.\n\n**a named oracle that no test runs cannot pass.** The serial runner is the component the\nexecutable tier leans its trust on, and it was outside the evidence perimeter — unclaimed,\nuntested, and (measured) willing to exit clean when the cited title survived only as a\nstring in a file. The runner itself must refuse a name it cannot show ran, because every\ngreen above it inherits that refusal.\n\n**an empty derivation against a remembered surface refuses, never passes.** Every verdict\nin this file rests on the graph deriving non-empty, and nothing checked that premise:\ngutting `buildGraph` left the gate printing \"claims: 0\" and \"✓ coherent\", exit 0 —\ndeeper than a vanished oracle, because it empties every check at once while announcing\nthey all passed. The record remembers how many claims the last run graded, so a run that\nsuddenly sees zero must refuse rather than report success over nothing; the only\nlegitimate zero (a project adopting from nothing) is exactly the one with no memory, and\nit gets the adoption ladder instead. The floor deliberately stops at zero: a partial\ncollapse where every component keeps a claim is observationally identical to deliberate\npruning, and deletion has to stay free or people stop deleting. What the complement\nunderneath it actually reaches is narrower than it first appears — a component stripped of\nits claims is still a node someone can red, while a component the walk never discovered\nleaves nothing behind to notice, so an N→1 slide reads as N ordinary prunings. Pinning the\npopulation as a mass dimension is the honest answer there, because the question it settles\nis not whether anything survived but whether as much survived as last time.\n\n**python sources feed the same instruments as typescript at their declared grade.**\nThe adapter seam always promised language-agnosticism, but three analyzers and two\nscanners parsed TypeScript directly, so a python project's surface grew invisibly — the\nzero-anchor alarm never fired, parity claims skipped `.py` oracles, duplicated domains\nwent unranked, batch oracles knew one report format, and f-string interpolations were not\nsites. Each instrument now reads python at a DECLARED grade: most through the shared\ngrammar queries of phase 2b (surface, sites, sinks), the oracle arms at the pinned\nindent-block grade their guards froze — in-harness, no subprocess, and since the arms\nported, no compiler dependency at all. The grade is declared, not hidden —\nprecision is preferred over recall everywhere, because an advisory that cries wolf\nretires the reader's attention without retiring risk, and with no compiler behind `.py`\na false positive can never be rescued downstream. What the regex grade deliberately does\nnot count is journaled beside each instrument, so the next reader inherits the boundary\nof the instrument instead of rediscovering it.\n\n**an undeclared root refuses the walk, never wanders.** A configless run walks whatever\ndirectory the shell happened to be in and grades that population with full confidence —\nthe incident run was `npx coherence verify` from a home directory, which is not exotic;\nit is the first thing a curious adopter types. The config file's PRESENCE is the\ndeclaration, so `{}` is a complete first rung of the adoption ladder, and the refusal\nprints exactly that one-line bootstrap. Journal, hook, and reference commands never\nwalk, so they stay available in an undeclared directory — the field does not require a\nconfig to remember decisions.\n\n**fast verification rejects a statically vanished Vitest oracle without executing\ntests.** Name ownership is cheaper than test outcome: a literal Vitest declaration either\nstill supplies a runner-style full name or it does not. The edit loop should answer that\nstructural question without buying remote credentials or a suite boot, while refusing to\nturn dynamic or damaged source into false certainty. Static presence therefore remains a\nskip. A complete current population can prove absence; independently, a concrete Git\n`HEAD` owner disappearing from a deleted or still-complete former path proves an ownership\nloss even when unrelated current source is incomplete. If that same path becomes dynamic\nor damaged, it stays explicitly unknown; everything else does too. The\nexecutable tier alone can supply pass/fail evidence. This is a direct-declaration grade,\nnot an evaluator for arbitrary runtime registration; projects beyond it disable\n`staticOracleExistence` or resolve a fresh report.",
       "invariants": [
+        "explicit guarantee links expire with their premises and never prove satisfaction",
         "a claim goes green only on positive evidence its oracle ran",
         "a vanished oracle reds its claim, never green-by-absence",
         "fast verification rejects a statically vanished Vitest oracle without executing tests",
@@ -514,6 +515,7 @@
         "an undeclared root refuses the walk, never wanders"
       ],
       "refutations": [
+        "explicit guarantee links expire with their premises and never prove satisfaction: disabled the subject-staleness check in resolveGuaranteeLinks (2026-09-08). The named guard failed with actual current versus expected stale, exposing the incorrectly retained mapping. Restored the check; the focused suite passes. This control tests link expiration, not semantic satisfaction.",
         "fast verification rejects a statically vanished Vitest oracle without executing tests: changed `resolveStaticOracle`'s complete zero-match branch from `absent` to `unknown` (2026-08-20), laundering the motivating Mnemion rename into an ordinary fast-tier skip — the focused boundary guard failed and captured the dangerous verdict: `claims: 1 · 0 green · 0 red · 1 skipped`, followed by `✓ coherent`. Restored; the same fixture now reds `VANISHED ORACLE (static)` without Vitest installed or invoked.",
         "fast verification rejects a statically vanished Vitest oracle without executing tests: 0.36.2 made incompleteness project-wide, so Mnemion's finite data-driven titles made an unrelated renamed clipboard oracle UNKNOWN forever. Reproduced against current main: renaming the literal clipboard test left fast verify green. The scanner now retains concrete runner names and owner paths from Git `HEAD`; losing a name from a deleted or still-complete former owner reds before unrelated current uncertainty is consulted, while a former owner that itself became dynamic remains UNKNOWN. No prefix guess or partial JavaScript evaluator is allowed to manufacture global completeness.",
         "fast oracle absence requires a complete direct-declaration population: before release, conventional files whose tests came only from a bare side-effect import, top-level `import()`, or `require()` each produced `fullNames=[]`, `incomplete=[]`, and `absent`, so fast verification could call a live runtime-owned oracle vanished. Release audit then found the same false absence behind a transitive local Vitest alias and a live `build/live.test.ts`, while a conventional file symlink was followed outside the declared traversal boundary. The scanner now resolves exact alias chains, marks registration-time module loads incomplete, mirrors Vitest v4's `node_modules`/`.git` default exclusions, and refuses every symlink/custom collection surface into UNKNOWN; loads inside test callbacks remain ordinary subject execution.",
@@ -525,6 +527,7 @@
         "an empty derivation against a remembered surface refuses, never passes: mutated BOTH ends (2026-07-31). (a) gutted `buildGraph` to return an empty graph — the original defect, which before the floor printed `claims: 0 · 0 green · 0 red · 0 skipped` and `✓ coherent`, exit 0: now full verify refuses before grading (`✗ [floor] the derived graph is EMPTY of claims — 0 component(s), 0 claims — but the record remembers 27 claim(s)`), exit 1, on the scoped path too, and the record is left un-clobbered so the refusal repeats. (b) made `vacuityRefusal` return null unconditionally — the floor itself deleted: full verify red BY NAME, `claims: 28 · 27 green · 1 red`, this claim failing through its guard. Restored, 28/28. (b) is the direction that matters: a floor that cannot fail is the vacuity it exists to catch."
       ],
       "claims": [
+        "boundary \"explicit guarantee links expire with their premises and never prove satisfaction\" at resolveGuaranteeLinks via guard \"guarantee links — expired premises never become current and passing evidence never proves satisfaction\"",
         "boundary \"a claim goes green only on positive evidence its oracle ran\" at execNamedTest via guard \"testMatch — a runner exiting 0 with no matching output FAILS (the renamed-test trap)\"",
         "boundary \"a vanished oracle reds its claim, never green-by-absence\" at resolveFromBatch via guard \"match — ZERO matching tests is its OWN state: the vanished oracle, named as such\"",
         "boundary \"fast verification rejects a statically vanished Vitest oracle without executing tests\" at resolveStaticOracle via guard \"static oracle floor — a renamed tracked literal owner reds despite unrelated dynamic titles\"",
@@ -539,13 +542,13 @@
       ],
       "claimKinds": {},
       "mass": {
-        "ownedFiles": 9,
-        "ownedLines": 3904,
-        "ownedSurface": 21,
+        "ownedFiles": 11,
+        "ownedLines": 4053,
+        "ownedSurface": 23,
         "inboundReliance": 7,
         "boundaryAuthority": 0,
-        "guaranteeResponsibility": 11,
-        "total": 39
+        "guaranteeResponsibility": 12,
+        "total": 42
       },
       "ring": 1,
       "angle": 6.370451769779303,
@@ -571,13 +574,13 @@
       ],
       "claimKinds": {},
       "mass": {
-        "ownedFiles": 82,
-        "ownedLines": 20160,
-        "ownedSurface": 97,
+        "ownedFiles": 83,
+        "ownedLines": 20288,
+        "ownedSurface": 98,
         "inboundReliance": 0,
         "boundaryAuthority": 0,
         "guaranteeResponsibility": 0,
-        "total": 97
+        "total": 98
       },
       "ring": 2,
       "angle": 5.497787143782138,
@@ -940,6 +943,22 @@
       "via": null
     },
     {
+      "id": "r:src/verification->src/readings:5",
+      "source": "src/verification",
+      "target": "src/readings",
+      "kind": "reliance",
+      "crossing": null,
+      "via": null
+    },
+    {
+      "id": "r:src/verification->src/taxonomy:6",
+      "source": "src/verification",
+      "target": "src/taxonomy",
+      "kind": "reliance",
+      "crossing": null,
+      "via": null
+    },
+    {
       "id": "r:test->src:0",
       "source": "test",
       "target": "src",
@@ -1022,7 +1041,7 @@
   ],
   "guarantees": [
     {
-      "id": "g:src:0",
+      "id": "g-64c635516a914cdd0097b9b572cf77ad37aabaa85db8914779be99d15292c6ba",
       "component": "src",
       "invariant": "swarm write identity and authority flags are singleton or refused",
       "chokepoint": "repeatedSingletonFlags",
@@ -1032,7 +1051,7 @@
       "oracle": "swarm writes reject repeated singleton identity and authority flags before append"
     },
     {
-      "id": "g:src/adapters:0",
+      "id": "g-212e8822ab337b675432f1c60961e6e98ba52b1674623ac4186f8092db1f08e3",
       "component": "src/adapters",
       "invariant": "committed platform capabilities survive optional deployment-config toggles",
       "chokepoint": "cloudflareBindings",
@@ -1042,7 +1061,7 @@
       "oracle": "Cloudflare bindings — committed Env capability is stable across optional wrangler toggles"
     },
     {
-      "id": "g:src/adapters:1",
+      "id": "g-a6b78578502dc6ce572e1502d76a2475b5441d21c92a41ed6b228078275538ee",
       "component": "src/adapters",
       "invariant": "a grammar-backed adapter derives the graph through the same language seam",
       "chokepoint": "makeTreeSitterAdapter",
@@ -1052,7 +1071,7 @@
       "oracle": "tree-sitter — a grammar-backed adapter derives ruby symbols, imports, and prose through the same seam"
     },
     {
-      "id": "g:src/adapters:2",
+      "id": "g-387c59a17fac9ecf0ca0846e1a651976a0ffe99bc62e7ca539ff96e155ac1d82",
       "component": "src/adapters",
       "invariant": "a parse's heap is returned before the next file",
       "chokepoint": "withTree",
@@ -1062,7 +1081,7 @@
       "oracle": "wasm heap — parses past the measured abort cliff survive because every tree is freed"
     },
     {
-      "id": "g:src/coordination:0",
+      "id": "g-2e3d4a42f3f26d54ea02a0dfcf7df76679dfe7d38d086250fff8e58ce5d40a1a",
       "component": "src/coordination",
       "invariant": "a weaker regulation obligation never masks a stronger one",
       "chokepoint": "selectRegulation",
@@ -1072,7 +1091,7 @@
       "oracle": "regulate — ordered potential is permutation-invariant and monotone"
     },
     {
-      "id": "g:src/coordination:1",
+      "id": "g-20aedc6478916cb05edf66af4a25612c1f962d78bd43446fd4a8e3618a467bcd",
       "component": "src/coordination",
       "invariant": "regulation evaluates and repairs the selected agent host",
       "chokepoint": "observeRegulation",
@@ -1082,7 +1101,7 @@
       "oracle": "regulate — selected Codex host cannot be redeemed by Claude control"
     },
     {
-      "id": "g:src/coordination:2",
+      "id": "g-eaf6be6149f9a4eba86327fc5aa93a461dd0acbb6182a955951518959cca2cc4",
       "component": "src/coordination",
       "invariant": "work state is append-only, attributable, and predecessor-checked",
       "chokepoint": "readWork",
@@ -1092,7 +1111,7 @@
       "oracle": "strict merged read — torn, tampered, detached, and competing histories all refuse"
     },
     {
-      "id": "g:src/coordination:3",
+      "id": "g-60553f19225b1145c46ea4eef69fcaac9a33763619ae3292690f235f76c2a8a4",
       "component": "src/coordination",
       "invariant": "work cannot activate or complete before every dependency completes",
       "chokepoint": "validateWorkGraph",
@@ -1102,7 +1121,7 @@
       "oracle": "readiness and scope control — dependencies serialize potential overlap while runnable writers conflict"
     },
     {
-      "id": "g:src/coordination:4",
+      "id": "g-df2de47e27a6d0ac018aaecfc9ab4430fccc2ab2e0d364e5494fd36b624eee7b",
       "component": "src/coordination",
       "invariant": "runnable work with overlapping write scopes is a collision, never concurrent permission",
       "chokepoint": "detectWorkScopeOverlaps",
@@ -1112,7 +1131,7 @@
       "oracle": "readiness and scope control — dependencies serialize potential overlap while runnable writers conflict"
     },
     {
-      "id": "g:src/coordination:5",
+      "id": "g-aa1fb4cad7c94f9a62687c2cce2e660a2414958d5fb5cbf3cac9a33dccccd4ad",
       "component": "src/coordination",
       "invariant": "a terminal parent has no live child and explicitly synthesizes every completed direct child",
       "chokepoint": "validateWorkGraph",
@@ -1122,7 +1141,7 @@
       "oracle": "lifecycle — predecessor checks, handoff attribution, closure evidence, orphaning, and synthesis stay explicit"
     },
     {
-      "id": "g:src/coordination:6",
+      "id": "g-db47731ff5707245a304131e05a7c669fee3deb2c4aa932d920bacbc15b7be2b",
       "component": "src/coordination",
       "invariant": "authored work text is single-line data, never model-instruction control",
       "chokepoint": "createWork",
@@ -1132,7 +1151,7 @@
       "oracle": "graph validation and input boundary — missing references, cycles, unsafe scopes, and evidence-free success are loud"
     },
     {
-      "id": "g:src/coordination:7",
+      "id": "g-3968df1558ad2e135279e8b7908d7faaada10e14404f5e75bf61ac3e55667a91",
       "component": "src/coordination",
       "invariant": "consequence navigation contains only explicit assessed edges",
       "chokepoint": "traceConsequences",
@@ -1142,7 +1161,7 @@
       "oracle": "co-presence never invents a causal edge"
     },
     {
-      "id": "g:src/coordination:8",
+      "id": "g-75101e6fa8c9471d546b09b1090c3b3609de42d35552a3f5d2dc4cad8e443417",
       "component": "src/coordination",
       "invariant": "specialized consequence relations admit only their declared endpoint kinds",
       "chokepoint": "relationProblem",
@@ -1152,7 +1171,7 @@
       "oracle": "semantic retries dedupe while specialized relation nonsense refuses"
     },
     {
-      "id": "g:src/coordination:9",
+      "id": "g-c707befe263f3bfe9f4855e461aa34834cb7875d1b9a450ebf32dd26ee0d1e5f",
       "component": "src/coordination",
       "invariant": "consequence evidence refuses surviving storage damage instead of shrinking navigation",
       "chokepoint": "readConsequences",
@@ -1162,7 +1181,7 @@
       "oracle": "damaged, forged, or displaced surviving rows refuse the whole projection"
     },
     {
-      "id": "g:src/coordination:10",
+      "id": "g-82029f55a2adb1eb02e68226cd63ae401a2954a662c409abaf5e1b55910b1a5f",
       "component": "src/coordination",
       "invariant": "orientation refuses damaged evidence before selecting a swarm heading",
       "chokepoint": "observeOrientation",
@@ -1172,7 +1191,7 @@
       "oracle": "orientation refuses a damaged trusted source instead of reading it as empty"
     },
     {
-      "id": "g:src/coordination:11",
+      "id": "g-90c7ca7d1fb899c411f8ef1039a38e700dade8f6d262b59d0640a12ada155de1",
       "component": "src/coordination",
       "invariant": "orientation admits verification state only with valid shape and comparable provenance",
       "chokepoint": "verifyOrientation",
@@ -1182,7 +1201,7 @@
       "oracle": "orientation refuses parseable malformed verification and never promotes missing provenance"
     },
     {
-      "id": "g:src/coordination:12",
+      "id": "g-dbb875aea7e5c2b1657aeeb482612120a92a7c3ed0a4dd68d2796162d920f932",
       "component": "src/coordination",
       "invariant": "verification currency follows material repository state without invalidating its own receipt",
       "chokepoint": "verifyOrientation",
@@ -1192,7 +1211,7 @@
       "oracle": "verification currency ignores its own receipt but rejects tracked source and index changes"
     },
     {
-      "id": "g:src/coordination:13",
+      "id": "g-f5ffb3e5ab886b0070974693a860c22b96f7b5a196ad50443cbbd18e7f119775",
       "component": "src/coordination",
       "invariant": "orientation selects synthesis only when parent closure can execute it",
       "chokepoint": "observeOrientation",
@@ -1202,7 +1221,7 @@
       "oracle": "orientation dispatches a ready sibling before asking for parent synthesis"
     },
     {
-      "id": "g:src/coordination:14",
+      "id": "g-13b14de2f711f7c4621da185d944e18b355a4a24635cd1d5d3f0a078a27960a3",
       "component": "src/coordination",
       "invariant": "orientation derives live blockage only from closeable work state",
       "chokepoint": "observeOrientation",
@@ -1212,7 +1231,7 @@
       "oracle": "orientation treats journal blockage as history, not a live work state"
     },
     {
-      "id": "g:src/coordination:15",
+      "id": "g-c893d71a84739c889cd3882c36159d205d8c1996e8bdcc19fb041d9a7f837a39",
       "component": "src/coordination",
       "invariant": "completed work remains unverified until an explicit verification edge names it",
       "chokepoint": "observeRegulation",
@@ -1222,7 +1241,7 @@
       "oracle": "regulate — completed work requires an explicit verification link before release"
     },
     {
-      "id": "g:src/derivation:0",
+      "id": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d",
       "component": "src/derivation",
       "invariant": "spec containment follows declared ancestry without inventing dependencies",
       "chokepoint": "buildGraph",
@@ -1232,7 +1251,7 @@
       "oracle": "spec containment — deepest declared ancestor is canonical parent, never an invented import"
     },
     {
-      "id": "g:src/derivation:1",
+      "id": "g-54e397e1d5d6537d8bc3137c4ac996d18ef45cbcabe5d42061335e7f08647e59",
       "component": "src/derivation",
       "invariant": "harness source remains searchable text rather than silently becoming binary",
       "chokepoint": "sourceTextIsNavigable",
@@ -1242,7 +1261,7 @@
       "oracle": "source text — every live TypeScript source remains NUL-free and searchable"
     },
     {
-      "id": "g:src/derivation:2",
+      "id": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09",
       "component": "src/derivation",
       "invariant": "a declared language resolves to a real adapter or refuses, never a silent fallback",
       "chokepoint": "resolveLanguageAdapter",
@@ -1252,7 +1271,7 @@
       "oracle": "language adapter — a project path loads and shapes the graph; unknown names refuse, never fall back"
     },
     {
-      "id": "g:src/derivation:3",
+      "id": "g-6f4302e8ac07d03d25c99c556ec4b485d077d6c46e07a7dde48cb7062f0c4a11",
       "component": "src/derivation",
       "invariant": "a built-in language pack is data: queries, patterns, and named strategies, never code",
       "chokepoint": "builtinLanguagePacks",
@@ -1262,7 +1281,7 @@
       "oracle": "language packs — every built-in pack is function-free data across all five instrument tables"
     },
     {
-      "id": "g:src/diagnostics:0",
+      "id": "g-53550835977575002ba22785c78f9dcaa1f78d814708dfd5fcfbc1c9356d1a0d",
       "component": "src/diagnostics",
       "invariant": "calibration denominators contain only validated surviving evidence",
       "chokepoint": "validateCalibrationSample",
@@ -1272,7 +1291,7 @@
       "oracle": "calibration integrity — damaged rows and invalid direct inputs cannot enter a denominator"
     },
     {
-      "id": "g:src/diagnostics:1",
+      "id": "g-96f1f46fb8a7a7e0dc5ab050f5237a3dd8e65088f368f05599d87557d9a7d2d7",
       "component": "src/diagnostics",
       "invariant": "significant behavioral growth acquires an anchor or patch-specific decision",
       "chokepoint": "signal",
@@ -1282,7 +1301,7 @@
       "oracle": "only a zero-anchor alarm without attestation needs a decision"
     },
     {
-      "id": "g:src/diagnostics:2",
+      "id": "g-04856f5183879bf681114c89b75bc6d8d994c0c3310e8aced20a05db7ae62b93",
       "component": "src/diagnostics",
       "invariant": "cached decisions expose structurally expired premises",
       "chokepoint": "auditPremiseLeases",
@@ -1292,7 +1311,7 @@
       "oracle": "audit — retracted decisions disappear and only broken strong leases fail a check"
     },
     {
-      "id": "g:src/diagnostics:3",
+      "id": "g-4c06305370759763a11e7d5d895176ce19b8f8a75aad8a493e1f885f31276e2b",
       "component": "src/diagnostics",
       "invariant": "predicted context closure is calibrated against observed reads and outcomes",
       "chokepoint": "calibrate",
@@ -1302,7 +1321,7 @@
       "oracle": "calibration reports coverage, outside reads, and defect rates by prediction misses"
     },
     {
-      "id": "g:src/diagnostics:4",
+      "id": "g-d6e0b1b54a09c42f92856d5f64f2638367fc5f0d79cf604974abd863716afa5c",
       "component": "src/diagnostics",
       "invariant": "calibration preserves the weakest host attribution of its trace",
       "chokepoint": "calibrationPaths",
@@ -1312,7 +1331,7 @@
       "oracle": "calibration keeps Codex parent-only writes aggregate and legacy rows unscoped"
     },
     {
-      "id": "g:src/diagnostics:5",
+      "id": "g-191523b1d154489636c26bf60122726298b29494650ca3c58ef47e09a1aba57a",
       "component": "src/diagnostics",
       "invariant": "reviewed risk sites survive relocation but never duplication",
       "chokepoint": "reconcile",
@@ -1322,7 +1341,7 @@
       "oracle": "sinks — a moved file keeps its baselined identity and a genuinely new site still fails"
     },
     {
-      "id": "g:src/diagnostics:6",
+      "id": "g-80b8fcc6922a85bf5238e6f61cb43cc7b3f8e2b66aa3b5932ad7cd2e156fa53f",
       "component": "src/diagnostics",
       "invariant": "pinned mass follows a value-conserving rename but never absorbs growth",
       "chokepoint": "reconcileMass",
@@ -1332,7 +1351,7 @@
       "oracle": "mass — a renamed component keeps its pin; growth and novelty are never absorbed"
     },
     {
-      "id": "g:src/diagnostics:7",
+      "id": "g-96cad312ff822d6934e47f5d5483433148b364491e8372fc6d6c06c93c709024",
       "component": "src/diagnostics",
       "invariant": "python sources feed the same instruments as typescript at their declared grade",
       "chokepoint": "surfaceOfSource",
@@ -1342,7 +1361,7 @@
       "oracle": "python surface — module defs, enum variants, and dict keys count; underscore and nested names do not"
     },
     {
-      "id": "g:src/diagnostics:8",
+      "id": "g-e541294ff4534521ac1119f7bd67c86b59218e48be6b9089565c10a758580714",
       "component": "src/diagnostics",
       "invariant": "python sources feed the same instruments as typescript at their declared grade",
       "chokepoint": "sitesOfPython",
@@ -1352,7 +1371,7 @@
       "oracle": "python redundancy — two spellings of one domain in .py rank as a candidate; declared parity and idiom do not"
     },
     {
-      "id": "g:src/diagnostics:9",
+      "id": "g-d9378c80b912fabfb39f08a3a784c72b83a0838d6444cc357d32c8d6b7296043",
       "component": "src/diagnostics",
       "invariant": "python sources feed the same instruments as typescript at their declared grade",
       "chokepoint": "lintSinks",
@@ -1362,7 +1381,7 @@
       "oracle": "python sinks — an f-string into a SQL context is a site, a safe-pattern expression is not, and the ratchet reds the new site"
     },
     {
-      "id": "g:src/diagnostics:10",
+      "id": "g-94ff0594f20c098b5975a6cd4d6c4714744b4e7403e3a4c87a0373163a392b95",
       "component": "src/diagnostics",
       "invariant": "instrument arms read languages through shared grammar queries, never a parallel scanner",
       "chokepoint": "lintSinks",
@@ -1372,7 +1391,7 @@
       "oracle": "ruby sinks — an interpolation into a SQL context is a site and the safe pattern exempts"
     },
     {
-      "id": "g:src/evidence:0",
+      "id": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f",
       "component": "src/evidence",
       "invariant": "concurrent status writers preserve complete independent reports",
       "chokepoint": "recordVerify",
@@ -1382,7 +1401,7 @@
       "oracle": "status publication — concurrent processes preserve independent reports and readers see complete JSON"
     },
     {
-      "id": "g:src/evidence:1",
+      "id": "g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150",
       "component": "src/evidence",
       "invariant": "verdict-bearing decision reads fail closed on surviving journal damage",
       "chokepoint": "readTrustedJournal",
@@ -1392,7 +1411,7 @@
       "oracle": "trusted journal — any malformed, forged, displaced, conflicting, or dangling row refuses the verdict projection"
     },
     {
-      "id": "g:src/evidence:2",
+      "id": "g-dd640f9dff77a6eb8267db51a30e2e67b4cb22e381f168509e0f562a2075aca9",
       "component": "src/evidence",
       "invariant": "a committed decision population cannot disappear into adoption from zero",
       "chokepoint": "readTrustedJournal",
@@ -1402,7 +1421,7 @@
       "oracle": "trusted journal — any malformed, forged, displaced, conflicting, or dangling row refuses the verdict projection"
     },
     {
-      "id": "g:src/evidence:3",
+      "id": "g-fe0545c1476681b21a20d071bebf706d04583d70497c388e4f38795966a9cc39",
       "component": "src/evidence",
       "invariant": "decision ratification follows explicit subject and authority, never prose similarity or recency",
       "chokepoint": "analyzeDecisionPositions",
@@ -1412,7 +1431,7 @@
       "oracle": "local alternatives need ratification; an explicit stronger choice settles them"
     },
     {
-      "id": "g:src/evidence:4",
+      "id": "g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf",
       "component": "src/evidence",
       "invariant": "a skipped run never clobbers an oracle's recorded verdict",
       "chokepoint": "recordVerify",
@@ -1422,7 +1441,7 @@
       "oracle": "merge — a skip never clobbers a real verdict; the old verdict rides through with its own stamp"
     },
     {
-      "id": "g:src/evidence:5",
+      "id": "g-3685a681d581a7b08cc9e2b36453978b42ef987e091a01649cd2b0d513b0a145",
       "component": "src/evidence",
       "invariant": "experiment outcomes require criterion-total evidence",
       "chokepoint": "closeExperiment",
@@ -1432,7 +1451,7 @@
       "oracle": "close — total nonempty evidence is mandatory and outcome is derived, never supplied"
     },
     {
-      "id": "g:src/evidence:6",
+      "id": "g-361b9b7bae849d1ce435ab95ca4e7d812056e9aa0705567f8b0b89eec4047ac1",
       "component": "src/evidence",
       "invariant": "experiment telemetry preserves its weakest provable attribution",
       "chokepoint": "closeExperiment",
@@ -1442,7 +1461,7 @@
       "oracle": "Codex parent-only tool events close the loop as an aggregate, never exact owner evidence"
     },
     {
-      "id": "g:src/evidence:7",
+      "id": "g-9b1cdfac34250376e0f04fb7fcdb5be051e0ff6690fbd83b0d2f89932ea24c5c",
       "component": "src/evidence",
       "invariant": "surviving agent-assessed defect evidence is attributable and internally consistent",
       "chokepoint": "recordDefect",
@@ -1452,7 +1471,7 @@
       "oracle": "defects — agent-assessed evidence is attributable, content-addressed, and strict on inconsistent rows"
     },
     {
-      "id": "g:src/evidence:8",
+      "id": "g-bf42374fcfb692ec656ac3b8949d0b4a95d84f0d285aea11483c485b93da36df",
       "component": "src/evidence",
       "invariant": "defect writes refuse pre-existing symlink redirection",
       "chokepoint": "recordDefect",
@@ -1462,7 +1481,7 @@
       "oracle": "defect containment — pre-existing directory and session symlinks refuse external append targets"
     },
     {
-      "id": "g:src/evidence:9",
+      "id": "g-72ff7044484c99e7f4e14e150dc70619e8f285adf53d01d71bb0cb9f843c8d83",
       "component": "src/evidence",
       "invariant": "defect provenance is data, never terminal control",
       "chokepoint": "readDefects",
@@ -1472,7 +1491,7 @@
       "oracle": "defect provenance — commit ids have Git shape and cannot carry terminal controls"
     },
     {
-      "id": "g:src/evidence:10",
+      "id": "g-f391caadcfdd6258d8bb709cb17b046d0488dc766ca9dbe67415b2710ce70a06",
       "component": "src/evidence",
       "invariant": "a streamed journal entry renders exactly once across appends and compaction",
       "chokepoint": "tailJournal",
@@ -1482,7 +1501,7 @@
       "oracle": "tail — an appended record arrives exactly once, a compaction fold re-emits nothing and drops nothing, and a half-written line waits for its bytes"
     },
     {
-      "id": "g:src/lifecycle:0",
+      "id": "g-f756d7d25cbc55fc32f6a4ed421ac9607ef47c86760af694e12174b9b16c5cc4",
       "component": "src/lifecycle",
       "invariant": "agent lifecycle preserves decisions and exposes the current change signal",
       "chokepoint": "runHook",
@@ -1492,7 +1511,7 @@
       "oracle": "hooks — main Stop snapshots without feedback while SubagentStop alone restates"
     },
     {
-      "id": "g:src/lifecycle:1",
+      "id": "g-2aaaefb581db032e8bc270572204620a95e1d6cef9045250bf7ecb2080dd927e",
       "component": "src/lifecycle",
       "invariant": "high-frequency lifecycle hooks start without the analysis dependency stack",
       "chokepoint": "runHook",
@@ -1502,7 +1521,7 @@
       "oracle": "PostToolUse starts from the source bundle with no dependency installation"
     },
     {
-      "id": "g:src/lifecycle:2",
+      "id": "g-5a5fec4add335e5eb09c9e16dbc5f8889f6bf226751509cd9f6b26eedf3fe611",
       "component": "src/lifecycle",
       "invariant": "hook telemetry loss never kills PostToolUse",
       "chokepoint": "runHook",
@@ -1512,7 +1531,7 @@
       "oracle": "PostToolUse starts from the source bundle with no dependency installation"
     },
     {
-      "id": "g:src/lifecycle:3",
+      "id": "g-7d53d5fd1e9c3a47789803dc7ebb6cf6525a89569804b61c415037ed785cf861",
       "component": "src/lifecycle",
       "invariant": "session startup injects only the exact session's current work order",
       "chokepoint": "assignedWorkInstructions",
@@ -1522,7 +1541,7 @@
       "oracle": "SessionStart teaches the executable swarm loop and exact owned lifecycle"
     },
     {
-      "id": "g:src/lifecycle:4",
+      "id": "g-913eb24ad608140812f1bd2c438e1dd80ec0ea29ef45b5b0361dd9e386307cc3",
       "component": "src/lifecycle",
       "invariant": "session startup teaches the executable swarm loop without manufacturing authority",
       "chokepoint": "runHook",
@@ -1532,7 +1551,7 @@
       "oracle": "SessionStart teaches the executable swarm loop and exact owned lifecycle"
     },
     {
-      "id": "g:src/lifecycle:5",
+      "id": "g-bfa3efd2ebdd0519c642388b8bf7d67baa71a763f1f4fa312e924f0a3dcf3d15",
       "component": "src/lifecycle",
       "invariant": "session startup survives a damaged decision-journal path with named degradation",
       "chokepoint": "runHook",
@@ -1542,7 +1561,7 @@
       "oracle": "SessionStart degrades around a damaged journal path without killing the session"
     },
     {
-      "id": "g:src/lifecycle:6",
+      "id": "g-cced37608bbbc14c92c5ee89061aa190972be9d1c22c33ce53f6045f4633761e",
       "component": "src/lifecycle",
       "invariant": "lifecycle hook presence is one canonical runnable bit",
       "chokepoint": "inspectLifecycleHook",
@@ -1552,7 +1571,7 @@
       "oracle": "control — presence is the complete canonical bundle, never a partial or lookalike"
     },
     {
-      "id": "g:src/lifecycle:7",
+      "id": "g-fcf3b4700049076d1b7c6016f444683d66638b2cb99dfc43097fcc9b4e512913",
       "component": "src/lifecycle",
       "invariant": "supported lifecycle hosts share one control contract without sharing host syntax",
       "chokepoint": "setLifecycleHookForHost",
@@ -1562,7 +1581,7 @@
       "oracle": "Codex control — install is exact, idempotent, preserving, and runnable across nested paths"
     },
     {
-      "id": "g:src/lifecycle:8",
+      "id": "g-6622a8513f6c28d3796df090e29bbf611eb68529ee9989bdcb9d854f2fe5ee66",
       "component": "src/lifecycle",
       "invariant": "current-session activation requires exact installed-bundle evidence",
       "chokepoint": "currentObservation",
@@ -1572,7 +1591,7 @@
       "oracle": "hook status — exact current bundle activates; stale, direct, replayed, and damaged evidence does not"
     },
     {
-      "id": "g:src/lifecycle:9",
+      "id": "g-0f4fea097a31d85ace4d5c682c7b7efe1f7482a8600c7a89e2c0cbfafcd85ae0",
       "component": "src/lifecycle",
       "invariant": "customized hook text composes declared overrides and appends, degrading to canon on damage",
       "chokepoint": "composeHookText",
@@ -1582,7 +1601,7 @@
       "oracle": "hook text — override replaces, append follows, and damage degrades to the canonical emission"
     },
     {
-      "id": "g:src/lifecycle:10",
+      "id": "g-09b5e7c0d1628bd4f93f8e6459181d8ced4d67e4d42f40274f316f50ff8d0465",
       "component": "src/lifecycle",
       "invariant": "activity evidence is accepted only when identity, scope, time, and command agree",
       "chokepoint": "isActivityRow",
@@ -1592,7 +1611,7 @@
       "oracle": "activity — internally inconsistent scope, time, and command rows are damage, not evidence"
     },
     {
-      "id": "g:src/readings:0",
+      "id": "g-03e70b2d98d2b69fe64a0bec93ba9cd8b308928cf377d147c7131535a2c0adf2",
       "component": "src/readings",
       "invariant": "Scope projects the canonical promise population with deterministic gravity and honest absence",
       "chokepoint": "buildScopeModel",
@@ -1602,7 +1621,7 @@
       "oracle": "scope roles — declared test imports are not runtime gravity or proof of a named oracle"
     },
     {
-      "id": "g:src/readings:1",
+      "id": "g-efa1440100a974b72c017cb6eb493c4e49ddb6859c5118c201388bc1b5ef4c9c",
       "component": "src/readings",
       "invariant": "Scope projects the canonical promise population with deterministic gravity and honest absence",
       "chokepoint": "buildScopeModel",
@@ -1612,7 +1631,7 @@
       "oracle": "scope semantics — containment and atlas meanings preserve ownership without inventing dependencies or verdicts"
     },
     {
-      "id": "g:src/readings:2",
+      "id": "g-279e12278a8564579c2402a7aa0fdcb2539e8e36d863eba923fc8e76e9346764",
       "component": "src/readings",
       "invariant": "task context is bounded and names its approximations",
       "chokepoint": "renderContextProjection",
@@ -1622,7 +1641,7 @@
       "oracle": "renderContext — bounded projection is route-first, byte-stable, and accounts for every omission"
     },
     {
-      "id": "g:src/readings:3",
+      "id": "g-58c33dc55db443ed922cd6643db6cc642d78d939428a1524228c68c9973be344",
       "component": "src/readings",
       "invariant": "Scope projects the canonical promise population with deterministic gravity and honest absence",
       "chokepoint": "buildScopeModel",
@@ -1632,7 +1651,7 @@
       "oracle": "scope model — graph/promise population mismatch refuses rather than drawing partial truth"
     },
     {
-      "id": "g:src/readings:4",
+      "id": "g-e0c889114418ec0be336a0689f113edfb8d82bc0b752f4e848d15a9a350c3304",
       "component": "src/readings",
       "invariant": "Scope projects the canonical promise population with deterministic gravity and honest absence",
       "chokepoint": "buildScopeModel",
@@ -1642,7 +1661,7 @@
       "oracle": "scope model — original spec explanation and unanchored declarations survive projection"
     },
     {
-      "id": "g:src/readings:5",
+      "id": "g-e1cb001a3b7ac9819b05464abca1c279d41a87faba8e07d6e230635188f34724",
       "component": "src/readings",
       "invariant": "Scope projects the canonical promise population with deterministic gravity and honest absence",
       "chokepoint": "renderScope",
@@ -1652,7 +1671,7 @@
       "oracle": "scope cards — titles have an opaque title bar and explicit contrast, with full text retained in the inspector"
     },
     {
-      "id": "g:src/taxonomy:0",
+      "id": "g-46e8461ac5cf5d006ac9b1bdcb254d8ff50c9df8363a78efc400084e427c4a3a",
       "component": "src/taxonomy",
       "invariant": "taxonomy representation roles require operational evidence under their recorded catalog",
       "chokepoint": "classifyTaxonomy",
@@ -1662,7 +1681,7 @@
       "oracle": "taxonomy interview — operational discriminators separate representation roles and preserve no-fit"
     },
     {
-      "id": "g:src/taxonomy:1",
+      "id": "g-de3ec13c0b8f0405704ce013d70fa251ae5ea1ef1cd47ee5295da9ee66096b2a",
       "component": "src/taxonomy",
       "invariant": "taxonomy revisions preserve scoped evidence and refuse damaged history",
       "chokepoint": "taxonomyView",
@@ -1672,7 +1691,7 @@
       "oracle": "taxonomy history — old catalog assessments retain their meaning and expire without silent migration"
     },
     {
-      "id": "g:src/taxonomy:2",
+      "id": "g-da5ad346269f95c41eb4d8d978050dfe207546719103e78222449792bfda6681",
       "component": "src/taxonomy",
       "invariant": "taxonomy suggestions never acquire verification authority",
       "chokepoint": "classifyTaxonomy",
@@ -1682,7 +1701,7 @@
       "oracle": "taxonomy classification — unknowns and plural responsibilities never become a single guessed role or passing guarantee"
     },
     {
-      "id": "g:src/taxonomy:3",
+      "id": "g-f0fc62c537dc5bbc813c19335f8449b18910b7b85d0544d7f80a0cfef42df726",
       "component": "src/taxonomy",
       "invariant": "taxonomy suggestions never acquire verification authority",
       "chokepoint": "TAXONOMY",
@@ -1692,7 +1711,7 @@
       "oracle": "taxonomy catalog — every frozen lab subject survives the namespaced port without added authority"
     },
     {
-      "id": "g:src/taxonomy:4",
+      "id": "g-c79be42fd605e585e709cb3c2d3e3df307d805ac4ee364e1d41f4d3bc081b303",
       "component": "src/taxonomy",
       "invariant": "taxonomy revisions preserve scoped evidence and refuse damaged history",
       "chokepoint": "recordTaxonomy",
@@ -1702,7 +1721,7 @@
       "oracle": "taxonomy concurrency — two CLI writers cannot both own the initial predecessor slot"
     },
     {
-      "id": "g:src/taxonomy:5",
+      "id": "g-a615e7641c3ffafd2d2c1c9c95b6f1a84586dc501ac43b3fbe86164e87034a21",
       "component": "src/taxonomy",
       "invariant": "taxonomy revisions preserve scoped evidence and refuse damaged history",
       "chokepoint": "readTaxonomyRecords",
@@ -1712,7 +1731,7 @@
       "oracle": "taxonomy damage — malformed or displaced history refuses instead of shrinking into a clean empty view"
     },
     {
-      "id": "g:src/taxonomy:6",
+      "id": "g-d1bce33f601420fa5db2e33d610ec91024029082fdcdb78ee7f4463ca49f4ad3",
       "component": "src/taxonomy",
       "invariant": "taxonomy wire records require canonical internally consistent caller assessments",
       "chokepoint": "validateTaxonomyRecord",
@@ -1722,7 +1741,7 @@
       "oracle": "taxonomy damage — malformed or displaced history refuses instead of shrinking into a clean empty view"
     },
     {
-      "id": "g:src/taxonomy:7",
+      "id": "g-f4b854e4f43303b214d3094b19a2667ddaf556afb65cb9064b6f3429d4b99702",
       "component": "src/taxonomy",
       "invariant": "taxonomy revisions preserve scoped evidence and refuse damaged history",
       "chokepoint": "captureTaxonomy",
@@ -1732,7 +1751,17 @@
       "oracle": "taxonomy subjects — only resolved graph addresses enter evidence; absent, compound and escaped paths refuse"
     },
     {
-      "id": "g:src/verification:0",
+      "id": "g-6f9e452d15d53e356b2989b222c65713c1d2239d48b0869566bd6e929df38cd4",
+      "component": "src/verification",
+      "invariant": "explicit guarantee links expire with their premises and never prove satisfaction",
+      "chokepoint": "resolveGuaranteeLinks",
+      "grade": "C",
+      "verdict": "pass",
+      "crossing": null,
+      "oracle": "guarantee links — expired premises never become current and passing evidence never proves satisfaction"
+    },
+    {
+      "id": "g-d6244b8ab8b0e28cbc3b1e767f965e566335ee7225751d8db44b18bc7419161b",
       "component": "src/verification",
       "invariant": "a claim goes green only on positive evidence its oracle ran",
       "chokepoint": "execNamedTest",
@@ -1742,7 +1771,7 @@
       "oracle": "testMatch — a runner exiting 0 with no matching output FAILS (the renamed-test trap)"
     },
     {
-      "id": "g:src/verification:1",
+      "id": "g-b2adce179b206bf934359709b496cf79c09b083c281debb6abcfe54a6c27d82c",
       "component": "src/verification",
       "invariant": "a vanished oracle reds its claim, never green-by-absence",
       "chokepoint": "resolveFromBatch",
@@ -1752,7 +1781,7 @@
       "oracle": "match — ZERO matching tests is its OWN state: the vanished oracle, named as such"
     },
     {
-      "id": "g:src/verification:2",
+      "id": "g-166c492aba8f6ce2da13f81354f6b5f70e94472e5b1abc8a619720920f3e17ad",
       "component": "src/verification",
       "invariant": "fast verification rejects a statically vanished Vitest oracle without executing tests",
       "chokepoint": "resolveStaticOracle",
@@ -1762,7 +1791,7 @@
       "oracle": "static oracle floor — a renamed tracked literal owner reds despite unrelated dynamic titles"
     },
     {
-      "id": "g:src/verification:3",
+      "id": "g-05886f174291e7cce7e9f7cf492e5454968edf06e0351c175b29d0761f3d8e09",
       "component": "src/verification",
       "invariant": "fast oracle absence requires a complete direct-declaration population",
       "chokepoint": "resolveStaticOracle",
@@ -1772,7 +1801,7 @@
       "oracle": "static names — a bare side-effect import may register tests and keeps absence UNKNOWN"
     },
     {
-      "id": "g:src/verification:4",
+      "id": "g-adafda36258aa2adbcdc22b383b5dfee52f283849ddd9dd766b2e512fb72910e",
       "component": "src/verification",
       "invariant": "a declared invariant unanchored by any boundary fails coverage",
       "chokepoint": "runVerify",
@@ -1782,7 +1811,7 @@
       "oracle": "RATCHET — a declared invariant with no anchoring boundary fails coverage"
     },
     {
-      "id": "g:src/verification:5",
+      "id": "g-405fa2f11f88ce4e307cec422162649b07dda1ba6c80c68d64097a4d8989ae3f",
       "component": "src/verification",
       "invariant": "a via-test oracle that iterates no live domain fails its claim",
       "chokepoint": "analyzeOracle",
@@ -1792,7 +1821,7 @@
       "oracle": "META-ORACLE — a `via test` boundary whose oracle loops a LITERAL fails"
     },
     {
-      "id": "g:src/verification:6",
+      "id": "g-2855a7aa75934deeda6a5ef8301fd8b18241bb62dd81e0cca835c6f5425ca7aa",
       "component": "src/verification",
       "invariant": "a named oracle that no test runs cannot pass",
       "chokepoint": "runNamedTest",
@@ -1802,7 +1831,7 @@
       "oracle": "runner contract — a name that exists nowhere exits nonzero (the vanished oracle cannot pass)"
     },
     {
-      "id": "g:src/verification:7",
+      "id": "g-db68bb89c99dd2ad269d505de1e1f307b6bd4414638554afe38ddd52592a4b7a",
       "component": "src/verification",
       "invariant": "an empty derivation against a remembered surface refuses, never passes",
       "chokepoint": "vacuityRefusal",
@@ -1812,7 +1841,7 @@
       "oracle": "FLOOR — an empty derivation against a remembered surface REFUSES, never reports coherent"
     },
     {
-      "id": "g:src/verification:8",
+      "id": "g-bfef8cbed1a292cfacf8fd4cb6f186a3667b11fda619463a431f61e1ea770dfa",
       "component": "src/verification",
       "invariant": "python sources feed the same instruments as typescript at their declared grade",
       "chokepoint": "analyzeParityOracle",
@@ -1822,7 +1851,7 @@
       "oracle": "python parity — a .py oracle that iterates the live domain passes; a literal list fails; a vanished oracle cannot pass"
     },
     {
-      "id": "g:src/verification:9",
+      "id": "g-bb32cf33099ee37766eb456d21f26afb895e4774fbb31133e1aa0f1d86d0a24b",
       "component": "src/verification",
       "invariant": "python sources feed the same instruments as typescript at their declared grade",
       "chokepoint": "resolveFromBatch",
@@ -1832,7 +1861,7 @@
       "oracle": "pytest batch — nodeid names resolve per claim, zero matches is the vanished oracle, and a torn report falls back loudly"
     },
     {
-      "id": "g:src/verification:10",
+      "id": "g-8c1be2fad7bd80dc0f0997183ee61dcac8a05acd650c2f16aa127861081fa8d3",
       "component": "src/verification",
       "invariant": "an undeclared root refuses the walk, never wanders",
       "chokepoint": "requireDeclaredRoot",
@@ -1888,6 +1917,784 @@
       "child": "test"
     }
   ],
+  "guaranteeLinks": {
+    "version": 1,
+    "links": [
+      {
+        "owner": "src/derivation",
+        "kind": "addresses",
+        "claim": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d",
+        "provider": "src/derivation",
+        "subject": "src/derivation/derive.ts#buildGraph",
+        "obligation": "guarantee:G-PROJECTION",
+        "assessment": "t-62eb19624910e1e45da79565e119ca0e8cd6df2f1c6910aa7533a22f133bbe28",
+        "because": "The containment oracle checks deepest declared ownership without fabricating dependency edges. This addresses ownership preservation in the graph projection, not completeness of every adapter or source construct.",
+        "basis": "caller-assessed",
+        "status": "current",
+        "problems": []
+      },
+      {
+        "owner": "src/evidence",
+        "kind": "addresses",
+        "claim": "g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150",
+        "provider": "src/evidence",
+        "subject": "src/evidence/decisions.ts#readTrustedJournal",
+        "obligation": "guarantee:G-BOUNDARY",
+        "assessment": "t-157fca4c0054ab5f39288e1bea84ccd3b8172d17ee48cea48315c735dac7cd32",
+        "because": "The strict journal projection validates surviving records and refuses the whole reading on damage. This addresses the invalid-input refusal part of the boundary obligation, not all caller-visible failure semantics.",
+        "basis": "caller-assessed",
+        "status": "current",
+        "problems": []
+      },
+      {
+        "owner": "src/evidence",
+        "kind": "addresses",
+        "claim": "g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf",
+        "provider": "src/evidence",
+        "subject": "src/evidence/status.ts#recordVerify",
+        "obligation": "guarantee:G-PERSISTENCE",
+        "assessment": "t-43387dcec74b31d96afdd95ba168f59db2ee996d511ef3d565958514ebeadb59",
+        "because": "The merge preserves the dated prior oracle verdict when a later run skips it. This addresses retained report history, not immutable evidence or complete crash recovery.",
+        "basis": "caller-assessed",
+        "status": "current",
+        "problems": []
+      },
+      {
+        "owner": "src/lifecycle",
+        "kind": "relies",
+        "claim": "g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150",
+        "provider": "src/evidence",
+        "subject": null,
+        "obligation": null,
+        "assessment": null,
+        "because": "SessionStart reads readTrustedJournal before projecting durable decisions. It requires damage to refuse the verdict-bearing projection instead of silently presenting a partial journal as trusted.",
+        "basis": "caller-assessed",
+        "status": "current",
+        "problems": []
+      },
+      {
+        "owner": "src/readings",
+        "kind": "relies",
+        "claim": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d",
+        "provider": "src/derivation",
+        "subject": null,
+        "obligation": null,
+        "assessment": null,
+        "because": "Reading surfaces consume the derived graph to show component ancestry and imports. They require containment to follow the deepest declared ancestor without inventing dependency connections.",
+        "basis": "caller-assessed",
+        "status": "current",
+        "problems": []
+      },
+      {
+        "owner": "src/verification",
+        "kind": "relies",
+        "claim": "g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf",
+        "provider": "src/evidence",
+        "subject": null,
+        "obligation": null,
+        "assessment": null,
+        "because": "runVerify publishes scoped and fast results through recordVerify. A skipped oracle must retain its prior dated verdict rather than erase the evidence used by subsequent readers.",
+        "basis": "caller-assessed",
+        "status": "current",
+        "problems": []
+      }
+    ],
+    "obligations": [
+      {
+        "owner": "src/adapters",
+        "subject": "src/adapters/tree-sitter.ts#makeTreeSitterAdapter",
+        "assessment": "t-3e9b980cc845148d3ef98821b0ab9cdc7f49cb276841977973cc6ad11ad406a3",
+        "obligation": "guarantee:G-BOUNDARY",
+        "text": "Boundary inputs are validated and failures preserve caller-visible semantics.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src/adapters",
+        "subject": "src/adapters/tree-sitter.ts#makeTreeSitterAdapter",
+        "assessment": "t-3e9b980cc845148d3ef98821b0ab9cdc7f49cb276841977973cc6ad11ad406a3",
+        "obligation": "guarantee:G-FACTORY",
+        "text": "Construction validates configuration and never leaks a partially initialized product.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src/adapters",
+        "subject": "src/adapters/tree-sitter.ts#makeTreeSitterAdapter",
+        "assessment": "t-3e9b980cc845148d3ef98821b0ab9cdc7f49cb276841977973cc6ad11ad406a3",
+        "obligation": "guarantee:G-LIFECYCLE",
+        "text": "Start, stop, cancellation, failure, and recovery are explicit and idempotent where repeated.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/calibration.ts",
+        "assessment": "t-0a499dac14ddca0b19a3cb791fe300907e665f249ade70309395c69d6ca1ab44",
+        "obligation": "guarantee:G-OBSERVABILITY",
+        "text": "Operational signals are bounded, attributable, redactable, and non-authoritative.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/calibration.ts",
+        "assessment": "t-0a499dac14ddca0b19a3cb791fe300907e665f249ade70309395c69d6ca1ab44",
+        "obligation": "guarantee:G-PERSISTENCE",
+        "text": "Durable authority and rebuildable derived state are distinguished and recovery is testable.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/cli.ts",
+        "assessment": "t-4f8c5bad6214414e5008f28f4cfc2c7f0d7e00970a88c00d3650e45bf15d697e",
+        "obligation": "guarantee:G-CLI",
+        "text": "Arguments, exit codes, output channels, interruption, and partial failure form a stable contract.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/context.ts#contextFor",
+        "assessment": "t-40d4d92c33f59fc8086f32fe47bb7479e20a952506b419f8865090d15398ab2e",
+        "obligation": "guarantee:G-DETERMINISM",
+        "text": "Equal effective inputs, including pinned policy and configuration, produce equal observable output; clocks, ordering and randomness are explicit inputs or excluded.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/context.ts#contextFor",
+        "assessment": "t-40d4d92c33f59fc8086f32fe47bb7479e20a952506b419f8865090d15398ab2e",
+        "obligation": "guarantee:G-PROJECTION",
+        "text": "The projection preserves required source identities and meaning, accounts for omissions, and names approximations rather than inventing evidence or authority.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/decisions.ts#readTrustedJournal",
+        "assessment": "t-77c67648a3db153484ec3bf636939279ab61c731ac76b42e7a0e0638fd9cba38",
+        "obligation": "guarantee:G-BOUNDARY",
+        "text": "Boundary inputs are validated and failures preserve caller-visible semantics.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/decisions.ts#readTrustedJournal",
+        "assessment": "t-77c67648a3db153484ec3bf636939279ab61c731ac76b42e7a0e0638fd9cba38",
+        "obligation": "guarantee:G-PERSISTENCE",
+        "text": "Durable authority and rebuildable derived state are distinguished and recovery is testable.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/decisions.ts",
+        "assessment": "t-f901123f377b849bd23c112ed4245828f606704020690adf8df713af85ff1583",
+        "obligation": "guarantee:G-BOUNDARY",
+        "text": "Boundary inputs are validated and failures preserve caller-visible semantics.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/decisions.ts",
+        "assessment": "t-f901123f377b849bd23c112ed4245828f606704020690adf8df713af85ff1583",
+        "obligation": "guarantee:G-CONCURRENCY",
+        "text": "Concurrent operations preserve ordering, ownership, and stale-work exclusion.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/decisions.ts",
+        "assessment": "t-f901123f377b849bd23c112ed4245828f606704020690adf8df713af85ff1583",
+        "obligation": "guarantee:G-PERSISTENCE",
+        "text": "Durable authority and rebuildable derived state are distinguished and recovery is testable.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/decisions.ts",
+        "assessment": "t-f901123f377b849bd23c112ed4245828f606704020690adf8df713af85ff1583",
+        "obligation": "guarantee:G-REGISTRY",
+        "text": "Canonical identities have one named owner; references resolve or refuse, and changes preserve declared compatibility and authority boundaries.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/decisions.ts",
+        "assessment": "t-f901123f377b849bd23c112ed4245828f606704020690adf8df713af85ff1583",
+        "obligation": "guarantee:G-STATE",
+        "text": "State transitions have one named authority and reject stale or invalid transitions.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src/derivation",
+        "subject": "src/derivation/derive.ts#buildGraph",
+        "assessment": "t-62eb19624910e1e45da79565e119ca0e8cd6df2f1c6910aa7533a22f133bbe28",
+        "obligation": "guarantee:G-PROJECTION",
+        "text": "The projection preserves required source identities and meaning, accounts for omissions, and names approximations rather than inventing evidence or authority.",
+        "applicability": "caller-assessed",
+        "assessmentState": "classified",
+        "mapping": "linked",
+        "claims": [
+          "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d"
+        ],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/derive.ts",
+        "assessment": "t-871d17bbc45533fa22bb4c9b0a0b185cd736f5ae17d3030392da74d3e31dd985",
+        "obligation": "guarantee:G-BOUNDARY",
+        "text": "Boundary inputs are validated and failures preserve caller-visible semantics.",
+        "applicability": "stale",
+        "assessmentState": "composite",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/derive.ts",
+        "assessment": "t-871d17bbc45533fa22bb4c9b0a0b185cd736f5ae17d3030392da74d3e31dd985",
+        "obligation": "guarantee:G-EXTENSION",
+        "text": "Extension discovery, compatibility, isolation, and failure containment are explicit.",
+        "applicability": "stale",
+        "assessmentState": "composite",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/derive.ts",
+        "assessment": "t-871d17bbc45533fa22bb4c9b0a0b185cd736f5ae17d3030392da74d3e31dd985",
+        "obligation": "guarantee:G-PROJECTION",
+        "text": "The projection preserves required source identities and meaning, accounts for omissions, and names approximations rather than inventing evidence or authority.",
+        "applicability": "stale",
+        "assessmentState": "composite",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/doctrine.ts",
+        "assessment": "t-7577a5222081bc4b05b1209f6353dcda7d0c583826fc148e103e5b3f7764c7ae",
+        "obligation": "guarantee:G-DETERMINISM",
+        "text": "Equal effective inputs, including pinned policy and configuration, produce equal observable output; clocks, ordering and randomness are explicit inputs or excluded.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/doctrine.ts",
+        "assessment": "t-7577a5222081bc4b05b1209f6353dcda7d0c583826fc148e103e5b3f7764c7ae",
+        "obligation": "guarantee:G-REGISTRY",
+        "text": "Canonical identities have one named owner; references resolve or refuse, and changes preserve declared compatibility and authority boundaries.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src/evidence",
+        "subject": "src/evidence/decisions.ts#readTrustedJournal",
+        "assessment": "t-157fca4c0054ab5f39288e1bea84ccd3b8172d17ee48cea48315c735dac7cd32",
+        "obligation": "guarantee:G-BOUNDARY",
+        "text": "Boundary inputs are validated and failures preserve caller-visible semantics.",
+        "applicability": "caller-assessed",
+        "assessmentState": "classified",
+        "mapping": "linked",
+        "claims": [
+          "g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150"
+        ],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src/evidence",
+        "subject": "src/evidence/status.ts#recordVerify",
+        "assessment": "t-43387dcec74b31d96afdd95ba168f59db2ee996d511ef3d565958514ebeadb59",
+        "obligation": "guarantee:G-PERSISTENCE",
+        "text": "Durable authority and rebuildable derived state are distinguished and recovery is testable.",
+        "applicability": "caller-assessed",
+        "assessmentState": "classified",
+        "mapping": "linked",
+        "claims": [
+          "g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf"
+        ],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src/evidence",
+        "subject": "src/evidence/status.ts#recordVerify",
+        "assessment": "t-43387dcec74b31d96afdd95ba168f59db2ee996d511ef3d565958514ebeadb59",
+        "obligation": "guarantee:G-REGISTRY",
+        "text": "Canonical identities have one named owner; references resolve or refuse, and changes preserve declared compatibility and authority boundaries.",
+        "applicability": "caller-assessed",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/hooks.ts",
+        "assessment": "t-cf0c5d901c41a7ef056bc6c47b318cc23f7603ec909caa0c224d0e1e8ac3c720",
+        "obligation": "guarantee:G-BOUNDARY",
+        "text": "Boundary inputs are validated and failures preserve caller-visible semantics.",
+        "applicability": "stale",
+        "assessmentState": "ambiguous",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/hooks.ts",
+        "assessment": "t-cf0c5d901c41a7ef056bc6c47b318cc23f7603ec909caa0c224d0e1e8ac3c720",
+        "obligation": "guarantee:G-LIFECYCLE",
+        "text": "Start, stop, cancellation, failure, and recovery are explicit and idempotent where repeated.",
+        "applicability": "stale",
+        "assessmentState": "ambiguous",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/hooks.ts",
+        "assessment": "t-cf0c5d901c41a7ef056bc6c47b318cc23f7603ec909caa0c224d0e1e8ac3c720",
+        "obligation": "guarantee:G-OBSERVABILITY",
+        "text": "Operational signals are bounded, attributable, redactable, and non-authoritative.",
+        "applicability": "stale",
+        "assessmentState": "ambiguous",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/read-trace.ts",
+        "assessment": "t-13939286a9a6518ba39c10a15e6ca270248694382fce0c91c994376809872bc9",
+        "obligation": "guarantee:G-BOUNDARY",
+        "text": "Boundary inputs are validated and failures preserve caller-visible semantics.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/read-trace.ts",
+        "assessment": "t-13939286a9a6518ba39c10a15e6ca270248694382fce0c91c994376809872bc9",
+        "obligation": "guarantee:G-OBSERVABILITY",
+        "text": "Operational signals are bounded, attributable, redactable, and non-authoritative.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/regulate.ts#selectRegulation",
+        "assessment": "t-166ce02286905d46cf5280e8b1ce7f08dda9d19b6a4b854131a59f1d3805349d",
+        "obligation": "guarantee:G-DETERMINISM",
+        "text": "Equal effective inputs, including pinned policy and configuration, produce equal observable output; clocks, ordering and randomness are explicit inputs or excluded.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/regulate.ts#selectRegulation",
+        "assessment": "t-166ce02286905d46cf5280e8b1ce7f08dda9d19b6a4b854131a59f1d3805349d",
+        "obligation": "guarantee:G-PURE-DECISION",
+        "text": "The decision is total over its declared input domain, deterministic, side-effect free, and explicit about missing or invalid inputs.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/render-index.ts",
+        "assessment": "t-b5c557d9f3601bd71652243359fb2d6972f8cf9dd66e6b5354e1e12b89973372",
+        "obligation": "guarantee:G-BOUNDARY",
+        "text": "Boundary inputs are validated and failures preserve caller-visible semantics.",
+        "applicability": "stale",
+        "assessmentState": "composite",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/render-index.ts",
+        "assessment": "t-b5c557d9f3601bd71652243359fb2d6972f8cf9dd66e6b5354e1e12b89973372",
+        "obligation": "guarantee:G-DETERMINISM",
+        "text": "Equal effective inputs, including pinned policy and configuration, produce equal observable output; clocks, ordering and randomness are explicit inputs or excluded.",
+        "applicability": "stale",
+        "assessmentState": "composite",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/render-index.ts",
+        "assessment": "t-b5c557d9f3601bd71652243359fb2d6972f8cf9dd66e6b5354e1e12b89973372",
+        "obligation": "guarantee:G-PRESENTATION",
+        "text": "User-visible state has deterministic loading, empty, success, and failure behavior.",
+        "applicability": "stale",
+        "assessmentState": "composite",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/render-index.ts",
+        "assessment": "t-b5c557d9f3601bd71652243359fb2d6972f8cf9dd66e6b5354e1e12b89973372",
+        "obligation": "guarantee:G-PROJECTION",
+        "text": "The projection preserves required source identities and meaning, accounts for omissions, and names approximations rather than inventing evidence or authority.",
+        "applicability": "stale",
+        "assessmentState": "composite",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/run-named-test.ts",
+        "assessment": "t-1089a2ff541d86338c8898b1faace3cae4a1dfc4ba593392da1fdd4cf53f7685",
+        "obligation": "guarantee:G-BOUNDARY",
+        "text": "Boundary inputs are validated and failures preserve caller-visible semantics.",
+        "applicability": "stale",
+        "assessmentState": "composite",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/scope-model.ts",
+        "assessment": "t-c78ec260342d7b40b96c435229436f6b593f073eb024bbf44088b46a8eb3b6af",
+        "obligation": "guarantee:G-DETERMINISM",
+        "text": "Equal effective inputs, including pinned policy and configuration, produce equal observable output; clocks, ordering and randomness are explicit inputs or excluded.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/scope-model.ts",
+        "assessment": "t-c78ec260342d7b40b96c435229436f6b593f073eb024bbf44088b46a8eb3b6af",
+        "obligation": "guarantee:G-PROJECTION",
+        "text": "The projection preserves required source identities and meaning, accounts for omissions, and names approximations rather than inventing evidence or authority.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/status.ts",
+        "assessment": "t-2d6e3a5e60c3d2cb8a6d4573f6e7d97f83daee381e60d93ee87a4e603194fa64",
+        "obligation": "guarantee:G-BOUNDARY",
+        "text": "Boundary inputs are validated and failures preserve caller-visible semantics.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/status.ts",
+        "assessment": "t-2d6e3a5e60c3d2cb8a6d4573f6e7d97f83daee381e60d93ee87a4e603194fa64",
+        "obligation": "guarantee:G-CONCURRENCY",
+        "text": "Concurrent operations preserve ordering, ownership, and stale-work exclusion.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/status.ts",
+        "assessment": "t-2d6e3a5e60c3d2cb8a6d4573f6e7d97f83daee381e60d93ee87a4e603194fa64",
+        "obligation": "guarantee:G-PERSISTENCE",
+        "text": "Durable authority and rebuildable derived state are distinguished and recovery is testable.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/status.ts",
+        "assessment": "t-2d6e3a5e60c3d2cb8a6d4573f6e7d97f83daee381e60d93ee87a4e603194fa64",
+        "obligation": "guarantee:G-REGISTRY",
+        "text": "Canonical identities have one named owner; references resolve or refuse, and changes preserve declared compatibility and authority boundaries.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/status.ts",
+        "assessment": "t-2d6e3a5e60c3d2cb8a6d4573f6e7d97f83daee381e60d93ee87a4e603194fa64",
+        "obligation": "guarantee:G-STATE",
+        "text": "State transitions have one named authority and reject stale or invalid transitions.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/taxonomy-catalog.ts",
+        "assessment": "t-9cddef92f7543094d3a7f93ff2338240760197377bca322d1ba1c7c751922bd1",
+        "obligation": "guarantee:G-DETERMINISM",
+        "text": "Equal effective inputs, including pinned policy and configuration, produce equal observable output; clocks, ordering and randomness are explicit inputs or excluded.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/taxonomy-catalog.ts",
+        "assessment": "t-9cddef92f7543094d3a7f93ff2338240760197377bca322d1ba1c7c751922bd1",
+        "obligation": "guarantee:G-REGISTRY",
+        "text": "Canonical identities have one named owner; references resolve or refuse, and changes preserve declared compatibility and authority boundaries.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/taxonomy-ledger.ts",
+        "assessment": "t-760cb10a69bd98b510adf868104178126dd3bc8298afea31a033e18442d7dfb8",
+        "obligation": "guarantee:G-CONCURRENCY",
+        "text": "Concurrent operations preserve ordering, ownership, and stale-work exclusion.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/taxonomy-ledger.ts",
+        "assessment": "t-760cb10a69bd98b510adf868104178126dd3bc8298afea31a033e18442d7dfb8",
+        "obligation": "guarantee:G-PERSISTENCE",
+        "text": "Durable authority and rebuildable derived state are distinguished and recovery is testable.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/taxonomy-ledger.ts",
+        "assessment": "t-760cb10a69bd98b510adf868104178126dd3bc8298afea31a033e18442d7dfb8",
+        "obligation": "guarantee:G-REGISTRY",
+        "text": "Canonical identities have one named owner; references resolve or refuse, and changes preserve declared compatibility and authority boundaries.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/taxonomy-ledger.ts",
+        "assessment": "t-760cb10a69bd98b510adf868104178126dd3bc8298afea31a033e18442d7dfb8",
+        "obligation": "guarantee:G-STATE",
+        "text": "State transitions have one named authority and reject stale or invalid transitions.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/taxonomy.ts#classifyTaxonomy",
+        "assessment": "t-e9c251e81c16510571838a1a793c94592f4b9f5957b887751eb565e80cb3a85d",
+        "obligation": "guarantee:G-DETERMINISM",
+        "text": "Equal effective inputs, including pinned policy and configuration, produce equal observable output; clocks, ordering and randomness are explicit inputs or excluded.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/taxonomy.ts#classifyTaxonomy",
+        "assessment": "t-e9c251e81c16510571838a1a793c94592f4b9f5957b887751eb565e80cb3a85d",
+        "obligation": "guarantee:G-PURE-DECISION",
+        "text": "The decision is total over its declared input domain, deterministic, side-effect free, and explicit about missing or invalid inputs.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/types.ts",
+        "assessment": "t-fa107a3ef7872b81e6c2f0d7485de05fda0334453ba8d33926e4337214179191",
+        "obligation": "guarantee:G-BOUNDARY",
+        "text": "Boundary inputs are validated and failures preserve caller-visible semantics.",
+        "applicability": "stale",
+        "assessmentState": "no-fit",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/verify.ts",
+        "assessment": "t-8397cfd591c4c1103bdb23081fd682a1f86f2f16b2896ef2c8cf9206c90895ba",
+        "obligation": "guarantee:G-BOUNDARY",
+        "text": "Boundary inputs are validated and failures preserve caller-visible semantics.",
+        "applicability": "stale",
+        "assessmentState": "composite",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/verify.ts",
+        "assessment": "t-8397cfd591c4c1103bdb23081fd682a1f86f2f16b2896ef2c8cf9206c90895ba",
+        "obligation": "guarantee:G-OBSERVABILITY",
+        "text": "Operational signals are bounded, attributable, redactable, and non-authoritative.",
+        "applicability": "stale",
+        "assessmentState": "composite",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/verify.ts",
+        "assessment": "t-8397cfd591c4c1103bdb23081fd682a1f86f2f16b2896ef2c8cf9206c90895ba",
+        "obligation": "guarantee:G-PERSISTENCE",
+        "text": "Durable authority and rebuildable derived state are distinguished and recovery is testable.",
+        "applicability": "stale",
+        "assessmentState": "composite",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/walk.ts#parseSpec",
+        "assessment": "t-73077288e8c493cfa9efd6af365c5449fcda1b9a750c60ad9caf6217ed24e448",
+        "obligation": "guarantee:G-DETERMINISM",
+        "text": "Equal effective inputs, including pinned policy and configuration, produce equal observable output; clocks, ordering and randomness are explicit inputs or excluded.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      },
+      {
+        "owner": "src",
+        "subject": "src/walk.ts#parseSpec",
+        "assessment": "t-73077288e8c493cfa9efd6af365c5449fcda1b9a750c60ad9caf6217ed24e448",
+        "obligation": "guarantee:G-PARSER",
+        "text": "Supported syntax maps to the declared structured population; malformed or unsupported input has explicit behavior and cannot silently erase required subjects.",
+        "applicability": "stale",
+        "assessmentState": "classified",
+        "mapping": "unlinked",
+        "claims": [],
+        "satisfaction": "unverified"
+      }
+    ],
+    "issues": [],
+    "taxonomy": "available",
+    "limit": "Link integrity is not satisfaction. Applicability and mapping are caller-assessed; oracle verdicts are separate recorded evidence, not immutable receipts. Import adjacency is not proof a guarantee is consumed."
+  },
   "charts": {
     "project-source": "The repository under analysis as it is on disk: *.spec.md prose, source text, coherence.config.json, git history. Agent-authored and arbitrary — never trusted as a statement about itself, only as text to be read.",
     "derived-model": "The graph the harness builds from that text — components, claims, symbols, import edges — plus the config it was walked with. Everything downstream is computed over this and nothing re-reads the tree.",
@@ -1907,7 +2714,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/evidence:3"
+        "g-fe0545c1476681b21a20d071bebf706d04583d70497c388e4f38795966a9cc39"
       ]
     },
     {
@@ -1920,7 +2727,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/verification:5"
+        "g-405fa2f11f88ce4e307cec422162649b07dda1ba6c80c68d64097a4d8989ae3f"
       ]
     },
     {
@@ -1933,7 +2740,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/verification:8"
+        "g-bfef8cbed1a292cfacf8fd4cb6f186a3667b11fda619463a431f61e1ea770dfa"
       ]
     },
     {
@@ -1946,7 +2753,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/lifecycle:3"
+        "g-7d53d5fd1e9c3a47789803dc7ebb6cf6525a89569804b61c415037ed785cf861"
       ]
     },
     {
@@ -1959,7 +2766,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/diagnostics:2"
+        "g-04856f5183879bf681114c89b75bc6d8d994c0c3310e8aced20a05db7ae62b93"
       ]
     },
     {
@@ -1972,7 +2779,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/derivation:0"
+        "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d"
       ]
     },
     {
@@ -1985,7 +2792,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/diagnostics:3"
+        "g-4c06305370759763a11e7d5d895176ce19b8f8a75aad8a493e1f885f31276e2b"
       ]
     },
     {
@@ -1998,7 +2805,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/diagnostics:4"
+        "g-d6e0b1b54a09c42f92856d5f64f2638367fc5f0d79cf604974abd863716afa5c"
       ]
     },
     {
@@ -2011,7 +2818,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/taxonomy:7"
+        "g-f4b854e4f43303b214d3094b19a2667ddaf556afb65cb9064b6f3429d4b99702"
       ]
     },
     {
@@ -2024,8 +2831,8 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/evidence:5",
-        "g:src/evidence:6"
+        "g-3685a681d581a7b08cc9e2b36453978b42ef987e091a01649cd2b0d513b0a145",
+        "g-361b9b7bae849d1ce435ab95ca4e7d812056e9aa0705567f8b0b89eec4047ac1"
       ]
     },
     {
@@ -2038,7 +2845,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/adapters:0"
+        "g-212e8822ab337b675432f1c60961e6e98ba52b1674623ac4186f8092db1f08e3"
       ]
     },
     {
@@ -2051,7 +2858,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/lifecycle:9"
+        "g-0f4fea097a31d85ace4d5c682c7b7efe1f7482a8600c7a89e2c0cbfafcd85ae0"
       ]
     },
     {
@@ -2075,7 +2882,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/coordination:6"
+        "g-db47731ff5707245a304131e05a7c669fee3deb2c4aa932d920bacbc15b7be2b"
       ]
     },
     {
@@ -2088,7 +2895,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/lifecycle:8"
+        "g-6622a8513f6c28d3796df090e29bbf611eb68529ee9989bdcb9d854f2fe5ee66"
       ]
     },
     {
@@ -2101,7 +2908,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/coordination:4"
+        "g-df2de47e27a6d0ac018aaecfc9ab4430fccc2ab2e0d364e5494fd36b624eee7b"
       ]
     },
     {
@@ -2114,7 +2921,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/verification:0"
+        "g-d6244b8ab8b0e28cbc3b1e767f965e566335ee7225751d8db44b18bc7419161b"
       ]
     },
     {
@@ -2127,7 +2934,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/lifecycle:6"
+        "g-cced37608bbbc14c92c5ee89061aa190972be9d1c22c33ce53f6045f4633761e"
       ]
     },
     {
@@ -2140,7 +2947,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/lifecycle:10"
+        "g-09b5e7c0d1628bd4f93f8e6459181d8ced4d67e4d42f40274f316f50ff8d0465"
       ]
     },
     {
@@ -2153,8 +2960,8 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/diagnostics:9",
-        "g:src/diagnostics:10"
+        "g-d9378c80b912fabfb39f08a3a784c72b83a0838d6444cc357d32c8d6b7296043",
+        "g-94ff0594f20c098b5975a6cd4d6c4714744b4e7403e3a4c87a0373163a392b95"
       ]
     },
     {
@@ -2178,7 +2985,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/adapters:1"
+        "g-a6b78578502dc6ce572e1502d76a2475b5441d21c92a41ed6b228078275538ee"
       ]
     },
     {
@@ -2191,9 +2998,9 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/coordination:10",
-        "g:src/coordination:13",
-        "g:src/coordination:14"
+        "g-82029f55a2adb1eb02e68226cd63ae401a2954a662c409abaf5e1b55910b1a5f",
+        "g-f5ffb3e5ab886b0070974693a860c22b96f7b5a196ad50443cbbd18e7f119775",
+        "g-13b14de2f711f7c4621da185d944e18b355a4a24635cd1d5d3f0a078a27960a3"
       ]
     },
     {
@@ -2206,8 +3013,8 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/coordination:1",
-        "g:src/coordination:15"
+        "g-20aedc6478916cb05edf66af4a25612c1f962d78bd43446fd4a8e3618a467bcd",
+        "g-c893d71a84739c889cd3882c36159d205d8c1996e8bdcc19fb041d9a7f837a39"
       ]
     },
     {
@@ -2220,7 +3027,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/coordination:9"
+        "g-c707befe263f3bfe9f4855e461aa34834cb7875d1b9a450ebf32dd26ee0d1e5f"
       ]
     },
     {
@@ -2233,7 +3040,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/evidence:9"
+        "g-72ff7044484c99e7f4e14e150dc70619e8f285adf53d01d71bb0cb9f843c8d83"
       ]
     },
     {
@@ -2257,7 +3064,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/taxonomy:5"
+        "g-a615e7641c3ffafd2d2c1c9c95b6f1a84586dc501ac43b3fbe86164e87034a21"
       ]
     },
     {
@@ -2270,8 +3077,8 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/evidence:1",
-        "g:src/evidence:2"
+        "g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150",
+        "g-dd640f9dff77a6eb8267db51a30e2e67b4cb22e381f168509e0f562a2075aca9"
       ]
     },
     {
@@ -2284,7 +3091,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/coordination:2"
+        "g-eaf6be6149f9a4eba86327fc5aa93a461dd0acbb6182a955951518959cca2cc4"
       ]
     },
     {
@@ -2297,7 +3104,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/diagnostics:5"
+        "g-191523b1d154489636c26bf60122726298b29494650ca3c58ef47e09a1aba57a"
       ]
     },
     {
@@ -2310,7 +3117,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/diagnostics:6"
+        "g-80b8fcc6922a85bf5238e6f61cb43cc7b3f8e2b66aa3b5932ad7cd2e156fa53f"
       ]
     },
     {
@@ -2323,8 +3130,8 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/evidence:7",
-        "g:src/evidence:8"
+        "g-9b1cdfac34250376e0f04fb7fcdb5be051e0ff6690fbd83b0d2f89932ea24c5c",
+        "g-bf42374fcfb692ec656ac3b8949d0b4a95d84f0d285aea11483c485b93da36df"
       ]
     },
     {
@@ -2337,7 +3144,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/taxonomy:4"
+        "g-c79be42fd605e585e709cb3c2d3e3df307d805ac4ee364e1d41f4d3bc081b303"
       ]
     },
     {
@@ -2350,8 +3157,8 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/evidence:0",
-        "g:src/evidence:4"
+        "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f",
+        "g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf"
       ]
     },
     {
@@ -2364,7 +3171,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/coordination:8"
+        "g-75101e6fa8c9471d546b09b1090c3b3609de42d35552a3f5d2dc4cad8e443417"
       ]
     },
     {
@@ -2377,7 +3184,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/readings:2"
+        "g-279e12278a8564579c2402a7aa0fdcb2539e8e36d863eba923fc8e76e9346764"
       ]
     },
     {
@@ -2390,7 +3197,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/readings:5"
+        "g-e1cb001a3b7ac9819b05464abca1c279d41a87faba8e07d6e230635188f34724"
       ]
     },
     {
@@ -2403,7 +3210,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src:0"
+        "g-64c635516a914cdd0097b9b572cf77ad37aabaa85db8914779be99d15292c6ba"
       ]
     },
     {
@@ -2416,7 +3223,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/verification:10"
+        "g-8c1be2fad7bd80dc0f0997183ee61dcac8a05acd650c2f16aa127861081fa8d3"
       ]
     },
     {
@@ -2429,8 +3236,21 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/verification:1",
-        "g:src/verification:9"
+        "g-b2adce179b206bf934359709b496cf79c09b083c281debb6abcfe54a6c27d82c",
+        "g-bb32cf33099ee37766eb456d21f26afb895e4774fbb31133e1aa0f1d86d0a24b"
+      ]
+    },
+    {
+      "symbol": "resolveGuaranteeLinks",
+      "from": "project-source",
+      "to": "derived-model",
+      "translates": "Spec-owned claim and obligation references join canonical graph, taxonomy and recorded oracle readings. Missing, ambiguous or expired premises remain explicit issues, never current mappings. Link integrity does not establish semantic satisfaction, and direct-import adjacency does not prove guarantee consumption.",
+      "security": false,
+      "component": "src/verification",
+      "ownerWhy": null,
+      "declaredAnchor": null,
+      "guarantees": [
+        "g-6f9e452d15d53e356b2989b222c65713c1d2239d48b0869566bd6e929df38cd4"
       ]
     },
     {
@@ -2443,7 +3263,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/derivation:2"
+        "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09"
       ]
     },
     {
@@ -2456,8 +3276,8 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/verification:2",
-        "g:src/verification:3"
+        "g-166c492aba8f6ce2da13f81354f6b5f70e94472e5b1abc8a619720920f3e17ad",
+        "g-05886f174291e7cce7e9f7cf492e5454968edf06e0351c175b29d0761f3d8e09"
       ]
     },
     {
@@ -2470,11 +3290,11 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/lifecycle:0",
-        "g:src/lifecycle:1",
-        "g:src/lifecycle:2",
-        "g:src/lifecycle:4",
-        "g:src/lifecycle:5"
+        "g-f756d7d25cbc55fc32f6a4ed421ac9607ef47c86760af694e12174b9b16c5cc4",
+        "g-2aaaefb581db032e8bc270572204620a95e1d6cef9045250bf7ecb2080dd927e",
+        "g-5a5fec4add335e5eb09c9e16dbc5f8889f6bf226751509cd9f6b26eedf3fe611",
+        "g-913eb24ad608140812f1bd2c438e1dd80ec0ea29ef45b5b0361dd9e386307cc3",
+        "g-bfa3efd2ebdd0519c642388b8bf7d67baa71a763f1f4fa312e924f0a3dcf3d15"
       ]
     },
     {
@@ -2487,7 +3307,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/verification:6"
+        "g-2855a7aa75934deeda6a5ef8301fd8b18241bb62dd81e0cca835c6f5425ca7aa"
       ]
     },
     {
@@ -2500,7 +3320,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/verification:4"
+        "g-adafda36258aa2adbcdc22b383b5dfee52f283849ddd9dd766b2e512fb72910e"
       ]
     },
     {
@@ -2513,7 +3333,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/coordination:0"
+        "g-2e3d4a42f3f26d54ea02a0dfcf7df76679dfe7d38d086250fff8e58ce5d40a1a"
       ]
     },
     {
@@ -2526,7 +3346,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/lifecycle:7"
+        "g-fcf3b4700049076d1b7c6016f444683d66638b2cb99dfc43097fcc9b4e512913"
       ]
     },
     {
@@ -2539,7 +3359,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/diagnostics:1"
+        "g-96f1f46fb8a7a7e0dc5ab050f5237a3dd8e65088f368f05599d87557d9a7d2d7"
       ]
     },
     {
@@ -2552,7 +3372,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/diagnostics:8"
+        "g-e541294ff4534521ac1119f7bd67c86b59218e48be6b9089565c10a758580714"
       ]
     },
     {
@@ -2565,7 +3385,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/derivation:1"
+        "g-54e397e1d5d6537d8bc3137c4ac996d18ef45cbcabe5d42061335e7f08647e59"
       ]
     },
     {
@@ -2578,7 +3398,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/diagnostics:7"
+        "g-96cad312ff822d6934e47f5d5483433148b364491e8372fc6d6c06c93c709024"
       ]
     },
     {
@@ -2591,7 +3411,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/evidence:10"
+        "g-f391caadcfdd6258d8bb709cb17b046d0488dc766ca9dbe67415b2710ce70a06"
       ]
     },
     {
@@ -2604,7 +3424,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/taxonomy:1"
+        "g-de3ec13c0b8f0405704ce013d70fa251ae5ea1ef1cd47ee5295da9ee66096b2a"
       ]
     },
     {
@@ -2617,7 +3437,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/coordination:7"
+        "g-3968df1558ad2e135279e8b7908d7faaada10e14404f5e75bf61ac3e55667a91"
       ]
     },
     {
@@ -2630,7 +3450,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/verification:7"
+        "g-db68bb89c99dd2ad269d505de1e1f307b6bd4414638554afe38ddd52592a4b7a"
       ]
     },
     {
@@ -2643,7 +3463,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/diagnostics:0"
+        "g-53550835977575002ba22785c78f9dcaa1f78d814708dfd5fcfbc1c9356d1a0d"
       ]
     },
     {
@@ -2656,7 +3476,7 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/taxonomy:6"
+        "g-d1bce33f601420fa5db2e33d610ec91024029082fdcdb78ee7f4463ca49f4ad3"
       ]
     },
     {
@@ -2669,8 +3489,8 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/coordination:3",
-        "g:src/coordination:5"
+        "g-60553f19225b1145c46ea4eef69fcaac9a33763619ae3292690f235f76c2a8a4",
+        "g-aa1fb4cad7c94f9a62687c2cce2e660a2414958d5fb5cbf3cac9a33dccccd4ad"
       ]
     },
     {
@@ -2683,8 +3503,8 @@
       "ownerWhy": null,
       "declaredAnchor": null,
       "guarantees": [
-        "g:src/coordination:11",
-        "g:src/coordination:12"
+        "g-90c7ca7d1fb899c411f8ef1039a38e700dade8f6d262b59d0640a12ada155de1",
+        "g-dbb875aea7e5c2b1657aeeb482612120a92a7c3ed0a4dd68d2796162d920f932"
       ]
     }
   ]

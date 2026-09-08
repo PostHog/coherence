@@ -55,6 +55,7 @@ await page.waitForFunction(() => document.querySelector('.feed-status')?.textCon
   await page.getByRole('tab', { name: 'Structure', exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length === 2);
   await page.locator('.component-index').getByRole('button', { name: 'Worker', exact: true }).click();
+  await page.locator('.component-card').filter({ hasText: 'Worker' }).locator('[data-card-view="description"]').click();
   await page.getByRole('slider', { name: 'Spacing', exact: true }).focus();
   await page.keyboard.press('End');
   await page.locator('.react-flow__controls-zoomin').click();
@@ -77,7 +78,7 @@ await page.waitForFunction(() => document.querySelector('.feed-status')?.textCon
   assert.match(await page.locator('.invariant-evidence').innerText(), /Unanchored/);
   assert.equal(await page.locator('.spec-inspector script').count(), 0, 'spec prose is text, never executable HTML');
   await writeFile(join(root, '.coherence/status.json'), JSON.stringify({ verify: { claims: [{ node: 'Core', claim, kind: 'fail', at: '2026-09-08T12:00:00.000Z' }] } }));
-  await page.locator('.component-card .status.fail').waitFor();
+  await page.locator('.component-card .status.fail').first().waitFor();
   await page.getByRole('button', { name: 'Pause updates' }).click();
   await unlink(join(root, 'new-child/index.ts')); await unlink(join(root, 'new-child/child.spec.md'));
   await page.waitForTimeout(400);

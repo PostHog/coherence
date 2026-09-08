@@ -122,6 +122,7 @@ export async function buildGraph(cfg: Config): Promise<Graph> {
     const spec = parseSpec(await readFile((await findSpec(join(root, d === "." ? "" : d)))!, "utf8"));
     const parent = d === "." ? null : ownerOf(d, dirs);
     add({ id: compId(d), ...(parent === null ? {} : { parent: compId(parent) }), label: spec.name || basename(d), kind: "component", sub: spec.intent, claimed: spec.claims.length > 0, claims: spec.claims, prose: spec.prose || undefined, why: spec.why || undefined, invariants: spec.invariants.length ? spec.invariants : undefined, refutations: spec.refutations.length ? spec.refutations : undefined, claimKinds: Object.keys(spec.claimKinds).length ? spec.claimKinds : undefined });
+    if (spec.guaranteeLinks) nodes[nodes.length - 1].guaranteeLinks = spec.guaranteeLinks;
     classToDir[spec.name || basename(d)] = d;
   }
 

@@ -25,6 +25,10 @@ Language packs and adapters supply syntax knowledge. This assembly owns the walk
 - boundary "a declared language resolves to a real adapter or refuses, never a silent fallback" at resolveLanguageAdapter via guard "language adapter — a project path loads and shapes the graph; unknown names refuse, never fall back"
 - boundary "a built-in language pack is data: queries, patterns, and named strategies, never code" at builtinLanguagePacks via guard "language packs — every built-in pack is function-free data across all five instrument tables"
 
+## addresses
+
+- {"claim":"g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d","subject":"src/derivation/derive.ts#buildGraph","obligation":"guarantee:G-PROJECTION","assessment":"t-62eb19624910e1e45da79565e119ca0e8cd6df2f1c6910aa7533a22f133bbe28","because":"The containment oracle checks deepest declared ownership without fabricating dependency edges. This addresses ownership preservation in the graph projection, not completeness of every adapter or source construct."}
+
 ## why
 
 **spec containment follows declared ancestry without inventing dependencies.** Repository and subsystem containment explain ownership even where no source import exists. Treating that relationship as an import fabricates reliance; omitting it turns the enclosing project into an unexplained island. The same deepest-spec rule that assigns file ownership supplies component ancestry.

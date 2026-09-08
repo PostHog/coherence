@@ -26,6 +26,10 @@ These projections can explain evidence but cannot create it. Scope, promise view
 - boundary "Scope projects the canonical promise population with deterministic gravity and honest absence" at buildScopeModel via guard "scope model — original spec explanation and unanchored declarations survive projection"
 - boundary "Scope projects the canonical promise population with deterministic gravity and honest absence" at renderScope via guard "scope cards — titles have an opaque title bar and explicit contrast, with full text retained in the inspector"
 
+## relies on
+
+- {"claim":"g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d","provider":"src/derivation","because":"Reading surfaces consume the derived graph to show component ancestry and imports. They require containment to follow the deepest declared ancestor without inventing dependency connections."}
+
 ## why
 
 **task context is bounded and names its approximations.** A focused context packet is

@@ -101,7 +101,7 @@ test("scope semantics — containment and atlas meanings preserve ownership with
   const declared = model.transitions.find(t => t.symbol === "checkedAt")!;
   assert.equal(declared.component, "core");
   assert.equal(declared.translates, atlas.transitions.checkedAt.translates);
-  assert.deepEqual(declared.guarantees, ["g:core:0"]);
+  assert.deepEqual(declared.guarantees, [model.guarantees[0].id]);
   assert.equal(model.transitions.find(t => t.symbol === "ambiguous")!.component, null);
   assert.match(model.transitions.find(t => t.symbol === "ambiguous")!.ownerWhy!, /AMBIGUOUS/);
   assert.equal(model.transitions.find(t => t.symbol === "absent")!.component, null);
