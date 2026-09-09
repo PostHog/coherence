@@ -70,7 +70,8 @@ import { observeOrientation, renderOrientation } from "./coordination/orient.ts"
 import { buildScopeModel } from "./readings/scope-model.ts";
 import { renderScope } from "./readings/render-scope.ts";
 import { runTaxonomyCommand } from "./taxonomy/taxonomy-cli.ts";
-import { runGuaranteesCommand, readGuaranteeTaxonomy } from "./verification/guarantees-cli.ts";
+import { runGuaranteesCommand, readGuaranteeTaxonomy, projectGuarantees } from "./verification/guarantees-cli.ts";
+import { runGuaranteeCatalog } from "./verification/guarantee-catalog-cli.ts";
 
 const cmd = process.argv[2];
 const argv = process.argv.slice(3);
@@ -143,6 +144,12 @@ const renderUnrunnable = (e: unknown): void => {
 process.on("uncaughtException", renderUnrunnable);
 process.on("unhandledRejection", renderUnrunnable);
 
+if (cmd === "guarantees" && argv[0] === "catalog") {
+  const result = runGuaranteeCatalog(argv.slice(1));
+  (result.code === 2 ? console.error : console.log)(result.output);
+  await exit(result.code);
+}
+
 const cfg = await loadConfig(process.cwd());
 const stamp = new Date().toISOString().slice(0, 16).replace("T", " ") + "Z";
 const out = (p: string) => join(cfg.root, cfg.outputDir, p);
@@ -192,9 +199,7 @@ async function doGraph(): Promise<string[]> {
 }
 
 async function doScope(): Promise<string[]> {
-  const graph = await buildGraph(cfg);
-  const promise = await buildPromiseModel(cfg, graph, await readStatus(cfg));
-  const model = buildScopeModel(graph, promise, cfg, readGuaranteeTaxonomy(cfg));
+  const model = await projectGuarantees(cfg);
   // Scope's model and renderer deliberately read no clock, checkout path, or browser
   // state. Exact comparison is therefore the determinism oracle: unlike the older graph
   // artifact, there is no normalization seam through which meaningful drift can vanish.

@@ -1,0 +1,21 @@
+# Parsing and team resolution
+
+Turns transport headers and payloads into events and resolves the team before team-aware processing. Unknown tokens can be dropped without halting the rest of a batch.
+
+## invariants
+
+
+## works when
+
+
+## guarantee bindings
+
+
+## relies on
+
+
+## why
+This spec covers the copied files in this directory, not every upstream module under the same directory. Named test evidence is scoped to its selected fixtures. Imports and declared reliance do not establish end-to-end satisfaction.
+
+## known limits
+- These selected pipeline fixtures do not prove tenant isolation across every caller, bypass or downstream store.

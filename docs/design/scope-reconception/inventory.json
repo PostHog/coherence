@@ -1,0 +1,1548 @@
+{
+  "current": {
+    "center": "src",
+    "nodes": [
+      {
+        "id": ".",
+        "label": "Coherence",
+        "intent": "The repository-level reading surface: configuration, package contract, generated maps, and the authored explanation of why the harness exists.",
+        "role": "project",
+        "parent": null
+      },
+      {
+        "id": "src",
+        "label": "Harness core",
+        "intent": "Composes configuration, public commands and shared contracts into the Coherence CLI.",
+        "role": "assembly",
+        "parent": "."
+      },
+      {
+        "id": "src/adapters",
+        "label": "Source adapters",
+        "intent": "Translate language syntax and platform configuration into the common graph vocabulary consumed by the harness core.",
+        "role": "assembly",
+        "parent": "src"
+      },
+      {
+        "id": "src/coordination",
+        "label": "Coordination",
+        "intent": "Combines work ownership, dependencies, consequences and trusted evidence into the next action an agent owes.",
+        "role": "assembly",
+        "parent": "src"
+      },
+      {
+        "id": "src/derivation",
+        "label": "Source derivation",
+        "intent": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "role": "assembly",
+        "parent": "src"
+      },
+      {
+        "id": "src/diagnostics",
+        "label": "Diagnostics and ratchets",
+        "intent": "Measures change, risk sites, architectural coupling and evidence gaps against the repository and its recorded baselines.",
+        "role": "assembly",
+        "parent": "src"
+      },
+      {
+        "id": "src/evidence",
+        "label": "Durable evidence",
+        "intent": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "role": "assembly",
+        "parent": "src"
+      },
+      {
+        "id": "src/lifecycle",
+        "label": "Agent lifecycle",
+        "intent": "Connects supported agent hosts to repository controls, lifecycle instructions and attributable activity traces.",
+        "role": "assembly",
+        "parent": "src"
+      },
+      {
+        "id": "src/readings",
+        "label": "Reading surfaces",
+        "intent": "Projects existing models into context packets, diagrams, component maps and inspectable reading surfaces.",
+        "role": "assembly",
+        "parent": "src"
+      },
+      {
+        "id": "src/taxonomy",
+        "label": "Taxonomy",
+        "intent": "Classifies repository subjects against a shared catalog and preserves caller-assessed evidence, ambiguity and staleness.",
+        "role": "assembly",
+        "parent": "src"
+      },
+      {
+        "id": "src/verification",
+        "label": "Verification",
+        "intent": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "role": "assembly",
+        "parent": "src"
+      },
+      {
+        "id": "test",
+        "label": "Executable contracts",
+        "intent": "Exercises the harness through focused unit contracts and end-to-end fixtures built from the same public data shapes that consuming repositories use.",
+        "role": "evidence",
+        "parent": "."
+      }
+    ],
+    "guarantees": [
+      {
+        "id": "g-64c635516a914cdd0097b9b572cf77ad37aabaa85db8914779be99d15292c6ba",
+        "component": "src",
+        "invariant": "swarm write identity and authority flags are singleton or refused",
+        "chokepoint": "repeatedSingletonFlags"
+      },
+      {
+        "id": "g-212e8822ab337b675432f1c60961e6e98ba52b1674623ac4186f8092db1f08e3",
+        "component": "src/adapters",
+        "invariant": "committed platform capabilities survive optional deployment-config toggles",
+        "chokepoint": "cloudflareBindings"
+      },
+      {
+        "id": "g-a6b78578502dc6ce572e1502d76a2475b5441d21c92a41ed6b228078275538ee",
+        "component": "src/adapters",
+        "invariant": "a grammar-backed adapter derives the graph through the same language seam",
+        "chokepoint": "makeTreeSitterAdapter"
+      },
+      {
+        "id": "g-387c59a17fac9ecf0ca0846e1a651976a0ffe99bc62e7ca539ff96e155ac1d82",
+        "component": "src/adapters",
+        "invariant": "a parse's heap is returned before the next file",
+        "chokepoint": "withTree"
+      },
+      {
+        "id": "g-2e3d4a42f3f26d54ea02a0dfcf7df76679dfe7d38d086250fff8e58ce5d40a1a",
+        "component": "src/coordination",
+        "invariant": "a weaker regulation obligation never masks a stronger one",
+        "chokepoint": "selectRegulation"
+      },
+      {
+        "id": "g-20aedc6478916cb05edf66af4a25612c1f962d78bd43446fd4a8e3618a467bcd",
+        "component": "src/coordination",
+        "invariant": "regulation evaluates and repairs the selected agent host",
+        "chokepoint": "observeRegulation"
+      },
+      {
+        "id": "g-eaf6be6149f9a4eba86327fc5aa93a461dd0acbb6182a955951518959cca2cc4",
+        "component": "src/coordination",
+        "invariant": "work state is append-only, attributable, and predecessor-checked",
+        "chokepoint": "readWork"
+      },
+      {
+        "id": "g-60553f19225b1145c46ea4eef69fcaac9a33763619ae3292690f235f76c2a8a4",
+        "component": "src/coordination",
+        "invariant": "work cannot activate or complete before every dependency completes",
+        "chokepoint": "validateWorkGraph"
+      },
+      {
+        "id": "g-df2de47e27a6d0ac018aaecfc9ab4430fccc2ab2e0d364e5494fd36b624eee7b",
+        "component": "src/coordination",
+        "invariant": "runnable work with overlapping write scopes is a collision, never concurrent permission",
+        "chokepoint": "detectWorkScopeOverlaps"
+      },
+      {
+        "id": "g-aa1fb4cad7c94f9a62687c2cce2e660a2414958d5fb5cbf3cac9a33dccccd4ad",
+        "component": "src/coordination",
+        "invariant": "a terminal parent has no live child and explicitly synthesizes every completed direct child",
+        "chokepoint": "validateWorkGraph"
+      },
+      {
+        "id": "g-db47731ff5707245a304131e05a7c669fee3deb2c4aa932d920bacbc15b7be2b",
+        "component": "src/coordination",
+        "invariant": "authored work text is single-line data, never model-instruction control",
+        "chokepoint": "createWork"
+      },
+      {
+        "id": "g-3968df1558ad2e135279e8b7908d7faaada10e14404f5e75bf61ac3e55667a91",
+        "component": "src/coordination",
+        "invariant": "consequence navigation contains only explicit assessed edges",
+        "chokepoint": "traceConsequences"
+      },
+      {
+        "id": "g-75101e6fa8c9471d546b09b1090c3b3609de42d35552a3f5d2dc4cad8e443417",
+        "component": "src/coordination",
+        "invariant": "specialized consequence relations admit only their declared endpoint kinds",
+        "chokepoint": "relationProblem"
+      },
+      {
+        "id": "g-c707befe263f3bfe9f4855e461aa34834cb7875d1b9a450ebf32dd26ee0d1e5f",
+        "component": "src/coordination",
+        "invariant": "consequence evidence refuses surviving storage damage instead of shrinking navigation",
+        "chokepoint": "readConsequences"
+      },
+      {
+        "id": "g-82029f55a2adb1eb02e68226cd63ae401a2954a662c409abaf5e1b55910b1a5f",
+        "component": "src/coordination",
+        "invariant": "orientation refuses damaged evidence before selecting a swarm heading",
+        "chokepoint": "observeOrientation"
+      },
+      {
+        "id": "g-90c7ca7d1fb899c411f8ef1039a38e700dade8f6d262b59d0640a12ada155de1",
+        "component": "src/coordination",
+        "invariant": "orientation admits verification state only with valid shape and comparable provenance",
+        "chokepoint": "verifyOrientation"
+      },
+      {
+        "id": "g-dbb875aea7e5c2b1657aeeb482612120a92a7c3ed0a4dd68d2796162d920f932",
+        "component": "src/coordination",
+        "invariant": "verification currency follows material repository state without invalidating its own receipt",
+        "chokepoint": "verifyOrientation"
+      },
+      {
+        "id": "g-f5ffb3e5ab886b0070974693a860c22b96f7b5a196ad50443cbbd18e7f119775",
+        "component": "src/coordination",
+        "invariant": "orientation selects synthesis only when parent closure can execute it",
+        "chokepoint": "observeOrientation"
+      },
+      {
+        "id": "g-13b14de2f711f7c4621da185d944e18b355a4a24635cd1d5d3f0a078a27960a3",
+        "component": "src/coordination",
+        "invariant": "orientation derives live blockage only from closeable work state",
+        "chokepoint": "observeOrientation"
+      },
+      {
+        "id": "g-c893d71a84739c889cd3882c36159d205d8c1996e8bdcc19fb041d9a7f837a39",
+        "component": "src/coordination",
+        "invariant": "completed work remains unverified until an explicit verification edge names it",
+        "chokepoint": "observeRegulation"
+      },
+      {
+        "id": "g-954c1e85a4cb55015cfa52de92ff41f43b0b88674173a42540060b2ee22175f9",
+        "component": "src/derivation",
+        "invariant": "Python local imports resolve only at the declared direct-module grade",
+        "chokepoint": "pythonImportCandidates"
+      },
+      {
+        "id": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d",
+        "component": "src/derivation",
+        "invariant": "spec containment follows declared ancestry without inventing dependencies",
+        "chokepoint": "buildGraph"
+      },
+      {
+        "id": "g-54e397e1d5d6537d8bc3137c4ac996d18ef45cbcabe5d42061335e7f08647e59",
+        "component": "src/derivation",
+        "invariant": "harness source remains searchable text rather than silently becoming binary",
+        "chokepoint": "sourceTextIsNavigable"
+      },
+      {
+        "id": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09",
+        "component": "src/derivation",
+        "invariant": "a declared language resolves to a real adapter or refuses, never a silent fallback",
+        "chokepoint": "resolveLanguageAdapter"
+      },
+      {
+        "id": "g-6f4302e8ac07d03d25c99c556ec4b485d077d6c46e07a7dde48cb7062f0c4a11",
+        "component": "src/derivation",
+        "invariant": "a built-in language pack is data: queries, patterns, and named strategies, never code",
+        "chokepoint": "builtinLanguagePacks"
+      },
+      {
+        "id": "g-53550835977575002ba22785c78f9dcaa1f78d814708dfd5fcfbc1c9356d1a0d",
+        "component": "src/diagnostics",
+        "invariant": "calibration denominators contain only validated surviving evidence",
+        "chokepoint": "validateCalibrationSample"
+      },
+      {
+        "id": "g-96f1f46fb8a7a7e0dc5ab050f5237a3dd8e65088f368f05599d87557d9a7d2d7",
+        "component": "src/diagnostics",
+        "invariant": "significant behavioral growth acquires an anchor or patch-specific decision",
+        "chokepoint": "signal"
+      },
+      {
+        "id": "g-04856f5183879bf681114c89b75bc6d8d994c0c3310e8aced20a05db7ae62b93",
+        "component": "src/diagnostics",
+        "invariant": "cached decisions expose structurally expired premises",
+        "chokepoint": "auditPremiseLeases"
+      },
+      {
+        "id": "g-4c06305370759763a11e7d5d895176ce19b8f8a75aad8a493e1f885f31276e2b",
+        "component": "src/diagnostics",
+        "invariant": "predicted context closure is calibrated against observed reads and outcomes",
+        "chokepoint": "calibrate"
+      },
+      {
+        "id": "g-d6e0b1b54a09c42f92856d5f64f2638367fc5f0d79cf604974abd863716afa5c",
+        "component": "src/diagnostics",
+        "invariant": "calibration preserves the weakest host attribution of its trace",
+        "chokepoint": "calibrationPaths"
+      },
+      {
+        "id": "g-191523b1d154489636c26bf60122726298b29494650ca3c58ef47e09a1aba57a",
+        "component": "src/diagnostics",
+        "invariant": "reviewed risk sites survive relocation but never duplication",
+        "chokepoint": "reconcile"
+      },
+      {
+        "id": "g-80b8fcc6922a85bf5238e6f61cb43cc7b3f8e2b66aa3b5932ad7cd2e156fa53f",
+        "component": "src/diagnostics",
+        "invariant": "pinned mass follows a value-conserving rename but never absorbs growth",
+        "chokepoint": "reconcileMass"
+      },
+      {
+        "id": "g-96cad312ff822d6934e47f5d5483433148b364491e8372fc6d6c06c93c709024",
+        "component": "src/diagnostics",
+        "invariant": "python sources feed the same instruments as typescript at their declared grade",
+        "chokepoint": "surfaceOfSource"
+      },
+      {
+        "id": "g-e541294ff4534521ac1119f7bd67c86b59218e48be6b9089565c10a758580714",
+        "component": "src/diagnostics",
+        "invariant": "python sources feed the same instruments as typescript at their declared grade",
+        "chokepoint": "sitesOfPython"
+      },
+      {
+        "id": "g-d9378c80b912fabfb39f08a3a784c72b83a0838d6444cc357d32c8d6b7296043",
+        "component": "src/diagnostics",
+        "invariant": "python sources feed the same instruments as typescript at their declared grade",
+        "chokepoint": "lintSinks"
+      },
+      {
+        "id": "g-94ff0594f20c098b5975a6cd4d6c4714744b4e7403e3a4c87a0373163a392b95",
+        "component": "src/diagnostics",
+        "invariant": "instrument arms read languages through shared grammar queries, never a parallel scanner",
+        "chokepoint": "lintSinks"
+      },
+      {
+        "id": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f",
+        "component": "src/evidence",
+        "invariant": "concurrent status writers preserve complete independent reports",
+        "chokepoint": "recordVerify"
+      },
+      {
+        "id": "g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150",
+        "component": "src/evidence",
+        "invariant": "verdict-bearing decision reads fail closed on surviving journal damage",
+        "chokepoint": "readTrustedJournal"
+      },
+      {
+        "id": "g-dd640f9dff77a6eb8267db51a30e2e67b4cb22e381f168509e0f562a2075aca9",
+        "component": "src/evidence",
+        "invariant": "a committed decision population cannot disappear into adoption from zero",
+        "chokepoint": "readTrustedJournal"
+      },
+      {
+        "id": "g-fe0545c1476681b21a20d071bebf706d04583d70497c388e4f38795966a9cc39",
+        "component": "src/evidence",
+        "invariant": "decision ratification follows explicit subject and authority, never prose similarity or recency",
+        "chokepoint": "analyzeDecisionPositions"
+      },
+      {
+        "id": "g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf",
+        "component": "src/evidence",
+        "invariant": "a skipped run never clobbers an oracle's recorded verdict",
+        "chokepoint": "recordVerify"
+      },
+      {
+        "id": "g-3685a681d581a7b08cc9e2b36453978b42ef987e091a01649cd2b0d513b0a145",
+        "component": "src/evidence",
+        "invariant": "experiment outcomes require criterion-total evidence",
+        "chokepoint": "closeExperiment"
+      },
+      {
+        "id": "g-361b9b7bae849d1ce435ab95ca4e7d812056e9aa0705567f8b0b89eec4047ac1",
+        "component": "src/evidence",
+        "invariant": "experiment telemetry preserves its weakest provable attribution",
+        "chokepoint": "closeExperiment"
+      },
+      {
+        "id": "g-9b1cdfac34250376e0f04fb7fcdb5be051e0ff6690fbd83b0d2f89932ea24c5c",
+        "component": "src/evidence",
+        "invariant": "surviving agent-assessed defect evidence is attributable and internally consistent",
+        "chokepoint": "recordDefect"
+      },
+      {
+        "id": "g-bf42374fcfb692ec656ac3b8949d0b4a95d84f0d285aea11483c485b93da36df",
+        "component": "src/evidence",
+        "invariant": "defect writes refuse pre-existing symlink redirection",
+        "chokepoint": "recordDefect"
+      },
+      {
+        "id": "g-72ff7044484c99e7f4e14e150dc70619e8f285adf53d01d71bb0cb9f843c8d83",
+        "component": "src/evidence",
+        "invariant": "defect provenance is data, never terminal control",
+        "chokepoint": "readDefects"
+      },
+      {
+        "id": "g-f391caadcfdd6258d8bb709cb17b046d0488dc766ca9dbe67415b2710ce70a06",
+        "component": "src/evidence",
+        "invariant": "a streamed journal entry renders exactly once across appends and compaction",
+        "chokepoint": "tailJournal"
+      },
+      {
+        "id": "g-f756d7d25cbc55fc32f6a4ed421ac9607ef47c86760af694e12174b9b16c5cc4",
+        "component": "src/lifecycle",
+        "invariant": "agent lifecycle preserves decisions and exposes the current change signal",
+        "chokepoint": "runHook"
+      },
+      {
+        "id": "g-2aaaefb581db032e8bc270572204620a95e1d6cef9045250bf7ecb2080dd927e",
+        "component": "src/lifecycle",
+        "invariant": "high-frequency lifecycle hooks start without the analysis dependency stack",
+        "chokepoint": "runHook"
+      },
+      {
+        "id": "g-5a5fec4add335e5eb09c9e16dbc5f8889f6bf226751509cd9f6b26eedf3fe611",
+        "component": "src/lifecycle",
+        "invariant": "hook telemetry loss never kills PostToolUse",
+        "chokepoint": "runHook"
+      },
+      {
+        "id": "g-7d53d5fd1e9c3a47789803dc7ebb6cf6525a89569804b61c415037ed785cf861",
+        "component": "src/lifecycle",
+        "invariant": "session startup injects only the exact session's current work order",
+        "chokepoint": "assignedWorkInstructions"
+      },
+      {
+        "id": "g-913eb24ad608140812f1bd2c438e1dd80ec0ea29ef45b5b0361dd9e386307cc3",
+        "component": "src/lifecycle",
+        "invariant": "session startup teaches the executable swarm loop without manufacturing authority",
+        "chokepoint": "runHook"
+      },
+      {
+        "id": "g-bfa3efd2ebdd0519c642388b8bf7d67baa71a763f1f4fa312e924f0a3dcf3d15",
+        "component": "src/lifecycle",
+        "invariant": "session startup survives a damaged decision-journal path with named degradation",
+        "chokepoint": "runHook"
+      },
+      {
+        "id": "g-cced37608bbbc14c92c5ee89061aa190972be9d1c22c33ce53f6045f4633761e",
+        "component": "src/lifecycle",
+        "invariant": "lifecycle hook presence is one canonical runnable bit",
+        "chokepoint": "inspectLifecycleHook"
+      },
+      {
+        "id": "g-fcf3b4700049076d1b7c6016f444683d66638b2cb99dfc43097fcc9b4e512913",
+        "component": "src/lifecycle",
+        "invariant": "supported lifecycle hosts share one control contract without sharing host syntax",
+        "chokepoint": "setLifecycleHookForHost"
+      },
+      {
+        "id": "g-6622a8513f6c28d3796df090e29bbf611eb68529ee9989bdcb9d854f2fe5ee66",
+        "component": "src/lifecycle",
+        "invariant": "current-session activation requires exact installed-bundle evidence",
+        "chokepoint": "currentObservation"
+      },
+      {
+        "id": "g-0f4fea097a31d85ace4d5c682c7b7efe1f7482a8600c7a89e2c0cbfafcd85ae0",
+        "component": "src/lifecycle",
+        "invariant": "customized hook text composes declared overrides and appends, degrading to canon on damage",
+        "chokepoint": "composeHookText"
+      },
+      {
+        "id": "g-09b5e7c0d1628bd4f93f8e6459181d8ced4d67e4d42f40274f316f50ff8d0465",
+        "component": "src/lifecycle",
+        "invariant": "activity evidence is accepted only when identity, scope, time, and command agree",
+        "chokepoint": "isActivityRow"
+      },
+      {
+        "id": "g-03e70b2d98d2b69fe64a0bec93ba9cd8b308928cf377d147c7131535a2c0adf2",
+        "component": "src/readings",
+        "invariant": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+        "chokepoint": "buildScopeModel"
+      },
+      {
+        "id": "g-efa1440100a974b72c017cb6eb493c4e49ddb6859c5118c201388bc1b5ef4c9c",
+        "component": "src/readings",
+        "invariant": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+        "chokepoint": "buildScopeModel"
+      },
+      {
+        "id": "g-279e12278a8564579c2402a7aa0fdcb2539e8e36d863eba923fc8e76e9346764",
+        "component": "src/readings",
+        "invariant": "task context is bounded and names its approximations",
+        "chokepoint": "renderContextProjection"
+      },
+      {
+        "id": "g-58c33dc55db443ed922cd6643db6cc642d78d939428a1524228c68c9973be344",
+        "component": "src/readings",
+        "invariant": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+        "chokepoint": "buildScopeModel"
+      },
+      {
+        "id": "g-e0c889114418ec0be336a0689f113edfb8d82bc0b752f4e848d15a9a350c3304",
+        "component": "src/readings",
+        "invariant": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+        "chokepoint": "buildScopeModel"
+      },
+      {
+        "id": "g-e1cb001a3b7ac9819b05464abca1c279d41a87faba8e07d6e230635188f34724",
+        "component": "src/readings",
+        "invariant": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+        "chokepoint": "renderScope"
+      },
+      {
+        "id": "g-46e8461ac5cf5d006ac9b1bdcb254d8ff50c9df8363a78efc400084e427c4a3a",
+        "component": "src/taxonomy",
+        "invariant": "taxonomy representation roles require operational evidence under their recorded catalog",
+        "chokepoint": "classifyTaxonomy"
+      },
+      {
+        "id": "g-de3ec13c0b8f0405704ce013d70fa251ae5ea1ef1cd47ee5295da9ee66096b2a",
+        "component": "src/taxonomy",
+        "invariant": "taxonomy revisions preserve scoped evidence and refuse damaged history",
+        "chokepoint": "taxonomyView"
+      },
+      {
+        "id": "g-da5ad346269f95c41eb4d8d978050dfe207546719103e78222449792bfda6681",
+        "component": "src/taxonomy",
+        "invariant": "taxonomy suggestions never acquire verification authority",
+        "chokepoint": "classifyTaxonomy"
+      },
+      {
+        "id": "g-f0fc62c537dc5bbc813c19335f8449b18910b7b85d0544d7f80a0cfef42df726",
+        "component": "src/taxonomy",
+        "invariant": "taxonomy suggestions never acquire verification authority",
+        "chokepoint": "TAXONOMY"
+      },
+      {
+        "id": "g-c79be42fd605e585e709cb3c2d3e3df307d805ac4ee364e1d41f4d3bc081b303",
+        "component": "src/taxonomy",
+        "invariant": "taxonomy revisions preserve scoped evidence and refuse damaged history",
+        "chokepoint": "recordTaxonomy"
+      },
+      {
+        "id": "g-a615e7641c3ffafd2d2c1c9c95b6f1a84586dc501ac43b3fbe86164e87034a21",
+        "component": "src/taxonomy",
+        "invariant": "taxonomy revisions preserve scoped evidence and refuse damaged history",
+        "chokepoint": "readTaxonomyRecords"
+      },
+      {
+        "id": "g-d1bce33f601420fa5db2e33d610ec91024029082fdcdb78ee7f4463ca49f4ad3",
+        "component": "src/taxonomy",
+        "invariant": "taxonomy wire records require canonical internally consistent caller assessments",
+        "chokepoint": "validateTaxonomyRecord"
+      },
+      {
+        "id": "g-f4b854e4f43303b214d3094b19a2667ddaf556afb65cb9064b6f3429d4b99702",
+        "component": "src/taxonomy",
+        "invariant": "taxonomy revisions preserve scoped evidence and refuse damaged history",
+        "chokepoint": "captureTaxonomy"
+      },
+      {
+        "id": "g-3892b535f05c1d46e70b27236e053ea36725542363ed834dd430f1efbbea88fb",
+        "component": "src/verification",
+        "invariant": "catalog binding support requires a named oracle check at unchanged explicit inputs",
+        "chokepoint": "bindRunEvidence"
+      },
+      {
+        "id": "g-c58d9e5f276c26c0be71ee2d63b8c8b15c418cb827455a2c3ab2af24180fbc80",
+        "component": "src/verification",
+        "invariant": "catalog binding support requires a named oracle check at unchanged explicit inputs",
+        "chokepoint": "projectBindings"
+      },
+      {
+        "id": "g-b025f20775ae6a447a0c511d282d64a1bc33c0a3e2b73d9a7bffa409893aba64",
+        "component": "src/verification",
+        "invariant": "catalog binding support requires a named oracle check at unchanged explicit inputs",
+        "chokepoint": "projectBindings"
+      },
+      {
+        "id": "g-e6376dd5ecea74f5a4f231ab3737fd46db9826bd61326d1362b7dfa4dd0a0b13",
+        "component": "src/verification",
+        "invariant": "candidate guarantee vocabulary stays project-independent and never activates obligations",
+        "chokepoint": "runGuaranteeCatalog"
+      },
+      {
+        "id": "g-623fddc1ade863d09ab3d23cfe3f5485d666d1c55ba736583df76d5b8293ef64",
+        "component": "src/verification",
+        "invariant": "candidate guarantee vocabulary stays project-independent and never activates obligations",
+        "chokepoint": "runGuaranteeCatalog"
+      },
+      {
+        "id": "g-6f9e452d15d53e356b2989b222c65713c1d2239d48b0869566bd6e929df38cd4",
+        "component": "src/verification",
+        "invariant": "explicit guarantee links expire with their premises and never prove satisfaction",
+        "chokepoint": "resolveGuaranteeLinks"
+      },
+      {
+        "id": "g-d6244b8ab8b0e28cbc3b1e767f965e566335ee7225751d8db44b18bc7419161b",
+        "component": "src/verification",
+        "invariant": "a claim goes green only on positive evidence its oracle ran",
+        "chokepoint": "execNamedTest"
+      },
+      {
+        "id": "g-b2adce179b206bf934359709b496cf79c09b083c281debb6abcfe54a6c27d82c",
+        "component": "src/verification",
+        "invariant": "a vanished oracle reds its claim, never green-by-absence",
+        "chokepoint": "resolveFromBatch"
+      },
+      {
+        "id": "g-166c492aba8f6ce2da13f81354f6b5f70e94472e5b1abc8a619720920f3e17ad",
+        "component": "src/verification",
+        "invariant": "fast verification rejects a statically vanished Vitest oracle without executing tests",
+        "chokepoint": "resolveStaticOracle"
+      },
+      {
+        "id": "g-05886f174291e7cce7e9f7cf492e5454968edf06e0351c175b29d0761f3d8e09",
+        "component": "src/verification",
+        "invariant": "fast oracle absence requires a complete direct-declaration population",
+        "chokepoint": "resolveStaticOracle"
+      },
+      {
+        "id": "g-adafda36258aa2adbcdc22b383b5dfee52f283849ddd9dd766b2e512fb72910e",
+        "component": "src/verification",
+        "invariant": "a declared invariant unanchored by any boundary fails coverage",
+        "chokepoint": "runVerify"
+      },
+      {
+        "id": "g-405fa2f11f88ce4e307cec422162649b07dda1ba6c80c68d64097a4d8989ae3f",
+        "component": "src/verification",
+        "invariant": "a via-test oracle that iterates no live domain fails its claim",
+        "chokepoint": "analyzeOracle"
+      },
+      {
+        "id": "g-2855a7aa75934deeda6a5ef8301fd8b18241bb62dd81e0cca835c6f5425ca7aa",
+        "component": "src/verification",
+        "invariant": "a named oracle that no test runs cannot pass",
+        "chokepoint": "runNamedTest"
+      },
+      {
+        "id": "g-db68bb89c99dd2ad269d505de1e1f307b6bd4414638554afe38ddd52592a4b7a",
+        "component": "src/verification",
+        "invariant": "an empty derivation against a remembered surface refuses, never passes",
+        "chokepoint": "vacuityRefusal"
+      },
+      {
+        "id": "g-bfef8cbed1a292cfacf8fd4cb6f186a3667b11fda619463a431f61e1ea770dfa",
+        "component": "src/verification",
+        "invariant": "python sources feed the same instruments as typescript at their declared grade",
+        "chokepoint": "analyzeParityOracle"
+      },
+      {
+        "id": "g-bb32cf33099ee37766eb456d21f26afb895e4774fbb31133e1aa0f1d86d0a24b",
+        "component": "src/verification",
+        "invariant": "python sources feed the same instruments as typescript at their declared grade",
+        "chokepoint": "resolveFromBatch"
+      },
+      {
+        "id": "g-8c1be2fad7bd80dc0f0997183ee61dcac8a05acd650c2f16aa127861081fa8d3",
+        "component": "src/verification",
+        "invariant": "an undeclared root refuses the walk, never wanders",
+        "chokepoint": "requireDeclaredRoot"
+      }
+    ],
+    "links": [
+      {
+        "owner": "src/derivation",
+        "kind": "addresses",
+        "claim": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d",
+        "provider": "src/derivation",
+        "subject": "src/derivation/derive.ts#buildGraph",
+        "obligation": "guarantee:G-PROJECTION",
+        "assessment": "t-62eb19624910e1e45da79565e119ca0e8cd6df2f1c6910aa7533a22f133bbe28",
+        "because": "The containment oracle checks deepest declared ownership without fabricating dependency edges. This addresses ownership preservation in the graph projection, not completeness of every adapter or source construct.",
+        "basis": "caller-assessed",
+        "status": "stale",
+        "problems": [
+          "Assessment expired: changed or missing: package.json; changed or missing: src/adapters/tree-sitter.ts; changed or missing: src/derivation/derive.ts; changed or missing: src/derivation/walk.ts; changed or missing: src/types.ts"
+        ]
+      },
+      {
+        "owner": "src/evidence",
+        "kind": "addresses",
+        "claim": "g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150",
+        "provider": "src/evidence",
+        "subject": "src/evidence/decisions.ts#readTrustedJournal",
+        "obligation": "guarantee:G-BOUNDARY",
+        "assessment": "t-157fca4c0054ab5f39288e1bea84ccd3b8172d17ee48cea48315c735dac7cd32",
+        "because": "The strict journal projection validates surviving records and refuses the whole reading on damage. This addresses the invalid-input refusal part of the boundary obligation, not all caller-visible failure semantics.",
+        "basis": "caller-assessed",
+        "status": "stale",
+        "problems": [
+          "Assessment expired: changed or missing: package.json; changed or missing: src/types.ts"
+        ]
+      },
+      {
+        "owner": "src/evidence",
+        "kind": "addresses",
+        "claim": "g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf",
+        "provider": "src/evidence",
+        "subject": "src/evidence/status.ts#recordVerify",
+        "obligation": "guarantee:G-PERSISTENCE",
+        "assessment": "t-43387dcec74b31d96afdd95ba168f59db2ee996d511ef3d565958514ebeadb59",
+        "because": "The merge preserves the dated prior oracle verdict when a later run skips it. This addresses retained report history, not immutable evidence or complete crash recovery.",
+        "basis": "caller-assessed",
+        "status": "stale",
+        "problems": [
+          "Assessment expired: changed or missing: package.json; changed or missing: src/evidence/status.ts; changed or missing: src/types.ts"
+        ]
+      },
+      {
+        "owner": "src/lifecycle",
+        "kind": "relies",
+        "claim": "g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150",
+        "provider": "src/evidence",
+        "subject": null,
+        "obligation": null,
+        "assessment": null,
+        "because": "SessionStart reads readTrustedJournal before projecting durable decisions. It requires damage to refuse the verdict-bearing projection instead of silently presenting a partial journal as trusted.",
+        "basis": "caller-assessed",
+        "status": "current",
+        "problems": []
+      },
+      {
+        "owner": "src/readings",
+        "kind": "relies",
+        "claim": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d",
+        "provider": "src/derivation",
+        "subject": null,
+        "obligation": null,
+        "assessment": null,
+        "because": "Reading surfaces consume the derived graph to show component ancestry and imports. They require containment to follow the deepest declared ancestor without inventing dependency connections.",
+        "basis": "caller-assessed",
+        "status": "current",
+        "problems": []
+      },
+      {
+        "owner": "src/verification",
+        "kind": "relies",
+        "claim": "g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf",
+        "provider": "src/evidence",
+        "subject": null,
+        "obligation": null,
+        "assessment": null,
+        "because": "runVerify publishes scoped and fast results through recordVerify. A skipped oracle must retain its prior dated verdict rather than erase the evidence used by subsequent readers.",
+        "basis": "caller-assessed",
+        "status": "current",
+        "problems": []
+      }
+    ]
+  },
+  "before": {
+    "ref": "ac70b9580cbaa9cb5f1fe5424f7ba60d898e37ee",
+    "guarantees": [
+      {
+        "id": "g-212e8822ab337b675432f1c60961e6e98ba52b1674623ac4186f8092db1f08e3",
+        "owner": "src/adapters",
+        "inv": "committed platform capabilities survive optional deployment-config toggles"
+      },
+      {
+        "id": "g-a6b78578502dc6ce572e1502d76a2475b5441d21c92a41ed6b228078275538ee",
+        "owner": "src/adapters",
+        "inv": "a grammar-backed adapter derives the graph through the same language seam"
+      },
+      {
+        "id": "g-387c59a17fac9ecf0ca0846e1a651976a0ffe99bc62e7ca539ff96e155ac1d82",
+        "owner": "src/adapters",
+        "inv": "a parse's heap is returned before the next file"
+      },
+      {
+        "id": "g-2e3d4a42f3f26d54ea02a0dfcf7df76679dfe7d38d086250fff8e58ce5d40a1a",
+        "owner": "src/coordination",
+        "inv": "a weaker regulation obligation never masks a stronger one"
+      },
+      {
+        "id": "g-20aedc6478916cb05edf66af4a25612c1f962d78bd43446fd4a8e3618a467bcd",
+        "owner": "src/coordination",
+        "inv": "regulation evaluates and repairs the selected agent host"
+      },
+      {
+        "id": "g-eaf6be6149f9a4eba86327fc5aa93a461dd0acbb6182a955951518959cca2cc4",
+        "owner": "src/coordination",
+        "inv": "work state is append-only, attributable, and predecessor-checked"
+      },
+      {
+        "id": "g-60553f19225b1145c46ea4eef69fcaac9a33763619ae3292690f235f76c2a8a4",
+        "owner": "src/coordination",
+        "inv": "work cannot activate or complete before every dependency completes"
+      },
+      {
+        "id": "g-df2de47e27a6d0ac018aaecfc9ab4430fccc2ab2e0d364e5494fd36b624eee7b",
+        "owner": "src/coordination",
+        "inv": "runnable work with overlapping write scopes is a collision, never concurrent permission"
+      },
+      {
+        "id": "g-aa1fb4cad7c94f9a62687c2cce2e660a2414958d5fb5cbf3cac9a33dccccd4ad",
+        "owner": "src/coordination",
+        "inv": "a terminal parent has no live child and explicitly synthesizes every completed direct child"
+      },
+      {
+        "id": "g-db47731ff5707245a304131e05a7c669fee3deb2c4aa932d920bacbc15b7be2b",
+        "owner": "src/coordination",
+        "inv": "authored work text is single-line data, never model-instruction control"
+      },
+      {
+        "id": "g-3968df1558ad2e135279e8b7908d7faaada10e14404f5e75bf61ac3e55667a91",
+        "owner": "src/coordination",
+        "inv": "consequence navigation contains only explicit assessed edges"
+      },
+      {
+        "id": "g-75101e6fa8c9471d546b09b1090c3b3609de42d35552a3f5d2dc4cad8e443417",
+        "owner": "src/coordination",
+        "inv": "specialized consequence relations admit only their declared endpoint kinds"
+      },
+      {
+        "id": "g-c707befe263f3bfe9f4855e461aa34834cb7875d1b9a450ebf32dd26ee0d1e5f",
+        "owner": "src/coordination",
+        "inv": "consequence evidence refuses surviving storage damage instead of shrinking navigation"
+      },
+      {
+        "id": "g-82029f55a2adb1eb02e68226cd63ae401a2954a662c409abaf5e1b55910b1a5f",
+        "owner": "src/coordination",
+        "inv": "orientation refuses damaged evidence before selecting a swarm heading"
+      },
+      {
+        "id": "g-90c7ca7d1fb899c411f8ef1039a38e700dade8f6d262b59d0640a12ada155de1",
+        "owner": "src/coordination",
+        "inv": "orientation admits verification state only with valid shape and comparable provenance"
+      },
+      {
+        "id": "g-dbb875aea7e5c2b1657aeeb482612120a92a7c3ed0a4dd68d2796162d920f932",
+        "owner": "src/coordination",
+        "inv": "verification currency follows material repository state without invalidating its own receipt"
+      },
+      {
+        "id": "g-f5ffb3e5ab886b0070974693a860c22b96f7b5a196ad50443cbbd18e7f119775",
+        "owner": "src/coordination",
+        "inv": "orientation selects synthesis only when parent closure can execute it"
+      },
+      {
+        "id": "g-13b14de2f711f7c4621da185d944e18b355a4a24635cd1d5d3f0a078a27960a3",
+        "owner": "src/coordination",
+        "inv": "orientation derives live blockage only from closeable work state"
+      },
+      {
+        "id": "g-c893d71a84739c889cd3882c36159d205d8c1996e8bdcc19fb041d9a7f837a39",
+        "owner": "src/coordination",
+        "inv": "completed work remains unverified until an explicit verification edge names it"
+      },
+      {
+        "id": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d",
+        "owner": "src/derivation",
+        "inv": "spec containment follows declared ancestry without inventing dependencies"
+      },
+      {
+        "id": "g-54e397e1d5d6537d8bc3137c4ac996d18ef45cbcabe5d42061335e7f08647e59",
+        "owner": "src/derivation",
+        "inv": "harness source remains searchable text rather than silently becoming binary"
+      },
+      {
+        "id": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09",
+        "owner": "src/derivation",
+        "inv": "a declared language resolves to a real adapter or refuses, never a silent fallback"
+      },
+      {
+        "id": "g-6f4302e8ac07d03d25c99c556ec4b485d077d6c46e07a7dde48cb7062f0c4a11",
+        "owner": "src/derivation",
+        "inv": "a built-in language pack is data: queries, patterns, and named strategies, never code"
+      },
+      {
+        "id": "g-53550835977575002ba22785c78f9dcaa1f78d814708dfd5fcfbc1c9356d1a0d",
+        "owner": "src/diagnostics",
+        "inv": "calibration denominators contain only validated surviving evidence"
+      },
+      {
+        "id": "g-96f1f46fb8a7a7e0dc5ab050f5237a3dd8e65088f368f05599d87557d9a7d2d7",
+        "owner": "src/diagnostics",
+        "inv": "significant behavioral growth acquires an anchor or patch-specific decision"
+      },
+      {
+        "id": "g-04856f5183879bf681114c89b75bc6d8d994c0c3310e8aced20a05db7ae62b93",
+        "owner": "src/diagnostics",
+        "inv": "cached decisions expose structurally expired premises"
+      },
+      {
+        "id": "g-4c06305370759763a11e7d5d895176ce19b8f8a75aad8a493e1f885f31276e2b",
+        "owner": "src/diagnostics",
+        "inv": "predicted context closure is calibrated against observed reads and outcomes"
+      },
+      {
+        "id": "g-d6e0b1b54a09c42f92856d5f64f2638367fc5f0d79cf604974abd863716afa5c",
+        "owner": "src/diagnostics",
+        "inv": "calibration preserves the weakest host attribution of its trace"
+      },
+      {
+        "id": "g-191523b1d154489636c26bf60122726298b29494650ca3c58ef47e09a1aba57a",
+        "owner": "src/diagnostics",
+        "inv": "reviewed risk sites survive relocation but never duplication"
+      },
+      {
+        "id": "g-80b8fcc6922a85bf5238e6f61cb43cc7b3f8e2b66aa3b5932ad7cd2e156fa53f",
+        "owner": "src/diagnostics",
+        "inv": "pinned mass follows a value-conserving rename but never absorbs growth"
+      },
+      {
+        "id": "g-96cad312ff822d6934e47f5d5483433148b364491e8372fc6d6c06c93c709024",
+        "owner": "src/diagnostics",
+        "inv": "python sources feed the same instruments as typescript at their declared grade"
+      },
+      {
+        "id": "g-e541294ff4534521ac1119f7bd67c86b59218e48be6b9089565c10a758580714",
+        "owner": "src/diagnostics",
+        "inv": "python sources feed the same instruments as typescript at their declared grade"
+      },
+      {
+        "id": "g-d9378c80b912fabfb39f08a3a784c72b83a0838d6444cc357d32c8d6b7296043",
+        "owner": "src/diagnostics",
+        "inv": "python sources feed the same instruments as typescript at their declared grade"
+      },
+      {
+        "id": "g-94ff0594f20c098b5975a6cd4d6c4714744b4e7403e3a4c87a0373163a392b95",
+        "owner": "src/diagnostics",
+        "inv": "instrument arms read languages through shared grammar queries, never a parallel scanner"
+      },
+      {
+        "id": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f",
+        "owner": "src/evidence",
+        "inv": "concurrent status writers preserve complete independent reports"
+      },
+      {
+        "id": "g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150",
+        "owner": "src/evidence",
+        "inv": "verdict-bearing decision reads fail closed on surviving journal damage"
+      },
+      {
+        "id": "g-dd640f9dff77a6eb8267db51a30e2e67b4cb22e381f168509e0f562a2075aca9",
+        "owner": "src/evidence",
+        "inv": "a committed decision population cannot disappear into adoption from zero"
+      },
+      {
+        "id": "g-fe0545c1476681b21a20d071bebf706d04583d70497c388e4f38795966a9cc39",
+        "owner": "src/evidence",
+        "inv": "decision ratification follows explicit subject and authority, never prose similarity or recency"
+      },
+      {
+        "id": "g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf",
+        "owner": "src/evidence",
+        "inv": "a skipped run never clobbers an oracle's recorded verdict"
+      },
+      {
+        "id": "g-3685a681d581a7b08cc9e2b36453978b42ef987e091a01649cd2b0d513b0a145",
+        "owner": "src/evidence",
+        "inv": "experiment outcomes require criterion-total evidence"
+      },
+      {
+        "id": "g-361b9b7bae849d1ce435ab95ca4e7d812056e9aa0705567f8b0b89eec4047ac1",
+        "owner": "src/evidence",
+        "inv": "experiment telemetry preserves its weakest provable attribution"
+      },
+      {
+        "id": "g-9b1cdfac34250376e0f04fb7fcdb5be051e0ff6690fbd83b0d2f89932ea24c5c",
+        "owner": "src/evidence",
+        "inv": "surviving agent-assessed defect evidence is attributable and internally consistent"
+      },
+      {
+        "id": "g-bf42374fcfb692ec656ac3b8949d0b4a95d84f0d285aea11483c485b93da36df",
+        "owner": "src/evidence",
+        "inv": "defect writes refuse pre-existing symlink redirection"
+      },
+      {
+        "id": "g-72ff7044484c99e7f4e14e150dc70619e8f285adf53d01d71bb0cb9f843c8d83",
+        "owner": "src/evidence",
+        "inv": "defect provenance is data, never terminal control"
+      },
+      {
+        "id": "g-f391caadcfdd6258d8bb709cb17b046d0488dc766ca9dbe67415b2710ce70a06",
+        "owner": "src/evidence",
+        "inv": "a streamed journal entry renders exactly once across appends and compaction"
+      },
+      {
+        "id": "g-64c635516a914cdd0097b9b572cf77ad37aabaa85db8914779be99d15292c6ba",
+        "owner": "src",
+        "inv": "swarm write identity and authority flags are singleton or refused"
+      },
+      {
+        "id": "g-f756d7d25cbc55fc32f6a4ed421ac9607ef47c86760af694e12174b9b16c5cc4",
+        "owner": "src/lifecycle",
+        "inv": "agent lifecycle preserves decisions and exposes the current change signal"
+      },
+      {
+        "id": "g-2aaaefb581db032e8bc270572204620a95e1d6cef9045250bf7ecb2080dd927e",
+        "owner": "src/lifecycle",
+        "inv": "high-frequency lifecycle hooks start without the analysis dependency stack"
+      },
+      {
+        "id": "g-5a5fec4add335e5eb09c9e16dbc5f8889f6bf226751509cd9f6b26eedf3fe611",
+        "owner": "src/lifecycle",
+        "inv": "hook telemetry loss never kills PostToolUse"
+      },
+      {
+        "id": "g-7d53d5fd1e9c3a47789803dc7ebb6cf6525a89569804b61c415037ed785cf861",
+        "owner": "src/lifecycle",
+        "inv": "session startup injects only the exact session's current work order"
+      },
+      {
+        "id": "g-913eb24ad608140812f1bd2c438e1dd80ec0ea29ef45b5b0361dd9e386307cc3",
+        "owner": "src/lifecycle",
+        "inv": "session startup teaches the executable swarm loop without manufacturing authority"
+      },
+      {
+        "id": "g-bfa3efd2ebdd0519c642388b8bf7d67baa71a763f1f4fa312e924f0a3dcf3d15",
+        "owner": "src/lifecycle",
+        "inv": "session startup survives a damaged decision-journal path with named degradation"
+      },
+      {
+        "id": "g-cced37608bbbc14c92c5ee89061aa190972be9d1c22c33ce53f6045f4633761e",
+        "owner": "src/lifecycle",
+        "inv": "lifecycle hook presence is one canonical runnable bit"
+      },
+      {
+        "id": "g-fcf3b4700049076d1b7c6016f444683d66638b2cb99dfc43097fcc9b4e512913",
+        "owner": "src/lifecycle",
+        "inv": "supported lifecycle hosts share one control contract without sharing host syntax"
+      },
+      {
+        "id": "g-6622a8513f6c28d3796df090e29bbf611eb68529ee9989bdcb9d854f2fe5ee66",
+        "owner": "src/lifecycle",
+        "inv": "current-session activation requires exact installed-bundle evidence"
+      },
+      {
+        "id": "g-0f4fea097a31d85ace4d5c682c7b7efe1f7482a8600c7a89e2c0cbfafcd85ae0",
+        "owner": "src/lifecycle",
+        "inv": "customized hook text composes declared overrides and appends, degrading to canon on damage"
+      },
+      {
+        "id": "g-09b5e7c0d1628bd4f93f8e6459181d8ced4d67e4d42f40274f316f50ff8d0465",
+        "owner": "src/lifecycle",
+        "inv": "activity evidence is accepted only when identity, scope, time, and command agree"
+      },
+      {
+        "id": "g-03e70b2d98d2b69fe64a0bec93ba9cd8b308928cf377d147c7131535a2c0adf2",
+        "owner": "src/readings",
+        "inv": "Scope projects the canonical promise population with deterministic gravity and honest absence"
+      },
+      {
+        "id": "g-efa1440100a974b72c017cb6eb493c4e49ddb6859c5118c201388bc1b5ef4c9c",
+        "owner": "src/readings",
+        "inv": "Scope projects the canonical promise population with deterministic gravity and honest absence"
+      },
+      {
+        "id": "g-279e12278a8564579c2402a7aa0fdcb2539e8e36d863eba923fc8e76e9346764",
+        "owner": "src/readings",
+        "inv": "task context is bounded and names its approximations"
+      },
+      {
+        "id": "g-58c33dc55db443ed922cd6643db6cc642d78d939428a1524228c68c9973be344",
+        "owner": "src/readings",
+        "inv": "Scope projects the canonical promise population with deterministic gravity and honest absence"
+      },
+      {
+        "id": "g-e0c889114418ec0be336a0689f113edfb8d82bc0b752f4e848d15a9a350c3304",
+        "owner": "src/readings",
+        "inv": "Scope projects the canonical promise population with deterministic gravity and honest absence"
+      },
+      {
+        "id": "g-e1cb001a3b7ac9819b05464abca1c279d41a87faba8e07d6e230635188f34724",
+        "owner": "src/readings",
+        "inv": "Scope projects the canonical promise population with deterministic gravity and honest absence"
+      },
+      {
+        "id": "g-46e8461ac5cf5d006ac9b1bdcb254d8ff50c9df8363a78efc400084e427c4a3a",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy representation roles require operational evidence under their recorded catalog"
+      },
+      {
+        "id": "g-de3ec13c0b8f0405704ce013d70fa251ae5ea1ef1cd47ee5295da9ee66096b2a",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy revisions preserve scoped evidence and refuse damaged history"
+      },
+      {
+        "id": "g-da5ad346269f95c41eb4d8d978050dfe207546719103e78222449792bfda6681",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy suggestions never acquire verification authority"
+      },
+      {
+        "id": "g-f0fc62c537dc5bbc813c19335f8449b18910b7b85d0544d7f80a0cfef42df726",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy suggestions never acquire verification authority"
+      },
+      {
+        "id": "g-c79be42fd605e585e709cb3c2d3e3df307d805ac4ee364e1d41f4d3bc081b303",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy revisions preserve scoped evidence and refuse damaged history"
+      },
+      {
+        "id": "g-a615e7641c3ffafd2d2c1c9c95b6f1a84586dc501ac43b3fbe86164e87034a21",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy revisions preserve scoped evidence and refuse damaged history"
+      },
+      {
+        "id": "g-d1bce33f601420fa5db2e33d610ec91024029082fdcdb78ee7f4463ca49f4ad3",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy wire records require canonical internally consistent caller assessments"
+      },
+      {
+        "id": "g-f4b854e4f43303b214d3094b19a2667ddaf556afb65cb9064b6f3429d4b99702",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy revisions preserve scoped evidence and refuse damaged history"
+      },
+      {
+        "id": "g-d6244b8ab8b0e28cbc3b1e767f965e566335ee7225751d8db44b18bc7419161b",
+        "owner": "src/verification",
+        "inv": "a claim goes green only on positive evidence its oracle ran"
+      },
+      {
+        "id": "g-b2adce179b206bf934359709b496cf79c09b083c281debb6abcfe54a6c27d82c",
+        "owner": "src/verification",
+        "inv": "a vanished oracle reds its claim, never green-by-absence"
+      },
+      {
+        "id": "g-166c492aba8f6ce2da13f81354f6b5f70e94472e5b1abc8a619720920f3e17ad",
+        "owner": "src/verification",
+        "inv": "fast verification rejects a statically vanished Vitest oracle without executing tests"
+      },
+      {
+        "id": "g-05886f174291e7cce7e9f7cf492e5454968edf06e0351c175b29d0761f3d8e09",
+        "owner": "src/verification",
+        "inv": "fast oracle absence requires a complete direct-declaration population"
+      },
+      {
+        "id": "g-adafda36258aa2adbcdc22b383b5dfee52f283849ddd9dd766b2e512fb72910e",
+        "owner": "src/verification",
+        "inv": "a declared invariant unanchored by any boundary fails coverage"
+      },
+      {
+        "id": "g-405fa2f11f88ce4e307cec422162649b07dda1ba6c80c68d64097a4d8989ae3f",
+        "owner": "src/verification",
+        "inv": "a via-test oracle that iterates no live domain fails its claim"
+      },
+      {
+        "id": "g-2855a7aa75934deeda6a5ef8301fd8b18241bb62dd81e0cca835c6f5425ca7aa",
+        "owner": "src/verification",
+        "inv": "a named oracle that no test runs cannot pass"
+      },
+      {
+        "id": "g-db68bb89c99dd2ad269d505de1e1f307b6bd4414638554afe38ddd52592a4b7a",
+        "owner": "src/verification",
+        "inv": "an empty derivation against a remembered surface refuses, never passes"
+      },
+      {
+        "id": "g-bfef8cbed1a292cfacf8fd4cb6f186a3667b11fda619463a431f61e1ea770dfa",
+        "owner": "src/verification",
+        "inv": "python sources feed the same instruments as typescript at their declared grade"
+      },
+      {
+        "id": "g-bb32cf33099ee37766eb456d21f26afb895e4774fbb31133e1aa0f1d86d0a24b",
+        "owner": "src/verification",
+        "inv": "python sources feed the same instruments as typescript at their declared grade"
+      },
+      {
+        "id": "g-8c1be2fad7bd80dc0f0997183ee61dcac8a05acd650c2f16aa127861081fa8d3",
+        "owner": "src/verification",
+        "inv": "an undeclared root refuses the walk, never wanders"
+      }
+    ]
+  },
+  "after": {
+    "ref": "197996912f0eef645f47d938bc6d7a9575dd191f",
+    "guarantees": [
+      {
+        "id": "g-212e8822ab337b675432f1c60961e6e98ba52b1674623ac4186f8092db1f08e3",
+        "owner": "src/adapters",
+        "inv": "committed platform capabilities survive optional deployment-config toggles"
+      },
+      {
+        "id": "g-a6b78578502dc6ce572e1502d76a2475b5441d21c92a41ed6b228078275538ee",
+        "owner": "src/adapters",
+        "inv": "a grammar-backed adapter derives the graph through the same language seam"
+      },
+      {
+        "id": "g-387c59a17fac9ecf0ca0846e1a651976a0ffe99bc62e7ca539ff96e155ac1d82",
+        "owner": "src/adapters",
+        "inv": "a parse's heap is returned before the next file"
+      },
+      {
+        "id": "g-2e3d4a42f3f26d54ea02a0dfcf7df76679dfe7d38d086250fff8e58ce5d40a1a",
+        "owner": "src/coordination",
+        "inv": "a weaker regulation obligation never masks a stronger one"
+      },
+      {
+        "id": "g-20aedc6478916cb05edf66af4a25612c1f962d78bd43446fd4a8e3618a467bcd",
+        "owner": "src/coordination",
+        "inv": "regulation evaluates and repairs the selected agent host"
+      },
+      {
+        "id": "g-eaf6be6149f9a4eba86327fc5aa93a461dd0acbb6182a955951518959cca2cc4",
+        "owner": "src/coordination",
+        "inv": "work state is append-only, attributable, and predecessor-checked"
+      },
+      {
+        "id": "g-60553f19225b1145c46ea4eef69fcaac9a33763619ae3292690f235f76c2a8a4",
+        "owner": "src/coordination",
+        "inv": "work cannot activate or complete before every dependency completes"
+      },
+      {
+        "id": "g-df2de47e27a6d0ac018aaecfc9ab4430fccc2ab2e0d364e5494fd36b624eee7b",
+        "owner": "src/coordination",
+        "inv": "runnable work with overlapping write scopes is a collision, never concurrent permission"
+      },
+      {
+        "id": "g-aa1fb4cad7c94f9a62687c2cce2e660a2414958d5fb5cbf3cac9a33dccccd4ad",
+        "owner": "src/coordination",
+        "inv": "a terminal parent has no live child and explicitly synthesizes every completed direct child"
+      },
+      {
+        "id": "g-db47731ff5707245a304131e05a7c669fee3deb2c4aa932d920bacbc15b7be2b",
+        "owner": "src/coordination",
+        "inv": "authored work text is single-line data, never model-instruction control"
+      },
+      {
+        "id": "g-3968df1558ad2e135279e8b7908d7faaada10e14404f5e75bf61ac3e55667a91",
+        "owner": "src/coordination",
+        "inv": "consequence navigation contains only explicit assessed edges"
+      },
+      {
+        "id": "g-75101e6fa8c9471d546b09b1090c3b3609de42d35552a3f5d2dc4cad8e443417",
+        "owner": "src/coordination",
+        "inv": "specialized consequence relations admit only their declared endpoint kinds"
+      },
+      {
+        "id": "g-c707befe263f3bfe9f4855e461aa34834cb7875d1b9a450ebf32dd26ee0d1e5f",
+        "owner": "src/coordination",
+        "inv": "consequence evidence refuses surviving storage damage instead of shrinking navigation"
+      },
+      {
+        "id": "g-82029f55a2adb1eb02e68226cd63ae401a2954a662c409abaf5e1b55910b1a5f",
+        "owner": "src/coordination",
+        "inv": "orientation refuses damaged evidence before selecting a swarm heading"
+      },
+      {
+        "id": "g-90c7ca7d1fb899c411f8ef1039a38e700dade8f6d262b59d0640a12ada155de1",
+        "owner": "src/coordination",
+        "inv": "orientation admits verification state only with valid shape and comparable provenance"
+      },
+      {
+        "id": "g-dbb875aea7e5c2b1657aeeb482612120a92a7c3ed0a4dd68d2796162d920f932",
+        "owner": "src/coordination",
+        "inv": "verification currency follows material repository state without invalidating its own receipt"
+      },
+      {
+        "id": "g-f5ffb3e5ab886b0070974693a860c22b96f7b5a196ad50443cbbd18e7f119775",
+        "owner": "src/coordination",
+        "inv": "orientation selects synthesis only when parent closure can execute it"
+      },
+      {
+        "id": "g-13b14de2f711f7c4621da185d944e18b355a4a24635cd1d5d3f0a078a27960a3",
+        "owner": "src/coordination",
+        "inv": "orientation derives live blockage only from closeable work state"
+      },
+      {
+        "id": "g-c893d71a84739c889cd3882c36159d205d8c1996e8bdcc19fb041d9a7f837a39",
+        "owner": "src/coordination",
+        "inv": "completed work remains unverified until an explicit verification edge names it"
+      },
+      {
+        "id": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d",
+        "owner": "src/derivation",
+        "inv": "spec containment follows declared ancestry without inventing dependencies"
+      },
+      {
+        "id": "g-54e397e1d5d6537d8bc3137c4ac996d18ef45cbcabe5d42061335e7f08647e59",
+        "owner": "src/derivation",
+        "inv": "harness source remains searchable text rather than silently becoming binary"
+      },
+      {
+        "id": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09",
+        "owner": "src/derivation",
+        "inv": "a declared language resolves to a real adapter or refuses, never a silent fallback"
+      },
+      {
+        "id": "g-6f4302e8ac07d03d25c99c556ec4b485d077d6c46e07a7dde48cb7062f0c4a11",
+        "owner": "src/derivation",
+        "inv": "a built-in language pack is data: queries, patterns, and named strategies, never code"
+      },
+      {
+        "id": "g-53550835977575002ba22785c78f9dcaa1f78d814708dfd5fcfbc1c9356d1a0d",
+        "owner": "src/diagnostics",
+        "inv": "calibration denominators contain only validated surviving evidence"
+      },
+      {
+        "id": "g-96f1f46fb8a7a7e0dc5ab050f5237a3dd8e65088f368f05599d87557d9a7d2d7",
+        "owner": "src/diagnostics",
+        "inv": "significant behavioral growth acquires an anchor or patch-specific decision"
+      },
+      {
+        "id": "g-04856f5183879bf681114c89b75bc6d8d994c0c3310e8aced20a05db7ae62b93",
+        "owner": "src/diagnostics",
+        "inv": "cached decisions expose structurally expired premises"
+      },
+      {
+        "id": "g-4c06305370759763a11e7d5d895176ce19b8f8a75aad8a493e1f885f31276e2b",
+        "owner": "src/diagnostics",
+        "inv": "predicted context closure is calibrated against observed reads and outcomes"
+      },
+      {
+        "id": "g-d6e0b1b54a09c42f92856d5f64f2638367fc5f0d79cf604974abd863716afa5c",
+        "owner": "src/diagnostics",
+        "inv": "calibration preserves the weakest host attribution of its trace"
+      },
+      {
+        "id": "g-191523b1d154489636c26bf60122726298b29494650ca3c58ef47e09a1aba57a",
+        "owner": "src/diagnostics",
+        "inv": "reviewed risk sites survive relocation but never duplication"
+      },
+      {
+        "id": "g-80b8fcc6922a85bf5238e6f61cb43cc7b3f8e2b66aa3b5932ad7cd2e156fa53f",
+        "owner": "src/diagnostics",
+        "inv": "pinned mass follows a value-conserving rename but never absorbs growth"
+      },
+      {
+        "id": "g-96cad312ff822d6934e47f5d5483433148b364491e8372fc6d6c06c93c709024",
+        "owner": "src/diagnostics",
+        "inv": "python sources feed the same instruments as typescript at their declared grade"
+      },
+      {
+        "id": "g-e541294ff4534521ac1119f7bd67c86b59218e48be6b9089565c10a758580714",
+        "owner": "src/diagnostics",
+        "inv": "python sources feed the same instruments as typescript at their declared grade"
+      },
+      {
+        "id": "g-d9378c80b912fabfb39f08a3a784c72b83a0838d6444cc357d32c8d6b7296043",
+        "owner": "src/diagnostics",
+        "inv": "python sources feed the same instruments as typescript at their declared grade"
+      },
+      {
+        "id": "g-94ff0594f20c098b5975a6cd4d6c4714744b4e7403e3a4c87a0373163a392b95",
+        "owner": "src/diagnostics",
+        "inv": "instrument arms read languages through shared grammar queries, never a parallel scanner"
+      },
+      {
+        "id": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f",
+        "owner": "src/evidence",
+        "inv": "concurrent status writers preserve complete independent reports"
+      },
+      {
+        "id": "g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150",
+        "owner": "src/evidence",
+        "inv": "verdict-bearing decision reads fail closed on surviving journal damage"
+      },
+      {
+        "id": "g-dd640f9dff77a6eb8267db51a30e2e67b4cb22e381f168509e0f562a2075aca9",
+        "owner": "src/evidence",
+        "inv": "a committed decision population cannot disappear into adoption from zero"
+      },
+      {
+        "id": "g-fe0545c1476681b21a20d071bebf706d04583d70497c388e4f38795966a9cc39",
+        "owner": "src/evidence",
+        "inv": "decision ratification follows explicit subject and authority, never prose similarity or recency"
+      },
+      {
+        "id": "g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf",
+        "owner": "src/evidence",
+        "inv": "a skipped run never clobbers an oracle's recorded verdict"
+      },
+      {
+        "id": "g-3685a681d581a7b08cc9e2b36453978b42ef987e091a01649cd2b0d513b0a145",
+        "owner": "src/evidence",
+        "inv": "experiment outcomes require criterion-total evidence"
+      },
+      {
+        "id": "g-361b9b7bae849d1ce435ab95ca4e7d812056e9aa0705567f8b0b89eec4047ac1",
+        "owner": "src/evidence",
+        "inv": "experiment telemetry preserves its weakest provable attribution"
+      },
+      {
+        "id": "g-9b1cdfac34250376e0f04fb7fcdb5be051e0ff6690fbd83b0d2f89932ea24c5c",
+        "owner": "src/evidence",
+        "inv": "surviving agent-assessed defect evidence is attributable and internally consistent"
+      },
+      {
+        "id": "g-bf42374fcfb692ec656ac3b8949d0b4a95d84f0d285aea11483c485b93da36df",
+        "owner": "src/evidence",
+        "inv": "defect writes refuse pre-existing symlink redirection"
+      },
+      {
+        "id": "g-72ff7044484c99e7f4e14e150dc70619e8f285adf53d01d71bb0cb9f843c8d83",
+        "owner": "src/evidence",
+        "inv": "defect provenance is data, never terminal control"
+      },
+      {
+        "id": "g-f391caadcfdd6258d8bb709cb17b046d0488dc766ca9dbe67415b2710ce70a06",
+        "owner": "src/evidence",
+        "inv": "a streamed journal entry renders exactly once across appends and compaction"
+      },
+      {
+        "id": "g-64c635516a914cdd0097b9b572cf77ad37aabaa85db8914779be99d15292c6ba",
+        "owner": "src",
+        "inv": "swarm write identity and authority flags are singleton or refused"
+      },
+      {
+        "id": "g-f756d7d25cbc55fc32f6a4ed421ac9607ef47c86760af694e12174b9b16c5cc4",
+        "owner": "src/lifecycle",
+        "inv": "agent lifecycle preserves decisions and exposes the current change signal"
+      },
+      {
+        "id": "g-2aaaefb581db032e8bc270572204620a95e1d6cef9045250bf7ecb2080dd927e",
+        "owner": "src/lifecycle",
+        "inv": "high-frequency lifecycle hooks start without the analysis dependency stack"
+      },
+      {
+        "id": "g-5a5fec4add335e5eb09c9e16dbc5f8889f6bf226751509cd9f6b26eedf3fe611",
+        "owner": "src/lifecycle",
+        "inv": "hook telemetry loss never kills PostToolUse"
+      },
+      {
+        "id": "g-7d53d5fd1e9c3a47789803dc7ebb6cf6525a89569804b61c415037ed785cf861",
+        "owner": "src/lifecycle",
+        "inv": "session startup injects only the exact session's current work order"
+      },
+      {
+        "id": "g-913eb24ad608140812f1bd2c438e1dd80ec0ea29ef45b5b0361dd9e386307cc3",
+        "owner": "src/lifecycle",
+        "inv": "session startup teaches the executable swarm loop without manufacturing authority"
+      },
+      {
+        "id": "g-bfa3efd2ebdd0519c642388b8bf7d67baa71a763f1f4fa312e924f0a3dcf3d15",
+        "owner": "src/lifecycle",
+        "inv": "session startup survives a damaged decision-journal path with named degradation"
+      },
+      {
+        "id": "g-cced37608bbbc14c92c5ee89061aa190972be9d1c22c33ce53f6045f4633761e",
+        "owner": "src/lifecycle",
+        "inv": "lifecycle hook presence is one canonical runnable bit"
+      },
+      {
+        "id": "g-fcf3b4700049076d1b7c6016f444683d66638b2cb99dfc43097fcc9b4e512913",
+        "owner": "src/lifecycle",
+        "inv": "supported lifecycle hosts share one control contract without sharing host syntax"
+      },
+      {
+        "id": "g-6622a8513f6c28d3796df090e29bbf611eb68529ee9989bdcb9d854f2fe5ee66",
+        "owner": "src/lifecycle",
+        "inv": "current-session activation requires exact installed-bundle evidence"
+      },
+      {
+        "id": "g-0f4fea097a31d85ace4d5c682c7b7efe1f7482a8600c7a89e2c0cbfafcd85ae0",
+        "owner": "src/lifecycle",
+        "inv": "customized hook text composes declared overrides and appends, degrading to canon on damage"
+      },
+      {
+        "id": "g-09b5e7c0d1628bd4f93f8e6459181d8ced4d67e4d42f40274f316f50ff8d0465",
+        "owner": "src/lifecycle",
+        "inv": "activity evidence is accepted only when identity, scope, time, and command agree"
+      },
+      {
+        "id": "g-03e70b2d98d2b69fe64a0bec93ba9cd8b308928cf377d147c7131535a2c0adf2",
+        "owner": "src/readings",
+        "inv": "Scope projects the canonical promise population with deterministic gravity and honest absence"
+      },
+      {
+        "id": "g-efa1440100a974b72c017cb6eb493c4e49ddb6859c5118c201388bc1b5ef4c9c",
+        "owner": "src/readings",
+        "inv": "Scope projects the canonical promise population with deterministic gravity and honest absence"
+      },
+      {
+        "id": "g-279e12278a8564579c2402a7aa0fdcb2539e8e36d863eba923fc8e76e9346764",
+        "owner": "src/readings",
+        "inv": "task context is bounded and names its approximations"
+      },
+      {
+        "id": "g-58c33dc55db443ed922cd6643db6cc642d78d939428a1524228c68c9973be344",
+        "owner": "src/readings",
+        "inv": "Scope projects the canonical promise population with deterministic gravity and honest absence"
+      },
+      {
+        "id": "g-e0c889114418ec0be336a0689f113edfb8d82bc0b752f4e848d15a9a350c3304",
+        "owner": "src/readings",
+        "inv": "Scope projects the canonical promise population with deterministic gravity and honest absence"
+      },
+      {
+        "id": "g-e1cb001a3b7ac9819b05464abca1c279d41a87faba8e07d6e230635188f34724",
+        "owner": "src/readings",
+        "inv": "Scope projects the canonical promise population with deterministic gravity and honest absence"
+      },
+      {
+        "id": "g-46e8461ac5cf5d006ac9b1bdcb254d8ff50c9df8363a78efc400084e427c4a3a",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy representation roles require operational evidence under their recorded catalog"
+      },
+      {
+        "id": "g-de3ec13c0b8f0405704ce013d70fa251ae5ea1ef1cd47ee5295da9ee66096b2a",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy revisions preserve scoped evidence and refuse damaged history"
+      },
+      {
+        "id": "g-da5ad346269f95c41eb4d8d978050dfe207546719103e78222449792bfda6681",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy suggestions never acquire verification authority"
+      },
+      {
+        "id": "g-f0fc62c537dc5bbc813c19335f8449b18910b7b85d0544d7f80a0cfef42df726",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy suggestions never acquire verification authority"
+      },
+      {
+        "id": "g-c79be42fd605e585e709cb3c2d3e3df307d805ac4ee364e1d41f4d3bc081b303",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy revisions preserve scoped evidence and refuse damaged history"
+      },
+      {
+        "id": "g-a615e7641c3ffafd2d2c1c9c95b6f1a84586dc501ac43b3fbe86164e87034a21",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy revisions preserve scoped evidence and refuse damaged history"
+      },
+      {
+        "id": "g-d1bce33f601420fa5db2e33d610ec91024029082fdcdb78ee7f4463ca49f4ad3",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy wire records require canonical internally consistent caller assessments"
+      },
+      {
+        "id": "g-f4b854e4f43303b214d3094b19a2667ddaf556afb65cb9064b6f3429d4b99702",
+        "owner": "src/taxonomy",
+        "inv": "taxonomy revisions preserve scoped evidence and refuse damaged history"
+      },
+      {
+        "id": "g-6f9e452d15d53e356b2989b222c65713c1d2239d48b0869566bd6e929df38cd4",
+        "owner": "src/verification",
+        "inv": "explicit guarantee links expire with their premises and never prove satisfaction"
+      },
+      {
+        "id": "g-d6244b8ab8b0e28cbc3b1e767f965e566335ee7225751d8db44b18bc7419161b",
+        "owner": "src/verification",
+        "inv": "a claim goes green only on positive evidence its oracle ran"
+      },
+      {
+        "id": "g-b2adce179b206bf934359709b496cf79c09b083c281debb6abcfe54a6c27d82c",
+        "owner": "src/verification",
+        "inv": "a vanished oracle reds its claim, never green-by-absence"
+      },
+      {
+        "id": "g-166c492aba8f6ce2da13f81354f6b5f70e94472e5b1abc8a619720920f3e17ad",
+        "owner": "src/verification",
+        "inv": "fast verification rejects a statically vanished Vitest oracle without executing tests"
+      },
+      {
+        "id": "g-05886f174291e7cce7e9f7cf492e5454968edf06e0351c175b29d0761f3d8e09",
+        "owner": "src/verification",
+        "inv": "fast oracle absence requires a complete direct-declaration population"
+      },
+      {
+        "id": "g-adafda36258aa2adbcdc22b383b5dfee52f283849ddd9dd766b2e512fb72910e",
+        "owner": "src/verification",
+        "inv": "a declared invariant unanchored by any boundary fails coverage"
+      },
+      {
+        "id": "g-405fa2f11f88ce4e307cec422162649b07dda1ba6c80c68d64097a4d8989ae3f",
+        "owner": "src/verification",
+        "inv": "a via-test oracle that iterates no live domain fails its claim"
+      },
+      {
+        "id": "g-2855a7aa75934deeda6a5ef8301fd8b18241bb62dd81e0cca835c6f5425ca7aa",
+        "owner": "src/verification",
+        "inv": "a named oracle that no test runs cannot pass"
+      },
+      {
+        "id": "g-db68bb89c99dd2ad269d505de1e1f307b6bd4414638554afe38ddd52592a4b7a",
+        "owner": "src/verification",
+        "inv": "an empty derivation against a remembered surface refuses, never passes"
+      },
+      {
+        "id": "g-bfef8cbed1a292cfacf8fd4cb6f186a3667b11fda619463a431f61e1ea770dfa",
+        "owner": "src/verification",
+        "inv": "python sources feed the same instruments as typescript at their declared grade"
+      },
+      {
+        "id": "g-bb32cf33099ee37766eb456d21f26afb895e4774fbb31133e1aa0f1d86d0a24b",
+        "owner": "src/verification",
+        "inv": "python sources feed the same instruments as typescript at their declared grade"
+      },
+      {
+        "id": "g-8c1be2fad7bd80dc0f0997183ee61dcac8a05acd650c2f16aa127861081fa8d3",
+        "owner": "src/verification",
+        "inv": "an undeclared root refuses the walk, never wanders"
+      }
+    ]
+  }
+}

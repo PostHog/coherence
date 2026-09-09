@@ -3,214 +3,87 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium, webkit } from 'playwright';
-import { scopeScene } from './scene.mjs';
+import { mapConnections } from './semantic.mjs';
 
-const url = new URL('../../public/_scope-library.html', import.meta.url).href;
-const screenshots = await mkdtemp(join(tmpdir(), 'scope-library-'));
-const engine = process.env.SCOPE_BROWSER_ENGINE === 'webkit' ? webkit : chromium;
-const browser = await engine.launch({ ...(engine === chromium && process.env.SCOPE_BROWSER_CHANNEL ? { channel: process.env.SCOPE_BROWSER_CHANNEL } : {}) });
+const screenshots = await mkdtemp(join(tmpdir(), 'scope-semantic-'));
+const engine = process.env.SCOPE_BROWSER_ENGINE === 'chromium' ? chromium : webkit;
+const browser = await engine.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
-  page.setDefaultTimeout(5000);
   const errors = [], requests = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('request', r => requests.push(r.url()));
   if (process.env.SCOPE_WITHHOLD_NODE_MEASUREMENTS === '1') await page.addInitScript(() => {
     const NativeObserver = window.ResizeObserver;
-    const deferred = [];
-    window.scopeResumeMeasurements = () => deferred.splice(0).forEach(resume => resume());
     window.ResizeObserver = class extends NativeObserver {
-      observe(target, options) {
-        // Preserve viewport measurement while withholding asynchronous card size
-        // observations. The old output stayed hidden forever in this condition.
-        if (target.classList.contains('react-flow__node')) deferred.push(() => super.observe(target, options));
-        else super.observe(target, options);
-      }
+      observe(target, options) { if (!target.classList.contains('react-flow__node')) super.observe(target, options); }
     };
   });
-  await page.goto(url);
-  await page.waitForSelector('.react-flow__node');
-  await page.waitForFunction(() => {
-    const canvas = document.querySelector('.canvas').getBoundingClientRect();
-    return [...document.querySelectorAll('.component-card')].every(card => {
-      const b = card.getBoundingClientRect();
-      return b.left >= canvas.left && b.right <= canvas.right && b.top >= canvas.top && b.bottom <= canvas.bottom;
-    });
-  });
+  await page.goto(new URL('../../public/_scope-library.html', import.meta.url).href);
+  await page.waitForSelector('[data-detail=overview]');
   const snapshot = await page.locator('#scope-data').evaluate(e => JSON.parse(e.textContent));
-  assert.equal(await page.locator('.card-guarantees:visible').count(), await page.locator('.component-card').count());
-  await page.screenshot({ path: join(screenshots, 'guarantees-default.png') });
-  for (const card of await page.locator('.react-flow__node').all()) {
-    const id = await card.getAttribute('data-id');
-    const names = snapshot.model.guarantees.filter(g => g.component === id).map(g => g.invariant);
-    assert.deepEqual(await card.locator('.card-guarantees > div > p').allTextContents(), names);
-  }
-  for (const button of await page.locator('[data-card-view="description"]').all()) await button.click();
-  assert.ok(await page.locator('.canvas-caption').evaluate(caption => {
-    const a = caption.getBoundingClientRect();
-    return [...document.querySelectorAll('.component-card')].every(card => {
-      const b = card.getBoundingClientRect();
-      return a.bottom <= b.top || a.top >= b.bottom || a.right <= b.left || a.left >= b.right;
-    });
-  }), 'the explanatory caption must not cover a card or its evidence footer');
-  const initialScene = scopeScene(snapshot.model);
-  const readingSize = await page.locator('.gravity-center').evaluate(card => {
-    const scale = card.getBoundingClientRect().width / card.offsetWidth;
-    return { purpose: parseFloat(getComputedStyle(card.querySelector('.spec-intent')).fontSize) * scale,
-      architecture: parseFloat(getComputedStyle(card.querySelector('.spec-prose')).fontSize) * scale };
-  });
-  assert.ok(readingSize.purpose >= 15 && readingSize.architecture >= 14,
-    `default view must be readable in screen pixels, not just CSS pixels: ${JSON.stringify(readingSize)}`);
-  await page.screenshot({ path: join(screenshots, 'reading-default.png') });
-  assert.ok(await page.locator('.canvas').evaluate(canvas => {
-    const b = canvas.getBoundingClientRect();
-    const cardArea = [...canvas.querySelectorAll('.component-card')].reduce((sum, card) => {
-      const r = card.getBoundingClientRect(); return sum + r.width * r.height;
-    }, 0);
-    return cardArea / (b.width * b.height) >= 0.35;
-  }), 'cards occupy the canvas rather than reserving most of it for orbital whitespace');
-  const openingViewport = await page.locator('.react-flow__viewport').getAttribute('style');
-  await page.getByRole('button', { name: 'Fit displayed assemblies' }).click();
-  assert.equal(await page.locator('.react-flow__viewport').getAttribute('style'), openingViewport,
-    'readability and containment must hold in the same default view, not separate zoom modes');
-  assert.ok(await page.locator('.canvas').evaluate(canvas => {
-    const view = canvas.getBoundingClientRect();
-    return [...canvas.querySelectorAll('.component-card')].every(card => {
-      const b = card.getBoundingClientRect();
-      return b.left >= view.left && b.right <= view.right && b.top >= view.top && b.bottom <= view.bottom;
-    });
-  }), 'explicit overview keeps the complete project available');
-  assert.equal(await page.locator('.component-card').count(), initialScene.model.nodes.length);
-  assert.equal(await page.locator('.card-taxonomy').count(), initialScene.model.nodes.length);
-  assert.ok(await page.locator('.component-card').evaluateAll(cards => cards.every(card => {
-    const panel = card.querySelector('.card-taxonomy'), footer = card.querySelector('.card-body footer');
-    return panel.scrollHeight <= panel.clientHeight + 1 && card.scrollHeight <= card.clientHeight + 1
-      && footer.getBoundingClientRect().bottom <= card.getBoundingClientRect().bottom + 1;
-  })), 'taxonomy and verification metadata fit inside the card');
-  assert.ok(await page.locator('.card-taxonomy-roles strong').evaluateAll(labels => labels.every(label => label.scrollWidth <= label.clientWidth + 1)), 'recorded role labels remain readable');
-  assert.ok(await page.locator('.card-taxonomy-roles strong, .card-taxonomy-facets>span').evaluateAll(entries => entries.every(entry => {
-    const style = getComputedStyle(entry);
-    return style.fontFamily.includes('monospace') && parseFloat(style.fontSize) < parseFloat(getComputedStyle(entry.closest('.component-card').querySelector('.spec-intent')).fontSize);
-  })), 'taxonomy entries use smaller monospace type');
-  assert.equal(await page.locator('.react-flow__edge').count(), snapshot.initial.connections.length);
-  assert.ok(await page.locator('.react-flow__node').evaluateAll(es => es.every(e => {
-    const style = getComputedStyle(e), bounds = e.getBoundingClientRect();
-    return style.visibility === 'visible' && style.display !== 'none' && Number(style.opacity) > 0 && bounds.width > 0 && bounds.height > 0;
-  })), 'cards must be painted, not merely present in the DOM');
-  assert.equal(await page.locator('.invariant-evidence').count(), Math.min(8, new Set([
-    ...(snapshot.model.nodes.find(n => n.id === snapshot.model.center).invariants ?? []),
-    ...snapshot.model.guarantees.filter(g => g.component === snapshot.model.center).map(g => g.invariant),
-  ]).size));
-  for (const node of initialScene.model.nodes) {
-    const card = page.locator('.react-flow__node').filter({ has: page.locator('header strong', { hasText: node.label }) });
-    assert.equal(await card.locator('.spec-intent').textContent(), node.intent || 'No authored description.');
-    if (node.prose) assert.equal(await card.locator('.spec-prose').textContent(), node.prose);
-    assert.ok(await card.evaluate(e => {
-      const description = e.querySelector('.card-description'), taxonomy = e.querySelector('.card-taxonomy');
-      return description.getBoundingClientRect().top < taxonomy.getBoundingClientRect().top &&
-        description.scrollHeight <= description.clientHeight + 1;
-    }), 'current project descriptions fit completely ahead of taxonomy');
-  }
-  const boxes = await page.locator('.component-card').evaluateAll(elements => elements.map(e => {
-    const b = e.getBoundingClientRect(); return { left: b.left, right: b.right, top: b.top, bottom: b.bottom };
+  const expected = snapshot.model.nodes.filter(n => n.role === 'assembly');
+  assert.deepEqual((await page.locator('.react-flow__node').evaluateAll(es => es.map(e => e.dataset.id))).sort(), expected.map(n => n.id).sort());
+  assert.equal(await page.locator('.structure-switch').count(), 0);
+  assert.equal(await page.locator('.map-inspector').count(), 0);
+  const positions = () => page.locator('.react-flow__node').evaluateAll(es => es.map(e => [e.dataset.id, e.style.transform]));
+  const initial = await positions();
+  const camera = () => page.locator('.react-flow__viewport').getAttribute('style');
+  const opening = await camera();
+  const boxes = await page.locator('.component-card').evaluateAll(es => es.map(e => {
+    const b = e.getBoundingClientRect(), title = e.querySelector('header strong');
+    return { x: b.x, y: b.y, right: b.right, bottom: b.bottom, title: parseFloat(getComputedStyle(title).fontSize) * b.width / e.offsetWidth,
+      visible: getComputedStyle(e.parentElement).visibility, overflow: e.scrollHeight > e.clientHeight + 1 };
   }));
+  for (const b of boxes) {
+    assert.ok(b.x >= 0 && b.right <= 1601 && b.y >= 200 && b.bottom <= 1001, 'all assemblies fit the opening map');
+    assert.ok(b.title >= 15.9 && b.visible === 'visible' && !b.overflow, 'readable painted cards, including withheld measurements');
+  }
   for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
     const a = boxes[i], b = boxes[j];
-    assert.ok(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top, 'browser cards overlap');
+    assert.ok(a.right <= b.x || b.right <= a.x || a.bottom <= b.y || b.bottom <= a.y, 'cards never overlap');
   }
-  assert.ok(await page.locator('.component-card header strong').evaluateAll(es => es.every(e =>
-    e.scrollHeight <= e.clientHeight + 1 && getComputedStyle(e).color === 'rgb(37, 50, 71)')), 'title clipping or contrast');
-  if (process.env.SCOPE_WITHHOLD_NODE_MEASUREMENTS === '1') {
-    await page.evaluate(async () => {
-      window.scopeResumeMeasurements();
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const connections = mapConnections(snapshot.model, snapshot.initial.connections);
+  assert.equal(await page.locator('.react-flow__edge').count(), connections.length);
+  assert.equal(await page.locator('.map-promise-label').count(), connections.filter(c => c.kind === 'promise').length);
+  assert.ok(await page.locator('.map-promise-label').evaluateAll(labels => labels.every(label => {
+    const b = label.getBoundingClientRect(), x = b.x + b.width / 2, y = b.y + b.height / 2;
+    return [...document.querySelectorAll('.react-flow__node')].filter(n => n.dataset.id !== label.dataset.owner).every(n => {
+      const r = n.getBoundingClientRect(); return x < r.left || x > r.right || y < r.top || y > r.bottom;
     });
-    assert.equal(await page.locator('.react-flow__edge').count(), snapshot.initial.connections.length,
-      'late browser measurements must not erase declared connection endpoints');
+  })), 'a guarantee label must not appear owned by an unrelated central card');
+  for (const n of expected) {
+    const card = page.locator('.react-flow__node').filter({ has: page.locator('header strong', { hasText: n.label }) });
+    assert.equal(await card.locator('.spec-intent').textContent(), n.intent || 'No authored description.');
+    assert.equal(await card.locator('.card-guarantees > div').count(), snapshot.model.guarantees.filter(g => g.component === n.id).length);
   }
-  await page.screenshot({ path: join(screenshots, 'desktop.png') });
-  const seenAssemblies = new Set();
-  for (let groupPage = 0; groupPage < initialScene.pages; groupPage++) {
-    const expected = scopeScene(snapshot.model, { page: groupPage });
-    const visible = await page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-id')));
-    assert.deepEqual(visible.sort(), expected.model.nodes.map(n => n.id).sort());
-    visible.forEach(id => seenAssemblies.add(id));
-    for (const button of await page.locator('[data-card-view="description"]').all()) await button.click();
-    assert.match(await page.locator('.assembly-pagination').innerText(), new RegExp(`${expected.withheld} elsewhere`));
-    assert.ok(await page.locator('.component-card').evaluateAll(cards => cards.every(card => {
-      const prose = card.querySelector('.card-description');
-      return prose.scrollHeight <= prose.clientHeight + 1;
-    })), 'each assembly page retains complete current spec prose');
-    if (groupPage + 1 < initialScene.pages) await page.getByRole('button', { name: 'Next assemblies', exact: true }).click();
+  await page.screenshot({ path: join(screenshots, 'overview.png') });
+  await page.locator('.map-promise-label').first().click();
+  assert.match(await page.locator('.inspector').textContent(), /caller-assessed/);
+  assert.equal(await camera(), opening, 'inspection does not move or resize the map');
+  await page.getByRole('button', { name: 'Close inspector', exact: true }).click();
+  for (let i = 0; i < 12 && await page.locator('[data-detail=summary]').count() === 0; i++) { await page.locator('.react-flow__controls-zoomin').click(); await page.waitForTimeout(250); }
+  await page.waitForSelector('[data-detail=summary]');
+  assert.deepEqual(await positions(), initial);
+  await page.screenshot({ path: join(screenshots, 'summary.png') });
+  for (let i = 0; i < 12 && await page.locator('[data-detail=detail]').count() === 0; i++) { await page.locator('.react-flow__controls-zoomin').click(); await page.waitForTimeout(250); }
+  await page.waitForSelector('[data-detail=detail]');
+  assert.deepEqual(await positions(), initial);
+  const center = page.locator('.gravity-center');
+  assert.ok(await center.locator('.card-guarantees').isVisible());
+  await center.locator('.expand-subjects').click();
+  assert.ok(await center.locator('.subject-map').isVisible());
+  assert.match(await center.locator('.subject-map').textContent(), /guarantee incidence.*declared subjects/s);
+  assert.deepEqual(await positions(), initial, 'local expansion preserves global geography');
+  assert.equal(await page.locator('.component-card').count(), expected.length);
+  await page.screenshot({ path: join(screenshots, 'expanded.png') });
+  await page.getByRole('button', { name: 'Fit displayed assemblies', exact: true }).click();
+  assert.equal(await camera(), opening);
+  for (const [name, selector] of [['Hooks', '.hooks-panel'], ['Journal', '.journal-panel'], ['Taxonomy', '.taxonomy-panel']]) {
+    await page.getByRole('tab', { name, exact: true }).click(); await page.waitForSelector(selector);
   }
-  assert.deepEqual([...seenAssemblies].sort(), snapshot.model.nodes.filter(n => n.role === 'assembly').map(n => n.id).sort());
-  for (let groupPage = 1; groupPage < initialScene.pages; groupPage++) await page.getByRole('button', { name: 'Previous assemblies', exact: true }).click();
-  await page.getByRole('button', { name: 'Whole-project overview', exact: true }).click();
-  assert.equal(await page.locator('.component-card').count(), initialScene.total);
-  for (const link of snapshot.model.guaranteeLinks.links.filter(l => l.kind === 'relies' && l.status === 'current')) {
-    const source = snapshot.model.nodes.find(n => n.id === link.owner);
-    await page.locator('.component-index button').filter({ hasText: source.label }).click();
-    const record = page.locator('.reliance-record').filter({ hasText: link.because });
-    const guarantee = snapshot.model.guarantees.find(g => g.id === link.claim);
-    assert.ok((await record.innerText()).includes(guarantee.invariant));
-    assert.ok((await record.innerText()).includes(guarantee.oracle));
-    assert.match(await record.innerText(), /Link: current · caller-assessed/);
-  }
-  await page.getByRole('button', { name: 'Readable groups', exact: true }).click();
-  assert.equal(await page.locator('.component-card').count(), initialScene.model.nodes.length);
-  await page.locator('.evidence-surface').click();
-  assert.match(await page.locator('.inspector').innerText(), /EVIDENCE SURFACE/);
-  await page.locator('.component-index button').filter({ hasText: 'Coordination' }).click();
-  const transition = snapshot.model.transitions.find(t => t.component === 'src/coordination');
-  assert.ok(transition);
-  await page.locator('.transition-reading').filter({ hasText: transition.symbol }).locator('summary').click();
-  assert.ok((await page.locator('.transition-inspector').innerText()).includes(transition.translates));
-  await page.locator('.component-index button').filter({ hasText: 'Harness core' }).click();
-  const center = snapshot.model.nodes.find(n => n.id === snapshot.model.center);
-  const linked = center.invariants.find(name => center.why.includes(name) && center.refutations.some(r => r.startsWith(`${name}:`)));
-  assert.ok(linked, 'this project has linked spec evidence to exercise');
-  await page.getByRole('searchbox', { name: 'Find an invariant or oracle' }).fill(linked);
-  await page.locator('.invariant-evidence summary').first().click();
-  assert.ok((await page.locator('.invariant-evidence').first().innerText()).includes(center.refutations.find(r => r.startsWith(`${linked}:`))));
-  await page.getByRole('searchbox', { name: 'Find an invariant or oracle' }).fill('');
-
-  const beforeSelection = await page.locator('.react-flow__viewport').getAttribute('style');
-  await page.locator('.component-index button').filter({ hasText: 'Coherence' }).click();
-  assert.equal(await page.locator('.react-flow__viewport').getAttribute('style'), beforeSelection, 'selecting a component must not sacrifice diagram context');
-  assert.match(await page.locator('.inspector').innerText(), /PROJECT CONTAINER/);
-  assert.match(await page.locator('.inspector').innerText(), /Contains/);
-  assert.match(await page.locator('.inspector').innerText(), /Unmeasured — no guarantees/);
-  await page.getByRole('button', { name: 'Fit displayed assemblies' }).click();
-  const mutual = snapshot.initial.connections.find(c => c.mutual);
-  await page.locator(`.react-flow__edge[data-id="${mutual.id}"]`).click();
-  assert.equal(await page.locator('.inspector .reliance-record').count(), 2, 'both canonical directions stay inspectable');
-
-  const before = await page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(n => n.getAttribute('style')).join('|'));
-  await page.getByRole('slider', { name: 'Rotation', exact: true }).fill('45');
-  await page.waitForFunction(previous => [...document.querySelectorAll('.react-flow__node')].map(n => n.getAttribute('style')).join('|') !== previous, before);
-  await page.getByRole('combobox', { name: 'Connection style' }).selectOption('smoothstep');
-  await page.locator('.react-flow__edge-smoothstep').first().waitFor();
-  assert.equal(await page.locator('.react-flow__edge-smoothstep').count(), snapshot.initial.connections.length);
-  await page.getByRole('combobox', { name: 'Connection style' }).selectOption('straight');
-  await page.locator('.react-flow__edge-straight').first().waitFor();
-  assert.equal(await page.locator('.react-flow__edge-straight').count(), snapshot.initial.connections.length);
-  await page.getByRole('button', { name: 'Reset view parameters' }).click();
-  assert.equal(await page.getByRole('slider', { name: 'Rotation', exact: true }).inputValue(), '-180');
-  const viewport = await page.locator('.react-flow__viewport').getAttribute('style');
-  await page.getByRole('button', { name: /zoom in/i }).click();
-  await page.waitForFunction(previous => document.querySelector('.react-flow__viewport').getAttribute('style') !== previous, viewport);
-  await page.getByRole('button', { name: 'Fit displayed assemblies' }).click();
-  // Library pan behavior, on clear canvas away from cards and controls.
-  const beforePan = await page.locator('.react-flow__viewport').getAttribute('style');
-  await page.mouse.move(300, 800); await page.mouse.down(); await page.mouse.move(390, 850, { steps: 5 }); await page.mouse.up();
-  await page.waitForFunction(previous => document.querySelector('.react-flow__viewport').getAttribute('style') !== previous, beforePan);
-  await page.getByRole('button', { name: 'Fit displayed assemblies' }).click();
-  await page.locator('.component-index button').filter({ hasText: 'Source adapters' }).focus();
-  await page.keyboard.press('Enter');
-  assert.equal(await page.locator('.inspector h2').innerText(), 'Source adapters');
-  assert.deepEqual(await page.locator('#scope-data').evaluate(e => JSON.parse(e.textContent)), snapshot, 'parameters must not mutate evidence');
-  await page.screenshot({ path: join(screenshots, 'selection.png') });
-
+  await page.getByRole('tab', { name: 'Structure', exact: true }).click();
+  assert.equal(await camera(), opening, 'tab switches retain map context');
   const beforeTabs = await page.locator('.react-flow__viewport').getAttribute('style');
   await page.getByRole('tab', { name: 'Hooks', exact: true }).click();
   assert.equal(await page.locator('.event-list button').count(), snapshot.readings.hooks.events.length);
@@ -249,7 +122,6 @@ try {
   await page.getByRole('combobox', { name: 'Journal source' }).selectOption('');
   await page.screenshot({ path: join(screenshots, 'journal.png') });
   await page.getByRole('tab', { name: 'Structure', exact: true }).click();
-  assert.equal(await page.locator('.inspector h2').innerText(), 'Source adapters');
   assert.equal(await page.locator('.react-flow__viewport').getAttribute('style'), beforeTabs, 'tab switches must preserve the canvas viewport');
   await page.getByRole('tab', { name: 'Structure', exact: true }).focus();
   await page.keyboard.press('ArrowRight');
@@ -272,6 +144,6 @@ try {
     await page.screenshot({ path: join(screenshots, `mobile-${name.toLowerCase()}.png`) });
   }
   assert.deepEqual(errors, []);
-  assert.deepEqual(requests, [url], 'self-contained means no second request');
-  console.log(`Browser checks passed: structure, Hooks/Journal tabs, shared session, filters, pagination, keyboard navigation, preserved viewport, mobile and no external requests. Screenshots: ${screenshots}`);
+  assert.equal(requests.filter(r => /^https?:/.test(r)).length, 0, 'standalone preview makes no network request');
+  console.log(JSON.stringify({ assemblies: expected.length, titlePixels: boxes[0].title, parity: true, semanticZoom: true, localExpansion: true, screenshots }));
 } finally { await browser.close(); }

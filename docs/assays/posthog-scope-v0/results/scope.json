@@ -1,0 +1,514 @@
+{
+  "root": "PostHog · query-cache adoption slice",
+  "center": "posthog/query_cache",
+  "nodes": [
+    {
+      "id": ".",
+      "graphNodeId": "c:.",
+      "parent": null,
+      "role": "project",
+      "label": "PostHog query-cache slice",
+      "intent": "An isolated source slice, not the complete PostHog application. Two explicitly adopted promises share one original production oracle.",
+      "prose": "",
+      "why": "Use unchanged source to test catalog adoption without altering the working application. The separate pinned runtime runs the original oracle against real Redis and fake S3.",
+      "invariants": [],
+      "refutations": [],
+      "claims": [],
+      "claimKinds": {},
+      "mass": {
+        "ownedFiles": 0,
+        "ownedLines": 0,
+        "ownedSurface": 0,
+        "inboundReliance": 0,
+        "boundaryAuthority": 0,
+        "guaranteeResponsibility": 0,
+        "total": 1
+      },
+      "ring": 2,
+      "angle": 2.356194490192345,
+      "x": 393,
+      "y": 393,
+      "disconnected": true
+    },
+    {
+      "id": "posthog/caching",
+      "graphNodeId": "c:posthog/caching",
+      "parent": ".",
+      "role": "assembly",
+      "label": "Redis connection factory",
+      "intent": "Selects and constructs the query-cache Redis client. No catalog promise is adopted here in this slice.",
+      "prose": "",
+      "why": "Retain this real ownership seam without inventing a guarantee from an import or a passing neighboring test.",
+      "invariants": [],
+      "refutations": [],
+      "claims": [],
+      "claimKinds": {},
+      "mass": {
+        "ownedFiles": 1,
+        "ownedLines": 139,
+        "ownedSurface": 9,
+        "inboundReliance": 1,
+        "boundaryAuthority": 0,
+        "guaranteeResponsibility": 0,
+        "total": 10
+      },
+      "ring": 1,
+      "angle": 0.7853981633974483,
+      "x": 229,
+      "y": -229
+    },
+    {
+      "id": "posthog/query_cache",
+      "graphNodeId": "c:posthog/query_cache",
+      "parent": ".",
+      "role": "assembly",
+      "label": "Query cache",
+      "intent": "Stores query results inline in Redis, moves large compressed results to object storage, and conditionally publishes their pointers.",
+      "prose": "The cache remains readable while uploads complete asynchronously. Redis byte comparisons arbitrate which upload may publish; the losing upload cleans up its own blob.",
+      "why": "A delayed upload must not damage the state that won while it was in flight. Retry recognition is separate from supersession: one distinguishes this operation from a competitor, the other recognizes this operation's own completed effect.",
+      "invariants": [
+        "a late upload cannot replace the newer cache entry or retain its losing blob",
+        "repeating an already-installed pointer swap returns success"
+      ],
+      "refutations": [
+        "a late upload cannot replace the newer cache entry or retain its losing blob: R3 removed the Lua expected-value refusal; the original oracle failed at two retained fake-storage objects instead of one. Restoring it passed.",
+        "repeating an already-installed pointer swap returns success: R3 removed already-applied recognition; the same oracle failed at False versus True. Restoring it passed."
+      ],
+      "claims": [
+        "boundary \"a late upload cannot replace the newer cache entry or retain its losing blob\" at replace_value() via guard \"test_stale_upload_cannot_replace_a_newer_entry\"",
+        "boundary \"repeating an already-installed pointer swap returns success\" at replace_value() via guard \"test_stale_upload_cannot_replace_a_newer_entry\""
+      ],
+      "claimKinds": {},
+      "mass": {
+        "ownedFiles": 10,
+        "ownedLines": 1537,
+        "ownedSurface": 21,
+        "inboundReliance": 0,
+        "boundaryAuthority": 0,
+        "guaranteeResponsibility": 2,
+        "total": 23
+      },
+      "ring": 0,
+      "angle": 0,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "posthog/query_cache/test",
+      "graphNodeId": "c:posthog/query_cache/test",
+      "parent": "posthog/query_cache",
+      "role": "evidence",
+      "label": "Query-cache oracles",
+      "intent": "Exercises query-cache behavior. The adopted promises share the original stale-upload test, with controlled upload order, real Redis and fake S3.",
+      "prose": "",
+      "why": "Retain this real ownership seam without inventing a guarantee from an import or a passing neighboring test.",
+      "invariants": [],
+      "refutations": [],
+      "claims": [],
+      "claimKinds": {},
+      "mass": {
+        "ownedFiles": 4,
+        "ownedLines": 1015,
+        "ownedSurface": 14,
+        "inboundReliance": 0,
+        "boundaryAuthority": 0,
+        "guaranteeResponsibility": 0,
+        "total": 14
+      },
+      "ring": 2,
+      "angle": 5.497787143782138,
+      "x": -393,
+      "y": -393,
+      "disconnected": true
+    },
+    {
+      "id": "posthog/storage",
+      "graphNodeId": "c:posthog/storage",
+      "parent": ".",
+      "role": "assembly",
+      "label": "Object storage client",
+      "intent": "Provides storage reads, writes and deletion. The selected oracle substitutes FakeObjectStorage; it does not verify this client.",
+      "prose": "",
+      "why": "Retain this real ownership seam without inventing a guarantee from an import or a passing neighboring test.",
+      "invariants": [],
+      "refutations": [],
+      "claims": [],
+      "claimKinds": {},
+      "mass": {
+        "ownedFiles": 1,
+        "ownedLines": 648,
+        "ownedSurface": 11,
+        "inboundReliance": 1,
+        "boundaryAuthority": 0,
+        "guaranteeResponsibility": 0,
+        "total": 12
+      },
+      "ring": 1,
+      "angle": 3.9269908169872414,
+      "x": -229,
+      "y": 229
+    }
+  ],
+  "relations": [
+    {
+      "id": "r:posthog/query_cache->posthog/caching:0",
+      "source": "posthog/query_cache",
+      "target": "posthog/caching",
+      "kind": "reliance",
+      "crossing": null,
+      "via": null
+    },
+    {
+      "id": "r:posthog/query_cache->posthog/storage:1",
+      "source": "posthog/query_cache",
+      "target": "posthog/storage",
+      "kind": "reliance",
+      "crossing": null,
+      "via": null
+    },
+    {
+      "id": "r:posthog/query_cache/test->posthog/caching:0",
+      "source": "posthog/query_cache/test",
+      "target": "posthog/caching",
+      "kind": "evidence-import",
+      "crossing": null,
+      "via": null
+    },
+    {
+      "id": "r:posthog/query_cache/test->posthog/query_cache:1",
+      "source": "posthog/query_cache/test",
+      "target": "posthog/query_cache",
+      "kind": "evidence-import",
+      "crossing": null,
+      "via": null
+    },
+    {
+      "id": "r:posthog/query_cache/test->posthog/storage:2",
+      "source": "posthog/query_cache/test",
+      "target": "posthog/storage",
+      "kind": "evidence-import",
+      "crossing": null,
+      "via": null
+    }
+  ],
+  "guarantees": [
+    {
+      "id": "g-a97b9dc48cd7f6acdb0cbee1c527bb731bfc08a8bd36a61d54d8920ffbf57198",
+      "component": "posthog/query_cache",
+      "invariant": "a late upload cannot replace the newer cache entry or retain its losing blob",
+      "chokepoint": "replace_value()",
+      "grade": "C",
+      "verdict": "pass",
+      "crossing": null,
+      "oracle": "test_stale_upload_cannot_replace_a_newer_entry"
+    },
+    {
+      "id": "g-f2bb6e947d40dceea023069a08f735a23cca490f142e8554fb8ccb32ec323596",
+      "component": "posthog/query_cache",
+      "invariant": "repeating an already-installed pointer swap returns success",
+      "chokepoint": "replace_value()",
+      "grade": "C",
+      "verdict": "pass",
+      "crossing": null,
+      "oracle": "test_stale_upload_cannot_replace_a_newer_entry"
+    }
+  ],
+  "containment": [
+    {
+      "parent": ".",
+      "child": "posthog/caching"
+    },
+    {
+      "parent": ".",
+      "child": "posthog/query_cache"
+    },
+    {
+      "parent": "posthog/query_cache",
+      "child": "posthog/query_cache/test"
+    },
+    {
+      "parent": ".",
+      "child": "posthog/storage"
+    }
+  ],
+  "guaranteeLinks": {
+    "version": 1,
+    "links": [],
+    "obligations": [],
+    "issues": [],
+    "taxonomy": "available",
+    "limit": "Link integrity is not satisfaction. Applicability and mapping are caller-assessed; oracle verdicts are separate recorded evidence, not immutable receipts. Import adjacency is not proof a guarantee is consumed."
+  },
+  "charts": null,
+  "transitions": [],
+  "catalogBindings": {
+    "items": [
+      {
+        "id": "b-376b9821e4dbfb58c72616916ffc86224f1628ec34392252d05ebe47286a3f24",
+        "owner": "posthog/query_cache",
+        "declaration": {
+          "claim": "g-a97b9dc48cd7f6acdb0cbee1c527bb731bfc08a8bd36a61d54d8920ffbf57198",
+          "definition": "guarantee:supersession-safety",
+          "definitionDigest": "9981729651f78817013e918715800750228490b576f36313858df3fc7e5b35c5",
+          "subject": "posthog/query_cache/size_tracker.py",
+          "assessor": "Codex · caller-assessed adoption, 2026-09-09",
+          "because": "Two asynchronous uploads can complete out of order for one cache key. The Redis compare-and-swap and upload cleanup form the bounded publication contract.",
+          "parameters": {
+            "publication subject": "The Redis entry at entry_redis_key(cache_key)",
+            "operation identity": "The per-upload UUID embedded in the S3 pointer",
+            "supersession relation": "Current Redis bytes differ from the inline bytes captured by this upload",
+            "acceptance precondition": "Current bytes equal expected inline bytes, or already equal this operation's pointer",
+            "cleanup ownership": "A losing upload deletes its own blob, never the winner's blob"
+          },
+          "excludes": "ABA with equal inline bytes, Redis failover, real S3 behavior and crash cleanup. R3 mutation failed first on orphan count; the later newer-response assertion was not reached.",
+          "falsifier": "Store older then newer results; finish newer upload before older; observe two remaining blobs instead of one or read back the older response.",
+          "evidence": {
+            "LICENSE": "6d82d67dba42eb94ba10f1e986d2eec338c22fb7c5216c2c0ebdecd83d53a029",
+            "posthog/caching/redis_cluster_connection_factory.py": "e14dbaaed815c440f06a2719ba258cb7e55d09e39916627705cbc875f871640e",
+            "posthog/query_cache/__init__.py": "9b166a8dfe48afc705ef99d3e8cc4186ed9b1d27d033c58225069a2b0fa5a5e7",
+            "posthog/query_cache/cache.py": "f677f2ceec9da546320ec368003546023f5169176d475f04f370e5b9e308ceb2",
+            "posthog/query_cache/failures.py": "168ab742db8db40cdc033d1ba6dab1f06b2956fa0b9635428fa39feb83b1b8d4",
+            "posthog/query_cache/freshness_index.py": "647e8b7a134eb28cc2272b4b4e7749e0983c0ab462d905b2cf248d301d6bdf6b",
+            "posthog/query_cache/metrics.py": "fc641c6a4f7900e9d3b6398c550096a066c5cc04343ff880392dbaacf19100a2",
+            "posthog/query_cache/results.py": "d218945f7be2e4ef5ee6ac151ebe42204a5d61e6e3a7170acab340f00593a9cb",
+            "posthog/query_cache/serialization.py": "dc97ae800ff2b2ad9a0853504a6078b8b77910d1cc28358ede87bc2da1198a42",
+            "posthog/query_cache/size_tracker.py": "9b1ff8d3b638b2532fa66b323cbb092c3e9b0bf34ccbfc7298716202fd6a0920",
+            "posthog/query_cache/storage.py": "760a88347afeb1ecaebaeb220fd0beded36eee1c2b8bc3fd0923f535c69ea54a",
+            "posthog/query_cache/tasks.py": "9f2100c61accb603cf9ea04a1bbf9b2ec9fdaa3e8e3811999bb90ea4a6f00222",
+            "posthog/query_cache/test/test_cache.py": "422e4ffd05e8e31b36704ae26efa274eb8107a7a26ef99081ba4a2b87c23476f",
+            "posthog/query_cache/test/test_failures.py": "90084af900a9697d83e8dc58e3a8fe0900379e9fab2845007b2078c555540bab",
+            "posthog/query_cache/test/test_size_tracker.py": "4be9b189cc95282b8a535e9e2ccbc770c44fb428fb5ea9e66e90d3119d98e136",
+            "posthog/query_cache/test/test_storage.py": "eeeda47ddec7c8517fd72d5f0863aee40110960eeeca8631176c733fedce1f7c",
+            "posthog/storage/object_storage.py": "eab2edf460e1abea8684e0069634ccaf15ee387c06d83aab6c38a1c5fac2ba0e",
+            "oracle.py": "d1e0a021cc96a3ba2bf9712edebc4c50122b2ea2c9fc620e7b99b757a2b5723b",
+            "source-pins.json": "2b395d72144946c5e1a945353c7d5a8721e24d3f049f429ade4b699bf36f6b77",
+            "assay-runtime.json": "4fba6771fda4759792a216377a320add85637c4924f29a3e425de79d8502cce1",
+            "network/sitecustomize.py": "31f21cb7a0cc7947df4178c907b966b8406432e1556ddba056ff9f1820a6d37a"
+          }
+        },
+        "binding": {
+          "claim": "g-a97b9dc48cd7f6acdb0cbee1c527bb731bfc08a8bd36a61d54d8920ffbf57198",
+          "definition": "guarantee:supersession-safety",
+          "definitionDigest": "9981729651f78817013e918715800750228490b576f36313858df3fc7e5b35c5",
+          "subject": "posthog/query_cache/size_tracker.py",
+          "assessor": "Codex · caller-assessed adoption, 2026-09-09",
+          "because": "Two asynchronous uploads can complete out of order for one cache key. The Redis compare-and-swap and upload cleanup form the bounded publication contract.",
+          "parameters": {
+            "publication subject": "The Redis entry at entry_redis_key(cache_key)",
+            "operation identity": "The per-upload UUID embedded in the S3 pointer",
+            "supersession relation": "Current Redis bytes differ from the inline bytes captured by this upload",
+            "acceptance precondition": "Current bytes equal expected inline bytes, or already equal this operation's pointer",
+            "cleanup ownership": "A losing upload deletes its own blob, never the winner's blob"
+          },
+          "excludes": "ABA with equal inline bytes, Redis failover, real S3 behavior and crash cleanup. R3 mutation failed first on orphan count; the later newer-response assertion was not reached.",
+          "falsifier": "Store older then newer results; finish newer upload before older; observe two remaining blobs instead of one or read back the older response.",
+          "evidence": {
+            "LICENSE": "6d82d67dba42eb94ba10f1e986d2eec338c22fb7c5216c2c0ebdecd83d53a029",
+            "posthog/caching/redis_cluster_connection_factory.py": "e14dbaaed815c440f06a2719ba258cb7e55d09e39916627705cbc875f871640e",
+            "posthog/query_cache/__init__.py": "9b166a8dfe48afc705ef99d3e8cc4186ed9b1d27d033c58225069a2b0fa5a5e7",
+            "posthog/query_cache/cache.py": "f677f2ceec9da546320ec368003546023f5169176d475f04f370e5b9e308ceb2",
+            "posthog/query_cache/failures.py": "168ab742db8db40cdc033d1ba6dab1f06b2956fa0b9635428fa39feb83b1b8d4",
+            "posthog/query_cache/freshness_index.py": "647e8b7a134eb28cc2272b4b4e7749e0983c0ab462d905b2cf248d301d6bdf6b",
+            "posthog/query_cache/metrics.py": "fc641c6a4f7900e9d3b6398c550096a066c5cc04343ff880392dbaacf19100a2",
+            "posthog/query_cache/results.py": "d218945f7be2e4ef5ee6ac151ebe42204a5d61e6e3a7170acab340f00593a9cb",
+            "posthog/query_cache/serialization.py": "dc97ae800ff2b2ad9a0853504a6078b8b77910d1cc28358ede87bc2da1198a42",
+            "posthog/query_cache/size_tracker.py": "9b1ff8d3b638b2532fa66b323cbb092c3e9b0bf34ccbfc7298716202fd6a0920",
+            "posthog/query_cache/storage.py": "760a88347afeb1ecaebaeb220fd0beded36eee1c2b8bc3fd0923f535c69ea54a",
+            "posthog/query_cache/tasks.py": "9f2100c61accb603cf9ea04a1bbf9b2ec9fdaa3e8e3811999bb90ea4a6f00222",
+            "posthog/query_cache/test/test_cache.py": "422e4ffd05e8e31b36704ae26efa274eb8107a7a26ef99081ba4a2b87c23476f",
+            "posthog/query_cache/test/test_failures.py": "90084af900a9697d83e8dc58e3a8fe0900379e9fab2845007b2078c555540bab",
+            "posthog/query_cache/test/test_size_tracker.py": "4be9b189cc95282b8a535e9e2ccbc770c44fb428fb5ea9e66e90d3119d98e136",
+            "posthog/query_cache/test/test_storage.py": "eeeda47ddec7c8517fd72d5f0863aee40110960eeeca8631176c733fedce1f7c",
+            "posthog/storage/object_storage.py": "eab2edf460e1abea8684e0069634ccaf15ee387c06d83aab6c38a1c5fac2ba0e",
+            "oracle.py": "d1e0a021cc96a3ba2bf9712edebc4c50122b2ea2c9fc620e7b99b757a2b5723b",
+            "source-pins.json": "2b395d72144946c5e1a945353c7d5a8721e24d3f049f429ade4b699bf36f6b77",
+            "assay-runtime.json": "4fba6771fda4759792a216377a320add85637c4924f29a3e425de79d8502cce1",
+            "network/sitecustomize.py": "31f21cb7a0cc7947df4178c907b966b8406432e1556ddba056ff9f1820a6d37a"
+          }
+        },
+        "definition": {
+          "id": "guarantee:supersession-safety",
+          "title": "Supersession safety",
+          "category": "Concurrency and identity",
+          "promise": "Late work publishes only while its declared precondition still holds; it cannot displace a superseding accepted value or clean up that winner's resources.",
+          "appliesWhen": "Asynchronous operations compete to publish state at one subject.",
+          "parameters": [
+            "publication subject",
+            "operation identity",
+            "supersession relation",
+            "acceptance precondition",
+            "cleanup ownership"
+          ],
+          "excludes": "General linearizability and equal-value intermediate-write detection unless explicitly represented by the precondition.",
+          "falsifier": "Finish a newer upload first, then an older upload, and observe an obsolete publication or surviving losing resource contrary to the cleanup policy.",
+          "demoteWhen": "A second context requires changing the supersession relation's meaning or hides the entire publication policy in an opaque predicate.",
+          "distinctFrom": {
+            "id": "guarantee:retry-recognition",
+            "because": "Competing operations must not win late; the same already-applied operation must still recognize its own success."
+          },
+          "example": {
+            "area": "posthog/query_cache",
+            "implementation": {
+              "path": "posthog/query_cache/size_tracker.py",
+              "anchor": "REPLACE_IF_UNCHANGED_SCRIPT"
+            },
+            "oracle": {
+              "path": "posthog/query_cache/test/test_storage.py",
+              "anchor": "test_stale_upload_cannot_replace_a_newer_entry"
+            },
+            "grade": "mutation-tested",
+            "runEvidence": [
+              "docs/assays/posthog-guarantees-r3/baseline.xml",
+              "docs/assays/posthog-guarantees-r3/cache-mutated.xml",
+              "docs/assays/posthog-guarantees-r3/cache-restored.xml"
+            ],
+            "limit": "Removing the mismatch refusal fails on two remaining fake-storage objects. The later newer-response assertion is not reached in that mutant. Real Redis, controlled uploads, fake S3."
+          }
+        },
+        "status": "current",
+        "problems": [],
+        "inputDigest": "bc21e90a104f63b31d785ac3646b92317e8fa68d4ebb1a5c0e1c17df588cb46c",
+        "observation": {
+          "verdict": "pass",
+          "at": "2026-09-09T18:11:29.356Z",
+          "oracle": "test_stale_upload_cannot_replace_a_newer_entry",
+          "detail": "a late upload cannot replace the newer cache entry or retain its losing blob @ replace_value() (source-property guard)"
+        }
+      },
+      {
+        "id": "b-30d5c381b0b84fe2e273a4fc88e4ebbbc7c0900d294ff2162880f159dfc0492c",
+        "owner": "posthog/query_cache",
+        "declaration": {
+          "claim": "g-f2bb6e947d40dceea023069a08f735a23cca490f142e8554fb8ccb32ec323596",
+          "definition": "guarantee:retry-recognition",
+          "definitionDigest": "63f42c83f77d4935b6d58540d7d900de9e9c81ca0a592626e50ad84f11cb7209",
+          "subject": "posthog/query_cache/size_tracker.py",
+          "assessor": "Codex · caller-assessed adoption, 2026-09-09",
+          "because": "A swap whose reply was lost must not be mistaken for a superseded upload: that result would select cleanup of the live pointer's blob.",
+          "parameters": {
+            "operation identity": "The unique pointer bytes for one upload",
+            "already-applied witness": "Current Redis bytes equal the proposed pointer",
+            "retry horizon": "While those pointer bytes remain the current entry",
+            "success result": "TeamCacheSizeTracker.replace_value returns True even when expected inline bytes no longer match",
+            "cleanup consequence": "Success avoids the losing-upload cleanup branch; the oracle directly checks return value and retained pointer"
+          },
+          "excludes": "An actual lost network reply, real S3 retry cleanup, arbitrary duplicate execution or reuse of an operation identity.",
+          "falsifier": "Publish a pointer, repeat replace_value with stale expected bytes, and observe False instead of True.",
+          "evidence": {
+            "LICENSE": "6d82d67dba42eb94ba10f1e986d2eec338c22fb7c5216c2c0ebdecd83d53a029",
+            "posthog/caching/redis_cluster_connection_factory.py": "e14dbaaed815c440f06a2719ba258cb7e55d09e39916627705cbc875f871640e",
+            "posthog/query_cache/__init__.py": "9b166a8dfe48afc705ef99d3e8cc4186ed9b1d27d033c58225069a2b0fa5a5e7",
+            "posthog/query_cache/cache.py": "f677f2ceec9da546320ec368003546023f5169176d475f04f370e5b9e308ceb2",
+            "posthog/query_cache/failures.py": "168ab742db8db40cdc033d1ba6dab1f06b2956fa0b9635428fa39feb83b1b8d4",
+            "posthog/query_cache/freshness_index.py": "647e8b7a134eb28cc2272b4b4e7749e0983c0ab462d905b2cf248d301d6bdf6b",
+            "posthog/query_cache/metrics.py": "fc641c6a4f7900e9d3b6398c550096a066c5cc04343ff880392dbaacf19100a2",
+            "posthog/query_cache/results.py": "d218945f7be2e4ef5ee6ac151ebe42204a5d61e6e3a7170acab340f00593a9cb",
+            "posthog/query_cache/serialization.py": "dc97ae800ff2b2ad9a0853504a6078b8b77910d1cc28358ede87bc2da1198a42",
+            "posthog/query_cache/size_tracker.py": "9b1ff8d3b638b2532fa66b323cbb092c3e9b0bf34ccbfc7298716202fd6a0920",
+            "posthog/query_cache/storage.py": "760a88347afeb1ecaebaeb220fd0beded36eee1c2b8bc3fd0923f535c69ea54a",
+            "posthog/query_cache/tasks.py": "9f2100c61accb603cf9ea04a1bbf9b2ec9fdaa3e8e3811999bb90ea4a6f00222",
+            "posthog/query_cache/test/test_cache.py": "422e4ffd05e8e31b36704ae26efa274eb8107a7a26ef99081ba4a2b87c23476f",
+            "posthog/query_cache/test/test_failures.py": "90084af900a9697d83e8dc58e3a8fe0900379e9fab2845007b2078c555540bab",
+            "posthog/query_cache/test/test_size_tracker.py": "4be9b189cc95282b8a535e9e2ccbc770c44fb428fb5ea9e66e90d3119d98e136",
+            "posthog/query_cache/test/test_storage.py": "eeeda47ddec7c8517fd72d5f0863aee40110960eeeca8631176c733fedce1f7c",
+            "posthog/storage/object_storage.py": "eab2edf460e1abea8684e0069634ccaf15ee387c06d83aab6c38a1c5fac2ba0e",
+            "oracle.py": "d1e0a021cc96a3ba2bf9712edebc4c50122b2ea2c9fc620e7b99b757a2b5723b",
+            "source-pins.json": "2b395d72144946c5e1a945353c7d5a8721e24d3f049f429ade4b699bf36f6b77",
+            "assay-runtime.json": "4fba6771fda4759792a216377a320add85637c4924f29a3e425de79d8502cce1",
+            "network/sitecustomize.py": "31f21cb7a0cc7947df4178c907b966b8406432e1556ddba056ff9f1820a6d37a"
+          }
+        },
+        "binding": {
+          "claim": "g-f2bb6e947d40dceea023069a08f735a23cca490f142e8554fb8ccb32ec323596",
+          "definition": "guarantee:retry-recognition",
+          "definitionDigest": "63f42c83f77d4935b6d58540d7d900de9e9c81ca0a592626e50ad84f11cb7209",
+          "subject": "posthog/query_cache/size_tracker.py",
+          "assessor": "Codex · caller-assessed adoption, 2026-09-09",
+          "because": "A swap whose reply was lost must not be mistaken for a superseded upload: that result would select cleanup of the live pointer's blob.",
+          "parameters": {
+            "operation identity": "The unique pointer bytes for one upload",
+            "already-applied witness": "Current Redis bytes equal the proposed pointer",
+            "retry horizon": "While those pointer bytes remain the current entry",
+            "success result": "TeamCacheSizeTracker.replace_value returns True even when expected inline bytes no longer match",
+            "cleanup consequence": "Success avoids the losing-upload cleanup branch; the oracle directly checks return value and retained pointer"
+          },
+          "excludes": "An actual lost network reply, real S3 retry cleanup, arbitrary duplicate execution or reuse of an operation identity.",
+          "falsifier": "Publish a pointer, repeat replace_value with stale expected bytes, and observe False instead of True.",
+          "evidence": {
+            "LICENSE": "6d82d67dba42eb94ba10f1e986d2eec338c22fb7c5216c2c0ebdecd83d53a029",
+            "posthog/caching/redis_cluster_connection_factory.py": "e14dbaaed815c440f06a2719ba258cb7e55d09e39916627705cbc875f871640e",
+            "posthog/query_cache/__init__.py": "9b166a8dfe48afc705ef99d3e8cc4186ed9b1d27d033c58225069a2b0fa5a5e7",
+            "posthog/query_cache/cache.py": "f677f2ceec9da546320ec368003546023f5169176d475f04f370e5b9e308ceb2",
+            "posthog/query_cache/failures.py": "168ab742db8db40cdc033d1ba6dab1f06b2956fa0b9635428fa39feb83b1b8d4",
+            "posthog/query_cache/freshness_index.py": "647e8b7a134eb28cc2272b4b4e7749e0983c0ab462d905b2cf248d301d6bdf6b",
+            "posthog/query_cache/metrics.py": "fc641c6a4f7900e9d3b6398c550096a066c5cc04343ff880392dbaacf19100a2",
+            "posthog/query_cache/results.py": "d218945f7be2e4ef5ee6ac151ebe42204a5d61e6e3a7170acab340f00593a9cb",
+            "posthog/query_cache/serialization.py": "dc97ae800ff2b2ad9a0853504a6078b8b77910d1cc28358ede87bc2da1198a42",
+            "posthog/query_cache/size_tracker.py": "9b1ff8d3b638b2532fa66b323cbb092c3e9b0bf34ccbfc7298716202fd6a0920",
+            "posthog/query_cache/storage.py": "760a88347afeb1ecaebaeb220fd0beded36eee1c2b8bc3fd0923f535c69ea54a",
+            "posthog/query_cache/tasks.py": "9f2100c61accb603cf9ea04a1bbf9b2ec9fdaa3e8e3811999bb90ea4a6f00222",
+            "posthog/query_cache/test/test_cache.py": "422e4ffd05e8e31b36704ae26efa274eb8107a7a26ef99081ba4a2b87c23476f",
+            "posthog/query_cache/test/test_failures.py": "90084af900a9697d83e8dc58e3a8fe0900379e9fab2845007b2078c555540bab",
+            "posthog/query_cache/test/test_size_tracker.py": "4be9b189cc95282b8a535e9e2ccbc770c44fb428fb5ea9e66e90d3119d98e136",
+            "posthog/query_cache/test/test_storage.py": "eeeda47ddec7c8517fd72d5f0863aee40110960eeeca8631176c733fedce1f7c",
+            "posthog/storage/object_storage.py": "eab2edf460e1abea8684e0069634ccaf15ee387c06d83aab6c38a1c5fac2ba0e",
+            "oracle.py": "d1e0a021cc96a3ba2bf9712edebc4c50122b2ea2c9fc620e7b99b757a2b5723b",
+            "source-pins.json": "2b395d72144946c5e1a945353c7d5a8721e24d3f049f429ade4b699bf36f6b77",
+            "assay-runtime.json": "4fba6771fda4759792a216377a320add85637c4924f29a3e425de79d8502cce1",
+            "network/sitecustomize.py": "31f21cb7a0cc7947df4178c907b966b8406432e1556ddba056ff9f1820a6d37a"
+          }
+        },
+        "definition": {
+          "id": "guarantee:retry-recognition",
+          "title": "Already-applied retry recognition",
+          "category": "Concurrency and identity",
+          "promise": "Repeating an operation whose own effect already landed recognizes that success rather than classifying the retry as a conflicting operation.",
+          "appliesWhen": "Replies can be lost and the caller retries a distinguishable operation.",
+          "parameters": [
+            "operation identity",
+            "already-applied witness",
+            "retry horizon",
+            "success result",
+            "cleanup consequence"
+          ],
+          "excludes": "Exactly-once execution, detection of every network failure, and retry identities reused by unrelated operations.",
+          "falsifier": "Install an operation's pointer, repeat its swap with the old expected bytes, and receive a conflict result that would trigger losing-upload cleanup.",
+          "demoteWhen": "The implementation cannot identify its own prior effect independently of a coincidentally equal foreign effect.",
+          "distinctFrom": {
+            "id": "guarantee:duplicate-suppression",
+            "because": "Recognizing success may permit redelivery; suppressing every retry can instead lose unfinished downstream work."
+          },
+          "example": {
+            "area": "posthog/query_cache",
+            "implementation": {
+              "path": "posthog/query_cache/size_tracker.py",
+              "anchor": "REPLACE_IF_UNCHANGED_SCRIPT"
+            },
+            "oracle": {
+              "path": "posthog/query_cache/test/test_storage.py",
+              "anchor": "test_stale_upload_cannot_replace_a_newer_entry"
+            },
+            "grade": "mutation-tested",
+            "runEvidence": [
+              "docs/assays/posthog-guarantees-r3/cache-restored.xml",
+              "docs/assays/posthog-guarantees-r3/retry-mutated.xml",
+              "docs/assays/posthog-guarantees-r3/final.xml"
+            ],
+            "limit": "Deleting already-applied recognition fails on False versus True at the retry assertion. No actual lost network reply was injected."
+          }
+        },
+        "status": "current",
+        "problems": [],
+        "inputDigest": "d44e3b8f818a4acabca7ee8054dcf9a11ffd95a8cd44380352a6d61686bb2210",
+        "observation": {
+          "verdict": "pass",
+          "at": "2026-09-09T18:11:29.356Z",
+          "oracle": "test_stale_upload_cannot_replace_a_newer_entry",
+          "detail": "repeating an already-installed pointer swap returns success @ replace_value() (source-property guard)"
+        }
+      }
+    ],
+    "issues": [],
+    "limit": "Candidate applicability and entailment are caller-assessed. Evidence supports only the named oracle at the explicit input set; dependency completeness, external services and whole-component safety are not established. Records are mutable local verification history, not immutable receipts. Catalog example results never activate support."
+  }
+}

@@ -29,7 +29,11 @@
   "files": [
     "dist",
     "README.md",
-    "grammars"
+    "grammars",
+    "docs/assays/posthog-guarantees-v0",
+    "docs/assays/posthog-guarantees-r2",
+    "docs/assays/posthog-guarantees-r3",
+    "docs/assays/posthog-scope-v0"
   ],
   "engines": {
     "node": ">=22"

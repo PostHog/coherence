@@ -41,6 +41,7 @@ export function withTree<T>(parser: Parser, src: string, empty: T, fn: (tree: Tr
 }
 
 export interface TreeSitterLanguageSpec {
+  importStyle?: "python";
   exts: string[];
   /** Query whose CAPTURE NAMES are the symbol kinds (`@method` → kind "method"). */
   symbolQuery: string;
@@ -206,6 +207,7 @@ export const typescript: TreeSitterLanguageSpec = {
  *  decorated forms included. Corpus-diffed against the retired regex adapter over
  *  flask/src (24 files, 430 symbols; the 8 deltas were regex nesting mistakes). */
 export const python: TreeSitterLanguageSpec = {
+  importStyle: "python",
   exts: ["py"],
   symbolQuery: `
     (module (function_definition name: (identifier) @function))
@@ -246,6 +248,7 @@ export async function makeTreeSitterAdapter(
   const commentPrefix = spec.lineComment;
   return {
     exts: spec.exts,
+    ...(spec.importStyle ? { importStyle: spec.importStyle } : {}),
     symbols(src: string) {
       return withTree(parser, src, [] as Array<{ name: string; kind: string; line: number }>, (tree) => {
       const out: Array<{ name: string; kind: string; line: number }> = [];

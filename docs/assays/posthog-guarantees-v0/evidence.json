@@ -1,0 +1,2315 @@
+{
+  "version": 1,
+  "catalogVersion": "coherence-guarantees/v0",
+  "catalogSha256": "937541b56086f08a23b80efa6004e69b22c06547526c7b39e1c561fe71941276",
+  "source": {
+    "repository": "https://github.com/PostHog/posthog",
+    "commit": "c54fec2163ad9455fd23a947f86a9034c1df9388"
+  },
+  "limit": "Structural address/hash audit, not semantic review or a test run. Inventory-only areas were not exhaustively read. Anchor lines locate inspected material; generic anchors are not runner-resolved test identities.",
+  "inventory": [
+    {
+      "area": ".github/ISSUE_TEMPLATE",
+      "trackedFiles": 4,
+      "definitions": []
+    },
+    {
+      "area": ".github/actions",
+      "trackedFiles": 40,
+      "definitions": []
+    },
+    {
+      "area": ".github/pr-deploy",
+      "trackedFiles": 3,
+      "definitions": []
+    },
+    {
+      "area": ".github/scripts",
+      "trackedFiles": 93,
+      "definitions": []
+    },
+    {
+      "area": ".github/workflows",
+      "trackedFiles": 129,
+      "definitions": []
+    },
+    {
+      "area": "common/esbuilder",
+      "trackedFiles": 2,
+      "definitions": []
+    },
+    {
+      "area": "common/fixtures",
+      "trackedFiles": 4,
+      "definitions": []
+    },
+    {
+      "area": "common/hogql_parser",
+      "trackedFiles": 35,
+      "definitions": []
+    },
+    {
+      "area": "common/hogvm",
+      "trackedFiles": 205,
+      "definitions": [
+        "guarantee:memory-budget",
+        "guarantee:execution-budget"
+      ]
+    },
+    {
+      "area": "common/ingestion",
+      "trackedFiles": 11,
+      "definitions": []
+    },
+    {
+      "area": "common/migration_utils",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "common/plugin_transpiler",
+      "trackedFiles": 6,
+      "definitions": []
+    },
+    {
+      "area": "common/replay-headless",
+      "trackedFiles": 18,
+      "definitions": []
+    },
+    {
+      "area": "common/replay-shared",
+      "trackedFiles": 40,
+      "definitions": []
+    },
+    {
+      "area": "common/storybook",
+      "trackedFiles": 28,
+      "definitions": []
+    },
+    {
+      "area": "common/tailwind",
+      "trackedFiles": 4,
+      "definitions": []
+    },
+    {
+      "area": "ee/admin",
+      "trackedFiles": 2,
+      "definitions": []
+    },
+    {
+      "area": "ee/api",
+      "trackedFiles": 138,
+      "definitions": []
+    },
+    {
+      "area": "ee/benchmarks",
+      "trackedFiles": 6,
+      "definitions": []
+    },
+    {
+      "area": "ee/billing",
+      "trackedFiles": 34,
+      "definitions": []
+    },
+    {
+      "area": "ee/bin",
+      "trackedFiles": 3,
+      "definitions": []
+    },
+    {
+      "area": "ee/certs",
+      "trackedFiles": 2,
+      "definitions": []
+    },
+    {
+      "area": "ee/clickhouse",
+      "trackedFiles": 55,
+      "definitions": []
+    },
+    {
+      "area": "ee/hogai",
+      "trackedFiles": 522,
+      "definitions": []
+    },
+    {
+      "area": "ee/management",
+      "trackedFiles": 6,
+      "definitions": []
+    },
+    {
+      "area": "ee/migrations",
+      "trackedFiles": 64,
+      "definitions": []
+    },
+    {
+      "area": "ee/models",
+      "trackedFiles": 12,
+      "definitions": []
+    },
+    {
+      "area": "ee/partners",
+      "trackedFiles": 31,
+      "definitions": []
+    },
+    {
+      "area": "ee/session_recordings",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "ee/sqs",
+      "trackedFiles": 2,
+      "definitions": []
+    },
+    {
+      "area": "ee/support_sidebar_max",
+      "trackedFiles": 5,
+      "definitions": []
+    },
+    {
+      "area": "ee/surveys",
+      "trackedFiles": 2,
+      "definitions": []
+    },
+    {
+      "area": "ee/tasks",
+      "trackedFiles": 21,
+      "definitions": []
+    },
+    {
+      "area": "ee/test",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "ee/vercel",
+      "trackedFiles": 6,
+      "definitions": []
+    },
+    {
+      "area": "frontend/@posthog/lemon-ui",
+      "trackedFiles": 7,
+      "definitions": []
+    },
+    {
+      "area": "frontend/bin/ci-report",
+      "trackedFiles": 6,
+      "definitions": []
+    },
+    {
+      "area": "frontend/bin/docs",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "frontend/public/browser_logos",
+      "trackedFiles": 7,
+      "definitions": []
+    },
+    {
+      "area": "frontend/public/coming-soon-destinations",
+      "trackedFiles": 170,
+      "definitions": []
+    },
+    {
+      "area": "frontend/public/email",
+      "trackedFiles": 5,
+      "definitions": []
+    },
+    {
+      "area": "frontend/public/fonts",
+      "trackedFiles": 3,
+      "definitions": []
+    },
+    {
+      "area": "frontend/public/geo",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "frontend/public/hedgehog",
+      "trackedFiles": 11,
+      "definitions": []
+    },
+    {
+      "area": "frontend/public/icons",
+      "trackedFiles": 8,
+      "definitions": []
+    },
+    {
+      "area": "frontend/public/posthog-ai-onboarding",
+      "trackedFiles": 10,
+      "definitions": []
+    },
+    {
+      "area": "frontend/public/services",
+      "trackedFiles": 1381,
+      "definitions": []
+    },
+    {
+      "area": "frontend/public/sounds",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "frontend/public/surveys",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "frontend/public/transformations",
+      "trackedFiles": 3,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/@types",
+      "trackedFiles": 2,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/exporter",
+      "trackedFiles": 24,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/generated",
+      "trackedFiles": 3,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/layout",
+      "trackedFiles": 175,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/lib",
+      "trackedFiles": 1632,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/mocks",
+      "trackedFiles": 114,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/models",
+      "trackedFiles": 20,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/queries",
+      "trackedFiles": 254,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/render-query",
+      "trackedFiles": 4,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/scenes",
+      "trackedFiles": 3390,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/styles",
+      "trackedFiles": 9,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/taxonomy",
+      "trackedFiles": 5,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/test",
+      "trackedFiles": 33,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/toolbar",
+      "trackedFiles": 129,
+      "definitions": []
+    },
+    {
+      "area": "frontend/src/vendor",
+      "trackedFiles": 2,
+      "definitions": []
+    },
+    {
+      "area": "nodejs/src/ai-observability",
+      "trackedFiles": 13,
+      "definitions": []
+    },
+    {
+      "area": "nodejs/src/cdp",
+      "trackedFiles": 543,
+      "definitions": []
+    },
+    {
+      "area": "nodejs/src/common",
+      "trackedFiles": 206,
+      "definitions": [
+        "guarantee:worker-fencing"
+      ]
+    },
+    {
+      "area": "nodejs/src/ingestion",
+      "trackedFiles": 684,
+      "definitions": [
+        "guarantee:input-validation",
+        "guarantee:canonical-encoding",
+        "guarantee:duplicate-suppression",
+        "guarantee:acknowledgment-barrier",
+        "guarantee:graceful-drain",
+        "guarantee:cancellation-release",
+        "guarantee:bounded-admission",
+        "guarantee:fair-admission"
+      ]
+    },
+    {
+      "area": "nodejs/src/logs",
+      "trackedFiles": 63,
+      "definitions": []
+    },
+    {
+      "area": "nodejs/src/servers",
+      "trackedFiles": 20,
+      "definitions": []
+    },
+    {
+      "area": "nodejs/src/session-replay",
+      "trackedFiles": 50,
+      "definitions": [
+        "guarantee:capability-authorization"
+      ]
+    },
+    {
+      "area": "nodejs/tests/assets",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "nodejs/tests/fixtures",
+      "trackedFiles": 504,
+      "definitions": []
+    },
+    {
+      "area": "nodejs/tests/helpers",
+      "trackedFiles": 33,
+      "definitions": []
+    },
+    {
+      "area": "nodejs/tests/ingestion",
+      "trackedFiles": 19,
+      "definitions": []
+    },
+    {
+      "area": "nodejs/tests/logs",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "nodejs/tests/service-e2e",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "nodejs/tests/session-replay",
+      "trackedFiles": 2,
+      "definitions": []
+    },
+    {
+      "area": "nodejs/tests/utils",
+      "trackedFiles": 5,
+      "definitions": []
+    },
+    {
+      "area": "packages/llm-normalizer",
+      "trackedFiles": 102,
+      "definitions": []
+    },
+    {
+      "area": "packages/quill",
+      "trackedFiles": 492,
+      "definitions": []
+    },
+    {
+      "area": "posthog/admin",
+      "trackedFiles": 61,
+      "definitions": []
+    },
+    {
+      "area": "posthog/api",
+      "trackedFiles": 344,
+      "definitions": []
+    },
+    {
+      "area": "posthog/async_migrations",
+      "trackedFiles": 30,
+      "definitions": []
+    },
+    {
+      "area": "posthog/caching",
+      "trackedFiles": 20,
+      "definitions": []
+    },
+    {
+      "area": "posthog/cdp",
+      "trackedFiles": 97,
+      "definitions": []
+    },
+    {
+      "area": "posthog/clickhouse",
+      "trackedFiles": 588,
+      "definitions": []
+    },
+    {
+      "area": "posthog/comment",
+      "trackedFiles": 3,
+      "definitions": []
+    },
+    {
+      "area": "posthog/dags",
+      "trackedFiles": 98,
+      "definitions": [
+        "guarantee:completion-evidence"
+      ]
+    },
+    {
+      "area": "posthog/db_backends",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "posthog/egress",
+      "trackedFiles": 47,
+      "definitions": [
+        "guarantee:rate-budget"
+      ]
+    },
+    {
+      "area": "posthog/heatmaps",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "posthog/helpers",
+      "trackedFiles": 39,
+      "definitions": [
+        "guarantee:encrypted-storage",
+        "guarantee:key-rotation-compatibility"
+      ]
+    },
+    {
+      "area": "posthog/hogql",
+      "trackedFiles": 372,
+      "definitions": [
+        "guarantee:semantic-preservation"
+      ]
+    },
+    {
+      "area": "posthog/hogql_queries",
+      "trackedFiles": 284,
+      "definitions": []
+    },
+    {
+      "area": "posthog/idl",
+      "trackedFiles": 8,
+      "definitions": []
+    },
+    {
+      "area": "posthog/integration_secrets",
+      "trackedFiles": 6,
+      "definitions": []
+    },
+    {
+      "area": "posthog/kafka_client",
+      "trackedFiles": 9,
+      "definitions": []
+    },
+    {
+      "area": "posthog/llm",
+      "trackedFiles": 7,
+      "definitions": []
+    },
+    {
+      "area": "posthog/local_bootstrap",
+      "trackedFiles": 5,
+      "definitions": []
+    },
+    {
+      "area": "posthog/logging",
+      "trackedFiles": 2,
+      "definitions": []
+    },
+    {
+      "area": "posthog/management",
+      "trackedFiles": 189,
+      "definitions": []
+    },
+    {
+      "area": "posthog/migration_helpers",
+      "trackedFiles": 7,
+      "definitions": []
+    },
+    {
+      "area": "posthog/migrations",
+      "trackedFiles": 1227,
+      "definitions": []
+    },
+    {
+      "area": "posthog/models",
+      "trackedFiles": 397,
+      "definitions": [
+        "guarantee:scoped-reads",
+        "guarantee:declared-target-coverage",
+        "guarantee:completion-evidence"
+      ]
+    },
+    {
+      "area": "posthog/openapi",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "posthog/personhog_client",
+      "trackedFiles": 46,
+      "definitions": []
+    },
+    {
+      "area": "posthog/plugins",
+      "trackedFiles": 9,
+      "definitions": []
+    },
+    {
+      "area": "posthog/queries",
+      "trackedFiles": 25,
+      "definitions": []
+    },
+    {
+      "area": "posthog/query_cache",
+      "trackedFiles": 14,
+      "definitions": [
+        "guarantee:supersession-safety",
+        "guarantee:retry-recognition"
+      ]
+    },
+    {
+      "area": "posthog/rbac",
+      "trackedFiles": 6,
+      "definitions": []
+    },
+    {
+      "area": "posthog/resource_limits",
+      "trackedFiles": 5,
+      "definitions": []
+    },
+    {
+      "area": "posthog/schema_migrations",
+      "trackedFiles": 20,
+      "definitions": []
+    },
+    {
+      "area": "posthog/security",
+      "trackedFiles": 13,
+      "definitions": []
+    },
+    {
+      "area": "posthog/session",
+      "trackedFiles": 22,
+      "definitions": []
+    },
+    {
+      "area": "posthog/session_recordings",
+      "trackedFiles": 102,
+      "definitions": []
+    },
+    {
+      "area": "posthog/settings",
+      "trackedFiles": 43,
+      "definitions": []
+    },
+    {
+      "area": "posthog/slo",
+      "trackedFiles": 5,
+      "definitions": []
+    },
+    {
+      "area": "posthog/storage",
+      "trackedFiles": 32,
+      "definitions": []
+    },
+    {
+      "area": "posthog/tasks",
+      "trackedFiles": 119,
+      "definitions": []
+    },
+    {
+      "area": "posthog/taxonomy",
+      "trackedFiles": 5,
+      "definitions": []
+    },
+    {
+      "area": "posthog/templates",
+      "trackedFiles": 143,
+      "definitions": []
+    },
+    {
+      "area": "posthog/templatetags",
+      "trackedFiles": 3,
+      "definitions": []
+    },
+    {
+      "area": "posthog/temporal",
+      "trackedFiles": 647,
+      "definitions": []
+    },
+    {
+      "area": "posthog/test",
+      "trackedFiles": 146,
+      "definitions": []
+    },
+    {
+      "area": "posthog/user_scripts",
+      "trackedFiles": 60,
+      "definitions": []
+    },
+    {
+      "area": "posthog/warehouse",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "products/access_control",
+      "trackedFiles": 55,
+      "definitions": []
+    },
+    {
+      "area": "products/actions",
+      "trackedFiles": 47,
+      "definitions": []
+    },
+    {
+      "area": "products/ai_gateway",
+      "trackedFiles": 16,
+      "definitions": []
+    },
+    {
+      "area": "products/ai_observability",
+      "trackedFiles": 692,
+      "definitions": []
+    },
+    {
+      "area": "products/alerts",
+      "trackedFiles": 155,
+      "definitions": []
+    },
+    {
+      "area": "products/analytics_platform",
+      "trackedFiles": 25,
+      "definitions": []
+    },
+    {
+      "area": "products/annotations",
+      "trackedFiles": 31,
+      "definitions": []
+    },
+    {
+      "area": "products/apm",
+      "trackedFiles": 45,
+      "definitions": []
+    },
+    {
+      "area": "products/approvals",
+      "trackedFiles": 37,
+      "definitions": [
+        "guarantee:separation-of-duties",
+        "guarantee:legal-state-transitions"
+      ]
+    },
+    {
+      "area": "products/batch_exports",
+      "trackedFiles": 242,
+      "definitions": [
+        "guarantee:destination-confinement",
+        "guarantee:resumption-coverage",
+        "guarantee:retry-classification"
+      ]
+    },
+    {
+      "area": "products/billing",
+      "trackedFiles": 11,
+      "definitions": []
+    },
+    {
+      "area": "products/billing_alerts",
+      "trackedFiles": 58,
+      "definitions": []
+    },
+    {
+      "area": "products/business_knowledge",
+      "trackedFiles": 81,
+      "definitions": []
+    },
+    {
+      "area": "products/canvas",
+      "trackedFiles": 80,
+      "definitions": []
+    },
+    {
+      "area": "products/cdp",
+      "trackedFiles": 72,
+      "definitions": []
+    },
+    {
+      "area": "products/cohorts",
+      "trackedFiles": 93,
+      "definitions": []
+    },
+    {
+      "area": "products/context_layer",
+      "trackedFiles": 41,
+      "definitions": []
+    },
+    {
+      "area": "products/conversations",
+      "trackedFiles": 370,
+      "definitions": []
+    },
+    {
+      "area": "products/core_events",
+      "trackedFiles": 7,
+      "definitions": []
+    },
+    {
+      "area": "products/customer_analytics",
+      "trackedFiles": 392,
+      "definitions": []
+    },
+    {
+      "area": "products/dashboards",
+      "trackedFiles": 285,
+      "definitions": []
+    },
+    {
+      "area": "products/data_catalog",
+      "trackedFiles": 99,
+      "definitions": []
+    },
+    {
+      "area": "products/data_modeling",
+      "trackedFiles": 213,
+      "definitions": []
+    },
+    {
+      "area": "products/data_quality",
+      "trackedFiles": 110,
+      "definitions": []
+    },
+    {
+      "area": "products/data_tools",
+      "trackedFiles": 23,
+      "definitions": []
+    },
+    {
+      "area": "products/data_warehouse",
+      "trackedFiles": 330,
+      "definitions": []
+    },
+    {
+      "area": "products/demo",
+      "trackedFiles": 47,
+      "definitions": []
+    },
+    {
+      "area": "products/desktop",
+      "trackedFiles": 5466,
+      "definitions": []
+    },
+    {
+      "area": "products/early_access_features",
+      "trackedFiles": 46,
+      "definitions": []
+    },
+    {
+      "area": "products/endpoints",
+      "trackedFiles": 144,
+      "definitions": []
+    },
+    {
+      "area": "products/engineering_analytics",
+      "trackedFiles": 227,
+      "definitions": []
+    },
+    {
+      "area": "products/error_tracking",
+      "trackedFiles": 506,
+      "definitions": []
+    },
+    {
+      "area": "products/event_definitions",
+      "trackedFiles": 28,
+      "definitions": []
+    },
+    {
+      "area": "products/experiments",
+      "trackedFiles": 348,
+      "definitions": []
+    },
+    {
+      "area": "products/exports",
+      "trackedFiles": 103,
+      "definitions": []
+    },
+    {
+      "area": "products/feature_flags",
+      "trackedFiles": 155,
+      "definitions": []
+    },
+    {
+      "area": "products/field_notes",
+      "trackedFiles": 17,
+      "definitions": []
+    },
+    {
+      "area": "products/games",
+      "trackedFiles": 9,
+      "definitions": []
+    },
+    {
+      "area": "products/groups",
+      "trackedFiles": 5,
+      "definitions": []
+    },
+    {
+      "area": "products/growth",
+      "trackedFiles": 155,
+      "definitions": []
+    },
+    {
+      "area": "products/inbox",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "products/ingestion",
+      "trackedFiles": 17,
+      "definitions": []
+    },
+    {
+      "area": "products/integrations",
+      "trackedFiles": 4,
+      "definitions": []
+    },
+    {
+      "area": "products/legal_documents",
+      "trackedFiles": 63,
+      "definitions": []
+    },
+    {
+      "area": "products/links",
+      "trackedFiles": 29,
+      "definitions": []
+    },
+    {
+      "area": "products/live_debugger",
+      "trackedFiles": 30,
+      "definitions": []
+    },
+    {
+      "area": "products/llm_analytics",
+      "trackedFiles": 41,
+      "definitions": []
+    },
+    {
+      "area": "products/logs",
+      "trackedFiles": 393,
+      "definitions": []
+    },
+    {
+      "area": "products/managed_migrations",
+      "trackedFiles": 39,
+      "definitions": []
+    },
+    {
+      "area": "products/managed_warehouse",
+      "trackedFiles": 88,
+      "definitions": []
+    },
+    {
+      "area": "products/marketing_analytics",
+      "trackedFiles": 149,
+      "definitions": []
+    },
+    {
+      "area": "products/mcp_analytics",
+      "trackedFiles": 189,
+      "definitions": []
+    },
+    {
+      "area": "products/mcp_store",
+      "trackedFiles": 128,
+      "definitions": []
+    },
+    {
+      "area": "products/messaging",
+      "trackedFiles": 60,
+      "definitions": []
+    },
+    {
+      "area": "products/metrics",
+      "trackedFiles": 158,
+      "definitions": []
+    },
+    {
+      "area": "products/notebooks",
+      "trackedFiles": 110,
+      "definitions": []
+    },
+    {
+      "area": "products/notifications",
+      "trackedFiles": 56,
+      "definitions": []
+    },
+    {
+      "area": "products/persons",
+      "trackedFiles": 6,
+      "definitions": []
+    },
+    {
+      "area": "products/platform_features",
+      "trackedFiles": 18,
+      "definitions": []
+    },
+    {
+      "area": "products/posthog_ai",
+      "trackedFiles": 487,
+      "definitions": []
+    },
+    {
+      "area": "products/product_analytics",
+      "trackedFiles": 239,
+      "definitions": []
+    },
+    {
+      "area": "products/product_tours",
+      "trackedFiles": 41,
+      "definitions": []
+    },
+    {
+      "area": "products/pulse",
+      "trackedFiles": 58,
+      "definitions": []
+    },
+    {
+      "area": "products/reminders",
+      "trackedFiles": 27,
+      "definitions": []
+    },
+    {
+      "area": "products/replay",
+      "trackedFiles": 32,
+      "definitions": []
+    },
+    {
+      "area": "products/replay_vision",
+      "trackedFiles": 539,
+      "definitions": []
+    },
+    {
+      "area": "products/revenue_analytics",
+      "trackedFiles": 106,
+      "definitions": []
+    },
+    {
+      "area": "products/review_hog",
+      "trackedFiles": 468,
+      "definitions": []
+    },
+    {
+      "area": "products/session_replay",
+      "trackedFiles": 2,
+      "definitions": []
+    },
+    {
+      "area": "products/signals",
+      "trackedFiles": 781,
+      "definitions": []
+    },
+    {
+      "area": "products/skills",
+      "trackedFiles": 78,
+      "definitions": []
+    },
+    {
+      "area": "products/slack_app",
+      "trackedFiles": 112,
+      "definitions": []
+    },
+    {
+      "area": "products/stamphog",
+      "trackedFiles": 107,
+      "definitions": []
+    },
+    {
+      "area": "products/streamlit_apps",
+      "trackedFiles": 55,
+      "definitions": []
+    },
+    {
+      "area": "products/subscriptions",
+      "trackedFiles": 57,
+      "definitions": []
+    },
+    {
+      "area": "products/support",
+      "trackedFiles": 8,
+      "definitions": []
+    },
+    {
+      "area": "products/surveys",
+      "trackedFiles": 69,
+      "definitions": []
+    },
+    {
+      "area": "products/tasks",
+      "trackedFiles": 550,
+      "definitions": [
+        "guarantee:current-authority",
+        "guarantee:commit-ordered-effects",
+        "guarantee:durable-dispatch-intent"
+      ]
+    },
+    {
+      "area": "products/toolbar",
+      "trackedFiles": 2,
+      "definitions": []
+    },
+    {
+      "area": "products/tracing",
+      "trackedFiles": 159,
+      "definitions": []
+    },
+    {
+      "area": "products/user_interviews",
+      "trackedFiles": 66,
+      "definitions": []
+    },
+    {
+      "area": "products/visual_review",
+      "trackedFiles": 170,
+      "definitions": []
+    },
+    {
+      "area": "products/warehouse_sources",
+      "trackedFiles": 7011,
+      "definitions": []
+    },
+    {
+      "area": "products/warehouse_sources_queue",
+      "trackedFiles": 19,
+      "definitions": []
+    },
+    {
+      "area": "products/web_analytics",
+      "trackedFiles": 298,
+      "definitions": []
+    },
+    {
+      "area": "products/wizard",
+      "trackedFiles": 47,
+      "definitions": []
+    },
+    {
+      "area": "products/workflows",
+      "trackedFiles": 356,
+      "definitions": [
+        "guarantee:message-authenticity",
+        "guarantee:revision-preservation"
+      ]
+    },
+    {
+      "area": "proto/cymbal",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "proto/ingestion",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "proto/kafka_assigner",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "proto/personhog",
+      "trackedFiles": 10,
+      "definitions": []
+    },
+    {
+      "area": "proto/prometheus",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "proto/usage_ingestion",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "rust/.cargo",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "rust/.config",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "rust/.sqlx",
+      "trackedFiles": 8,
+      "definitions": []
+    },
+    {
+      "area": "rust/affected-services",
+      "trackedFiles": 9,
+      "definitions": []
+    },
+    {
+      "area": "rust/batch-import-worker",
+      "trackedFiles": 64,
+      "definitions": []
+    },
+    {
+      "area": "rust/behavioral_cohorts_migrations",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "rust/bin",
+      "trackedFiles": 5,
+      "definitions": []
+    },
+    {
+      "area": "rust/capture",
+      "trackedFiles": 139,
+      "definitions": [
+        "guarantee:keyed-ordering"
+      ]
+    },
+    {
+      "area": "rust/capture-load-gen",
+      "trackedFiles": 6,
+      "definitions": []
+    },
+    {
+      "area": "rust/capture-logs",
+      "trackedFiles": 24,
+      "definitions": []
+    },
+    {
+      "area": "rust/cohort-core",
+      "trackedFiles": 29,
+      "definitions": []
+    },
+    {
+      "area": "rust/cohort-event-shuffler",
+      "trackedFiles": 13,
+      "definitions": []
+    },
+    {
+      "area": "rust/cohort-seeder",
+      "trackedFiles": 54,
+      "definitions": []
+    },
+    {
+      "area": "rust/cohort-stream-processor",
+      "trackedFiles": 127,
+      "definitions": []
+    },
+    {
+      "area": "rust/common",
+      "trackedFiles": 295,
+      "definitions": []
+    },
+    {
+      "area": "rust/cyclotron-node-migrations",
+      "trackedFiles": 14,
+      "definitions": []
+    },
+    {
+      "area": "rust/cymbal",
+      "trackedFiles": 257,
+      "definitions": []
+    },
+    {
+      "area": "rust/cymbal-proto",
+      "trackedFiles": 5,
+      "definitions": []
+    },
+    {
+      "area": "rust/deltalite",
+      "trackedFiles": 29,
+      "definitions": []
+    },
+    {
+      "area": "rust/embedding-worker",
+      "trackedFiles": 19,
+      "definitions": []
+    },
+    {
+      "area": "rust/feature-flags",
+      "trackedFiles": 130,
+      "definitions": [
+        "guarantee:identity-continuity"
+      ]
+    },
+    {
+      "area": "rust/flags-consumer",
+      "trackedFiles": 31,
+      "definitions": []
+    },
+    {
+      "area": "rust/flags_read_store_migrations",
+      "trackedFiles": 1,
+      "definitions": []
+    },
+    {
+      "area": "rust/hogql",
+      "trackedFiles": 21,
+      "definitions": []
+    },
+    {
+      "area": "rust/hypercache-server",
+      "trackedFiles": 14,
+      "definitions": []
+    },
+    {
+      "area": "rust/ingestion-consumer",
+      "trackedFiles": 25,
+      "definitions": []
+    },
+    {
+      "area": "rust/ingestion-control-plane",
+      "trackedFiles": 24,
+      "definitions": []
+    },
+    {
+      "area": "rust/ingestion-worker-proto",
+      "trackedFiles": 4,
+      "definitions": []
+    },
+    {
+      "area": "rust/kafka-assigner",
+      "trackedFiles": 20,
+      "definitions": []
+    },
+    {
+      "area": "rust/kafka-assigner-proto",
+      "trackedFiles": 3,
+      "definitions": []
+    },
+    {
+      "area": "rust/kafka-deduplicator",
+      "trackedFiles": 82,
+      "definitions": []
+    },
+    {
+      "area": "rust/personhog-common",
+      "trackedFiles": 13,
+      "definitions": []
+    },
+    {
+      "area": "rust/personhog-coordination",
+      "trackedFiles": 19,
+      "definitions": []
+    },
+    {
+      "area": "rust/personhog-identity",
+      "trackedFiles": 79,
+      "definitions": []
+    },
+    {
+      "area": "rust/personhog-leader",
+      "trackedFiles": 27,
+      "definitions": []
+    },
+    {
+      "area": "rust/personhog-proto",
+      "trackedFiles": 4,
+      "definitions": []
+    },
+    {
+      "area": "rust/personhog-replica",
+      "trackedFiles": 92,
+      "definitions": []
+    },
+    {
+      "area": "rust/personhog-router",
+      "trackedFiles": 18,
+      "definitions": []
+    },
+    {
+      "area": "rust/personhog-stateright",
+      "trackedFiles": 7,
+      "definitions": []
+    },
+    {
+      "area": "rust/personhog-test-harness",
+      "trackedFiles": 22,
+      "definitions": []
+    },
+    {
+      "area": "rust/personhog-writer",
+      "trackedFiles": 16,
+      "definitions": []
+    },
+    {
+      "area": "rust/persons_migrations",
+      "trackedFiles": 14,
+      "definitions": []
+    },
+    {
+      "area": "rust/prometheus-rw-proto",
+      "trackedFiles": 3,
+      "definitions": []
+    },
+    {
+      "area": "rust/property-defs-rs",
+      "trackedFiles": 42,
+      "definitions": []
+    },
+    {
+      "area": "rust/property-vals-rs",
+      "trackedFiles": 12,
+      "definitions": []
+    },
+    {
+      "area": "rust/replay-anonymizer",
+      "trackedFiles": 46,
+      "definitions": [
+        "guarantee:redaction"
+      ]
+    },
+    {
+      "area": "rust/replay-anonymizer-node",
+      "trackedFiles": 7,
+      "definitions": []
+    },
+    {
+      "area": "rust/usage-ingestion",
+      "trackedFiles": 12,
+      "definitions": []
+    },
+    {
+      "area": "rust/usage-ingestion-proto",
+      "trackedFiles": 4,
+      "definitions": []
+    },
+    {
+      "area": "services/agent-proxy",
+      "trackedFiles": 42,
+      "definitions": []
+    },
+    {
+      "area": "services/integration-service",
+      "trackedFiles": 27,
+      "definitions": []
+    },
+    {
+      "area": "services/llm-gateway",
+      "trackedFiles": 151,
+      "definitions": [
+        "guarantee:circuit-breaker-policy",
+        "guarantee:readiness-evidence"
+      ]
+    },
+    {
+      "area": "services/mcp",
+      "trackedFiles": 1393,
+      "definitions": []
+    },
+    {
+      "area": "services/oauth-proxy",
+      "trackedFiles": 25,
+      "definitions": []
+    },
+    {
+      "area": "services/stripe-app",
+      "trackedFiles": 31,
+      "definitions": []
+    },
+    {
+      "area": "services/stripe-mock",
+      "trackedFiles": 24,
+      "definitions": []
+    },
+    {
+      "area": "tools/hedgebox-dummy",
+      "trackedFiles": 26,
+      "definitions": []
+    },
+    {
+      "area": "tools/hogbox-preview",
+      "trackedFiles": 13,
+      "definitions": []
+    },
+    {
+      "area": "tools/hogli",
+      "trackedFiles": 27,
+      "definitions": []
+    },
+    {
+      "area": "tools/hogli-commands",
+      "trackedFiles": 108,
+      "definitions": []
+    },
+    {
+      "area": "tools/infra-scripts",
+      "trackedFiles": 20,
+      "definitions": []
+    },
+    {
+      "area": "tools/openapi-codegen",
+      "trackedFiles": 12,
+      "definitions": []
+    },
+    {
+      "area": "tools/owners",
+      "trackedFiles": 10,
+      "definitions": []
+    },
+    {
+      "area": "tools/phrocs",
+      "trackedFiles": 43,
+      "definitions": []
+    },
+    {
+      "area": "tools/query-performance-ai",
+      "trackedFiles": 47,
+      "definitions": []
+    },
+    {
+      "area": "tools/traffic-sim",
+      "trackedFiles": 18,
+      "definitions": []
+    }
+  ],
+  "definitions": [
+    {
+      "id": "guarantee:scoped-reads",
+      "area": "posthog/models/scoping",
+      "grade": "mutation-tested",
+      "implementation": {
+        "path": "posthog/models/scoping/manager.py",
+        "anchor": "_apply_team_filter",
+        "line": 70,
+        "sha256": "00b887276441eda0f1fd32824f8c628c283c5eda48f5a1d512ebd69b74d59950",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/models/scoping/manager.py#L70"
+      },
+      "oracle": {
+        "path": "posthog/models/scoping/test_manager.py",
+        "anchor": "test_team_scope_filters_to_team",
+        "line": 22,
+        "sha256": "4a5cfecaee795a762b5b1561f55e9c918ac5e3b581109eb39121e21e701e31b9",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/models/scoping/test_manager.py#L22"
+      },
+      "runEvidence": [
+        {
+          "path": "docs/assays/posthog-guarantees-r3/baseline.xml",
+          "sha256": "98ed738a11bab31efabd84ecefa8fdfc55719b2a6171a3990e32156c1f7c24b3"
+        },
+        {
+          "path": "docs/assays/posthog-guarantees-r3/tenant-mutated.xml",
+          "sha256": "f1cade4f8a04f247db2c423cb6f7fbe06410ab855a4da4cfd22527817c0e0630"
+        },
+        {
+          "path": "docs/assays/posthog-guarantees-r3/tenant-restored.xml",
+          "sha256": "b116d271f6f4f5a9a5988e2234718b8c7f06cfcc6415df9894b6cdf717514394"
+        }
+      ]
+    },
+    {
+      "id": "guarantee:capability-authorization",
+      "area": "nodejs/src/session-replay",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "nodejs/src/session-replay/recording-api/auth.ts",
+        "anchor": "jwt",
+        "line": 4,
+        "sha256": "d79bbbf9c4b4189b34a4d9ff5a5f494919d09ca2e51b7052dc140dc6e5f234d5",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/session-replay/recording-api/auth.ts#L4"
+      },
+      "oracle": {
+        "path": "nodejs/src/session-replay/recording-api/auth.test.ts",
+        "anchor": "describe",
+        "line": 7,
+        "sha256": "12fe173e12bf9eb2c41c6e2506206ed5fe0d9ce1a3083d399d354660fdbd06db",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/session-replay/recording-api/auth.test.ts#L7"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:current-authority",
+      "area": "products/tasks",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "products/tasks/backend/management/commands/run_task_workflow_dispatcher.py",
+        "anchor": "_user_can_dispatch",
+        "line": 54,
+        "sha256": "16536a51e9c5764273ea0b946fda09836d780e5a4004ddda0366ed28d00a5c72",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/tasks/backend/management/commands/run_task_workflow_dispatcher.py#L54"
+      },
+      "oracle": {
+        "path": "products/tasks/backend/tests/test_workflow_dispatch.py",
+        "anchor": "membership",
+        "line": 409,
+        "sha256": "4715a3626ae4db9b1da074ac358436c678d70ed4f276fc2ff4a2c0e89a3ed761",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/tasks/backend/tests/test_workflow_dispatch.py#L409"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:destination-confinement",
+      "area": "products/batch_exports",
+      "grade": "source-inspected",
+      "implementation": {
+        "path": "products/batch_exports/backend/temporal/destinations/http_batch_export.py",
+        "anchor": "allow_redirects=False",
+        "line": 164,
+        "sha256": "d47a5607e0eb726b9672da70eed62a0a3b408998c841e1c3090774e6e2c0d6f6",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/batch_exports/backend/temporal/destinations/http_batch_export.py#L164"
+      },
+      "oracle": null,
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:message-authenticity",
+      "area": "products/workflows",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "products/workflows/backend/services/sns_verification.py",
+        "anchor": "verify_sns_message",
+        "line": 131,
+        "sha256": "9d3d099ebc47abc56db195c4cdb2640a9d80e60b6a2f9217a4b82e1a16bc11a2",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/workflows/backend/services/sns_verification.py#L131"
+      },
+      "oracle": {
+        "path": "products/workflows/backend/test/test_sns_verification.py",
+        "anchor": "test_rejects",
+        "line": 86,
+        "sha256": "5ea35574d346f71fad48fd03db9256d0cd2591d3c8844f611ace350611c21592",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/workflows/backend/test/test_sns_verification.py#L86"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:encrypted-storage",
+      "area": "posthog/helpers",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "posthog/helpers/encrypted_fields.py",
+        "anchor": "get_prep_value",
+        "line": 105,
+        "sha256": "e81abe5e4a8e27c232e624a0457a966a1747a5912faa9b890fb56f08ee8301d7",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/helpers/encrypted_fields.py#L105"
+      },
+      "oracle": {
+        "path": "posthog/helpers/tests/test_encrypted_fields.py",
+        "anchor": "test_simple_encryption_and_decryption",
+        "line": 63,
+        "sha256": "a015105d83042f06b7bc0d96d9969b2d7c9df366a742d6b6cb7ac7fe0f08ab20",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/helpers/tests/test_encrypted_fields.py#L63"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:key-rotation-compatibility",
+      "area": "posthog/helpers",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "posthog/helpers/encrypted_fields.py",
+        "anchor": "MultiFernet",
+        "line": 12,
+        "sha256": "e81abe5e4a8e27c232e624a0457a966a1747a5912faa9b890fb56f08ee8301d7",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/helpers/encrypted_fields.py#L12"
+      },
+      "oracle": {
+        "path": "posthog/helpers/tests/test_encrypted_fields.py",
+        "anchor": "test_prepending_new_key_keeps_old_data_readable_and_writes_with_new",
+        "line": 99,
+        "sha256": "a015105d83042f06b7bc0d96d9969b2d7c9df366a742d6b6cb7ac7fe0f08ab20",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/helpers/tests/test_encrypted_fields.py#L99"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:redaction",
+      "area": "rust/replay-anonymizer",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "rust/replay-anonymizer/src/text.rs",
+        "anchor": "scrub_text",
+        "line": 92,
+        "sha256": "1685cafd92e55ec9ef58eca1f0e2f473f8f6e8f9b3f3f371f6bbc2d5bbbc8c0e",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/rust/replay-anonymizer/src/text.rs#L92"
+      },
+      "oracle": {
+        "path": "rust/replay-anonymizer/tests/typed.rs",
+        "anchor": "full_snapshot_parses_to_a_scrubbed_typed_tree",
+        "line": 50,
+        "sha256": "57e7818aec240aeb60b4710ebcafa4d171575f47561adaf894ef9a1e655dcaff",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/rust/replay-anonymizer/tests/typed.rs#L50"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:input-validation",
+      "area": "nodejs/src/ingestion",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "nodejs/src/ingestion/common/steps/event-preprocessing/validate-event-schema.ts",
+        "anchor": "validateEventAgainstSchema",
+        "line": 73,
+        "sha256": "e332c38bfb66d880fc93c5eff5e0b4e306aaf6a4e1b0683b22c91f265dc0c99c",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/common/steps/event-preprocessing/validate-event-schema.ts#L73"
+      },
+      "oracle": {
+        "path": "nodejs/src/ingestion/common/steps/event-preprocessing/validate-event-schema.test.ts",
+        "anchor": "should reject when required property is missing",
+        "line": 41,
+        "sha256": "b7862a5ecb4c78d1df83a6140e618d07a72e831d7224da08e0d09676fb5a460e",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/common/steps/event-preprocessing/validate-event-schema.test.ts#L41"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:semantic-preservation",
+      "area": "posthog/hogql",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "posthog/hogql/database/schema/persons.py",
+        "anchor": "limit",
+        "line": 192,
+        "sha256": "af4b6883b012101ff1390ef7d46125589b03c38b45a9e8d9decf42e30d35d8d8",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/hogql/database/schema/persons.py#L192"
+      },
+      "oracle": {
+        "path": "posthog/hogql/database/schema/test/test_persons.py",
+        "anchor": "count",
+        "line": 141,
+        "sha256": "2bb040f6df4680f7e598db73747d3602a5ddc3283be63032cc63b30987676e3f",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/hogql/database/schema/test/test_persons.py#L141"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:canonical-encoding",
+      "area": "nodejs/src/ingestion",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "nodejs/src/ingestion/common/feature-flag-called-dedup/feature-flag-called-dedup-service.ts",
+        "anchor": "featureFlagCalledDedupKey",
+        "line": 80,
+        "sha256": "071a584a8b6362637f93a45487ced648372d86afc098c2c0771b07f5edd70ef1",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/common/feature-flag-called-dedup/feature-flag-called-dedup-service.ts#L80"
+      },
+      "oracle": {
+        "path": "nodejs/src/ingestion/common/feature-flag-called-dedup/feature-flag-called-dedup-service.test.ts",
+        "anchor": "is independent of $groups property ordering",
+        "line": 172,
+        "sha256": "5d24d70842ef2dce2d5e573f7c6d6ef8aaa7fc7ac3dd83c3a74527a9ad7cd7bb",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/common/feature-flag-called-dedup/feature-flag-called-dedup-service.test.ts#L172"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:identity-continuity",
+      "area": "rust/feature-flags",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "rust/feature-flags/src/flags/flag_matching.rs",
+        "anchor": "hash",
+        "line": 15,
+        "sha256": "4527a83c528ada24273f3c0fae79d6ff1c80279de0386f612fa8b6398a0fe401",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/rust/feature-flags/src/flags/flag_matching.rs#L15"
+      },
+      "oracle": {
+        "path": "rust/feature-flags/tests/test_experience_continuity.rs",
+        "anchor": "anonymous",
+        "line": 209,
+        "sha256": "1e4522a6fde0b4c90c878abfd3b16c3be4a9bcfca1da7d087cc7407580e693cc",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/rust/feature-flags/tests/test_experience_continuity.rs#L209"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:revision-preservation",
+      "area": "products/workflows",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "products/workflows/backend/api/hog_flow.py",
+        "anchor": "_append_revisions",
+        "line": 3523,
+        "sha256": "d0d1233a457178aba38e7a68774cc9af72fc4412b47c28ae8b7d6f2a324fca8a",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/workflows/backend/api/hog_flow.py#L3523"
+      },
+      "oracle": {
+        "path": "products/workflows/backend/api/test/test_hog_flow_revisions.py",
+        "anchor": "test_publish_appends_revision_and_bumps_version",
+        "line": 121,
+        "sha256": "75d49a8b7538bea84a09f50c55f6b5e375ff77c8e7a3464830848411d1ae7769",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/workflows/backend/api/test/test_hog_flow_revisions.py#L121"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:separation-of-duties",
+      "area": "products/approvals",
+      "grade": "source-inspected",
+      "implementation": {
+        "path": "products/approvals/backend/permissions.py",
+        "anchor": "allow_self_approve",
+        "line": 23,
+        "sha256": "ecd289fb7f90b0499cf9e2a04242b7ba3e9f08d725de2b1d22b28cc91bbebbe2",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/approvals/backend/permissions.py#L23"
+      },
+      "oracle": null,
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:legal-state-transitions",
+      "area": "products/approvals",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "products/approvals/backend/services.py",
+        "anchor": "select_for_update",
+        "line": 200,
+        "sha256": "396bdf6aa36fa30025303717193001b4b0cf15c052aeb0ed965bd7247ae3914f",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/approvals/backend/services.py#L200"
+      },
+      "oracle": {
+        "path": "products/approvals/backend/tests/test_services.py",
+        "anchor": "test_raises_when_state_changed_under_lock",
+        "line": 44,
+        "sha256": "8d4e822ec7c9c476e34d3cc904531d2cd8da089be9da39ed905973eb33e2c2a5",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/approvals/backend/tests/test_services.py#L44"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:supersession-safety",
+      "area": "posthog/query_cache",
+      "grade": "mutation-tested",
+      "implementation": {
+        "path": "posthog/query_cache/size_tracker.py",
+        "anchor": "REPLACE_IF_UNCHANGED_SCRIPT",
+        "line": 140,
+        "sha256": "9b1ff8d3b638b2532fa66b323cbb092c3e9b0bf34ccbfc7298716202fd6a0920",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/query_cache/size_tracker.py#L140"
+      },
+      "oracle": {
+        "path": "posthog/query_cache/test/test_storage.py",
+        "anchor": "test_stale_upload_cannot_replace_a_newer_entry",
+        "line": 243,
+        "sha256": "eeeda47ddec7c8517fd72d5f0863aee40110960eeeca8631176c733fedce1f7c",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/query_cache/test/test_storage.py#L243"
+      },
+      "runEvidence": [
+        {
+          "path": "docs/assays/posthog-guarantees-r3/baseline.xml",
+          "sha256": "98ed738a11bab31efabd84ecefa8fdfc55719b2a6171a3990e32156c1f7c24b3"
+        },
+        {
+          "path": "docs/assays/posthog-guarantees-r3/cache-mutated.xml",
+          "sha256": "042a3e697cbf6ffc4bf9c8d00d5f0a25060478a85279e89e30fa7584dbc98965"
+        },
+        {
+          "path": "docs/assays/posthog-guarantees-r3/cache-restored.xml",
+          "sha256": "dc49a3cdb98520bdee90ca2b78654e4080957d5128d522ca1d7e4c9ab5fa1602"
+        }
+      ]
+    },
+    {
+      "id": "guarantee:retry-recognition",
+      "area": "posthog/query_cache",
+      "grade": "mutation-tested",
+      "implementation": {
+        "path": "posthog/query_cache/size_tracker.py",
+        "anchor": "REPLACE_IF_UNCHANGED_SCRIPT",
+        "line": 140,
+        "sha256": "9b1ff8d3b638b2532fa66b323cbb092c3e9b0bf34ccbfc7298716202fd6a0920",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/query_cache/size_tracker.py#L140"
+      },
+      "oracle": {
+        "path": "posthog/query_cache/test/test_storage.py",
+        "anchor": "test_stale_upload_cannot_replace_a_newer_entry",
+        "line": 243,
+        "sha256": "eeeda47ddec7c8517fd72d5f0863aee40110960eeeca8631176c733fedce1f7c",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/query_cache/test/test_storage.py#L243"
+      },
+      "runEvidence": [
+        {
+          "path": "docs/assays/posthog-guarantees-r3/cache-restored.xml",
+          "sha256": "dc49a3cdb98520bdee90ca2b78654e4080957d5128d522ca1d7e4c9ab5fa1602"
+        },
+        {
+          "path": "docs/assays/posthog-guarantees-r3/retry-mutated.xml",
+          "sha256": "35ce3e1bf0d91160cfeff5f626c17a2ac5a2afd4941a1fbcb8c732da82342519"
+        },
+        {
+          "path": "docs/assays/posthog-guarantees-r3/final.xml",
+          "sha256": "ac5e3b56bb7b3db248b8633b014139e4faa08bee7b29a04293543ca6d291fb0a"
+        }
+      ]
+    },
+    {
+      "id": "guarantee:duplicate-suppression",
+      "area": "nodejs/src/ingestion",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "nodejs/src/ingestion/common/feature-flag-called-dedup/feature-flag-called-dedup-service.ts",
+        "anchor": "claimKeys",
+        "line": 136,
+        "sha256": "071a584a8b6362637f93a45487ced648372d86afc098c2c0771b07f5edd70ef1",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/common/feature-flag-called-dedup/feature-flag-called-dedup-service.ts#L136"
+      },
+      "oracle": {
+        "path": "nodejs/src/ingestion/common/feature-flag-called-dedup/feature-flag-called-dedup-service.test.ts",
+        "anchor": "maps fresh claims to true and foreign claims to false",
+        "line": 222,
+        "sha256": "5d24d70842ef2dce2d5e573f7c6d6ef8aaa7fc7ac3dd83c3a74527a9ad7cd7bb",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/common/feature-flag-called-dedup/feature-flag-called-dedup-service.test.ts#L222"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:keyed-ordering",
+      "area": "rust/capture",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "rust/capture/src/pipeline.rs",
+        "anchor": "OrderingGuarantee",
+        "line": 7,
+        "sha256": "3308d47d00814257af700272c8682308f5754b01afa88a9481390db2739a015c",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/rust/capture/src/pipeline.rs#L7"
+      },
+      "oracle": {
+        "path": "rust/capture/src/v1/sinks/kafka/sink_tests.rs",
+        "anchor": "ordering_decides_partition_key",
+        "line": 768,
+        "sha256": "65f68d7cc82765cb04e193407e92f47b20da51ffc3edad7f6de4e0a43b406677",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/rust/capture/src/v1/sinks/kafka/sink_tests.rs#L768"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:worker-fencing",
+      "area": "nodejs/src/common/kafka",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "nodejs/src/common/kafka/consumer/consumer-v2.ts",
+        "anchor": "dispatchEpochs",
+        "line": 353,
+        "sha256": "814bb9e14524d02b4b9d631ab5787c0794e9b50ffe9aea678ca80cf347a201b5",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/common/kafka/consumer/consumer-v2.ts#L353"
+      },
+      "oracle": {
+        "path": "nodejs/src/common/kafka/consumer/consumer-v2.rebalance.integration.serial.test.ts",
+        "anchor": "a batch outliving the drain budget is fenced",
+        "line": 467,
+        "sha256": "584202068e3795a74063db878085c48b610dd08ca954f0c23df441d2e99c51e0",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/common/kafka/consumer/consumer-v2.rebalance.integration.serial.test.ts#L467"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:acknowledgment-barrier",
+      "area": "nodejs/src/ingestion",
+      "grade": "mutation-tested",
+      "implementation": {
+        "path": "nodejs/src/ingestion/api/grpc-server.ts",
+        "anchor": "settleAndAck",
+        "line": 512,
+        "sha256": "0b140c61e105ed61db0f737177e4ac5983c06e19c041543b7c8d8c156c1aea76",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/api/grpc-server.ts#L512"
+      },
+      "oracle": {
+        "path": "nodejs/src/ingestion/api/grpc-server.test.ts",
+        "anchor": "records an accepted sub-batch in the shared in-flight metrics until it settles",
+        "line": 470,
+        "sha256": "9f8bb180a1d1dd2c07c5319733e2c7049279180fdd36db087a7a0ab609ea8f06",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/api/grpc-server.test.ts#L470"
+      },
+      "runEvidence": [
+        {
+          "path": "docs/assays/posthog-guarantees-r2/ack-restored.json",
+          "sha256": "3fd149489e3f516357cd42d3b75e4472f9b9bdf89c9f46ad1a49783c10943ac1"
+        },
+        {
+          "path": "docs/assays/posthog-guarantees-r2/ack-mutated.json",
+          "sha256": "082b57d151ec701803b5741268f8d30442eab28c43991adebc00c94952c86fb2"
+        },
+        {
+          "path": "docs/assays/posthog-guarantees-r2/ack-final.json",
+          "sha256": "13316d6b8d0ba5a01bdf20fd58150941fe9eb6fb33c3ff162f83d593e77cb048"
+        }
+      ]
+    },
+    {
+      "id": "guarantee:commit-ordered-effects",
+      "area": "products/tasks",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "products/tasks/backend/models.py",
+        "anchor": "on_commit",
+        "line": 59,
+        "sha256": "c2d46fcebf6b87092cc32f524a8213b0c353cf46a12218c69b6237c85dbd8d3b",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/tasks/backend/models.py#L59"
+      },
+      "oracle": {
+        "path": "products/tasks/backend/tests/test_workflow_dispatch.py",
+        "anchor": "dispatch",
+        "line": 21,
+        "sha256": "4715a3626ae4db9b1da074ac358436c678d70ed4f276fc2ff4a2c0e89a3ed761",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/tasks/backend/tests/test_workflow_dispatch.py#L21"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:durable-dispatch-intent",
+      "area": "products/tasks",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "products/tasks/backend/logic/services/workflow_dispatch.py",
+        "anchor": "def create_dispatch",
+        "line": 98,
+        "sha256": "cc263b512cf9d22ad8e5815cea619739fbeed205a7f81793b9054ebd9322131f",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/tasks/backend/logic/services/workflow_dispatch.py#L98"
+      },
+      "oracle": {
+        "path": "products/tasks/backend/tests/test_workflow_dispatch.py",
+        "anchor": "pending_dispatch",
+        "line": 295,
+        "sha256": "4715a3626ae4db9b1da074ac358436c678d70ed4f276fc2ff4a2c0e89a3ed761",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/tasks/backend/tests/test_workflow_dispatch.py#L295"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:resumption-coverage",
+      "area": "products/batch_exports",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "products/batch_exports/backend/temporal/batch_exports.py",
+        "anchor": "generate_query_ranges",
+        "line": 199,
+        "sha256": "e8744542a5b060408998173dbc0666be62ddad66847671991e5e6ac56354cec3",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/batch_exports/backend/temporal/batch_exports.py#L199"
+      },
+      "oracle": {
+        "path": "products/batch_exports/backend/tests/temporal/test_batch_exports.py",
+        "anchor": "test_generate_query_ranges",
+        "line": 497,
+        "sha256": "ba926c9dde23abaf0ab291eb0d2b2ea43f116a023c8fe7ffdc248e70d2d2e493",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/batch_exports/backend/tests/temporal/test_batch_exports.py#L497"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:retry-classification",
+      "area": "products/batch_exports",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "products/batch_exports/backend/temporal/destinations/http_batch_export.py",
+        "anchor": "429",
+        "line": 40,
+        "sha256": "d47a5607e0eb726b9672da70eed62a0a3b408998c841e1c3090774e6e2c0d6f6",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/batch_exports/backend/temporal/destinations/http_batch_export.py#L40"
+      },
+      "oracle": {
+        "path": "products/batch_exports/backend/tests/temporal/destinations/test_http_batch_export_workflow.py",
+        "anchor": "429",
+        "line": 295,
+        "sha256": "2eb3b99981bb99d805bfa427476e5a20343a5ddbc73320e6dbb83c77277d4f67",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/products/batch_exports/backend/tests/temporal/destinations/test_http_batch_export_workflow.py#L295"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:graceful-drain",
+      "area": "nodejs/src/ingestion",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "nodejs/src/ingestion/api/grpc-server.ts",
+        "anchor": "async stop",
+        "line": 432,
+        "sha256": "0b140c61e105ed61db0f737177e4ac5983c06e19c041543b7c8d8c156c1aea76",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/api/grpc-server.ts#L432"
+      },
+      "oracle": {
+        "path": "nodejs/src/ingestion/api/grpc-server.test.ts",
+        "anchor": "stop() drains in-flight sub-batch acks before ending streams",
+        "line": 268,
+        "sha256": "9f8bb180a1d1dd2c07c5319733e2c7049279180fdd36db087a7a0ab609ea8f06",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/api/grpc-server.test.ts#L268"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:cancellation-release",
+      "area": "nodejs/src/ingestion",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "nodejs/src/ingestion/api/grpc-server.ts",
+        "anchor": "class FifoSlots",
+        "line": 142,
+        "sha256": "0b140c61e105ed61db0f737177e4ac5983c06e19c041543b7c8d8c156c1aea76",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/api/grpc-server.ts#L142"
+      },
+      "oracle": {
+        "path": "nodejs/src/ingestion/api/grpc-server.test.ts",
+        "anchor": "drops a cancelled stream from the admission queue",
+        "line": 419,
+        "sha256": "9f8bb180a1d1dd2c07c5319733e2c7049279180fdd36db087a7a0ab609ea8f06",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/api/grpc-server.test.ts#L419"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:bounded-admission",
+      "area": "nodejs/src/ingestion",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "nodejs/src/ingestion/api/grpc-server.ts",
+        "anchor": "maxStreams",
+        "line": 107,
+        "sha256": "0b140c61e105ed61db0f737177e4ac5983c06e19c041543b7c8d8c156c1aea76",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/api/grpc-server.ts#L107"
+      },
+      "oracle": {
+        "path": "nodejs/src/ingestion/api/grpc-server.test.ts",
+        "anchor": "refuses a stream past the total concurrency ceiling",
+        "line": 549,
+        "sha256": "9f8bb180a1d1dd2c07c5319733e2c7049279180fdd36db087a7a0ab609ea8f06",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/api/grpc-server.test.ts#L549"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:fair-admission",
+      "area": "nodejs/src/ingestion",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "nodejs/src/ingestion/api/grpc-server.ts",
+        "anchor": "class FifoSlots",
+        "line": 142,
+        "sha256": "0b140c61e105ed61db0f737177e4ac5983c06e19c041543b7c8d8c156c1aea76",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/api/grpc-server.ts#L142"
+      },
+      "oracle": {
+        "path": "nodejs/src/ingestion/api/grpc-server.test.ts",
+        "anchor": "grants feed slots in arrival order across streams",
+        "line": 379,
+        "sha256": "9f8bb180a1d1dd2c07c5319733e2c7049279180fdd36db087a7a0ab609ea8f06",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/nodejs/src/ingestion/api/grpc-server.test.ts#L379"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:rate-budget",
+      "area": "posthog/egress",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "posthog/egress/limiter/outbound.py",
+        "anchor": "consume_sync",
+        "line": 3,
+        "sha256": "6d62fbc2e94fd3813021d6279a8d39527747143a12a3d5a72cbd96058d46124d",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/egress/limiter/outbound.py#L3"
+      },
+      "oracle": {
+        "path": "posthog/egress/test/test_outbound_rate_limiter.py",
+        "anchor": "test_budget_denies_once_exhausted",
+        "line": 49,
+        "sha256": "3b31c8b2dadb3b96dde7895f8e94bd5521aa74f614f04560f5aa757dd31f73df",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/egress/test/test_outbound_rate_limiter.py#L49"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:memory-budget",
+      "area": "common/hogvm",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "common/hogvm/typescript/src/execute.ts",
+        "anchor": "Memory limit of",
+        "line": 250,
+        "sha256": "9f70a35d7b12175304d4b2e90a5b1801c1a12395900408f4e29ce0a561f3a5d8",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/common/hogvm/typescript/src/execute.ts#L250"
+      },
+      "oracle": {
+        "path": "common/hogvm/typescript/src/__tests__/execute.test.ts",
+        "anchor": "memory limits 1",
+        "line": 250,
+        "sha256": "cd69d51549b96bd60822023686ece2be709afefc4ad2069333cf38cfe00867dd",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/common/hogvm/typescript/src/__tests__/execute.test.ts#L250"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:execution-budget",
+      "area": "common/hogvm",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "common/hogvm/typescript/src/execute.ts",
+        "anchor": "Exceeded maximum number of async steps",
+        "line": 833,
+        "sha256": "9f70a35d7b12175304d4b2e90a5b1801c1a12395900408f4e29ce0a561f3a5d8",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/common/hogvm/typescript/src/execute.ts#L833"
+      },
+      "oracle": {
+        "path": "common/hogvm/typescript/src/__tests__/execute.test.ts",
+        "anchor": "async limits",
+        "line": 220,
+        "sha256": "cd69d51549b96bd60822023686ece2be709afefc4ad2069333cf38cfe00867dd",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/common/hogvm/typescript/src/__tests__/execute.test.ts#L220"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:circuit-breaker-policy",
+      "area": "services/llm-gateway",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "services/llm-gateway/src/llm_gateway/circuit_breaker.py",
+        "anchor": "async def evaluate",
+        "line": 117,
+        "sha256": "212f784bc0e1beefcad6ad247b5f5a3d6c727cf74aa6a95f875f57423f9965c2",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/services/llm-gateway/src/llm_gateway/circuit_breaker.py#L117"
+      },
+      "oracle": {
+        "path": "services/llm-gateway/tests/test_circuit_breaker.py",
+        "anchor": "test_opens_when_failure_rate_crosses_threshold",
+        "line": 77,
+        "sha256": "db61a02a1066cbf18691c5eb084633159a1bb59654d05df0c811463df916c70e",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/services/llm-gateway/tests/test_circuit_breaker.py#L77"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:readiness-evidence",
+      "area": "services/llm-gateway",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "services/llm-gateway/src/llm_gateway/api/health.py",
+        "anchor": "async def readiness",
+        "line": 18,
+        "sha256": "9c6e7617f203797d4a4d552d309cb3c2aeaef40adac7dd6c00df71d13de194db",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/services/llm-gateway/src/llm_gateway/api/health.py#L18"
+      },
+      "oracle": {
+        "path": "services/llm-gateway/tests/test_health.py",
+        "anchor": "test_readiness_fails_when_privileges_missing",
+        "line": 58,
+        "sha256": "8ae117e435b078eb9fffcc5838e5936927d8ba4dc08a18cd210e5e6811c65fcb",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/services/llm-gateway/tests/test_health.py#L58"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:declared-target-coverage",
+      "area": "posthog/models/deletion",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "posthog/models/deletion_targets.py",
+        "anchor": "dispatch",
+        "line": 135,
+        "sha256": "096d56de5a4104352b6d8d1c7b5c2afd4374fa0fc8f7c2dcf7ee68c8fd1f8f37",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/models/deletion_targets.py#L135"
+      },
+      "oracle": {
+        "path": "posthog/models/test/test_deletion_targets.py",
+        "anchor": "cluster",
+        "line": 9,
+        "sha256": "0b82987b795b6ca05322f7031b776dbf8f34e94c71cf307e83127d2128123dc1",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/models/test/test_deletion_targets.py#L9"
+      },
+      "runEvidence": []
+    },
+    {
+      "id": "guarantee:completion-evidence",
+      "area": "posthog/models/deletion",
+      "grade": "test-inspected",
+      "implementation": {
+        "path": "posthog/models/data_deletion_request.py",
+        "anchor": "verify_queued_request",
+        "line": 950,
+        "sha256": "d0e2c50177783ac04a9a5f17511e029ba9e39b309537039715eb646feb3348a9",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/models/data_deletion_request.py#L950"
+      },
+      "oracle": {
+        "path": "posthog/dags/tests/test_data_deletion_requests.py",
+        "anchor": "test_verify_queued_request_keeps_status_when_events_remain",
+        "line": 568,
+        "sha256": "7ecf2181dfed5ab768d35e31dca5743daa8fb4b0d25edb46816463c0ea486f19",
+        "url": "https://github.com/PostHog/posthog/blob/c54fec2163ad9455fd23a947f86a9034c1df9388/posthog/dags/tests/test_data_deletion_requests.py#L568"
+      },
+      "runEvidence": []
+    }
+  ],
+  "supplementalDiscovery": [
+    {
+      "path": "ee/billing/quota_limiting.py",
+      "anchor": "def replace_limited_team_tokens",
+      "line": 179,
+      "sha256": "a064df866ef9125781c7b41829b7dd90c8282f9da2de63eba51c6a09edfac656",
+      "disposition": "Billing quotas have identity/time policies; not automatically the same as per-request egress budgets."
+    },
+    {
+      "path": "ee/billing/test/test_quota_limiting.py",
+      "anchor": "test_quota_cron_recounts_live_instead_of_writing_its_stale_snapshot",
+      "line": 3044,
+      "sha256": "c15551670ba319c2f3d8d0ceddcf33ea91051f304d8216c496330b71eec86649",
+      "disposition": "Potential second supersession context: live usage must not be replaced by an earlier cron snapshot. Inspected, not bound or executed."
+    },
+    {
+      "path": "products/experiments/stats/frequentist/tests.py",
+      "anchor": "degrees_of_freedom = math.nan",
+      "line": 193,
+      "sha256": "ab4a6453ac8b8563d3a61d13779fe523a62c5300f1276889b76191bd209017d3",
+      "disposition": "Undefined statistical quantities deliberately remain NaN. This file implements statistical tests, not unit tests; uncertainty-preserving output is a deferred candidate, not forced into v0."
+    },
+    {
+      "path": "products/error_tracking/backend/temporal/symbol_set_cleanup/test/test_symbol_set_cleanup.py",
+      "anchor": "test_deletes_old_used_and_unused_symbol_sets_with_model_semantics",
+      "line": 61,
+      "sha256": "98ea627c3d4ce821ba91601d34397f64f9eacf41570fd534d9458dff7d7b47c9",
+      "disposition": "Retention eligibility and paced deletion merit another assay; not evidence for universal deletion completion."
+    },
+    {
+      "path": "products/access_control/backend/logic.py",
+      "anchor": "Business logic for access_control",
+      "line": 2,
+      "sha256": "8ecdf1222ec612aa82da8ea55f3edd08814a6633ca3b57edf054f39128af8acd",
+      "disposition": "This entry point is only a scaffold docstring; its name is not evidence of enforcement."
+    },
+    {
+      "path": "tools/test_selection_verdict.py",
+      "anchor": "def parse_junit_failures",
+      "line": 47,
+      "sha256": "ac985cc0e05b00608f5775498f191735b5f630a86139dc53e6f9782d1c659c18",
+      "disposition": "Tooling derives verdicts from JUnit populations. No new guarantee inferred from the function name or handling of unreadable XML."
+    },
+    {
+      "path": ".github/workflows/_rust-build-images.yml",
+      "anchor": "Read and filter matrix",
+      "line": 67,
+      "sha256": "2c7b467efa2f9570efdfe1634c07a7acd654725d44ebefb6a3d0969c6425e063",
+      "disposition": "Build workflow derives its image matrix from a registry. No full deployment/provenance guarantee admitted from this bounded read."
+    }
+  ]
+}

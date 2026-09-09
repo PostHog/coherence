@@ -23,6 +23,7 @@ import {
   detectRunner, type BatchOutcome, type OracleAccess,
 } from "./test-batch.ts";
 import { indexStaticVitestOracles, type StaticOracleIndex } from "./static-oracles.ts";
+import { projectBindings, bindRunEvidence } from "./guarantee-bindings.ts";
 
 const hashOf = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 16);
 const jobsPath = (cfg: Config) => join(cfg.root, ".coherence", "verify-jobs.json");
@@ -280,6 +281,7 @@ export interface VerifyOpts {
 
 export async function runVerify(cfg: Config, graph: Graph, opts: VerifyOpts): Promise<number> {
   const root = cfg.root;
+  const bindingsBefore = projectBindings(cfg, graph);
   // THE NON-VACUITY FLOOR, checked before anything is graded — the instrument-check-first
   // idiom (test/commands.test.ts proves its AST scanner reads a plausible dispatch BEFORE
   // trusting any set comparison) applied to verify itself: a graph that derived EMPTY of
@@ -425,7 +427,7 @@ export async function runVerify(cfg: Config, graph: Graph, opts: VerifyOpts): Pr
   // runner's own per-test duration (the only honest reading for a batch-resolved claim, whose
   // wall time here is a map lookup), "wall" is verify's own clock around evalClaim (the only
   // reading available for everything else — a typecheck, a fetch, a serial runner boot).
-  type Sig = { kind: "pass" | "fail" | "skip"; claim: string; node: string; detail?: string; declaredKind?: string; ms?: number; msSource?: "wall" | "report" };
+  type Sig = { kind: "pass" | "fail" | "skip"; claim: string; node: string; detail?: string; declaredKind?: string; ms?: number; msSource?: "wall" | "report"; oracleChecked?: boolean };
   // Undeclared (the default) leaves the whole mechanism off: kinds are neither required
   // nor checked, and every existing spec in the world parses unchanged.
   const kindPolicy = cfg.claimKinds;
@@ -444,13 +446,15 @@ export async function runVerify(cfg: Config, graph: Graph, opts: VerifyOpts): Pr
     if (kindPolicy && declaredKind && !kindPolicy[declaredKind])
       return { kind: "fail", claim, node, declaredKind,
         detail: `unknown claim kind "${declaredKind}" — config.claimKinds declares: ${Object.keys(kindPolicy).join(", ")}` };
+    let oracleChecked = false;
     const ctx: ClaimCtx = {
+      oracleChecked: () => { oracleChecked = true; },
       cfg, graph, root, nodeDir, node, fast: !!opts.fast, typecheck, wordStack: [], oracles, staticOracles,
       anchor: (inv) => { let set = anchored.get(node); if (!set) { set = new Set(); anchored.set(node, set); } set.add(inv); },
     };
     for (const form of CLAIM_FORMS) {
       const m = form.match(claim);
-      if (m) { const r = await form.evaluate(ctx, m); return { kind: r.kind, claim, node, detail: r.detail, declaredKind, ms: r.ms }; }
+      if (m) { const r = await form.evaluate(ctx, m); return { kind: r.kind, claim, node, detail: r.detail, declaredKind, ms: r.ms, ...(oracleChecked ? { oracleChecked } : {}) }; }
     }
     return { kind: "skip", claim, node, detail: "no verifier (dialect gap)", declaredKind };
   };
@@ -758,7 +762,8 @@ export async function runVerify(cfg: Config, graph: Graph, opts: VerifyOpts): Pr
       tier: opts.fast ? "fast" : "full",
       scope: opts.only ? comps.map((c) => c.label) : null,
       batched: batchEngaged,
-      sigs,
+      // A supplied historical report has no witnessed execution/input interval.
+      sigs: opts.fromReport ? sigs : bindRunEvidence(sigs, bindingsBefore, projectBindings(cfg, graph), graph),
       coverage: {
         components: allComps.length,
         claimed: allComps.filter((c) => c.claims && c.claims.length).length,

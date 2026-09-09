@@ -1,0 +1,31 @@
+{
+  "name": "PostHog · bounded ingestion worker",
+  "language": "typescript",
+  "codeExt": [
+    "ts"
+  ],
+  "entryDir": ".",
+  "outputDir": "public",
+  "ignore": [
+    "node_modules",
+    ".git",
+    ".coherence",
+    "public",
+    "runs",
+    "grpc-server.test.ts",
+    "batching-pipeline.test.ts",
+    "result-handling-pipeline.test.ts",
+    "side-effect-handling-pipeline.test.ts",
+    "common-ingestion-pipeline.test.ts",
+    "promise-scheduler.test.ts",
+    "jest.setup.ts",
+    "jest.setup-env.ts"
+  ],
+  "staticOracleExistence": false,
+  "test": [],
+  "testBatch": [
+    "/Users/daniloc/.nvm/versions/node/v22.21.1/bin/node",
+    "oracle.mjs"
+  ],
+  "testBatchFormat": "vitest-json"
+}

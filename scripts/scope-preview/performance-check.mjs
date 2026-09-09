@@ -15,7 +15,10 @@ try {
   });
   await page.goto(new URL('../../public/_scope-library.html', import.meta.url).href);
   await page.waitForSelector('.gravity-center');
-  await page.getByRole('button', { name: 'Whole-project overview', exact: true }).click();
+  await page.getByRole('button', { name: 'Inspector & settings', exact: true }).first().click();
+  await page.locator('.parameters summary').click();
+  await page.getByLabel('Show reliance rings', { exact: true }).check();
+  await page.getByRole('button', { name: 'Close inspector', exact: true }).click();
   const population = await page.locator('#scope-data').evaluate(e => JSON.parse(e.textContent).model.nodes.filter(n => n.role === 'assembly').length);
   assert.equal(await page.locator('.component-card').count(), population, 'measure the full assembly population, not the bounded reading page');
   assert.equal(await page.locator('svg.orbits').count(), 0, 'the measured world-sized SVG failure must stay unrepresentable');

@@ -2,7 +2,7 @@ import cytoscape from 'cytoscape';
 
 // Cytoscape owns angular placement and relative ring radii. A uniform rectangular
 // clearance projection owns density; the canonical model owns center/membership.
-export const defaults = Object.freeze({ width: 560, height: 614, gap: 24, rotation: -180, sweep: 180 });
+export const defaults = Object.freeze({ width: 560, height: 614, gap: 24, rotation: -90, sweep: 320 });
 const compare = (a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 
 export function layoutScope(model, options = defaults) {

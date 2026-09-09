@@ -74,9 +74,10 @@ export function parseSpec(text: string): ParsedSpec {
   const guaranteeLinks = { addresses: [] as unknown[], relies: [] as unknown[], problems: [] as string[] };
   const linkLines = new Set<number>(), seenSections = new Set<string>();
   for (let j = 0; j < lines.length; j++) {
-    const section = /^##\s+(addresses|relies on)\s*$/i.exec(lines[j]);
+    const section = /^##\s+(addresses|relies on|guarantee bindings)\s*$/i.exec(lines[j]);
     if (!section) continue;
-    const kind = section[1].toLowerCase() === "addresses" ? "addresses" : "relies";
+    const kind = section[1].toLowerCase() === "addresses" ? "addresses" : section[1].toLowerCase() === "relies on" ? "relies" : "bindings";
+    if (kind === "bindings") (guaranteeLinks as import("../types.ts").SpecGuaranteeLinks).bindings ??= [];
     if (seenSections.has(kind)) guaranteeLinks.problems.push(`Duplicate ${section[1]} section`);
     seenSections.add(kind); linkLines.add(j);
     for (j++; j < lines.length && !/^##\s+/.test(lines[j]); j++) {
@@ -85,7 +86,7 @@ export function parseSpec(text: string): ParsedSpec {
       try {
         const bullet = /^-\s+(.+)$/.exec(lines[j]);
         if (!bullet) throw new Error("Expected a JSON object bullet");
-        guaranteeLinks[kind].push(JSON.parse(bullet[1]));
+        (guaranteeLinks as import("../types.ts").SpecGuaranteeLinks)[kind]!.push(JSON.parse(bullet[1]));
       } catch { guaranteeLinks.problems.push(`${section[1]} line ${j + 1}: expected a valid JSON object bullet`); }
     }
     j--;

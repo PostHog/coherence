@@ -6,6 +6,8 @@ Oracle discovery, execution and record lookup converge here. A passing process i
 
 ## invariants
 
+- catalog binding support requires a named oracle check at unchanged explicit inputs
+- candidate guarantee vocabulary stays project-independent and never activates obligations
 - explicit guarantee links expire with their premises and never prove satisfaction
 - a claim goes green only on positive evidence its oracle ran
 - a vanished oracle reds its claim, never green-by-absence
@@ -19,7 +21,10 @@ Oracle discovery, execution and record lookup converge here. A passing process i
 - an undeclared root refuses the walk, never wanders
 
 ## refutations
+- catalog binding support requires a named oracle check at unchanged explicit inputs: removed the flow-endpoint file pin check; the flow-endpoint guard failed because an owned symbol in an unpinned second file produced no missing-pin issue. Restored the check and the guard passed. This proves endpoint input inclusion, not authored direction or semantic entailment.
 
+- catalog binding support requires a named oracle check at unchanged explicit inputs: removed the pre/post input-digest equality in bindRunEvidence. The guard then observed a populated bindingInputs record after a spec changed during the execution interval, where no support was allowed. Restored the comparison. This controls input freshness, not semantic entailment or immutable receipt integrity.
+- candidate guarantee vocabulary stays project-independent and never activates obligations: the initial catalog branch ran after loadConfig. The public CLI guard supplied damaged configuration and a torn journal and observed exit 2 before reference lookup. Dispatching catalog lookup before configuration makes those project inputs irrelevant; the same guard then passes. Population/detail guards separately retain all 36 definitions, their limits, non-activation metadata and pinned evidence grades. These guards test the catalog product, not PostHog satisfaction or cross-project portability.
 - explicit guarantee links expire with their premises and never prove satisfaction: disabled the subject-staleness check in resolveGuaranteeLinks (2026-09-08). The named guard failed with actual current versus expected stale, exposing the incorrectly retained mapping. Restored the check; the focused suite passes. This control tests link expiration, not semantic satisfaction.
 - fast verification rejects a statically vanished Vitest oracle without executing tests: changed `resolveStaticOracle`'s complete zero-match branch from `absent` to `unknown` (2026-08-20), laundering the motivating Mnemion rename into an ordinary fast-tier skip — the focused boundary guard failed and captured the dangerous verdict: `claims: 1 · 0 green · 0 red · 1 skipped`, followed by `✓ coherent`. Restored; the same fixture now reds `VANISHED ORACLE (static)` without Vitest installed or invoked.
 - fast verification rejects a statically vanished Vitest oracle without executing tests: 0.36.2 made incompleteness project-wide, so Mnemion's finite data-driven titles made an unrelated renamed clipboard oracle UNKNOWN forever. Reproduced against current main: renaming the literal clipboard test left fast verify green. The scanner now retains concrete runner names and owner paths from Git `HEAD`; losing a name from a deleted or still-complete former owner reds before unrelated current uncertainty is consulted, while a former owner that itself became dynamic remains UNKNOWN. No prefix guess or partial JavaScript evaluator is allowed to manufacture global completeness.
@@ -33,6 +38,11 @@ Oracle discovery, execution and record lookup converge here. A passing process i
 
 ## works when
 
+- boundary "catalog binding support requires a named oracle check at unchanged explicit inputs" at bindRunEvidence via guard "catalog bindings — only unchanged executed inputs earn support; edits and historical reports cannot renew it"
+- boundary "catalog binding support requires a named oracle check at unchanged explicit inputs" at projectBindings via guard "catalog bindings — exact scoped declarations retain failures and never borrow example support"
+- boundary "catalog binding support requires a named oracle check at unchanged explicit inputs" at projectBindings via guard "catalog bindings — flow endpoints require owned pinned symbols and changed paths cannot borrow support"
+- boundary "candidate guarantee vocabulary stays project-independent and never activates obligations" at runGuaranteeCatalog via guard "guarantee catalog — public lookup never loads project configuration or reads its ledgers"
+- boundary "candidate guarantee vocabulary stays project-independent and never activates obligations" at runGuaranteeCatalog via guard "guarantee catalog — list and detail preserve the canonical population, qualifications and refusal semantics"
 - boundary "explicit guarantee links expire with their premises and never prove satisfaction" at resolveGuaranteeLinks via guard "guarantee links — expired premises never become current and passing evidence never proves satisfaction"
 - boundary "a claim goes green only on positive evidence its oracle ran" at execNamedTest via guard "testMatch — a runner exiting 0 with no matching output FAILS (the renamed-test trap)"
 - boundary "a vanished oracle reds its claim, never green-by-absence" at resolveFromBatch via guard "match — ZERO matching tests is its OWN state: the vanished oracle, named as such"
@@ -51,6 +61,26 @@ Oracle discovery, execution and record lookup converge here. A passing process i
 - {"claim":"g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf","provider":"src/evidence","because":"runVerify publishes scoped and fast results through recordVerify. A skipped oracle must retain its prior dated verdict rather than erase the evidence used by subsequent readers."}
 
 ## why
+
+**catalog binding support requires a named oracle check at unchanged explicit inputs.**
+A catalog's good example does not verify another adoption, and a prior test pass
+cannot speak for edited applicability or source. The existing claim record therefore
+retains the binding input identity observed on both sides of an executable check.
+Structural failure, imported history and changed inputs cannot mint that support.
+Optional authored flow endpoints must resolve to owned symbols and belong to the
+explicit pinned input set. Their role titles and direction remain caller-assessed;
+the local boundary remains the only promise string. Changing that mapping changes
+the binding identity, so an old observation cannot endorse a new visual relationship.
+This is a bounded freshness relation, not immutable receipt integrity or semantic
+proof that a caller chose the right guarantee and complete dependency population.
+
+**candidate guarantee vocabulary stays project-independent and never activates obligations.**
+A reusable reference is not a project assessment. Loading a project's configuration
+or damaged ledger to look up a definition creates a false dependency, while treating
+candidate presence as an obligation would create promises nobody adopted. The lookup
+therefore has no project input and preserves its candidate and evidence qualifications
+in both list and detail. Existing taxonomy history, spec bindings and oracle verdicts
+retain their independent meanings; candidate IDs cannot silently replace them.
 
 **explicit guarantee links expire with their premises and never prove satisfaction.**
 A taxonomy suggestion names an obligation, not the claim that enforces it. Spec-owned

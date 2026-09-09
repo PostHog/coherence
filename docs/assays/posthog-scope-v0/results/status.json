@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "verify": {
+    "at": "2026-09-09T18:11:29.356Z",
+    "commit": null,
+    "dirty": false,
+    "tier": "full",
+    "scope": null,
+    "batched": true,
+    "cost": {
+      "totalMs": 7688,
+      "claims": [
+        {
+          "node": "Query cache",
+          "claim": "boundary \"a late upload cannot replace the newer cache entry or retain its losing blob\" at replace_value() via guard \"test_stale_upload_cannot_replace_a_newer_entry\"",
+          "ms": 3844,
+          "source": "report"
+        },
+        {
+          "node": "Query cache",
+          "claim": "boundary \"repeating an already-installed pointer swap returns success\" at replace_value() via guard \"test_stale_upload_cannot_replace_a_newer_entry\"",
+          "ms": 3844,
+          "source": "report"
+        }
+      ]
+    },
+    "lastFullAt": "2026-09-09T18:11:29.356Z",
+    "claims": [
+      {
+        "node": "Query cache",
+        "claim": "boundary \"a late upload cannot replace the newer cache entry or retain its losing blob\" at replace_value() via guard \"test_stale_upload_cannot_replace_a_newer_entry\"",
+        "kind": "pass",
+        "detail": "a late upload cannot replace the newer cache entry or retain its losing blob @ replace_value() (source-property guard)",
+        "bindingInputs": {
+          "b-376b9821e4dbfb58c72616916ffc86224f1628ec34392252d05ebe47286a3f24": "bc21e90a104f63b31d785ac3646b92317e8fa68d4ebb1a5c0e1c17df588cb46c"
+        },
+        "at": "2026-09-09T18:11:29.356Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 1
+      },
+      {
+        "node": "Query cache",
+        "claim": "boundary \"repeating an already-installed pointer swap returns success\" at replace_value() via guard \"test_stale_upload_cannot_replace_a_newer_entry\"",
+        "kind": "pass",
+        "detail": "repeating an already-installed pointer swap returns success @ replace_value() (source-property guard)",
+        "bindingInputs": {
+          "b-30d5c381b0b84fe2e273a4fc88e4ebbbc7c0900d294ff2162880f159dfc0492c": "d44e3b8f818a4acabca7ee8054dcf9a11ffd95a8cd44380352a6d61686bb2210"
+        },
+        "at": "2026-09-09T18:11:29.356Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 1
+      }
+    ],
+    "coverage": {
+      "components": 5,
+      "claimed": 1,
+      "withWhy": 5,
+      "symbols": 275,
+      "documented": 59
+    },
+    "invariants": {
+      "total": 2,
+      "anchored": 2,
+      "gaps": []
+    },
+    "narrative": null,
+    "jobs": 220,
+    "failures": 4
+  }
+}

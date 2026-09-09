@@ -1,0 +1,225 @@
+{
+  "version": 1,
+  "verify": {
+    "at": "2026-09-09T21:18:50.490Z",
+    "commit": null,
+    "dirty": false,
+    "tier": "full",
+    "scope": null,
+    "batched": true,
+    "cost": {
+      "totalMs": 182,
+      "claims": [
+        {
+          "node": "Admission and acknowledgment",
+          "claim": "boundary \"live streams acquire feed slots in arrival order\" at WorkerIngestServer via guard \"grants feed slots in arrival order across streams instead of racing\"",
+          "ms": 63,
+          "source": "report"
+        },
+        {
+          "node": "Admission and acknowledgment",
+          "claim": "boundary \"a cancelled queued stream does not consume the next live feed slot\" at WorkerIngestServer via guard \"drops a cancelled stream from the admission queue so its slot skips to a live stream\"",
+          "ms": 60,
+          "source": "report"
+        },
+        {
+          "node": "Admission and acknowledgment",
+          "claim": "boundary \"an accepted sub-batch remains in flight until its driver settlement completes\" at WorkerIngestServer via guard \"records an accepted sub-batch in the shared in-flight metrics until it settles\"",
+          "ms": 27,
+          "source": "report"
+        },
+        {
+          "node": "Admission and acknowledgment",
+          "claim": "boundary \"shutdown waits for accepted sub-batch acknowledgments within its drain budget\" at WorkerIngestServer via guard \"stop() drains in-flight sub-batch acks before ending streams\"",
+          "ms": 15,
+          "source": "report"
+        },
+        {
+          "node": "Batch execution and result routing",
+          "claim": "boundary \"inline effect handling waits for settlement before clearing effect context\" at SideEffectHandlingPipeline via guard \"should await side effects and clear them from context\"",
+          "ms": 11,
+          "source": "report"
+        }
+      ]
+    },
+    "lastFullAt": "2026-09-09T21:18:50.490Z",
+    "claims": [
+      {
+        "node": "Deferred effect scheduler",
+        "claim": "boundary \"waitForAll waits for the scheduled promise population it observes\" at PromiseScheduler via guard \"should wait for all scheduled promises\"",
+        "kind": "pass",
+        "detail": "waitForAll waits for the scheduled promise population it observes @ PromiseScheduler (source-property guard)",
+        "at": "2026-09-09T21:18:50.490Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Admission and acknowledgment",
+        "claim": "boundary \"an accepted sub-batch remains in flight until its driver settlement completes\" at WorkerIngestServer via guard \"records an accepted sub-batch in the shared in-flight metrics until it settles\"",
+        "kind": "pass",
+        "detail": "an accepted sub-batch remains in flight until its driver settlement completes @ WorkerIngestServer (source-property guard)",
+        "bindingInputs": {
+          "b-f3f50389a37d9c6f613fe8d3676748dbbe3b6867826fa11d62a4eac5f5a86653": "05704aad6ef13895897ae2d00bfc74fb05a999401f5286dbc7ade0937f0f9bea"
+        },
+        "at": "2026-09-09T21:18:50.490Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Admission and acknowledgment",
+        "claim": "boundary \"shutdown waits for accepted sub-batch acknowledgments within its drain budget\" at WorkerIngestServer via guard \"stop() drains in-flight sub-batch acks before ending streams\"",
+        "kind": "pass",
+        "detail": "shutdown waits for accepted sub-batch acknowledgments within its drain budget @ WorkerIngestServer (source-property guard)",
+        "bindingInputs": {
+          "b-cc884ec454d0119626a2853550a8d25ffcc3cbb661e4673ade1edd9829ea9222": "172816eefb24674fe7da5d3e5e4ec3e96a8da7989ea817d57df8eab35790b987"
+        },
+        "at": "2026-09-09T21:18:50.490Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Admission and acknowledgment",
+        "claim": "boundary \"a cancelled queued stream does not consume the next live feed slot\" at WorkerIngestServer via guard \"drops a cancelled stream from the admission queue so its slot skips to a live stream\"",
+        "kind": "pass",
+        "detail": "a cancelled queued stream does not consume the next live feed slot @ WorkerIngestServer (source-property guard)",
+        "bindingInputs": {
+          "b-2da6a6e89c09ed6cf6d13811a82da533e8d2fe17a46be4c182eccb77d510caea": "38570ce133565b17e443688ac0401f57031e92ee60579a02f82a819129c10b97"
+        },
+        "at": "2026-09-09T21:18:50.490Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Admission and acknowledgment",
+        "claim": "boundary \"live streams acquire feed slots in arrival order\" at WorkerIngestServer via guard \"grants feed slots in arrival order across streams instead of racing\"",
+        "kind": "pass",
+        "detail": "live streams acquire feed slots in arrival order @ WorkerIngestServer (source-property guard)",
+        "bindingInputs": {
+          "b-aabecb0d13f35c84fd454f757a00b22a27b0ed3a96c0ac73c330b9243b2f3f02": "86681cf04af52e22a2df1f415238123e4e6ccaba6818a130816f64f9342c2f1e"
+        },
+        "at": "2026-09-09T21:18:50.490Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Admission and acknowledgment",
+        "claim": "boundary \"stream admission refuses work beyond the configured total concurrency ceiling\" at WorkerIngestServer via guard \"refuses a stream past the total concurrency ceiling with ResourceExhausted\"",
+        "kind": "pass",
+        "detail": "stream admission refuses work beyond the configured total concurrency ceiling @ WorkerIngestServer (source-property guard)",
+        "bindingInputs": {
+          "b-0b7475ba5ac4270cdf98c273912b4be53d21e835fed3356992106a0cc3af9227": "b6b424d70f385e4ff17816d953d313a7d66ead970e3af3ebe3f853309e3c79e6"
+        },
+        "at": "2026-09-09T21:18:50.490Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Shared ingestion recipe",
+        "claim": "boundary \"unresolved event tokens are dropped while other events continue\" at newCommonIngestionPipeline via guard \"drops events whose token cannot be resolved and keeps processing the rest\"",
+        "kind": "pass",
+        "detail": "unresolved event tokens are dropped while other events continue @ newCommonIngestionPipeline (source-property guard)",
+        "at": "2026-09-09T21:18:50.490Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Shared ingestion recipe",
+        "claim": "boundary \"the shared recipe routes dead-letter results to the configured output\" at newCommonIngestionPipeline via guard \"produces DLQ results from steps to the DLQ output\"",
+        "kind": "pass",
+        "detail": "the shared recipe routes dead-letter results to the configured output @ newCommonIngestionPipeline (source-property guard)",
+        "at": "2026-09-09T21:18:50.490Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Shared ingestion recipe",
+        "claim": "boundary \"the shared recipe routes redirect results to the configured output\" at newCommonIngestionPipeline via guard \"produces redirect results to the configured redirect output\"",
+        "kind": "pass",
+        "detail": "the shared recipe routes redirect results to the configured output @ newCommonIngestionPipeline (source-property guard)",
+        "at": "2026-09-09T21:18:50.490Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Batch execution and result routing",
+        "claim": "boundary \"batch feed refuses excess concurrent batches until capacity is released\" at BatchingPipeline via guard \"feed() accepts when under limit and rejects when at limit\"",
+        "kind": "pass",
+        "detail": "batch feed refuses excess concurrent batches until capacity is released @ BatchingPipeline (source-property guard)",
+        "bindingInputs": {
+          "b-49ff68d1c02ae8f0fe8d1be9899c326c3f902724230c23ebf75bc7a7d50cb7e9": "0415bc32862707b17fcd6154362629ee92525dead37a18dcf46e2b4814b643b7"
+        },
+        "at": "2026-09-09T21:18:50.490Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Batch execution and result routing",
+        "claim": "boundary \"dead-letter results retain the producer effect in their result context\" at ResultHandlingPipeline via guard \"should handle dlq results and add side effects\"",
+        "kind": "pass",
+        "detail": "dead-letter results retain the producer effect in their result context @ ResultHandlingPipeline (source-property guard)",
+        "at": "2026-09-09T21:18:50.490Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Batch execution and result routing",
+        "claim": "boundary \"redirect results retain the destination producer effect in their result context\" at ResultHandlingPipeline via guard \"should handle redirected results and add side effects\"",
+        "kind": "pass",
+        "detail": "redirect results retain the destination producer effect in their result context @ ResultHandlingPipeline (source-property guard)",
+        "at": "2026-09-09T21:18:50.490Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      },
+      {
+        "node": "Batch execution and result routing",
+        "claim": "boundary \"inline effect handling waits for settlement before clearing effect context\" at SideEffectHandlingPipeline via guard \"should await side effects and clear them from context\"",
+        "kind": "pass",
+        "detail": "inline effect handling waits for settlement before clearing effect context @ SideEffectHandlingPipeline (source-property guard)",
+        "at": "2026-09-09T21:18:50.490Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 2
+      }
+    ],
+    "coverage": {
+      "components": 9,
+      "claimed": 4,
+      "withWhy": 9,
+      "symbols": 214,
+      "documented": 81
+    },
+    "invariants": {
+      "total": 13,
+      "anchored": 13,
+      "gaps": []
+    },
+    "narrative": null,
+    "jobs": 138,
+    "failures": 5
+  }
+}

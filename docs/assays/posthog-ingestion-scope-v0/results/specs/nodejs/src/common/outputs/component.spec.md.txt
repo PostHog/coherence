@@ -1,0 +1,21 @@
+# Output destinations
+
+Provides named destinations to the result router. Dead-letter and redirected records become producer effects; ordinary successful events continue on the processing path.
+
+## invariants
+
+
+## works when
+
+
+## guarantee bindings
+
+
+## relies on
+
+
+## why
+This spec covers the copied files in this directory, not every upstream module under the same directory. Named test evidence is scoped to its selected fixtures. Imports and declared reliance do not establish end-to-end satisfaction.
+
+## known limits
+- Fake-producer tests do not establish Kafka durability, delivery uniqueness or the completeness of configured destinations.

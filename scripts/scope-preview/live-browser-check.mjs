@@ -54,8 +54,9 @@ await page.waitForFunction(() => document.querySelector('.feed-status')?.textCon
   assert.equal(await page.locator('.journal-panel .journal-row').filter({ hasText: 'Live seed' }).count(), 1, 'compaction must not duplicate displayed records');
   await page.getByRole('tab', { name: 'Structure', exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll('.react-flow__node').length === 2);
+  await page.getByRole('button', { name: 'Inspector & settings', exact: true }).first().click();
+  await page.locator('.parameters summary').click();
   await page.locator('.component-index').getByRole('button', { name: 'Worker', exact: true }).click();
-  await page.locator('.component-card').filter({ hasText: 'Worker' }).locator('[data-card-view="description"]').click();
   await page.getByRole('slider', { name: 'Spacing', exact: true }).focus();
   await page.keyboard.press('End');
   await page.locator('.react-flow__controls-zoomin').click();
@@ -71,14 +72,14 @@ await page.waitForFunction(() => document.querySelector('.feed-status')?.textCon
   assert.equal(await page.getByRole('slider', { name: 'Spacing', exact: true }).inputValue(), spacing);
   await writeFile(join(root, 'worker/worker.spec.md'), '# Worker\n\nChanged live intent.\n\nChanged architecture <script>literal text</script>.\n\n## invariants\n- worker property\n\n## why\n**worker property.** Changed live rationale.\n\n## refutations\n- worker property: removed protection; observed red\n');
   await page.waitForFunction(() => document.querySelector('.inspector')?.textContent.includes('Changed live intent.'));
-  assert.match(await page.locator('.component-card').filter({ hasText: 'Worker' }).innerText(), /Changed architecture <script>literal text<\/script>/);
+  assert.match(await page.locator('.component-card').filter({ hasText: 'Worker' }).textContent(), /Changed architecture <script>literal text<\/script>/);
   await page.locator('.invariant-evidence summary').click();
   assert.match(await page.locator('.invariant-evidence').innerText(), /Changed live rationale/);
   assert.match(await page.locator('.invariant-evidence').innerText(), /removed protection; observed red/);
   assert.match(await page.locator('.invariant-evidence').innerText(), /Unanchored/);
   assert.equal(await page.locator('.spec-inspector script').count(), 0, 'spec prose is text, never executable HTML');
   await writeFile(join(root, '.coherence/status.json'), JSON.stringify({ verify: { claims: [{ node: 'Core', claim, kind: 'fail', at: '2026-09-08T12:00:00.000Z' }] } }));
-  await page.locator('.component-card .status.fail').first().waitFor();
+  await page.locator('.component-card .status.fail').first().waitFor({ state: 'attached' });
   await page.getByRole('button', { name: 'Pause updates' }).click();
   await unlink(join(root, 'new-child/index.ts')); await unlink(join(root, 'new-child/child.spec.md'));
   await page.waitForTimeout(400);

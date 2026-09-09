@@ -3,6 +3,7 @@
 // behind LanguageAdapter (how to read code) and PlatformAdapter (how to read infra).
 
 export interface GraphNode {
+  specPath?: string; // source address retained when a spec owns catalog bindings
   guaranteeLinks?: SpecGuaranteeLinks;
   id: string; parent?: string; label: string; kind: string;
   sub?: string; path?: string; line?: number; claimed?: boolean; claims?: string[];
@@ -30,11 +31,12 @@ export interface Graph {
 }
 
 /** A raw spec parsed from a *.spec.md file. */
-export interface SpecGuaranteeLinks { addresses: unknown[]; relies: unknown[]; problems: string[] }
+export interface SpecGuaranteeLinks { addresses: unknown[]; relies: unknown[]; bindings?: unknown[]; problems: string[] }
 export interface ParsedSpec { name: string; intent: string; claims: string[]; claimKinds: Record<string, string>; prose: string; why: string; invariants: string[]; refutations: string[]; guaranteeLinks?: SpecGuaranteeLinks }
 
 /** How to read a language's code — symbols, imports, and where docblocks live. */
 export interface LanguageAdapter {
+  importStyle?: "python"; // root-relative dotted modules; absent retains path-specifier behavior
   exts: string[]; // file extensions whose symbols/imports/docblocks we parse
   symbols(src: string): Array<{ name: string; kind: string; line: number }>;
   imports(src: string): string[];
@@ -77,6 +79,7 @@ export interface Config {
   tooling: string[];        // path prefixes demoted to a "tooling" group
   ignore: string[];         // dir names never walked
   codeExt: string[];        // file extensions treated as code (for the tree)
+  importAliases?: Record<string, string[]>; // explicit root-relative exact or trailing /* module mappings; unique walked targets only
   typecheck: string[];      // command for the `typechecks` claim
   test: string[];           // base command for `passes test "<name>"` claims (name appended as final arg). Empty = claim skips.
   testMatch?: string;       // optional regex the test output MUST contain to count as a pass. Guards runners (e.g. vitest -t) that exit 0 when the named test matched nothing — without it, a deleted/renamed test silently stays green.

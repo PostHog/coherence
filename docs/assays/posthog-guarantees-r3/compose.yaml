@@ -1,0 +1,86 @@
+name: coherence-posthog-r3-jyxkid
+services:
+  db:
+    image: postgres:15.12-alpine
+    environment:
+      POSTGRES_USER: posthog
+      POSTGRES_PASSWORD: synthetic-assay
+      POSTGRES_DB: posthog
+    ports: ["127.0.0.1:55439:5432"]
+    command: ["postgres", "-c", "max_connections=200"]
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - /tmp/coherence-posthog-probes.jYxKId/posthog/docker/postgres-init-scripts:/docker-entrypoint-initdb.d:ro
+      - /tmp/coherence-posthog-probes.jYxKId/posthog/products:/products:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U posthog"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  redis7:
+    image: redis:7.2-alpine
+    ports: ["127.0.0.1:56389:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  zookeeper:
+    image: zookeeper:3.7.0
+  kafka:
+    image: redpandadata/redpanda:v25.1.9
+    command:
+      - redpanda
+      - start
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:39092
+      - --advertise-kafka-addr
+      - internal://kafka:9092,external://127.0.0.1:39092
+      - --mode
+      - dev-container
+      - --smp
+      - "1"
+      - --memory
+      - 1G
+      - --reserve-memory
+      - 0M
+      - --overprovisioned
+      - --set
+      - redpanda.auto_create_topics_enabled=true
+    ports: ["127.0.0.1:39092:39092"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9644/v1/status/ready"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.6.2.158
+    hostname: clickhouse
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+      KAFKA_HOSTS: kafka:9092
+    ports: ["127.0.0.1:58129:8123", "127.0.0.1:59009:9000"]
+    mem_limit: 6g
+    volumes:
+      - ch-data:/var/lib/clickhouse
+      - /tmp/coherence-posthog-probes.jYxKId/posthog/posthog/idl:/idl:ro
+      - /tmp/coherence-posthog-probes.jYxKId/posthog/docker/clickhouse/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d:ro
+      - /tmp/coherence-posthog-probes.jYxKId/posthog/docker/clickhouse/config.xml:/etc/clickhouse-server/config.xml:ro
+      - /tmp/coherence-posthog-probes.jYxKId/posthog/docker/clickhouse/config.d/default.xml:/etc/clickhouse-server/config.d/default.xml:ro
+      - /tmp/coherence-posthog-probes.jYxKId/posthog/docker/clickhouse/config.d/dev-memory.xml:/etc/clickhouse-server/config.d/dev-memory.xml:ro
+      - /tmp/coherence-posthog-probes.jYxKId/posthog/docker/clickhouse/users-dev.xml:/etc/clickhouse-server/users.xml:ro
+      - /tmp/coherence-posthog-probes.jYxKId/posthog/docker/clickhouse/user_defined_function.xml:/etc/clickhouse-server/user_defined_function.xml:ro
+      - /tmp/coherence-posthog-probes.jYxKId/posthog/posthog/user_scripts:/var/lib/clickhouse/user_scripts:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+      zookeeper:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8123/ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+volumes:
+  pg-data:
+  ch-data:

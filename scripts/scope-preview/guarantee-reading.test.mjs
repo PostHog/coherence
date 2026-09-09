@@ -9,7 +9,7 @@ test('guarantee presentation preserves direction, damage and evidence without in
   assert.equal(relianceReading(model, reverse).length, 0);
   assert.equal(relianceReading(model, forward)[0].guarantee.verdict, 'fail');
   assert.equal(connectionLabel(model, [forward, reverse]), model.guarantees[0].invariant);
-  assert.equal(connectionLabel(model, [reverse]), 'No guarantee linked');
+  assert.equal(connectionLabel(model, [reverse]), 'Import only');
   model.guaranteeLinks.links[0].status = 'stale';
   assert.equal(connectionLabel(model, [forward]), 'Guarantee link needs repair');
   assert.equal(relianceReading(model, forward)[0].link.status, 'stale');

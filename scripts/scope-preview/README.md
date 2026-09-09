@@ -9,11 +9,42 @@ evidence come from that snapshot. Previous hand-written x/y positions are ignore
 
 ## Run
 
-Cards switch between Description and Guarantees with taxonomy fixed below both.
-The full spec text is retained at the same readable scale; guarantee lists scroll
-independently. WebKit caught the first attempt crowding 529px of combined content into
-a 357px description area; the browser guard still checks complete current descriptions
-fit, and additionally checks every canonical guarantee name in the alternate reading.
+PostHog's first catalog-binding adoption is documented in
+[the vertical-slice study](../../docs/assays/posthog-scope-v0/README-CODEX-TAKE.md).
+`snapshot`, `build`, and `serve` accept `--project /absolute/project/root` so an
+isolated adoption can use this same renderer without replacing Coherence's artifacts.
+These preview helpers currently expect `public/` as the artifact directory.
+Cards with no guarantees open on their descriptions; the Guarantees tab still names
+the absence. Bound cards show the reusable title, actual local promise, subject and
+input-bound oracle reading. Their footer makes no whole-component health judgment.
+The inspector retains parameters, assessor, exclusions, falsifier, input identity
+and run detail. A challenge form prepares a shell-quoted CLI conjecture, not a browser
+write: drafts are neither recorded nor delivered; running it enters the existing journal.
+The live model also watches explicitly bound evidence outside the source walker.
+
+Structure now opens one **gravity map**, with every assembly visible. The competing
+Region / Paths / Assemblies switch is retired. Existing React Flow interaction and
+Cytoscape concentric geometry remain; a nearly full arc makes the canonical center
+spatially legible. Ring guides are optional and off by default.
+
+Semantic zoom changes content, never node positions: below 0.48, names, purpose
+excerpts and scoped attention; from 0.48 to 0.85, purpose, monospace taxonomy and two
+guarantee readings with a withheld count; at 0.85 and above, full existing card
+readings and inline subject expansion. Overview titles compensate for zoom to retain
+16 screen pixels. Pan does not rerender cards. Mobile is not a desktop readability claim.
+
+Inline expansion uses explicit binding addresses and spec enforcement anchors, not
+an inferred call graph. Its local center is guarantee incidence over that declared
+population; ties and the six-subject display cap are named. Binding arrows retain
+their explicit directions. External assemblies remain in the same places.
+Import edges are subdued, dashed context, not promises. Authored reliance directions
+are separate solid arrows with consumer-endpoint labels; selection opens the existing
+temporary inspector without resizing/refitting the map. Library curves do not avoid
+obstacles: crossings remain a visual quality limitation, not a solved routing claim.
+
+At close zoom cards switch between Description and Guarantees with taxonomy below.
+Full spec text and guarantee lists remain available by scrolling. Overview excerpts
+are explicitly a lower detail level, not a second authored briefing.
 Connections use explicit
 spec-owned `relies on` declarations, not inferred zone matches. The inspector shows
 each direction's claim, rationale, link health and recorded oracle evidence; missing
@@ -53,10 +84,9 @@ transactional filesystem snapshot or a guarantee to observe every intermediate s
 SSE carries changed replacement snapshots. Reconnect gets the current state; Pause holds
 the latest incoming snapshot until resumed. Tab, filters, selected records/components,
 layout parameters and viewport survive updates. A removed selection falls back to the
-new center. Scope opens with the center and up to three peer assemblies in a bounded
-group. Paging retains the center and names how many assemblies and import relations
-are outside the current view. **Whole-project overview** exposes all implementation
-assemblies; **Fit displayed assemblies** fits the current group. Component-index selection
+new center. Scope opens with all assemblies. Optional **Readable groups** retains the
+center and pages through peers, naming withheld populations. **Whole-project overview**
+returns to all implementation assemblies; **Fit displayed assemblies** fits the current group. Component-index selection
 never zooms. The project is a containing frame, and the configured test component has
 its own evidence entry instead of masquerading as a disconnected runtime peer.
 Neither incoming data nor tab changes reset the user's camera. The fitted bounds cover
@@ -75,7 +105,7 @@ loaded at startup), and opening the newly printed URL.
 
 The four tabs are Structure, Hooks, Journal and Taxonomy. Hooks distinguishes installed control from observed session activation and shows canonical/customized event text without executing a hook. Journal exposes decisions, defects and experiments, with full-record search, pagination and outstanding-state filtering. Resolution is computed over the complete canonical journal before filtering by session. Taxonomy consumes the CLI's immutable caller-assessed classifications, with roles, facets, candidate responsibilities, evidence, ambiguity and staleness. Suggested obligations remain unverified. Only the CLI records assessments; browser annotations, verification and receipts are not implemented.
 
-Structure cards lead with the existing spec's full intent and architectural prose,
+Close-zoom Structure cards retain the existing spec's full intent and architectural prose,
 not a second authored or generated briefing. Long descriptions scroll within the card
 instead of being clamped away. The inspector presents eight invariants at a time, with
 search and an explicit remaining count. Literal-name rationale mentions and named
@@ -91,17 +121,17 @@ Unassigned declarations remain at project scope, and no atlas prose creates a ve
 
 Readability refutations: the original whole-orbit fit painted 420px cards at about 172px
 wide. A subsequent single-card zoom made the text readable but hid the diagram; the user
-rejected it. The replacement guard requires ALL of these in the SAME initial desktop
-view: every card in the displayed group visible, complete purpose and architecture without scrolling, at least
-15px / 14px effective prose type, and at least 35% card-area occupancy. Selection must
-preserve that camera. A first 560×580 sizing attempt failed the full-prose guard (Harness
-core needed 349px in a 323px description area); 560×614 retains that content without
-clipping. Typography is larger inside the cards, with supporting monospace taxonomy.
+rejected it. The user subsequently authorized semantic zoom. The current guard therefore
+requires all assemblies visible with 16px effective titles initially, canonical text
+retained at close zoom, and identical component positions across detail levels and
+inline expansion. Selection preserves the camera. The earlier bounded-group guard's
+full-prose-at-opening and 35% occupancy requirements are superseded, not claimed passed.
+Typography is larger inside close cards, with supporting monospace taxonomy.
 Mobile retains the full diagram and inspector, but does not claim desktop type sizes.
 An earlier startup guard also caught `fitView` waiting on unavailable node measurements;
 the current fit uses the already-known rectangles with `fitBounds`. The 12-component adoption
-also checks that paging conserves all implementation subjects and exposes a full overview;
-the dense, explicitly selected overview does not claim desktop reading sizes.
+also checked paging conservation; the new opening overview checks all ten assemblies
+at once and claims readable titles, not full prose at that scale.
 
 Performance refutation: the original overflow-visible orbit SVG caused repeated WebKit
 zoom p95 gaps of 234–350ms. Removing only the orbits reduced that to 31–33ms; merely

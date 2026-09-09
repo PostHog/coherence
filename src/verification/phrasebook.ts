@@ -47,6 +47,7 @@ export interface ClaimResult { kind: "pass" | "fail" | "skip"; detail?: string; 
  * and the claim skips rather than quietly costing a full pool boot.
  */
 export interface ClaimCtx {
+  oracleChecked?: () => void; // observation only; does not change a verdict
   cfg: Config;
   graph: Graph;
   root: string;
@@ -142,6 +143,7 @@ export const reEscape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  * not about the claim. Verify's own wall clock takes over when this is absent.
  */
 export function execNamedTest(ctx: ClaimCtx, name: string): { ok: boolean; detail: string; ms?: number } {
+  ctx.oracleChecked?.();
   const o = ctx.oracles?.();
   if (o?.report) return resolveFromBatch(o.report, name);
   return runSerialNamedTest(ctx.cfg, ctx.root, name);

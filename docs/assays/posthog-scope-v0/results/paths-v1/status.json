@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "verify": {
+    "at": "2026-09-09T18:36:59.273Z",
+    "commit": null,
+    "dirty": false,
+    "tier": "full",
+    "scope": null,
+    "batched": true,
+    "cost": {
+      "totalMs": 8029.999999999999,
+      "claims": [
+        {
+          "node": "Query cache",
+          "claim": "boundary \"a late upload cannot replace the newer cache entry or retain its losing blob\" at replace_value() via guard \"test_stale_upload_cannot_replace_a_newer_entry\"",
+          "ms": 4014.9999999999995,
+          "source": "report"
+        },
+        {
+          "node": "Query cache",
+          "claim": "boundary \"repeating an already-installed pointer swap returns success\" at replace_value() via guard \"test_stale_upload_cannot_replace_a_newer_entry\"",
+          "ms": 4014.9999999999995,
+          "source": "report"
+        }
+      ]
+    },
+    "lastFullAt": "2026-09-09T18:36:59.273Z",
+    "claims": [
+      {
+        "node": "Query cache",
+        "claim": "boundary \"a late upload cannot replace the newer cache entry or retain its losing blob\" at replace_value() via guard \"test_stale_upload_cannot_replace_a_newer_entry\"",
+        "kind": "pass",
+        "detail": "a late upload cannot replace the newer cache entry or retain its losing blob @ replace_value() (source-property guard)",
+        "bindingInputs": {
+          "b-a7133733254810292e419cbaeef649462425bf56fb48c6cf94df91b0e82f7cc8": "427b0421c1f4190ee9f3d5688e1ce80b1bf53dcc84d498cc3f7f63edcf85c75e"
+        },
+        "at": "2026-09-09T18:36:59.273Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 1
+      },
+      {
+        "node": "Query cache",
+        "claim": "boundary \"repeating an already-installed pointer swap returns success\" at replace_value() via guard \"test_stale_upload_cannot_replace_a_newer_entry\"",
+        "kind": "pass",
+        "detail": "repeating an already-installed pointer swap returns success @ replace_value() (source-property guard)",
+        "bindingInputs": {
+          "b-411dd20b9a8b672c73b7e5bae722c708fdcf7a95fe9a3f76bdcb4c313171f6df": "bd5b5ee14ccbfe01723eb43a450581ad82624730ee6d72be898c5d7f1eac4dca"
+        },
+        "at": "2026-09-09T18:36:59.273Z",
+        "commit": null,
+        "tier": "full",
+        "everFailed": false,
+        "runs": 1
+      }
+    ],
+    "coverage": {
+      "components": 5,
+      "claimed": 1,
+      "withWhy": 5,
+      "symbols": 275,
+      "documented": 59
+    },
+    "invariants": {
+      "total": 2,
+      "anchored": 2,
+      "gaps": []
+    },
+    "narrative": null,
+    "jobs": 220,
+    "failures": 4
+  }
+}

@@ -1,0 +1,17 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.13, pytest-8.4.2, pluggy-1.6.0 -- /tmp/coherence-posthog-probes.jYxKId/pinned-env/bin/python
+cachedir: .pytest_cache
+django: version: 5.2.17, settings: posthog.settings (from ini)
+hypothesis profile 'default'
+rootdir: /private/tmp/coherence-posthog-probes.jYxKId/posthog
+configfile: pytest.ini
+plugins: mock-3.15.1, anyio-4.9.0, syrupy-4.9.1, xdist-3.8.0, split-0.11.0, timeout-2.4.0, icdiff-0.9, django-4.11.1, hypothesis-6.151.9, asyncio-1.3.0, durations-1.6.2, env-1.2.0, aiohttp-1.1.0, rerunfailures-16.1, requests-mock-1.12.1, cov-7.0.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=module, asyncio_default_test_loop_scope=module
+collecting ... collected 3 items
+
+posthog/models/scoping/test_manager.py::TestTeamScopedManager::test_no_scope_raises_team_scope_error PASSED [ 33%]
+posthog/models/scoping/test_manager.py::TestTeamScopedManager::test_team_scope_filters_to_team PASSED [ 66%]
+posthog/query_cache/test/test_storage.py::TestQueryCacheS3Routing::test_stale_upload_cannot_replace_a_newer_entry PASSED [100%]
+
+- generated xml file: /Users/daniloc/Documents/Dev/coherence/docs/assays/posthog-guarantees-r3/cache-restored.xml -
+============================== 3 passed in 3.15s ===============================

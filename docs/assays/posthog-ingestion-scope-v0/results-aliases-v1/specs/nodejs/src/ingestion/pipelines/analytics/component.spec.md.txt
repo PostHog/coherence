@@ -1,0 +1,21 @@
+# Analytics processing
+
+Assembles event restrictions, per-identity processing and batched store flushes for analytics ingestion. Uses the shared recipe and declares typed output destinations.
+
+## invariants
+
+
+## works when
+
+
+## guarantee bindings
+
+
+## relies on
+- {"claim":"g-4a6f60254d3827457eabcd6cd08779332641121f32461e8f6620f711e28a4fdc","provider":"nodejs/src/ingestion/common","because":"The joined analytics pipeline uses the shared recipe to resolve teams before team-aware steps."}
+
+## why
+This spec covers the copied files in this directory, not every upstream module under the same directory. Named test evidence is scoped to its selected fixtures. Imports and declared reliance do not establish end-to-end satisfaction.
+
+## known limits
+- Person merges, overflow policy, event transformation and real-store writes are outside this executable slice.

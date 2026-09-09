@@ -1,0 +1,27 @@
+# Shared ingestion recipe
+
+Composes parsing, team resolution, event processing, warnings, result routing and side effects. The same skeleton supplies multiple ingestion products; this adoption examines only the selected worker path.
+
+## invariants
+- unresolved event tokens are dropped while other events continue
+- the shared recipe routes dead-letter results to the configured output
+- the shared recipe routes redirect results to the configured output
+
+## works when
+- boundary "unresolved event tokens are dropped while other events continue" at newCommonIngestionPipeline via guard "drops events whose token cannot be resolved and keeps processing the rest"
+- boundary "the shared recipe routes dead-letter results to the configured output" at newCommonIngestionPipeline via guard "produces DLQ results from steps to the DLQ output"
+- boundary "the shared recipe routes redirect results to the configured output" at newCommonIngestionPipeline via guard "produces redirect results to the configured redirect output"
+
+## guarantee bindings
+
+
+## relies on
+- {"claim":"g-39e6f9ff9ca3814f066d946b5f47a96b1ee9701f43187fb1763f0958cfb691ef","provider":"nodejs/src/ingestion/framework","because":"The shared builder installs result handling after the event processing steps."}
+- {"claim":"g-d03c89cc8240911f62aec65a1d7fe334b6f3000cb6c004b2c4f6e90cd75df339","provider":"nodejs/src/ingestion/framework","because":"The shared builder delegates redirect effect construction to result handling."}
+- {"claim":"g-4db4be96a3987e3b7791851afbc11049b2c1208d22e50556031b922201716321","provider":"nodejs/src/common/utils","because":"The common builder receives the scheduler used for detached step and hook effects."}
+
+## why
+This spec covers the copied files in this directory, not every upstream module under the same directory. Named test evidence is scoped to its selected fixtures. Imports and declared reliance do not establish end-to-end satisfaction.
+
+## known limits
+- No claim of complete behavioral coverage.

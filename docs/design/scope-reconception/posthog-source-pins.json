@@ -1,0 +1,16 @@
+{
+  "repository": "posthog/posthog",
+  "commit": "c54fec2163ad9455fd23a947f86a9034c1df9388",
+  "grade": "source-inspected discovery, not adopted component inventory",
+  "files": {
+    "nodejs/src/ingestion/api/grpc-server.ts": "0b140c61e105ed61db0f737177e4ac5983c06e19c041543b7c8d8c156c1aea76",
+    "nodejs/src/ingestion/common/steps/event-preprocessing/validate-event-schema.ts": "e332c38bfb66d880fc93c5eff5e0b4e306aaf6a4e1b0683b22c91f265dc0c99c",
+    "nodejs/src/ingestion/common/feature-flag-called-dedup/feature-flag-called-dedup-service.ts": "071a584a8b6362637f93a45487ced648372d86afc098c2c0771b07f5edd70ef1",
+    "posthog/query_cache/storage.py": "760a88347afeb1ecaebaeb220fd0beded36eee1c2b8bc3fd0923f535c69ea54a",
+    "posthog/query_cache/size_tracker.py": "9b1ff8d3b638b2532fa66b323cbb092c3e9b0bf34ccbfc7298716202fd6a0920",
+    "products/tasks/backend/models.py": "c2d46fcebf6b87092cc32f524a8213b0c353cf46a12218c69b6237c85dbd8d3b",
+    "products/tasks/backend/logic/services/workflow_dispatch.py": "cc263b512cf9d22ad8e5815cea619739fbeed205a7f81793b9054ebd9322131f",
+    "products/tasks/backend/management/commands/run_task_workflow_dispatcher.py": "16536a51e9c5764273ea0b946fda09836d780e5a4004ddda0366ed28d00a5c72",
+    "posthog/egress/limiter/outbound.py": "6d62fbc2e94fd3813021d6279a8d39527747143a12a3d5a72cbd96058d46124d"
+  }
+}

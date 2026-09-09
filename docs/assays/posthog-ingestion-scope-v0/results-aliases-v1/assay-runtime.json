@@ -1,0 +1,12 @@
+{
+  "upstream": "/tmp/coherence-posthog-probes.jYxKId/posthog",
+  "node": "/Users/daniloc/.nvm/versions/node/v24.8.0/bin/node",
+  "tests": [
+    "src/ingestion/api/grpc-server.test.ts",
+    "src/ingestion/framework/batching-pipeline.test.ts",
+    "src/ingestion/framework/result-handling-pipeline.test.ts",
+    "src/ingestion/framework/side-effect-handling-pipeline.test.ts",
+    "src/ingestion/common/common-ingestion-pipeline.test.ts",
+    "src/common/utils/promise-scheduler.test.ts"
+  ]
+}

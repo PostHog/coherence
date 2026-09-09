@@ -979,6 +979,7 @@ defaults come from `src/config.ts`):
 | `tooling` | `[]` | Path prefixes demoted to a "tooling" group in the graph. |
 | `ignore` | `["node_modules",".git","dist",".turbo",".wrangler"]` | File or directory names the spec/code walk never enters. Put machine-generated environment declarations here when platform capability inference should use authored types only. NOTE: neither the meta-oracle nor the fast Vitest name floor reuses this graph list when hunting for oracle test files (see below). |
 | `codeExt` | `["ts"]` | File extensions treated as code for the tree. |
+| `importAliases` | unset | Explicit root-relative module mappings, e.g. `{ "~/*": ["nodejs/src/*"], "~/tests/*": ["nodejs/tests/*"] }`. Exact bare-name keys or one trailing `/*`; targets use the same wildcard form (optional leading `./`). Exact matches precede wildcard matches; longest prefix wins, with no broader fallback on a miss. Only a unique walked file (exact, extension, or `index` form) resolves; ignored, missing, and ambiguous targets stay external. Malformed or escaping declarations refuse. No implicit tsconfig loading, package-exports resolution, reexport inference, or project execution; Python retains its separate direct-module grade. |
 | `typecheck` | `["npm","run","typecheck"]` | Command the `typechecks` claim shells. |
 | `test` | `[]` | Base command for `passes test "<name>"` / boundary-oracle claims; `<name>` is appended as the final arg. Empty = those claims skip. |
 | `testMatch` | unset | Optional regex the test output MUST contain to count as a pass. Guards the **serial** arm against runners like `vitest -t` that exit 0 when the name matched nothing. **Not needed for batched claims** — a batch report observes a missing test directly (see "Batched oracle execution"). It does **not** protect a `node --test` project at all (measured: a pattern matching nothing still reports the file as one passing test). |
@@ -2435,9 +2436,44 @@ superseded selections exit 1; damaged evidence and invalid requests exit 2.
 
 ### Connecting obligations and guarantees
 
+The candidate v0 vocabulary is a project-independent reference:
+
+```sh
+coherence guarantees catalog
+coherence guarantees catalog guarantee:supersession-safety
+coherence guarantees catalog --json
+```
+
+It contains 36 scoped definitions with applicability conditions, binding parameters,
+exclusions, falsifiers, demotion criteria, distinctions from neighboring definitions,
+and pinned PostHog examples. Four examples have retained mutation controls; the other
+examples are source/test inspections, not new passing verdicts. Portability remains
+unproven. Full catalog and curation notes: [Guarantee vocabulary v0](docs/assays/posthog-guarantees-v0/CATALOG-CODEX-TAKE.md).
+
+Catalog lookup does not load project configuration, execute tests, write assessments,
+activate obligations or create receipts. `catalog --check` is intentionally rejected:
+there is no project satisfaction to check. Existing taxonomy suggestions, historical
+assessments and spec links are unchanged. Candidate IDs cannot yet be used as activated
+taxonomy obligations in `## addresses`. Explicit adoption instead uses spec-owned
+`## guarantee bindings` JSON bullets: a catalog definition and its digest, local `g-…`
+claim, subject, assessor, applicability rationale, exact parameter values, exclusions,
+falsifier and SHA-256 evidence-file pins. Nothing is activated from a role alone.
+
+`verify` now retains the bound inputs accompanying a named oracle check. Changed
+source, spec, definition or runner configuration cannot reuse that support. Fast skips
+retain previous observations without renewing them; `--from-report` cannot establish
+an execution/input interval. Scope shows this evidence per subject, never as component
+health or a coverage percentage. These are mutable local records, not immutable receipts.
+Dependency completeness and applicability remain caller assessments.
+
+The [PostHog query-cache slice](docs/assays/posthog-scope-v0/README-CODEX-TAKE.md)
+exercises two bindings against one original test, live staleness, and a Scope-generated
+counterexample command into the existing journal. Browser drafts are neither recorded
+nor delivered; executing the command records an open question, not agent receipt.
+
 `coherence guarantees --json` inventories canonical boundary claims with stable
 `g-…` references, recorded oracle evidence, taxonomy obligations and explicit links.
-`coherence guarantees --check` checks **declared-link integrity only**. It does not
+`coherence guarantees --check` checks **declared-link and binding integrity only**. It does not
 run tests, prove satisfaction or require every obligation/import to have a link.
 Unlinked obligations remain visible. Damaged declarations or unavailable taxonomy
 make the check fail. Agents receive this distinction in both hosts' startup instructions.
@@ -2541,7 +2577,7 @@ any is in **In detail** below — that half is authored, and does not cover all 
 **Perceive the project**
 
 - `coherence taxonomy <catalog|profile|inspect|record|list|show|help> [options]` — evidence-addressed role/facet classification and unverified obligation suggestions; only record writes
-- `coherence guarantees [--check] [--json]` — inspect spec guarantees, explicit taxonomy/consumer links and recorded evidence; check link integrity, not satisfaction
+- `coherence guarantees [catalog [guarantee:ID]] [--check] [--json]` — inspect candidate vocabulary or spec guarantees and links; --check applies only to project link integrity, not satisfaction
 - `coherence index [--since <ref>]` — the returning human's page — MAP · JOURNAL · TRAJECTORY, framed against what you last saw (`_index.html` + `index.json`)
 - `coherence panel [--no-watch | --once]` — live TUI over the graph + the status record
 - `coherence orient [--json]` — one deterministic swarm heading over strict decisions, work, links, experiments, defects, and verification

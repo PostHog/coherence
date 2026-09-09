@@ -1,0 +1,23 @@
+{
+  "repository": "https://github.com/PostHog/posthog",
+  "commit": "c54fec2163ad9455fd23a947f86a9034c1df9388",
+  "files": {
+    "LICENSE": "6d82d67dba42eb94ba10f1e986d2eec338c22fb7c5216c2c0ebdecd83d53a029",
+    "posthog/caching/redis_cluster_connection_factory.py": "e14dbaaed815c440f06a2719ba258cb7e55d09e39916627705cbc875f871640e",
+    "posthog/query_cache/__init__.py": "9b166a8dfe48afc705ef99d3e8cc4186ed9b1d27d033c58225069a2b0fa5a5e7",
+    "posthog/query_cache/cache.py": "f677f2ceec9da546320ec368003546023f5169176d475f04f370e5b9e308ceb2",
+    "posthog/query_cache/failures.py": "168ab742db8db40cdc033d1ba6dab1f06b2956fa0b9635428fa39feb83b1b8d4",
+    "posthog/query_cache/freshness_index.py": "647e8b7a134eb28cc2272b4b4e7749e0983c0ab462d905b2cf248d301d6bdf6b",
+    "posthog/query_cache/metrics.py": "fc641c6a4f7900e9d3b6398c550096a066c5cc04343ff880392dbaacf19100a2",
+    "posthog/query_cache/results.py": "d218945f7be2e4ef5ee6ac151ebe42204a5d61e6e3a7170acab340f00593a9cb",
+    "posthog/query_cache/serialization.py": "dc97ae800ff2b2ad9a0853504a6078b8b77910d1cc28358ede87bc2da1198a42",
+    "posthog/query_cache/size_tracker.py": "9b1ff8d3b638b2532fa66b323cbb092c3e9b0bf34ccbfc7298716202fd6a0920",
+    "posthog/query_cache/storage.py": "760a88347afeb1ecaebaeb220fd0beded36eee1c2b8bc3fd0923f535c69ea54a",
+    "posthog/query_cache/tasks.py": "9f2100c61accb603cf9ea04a1bbf9b2ec9fdaa3e8e3811999bb90ea4a6f00222",
+    "posthog/query_cache/test/test_cache.py": "422e4ffd05e8e31b36704ae26efa274eb8107a7a26ef99081ba4a2b87c23476f",
+    "posthog/query_cache/test/test_failures.py": "90084af900a9697d83e8dc58e3a8fe0900379e9fab2845007b2078c555540bab",
+    "posthog/query_cache/test/test_size_tracker.py": "4be9b189cc95282b8a535e9e2ccbc770c44fb428fb5ea9e66e90d3119d98e136",
+    "posthog/query_cache/test/test_storage.py": "eeeda47ddec7c8517fd72d5f0863aee40110960eeeca8631176c733fedce1f7c",
+    "posthog/storage/object_storage.py": "eab2edf460e1abea8684e0069634ccaf15ee387c06d83aab6c38a1c5fac2ba0e"
+  }
+}

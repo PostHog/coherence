@@ -54,6 +54,7 @@ export interface ScopeGuarantee {
 }
 
 export interface ScopeModel {
+  catalogBindings?: import("../verification/guarantee-bindings.ts").BindingProjection;
   guaranteeLinks?: GuaranteeLinks;
   root: string;
   center: string | null;

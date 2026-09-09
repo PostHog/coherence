@@ -18,6 +18,7 @@ import { claimKey, type ClaimKey } from "../verification/boundary.ts";
 import { readJsonOrRefuse } from "../verification/floor.ts";
 
 export interface ClaimRecord {
+  bindingInputs?: Record<string, string>; // exact spec/catalog/source inputs observed by this run; not a receipt
   node: string;            // declaring component's label
   claim: string;           // the claim line, verbatim
   kind: "pass" | "fail" | "skip";
@@ -253,7 +254,7 @@ export interface VerifyReport {
   tier: "fast" | "full";
   scope: string[] | null;
   batched?: boolean;       // the executable tier resolved from ONE batched suite report
-  sigs: Array<{ kind: "pass" | "fail" | "skip"; claim: string; node: string; detail?: string }>;
+  sigs: Array<{ kind: "pass" | "fail" | "skip"; claim: string; node: string; detail?: string; bindingInputs?: Record<string, string> }>;
   coverage: VerifySection["coverage"];
   invTotal: number;
   invGaps: Array<{ comp: string; inv: string }>;
@@ -267,7 +268,7 @@ export async function recordVerify(cfg: Config, r: VerifyReport): Promise<void> 
   await updateStatus(cfg, prev => {
     const { commit, dirty } = gitStamp(cfg.root);
     const at = new Date().toISOString();
-    const fresh: ClaimRecord[] = r.sigs.map((s) => ({ node: s.node, claim: s.claim, kind: s.kind, detail: s.detail, at, commit, tier: r.tier }));
+    const fresh: ClaimRecord[] = r.sigs.map((s) => ({ node: s.node, claim: s.claim, kind: s.kind, detail: s.detail, ...(s.bindingInputs ? { bindingInputs: s.bindingInputs } : {}), at, commit, tier: r.tier }));
     const scopeSet = r.scope ? new Set(r.scope) : null;
     const claims = mergeClaimRecords(prev.verify?.claims ?? [], fresh, scopeSet);
     // Scoped runs are authoritative only for the components they touched: their gap list

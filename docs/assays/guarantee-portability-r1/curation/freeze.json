@@ -1,0 +1,292 @@
+{
+  "schema": "guarantee-portability-curation-freeze/v1",
+  "version": 1,
+  "attribution": {
+    "session": "01a086a2-4e8c-7712-96d6-f3e2a7523b73",
+    "agent": "guarantee_curator",
+    "work": "wrk-guarantee-curation-r1"
+  },
+  "frozenAt": "2026-09-09T14:53:46.376Z",
+  "corpusSha256": "0b6a45e2d3613ed8a38c210a099ec696fbcbf76a2a86ed8bd31a0d449f0dc4e4",
+  "referenceSha256": "6cdd54641451ea9a19e368a7c570175abd393031a179cabd3ec1f71f901eae85",
+  "hashAlgorithm": "SHA-256 over exact UTF-8 file bytes including final newline",
+  "files": {
+    "corpus": "corpus.json",
+    "reference": "reference.json"
+  },
+  "counts": {
+    "cases": 27,
+    "knownStress": 17,
+    "fresh": 10,
+    "projects": 12,
+    "domains": 12,
+    "referenceRows": 108,
+    "positiveUsefulnessTasks": 24,
+    "topics": {
+      "boundary": {
+        "positive": {
+          "cases": 6,
+          "projects": 4,
+          "domains": 4,
+          "byProject": {
+            "illegalstudio--elephc": 3,
+            "kubernetes-sigs--kubebuilder": 1,
+            "streamplace--streamplace": 1,
+            "omdsh-dev--DSH-better-sidebar": 1
+          },
+          "byDomain": {
+            "PHP compiler": 3,
+            "Kubernetes project scaffolding": 1,
+            "live video social service": 1,
+            "coding assistant workspace UI": 1
+          }
+        },
+        "negative": {
+          "cases": 3,
+          "projects": 3,
+          "domains": 3,
+          "byProject": {
+            "streamplace--streamplace": 1,
+            "kubernetes-sigs--kubebuilder": 1,
+            "vaadin--hilla": 1
+          },
+          "byDomain": {
+            "live video social service": 1,
+            "Kubernetes project scaffolding": 1,
+            "web forms": 1
+          }
+        },
+        "unknown": {
+          "cases": 18,
+          "projects": 11,
+          "domains": 11,
+          "byProject": {
+            "illegalstudio--elephc": 2,
+            "btraceio--btrace": 2,
+            "wboayue--rust-ibapi": 1,
+            "ssh-mitm--ssh-mitm": 2,
+            "owncloud--client": 1,
+            "NVIDIA-NeMo--Megatron-Bridge": 1,
+            "oblien--openship": 1,
+            "omdsh-dev--DSH-better-sidebar": 3,
+            "uxlfoundation--oneTBB": 1,
+            "kubernetes-sigs--kubebuilder": 1,
+            "streamplace--streamplace": 3
+          },
+          "byDomain": {
+            "PHP compiler": 2,
+            "JVM tracing": 2,
+            "brokerage network client": 1,
+            "SSH interception": 2,
+            "desktop file synchronization": 1,
+            "machine learning datasets": 1,
+            "email web application": 1,
+            "coding assistant workspace UI": 3,
+            "parallel task runtime": 1,
+            "Kubernetes project scaffolding": 1,
+            "live video social service": 3
+          }
+        }
+      },
+      "determinism": {
+        "positive": {
+          "cases": 6,
+          "projects": 4,
+          "domains": 4,
+          "byProject": {
+            "illegalstudio--elephc": 2,
+            "btraceio--btrace": 1,
+            "streamplace--streamplace": 1,
+            "omdsh-dev--DSH-better-sidebar": 2
+          },
+          "byDomain": {
+            "PHP compiler": 2,
+            "JVM tracing": 1,
+            "live video social service": 1,
+            "coding assistant workspace UI": 2
+          }
+        },
+        "negative": {
+          "cases": 3,
+          "projects": 3,
+          "domains": 3,
+          "byProject": {
+            "wboayue--rust-ibapi": 1,
+            "omdsh-dev--DSH-better-sidebar": 1,
+            "uxlfoundation--oneTBB": 1
+          },
+          "byDomain": {
+            "brokerage network client": 1,
+            "coding assistant workspace UI": 1,
+            "parallel task runtime": 1
+          }
+        },
+        "unknown": {
+          "cases": 18,
+          "projects": 10,
+          "domains": 10,
+          "byProject": {
+            "illegalstudio--elephc": 3,
+            "btraceio--btrace": 1,
+            "ssh-mitm--ssh-mitm": 2,
+            "owncloud--client": 1,
+            "streamplace--streamplace": 4,
+            "NVIDIA-NeMo--Megatron-Bridge": 1,
+            "kubernetes-sigs--kubebuilder": 3,
+            "vaadin--hilla": 1,
+            "oblien--openship": 1,
+            "omdsh-dev--DSH-better-sidebar": 1
+          },
+          "byDomain": {
+            "PHP compiler": 3,
+            "JVM tracing": 1,
+            "SSH interception": 2,
+            "desktop file synchronization": 1,
+            "live video social service": 4,
+            "machine learning datasets": 1,
+            "Kubernetes project scaffolding": 3,
+            "web forms": 1,
+            "email web application": 1,
+            "coding assistant workspace UI": 1
+          }
+        }
+      },
+      "projection": {
+        "positive": {
+          "cases": 6,
+          "projects": 3,
+          "domains": 3,
+          "byProject": {
+            "illegalstudio--elephc": 4,
+            "NVIDIA-NeMo--Megatron-Bridge": 1,
+            "omdsh-dev--DSH-better-sidebar": 1
+          },
+          "byDomain": {
+            "PHP compiler": 4,
+            "machine learning datasets": 1,
+            "coding assistant workspace UI": 1
+          }
+        },
+        "negative": {
+          "cases": 3,
+          "projects": 3,
+          "domains": 3,
+          "byProject": {
+            "streamplace--streamplace": 1,
+            "kubernetes-sigs--kubebuilder": 1,
+            "vaadin--hilla": 1
+          },
+          "byDomain": {
+            "live video social service": 1,
+            "Kubernetes project scaffolding": 1,
+            "web forms": 1
+          }
+        },
+        "unknown": {
+          "cases": 18,
+          "projects": 10,
+          "domains": 10,
+          "byProject": {
+            "illegalstudio--elephc": 1,
+            "btraceio--btrace": 2,
+            "wboayue--rust-ibapi": 1,
+            "ssh-mitm--ssh-mitm": 2,
+            "owncloud--client": 1,
+            "oblien--openship": 1,
+            "omdsh-dev--DSH-better-sidebar": 3,
+            "uxlfoundation--oneTBB": 1,
+            "kubernetes-sigs--kubebuilder": 2,
+            "streamplace--streamplace": 4
+          },
+          "byDomain": {
+            "PHP compiler": 1,
+            "JVM tracing": 2,
+            "brokerage network client": 1,
+            "SSH interception": 2,
+            "desktop file synchronization": 1,
+            "email web application": 1,
+            "coding assistant workspace UI": 3,
+            "parallel task runtime": 1,
+            "Kubernetes project scaffolding": 2,
+            "live video social service": 4
+          }
+        }
+      },
+      "persistence": {
+        "positive": {
+          "cases": 6,
+          "projects": 3,
+          "domains": 3,
+          "byProject": {
+            "kubernetes-sigs--kubebuilder": 2,
+            "streamplace--streamplace": 3,
+            "omdsh-dev--DSH-better-sidebar": 1
+          },
+          "byDomain": {
+            "Kubernetes project scaffolding": 2,
+            "live video social service": 3,
+            "coding assistant workspace UI": 1
+          }
+        },
+        "negative": {
+          "cases": 4,
+          "projects": 4,
+          "domains": 4,
+          "byProject": {
+            "streamplace--streamplace": 1,
+            "kubernetes-sigs--kubebuilder": 1,
+            "vaadin--hilla": 1,
+            "omdsh-dev--DSH-better-sidebar": 1
+          },
+          "byDomain": {
+            "live video social service": 1,
+            "Kubernetes project scaffolding": 1,
+            "web forms": 1,
+            "coding assistant workspace UI": 1
+          }
+        },
+        "unknown": {
+          "cases": 17,
+          "projects": 10,
+          "domains": 10,
+          "byProject": {
+            "illegalstudio--elephc": 5,
+            "btraceio--btrace": 2,
+            "wboayue--rust-ibapi": 1,
+            "ssh-mitm--ssh-mitm": 2,
+            "owncloud--client": 1,
+            "NVIDIA-NeMo--Megatron-Bridge": 1,
+            "oblien--openship": 1,
+            "uxlfoundation--oneTBB": 1,
+            "streamplace--streamplace": 1,
+            "omdsh-dev--DSH-better-sidebar": 2
+          },
+          "byDomain": {
+            "PHP compiler": 5,
+            "JVM tracing": 2,
+            "brokerage network client": 1,
+            "SSH interception": 2,
+            "desktop file synchronization": 1,
+            "machine learning datasets": 1,
+            "email web application": 1,
+            "parallel task runtime": 1,
+            "live video social service": 1,
+            "coding assistant workspace UI": 2
+          }
+        }
+      }
+    }
+  },
+  "readiness": "ready-for-candidate-drafting-and-blinded-review",
+  "missingCriteria": [],
+  "limits": [
+    "Procedural independence only: curator and author/reviewers use the same model family and share the surrounding task framing. This is not independent human judgment or a population sample.",
+    "Selection was completed before candidate drafting. No candidate definitions, product plan, adoption mappings/README or reviewer outputs were read. The permitted readiness inventory contained family identifiers and inherited role labels; these were visible but no candidate clause text was used.",
+    "Known stress cases are not held out. Fresh subjects are new at the selected symbol scope but come from the same twelve local repositories.",
+    "Positive means the local responsibility applies, not that an implementation satisfies it. Source comments are author testimony and no application test outcomes were collected.",
+    "Function-level subjects in the same file share implementation/library dependencies and are not statistically independent samples. Read and write entries are separate responsibilities, not separate storage engines.",
+    "References freeze expected roles/facets as unknown; no new standardized role/facet judgment is inferred from inherited labels.",
+    "Reviewer-facing corpus excludes topic expectations and usefulness answers. Local descriptions still naturally reveal source duties; this is blinded to answers, not anonymized source.",
+    "Source files are included as finite excerpts and whole-file digests. Uninspected delegated code remains a limitation even if entry documentation states a contract."
+  ]
+}

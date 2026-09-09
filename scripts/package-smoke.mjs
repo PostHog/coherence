@@ -115,6 +115,23 @@ try {
   await executable(coherence);
   await executable(coherenceHook);
 
+  const guaranteeCatalog = JSON.parse(run(coherence, ["guarantees", "catalog", "--json"], { cwd: consumer }).stdout);
+  assert.equal(guaranteeCatalog.definitions.length, 36);
+  assert.equal(guaranteeCatalog.maturity, "candidate");
+  assert.equal(guaranteeCatalog.portability, "unproven");
+  const guaranteeDetail = JSON.parse(run(coherence, ["guarantees", "catalog", "guarantee:supersession-safety", "--json"], { cwd: consumer }).stdout);
+  assert.equal(guaranteeDetail.definition.example.grade, "mutation-tested");
+  assert.ok(guaranteeDetail.definition.falsifier);
+  assert.ok(existsSync(join(installed, "docs/assays/posthog-guarantees-v0/evidence.json")));
+  assert.ok(existsSync(join(installed, "dist/verification/guarantee-bindings.js")), "input-bound guarantee projection must ship");
+  assert.ok(existsSync(join(installed, "docs/assays/posthog-scope-v0/README-CODEX-TAKE.md")), "binding adoption documentation must ship");
+  assert.match(run(coherence, ["guarantees", "--help"], { cwd: consumer }).stdout, /guarantee bindings/);
+  for (const definition of guaranteeCatalog.definitions) {
+    for (const evidence of definition.example.runEvidence)
+      assert.ok(existsSync(join(installed, evidence)), `packed guarantee evidence missing: ${evidence}`);
+  }
+  run(coherence, ["guarantees", "catalog", "--check"], { cwd: consumer, status: 2 });
+
   // Taxonomy must ship as CLI code/data, without a lab checkout or frontend package.
   const catalog = JSON.parse(run(coherence, ["taxonomy", "catalog", "--json"], { cwd: consumer }).stdout);
   assert.ok(catalog.roles.length > 0 && catalog.guarantees.length > 0);

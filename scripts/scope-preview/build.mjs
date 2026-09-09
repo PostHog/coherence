@@ -1,17 +1,20 @@
 import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { resolve, join } from 'node:path';
 import { layoutScope } from './layout.mjs';
 import { scopeScene } from './scene.mjs';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
-const input = new URL('../../public/scope.json', import.meta.url);
-const output = new URL('../../public/_scope-library.html', import.meta.url);
+const rootFlag = process.argv.indexOf('--project');
+const project = rootFlag < 0 ? fileURLToPath(new URL('../..', import.meta.url)) : resolve(process.argv[rootFlag + 1]);
+const input = join(project, 'public/scope.json');
+const output = join(project, 'public/_scope-library.html');
 const model = JSON.parse(await readFile(input, 'utf8'));
-const readings = JSON.parse(await readFile(new URL('../../public/scope-readings.json', import.meta.url), 'utf8'));
+const readings = JSON.parse(await readFile(join(project, 'public/scope-readings.json'), 'utf8'));
 // Saved geometry is auditable independently of the browser. Interactive controls
 // are explicitly a local view, not a mutation of the canonical snapshot.
-const initial = layoutScope(scopeScene(model).model);
+const initial = layoutScope(scopeScene(model, { all: true }).model);
 const result = await build({ absWorkingDir: here, entryPoints: ['app.jsx'], bundle: true,
   write: false, outfile: 'preview.js', minify: true, legalComments: 'inline', jsx: 'automatic',
   define: { 'process.env.NODE_ENV': '"production"' },
@@ -25,5 +28,5 @@ if (process.argv.includes('--check')) {
   console.log('Scope library preview is byte-current');
 } else {
   await writeFile(output, html);
-  console.log(`Scope library preview: ${model.nodes.length} components, ${model.relations.length} reliances, ${model.guarantees.length} guarantees; ${(Buffer.byteLength(html) / 1024).toFixed(0)} KiB → ${fileURLToPath(output)}`);
+  console.log(`Scope library preview: ${model.nodes.length} components, ${model.relations.length} reliances, ${model.guarantees.length} guarantees; ${(Buffer.byteLength(html) / 1024).toFixed(0)} KiB → ${output}`);
 }

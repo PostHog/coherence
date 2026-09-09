@@ -14,6 +14,7 @@ import { readSurface, vacuityRefusal } from '../../src/verification/floor.ts';
 import { codeFiles } from '../../src/derivation/walk.ts';
 import { BUILTIN_LANGUAGES } from '../../src/adapters/tree-sitter.ts';
 import { resolveGuaranteeLinks } from '../../src/verification/guarantees.ts';
+import { projectBindings } from '../../src/verification/guarantee-bindings.ts';
 
 const digestOf = value => createHash('sha256').update(value).digest('hex');
 function ledgerStamp(cfg, evidenceFiles = []) {
@@ -65,6 +66,8 @@ export async function startScopeServer({ cfg, htmlPath, port = 0, intervalMs = 7
         const refusal = vacuityRefusal(readSurface(graph, status));
         if (refusal) throw new Error(refusal.join('\n'));
         const model = buildScopeModel(graph, await buildPromiseModel(current, graph, status), current);
+        const bindings = projectBindings(current, graph, status);
+        if (bindings.items.length) model.catalogBindings = bindings;
         if ((await projectStamp(current)).value !== probe.value) throw new Error('Project changed during derivation; retrying after the edit burst.');
         structure = { status: 'current', model, git: probe.git,
           evidence: 'Recorded verification only. Watching never runs tests; uncommitted edits are not reverified.' };
@@ -79,6 +82,7 @@ export async function startScopeServer({ cfg, htmlPath, port = 0, intervalMs = 7
     if (!readings || retryRead || tail.fresh.length || tail.unreadable !== tailDamage || nextStamp !== stamp) {
       readings = readScopeReadings(cfg);
       evidenceFiles = [...new Set([
+        ...(structure.model?.catalogBindings?.items ?? []).flatMap(b => Object.keys(b.binding?.evidence ?? {})),
         ...(readings.taxonomy?.records ?? []).flatMap(r => Object.keys(r.snapshot.files)),
         ...readings.hooks.hosts.flatMap(({ control }) => [
           ...control.files.map(file => file.path), control.launcher?.path,
@@ -90,6 +94,10 @@ export async function startScopeServer({ cfg, htmlPath, port = 0, intervalMs = 7
     if (currentGraph && structure.model) structure = { ...structure, model: { ...structure.model,
       guaranteeLinks: resolveGuaranteeLinks(currentGraph, structure.model.guarantees, structure.model.relations,
         { view: readings.taxonomy, error: readings.errors.find(e => e.source === 'taxonomy')?.message ?? null }) } };
+    if (currentGraph && structure.status === 'current') {
+      const bindings = projectBindings(cfg, currentGraph, await readStatus(cfg));
+      if (bindings.items.length) structure = { ...structure, model: { ...structure.model, catalogBindings: bindings } };
+    }
     const raw = JSON.stringify({ ...readings, structure }), next = digestOf(raw);
     if (next === digest && !retryRead) return;
     digest = next;

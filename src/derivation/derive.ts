@@ -9,6 +9,7 @@ import { parseSpec, splitWhy, findSpec, nodeDirs, codeFiles, ownerOf } from "./w
 import { Unrunnable, requireDeclaredRoot } from "../verification/floor.ts";
 import { BUILTIN_LANGUAGES } from "../adapters/tree-sitter.ts";
 import { cloudflare } from "../adapters/cloudflare.ts";
+import { compileImportAliases } from "./import-aliases.ts";
 
 const PLATFORMS: Record<string, PlatformAdapter> = { cloudflare };
 
@@ -24,7 +25,21 @@ function adapterShapeProblem(a: unknown): string | null {
   for (const fn of ["symbols", "imports", "docAbove", "fileDoc"] as const) {
     if (typeof o[fn] !== "function") return `\`${fn}\` must be a function`;
   }
+  if (o.importStyle !== undefined && o.importStyle !== "python") return "`importStyle` must be python or absent";
   return null;
+}
+
+/** Direct-module grade only: no sys.path, reexports or execution. Ambiguity stays external. */
+export function pythonImportCandidates(file: string, specifier: string): string[] {
+  const m = /^(\.*)([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)?$/.exec(specifier);
+  if (!m || !specifier) return [];
+  const levels = m[1].length;
+  const parts = levels ? dirname(file).split('/').filter(p => p !== '.') : [];
+  if (levels > parts.length) return [];
+  if (levels > 1) parts.splice(parts.length - levels + 1);
+  if (m[2]) parts.push(...m[2].split('.'));
+  const target = parts.join('/');
+  return target ? [`${target}.py`, `${target}/__init__.py`] : [];
 }
 
 /**
@@ -88,6 +103,7 @@ export const isDocumented = (n: GraphNode): boolean => !!(n.prose && String(n.pr
 
 export async function buildGraph(cfg: Config): Promise<Graph> {
   requireDeclaredRoot(cfg); // the walk floor: an undeclared tree is refused, never wandered
+  const resolveAlias = compileImportAliases(cfg.importAliases);
   const root = cfg.root;
   const lang = await resolveLanguageAdapter(cfg);
   const platform = cfg.platform ? PLATFORMS[cfg.platform] ?? null : null;
@@ -123,6 +139,7 @@ export async function buildGraph(cfg: Config): Promise<Graph> {
     const parent = d === "." ? null : ownerOf(d, dirs);
     add({ id: compId(d), ...(parent === null ? {} : { parent: compId(parent) }), label: spec.name || basename(d), kind: "component", sub: spec.intent, claimed: spec.claims.length > 0, claims: spec.claims, prose: spec.prose || undefined, why: spec.why || undefined, invariants: spec.invariants.length ? spec.invariants : undefined, refutations: spec.refutations.length ? spec.refutations : undefined, claimKinds: Object.keys(spec.claimKinds).length ? spec.claimKinds : undefined });
     if (spec.guaranteeLinks) nodes[nodes.length - 1].guaranteeLinks = spec.guaranteeLinks;
+    if (spec.guaranteeLinks?.bindings) nodes[nodes.length - 1].specPath = relative(root, (await findSpec(join(root, d === "." ? "" : d)))!);
     classToDir[spec.name || basename(d)] = d;
   }
 
@@ -155,7 +172,11 @@ export async function buildGraph(cfg: Config): Promise<Graph> {
       add({ id: `s:${f}#${s.name}`, parent: fileIds.get(f), label: s.name, kind: "symbol", sub: s.kind, path: f, line: s.line, prose: what || undefined, why: why || undefined });
     }
     for (const spec of lang.imports(src)) {
-      if (spec.startsWith(".")) {
+      if (lang.importStyle === "python") {
+        const hits = pythonImportCandidates(f, spec).filter(t => fileIds.has(t));
+        if (hits.length === 1) link(fileIds.get(f)!, fileIds.get(hits[0])!, "imports");
+        else { const id = `x:${spec}`; add({ id, label: spec, kind: "external", sub: "unresolved module (root-relative Python grade)" }); link(fileIds.get(f)!, id, "imports"); }
+      } else if (spec.startsWith(".")) {
         const target = relative(root, resolve(join(root, dirname(f)), spec));
         // A specifier may name the file exactly (`./data.ts`, Node-style), omit the
         // extension (`./data`, bundler-style), or name a directory (`./data` →
@@ -165,7 +186,11 @@ export async function buildGraph(cfg: Config): Promise<Graph> {
         const candidates = [target, ...lang.exts.map((e) => `${target}.${e}`), ...lang.exts.map((e) => join(target, `index.${e}`))];
         const hit = candidates.find((t) => fileIds.has(t));
         if (hit) link(fileIds.get(f)!, fileIds.get(hit)!, "imports");
-      } else { const id = `x:${spec}`; add({ id, label: spec, kind: "external", sub: "module" }); link(fileIds.get(f)!, id, "imports"); }
+      } else {
+        const alias = resolveAlias(spec, fileIds, lang.exts);
+        if (alias?.target) link(fileIds.get(f)!, fileIds.get(alias.target)!, "imports");
+        else { const id = `x:${spec}`; add({ id, label: spec, kind: "external", sub: alias ? `unresolved module (${alias.reason})` : "module" }); link(fileIds.get(f)!, id, "imports"); }
+      }
     }
     for (const [bind, target] of Object.entries(targets)) if (new RegExp(`env\\.${bind}\\b`).test(src)) link(fileIds.get(f)!, target, "binds");
     for (const m of src.matchAll(/fetch\(\s*["']https?:\/\/([^"'/]+)/g)) { const id = `x:host:${m[1]}`; add({ id, label: m[1], kind: "external", sub: "service" }); link(fileIds.get(f)!, id, "calls"); }

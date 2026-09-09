@@ -1,0 +1,1804 @@
+{
+  "schema": "coherence-adoption-mapping-review/v1",
+  "assessor": {
+    "session": "01a06cfd-b3bc-7771-b2fb-a270ead577b7",
+    "agent": "main"
+  },
+  "catalogDigest": "2cad03bde21934bebfbeb5758607eccbe715d296410cc3e88a1a30145baeedeb",
+  "method": "Manual retrospective semantic comparison of each cited claim, named oracle and consumer rationale against the captured catalog text. No keyword classifier, no new applicability assertion, no oracle execution.",
+  "limits": [
+    "Single-author assessment; not the independent portability assay. Current one-line candidates lack scope-parameter and clause schemas. Partial means thematic support but an essential local rule remains unspecified; generic words such as invalid cannot smuggle that rule into an unchanged mapping.",
+    "Each row names one residual clause group, not a proven minimum number of atomic clauses. Repeated consumers reuse the same claim-level residual ID. Reasons refer only to the cited property, not every other property in a broad consumer rationale.",
+    "Simulation entries remain in the frozen catalog for review. No simulation facet is established for these consumers; this review does not establish their portability or justify deleting that domain.",
+    "None does not mean this property cannot ever be standardized. It means the present catalog does not state it. No family is promoted from these mappings."
+  ],
+  "rows": [
+    {
+      "path": "src/coordination/coordination.spec.md",
+      "line": 62,
+      "consumer": "src/coordination",
+      "provider": "src/diagnostics",
+      "claim": "g-96f1f46fb8a7a7e0dc5ab050f5237a3dd8e65088f368f05599d87557d9a7d2d7",
+      "consumedProperty": "significant behavioral growth acquires an anchor or patch-specific decision",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "Significant growth without an enforcement anchor requires a patch-specific decision; none of the current candidates prescribes this change-policy obligation.",
+      "residualClauseId": "g-96f1f46fb8a7a7e0dc5ab050f5237a3dd8e65088f368f05599d87557d9a7d2d7:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/coordination/coordination.spec.md",
+      "line": 63,
+      "consumer": "src/coordination",
+      "provider": "src/evidence",
+      "claim": "g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150",
+      "consumedProperty": "verdict-bearing decision reads fail closed on surviving journal damage",
+      "candidates": [
+        "guarantee:G-BOUNDARY",
+        "guarantee:G-PERSISTENCE"
+      ],
+      "fit": "partial",
+      "reason": "Persisted inputs are validated and have an explicit failure policy.",
+      "residual": "Any surviving decision-row damage refuses a verdict-bearing read; valid rows cannot conceal damaged rows.",
+      "residualClauseId": "g-5fb8608906bde1e3901cc69a620b322119d60860709f5e8a119f429ab08d5150:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/coordination/coordination.spec.md",
+      "line": 64,
+      "consumer": "src/coordination",
+      "provider": "src/evidence",
+      "claim": "g-dd640f9dff77a6eb8267db51a30e2e67b4cb22e381f168509e0f562a2075aca9",
+      "consumedProperty": "a committed decision population cannot disappear into adoption from zero",
+      "candidates": [
+        "guarantee:G-PERSISTENCE",
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Remembered state and population preservation are candidate concerns.",
+      "residual": "A committed nonempty decision population disappearing cannot be interpreted as legitimate adoption from zero.",
+      "residualClauseId": "g-dd640f9dff77a6eb8267db51a30e2e67b4cb22e381f168509e0f562a2075aca9:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/coordination/coordination.spec.md",
+      "line": 65,
+      "consumer": "src/coordination",
+      "provider": "src/evidence",
+      "claim": "g-fe0545c1476681b21a20d071bebf706d04583d70497c388e4f38795966a9cc39",
+      "consumedProperty": "decision ratification follows explicit subject and authority, never prose similarity or recency",
+      "candidates": [
+        "guarantee:G-STATE"
+      ],
+      "fit": "partial",
+      "reason": "Decisions have authority and legal state transitions.",
+      "residual": "Ratification follows explicit subject/authority links, never prose similarity or most-recent timestamp.",
+      "residualClauseId": "g-fe0545c1476681b21a20d071bebf706d04583d70497c388e4f38795966a9cc39:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/coordination/coordination.spec.md",
+      "line": 66,
+      "consumer": "src/coordination",
+      "provider": "src/evidence",
+      "claim": "g-72ff7044484c99e7f4e14e150dc70619e8f285adf53d01d71bb0cb9f843c8d83",
+      "consumedProperty": "defect provenance is data, never terminal control",
+      "candidates": [
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "Provenance is untrusted input at a rendering boundary.",
+      "residual": "Commit identifiers need strict object-name shape and terminal output encoding; a recomputed content ID cannot legitimize terminal control.",
+      "residualClauseId": "g-72ff7044484c99e7f4e14e150dc70619e8f285adf53d01d71bb0cb9f843c8d83:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/coordination/coordination.spec.md",
+      "line": 67,
+      "consumer": "src/coordination",
+      "provider": "src/evidence",
+      "claim": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f",
+      "consumedProperty": "concurrent status writers preserve complete independent reports",
+      "candidates": [
+        "guarantee:G-CONCURRENCY",
+        "guarantee:G-PERSISTENCE"
+      ],
+      "fit": "partial",
+      "reason": "Concurrent writers preserve ownership of durable state.",
+      "residual": "Independent report sections must survive interleaved publication and readers must never see a partial report.",
+      "residualClauseId": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/coordination/coordination.spec.md",
+      "line": 68,
+      "consumer": "src/coordination",
+      "provider": "src/lifecycle",
+      "claim": "g-cced37608bbbc14c92c5ee89061aa190972be9d1c22c33ce53f6045f4633761e",
+      "consumedProperty": "lifecycle hook presence is one canonical runnable bit",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "Presence is the exact complete runnable host bundle, including exclusion of competing paths; generic lifecycle descriptions do not define this binary control.",
+      "residualClauseId": "g-cced37608bbbc14c92c5ee89061aa190972be9d1c22c33ce53f6045f4633761e:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/derivation/derivation.spec.md",
+      "line": 34,
+      "consumer": "src/derivation",
+      "provider": "src/adapters",
+      "claim": "g-a6b78578502dc6ce572e1502d76a2475b5441d21c92a41ed6b228078275538ee",
+      "consumedProperty": "a grammar-backed adapter derives the graph through the same language seam",
+      "candidates": [
+        "guarantee:G-EXTENSION",
+        "guarantee:G-PARSER"
+      ],
+      "fit": "partial",
+      "reason": "Adapters have compatibility and structured-output concerns.",
+      "residual": "Grammar-backed adapters must implement the existing language seam at its declared grade; neither generic entry fixes that seam.",
+      "residualClauseId": "g-a6b78578502dc6ce572e1502d76a2475b5441d21c92a41ed6b228078275538ee:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/derivation/derivation.spec.md",
+      "line": 35,
+      "consumer": "src/derivation",
+      "provider": "src/adapters",
+      "claim": "g-387c59a17fac9ecf0ca0846e1a651976a0ffe99bc62e7ca539ff96e155ac1d82",
+      "consumedProperty": "a parse's heap is returned before the next file",
+      "candidates": [
+        "guarantee:G-LIFECYCLE"
+      ],
+      "fit": "partial",
+      "reason": "Resource teardown belongs to lifecycle management.",
+      "residual": "The WASM tree must be freed before the next file, including exceptional paths; explicit stop/idempotence alone does not impose this lifetime.",
+      "residualClauseId": "g-387c59a17fac9ecf0ca0846e1a651976a0ffe99bc62e7ca539ff96e155ac1d82:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/derivation/derivation.spec.md",
+      "line": 36,
+      "consumer": "src/derivation",
+      "provider": "src/adapters",
+      "claim": "g-212e8822ab337b675432f1c60961e6e98ba52b1674623ac4186f8092db1f08e3",
+      "consumedProperty": "committed platform capabilities survive optional deployment-config toggles",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Required source populations survive projection.",
+      "residual": "Optional deployment flags must not erase committed platform capabilities.",
+      "residualClauseId": "g-212e8822ab337b675432f1c60961e6e98ba52b1674623ac4186f8092db1f08e3:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/derivation/derivation.spec.md",
+      "line": 37,
+      "consumer": "src/derivation",
+      "provider": "src/verification",
+      "claim": "g-8c1be2fad7bd80dc0f0997183ee61dcac8a05acd650c2f16aa127861081fa8d3",
+      "consumedProperty": "an undeclared root refuses the walk, never wanders",
+      "candidates": [
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "The project root is a validated boundary input.",
+      "residual": "Config-file presence declares walk authority; a configless cwd refuses rather than defaulting into a scan.",
+      "residualClauseId": "g-8c1be2fad7bd80dc0f0997183ee61dcac8a05acd650c2f16aa127861081fa8d3:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/diagnostics/diagnostics.spec.md",
+      "line": 44,
+      "consumer": "src/diagnostics",
+      "provider": "src/adapters",
+      "claim": "g-387c59a17fac9ecf0ca0846e1a651976a0ffe99bc62e7ca539ff96e155ac1d82",
+      "consumedProperty": "a parse's heap is returned before the next file",
+      "candidates": [
+        "guarantee:G-LIFECYCLE"
+      ],
+      "fit": "partial",
+      "reason": "Resource teardown belongs to lifecycle management.",
+      "residual": "The WASM tree must be freed before the next file, including exceptional paths; explicit stop/idempotence alone does not impose this lifetime.",
+      "residualClauseId": "g-387c59a17fac9ecf0ca0846e1a651976a0ffe99bc62e7ca539ff96e155ac1d82:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/diagnostics/diagnostics.spec.md",
+      "line": 45,
+      "consumer": "src/diagnostics",
+      "provider": "src/derivation",
+      "claim": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d",
+      "consumedProperty": "spec containment follows declared ancestry without inventing dependencies",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Identity and required meaning must survive graph projection.",
+      "residual": "Ownership follows deepest declared ancestry, and containment must not create import dependencies.",
+      "residualClauseId": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/diagnostics/diagnostics.spec.md",
+      "line": 46,
+      "consumer": "src/diagnostics",
+      "provider": "src/derivation",
+      "claim": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09",
+      "consumedProperty": "a declared language resolves to a real adapter or refuses, never a silent fallback",
+      "candidates": [
+        "guarantee:G-EXTENSION"
+      ],
+      "fit": "partial",
+      "reason": "Extension discovery and compatibility must be explicit.",
+      "residual": "An unknown language refuses instead of selecting TypeScript, and custom adapter shape is checked at the loader.",
+      "residualClauseId": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/diagnostics/diagnostics.spec.md",
+      "line": 47,
+      "consumer": "src/diagnostics",
+      "provider": "src/evidence",
+      "claim": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f",
+      "consumedProperty": "concurrent status writers preserve complete independent reports",
+      "candidates": [
+        "guarantee:G-CONCURRENCY",
+        "guarantee:G-PERSISTENCE"
+      ],
+      "fit": "partial",
+      "reason": "Concurrent writers preserve ownership of durable state.",
+      "residual": "Independent report sections must survive interleaved publication and readers must never see a partial report.",
+      "residualClauseId": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/diagnostics/diagnostics.spec.md",
+      "line": 48,
+      "consumer": "src/diagnostics",
+      "provider": "src/verification",
+      "claim": "g-8c1be2fad7bd80dc0f0997183ee61dcac8a05acd650c2f16aa127861081fa8d3",
+      "consumedProperty": "an undeclared root refuses the walk, never wanders",
+      "candidates": [
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "The project root is a validated boundary input.",
+      "residual": "Config-file presence declares walk authority; a configless cwd refuses rather than defaulting into a scan.",
+      "residualClauseId": "g-8c1be2fad7bd80dc0f0997183ee61dcac8a05acd650c2f16aa127861081fa8d3:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/evidence/evidence.spec.md",
+      "line": 53,
+      "consumer": "src/evidence",
+      "provider": "src/lifecycle",
+      "claim": "g-09b5e7c0d1628bd4f93f8e6459181d8ced4d67e4d42f40274f316f50ff8d0465",
+      "consumedProperty": "activity evidence is accepted only when identity, scope, time, and command agree",
+      "candidates": [
+        "guarantee:G-BOUNDARY",
+        "guarantee:G-OBSERVABILITY"
+      ],
+      "fit": "partial",
+      "reason": "Activity rows require validation and attribution.",
+      "residual": "Identity, attribution scope, canonical time, command kind and result must agree relationally; individually well-shaped fields are insufficient.",
+      "residualClauseId": "g-09b5e7c0d1628bd4f93f8e6459181d8ced4d67e4d42f40274f316f50ff8d0465:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 27,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-2e3d4a42f3f26d54ea02a0dfcf7df76679dfe7d38d086250fff8e58ce5d40a1a",
+      "consumedProperty": "a weaker regulation obligation never masks a stronger one",
+      "candidates": [
+        "guarantee:G-PURE-DECISION"
+      ],
+      "fit": "partial",
+      "reason": "Regulation is a decision over a declared domain.",
+      "residual": "Lexicographic strongest-obligation selection and monotonicity under added obligations are not consequences of totality or determinism.",
+      "residualClauseId": "g-2e3d4a42f3f26d54ea02a0dfcf7df76679dfe7d38d086250fff8e58ce5d40a1a:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 28,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-20aedc6478916cb05edf66af4a25612c1f962d78bd43446fd4a8e3618a467bcd",
+      "consumedProperty": "regulation evaluates and repairs the selected agent host",
+      "candidates": [
+        "guarantee:G-STATE"
+      ],
+      "fit": "partial",
+      "reason": "A selected host is part of the authority scope.",
+      "residual": "Sensor, decision identity and repair must all preserve the same host and reject foreign values before command emission.",
+      "residualClauseId": "g-20aedc6478916cb05edf66af4a25612c1f962d78bd43446fd4a8e3618a467bcd:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 29,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-c893d71a84739c889cd3882c36159d205d8c1996e8bdcc19fb041d9a7f837a39",
+      "consumedProperty": "completed work remains unverified until an explicit verification edge names it",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "Work completion cannot confer verification; a separate explicit verification edge is required.",
+      "residualClauseId": "g-c893d71a84739c889cd3882c36159d205d8c1996e8bdcc19fb041d9a7f837a39:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 30,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-eaf6be6149f9a4eba86327fc5aa93a461dd0acbb6182a955951518959cca2cc4",
+      "consumedProperty": "work state is append-only, attributable, and predecessor-checked",
+      "candidates": [
+        "guarantee:G-STATE",
+        "guarantee:G-CONCURRENCY"
+      ],
+      "fit": "partial",
+      "reason": "State ownership and stale-transition rejection are explicit candidate concerns.",
+      "residual": "Append-only attributed history and exact predecessor identity must hold together, including damaged-history reads.",
+      "residualClauseId": "g-eaf6be6149f9a4eba86327fc5aa93a461dd0acbb6182a955951518959cca2cc4:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 31,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-60553f19225b1145c46ea4eef69fcaac9a33763619ae3292690f235f76c2a8a4",
+      "consumedProperty": "work cannot activate or complete before every dependency completes",
+      "candidates": [
+        "guarantee:G-STATE"
+      ],
+      "fit": "partial",
+      "reason": "State transitions must reject invalid changes.",
+      "residual": "Activation and completion require every declared dependency completed; generic invalid-transition language does not define that relation.",
+      "residualClauseId": "g-60553f19225b1145c46ea4eef69fcaac9a33763619ae3292690f235f76c2a8a4:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 32,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-df2de47e27a6d0ac018aaecfc9ab4430fccc2ab2e0d364e5494fd36b624eee7b",
+      "consumedProperty": "runnable work with overlapping write scopes is a collision, never concurrent permission",
+      "candidates": [
+        "guarantee:G-CONCURRENCY"
+      ],
+      "fit": "partial",
+      "reason": "Concurrent work must preserve ownership/exclusion.",
+      "residual": "Intersecting runnable write scopes are collisions, not permissions, under the declared path-overlap rules.",
+      "residualClauseId": "g-df2de47e27a6d0ac018aaecfc9ab4430fccc2ab2e0d364e5494fd36b624eee7b:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 33,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-aa1fb4cad7c94f9a62687c2cce2e660a2414958d5fb5cbf3cac9a33dccccd4ad",
+      "consumedProperty": "a terminal parent has no live child and explicitly synthesizes every completed direct child",
+      "candidates": [
+        "guarantee:G-STATE"
+      ],
+      "fit": "partial",
+      "reason": "Parent terminal transitions have validity conditions.",
+      "residual": "Every direct child must be terminal and completed children explicitly synthesized before parent closure.",
+      "residualClauseId": "g-aa1fb4cad7c94f9a62687c2cce2e660a2414958d5fb5cbf3cac9a33dccccd4ad:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 34,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-db47731ff5707245a304131e05a7c669fee3deb2c4aa932d920bacbc15b7be2b",
+      "consumedProperty": "authored work text is single-line data, never model-instruction control",
+      "candidates": [
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "Authored text is boundary input.",
+      "residual": "Single-line encoding must prevent authored text from becoming model-instruction control; input validation alone does not specify that sink.",
+      "residualClauseId": "g-db47731ff5707245a304131e05a7c669fee3deb2c4aa932d920bacbc15b7be2b:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 35,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-3968df1558ad2e135279e8b7908d7faaada10e14404f5e75bf61ac3e55667a91",
+      "consumedProperty": "consequence navigation contains only explicit assessed edges",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "A navigation projection must not invent authority or relations.",
+      "residual": "Only explicitly assessed admissible edges may appear; shared subjects or proximity cannot synthesize edges.",
+      "residualClauseId": "g-3968df1558ad2e135279e8b7908d7faaada10e14404f5e75bf61ac3e55667a91:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 36,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-75101e6fa8c9471d546b09b1090c3b3609de42d35552a3f5d2dc4cad8e443417",
+      "consumedProperty": "specialized consequence relations admit only their declared endpoint kinds",
+      "candidates": [
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "Relation endpoint kinds are validated inputs.",
+      "residual": "Each specialized relation has a particular allowed source/target-kind pair, not merely two existing endpoints.",
+      "residualClauseId": "g-75101e6fa8c9471d546b09b1090c3b3609de42d35552a3f5d2dc4cad8e443417:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 37,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-c707befe263f3bfe9f4855e461aa34834cb7875d1b9a450ebf32dd26ee0d1e5f",
+      "consumedProperty": "consequence evidence refuses surviving storage damage instead of shrinking navigation",
+      "candidates": [
+        "guarantee:G-PERSISTENCE",
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "Stored evidence must be validated and recovery has a declared policy.",
+      "residual": "Any surviving ledger damage refuses navigation rather than removing the damaged rows from its population.",
+      "residualClauseId": "g-c707befe263f3bfe9f4855e461aa34834cb7875d1b9a450ebf32dd26ee0d1e5f:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 38,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-82029f55a2adb1eb02e68226cd63ae401a2954a662c409abaf5e1b55910b1a5f",
+      "consumedProperty": "orientation refuses damaged evidence before selecting a swarm heading",
+      "candidates": [
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "Orientation consumes validated evidence.",
+      "residual": "Damage must win before heading selection, not become an optional input or empty evidence.",
+      "residualClauseId": "g-82029f55a2adb1eb02e68226cd63ae401a2954a662c409abaf5e1b55910b1a5f:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 39,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-90c7ca7d1fb899c411f8ef1039a38e700dade8f6d262b59d0640a12ada155de1",
+      "consumedProperty": "orientation admits verification state only with valid shape and comparable provenance",
+      "candidates": [
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "Verification input shape requires validation.",
+      "residual": "Shape, time and repository provenance must agree before a report can influence orientation.",
+      "residualClauseId": "g-90c7ca7d1fb899c411f8ef1039a38e700dade8f6d262b59d0640a12ada155de1:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 40,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-dbb875aea7e5c2b1657aeeb482612120a92a7c3ed0a4dd68d2796162d920f932",
+      "consumedProperty": "verification currency follows material repository state without invalidating its own receipt",
+      "candidates": [
+        "guarantee:G-STATE"
+      ],
+      "fit": "partial",
+      "reason": "References and state changes can become stale.",
+      "residual": "Material repository state changes expire verification while writing the receipt itself does not; the exclusion policy is essential.",
+      "residualClauseId": "g-dbb875aea7e5c2b1657aeeb482612120a92a7c3ed0a4dd68d2796162d920f932:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 41,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-f5ffb3e5ab886b0070974693a860c22b96f7b5a196ad50443cbbd18e7f119775",
+      "consumedProperty": "orientation selects synthesis only when parent closure can execute it",
+      "candidates": [
+        "guarantee:G-STATE"
+      ],
+      "fit": "partial",
+      "reason": "A selected action depends on valid work transitions.",
+      "residual": "A synthesis heading may be emitted only when the current parent's closure can actually execute.",
+      "residualClauseId": "g-f5ffb3e5ab886b0070974693a860c22b96f7b5a196ad50443cbbd18e7f119775:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 42,
+      "consumer": "src",
+      "provider": "src/coordination",
+      "claim": "g-13b14de2f711f7c4621da185d944e18b355a4a24635cd1d5d3f0a078a27960a3",
+      "consumedProperty": "orientation derives live blockage only from closeable work state",
+      "candidates": [
+        "guarantee:G-STATE"
+      ],
+      "fit": "partial",
+      "reason": "Live work state has a named authority.",
+      "residual": "Historical blocked journal entries cannot establish current blockage; only closeable work records can.",
+      "residualClauseId": "g-13b14de2f711f7c4621da185d944e18b355a4a24635cd1d5d3f0a078a27960a3:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 43,
+      "consumer": "src",
+      "provider": "src/derivation",
+      "claim": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d",
+      "consumedProperty": "spec containment follows declared ancestry without inventing dependencies",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Identity and required meaning must survive graph projection.",
+      "residual": "Ownership follows deepest declared ancestry, and containment must not create import dependencies.",
+      "residualClauseId": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 44,
+      "consumer": "src",
+      "provider": "src/derivation",
+      "claim": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09",
+      "consumedProperty": "a declared language resolves to a real adapter or refuses, never a silent fallback",
+      "candidates": [
+        "guarantee:G-EXTENSION"
+      ],
+      "fit": "partial",
+      "reason": "Extension discovery and compatibility must be explicit.",
+      "residual": "An unknown language refuses instead of selecting TypeScript, and custom adapter shape is checked at the loader.",
+      "residualClauseId": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 45,
+      "consumer": "src",
+      "provider": "src/diagnostics",
+      "claim": "g-53550835977575002ba22785c78f9dcaa1f78d814708dfd5fcfbc1c9356d1a0d",
+      "consumedProperty": "calibration denominators contain only validated surviving evidence",
+      "candidates": [
+        "guarantee:G-BOUNDARY",
+        "guarantee:G-OBSERVABILITY"
+      ],
+      "fit": "partial",
+      "reason": "Calibration consumes validated attributable observations.",
+      "residual": "Malformed surviving samples must refuse rather than disappear from the calibration denominator.",
+      "residualClauseId": "g-53550835977575002ba22785c78f9dcaa1f78d814708dfd5fcfbc1c9356d1a0d:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 46,
+      "consumer": "src",
+      "provider": "src/diagnostics",
+      "claim": "g-96f1f46fb8a7a7e0dc5ab050f5237a3dd8e65088f368f05599d87557d9a7d2d7",
+      "consumedProperty": "significant behavioral growth acquires an anchor or patch-specific decision",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "Significant growth without an enforcement anchor requires a patch-specific decision; none of the current candidates prescribes this change-policy obligation.",
+      "residualClauseId": "g-96f1f46fb8a7a7e0dc5ab050f5237a3dd8e65088f368f05599d87557d9a7d2d7:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 47,
+      "consumer": "src",
+      "provider": "src/diagnostics",
+      "claim": "g-04856f5183879bf681114c89b75bc6d8d994c0c3310e8aced20a05db7ae62b93",
+      "consumedProperty": "cached decisions expose structurally expired premises",
+      "candidates": [
+        "guarantee:G-REGISTRY"
+      ],
+      "fit": "partial",
+      "reason": "References must resolve or refuse.",
+      "residual": "Cached decision premises acquire explicit structural leases whose broken referents are surfaced without asserting semantic expiry.",
+      "residualClauseId": "g-04856f5183879bf681114c89b75bc6d8d994c0c3310e8aced20a05db7ae62b93:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 48,
+      "consumer": "src",
+      "provider": "src/diagnostics",
+      "claim": "g-4c06305370759763a11e7d5d895176ce19b8f8a75aad8a493e1f885f31276e2b",
+      "consumedProperty": "predicted context closure is calibrated against observed reads and outcomes",
+      "candidates": [
+        "guarantee:G-OBSERVABILITY"
+      ],
+      "fit": "partial",
+      "reason": "Calibration is an attributable observation surface.",
+      "residual": "Predicted one-hop context must be compared against observed reads and defect labels, not treated as a proven model.",
+      "residualClauseId": "g-4c06305370759763a11e7d5d895176ce19b8f8a75aad8a493e1f885f31276e2b:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 49,
+      "consumer": "src",
+      "provider": "src/diagnostics",
+      "claim": "g-d6e0b1b54a09c42f92856d5f64f2638367fc5f0d79cf604974abd863716afa5c",
+      "consumedProperty": "calibration preserves the weakest host attribution of its trace",
+      "candidates": [
+        "guarantee:G-OBSERVABILITY"
+      ],
+      "fit": "partial",
+      "reason": "Signals must remain attributable.",
+      "residual": "The weakest trace attribution controls the result: parent aggregates and legacy unscoped rows cannot become child-owned samples.",
+      "residualClauseId": "g-d6e0b1b54a09c42f92856d5f64f2638367fc5f0d79cf604974abd863716afa5c:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 50,
+      "consumer": "src",
+      "provider": "src/diagnostics",
+      "claim": "g-191523b1d154489636c26bf60122726298b29494650ca3c58ef47e09a1aba57a",
+      "consumedProperty": "reviewed risk sites survive relocation but never duplication",
+      "candidates": [
+        "guarantee:G-REGISTRY"
+      ],
+      "fit": "partial",
+      "reason": "Identity and reference compatibility matter across changes.",
+      "residual": "Relocation preserves a reviewed risk site, but duplication must add an unreviewed site rather than inherit its pin.",
+      "residualClauseId": "g-191523b1d154489636c26bf60122726298b29494650ca3c58ef47e09a1aba57a:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 51,
+      "consumer": "src",
+      "provider": "src/diagnostics",
+      "claim": "g-80b8fcc6922a85bf5238e6f61cb43cc7b3f8e2b66aa3b5932ad7cd2e156fa53f",
+      "consumedProperty": "pinned mass follows a value-conserving rename but never absorbs growth",
+      "candidates": [
+        "guarantee:G-STATE"
+      ],
+      "fit": "partial",
+      "reason": "A pin is authoritative state with constrained transitions.",
+      "residual": "Only a vanished same-family/unit/exact-value pin absorbs a rename; growth or novelty cannot be canceled by matching names.",
+      "residualClauseId": "g-80b8fcc6922a85bf5238e6f61cb43cc7b3f8e2b66aa3b5932ad7cd2e156fa53f:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 52,
+      "consumer": "src",
+      "provider": "src/diagnostics",
+      "claim": "g-96cad312ff822d6934e47f5d5483433148b364491e8372fc6d6c06c93c709024",
+      "consumedProperty": "python sources feed the same instruments as typescript at their declared grade",
+      "candidates": [
+        "guarantee:G-PARSER",
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Language-specific analysis must preserve its declared source population.",
+      "residual": "Python surface counts must have an explicit grammar grade and exclusions equivalent in meaning to TypeScript's instrument.",
+      "residualClauseId": "g-96cad312ff822d6934e47f5d5483433148b364491e8372fc6d6c06c93c709024:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 53,
+      "consumer": "src",
+      "provider": "src/diagnostics",
+      "claim": "g-e541294ff4534521ac1119f7bd67c86b59218e48be6b9089565c10a758580714",
+      "consumedProperty": "python sources feed the same instruments as typescript at their declared grade",
+      "candidates": [
+        "guarantee:G-PARSER",
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Language-specific analysis must preserve its declared source population.",
+      "residual": "Python redundancy candidates use the declared language grade while parity and idiom exclusions remain intact.",
+      "residualClauseId": "g-e541294ff4534521ac1119f7bd67c86b59218e48be6b9089565c10a758580714:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 54,
+      "consumer": "src",
+      "provider": "src/diagnostics",
+      "claim": "g-d9378c80b912fabfb39f08a3a784c72b83a0838d6444cc357d32c8d6b7296043",
+      "consumedProperty": "python sources feed the same instruments as typescript at their declared grade",
+      "candidates": [
+        "guarantee:G-PARSER",
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Language-specific analysis must preserve its declared source population.",
+      "residual": "Python sink interpolation, context and safe-pattern grading must reach the same ratchet, not silently skip the language.",
+      "residualClauseId": "g-d9378c80b912fabfb39f08a3a784c72b83a0838d6444cc357d32c8d6b7296043:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 55,
+      "consumer": "src",
+      "provider": "src/diagnostics",
+      "claim": "g-94ff0594f20c098b5975a6cd4d6c4714744b4e7403e3a4c87a0373163a392b95",
+      "consumedProperty": "instrument arms read languages through shared grammar queries, never a parallel scanner",
+      "candidates": [
+        "guarantee:G-REGISTRY"
+      ],
+      "fit": "partial",
+      "reason": "A named owner avoids duplicated authority.",
+      "residual": "All instrument language arms must use the shared grammar-query mechanism rather than a parallel scanner.",
+      "residualClauseId": "g-94ff0594f20c098b5975a6cd4d6c4714744b4e7403e3a4c87a0373163a392b95:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 56,
+      "consumer": "src",
+      "provider": "src/evidence",
+      "claim": "g-3685a681d581a7b08cc9e2b36453978b42ef987e091a01649cd2b0d513b0a145",
+      "consumedProperty": "experiment outcomes require criterion-total evidence",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "An experiment outcome must derive from statuses for every frozen action and criterion; an author-supplied success label is insufficient.",
+      "residualClauseId": "g-3685a681d581a7b08cc9e2b36453978b42ef987e091a01649cd2b0d513b0a145:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 57,
+      "consumer": "src",
+      "provider": "src/evidence",
+      "claim": "g-361b9b7bae849d1ce435ab95ca4e7d812056e9aa0705567f8b0b89eec4047ac1",
+      "consumedProperty": "experiment telemetry preserves its weakest provable attribution",
+      "candidates": [
+        "guarantee:G-OBSERVABILITY"
+      ],
+      "fit": "partial",
+      "reason": "Telemetry is attributable evidence.",
+      "residual": "Closed experiment windows preserve exact, parent-aggregate, legacy-unscoped and empty attribution without promotion.",
+      "residualClauseId": "g-361b9b7bae849d1ce435ab95ca4e7d812056e9aa0705567f8b0b89eec4047ac1:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 58,
+      "consumer": "src",
+      "provider": "src/evidence",
+      "claim": "g-9b1cdfac34250376e0f04fb7fcdb5be051e0ff6690fbd83b0d2f89932ea24c5c",
+      "consumedProperty": "surviving agent-assessed defect evidence is attributable and internally consistent",
+      "candidates": [
+        "guarantee:G-BOUNDARY",
+        "guarantee:G-PERSISTENCE"
+      ],
+      "fit": "partial",
+      "reason": "Persisted defect records require validation.",
+      "residual": "Caller attribution, subject identity and content address must be internally consistent; exact retries dedupe.",
+      "residualClauseId": "g-9b1cdfac34250376e0f04fb7fcdb5be051e0ff6690fbd83b0d2f89932ea24c5c:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 59,
+      "consumer": "src",
+      "provider": "src/evidence",
+      "claim": "g-bf42374fcfb692ec656ac3b8949d0b4a95d84f0d285aea11483c485b93da36df",
+      "consumedProperty": "defect writes refuse pre-existing symlink redirection",
+      "candidates": [
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "Writes cross a storage boundary.",
+      "residual": "Pre-existing symlink redirects at directory and session targets must refuse before append; lexical containment is insufficient.",
+      "residualClauseId": "g-bf42374fcfb692ec656ac3b8949d0b4a95d84f0d285aea11483c485b93da36df:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 60,
+      "consumer": "src",
+      "provider": "src/evidence",
+      "claim": "g-72ff7044484c99e7f4e14e150dc70619e8f285adf53d01d71bb0cb9f843c8d83",
+      "consumedProperty": "defect provenance is data, never terminal control",
+      "candidates": [
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "Provenance is untrusted input at a rendering boundary.",
+      "residual": "Commit identifiers need strict object-name shape and terminal output encoding; a recomputed content ID cannot legitimize terminal control.",
+      "residualClauseId": "g-72ff7044484c99e7f4e14e150dc70619e8f285adf53d01d71bb0cb9f843c8d83:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 61,
+      "consumer": "src",
+      "provider": "src/evidence",
+      "claim": "g-f391caadcfdd6258d8bb709cb17b046d0488dc766ca9dbe67415b2710ce70a06",
+      "consumedProperty": "a streamed journal entry renders exactly once across appends and compaction",
+      "candidates": [
+        "guarantee:G-CONCURRENCY",
+        "guarantee:G-PERSISTENCE"
+      ],
+      "fit": "partial",
+      "reason": "Journal streaming crosses concurrent durable state.",
+      "residual": "Exactly-once delivery uses content identity across file appends, moves and compaction; ordering/ownership alone does not prohibit duplicate or lost delivery.",
+      "residualClauseId": "g-f391caadcfdd6258d8bb709cb17b046d0488dc766ca9dbe67415b2710ce70a06:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 62,
+      "consumer": "src",
+      "provider": "src/evidence",
+      "claim": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f",
+      "consumedProperty": "concurrent status writers preserve complete independent reports",
+      "candidates": [
+        "guarantee:G-CONCURRENCY",
+        "guarantee:G-PERSISTENCE"
+      ],
+      "fit": "partial",
+      "reason": "Concurrent writers preserve ownership of durable state.",
+      "residual": "Independent report sections must survive interleaved publication and readers must never see a partial report.",
+      "residualClauseId": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 63,
+      "consumer": "src",
+      "provider": "src/lifecycle",
+      "claim": "g-f756d7d25cbc55fc32f6a4ed421ac9607ef47c86760af694e12174b9b16c5cc4",
+      "consumedProperty": "agent lifecycle preserves decisions and exposes the current change signal",
+      "candidates": [
+        "guarantee:G-LIFECYCLE"
+      ],
+      "fit": "partial",
+      "reason": "Agent entry/exit are lifecycle transitions.",
+      "residual": "Main Stop emits no canonical feedback, while SubagentStop alone carries the journal and patch signal to its caller.",
+      "residualClauseId": "g-f756d7d25cbc55fc32f6a4ed421ac9607ef47c86760af694e12174b9b16c5cc4:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 64,
+      "consumer": "src",
+      "provider": "src/lifecycle",
+      "claim": "g-2aaaefb581db032e8bc270572204620a95e1d6cef9045250bf7ecb2080dd927e",
+      "consumedProperty": "high-frequency lifecycle hooks start without the analysis dependency stack",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "High-frequency hooks must start without loading the analysis dependency stack; no candidate defines startup dependency cost.",
+      "residualClauseId": "g-2aaaefb581db032e8bc270572204620a95e1d6cef9045250bf7ecb2080dd927e:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 65,
+      "consumer": "src",
+      "provider": "src/lifecycle",
+      "claim": "g-5a5fec4add335e5eb09c9e16dbc5f8889f6bf226751509cd9f6b26eedf3fe611",
+      "consumedProperty": "hook telemetry loss never kills PostToolUse",
+      "candidates": [
+        "guarantee:G-OBSERVABILITY"
+      ],
+      "fit": "partial",
+      "reason": "Telemetry is a non-authoritative signal.",
+      "residual": "Telemetry failure must not kill PostToolUse; being non-authoritative alone does not establish failure isolation.",
+      "residualClauseId": "g-5a5fec4add335e5eb09c9e16dbc5f8889f6bf226751509cd9f6b26eedf3fe611:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 66,
+      "consumer": "src",
+      "provider": "src/lifecycle",
+      "claim": "g-7d53d5fd1e9c3a47789803dc7ebb6cf6525a89569804b61c415037ed785cf861",
+      "consumedProperty": "session startup injects only the exact session's current work order",
+      "candidates": [
+        "guarantee:G-SESSION"
+      ],
+      "fit": "partial",
+      "reason": "Session identity must remain explicit.",
+      "residual": "Startup may inject only the exact current session's live assigned work, never a guessed latest assignment.",
+      "residualClauseId": "g-7d53d5fd1e9c3a47789803dc7ebb6cf6525a89569804b61c415037ed785cf861:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 67,
+      "consumer": "src",
+      "provider": "src/lifecycle",
+      "claim": "g-913eb24ad608140812f1bd2c438e1dd80ec0ea29ef45b5b0361dd9e386307cc3",
+      "consumedProperty": "session startup teaches the executable swarm loop without manufacturing authority",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "Startup must teach the executable coordination protocol without manufacturing authority; no candidate defines instruction completeness.",
+      "residualClauseId": "g-913eb24ad608140812f1bd2c438e1dd80ec0ea29ef45b5b0361dd9e386307cc3:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 68,
+      "consumer": "src",
+      "provider": "src/lifecycle",
+      "claim": "g-bfa3efd2ebdd0519c642388b8bf7d67baa71a763f1f4fa312e924f0a3dcf3d15",
+      "consumedProperty": "session startup survives a damaged decision-journal path with named degradation",
+      "candidates": [
+        "guarantee:G-LIFECYCLE"
+      ],
+      "fit": "partial",
+      "reason": "Failure and recovery paths must be explicit.",
+      "residual": "A damaged decision-journal path degrades startup with a named warning rather than preventing the session.",
+      "residualClauseId": "g-bfa3efd2ebdd0519c642388b8bf7d67baa71a763f1f4fa312e924f0a3dcf3d15:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 69,
+      "consumer": "src",
+      "provider": "src/lifecycle",
+      "claim": "g-cced37608bbbc14c92c5ee89061aa190972be9d1c22c33ce53f6045f4633761e",
+      "consumedProperty": "lifecycle hook presence is one canonical runnable bit",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "Presence is the exact complete runnable host bundle, including exclusion of competing paths; generic lifecycle descriptions do not define this binary control.",
+      "residualClauseId": "g-cced37608bbbc14c92c5ee89061aa190972be9d1c22c33ce53f6045f4633761e:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 70,
+      "consumer": "src",
+      "provider": "src/lifecycle",
+      "claim": "g-fcf3b4700049076d1b7c6016f444683d66638b2cb99dfc43097fcc9b4e512913",
+      "consumedProperty": "supported lifecycle hosts share one control contract without sharing host syntax",
+      "candidates": [
+        "guarantee:G-EXTENSION",
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Host integrations preserve a common contract across representations.",
+      "residual": "Claude and Codex must derive all five lifecycle meanings from one domain while retaining distinct host syntax and fingerprints.",
+      "residualClauseId": "g-fcf3b4700049076d1b7c6016f444683d66638b2cb99dfc43097fcc9b4e512913:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 71,
+      "consumer": "src",
+      "provider": "src/lifecycle",
+      "claim": "g-6622a8513f6c28d3796df090e29bbf611eb68529ee9989bdcb9d854f2fe5ee66",
+      "consumedProperty": "current-session activation requires exact installed-bundle evidence",
+      "candidates": [
+        "guarantee:G-OBSERVABILITY"
+      ],
+      "fit": "partial",
+      "reason": "Activation claims depend on attributable activity.",
+      "residual": "Only exact installed-bundle evidence from the current session proves activation; direct probes, stale bundles and guessed sessions do not.",
+      "residualClauseId": "g-6622a8513f6c28d3796df090e29bbf611eb68529ee9989bdcb9d854f2fe5ee66:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 72,
+      "consumer": "src",
+      "provider": "src/lifecycle",
+      "claim": "g-0f4fea097a31d85ace4d5c682c7b7efe1f7482a8600c7a89e2c0cbfafcd85ae0",
+      "consumedProperty": "customized hook text composes declared overrides and appends, degrading to canon on damage",
+      "candidates": [
+        "guarantee:G-EXTENSION"
+      ],
+      "fit": "partial",
+      "reason": "Customization has explicit compatibility and failure containment.",
+      "residual": "Override then append composes deterministically, and damaged custom text falls back to canonical emission without breaking the session.",
+      "residualClauseId": "g-0f4fea097a31d85ace4d5c682c7b7efe1f7482a8600c7a89e2c0cbfafcd85ae0:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 73,
+      "consumer": "src",
+      "provider": "src/readings",
+      "claim": "g-03e70b2d98d2b69fe64a0bec93ba9cd8b308928cf377d147c7131535a2c0adf2",
+      "consumedProperty": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "A graph view must preserve meanings without inventing evidence.",
+      "residual": "Test imports are evidence edges, not runtime gravity or proof that a named oracle ran.",
+      "residualClauseId": "g-03e70b2d98d2b69fe64a0bec93ba9cd8b308928cf377d147c7131535a2c0adf2:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 74,
+      "consumer": "src",
+      "provider": "src/readings",
+      "claim": "g-efa1440100a974b72c017cb6eb493c4e49ddb6859c5118c201388bc1b5ef4c9c",
+      "consumedProperty": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Ownership and meaning must survive a graph view.",
+      "residual": "Containment and atlas transitions preserve ownership without inventing dependency edges or verdicts.",
+      "residualClauseId": "g-efa1440100a974b72c017cb6eb493c4e49ddb6859c5118c201388bc1b5ef4c9c:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 75,
+      "consumer": "src",
+      "provider": "src/readings",
+      "claim": "g-279e12278a8564579c2402a7aa0fdcb2539e8e36d863eba923fc8e76e9346764",
+      "consumedProperty": "task context is bounded and names its approximations",
+      "candidates": [
+        "guarantee:G-PROJECTION",
+        "guarantee:G-DETERMINISM"
+      ],
+      "fit": "partial",
+      "reason": "A projection names omissions and is stable for equal inputs.",
+      "residual": "The context packet is route-first and bounded by the declared budget, with every omission accounted for; stable output alone does not fix its attention policy.",
+      "residualClauseId": "g-279e12278a8564579c2402a7aa0fdcb2539e8e36d863eba923fc8e76e9346764:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 76,
+      "consumer": "src",
+      "provider": "src/readings",
+      "claim": "g-58c33dc55db443ed922cd6643db6cc642d78d939428a1524228c68c9973be344",
+      "consumedProperty": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "A required population cannot silently vanish.",
+      "residual": "Graph/promise population mismatch refuses the entire Scope model instead of producing a partial diagram.",
+      "residualClauseId": "g-58c33dc55db443ed922cd6643db6cc642d78d939428a1524228c68c9973be344:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 77,
+      "consumer": "src",
+      "provider": "src/readings",
+      "claim": "g-e0c889114418ec0be336a0689f113edfb8d82bc0b752f4e848d15a9a350c3304",
+      "consumedProperty": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Required source explanation survives transformation.",
+      "residual": "Original spec prose and unanchored declarations must remain visible, not only anchored green claims.",
+      "residualClauseId": "g-e0c889114418ec0be336a0689f113edfb8d82bc0b752f4e848d15a9a350c3304:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 78,
+      "consumer": "src",
+      "provider": "src/readings",
+      "claim": "g-e1cb001a3b7ac9819b05464abca1c279d41a87faba8e07d6e230635188f34724",
+      "consumedProperty": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+      "candidates": [
+        "guarantee:G-PRESENTATION"
+      ],
+      "fit": "partial",
+      "reason": "User-visible state has declared rendering behavior.",
+      "residual": "Opaque title bars, explicit contrast and complete inspector text are legibility requirements not specified by loading/empty/success/failure states.",
+      "residualClauseId": "g-e1cb001a3b7ac9819b05464abca1c279d41a87faba8e07d6e230635188f34724:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 79,
+      "consumer": "src",
+      "provider": "src/taxonomy",
+      "claim": "g-46e8461ac5cf5d006ac9b1bdcb254d8ff50c9df8363a78efc400084e427c4a3a",
+      "consumedProperty": "taxonomy representation roles require operational evidence under their recorded catalog",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "Representation roles require their specific operational discriminators under the recorded catalog, with explicit no-fit; no existing guarantee defines classifier epistemics.",
+      "residualClauseId": "g-46e8461ac5cf5d006ac9b1bdcb254d8ff50c9df8363a78efc400084e427c4a3a:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 80,
+      "consumer": "src",
+      "provider": "src/taxonomy",
+      "claim": "g-de3ec13c0b8f0405704ce013d70fa251ae5ea1ef1cd47ee5295da9ee66096b2a",
+      "consumedProperty": "taxonomy revisions preserve scoped evidence and refuse damaged history",
+      "candidates": [
+        "guarantee:G-PERSISTENCE",
+        "guarantee:G-REGISTRY"
+      ],
+      "fit": "partial",
+      "reason": "Historical authority and reference meaning must survive revisions.",
+      "residual": "Old assessments retain the exact recorded catalog's meaning and expire without automatic reassessment or silent migration.",
+      "residualClauseId": "g-de3ec13c0b8f0405704ce013d70fa251ae5ea1ef1cd47ee5295da9ee66096b2a:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 81,
+      "consumer": "src",
+      "provider": "src/taxonomy",
+      "claim": "g-da5ad346269f95c41eb4d8d978050dfe207546719103e78222449792bfda6681",
+      "consumedProperty": "taxonomy suggestions never acquire verification authority",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "Unknown/plural taxonomy assessments cannot be relabeled as one confident role or a satisfied guarantee.",
+      "residualClauseId": "g-da5ad346269f95c41eb4d8d978050dfe207546719103e78222449792bfda6681:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 82,
+      "consumer": "src",
+      "provider": "src/taxonomy",
+      "claim": "g-f0fc62c537dc5bbc813c19335f8449b18910b7b85d0544d7f80a0cfef42df726",
+      "consumedProperty": "taxonomy suggestions never acquire verification authority",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Catalog projection must preserve its population and authority.",
+      "residual": "All frozen lab subjects survive namespaced porting without acquiring verification authority.",
+      "residualClauseId": "g-f0fc62c537dc5bbc813c19335f8449b18910b7b85d0544d7f80a0cfef42df726:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 83,
+      "consumer": "src",
+      "provider": "src/taxonomy",
+      "claim": "g-c79be42fd605e585e709cb3c2d3e3df307d805ac4ee364e1d41f4d3bc081b303",
+      "consumedProperty": "taxonomy revisions preserve scoped evidence and refuse damaged history",
+      "candidates": [
+        "guarantee:G-CONCURRENCY",
+        "guarantee:G-STATE"
+      ],
+      "fit": "partial",
+      "reason": "Concurrent state changes preserve exclusive ownership.",
+      "residual": "Exactly one writer can own the initial taxonomy predecessor slot; parallel first writes cannot both succeed.",
+      "residualClauseId": "g-c79be42fd605e585e709cb3c2d3e3df307d805ac4ee364e1d41f4d3bc081b303:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 84,
+      "consumer": "src",
+      "provider": "src/taxonomy",
+      "claim": "g-a615e7641c3ffafd2d2c1c9c95b6f1a84586dc501ac43b3fbe86164e87034a21",
+      "consumedProperty": "taxonomy revisions preserve scoped evidence and refuse damaged history",
+      "candidates": [
+        "guarantee:G-PERSISTENCE",
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "Stored history must remain valid and recoverable.",
+      "residual": "Malformed or displaced taxonomy rows refuse the reading instead of shrinking the observed history.",
+      "residualClauseId": "g-a615e7641c3ffafd2d2c1c9c95b6f1a84586dc501ac43b3fbe86164e87034a21:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 85,
+      "consumer": "src",
+      "provider": "src/taxonomy",
+      "claim": "g-d1bce33f601420fa5db2e33d610ec91024029082fdcdb78ee7f4463ca49f4ad3",
+      "consumedProperty": "taxonomy wire records require canonical internally consistent caller assessments",
+      "candidates": [
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "Wire inputs require validation.",
+      "residual": "Assessment fields, canonical representation, IDs and subject location must agree internally; parseable JSON alone is not valid.",
+      "residualClauseId": "g-d1bce33f601420fa5db2e33d610ec91024029082fdcdb78ee7f4463ca49f4ad3:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 86,
+      "consumer": "src",
+      "provider": "src/taxonomy",
+      "claim": "g-f4b854e4f43303b214d3094b19a2667ddaf556afb65cb9064b6f3429d4b99702",
+      "consumedProperty": "taxonomy revisions preserve scoped evidence and refuse damaged history",
+      "candidates": [
+        "guarantee:G-BOUNDARY",
+        "guarantee:G-REGISTRY"
+      ],
+      "fit": "partial",
+      "reason": "Subjects must be valid resolvable references.",
+      "residual": "Only resolved graph addresses enter captured evidence; absent, compound and escaping subject paths refuse.",
+      "residualClauseId": "g-f4b854e4f43303b214d3094b19a2667ddaf556afb65cb9064b6f3429d4b99702:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 87,
+      "consumer": "src",
+      "provider": "src/verification",
+      "claim": "g-6f9e452d15d53e356b2989b222c65713c1d2239d48b0869566bd6e929df38cd4",
+      "consumedProperty": "explicit guarantee links expire with their premises and never prove satisfaction",
+      "candidates": [
+        "guarantee:G-REGISTRY"
+      ],
+      "fit": "partial",
+      "reason": "Changed references and premises can expire.",
+      "residual": "Link integrity never certifies applicability or satisfaction; missing mappings and stale taxonomy remain visible despite passing oracles.",
+      "residualClauseId": "g-6f9e452d15d53e356b2989b222c65713c1d2239d48b0869566bd6e929df38cd4:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 88,
+      "consumer": "src",
+      "provider": "src/verification",
+      "claim": "g-d6244b8ab8b0e28cbc3b1e767f965e566335ee7225751d8db44b18bc7419161b",
+      "consumedProperty": "a claim goes green only on positive evidence its oracle ran",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "A named claim needs positive output evidence that its oracle ran; process success or an absent match cannot supply that evidence.",
+      "residualClauseId": "g-d6244b8ab8b0e28cbc3b1e767f965e566335ee7225751d8db44b18bc7419161b:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 89,
+      "consumer": "src",
+      "provider": "src/verification",
+      "claim": "g-b2adce179b206bf934359709b496cf79c09b083c281debb6abcfe54a6c27d82c",
+      "consumedProperty": "a vanished oracle reds its claim, never green-by-absence",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "A vanished oracle must be a distinct red verdict, not green-by-absence or ordinary executed failure.",
+      "residualClauseId": "g-b2adce179b206bf934359709b496cf79c09b083c281debb6abcfe54a6c27d82c:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 90,
+      "consumer": "src",
+      "provider": "src/verification",
+      "claim": "g-166c492aba8f6ce2da13f81354f6b5f70e94472e5b1abc8a619720920f3e17ad",
+      "consumedProperty": "fast verification rejects a statically vanished Vitest oracle without executing tests",
+      "candidates": [
+        "guarantee:G-PARSER"
+      ],
+      "fit": "partial",
+      "reason": "Static source parsing has an explicit supported population.",
+      "residual": "Direct-declaration absence may red a fast claim without execution; presence remains skipped and incomplete registration knowledge remains unknown.",
+      "residualClauseId": "g-166c492aba8f6ce2da13f81354f6b5f70e94472e5b1abc8a619720920f3e17ad:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 91,
+      "consumer": "src",
+      "provider": "src/verification",
+      "claim": "g-05886f174291e7cce7e9f7cf492e5454968edf06e0351c175b29d0761f3d8e09",
+      "consumedProperty": "fast oracle absence requires a complete direct-declaration population",
+      "candidates": [
+        "guarantee:G-PARSER",
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "A parser must account for unsupported input and omissions.",
+      "residual": "Static absence requires a complete enumerable registration population; dynamic loaders and registration mechanisms poison absence into unknown.",
+      "residualClauseId": "g-05886f174291e7cce7e9f7cf492e5454968edf06e0351c175b29d0761f3d8e09:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 92,
+      "consumer": "src",
+      "provider": "src/verification",
+      "claim": "g-adafda36258aa2adbcdc22b383b5dfee52f283849ddd9dd766b2e512fb72910e",
+      "consumedProperty": "a declared invariant unanchored by any boundary fails coverage",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "Every declared invariant must have an anchoring boundary, and missing coverage must fail verification.",
+      "residualClauseId": "g-adafda36258aa2adbcdc22b383b5dfee52f283849ddd9dd766b2e512fb72910e:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 93,
+      "consumer": "src",
+      "provider": "src/verification",
+      "claim": "g-405fa2f11f88ce4e307cec422162649b07dda1ba6c80c68d64097a4d8989ae3f",
+      "consumedProperty": "a via-test oracle that iterates no live domain fails its claim",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "A totality oracle must iterate the live domain, not an authored literal fixture list or an empty population.",
+      "residualClauseId": "g-405fa2f11f88ce4e307cec422162649b07dda1ba6c80c68d64097a4d8989ae3f:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 94,
+      "consumer": "src",
+      "provider": "src/verification",
+      "claim": "g-2855a7aa75934deeda6a5ef8301fd8b18241bb62dd81e0cca835c6f5425ca7aa",
+      "consumedProperty": "a named oracle that no test runs cannot pass",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "The serial runner itself refuses when no named test demonstrably ran, regardless of its own process exit convention.",
+      "residualClauseId": "g-2855a7aa75934deeda6a5ef8301fd8b18241bb62dd81e0cca835c6f5425ca7aa:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 95,
+      "consumer": "src",
+      "provider": "src/verification",
+      "claim": "g-db68bb89c99dd2ad269d505de1e1f307b6bd4414638554afe38ddd52592a4b7a",
+      "consumedProperty": "an empty derivation against a remembered surface refuses, never passes",
+      "candidates": [
+        "guarantee:G-PERSISTENCE",
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "A remembered population cannot silently disappear from a projection.",
+      "residual": "An empty derivation against a remembered nonempty surface refuses; genuine adoption from zero remains distinct.",
+      "residualClauseId": "g-db68bb89c99dd2ad269d505de1e1f307b6bd4414638554afe38ddd52592a4b7a:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 96,
+      "consumer": "src",
+      "provider": "src/verification",
+      "claim": "g-bb32cf33099ee37766eb456d21f26afb895e4774fbb31133e1aa0f1d86d0a24b",
+      "consumedProperty": "python sources feed the same instruments as typescript at their declared grade",
+      "candidates": [
+        "guarantee:G-PARSER",
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "Batch input parsing and failures must be explicit.",
+      "residual": "Pytest nodeids resolve per claim; zero matches mean vanished oracle, and damaged reports fall back loudly.",
+      "residualClauseId": "g-bb32cf33099ee37766eb456d21f26afb895e4774fbb31133e1aa0f1d86d0a24b:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/harness.spec.md",
+      "line": 97,
+      "consumer": "src",
+      "provider": "src/verification",
+      "claim": "g-bfef8cbed1a292cfacf8fd4cb6f186a3667b11fda619463a431f61e1ea770dfa",
+      "consumedProperty": "python sources feed the same instruments as typescript at their declared grade",
+      "candidates": [
+        "guarantee:G-PARSER",
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Language support must preserve its declared oracle population.",
+      "residual": "Python parity tests must enumerate the live domain; literal lists and vanished oracles cannot establish totality.",
+      "residualClauseId": "g-bfef8cbed1a292cfacf8fd4cb6f186a3667b11fda619463a431f61e1ea770dfa:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/lifecycle/lifecycle.spec.md",
+      "line": 47,
+      "consumer": "src/lifecycle",
+      "provider": "src/diagnostics",
+      "claim": "g-96f1f46fb8a7a7e0dc5ab050f5237a3dd8e65088f368f05599d87557d9a7d2d7",
+      "consumedProperty": "significant behavioral growth acquires an anchor or patch-specific decision",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "Significant growth without an enforcement anchor requires a patch-specific decision; none of the current candidates prescribes this change-policy obligation.",
+      "residualClauseId": "g-96f1f46fb8a7a7e0dc5ab050f5237a3dd8e65088f368f05599d87557d9a7d2d7:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/lifecycle/lifecycle.spec.md",
+      "line": 48,
+      "consumer": "src/lifecycle",
+      "provider": "src/diagnostics",
+      "claim": "g-53550835977575002ba22785c78f9dcaa1f78d814708dfd5fcfbc1c9356d1a0d",
+      "consumedProperty": "calibration denominators contain only validated surviving evidence",
+      "candidates": [
+        "guarantee:G-BOUNDARY",
+        "guarantee:G-OBSERVABILITY"
+      ],
+      "fit": "partial",
+      "reason": "Calibration consumes validated attributable observations.",
+      "residual": "Malformed surviving samples must refuse rather than disappear from the calibration denominator.",
+      "residualClauseId": "g-53550835977575002ba22785c78f9dcaa1f78d814708dfd5fcfbc1c9356d1a0d:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/lifecycle/lifecycle.spec.md",
+      "line": 49,
+      "consumer": "src/lifecycle",
+      "provider": "src/diagnostics",
+      "claim": "g-d6e0b1b54a09c42f92856d5f64f2638367fc5f0d79cf604974abd863716afa5c",
+      "consumedProperty": "calibration preserves the weakest host attribution of its trace",
+      "candidates": [
+        "guarantee:G-OBSERVABILITY"
+      ],
+      "fit": "partial",
+      "reason": "Signals must remain attributable.",
+      "residual": "The weakest trace attribution controls the result: parent aggregates and legacy unscoped rows cannot become child-owned samples.",
+      "residualClauseId": "g-d6e0b1b54a09c42f92856d5f64f2638367fc5f0d79cf604974abd863716afa5c:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/lifecycle/lifecycle.spec.md",
+      "line": 50,
+      "consumer": "src/lifecycle",
+      "provider": "src/evidence",
+      "claim": "g-dd640f9dff77a6eb8267db51a30e2e67b4cb22e381f168509e0f562a2075aca9",
+      "consumedProperty": "a committed decision population cannot disappear into adoption from zero",
+      "candidates": [
+        "guarantee:G-PERSISTENCE",
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Remembered state and population preservation are candidate concerns.",
+      "residual": "A committed nonempty decision population disappearing cannot be interpreted as legitimate adoption from zero.",
+      "residualClauseId": "g-dd640f9dff77a6eb8267db51a30e2e67b4cb22e381f168509e0f562a2075aca9:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/readings/readings.spec.md",
+      "line": 31,
+      "consumer": "src/readings",
+      "provider": "src/derivation",
+      "claim": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09",
+      "consumedProperty": "a declared language resolves to a real adapter or refuses, never a silent fallback",
+      "candidates": [
+        "guarantee:G-EXTENSION"
+      ],
+      "fit": "partial",
+      "reason": "Extension discovery and compatibility must be explicit.",
+      "residual": "An unknown language refuses instead of selecting TypeScript, and custom adapter shape is checked at the loader.",
+      "residualClauseId": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/readings/readings.spec.md",
+      "line": 32,
+      "consumer": "src/readings",
+      "provider": "src/evidence",
+      "claim": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f",
+      "consumedProperty": "concurrent status writers preserve complete independent reports",
+      "candidates": [
+        "guarantee:G-CONCURRENCY",
+        "guarantee:G-PERSISTENCE"
+      ],
+      "fit": "partial",
+      "reason": "Concurrent writers preserve ownership of durable state.",
+      "residual": "Independent report sections must survive interleaved publication and readers must never see a partial report.",
+      "residualClauseId": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/readings/readings.spec.md",
+      "line": 33,
+      "consumer": "src/readings",
+      "provider": "src/evidence",
+      "claim": "g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf",
+      "consumedProperty": "a skipped run never clobbers an oracle's recorded verdict",
+      "candidates": [
+        "guarantee:G-PERSISTENCE"
+      ],
+      "fit": "partial",
+      "reason": "Recorded results are authoritative durable state.",
+      "residual": "A skipped verification must preserve the previous real verdict and its original timestamp, including a previous failure.",
+      "residualClauseId": "g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/readings/readings.spec.md",
+      "line": 34,
+      "consumer": "src/readings",
+      "provider": "src/verification",
+      "claim": "g-6f9e452d15d53e356b2989b222c65713c1d2239d48b0869566bd6e929df38cd4",
+      "consumedProperty": "explicit guarantee links expire with their premises and never prove satisfaction",
+      "candidates": [
+        "guarantee:G-REGISTRY"
+      ],
+      "fit": "partial",
+      "reason": "Changed references and premises can expire.",
+      "residual": "Link integrity never certifies applicability or satisfaction; missing mappings and stale taxonomy remain visible despite passing oracles.",
+      "residualClauseId": "g-6f9e452d15d53e356b2989b222c65713c1d2239d48b0869566bd6e929df38cd4:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/taxonomy/taxonomy.spec.md",
+      "line": 33,
+      "consumer": "src/taxonomy",
+      "provider": "src/derivation",
+      "claim": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d",
+      "consumedProperty": "spec containment follows declared ancestry without inventing dependencies",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Identity and required meaning must survive graph projection.",
+      "residual": "Ownership follows deepest declared ancestry, and containment must not create import dependencies.",
+      "residualClauseId": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/taxonomy/taxonomy.spec.md",
+      "line": 34,
+      "consumer": "src/taxonomy",
+      "provider": "src/derivation",
+      "claim": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09",
+      "consumedProperty": "a declared language resolves to a real adapter or refuses, never a silent fallback",
+      "candidates": [
+        "guarantee:G-EXTENSION"
+      ],
+      "fit": "partial",
+      "reason": "Extension discovery and compatibility must be explicit.",
+      "residual": "An unknown language refuses instead of selecting TypeScript, and custom adapter shape is checked at the loader.",
+      "residualClauseId": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/taxonomy/taxonomy.spec.md",
+      "line": 35,
+      "consumer": "src/taxonomy",
+      "provider": "src/verification",
+      "claim": "g-8c1be2fad7bd80dc0f0997183ee61dcac8a05acd650c2f16aa127861081fa8d3",
+      "consumedProperty": "an undeclared root refuses the walk, never wanders",
+      "candidates": [
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "The project root is a validated boundary input.",
+      "residual": "Config-file presence declares walk authority; a configless cwd refuses rather than defaulting into a scan.",
+      "residualClauseId": "g-8c1be2fad7bd80dc0f0997183ee61dcac8a05acd650c2f16aa127861081fa8d3:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/verification/verification.spec.md",
+      "line": 51,
+      "consumer": "src/verification",
+      "provider": "src/adapters",
+      "claim": "g-387c59a17fac9ecf0ca0846e1a651976a0ffe99bc62e7ca539ff96e155ac1d82",
+      "consumedProperty": "a parse's heap is returned before the next file",
+      "candidates": [
+        "guarantee:G-LIFECYCLE"
+      ],
+      "fit": "partial",
+      "reason": "Resource teardown belongs to lifecycle management.",
+      "residual": "The WASM tree must be freed before the next file, including exceptional paths; explicit stop/idempotence alone does not impose this lifetime.",
+      "residualClauseId": "g-387c59a17fac9ecf0ca0846e1a651976a0ffe99bc62e7ca539ff96e155ac1d82:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/verification/verification.spec.md",
+      "line": 52,
+      "consumer": "src/verification",
+      "provider": "src/derivation",
+      "claim": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d",
+      "consumedProperty": "spec containment follows declared ancestry without inventing dependencies",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Identity and required meaning must survive graph projection.",
+      "residual": "Ownership follows deepest declared ancestry, and containment must not create import dependencies.",
+      "residualClauseId": "g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/verification/verification.spec.md",
+      "line": 53,
+      "consumer": "src/verification",
+      "provider": "src/derivation",
+      "claim": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09",
+      "consumedProperty": "a declared language resolves to a real adapter or refuses, never a silent fallback",
+      "candidates": [
+        "guarantee:G-EXTENSION"
+      ],
+      "fit": "partial",
+      "reason": "Extension discovery and compatibility must be explicit.",
+      "residual": "An unknown language refuses instead of selecting TypeScript, and custom adapter shape is checked at the loader.",
+      "residualClauseId": "g-c0dda2539a9e3d87be9163c42ab4c7e37124558d47d9fb86af3e9a673f923d09:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/verification/verification.spec.md",
+      "line": 54,
+      "consumer": "src/verification",
+      "provider": "src/evidence",
+      "claim": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f",
+      "consumedProperty": "concurrent status writers preserve complete independent reports",
+      "candidates": [
+        "guarantee:G-CONCURRENCY",
+        "guarantee:G-PERSISTENCE"
+      ],
+      "fit": "partial",
+      "reason": "Concurrent writers preserve ownership of durable state.",
+      "residual": "Independent report sections must survive interleaved publication and readers must never see a partial report.",
+      "residualClauseId": "g-270a128828d3527799676161a81bb52f030d999d3b7f52a12e79a2ff779a4e0f:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/verification/verification.spec.md",
+      "line": 55,
+      "consumer": "src/verification",
+      "provider": "src/readings",
+      "claim": "g-03e70b2d98d2b69fe64a0bec93ba9cd8b308928cf377d147c7131535a2c0adf2",
+      "consumedProperty": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "A graph view must preserve meanings without inventing evidence.",
+      "residual": "Test imports are evidence edges, not runtime gravity or proof that a named oracle ran.",
+      "residualClauseId": "g-03e70b2d98d2b69fe64a0bec93ba9cd8b308928cf377d147c7131535a2c0adf2:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/verification/verification.spec.md",
+      "line": 56,
+      "consumer": "src/verification",
+      "provider": "src/readings",
+      "claim": "g-efa1440100a974b72c017cb6eb493c4e49ddb6859c5118c201388bc1b5ef4c9c",
+      "consumedProperty": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Ownership and meaning must survive a graph view.",
+      "residual": "Containment and atlas transitions preserve ownership without inventing dependency edges or verdicts.",
+      "residualClauseId": "g-efa1440100a974b72c017cb6eb493c4e49ddb6859c5118c201388bc1b5ef4c9c:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/verification/verification.spec.md",
+      "line": 57,
+      "consumer": "src/verification",
+      "provider": "src/readings",
+      "claim": "g-58c33dc55db443ed922cd6643db6cc642d78d939428a1524228c68c9973be344",
+      "consumedProperty": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "A required population cannot silently vanish.",
+      "residual": "Graph/promise population mismatch refuses the entire Scope model instead of producing a partial diagram.",
+      "residualClauseId": "g-58c33dc55db443ed922cd6643db6cc642d78d939428a1524228c68c9973be344:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/verification/verification.spec.md",
+      "line": 58,
+      "consumer": "src/verification",
+      "provider": "src/readings",
+      "claim": "g-e0c889114418ec0be336a0689f113edfb8d82bc0b752f4e848d15a9a350c3304",
+      "consumedProperty": "Scope projects the canonical promise population with deterministic gravity and honest absence",
+      "candidates": [
+        "guarantee:G-PROJECTION"
+      ],
+      "fit": "partial",
+      "reason": "Required source explanation survives transformation.",
+      "residual": "Original spec prose and unanchored declarations must remain visible, not only anchored green claims.",
+      "residualClauseId": "g-e0c889114418ec0be336a0689f113edfb8d82bc0b752f4e848d15a9a350c3304:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/verification/verification.spec.md",
+      "line": 59,
+      "consumer": "src/verification",
+      "provider": "src/taxonomy",
+      "claim": "g-46e8461ac5cf5d006ac9b1bdcb254d8ff50c9df8363a78efc400084e427c4a3a",
+      "consumedProperty": "taxonomy representation roles require operational evidence under their recorded catalog",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "Representation roles require their specific operational discriminators under the recorded catalog, with explicit no-fit; no existing guarantee defines classifier epistemics.",
+      "residualClauseId": "g-46e8461ac5cf5d006ac9b1bdcb254d8ff50c9df8363a78efc400084e427c4a3a:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/verification/verification.spec.md",
+      "line": 60,
+      "consumer": "src/verification",
+      "provider": "src/taxonomy",
+      "claim": "g-de3ec13c0b8f0405704ce013d70fa251ae5ea1ef1cd47ee5295da9ee66096b2a",
+      "consumedProperty": "taxonomy revisions preserve scoped evidence and refuse damaged history",
+      "candidates": [
+        "guarantee:G-PERSISTENCE",
+        "guarantee:G-REGISTRY"
+      ],
+      "fit": "partial",
+      "reason": "Historical authority and reference meaning must survive revisions.",
+      "residual": "Old assessments retain the exact recorded catalog's meaning and expire without automatic reassessment or silent migration.",
+      "residualClauseId": "g-de3ec13c0b8f0405704ce013d70fa251ae5ea1ef1cd47ee5295da9ee66096b2a:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/verification/verification.spec.md",
+      "line": 61,
+      "consumer": "src/verification",
+      "provider": "src/taxonomy",
+      "claim": "g-da5ad346269f95c41eb4d8d978050dfe207546719103e78222449792bfda6681",
+      "consumedProperty": "taxonomy suggestions never acquire verification authority",
+      "candidates": [],
+      "fit": "none",
+      "reason": "No existing candidate states this consumed property without introducing its essential semantics.",
+      "residual": "Unknown/plural taxonomy assessments cannot be relabeled as one confident role or a satisfied guarantee.",
+      "residualClauseId": "g-da5ad346269f95c41eb4d8d978050dfe207546719103e78222449792bfda6681:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/verification/verification.spec.md",
+      "line": 62,
+      "consumer": "src/verification",
+      "provider": "src/taxonomy",
+      "claim": "g-a615e7641c3ffafd2d2c1c9c95b6f1a84586dc501ac43b3fbe86164e87034a21",
+      "consumedProperty": "taxonomy revisions preserve scoped evidence and refuse damaged history",
+      "candidates": [
+        "guarantee:G-PERSISTENCE",
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "Stored history must remain valid and recoverable.",
+      "residual": "Malformed or displaced taxonomy rows refuse the reading instead of shrinking the observed history.",
+      "residualClauseId": "g-a615e7641c3ffafd2d2c1c9c95b6f1a84586dc501ac43b3fbe86164e87034a21:residual-1",
+      "applicability": "not-assessed"
+    },
+    {
+      "path": "src/verification/verification.spec.md",
+      "line": 63,
+      "consumer": "src/verification",
+      "provider": "src/taxonomy",
+      "claim": "g-d1bce33f601420fa5db2e33d610ec91024029082fdcdb78ee7f4463ca49f4ad3",
+      "consumedProperty": "taxonomy wire records require canonical internally consistent caller assessments",
+      "candidates": [
+        "guarantee:G-BOUNDARY"
+      ],
+      "fit": "partial",
+      "reason": "Wire inputs require validation.",
+      "residual": "Assessment fields, canonical representation, IDs and subject location must agree internally; parseable JSON alone is not valid.",
+      "residualClauseId": "g-d1bce33f601420fa5db2e33d610ec91024029082fdcdb78ee7f4463ca49f4ad3:residual-1",
+      "applicability": "not-assessed"
+    }
+  ]
+}

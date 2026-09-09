@@ -14,6 +14,9 @@ import { layoutScope } from './layout.mjs';
 import { readGuaranteeTaxonomy } from '../../src/verification/guarantees-cli.ts';
 import { recordTaxonomy } from '../../src/taxonomy/taxonomy-ledger.ts';
 import { guaranteeRef, parseBoundary } from '../../src/verification/boundary.ts';
+import { bindingDigest } from '../../src/verification/guarantee-bindings.ts';
+import { GUARANTEE_CATALOG } from '../../src/verification/guarantee-catalog.ts';
+import { createHash } from 'node:crypto';
 
 const record = id => ({ id, session: 'fixture', agent: 'fixture', job: '-', kind: 'decision',
   at: '2026-09-04T12:00:00.000Z', chose: id, because: 'test evidence', over: [], branch: null, commit: null, dirty: false });
@@ -51,6 +54,23 @@ async function feed(url) {
   }, close: () => reader.cancel() };
 }
 
+test('live declared aliases repopulate canonical component relations after a config edit', { timeout: 15000 }, async () => {
+  const root = await tmpProject({ 'coherence.config.json': '{}', 'root.spec.md': '# Project\n',
+    'a/component.spec.md': '# Consumer\n', 'b/component.spec.md': '# Provider\n',
+    'a/main.ts': 'import "~/b/value";', 'b/value.ts': 'export const value = 1;',
+    'index.html': '<div id="root"></div>' });
+  const live = await startScopeServer({ cfg: await loadConfig(root), htmlPath: join(root, 'index.html'), intervalMs: 30 });
+  const stream = await feed(live.url);
+  try {
+    const initial = await stream.next();
+    assert.equal(initial.structure.model.relations.length, 0);
+    await writeFile(join(root, 'coherence.config.json'), JSON.stringify({ importAliases: { '~/b/*': ['b/*'] } }));
+    let updated;
+    do { updated = await stream.next(); } while (!updated.structure.model.relations.length);
+    assert.deepEqual(updated.structure.model.relations.map(r => [r.source, r.target]), [['a', 'b']]);
+  } finally { await stream.close(); await live.close(); await cleanup(root); }
+});
+
 test('live server refuses foreign origin/host, wrong capability, arbitrary paths and writes', async () => {
   const f = await start();
   try {
@@ -66,6 +86,31 @@ test('live server refuses foreign origin/host, wrong capability, arbitrary paths
     assert.equal((await get(f.live.url, { headers: { 'Sec-Fetch-Site': 'cross-site' } })).status, 403);
     assert.equal((await get(f.live.url, { headers: { Origin: f.live.origin } })).status, 200);
   } finally { await f.close(); }
+});
+
+test('live catalog bindings refresh ignored explicit evidence without camera geometry changes', { timeout: 15000 }, async () => {
+  const claim = 'boundary "late work loses" at publish via guard "publish test"';
+  const source = 'export function publish() { return true; }\n';
+  const root = await tmpProject({ 'coherence.config.json': '{"ignore":["hidden"]}', 'core.spec.md': '# Cache\n',
+    'core.ts': source, 'hidden/evidence.txt': 'first', 'index.html': '<div id="root"></div>' });
+  const definition = GUARANTEE_CATALOG.definitions.find(d => d.id === 'guarantee:supersession-safety');
+  const sha = s => createHash('sha256').update(s).digest('hex');
+  const binding = { claim: guaranteeRef('.', parseBoundary(claim)), definition: definition.id, definitionDigest: bindingDigest(definition),
+    subject: 'core.ts', assessor: 'test', because: 'Competing writes', parameters: Object.fromEntries(definition.parameters.map(k => [k, k])),
+    excludes: 'external runtime', falsifier: 'old result wins', evidence: { 'core.ts': sha(source), 'hidden/evidence.txt': sha('first') } };
+  await writeFile(join(root, 'core.spec.md'), `# Cache\n\n## works when\n- ${claim}\n\n## guarantee bindings\n- ${JSON.stringify(binding)}\n`);
+  const live = await startScopeServer({ cfg: await loadConfig(root), htmlPath: join(root, 'index.html'), intervalMs: 30 });
+  const stream = await feed(live.url);
+  try {
+    const initial = await stream.next();
+    assert.equal(initial.structure.model.catalogBindings.items[0].status, 'current');
+    await writeFile(join(root, 'hidden/evidence.txt'), 'second');
+    let updated;
+    do { updated = await stream.next(); } while (updated.structure.model.catalogBindings.items[0].status === 'current');
+    assert.equal(updated.structure.model.catalogBindings.items[0].status, 'stale');
+    assert.deepEqual(updated.structure.model.nodes, initial.structure.model.nodes);
+    assert.equal(updated.structure.model.catalogBindings.items[0].observation.verdict, 'unverified');
+  } finally { await stream.close(); await live.close(); await cleanup(root); }
 });
 
 test('live guarantee links repopulate on spec declarations and expire on assessment revisions and source edits', { timeout: 15000 }, async () => {

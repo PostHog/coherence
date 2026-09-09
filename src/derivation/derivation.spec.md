@@ -6,6 +6,8 @@ Language packs and adapters supply syntax knowledge. This assembly owns the walk
 
 ## invariants
 
+- declared import aliases resolve only unique walked targets and refuse malformed configuration
+- Python local imports resolve only at the declared direct-module grade
 - spec containment follows declared ancestry without inventing dependencies
 
 - harness source remains searchable text rather than silently becoming binary
@@ -14,10 +16,15 @@ Language packs and adapters supply syntax knowledge. This assembly owns the walk
 
 ## refutations
 
+- declared import aliases resolve only unique walked targets and refuse malformed configuration: the pinned PostHog ingestion fixture had 42 alias import occurrences targeting copied files, but the relative-only resolver hid 15 component relations and rejected 7 of 8 declared guarantee reliances. The same source population must recover those relations when its root aliases are declared; omitting the declarations remains an explicit external-module negative control.
+- Python local imports resolve only at the declared direct-module grade: the pinned PostHog slice contained both imported Redis and object-storage files but Scope derived zero relations. The resolver treated every absolute dotted module as external. With the Python address strategy the same slice derives five canonical relations; ambiguous modules and unresolved imports remain external.
 - harness source remains searchable text rather than silently becoming binary: two new render/validation regexes carried literal NUL bytes, and `rg` classified `src/consequence.ts` as binary instead of returning navigable source matches. The ranges now use escaped source notation and the focused guard enumerates every live TypeScript source, so the same byte turns the claim red rather than degrading repository navigation silently.
 
 ## works when
 
+- boundary "declared import aliases resolve only unique walked targets and refuse malformed configuration" at compileImportAliases via guard "import aliases — only unique declared in-population targets become canonical edges"
+- boundary "declared import aliases resolve only unique walked targets and refuse malformed configuration" at compileImportAliases via guard "import aliases — malformed and escaping declarations refuse; alternatives never guess precedence"
+- boundary "Python local imports resolve only at the declared direct-module grade" at pythonImportCandidates via guard "python imports — unique dotted local modules become canonical edges; ambiguity and missing modules do not"
 - boundary "spec containment follows declared ancestry without inventing dependencies" at buildGraph via guard "spec containment — deepest declared ancestor is canonical parent, never an invented import"
 
 - derive.ts imports ./walk.ts
@@ -30,6 +37,14 @@ Language packs and adapters supply syntax knowledge. This assembly owns the walk
 - {"claim":"g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d","subject":"src/derivation/derive.ts#buildGraph","obligation":"guarantee:G-PROJECTION","assessment":"t-62eb19624910e1e45da79565e119ca0e8cd6df2f1c6910aa7533a22f133bbe28","because":"The containment oracle checks deepest declared ownership without fabricating dependency edges. This addresses ownership preservation in the graph projection, not completeness of every adapter or source construct."}
 
 ## why
+
+**declared import aliases resolve only unique walked targets and refuse malformed configuration.** Aliases are part of a project's declared module address space, not relationships for a renderer to guess. Exact or trailing-star mappings resolve against the one canonical walked population. The most specific declaration owns a match; missing targets never fall back to broader mappings, and multiple candidates remain explicitly ambiguous. Root-relative targets and safe captures prevent traversal. This direct-module grade does not execute build configuration, infer reexports, or promise TypeScript resolution parity. Existing relative and Python resolution retain their declared grades.
+
+**Python local imports resolve only at the declared direct-module grade.** A graph
+that captures a local module but calls it external erases the relationships every
+reading surface needs. Resolve dotted names against the existing file population,
+not a second walk or Python execution. Ambiguous modules stay external because
+guessing runtime search-path precedence would exceed this instrument's evidence.
 
 **spec containment follows declared ancestry without inventing dependencies.** Repository and subsystem containment explain ownership even where no source import exists. Treating that relationship as an import fabricates reliance; omitting it turns the enclosing project into an unexplained island. The same deepest-spec rule that assigns file ownership supplies component ancestry.
 
