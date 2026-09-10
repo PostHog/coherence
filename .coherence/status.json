@@ -1,47 +1,47 @@
 {
   "version": 1,
   "verify": {
-    "at": "2026-09-09T03:34:51.597Z",
-    "commit": "1979969",
+    "at": "2026-09-10T14:36:58.855Z",
+    "commit": "2ea3648",
     "dirty": true,
-    "tier": "full",
+    "tier": "fast",
     "scope": null,
     "cost": {
-      "totalMs": 2739330.9310020027,
+      "totalMs": 1663.311621999998,
       "claims": [
         {
-          "node": "Source adapters",
-          "claim": "boundary \"a parse's heap is returned before the next file\" at withTree via guard \"wasm heap — parses past the measured abort cliff survive because every tree is freed\"",
-          "ms": 1605330.326959,
+          "node": "Harness core",
+          "claim": "typechecks",
+          "ms": 1659.608875,
+          "source": "wall"
+        },
+        {
+          "node": "Coherence",
+          "claim": "passes test \"repository assemblies — contracts follow their chokepoint owners and composition stays thin\"",
+          "ms": 0.4537919999999076,
           "source": "wall"
         },
         {
           "node": "Harness core",
-          "claim": "passes test \"repository control — work and consequence records survive a fresh clone\"",
-          "ms": 1029068.889125,
-          "source": "wall"
-        },
-        {
-          "node": "Durable evidence",
-          "claim": "boundary \"concurrent status writers preserve complete independent reports\" at recordVerify via guard \"status publication — concurrent processes preserve independent reports and readers see complete JSON\"",
-          "ms": 25743.97908399999,
+          "claim": "cli.ts imports ./config.ts",
+          "ms": 0.4466659999998228,
           "source": "wall"
         },
         {
           "node": "Harness core",
-          "claim": "passes test \"field journey — competing duties settle into reconstructable evidence and damage recovers\"",
-          "ms": 18729.79425,
+          "claim": "boundary \"swarm write identity and authority flags are singleton or refused\" at repeatedSingletonFlags via guard \"swarm writes reject repeated singleton identity and authority flags before append\"",
+          "ms": 0.3316669999999249,
           "source": "wall"
         },
         {
-          "node": "Agent lifecycle",
-          "claim": "boundary \"agent lifecycle preserves decisions and exposes the current change signal\" at runHook via guard \"hooks — main Stop snapshots without feedback while SubagentStop alone restates\"",
-          "ms": 2674.7387500000186,
+          "node": "Harness core",
+          "claim": "cli.ts imports ./derivation/derive.ts",
+          "ms": 0.25787499999978536,
           "source": "wall"
         }
       ]
     },
-    "lastFastAt": "2026-09-08T19:47:31.672Z",
+    "lastFastAt": "2026-09-10T14:36:58.855Z",
     "lastFullAt": "2026-09-09T03:34:51.597Z",
     "claims": [
       {
@@ -59,11 +59,11 @@
         "claim": "coherence.config.json exists at root",
         "kind": "pass",
         "detail": "coherence.config.json @ root",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": false,
-        "runs": 149
+        "runs": 151
       },
       {
         "node": "Coherence",
@@ -90,46 +90,46 @@
         "claim": "typechecks",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": true,
         "lastFailAt": "2026-09-08T20:58:47.134Z",
         "lastFailCommit": "ac70b95",
-        "runs": 119
+        "runs": 121
       },
       {
         "node": "Harness core",
         "claim": "cli.ts imports ./config.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": false,
-        "runs": 149
+        "runs": 151
       },
       {
         "node": "Harness core",
         "claim": "cli.ts imports ./derivation/derive.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": false,
-        "runs": 8
+        "runs": 10
       },
       {
         "node": "Harness core",
         "claim": "cli.ts imports ./verification/verify.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": false,
-        "runs": 8
+        "runs": 10
       },
       {
         "node": "Harness core",
@@ -170,22 +170,22 @@
         "claim": "tree-sitter.ts exists at this node",
         "kind": "pass",
         "detail": "tree-sitter.ts @ this node",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": false,
-        "runs": 48
+        "runs": 50
       },
       {
         "node": "Source adapters",
         "claim": "cloudflare.ts exists at this node",
         "kind": "pass",
         "detail": "cloudflare.ts @ this node",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": false,
-        "runs": 149
+        "runs": 151
       },
       {
         "node": "Source adapters",
@@ -400,6 +400,39 @@
       },
       {
         "node": "Source derivation",
+        "claim": "boundary \"declared import aliases resolve only unique walked targets and refuse malformed configuration\" at compileImportAliases via guard \"import aliases — only unique declared in-population targets become canonical edges\"",
+        "kind": "skip",
+        "detail": "boundary oracle (--fast) — static oracle existence UNKNOWN: the configured runner is not statically identifiable as Vitest (set testBatchFormat to vitest-json to declare it)",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
+        "everFailed": false,
+        "runs": 0
+      },
+      {
+        "node": "Source derivation",
+        "claim": "boundary \"declared import aliases resolve only unique walked targets and refuse malformed configuration\" at compileImportAliases via guard \"import aliases — malformed and escaping declarations refuse; alternatives never guess precedence\"",
+        "kind": "skip",
+        "detail": "boundary oracle (--fast) — static oracle existence UNKNOWN: the configured runner is not statically identifiable as Vitest (set testBatchFormat to vitest-json to declare it)",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
+        "everFailed": false,
+        "runs": 0
+      },
+      {
+        "node": "Source derivation",
+        "claim": "boundary \"Python local imports resolve only at the declared direct-module grade\" at pythonImportCandidates via guard \"python imports — unique dotted local modules become canonical edges; ambiguity and missing modules do not\"",
+        "kind": "skip",
+        "detail": "boundary oracle (--fast) — static oracle existence UNKNOWN: the configured runner is not statically identifiable as Vitest (set testBatchFormat to vitest-json to declare it)",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
+        "everFailed": false,
+        "runs": 0
+      },
+      {
+        "node": "Source derivation",
         "claim": "boundary \"spec containment follows declared ancestry without inventing dependencies\" at buildGraph via guard \"spec containment — deepest declared ancestor is canonical parent, never an invented import\"",
         "kind": "pass",
         "detail": "spec containment follows declared ancestry without inventing dependencies @ buildGraph (source-property guard)",
@@ -414,11 +447,11 @@
         "claim": "derive.ts imports ./walk.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": false,
-        "runs": 8
+        "runs": 10
       },
       {
         "node": "Source derivation",
@@ -633,14 +666,14 @@
       },
       {
         "node": "Durable evidence",
-        "claim": "boundary \"experiment outcomes require criterion-total evidence\" at closeExperiment via guard \"close — total nonempty evidence is mandatory and outcome is derived, never supplied\"",
-        "kind": "pass",
-        "detail": "experiment outcomes require criterion-total evidence @ closeExperiment (source-property guard)",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "claim": "boundary \"experiment outcomes require criterion-total evidence\" at closeExperiment over ExperimentOpened via guard \"close — total nonempty evidence is mandatory and outcome is derived, never supplied\"",
+        "kind": "skip",
+        "detail": "boundary oracle (--fast) — static oracle existence UNKNOWN: the configured runner is not statically identifiable as Vitest (set testBatchFormat to vitest-json to declare it)",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": false,
-        "runs": 7
+        "runs": 0
       },
       {
         "node": "Durable evidence",
@@ -702,11 +735,11 @@
         "claim": "hooks.ts imports ../evidence/decisions.ts",
         "kind": "pass",
         "detail": "",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": false,
-        "runs": 8
+        "runs": 10
       },
       {
         "node": "Agent lifecycle",
@@ -985,6 +1018,61 @@
       },
       {
         "node": "Verification",
+        "claim": "boundary \"catalog binding support requires a named oracle check at unchanged explicit inputs\" at bindRunEvidence via guard \"catalog bindings — only unchanged executed inputs earn support; edits and historical reports cannot renew it\"",
+        "kind": "skip",
+        "detail": "boundary oracle (--fast) — static oracle existence UNKNOWN: the configured runner is not statically identifiable as Vitest (set testBatchFormat to vitest-json to declare it)",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
+        "everFailed": false,
+        "runs": 0
+      },
+      {
+        "node": "Verification",
+        "claim": "boundary \"catalog binding support requires a named oracle check at unchanged explicit inputs\" at projectBindings via guard \"catalog bindings — exact scoped declarations retain failures and never borrow example support\"",
+        "kind": "skip",
+        "detail": "boundary oracle (--fast) — static oracle existence UNKNOWN: the configured runner is not statically identifiable as Vitest (set testBatchFormat to vitest-json to declare it)",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
+        "everFailed": false,
+        "runs": 0
+      },
+      {
+        "node": "Verification",
+        "claim": "boundary \"catalog binding support requires a named oracle check at unchanged explicit inputs\" at projectBindings via guard \"catalog bindings — flow endpoints require owned pinned symbols and changed paths cannot borrow support\"",
+        "kind": "skip",
+        "detail": "boundary oracle (--fast) — static oracle existence UNKNOWN: the configured runner is not statically identifiable as Vitest (set testBatchFormat to vitest-json to declare it)",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
+        "everFailed": false,
+        "runs": 0
+      },
+      {
+        "node": "Verification",
+        "claim": "boundary \"candidate guarantee vocabulary stays project-independent and never activates obligations\" at runGuaranteeCatalog via guard \"guarantee catalog — public lookup never loads project configuration or reads its ledgers\"",
+        "kind": "skip",
+        "detail": "boundary oracle (--fast) — static oracle existence UNKNOWN: the configured runner is not statically identifiable as Vitest (set testBatchFormat to vitest-json to declare it)",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
+        "everFailed": false,
+        "runs": 0
+      },
+      {
+        "node": "Verification",
+        "claim": "boundary \"candidate guarantee vocabulary stays project-independent and never activates obligations\" at runGuaranteeCatalog via guard \"guarantee catalog — list and detail preserve the canonical population, qualifications and refusal semantics\"",
+        "kind": "skip",
+        "detail": "boundary oracle (--fast) — static oracle existence UNKNOWN: the configured runner is not statically identifiable as Vitest (set testBatchFormat to vitest-json to declare it)",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
+        "everFailed": false,
+        "runs": 0
+      },
+      {
+        "node": "Verification",
         "claim": "boundary \"explicit guarantee links expire with their premises and never prove satisfaction\" at resolveGuaranteeLinks via guard \"guarantee links — expired premises never become current and passing evidence never proves satisfaction\"",
         "kind": "pass",
         "detail": "explicit guarantee links expire with their premises and never prove satisfaction @ resolveGuaranteeLinks (source-property guard)",
@@ -1120,61 +1208,61 @@
         "claim": "_helpers.ts exists at this node",
         "kind": "pass",
         "detail": "_helpers.ts @ this node",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": false,
-        "runs": 149
+        "runs": 151
       },
       {
         "node": "Executable contracts",
         "claim": "verify.test.ts exists at this node",
         "kind": "pass",
         "detail": "verify.test.ts @ this node",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": false,
-        "runs": 149
+        "runs": 151
       },
       {
         "node": "Executable contracts",
         "claim": "decisions.test.ts exists at this node",
         "kind": "pass",
         "detail": "decisions.test.ts @ this node",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": false,
-        "runs": 149
+        "runs": 151
       },
       {
         "node": "Executable contracts",
         "claim": "commands.test.ts exists at this node",
         "kind": "pass",
         "detail": "commands.test.ts @ this node",
-        "at": "2026-09-09T03:34:51.597Z",
-        "commit": "1979969",
-        "tier": "full",
+        "at": "2026-09-10T14:36:58.855Z",
+        "commit": "2ea3648",
+        "tier": "fast",
         "everFailed": false,
-        "runs": 149
+        "runs": 151
       }
     ],
     "coverage": {
       "components": 12,
       "claimed": 12,
       "withWhy": 12,
-      "symbols": 818,
-      "documented": 412
+      "symbols": 839,
+      "documented": 424
     },
     "invariants": {
-      "total": 72,
-      "anchored": 72,
+      "total": 76,
+      "anchored": 76,
       "gaps": []
     },
     "narrative": null,
-    "jobs": 406,
-    "failures": 3
+    "jobs": 415,
+    "failures": 0
   },
   "mass": {
     "at": "2026-09-09T02:49:19.558Z",

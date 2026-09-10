@@ -75,9 +75,12 @@ export function comp(
 /** A symbol graph node — what a boundary claim's chokepoint resolves against.
  *  `parent` (a `f:<path>` file id) is optional because most callers only need the symbol to
  *  EXIST; supply it when the test is about which COMPONENT owns the symbol, which is the
- *  chain `buildMap` walks to join a guarded crossing to the organ that holds it. */
-export function sym(name: string, path = "x.ts", parent?: string): GraphNode {
-  return { id: `s:${path}#${name}`, label: name, kind: "symbol", path, line: 1, ...(parent ? { parent } : {}) };
+ *  chain `buildMap` walks to join a guarded crossing to the organ that holds it.
+ *  `sub` is the SYMBOL KIND, defaulting to the realistic case — a chokepoint is a function.
+ *  Pass "const" (or another enumerable kind) when the fixture is about a totality claim's
+ *  enumeration, which a `function` deliberately cannot be. */
+export function sym(name: string, path = "x.ts", parent?: string, sub = "function"): GraphNode {
+  return { id: `s:${path}#${name}`, label: name, kind: "symbol", sub, path, line: 1, ...(parent ? { parent } : {}) };
 }
 
 export function graph(nodes: GraphNode[], edges: GraphEdge[] = []): Graph {

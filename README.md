@@ -1035,7 +1035,7 @@ at the terminal.
      edit by hand — change the registry and re-run. Everything OUTSIDE these markers is
      authored prose. -->
 
-_9 claim forms, in registry order — **first match wins**, so this order IS the
+_10 claim forms, in registry order — **first match wins**, so this order IS the
 precedence. Derived from the same registry `evalClaim` executes (`coherence phrasebook`
 prints it at the terminal), so it cannot drift from the grammar. The per-form notes below
 the block are authored._
@@ -1050,8 +1050,10 @@ the block are authored._
   e.g. `http://localhost:8787/health responds 200 with "ok"`
 - **passes test** [executable] — `passes test "<name>"`
   e.g. `passes test "write policy totality"`
-- **boundary** [hybrid] — `boundary "<invariant>" at <chokepoint> [crossing <zone> -> <zone>] [via (test|guard) "<oracle>"]`
-  e.g. `boundary "fail-closed writes" at applyWritePolicy crossing agent-mcp -> storage via test "write policy totality"`
+- **boundary** [hybrid] — `boundary "<invariant>" at <chokepoint> [over <enumeration>] [crossing <zone> -> <zone>] [via (test|guard) "<oracle>"]`
+  e.g. `boundary "write-policy totality" at writeClass over KERNEL_WRITE_POLICY crossing agent-mcp -> storage via test "write policy totality"`
+- **coverage** [hybrid] — `coverage "<subject>" at <chokepoint> [crossing <zone> -> <zone>] residual "<what is NOT covered>" [via (test|guard) "<oracle>"]`
+  e.g. `coverage "SSRF block-host" at isBlockedFederationHost crossing owner-trusted -> federated residual "a public hostname whose DNS resolves to a private IP — no DNS API on Workers" via guard "SSRF block-host cases"`
 - **lives in** [deterministic] — `lives in <zone>`
   e.g. `lives in owner-trusted`
 - **parity** [hybrid] — `parity "<invariant>" over <domain> between <fnA> and <fnB> via test "<oracle>"`

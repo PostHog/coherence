@@ -28,12 +28,12 @@ const ZONES: Zone[] = [{ name: "za", intent: "", inside: null }, { name: "zb", i
 test("grammar — the boundary crossing clause parses (with and without), and OLD via-only lines are unchanged", () => {
   // Old form — no crossing: crossing is null, verb/oracle land in the right (now shifted) groups.
   const old = parseBoundary('boundary "kernel write" at writeClass via guard "totality"');
-  assert.deepEqual(old, { inv: "kernel write", chokepoint: "writeClass", verb: "guard", oracle: "totality", crossing: null });
+  assert.deepEqual(old, { inv: "kernel write", chokepoint: "writeClass", verb: "guard", oracle: "totality", over: null, crossing: null });
 
   // Crossing + via: the wall is captured, verb/oracle still resolve.
   const both = parseBoundary('boundary "raise trust" at query crossing served-untrusted -> owner-trusted via test "trust totality"');
   assert.deepEqual(both, {
-    inv: "raise trust", chokepoint: "query", verb: "test", oracle: "trust totality",
+    inv: "raise trust", chokepoint: "query", verb: "test", oracle: "trust totality", over: null,
     crossing: { from: "served-untrusted", to: "owner-trusted" },
   });
 
@@ -44,7 +44,15 @@ test("grammar — the boundary crossing clause parses (with and without), and OL
 
   // Bare form still parses to no wall, no oracle.
   const bare = parseBoundary('boundary "x" at Choke');
-  assert.deepEqual(bare, { inv: "x", chokepoint: "Choke", verb: "", oracle: "", crossing: null });
+  assert.deepEqual(bare, { inv: "x", chokepoint: "Choke", verb: "", oracle: "", over: null, crossing: null });
+
+  // `over` — the enumeration clause, parsing with and without the neighbours it sits between.
+  const over = parseBoundary('boundary "write-policy totality" at writeClass over KERNEL_WRITE_POLICY via test "write policy totality"');
+  assert.equal(over!.over, "KERNEL_WRITE_POLICY");
+  assert.equal(over!.chokepoint, "writeClass");
+  assert.equal(over!.oracle, "write policy totality");
+  const overCrossing = parseBoundary('boundary "x" at S over ENUM crossing a -> b via guard "g"');
+  assert.deepEqual(overCrossing, { inv: "x", chokepoint: "S", over: "ENUM", verb: "guard", oracle: "g", crossing: { from: "a", to: "b" } });
 });
 
 test("grammar — `## zones` parses in declared (trust) order, honoring `inside` and optional intents", () => {

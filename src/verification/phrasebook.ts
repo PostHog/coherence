@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import type { Config, Graph } from "../types.ts";
-import { BOUNDARY_RE } from "./boundary.ts";
+import { BOUNDARY_RE, COVERAGE_RE, claimsTotality, ENUMERABLE_SYMBOL_KINDS } from "./boundary.ts";
 import { PARITY_RE } from "./parity.ts";
 import { analyzeOracle, analyzeParityOracle } from "./oracle-domain.ts";
 import { unescapeMd } from "../derivation/walk.ts";
@@ -23,6 +23,45 @@ import { resolveFromBatch, type OracleAccess } from "./test-batch.ts";
 import { staticFastVerdict, type StaticOracleIndex } from "./static-oracles.ts";
 
 const fileExists = async (p: string) => { try { await stat(p); return true; } catch { return false; } };
+
+/**
+ * THE TOTALITY GATE — a claim that says "totality" must NAME THE SET it is total over.
+ *
+ * Returns a failure detail, or null when the claim is entitled to the word. Shared by
+ * `boundary` and `passes test` so the word cannot be laundered by changing verb: measured in
+ * mnemion, the same oracle name appears as both a boundary at a `const` and a bare
+ * `passes test`, and only the first form was ever domain-analyzed.
+ *
+ * The enumeration is `over <sym>` when given, else the chokepoint itself — because a
+ * boundary AT a list ("at SENSITIVE_COLUMNS") already names one, and demanding it twice
+ * would be ceremony. What is refused is a `function`/`method`/`class`: a predicate has no
+ * members to iterate, so a totality claim anchored to one is promising a coverage nobody
+ * can compute. That is not a lint about wording — `isBlockedFederationHost` ends in
+ * `return false`, and every host encoding nobody enumerated is admitted by construction.
+ *
+ * Both the invariant and the oracle name are checked, because both are read as the promise:
+ * the invariant is what lands in the generated CLAUDE.md table, the oracle is what lands in
+ * the verify report, and a reader believes whichever one they saw.
+ */
+export function totalityGateFailure(
+  ctx: ClaimCtx, inv: string, chokepoint: string, over: string | null, oracle: string,
+): string | null {
+  if (ctx.cfg.totalityEnumeration === false) return null;
+  const promise = claimsTotality(oracle) ? oracle : claimsTotality(inv) ? inv : null;
+  if (!promise) return null;
+  const named = over ?? chokepoint;
+  const node = ctx.graph.nodes.find((n) => n.kind === "symbol" && n.label === named);
+  if (!node)
+    return `[totality] "${promise}" promises totality but its enumeration \`${named}\` is not in the code graph. Name the list it is total over: \`boundary "…" at ${chokepoint} over <ENUMERATION> …\`.`;
+  const kind = node.sub ?? "(unknown)";
+  if (ENUMERABLE_SYMBOL_KINDS.has(kind)) return null;
+  return [
+    `[totality] "${promise}" promises totality, but \`${named}\` is a ${kind} — a predicate, not an enumeration.`,
+    `A ${kind} has no members to iterate, so nothing can check that every member is covered; whatever it does not recognize is admitted by construction.`,
+    `Either name the set this is total OVER — \`boundary "${inv}" at ${chokepoint} over <ENUMERATION> …\` (an enumeration is one of: ${[...ENUMERABLE_SYMBOL_KINDS].sort().join(", ")}) —`,
+    `or say the honest thing, that this samples an open domain: \`coverage "${inv}" at ${chokepoint} residual "<what this does NOT cover>" …\`.`,
+  ].join(" ");
+}
 
 /** The verdict a claim form returns — adapted into verify's `Sig` (which adds claim + node).
  *
@@ -280,7 +319,15 @@ export const CLAIM_FORMS: ClaimForm[] = [
     example: 'passes test "write policy totality"',
     tier: "executable",
     match: (l) => l.match(/^passes test\s+"(.+)"$/),
+    // `passes test` NAMES NO CHOKEPOINT, so it can name no enumeration either — which makes
+    // it the cheapest way to keep the word "totality" while shedding every check that backs
+    // it (no meta-oracle, no domain, no symbol). Measured in mnemion: "pattern-effects
+    // totality" appears BOTH as a boundary at a `const` and as a bare `passes test`. The
+    // claim itself is honest — a named test passed — but the NAME promises coverage, and the
+    // form has nowhere to put the set. So it refuses and points at the form that does.
     evaluate: async (ctx, m) => {
+      if (ctx.cfg.totalityEnumeration !== false && claimsTotality(m[1]))
+        return { kind: "fail", detail: `[totality] "${m[1]}" promises totality, but \`passes test\` names no chokepoint and so cannot name the enumeration it is total over — the word here is backed by nothing but the test's own title. Restate as \`boundary "<invariant>" at <ENUMERATION> via test "${m[1]}"\` (which anchors the invariant and runs the live-domain meta-oracle), or rename the test.` };
       if (ctx.fast) return fastNamedOracle(ctx, m[1], "executable tier (--fast)");
       if (!hasRunner(ctx)) return { kind: "skip", detail: "no test runner configured (config.test)" };
       const r = execNamedTest(ctx, m[1]);
@@ -289,20 +336,31 @@ export const CLAIM_FORMS: ClaimForm[] = [
   },
   {
     name: "boundary",
-    grammar: 'boundary "<invariant>" at <chokepoint> [crossing <zone> -> <zone>] [via (test|guard) "<oracle>"]',
-    example: 'boundary "fail-closed writes" at applyWritePolicy crossing agent-mcp -> storage via test "write policy totality"',
+    grammar: 'boundary "<invariant>" at <chokepoint> [over <enumeration>] [crossing <zone> -> <zone>] [via (test|guard) "<oracle>"]',
+    example: 'boundary "write-policy totality" at writeClass over KERNEL_WRITE_POLICY crossing agent-mcp -> storage via test "write policy totality"',
     tier: "hybrid",
     match: (l) => l.match(BOUNDARY_RE),
     // The anti-entropy ratchet. Asserts the four-part anatomy of a self-enforcing boundary:
     // the invariant is named (and ANCHORED for the coverage gate), the chokepoint SYMBOL
     // exists, and (if given) the oracle passes. `via test` additionally runs the META-ORACLE
     // (live-domain analysis, even under --fast); `via guard` is exempt (source-property oracle).
-    // The optional `crossing` clause (groups 3/4) is PROMISE-GRAPH topology, not a runtime
-    // check — verify never evaluates it, so verb/oracle now read from groups 5/6.
+    // The optional `crossing` clause (groups 4/5) is PROMISE-GRAPH topology, not a runtime
+    // check — verify never evaluates it, so verb/oracle read from groups 6/7 and the optional
+    // `over` enumeration from group 3.
+    //
+    // THE TOTALITY GATE RUNS FOR BOTH VERBS, and that is deliberate: `via guard` is the
+    // declared exemption from the live-domain meta-oracle, and it had become the place an
+    // unbackable totality claim could sit undisturbed (measured: mnemion's SSRF block-host
+    // "totality" is a guard on a `return false` predicate). An exemption from domain
+    // ANALYSIS is not an exemption from naming the domain.
     evaluate: async (ctx, m) => {
-      const inv = m[1], sym = m[2], verb = m[5], test = m[6];
+      const inv = m[1], sym = m[2], over = m[3] ?? null, verb = m[6], test = m[7];
       ctx.anchor(inv);
       if (!ctx.graph.nodes.some((n) => n.kind === "symbol" && n.label === sym)) return { kind: "fail", detail: `chokepoint symbol "${sym}" not found in the code graph` };
+      if (over && !ctx.graph.nodes.some((n) => n.kind === "symbol" && n.label === over))
+        return { kind: "fail", detail: `enumeration "${over}" (over) not found in the code graph` };
+      const totality = totalityGateFailure(ctx, inv, sym, over, test ?? "");
+      if (totality) return { kind: "fail", detail: totality };
       if (!test) return { kind: "pass", detail: `${inv} @ ${sym} (no oracle)` };
       if (verb === "test" && ctx.cfg.oracleDomain !== false) {
         const a = await analyzeOracle(ctx.cfg, test);
@@ -317,7 +375,47 @@ export const CLAIM_FORMS: ClaimForm[] = [
       if (!hasRunner(ctx)) return { kind: "skip", detail: "no test runner configured (config.test)" };
       const r = execNamedTest(ctx, test);
       if (!r.ok) return { kind: "fail", detail: r.detail, ms: r.ms };
-      return { kind: "pass", detail: `${inv} @ ${sym}${verb === "guard" ? " (source-property guard)" : ""}`, ms: r.ms };
+      const domain = over ? ` over ${over}` : "";
+      return { kind: "pass", detail: `${inv} @ ${sym}${domain}${verb === "guard" ? " (source-property guard)" : ""}`, ms: r.ms };
+    },
+  },
+  {
+    name: "coverage",
+    grammar: 'coverage "<subject>" at <chokepoint> [crossing <zone> -> <zone>] residual "<what is NOT covered>" [via (test|guard) "<oracle>"]',
+    example: 'coverage "SSRF block-host" at isBlockedFederationHost crossing owner-trusted -> federated residual "a public hostname whose DNS resolves to a private IP — no DNS API on Workers" via guard "SSRF block-host cases"',
+    tier: "hybrid",
+    // THE HONEST VERB FOR AN OPEN DOMAIN. Its subject is a set the WORLD defines — "private
+    // host", "sensitive data", "malicious input" — so no enumeration exists to be total over
+    // and the claim can only ever sample. That is not a defect; shipping it as `boundary …
+    // totality` is.
+    //
+    // What this verb buys, and what it costs. It BUYS the live-domain meta-oracle's silence:
+    // a sampling oracle is exactly right here, so `analyzeOracle` is deliberately NOT run —
+    // demanding live-domain iteration of a claim that has announced it samples would be
+    // incoherent. It COSTS a `residual`, which COVERAGE_RE makes unskippable. Before this
+    // verb, `via guard` was a FREE exemption from that analysis; this is a PRICED one, and
+    // the price is saying out loud what you did not cover.
+    //
+    // The residual is not decoration. mnemion already writes these — "A public hostname whose
+    // DNS resolves to a private IP cannot be caught here" — in a source comment, where no
+    // gate can see it and no render will ever show it to the person trusting the green.
+    match: (l) => l.match(COVERAGE_RE),
+    evaluate: async (ctx, m) => {
+      const subject = m[1], sym = m[2], residual = m[5], test = m[7];
+      ctx.anchor(subject);
+      if (!ctx.graph.nodes.some((n) => n.kind === "symbol" && n.label === sym))
+        return { kind: "fail", detail: `chokepoint symbol "${sym}" not found in the code graph` };
+      // A coverage claim whose oracle calls itself a totality is the contradiction this pair
+      // of verbs exists to make unsayable — it would let the word back in through the door
+      // built for admitting there is no such word to be had.
+      if (claimsTotality(subject) || claimsTotality(test ?? ""))
+        return { kind: "fail", detail: `[coverage] "${claimsTotality(subject) ? subject : test}" says totality on a \`coverage\` claim, which declares an open domain. A claim cannot both sample and be total: drop the word, or — if a real enumeration exists — restate this as \`boundary "…" at ${sym} over <ENUMERATION> …\`.` };
+      if (!test) return { kind: "pass", detail: `${subject} @ ${sym} — samples; NOT covered: ${residual}` };
+      if (ctx.fast) return fastNamedOracle(ctx, test, "coverage oracle (--fast)");
+      if (!hasRunner(ctx)) return { kind: "skip", detail: "no test runner configured (config.test)" };
+      const r = execNamedTest(ctx, test);
+      if (!r.ok) return { kind: "fail", detail: r.detail, ms: r.ms };
+      return { kind: "pass", detail: `${subject} @ ${sym} — samples; NOT covered: ${residual}`, ms: r.ms };
     },
   },
   {

@@ -9,8 +9,8 @@
 // the runner's own suite-path concatenation and on `-t` matching it unanchored, and both
 // were verified by running the real thing before any of this was written.
 //
-// Note the fixture contains "write policy totality covers every op" AND
-// "write policy totality covers every op extended" — the prefix edge, where a claim name
+// Note the fixture contains "write policy audit covers every op" AND
+// "write policy audit covers every op extended" — the prefix edge, where a claim name
 // that is a strict prefix of a longer test's name must match BOTH, because that is what
 // the runner's `-t` does.
 import { test } from "node:test";
@@ -38,8 +38,8 @@ const VITEST_REPORT = JSON.stringify({
     {
       name: "/proj/a.test.ts", status: "passed", message: "",
       assertionResults: [
-        { ancestorTitles: ["write policy totality"], fullName: "write policy totality covers every op", title: "covers every op", status: "passed", failureMessages: [], meta: {}, tags: [] },
-        { ancestorTitles: ["write policy totality"], fullName: "write policy totality rejects unknown (a+b)", title: "rejects unknown (a+b)", status: "passed", failureMessages: [], meta: {}, tags: [] },
+        { ancestorTitles: ["write policy audit"], fullName: "write policy audit covers every op", title: "covers every op", status: "passed", failureMessages: [], meta: {}, tags: [] },
+        { ancestorTitles: ["write policy audit"], fullName: "write policy audit rejects unknown (a+b)", title: "rejects unknown (a+b)", status: "passed", failureMessages: [], meta: {}, tags: [] },
         { ancestorTitles: ["outer", "inner nest"], fullName: "outer inner nest deep", title: "deep", status: "passed", failureMessages: [], meta: {}, tags: [] },
         { ancestorTitles: [], fullName: "bare top level test", title: "bare top level test", status: "passed", failureMessages: [], meta: {}, tags: [] },
       ],
@@ -55,7 +55,7 @@ const VITEST_REPORT = JSON.stringify({
     {
       name: "/proj/d.test.ts", status: "passed", message: "",
       assertionResults: [
-        { ancestorTitles: ["write policy totality"], fullName: "write policy totality covers every op extended", title: "covers every op extended", status: "passed", failureMessages: [], meta: {}, tags: [] },
+        { ancestorTitles: ["write policy audit"], fullName: "write policy audit covers every op extended", title: "covers every op extended", status: "passed", failureMessages: [], meta: {}, tags: [] },
       ],
     },
   ],
@@ -91,7 +91,7 @@ test("parse — the real vitest report yields every test with its runner-supplie
   assert.equal(byName.get("failing group this one fails")?.status, "failed");
   assert.equal(byName.get("skipped test")?.status, "skipped");
   // the per-file `name` rides along for detail lines
-  assert.equal(byName.get("write policy totality covers every op")?.file, "/proj/a.test.ts");
+  assert.equal(byName.get("write policy audit covers every op")?.file, "/proj/a.test.ts");
 });
 
 test("parse — a report missing `fullName` is reconstructed with the runner's own join", () => {
@@ -146,10 +146,10 @@ test("outputFile — all three spellings the runner accepts are recognized", () 
 // ── matching: the mirror of `-t` ──────────────────────────────────────────────────────
 
 test("match — a substring spanning the describe/test boundary matches, as `-t` does", () => {
-  // VERIFIED against vitest 4.1.10: `-t "totality covers"` runs
-  // "write policy totality covers every op". Anchored equality would have matched nothing.
-  assert.ok(resolveFromBatch(REPORT, "totality covers").ok);
-  assert.ok(resolveFromBatch(REPORT, "write policy totality covers every op").ok);
+  // VERIFIED against vitest 4.1.10: `-t "audit covers"` runs
+  // "write policy audit covers every op". Anchored equality would have matched nothing.
+  assert.ok(resolveFromBatch(REPORT, "audit covers").ok);
+  assert.ok(resolveFromBatch(REPORT, "write policy audit covers every op").ok);
   assert.ok(resolveFromBatch(REPORT, "inner nest deep").ok);
   assert.ok(resolveFromBatch(REPORT, "bare top level test").ok);
 });
@@ -158,9 +158,9 @@ test("match — a claim name that is a strict PREFIX of another test's name matc
   // "…covers every op" is a prefix of "…covers every op extended". Both are green here, so
   // the claim is green — and it would go red if EITHER failed, which is exactly what the
   // runner would report for that `-t`.
-  const both = REPORT.tests.filter((t) => t.fullName.includes("write policy totality covers every op"));
+  const both = REPORT.tests.filter((t) => t.fullName.includes("write policy audit covers every op"));
   assert.equal(both.length, 2, "the prefix edge must actually be present in the fixture");
-  assert.ok(resolveFromBatch(REPORT, "write policy totality covers every op").ok);
+  assert.ok(resolveFromBatch(REPORT, "write policy audit covers every op").ok);
 });
 
 test("match — names with regex metacharacters match LITERALLY, never as a pattern", () => {
@@ -246,7 +246,7 @@ test("verify — `passes test` claims resolve from ONE batch run, and the suite 
     process.env.RUNS_LOG = join(root, "runs.log");
     const g = graph([comp(".", {
       claims: [
-        'passes test "write policy totality covers every op"',
+        'passes test "write policy audit covers every op"',
         'passes test "outer inner nest deep"',
         'passes test "bare top level test"',
         'passes test "rejects unknown (a+b)"',
@@ -388,7 +388,7 @@ test("verify — a boundary `via test` oracle resolves from the batch too (the e
     process.env.RUNS_LOG = join(root, "runs.log");
     const g = graph([
       comp(".", {
-        claims: ['boundary "fail-closed writes" at applyWritePolicy via test "write policy totality"'],
+        claims: ['boundary "fail-closed writes" at applyWritePolicy via test "write policy audit"'],
         invariants: ["fail-closed writes"], why: "r",
       }),
       sym("applyWritePolicy"),
@@ -783,7 +783,7 @@ test("cost — resolveFromBatch SUMS the duration of every test the claim's name
 });
 
 test("cost — with no timings anywhere, ms is UNDEFINED rather than 0 (absence ≠ zero)", () => {
-  const r = resolveFromBatch(REPORT, "write policy totality covers every op");
+  const r = resolveFromBatch(REPORT, "write policy audit covers every op");
   assert.equal(r.ok, true);
   assert.equal(r.ms, undefined, "an untimed report must answer `unknown`, not `free`");
   // and the same for a red verdict — the cost question is independent of the verdict

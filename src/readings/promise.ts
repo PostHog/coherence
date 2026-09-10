@@ -99,7 +99,7 @@ export function deriveGates(
       : isStalePass(rec, head) ? "stale"
       : "pass";
     const gate: PromiseGate = {
-      inv: b.inv, chokepoint: b.chokepoint, verb: b.verb as PromiseGate["verb"], oracle: b.oracle,
+      inv: b.inv, chokepoint: b.chokepoint, verb: b.verb as PromiseGate["verb"], oracle: b.oracle, over: b.over,
       crossing: b.crossing, grade: gradeOf(b.verb, rec, head), verdict, reliants: [],
     };
     if (rec?.kind === "pass") gate.freshest = rec.at;          // a stale pass still has a stamp

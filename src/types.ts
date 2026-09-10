@@ -111,6 +111,15 @@ export interface Config {
   // checked, and existing specs are unaffected.
   claimKinds?: Record<string, { policy: "pin" | "warn"; why?: string }>;
   oracleDomain?: boolean;   // META-ORACLE: also assert a boundary's oracle test iterates a LIVE domain (not a literal/source-grep). Default true; set false to disable the gate (still classifies for the report).
+  // TOTALITY GATE — a claim whose invariant or oracle says "totality"/"total" must NAME the
+  // enumeration it is total over: the chokepoint itself when that is a data symbol, or an
+  // explicit `over <ENUMERATION>`. A `function`/`method`/`class` is refused, because a
+  // predicate has no members and a totality anchored to one promises a coverage nobody can
+  // compute (measured in mnemion: "SSRF block-host totality" guards a `return false`).
+  // A claim with no such enumeration belongs to the `coverage` verb, which requires a
+  // declared `residual`. Default true. Set false to disable — the two claim populations
+  // still render separately, because a sampled claim and a total one must never sum.
+  totalityEnumeration?: boolean;
   staticOracleExistence?: boolean; // FAST-TIER Vitest name floor. Default true when Vitest is detectable; false keeps named oracles UNKNOWN/skipped and performs no source index build.
   language: string;         // language adapter key
   platform: string | null;  // platform adapter key, or null

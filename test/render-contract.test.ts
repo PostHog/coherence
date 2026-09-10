@@ -46,10 +46,10 @@ const model: PromiseModel = {
       intent: "owns the boot invariant",
       zone: "core",
       gates: [
-        { inv: "boot-sealed", chokepoint: "seal", verb: "test", oracle: "seal totality",
+        { inv: "boot-sealed", chokepoint: "seal", verb: "test", oracle: "seal totality", over: null,
           crossing: { from: "edge", to: "core" }, grade: "A", verdict: "pass",
           freshest: "2026-07-13T11:00:00.000Z", reliants: ["edge/http"] },
-        { inv: "entropy-fresh", chokepoint: "reseed", verb: "", oracle: "",
+        { inv: "entropy-fresh", chokepoint: "reseed", verb: "", oracle: "", over: null,
           crossing: null, grade: "U", verdict: "unknown", reliants: [] }, // UNPLACED + grade U
       ],
       relies: [
@@ -66,7 +66,7 @@ const model: PromiseModel = {
       intent: "custodies signing keys",
       zone: "core/crypto",
       gates: [
-        { inv: "keys-guarded", chokepoint: "withdrawKey", verb: "guard", oracle: "custody judgement",
+        { inv: "keys-guarded", chokepoint: "withdrawKey", verb: "guard", oracle: "custody judgement", over: null,
           crossing: { from: "core", to: "core/crypto" }, grade: "C", verdict: "pass",
           freshest: "2026-07-12T08:00:00.000Z", reliants: ["."] },
       ],
@@ -82,10 +82,10 @@ const model: PromiseModel = {
       intent: "terminates TLS and routes requests",
       zone: "edge",
       gates: [
-        { inv: "authenticated", chokepoint: "requireToken", verb: "test", oracle: "token totality",
+        { inv: "authenticated", chokepoint: "requireToken", verb: "test", oracle: "token totality", over: null,
           crossing: { from: "edge", to: "core" }, grade: "B", verdict: "stale",
           freshest: "2026-06-30T08:00:00.000Z", reliants: ["."] }, // grade B (aging green)
-        { inv: "rate-limited", chokepoint: "bucket", verb: "guard", oracle: "",
+        { inv: "rate-limited", chokepoint: "bucket", verb: "guard", oracle: "", over: null,
           crossing: { from: "edge", to: "edge" }, grade: "D", verdict: "fail", reliants: [] }, // grade D + BREACH
       ],
       relies: [
@@ -122,7 +122,7 @@ function denseComponent(withFail: boolean): PromiseModel {
   const gates = [];
   for (let i = 0; i < 16; i++) {
     gates.push({
-      inv: "law-" + i, chokepoint: "cp" + i, verb: "" as const, oracle: "",
+      inv: "law-" + i, chokepoint: "cp" + i, verb: "" as const, oracle: "", over: null,
       crossing: { from: "hive", to: "hive" }, grade: "U" as const,
       verdict: (withFail && i === 7 ? "fail" : "unknown") as "fail" | "unknown", reliants: [],
     });

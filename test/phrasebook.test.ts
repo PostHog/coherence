@@ -11,7 +11,7 @@ import { CLAIM_FORMS, parseWord, reEscape } from "../src/verification/phrasebook
 test("registry — order IS the historical precedence (typechecks → conforms to)", () => {
   assert.deepEqual(
     CLAIM_FORMS.map((f) => f.name),
-    ["typechecks", "exists", "imports", "responds", "passes test", "boundary", "lives in", "parity", "conforms to"],
+    ["typechecks", "exists", "imports", "responds", "passes test", "boundary", "coverage", "lives in", "parity", "conforms to"],
   );
 });
 

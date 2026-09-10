@@ -32,8 +32,8 @@ async function fixture() {
 test("guarantee references — reorder is stable, contract and owner changes expire", () => {
   const boundary = parseBoundary(claim)!;
   const ref = guaranteeRef("provider", boundary);
-  assert.equal(guaranteeRef("provider", { crossing: boundary.crossing, oracle: boundary.oracle, verb: boundary.verb, chokepoint: boundary.chokepoint, inv: boundary.inv }), ref);
-  for (const change of [{ inv: "new" }, { chokepoint: "other" }, { oracle: "other" }, { verb: "test" as const }, { crossing: { from: "a", to: "b" } }])
+  assert.equal(guaranteeRef("provider", { crossing: boundary.crossing, oracle: boundary.oracle, over: boundary.over, verb: boundary.verb, chokepoint: boundary.chokepoint, inv: boundary.inv }), ref);
+  for (const change of [{ inv: "new" }, { chokepoint: "other" }, { oracle: "other" }, { verb: "test" as const }, { crossing: { from: "a", to: "b" } }, { over: "SOME_ENUM" }])
     assert.notEqual(guaranteeRef("provider", { ...boundary, ...change }), ref);
   assert.notEqual(guaranteeRef("renamed", boundary), ref);
 });

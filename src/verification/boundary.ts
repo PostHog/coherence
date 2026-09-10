@@ -1,6 +1,37 @@
-// boundary.ts — the ONE home of the boundary-claim grammar.
+// boundary.ts — the ONE home of the boundary- and coverage-claim grammars.
 //
-// `boundary "<invariant>" at <chokepoint> [crossing <zone> -> <zone>] [via (test|guard) "<oracle>"]`
+// `boundary "<invariant>" at <chokepoint> [over <enumeration>] [crossing <zone> -> <zone>] [via (test|guard) "<oracle>"]`
+// `coverage "<subject>" at <chokepoint> [crossing <zone> -> <zone>] residual "<what is NOT covered>" [via (test|guard) "<oracle>"]`
+//
+// ── WHY TWO VERBS, AND WHY `over` ─────────────────────────────────────────────────────
+//
+// MEASURED, in a consumer, not here: mnemion carries 15 oracles whose names end in
+// "totality", and they are not the same kind of promise. Two of them:
+//
+//   boundary "egress-sensitivity totality" at SENSITIVE_COLUMNS  via test  "…"
+//   boundary "SSRF block-host totality"    at isBlockedFederationHost via guard "…"
+//
+// The first is total and can be finished: SENSITIVE_COLUMNS is a `const` — a list THIS
+// CODE OWNS — so "every member is classified" is a finite check with an end. The second
+// cannot be finished by anyone: `isBlockedFederationHost` is a PREDICATE, its last line is
+// `return false`, and there is no enumeration of "every private host" to iterate. Its own
+// source says so ("A public hostname whose DNS resolves to a private IP cannot be caught
+// here"). One is a fact; the other is a hope wearing the same word — and both render green.
+//
+// The discriminator is not decidability. It is WHO OWNS THE DOMAIN. If the artifact
+// defines the set, the claim closes. If the world defines it ("private", "sensitive",
+// "malicious"), it can only be sampled, and the sample must say what it left out.
+//
+// So: a claim whose oracle NAMES totality must NAME THE ENUMERATION it is total over —
+// either because its chokepoint IS one, or through an explicit `over <enumeration>`. A
+// symbol that is `function`/`method`/`class` is a predicate, not an enumeration, and
+// naming one is exactly the open-domain mistake. A claim that genuinely has no enumeration
+// is spelled `coverage` and must declare its `residual`. This is deliberately a PARSE, not
+// a judgment: the model that authors a claim cannot be asked whether the claim is closable
+// (that is the same failure one level up), so the grammar decides instead of the author.
+//
+// The `over` clause mirrors `parity … over <domain> …`, which has required a resolvable
+// enumeration since it shipped. This is that rule, applied to the other totality verb.
 //
 // This regex used to live (identically, in intent) at three sites — structural.ts,
 // verify.ts, and render-claude.ts — and the render-claude copy drifted: it matched
@@ -16,21 +47,44 @@
 // are optional and independently absent. The clause sits BETWEEN chokepoint and via, so a
 // gate may declare a crossing with or without an oracle, in any combination.
 //
-// Capture groups: 1=invariant, 2=chokepoint symbol, 3=crossing-from, 4=crossing-to,
-// 5=verb (test|guard), 6=oracle name. Groups 3/4 are undefined when the crossing clause is
-// absent; groups 5/6 are undefined when the via clause is absent.
+// Capture groups: 1=invariant, 2=chokepoint symbol, 3=enumeration (`over`), 4=crossing-from,
+// 5=crossing-to, 6=verb (test|guard), 7=oracle name. Group 3 is undefined without an `over`
+// clause, 4/5 without a crossing, 6/7 without a via — each independently optional, so every
+// pre-`over` spec in every consumer parses unchanged.
 import { createHash } from "node:crypto";
 
 export const BOUNDARY_RE =
-  /^boundary\s+"([^"]+)"\s+at\s+(\S+)(?:\s+crossing\s+(\S+)\s+->\s+(\S+))?(?:\s+via (test|guard)\s+"([^"]+)")?$/;
+  /^boundary\s+"([^"]+)"\s+at\s+(\S+)(?:\s+over\s+(\S+))?(?:\s+crossing\s+(\S+)\s+->\s+(\S+))?(?:\s+via (test|guard)\s+"([^"]+)")?$/;
+
+/** The COVERAGE grammar — the honest verb for an open domain. `residual` is REQUIRED and
+ *  the regex is where that is enforced: a coverage claim with nothing to say about what it
+ *  does not cover is the green-by-absence this verb exists to prevent, so it simply does
+ *  not parse as one. Capture groups: 1=subject, 2=chokepoint, 3=crossing-from,
+ *  4=crossing-to, 5=residual, 6=verb, 7=oracle. */
+export const COVERAGE_RE =
+  /^coverage\s+"([^"]+)"\s+at\s+(\S+)(?:\s+crossing\s+(\S+)\s+->\s+(\S+))?\s+residual\s+"([^"]+)"(?:\s+via (test|guard)\s+"([^"]+)")?$/;
 
 /** A parsed boundary claim. `verb`/`oracle` are `""` when the claim has no `via` clause;
- *  `crossing` is null when it declares no `crossing <from> -> <to>` wall. */
+ *  `crossing` is null when it declares no `crossing <from> -> <to>` wall; `over` is null
+ *  when it names no explicit enumeration (the chokepoint may still be one). */
 export interface Boundary {
   inv: string;
   chokepoint: string;
   verb: string;
   oracle: string;
+  over: string | null;
+  crossing: { from: string; to: string } | null;
+}
+
+/** A parsed coverage claim. `residual` is never empty — COVERAGE_RE will not match without
+ *  it. Same shape as Boundary otherwise, so renderers can treat the two uniformly where the
+ *  distinction does not matter (and MUST NOT where it does — see `verify`'s two tallies). */
+export interface Coverage {
+  subject: string;
+  chokepoint: string;
+  verb: string;
+  oracle: string;
+  residual: string;
   crossing: { from: string; to: string } | null;
 }
 
@@ -41,18 +95,71 @@ export function parseBoundary(claim: string): Boundary | null {
   return {
     inv: m[1],
     chokepoint: m[2],
-    verb: m[5] ?? "",
-    oracle: m[6] ?? "",
+    over: m[3] ?? null,
+    verb: m[6] ?? "",
+    oracle: m[7] ?? "",
+    crossing: m[4] && m[5] ? { from: m[4], to: m[5] } : null,
+  };
+}
+
+/** Parse a coverage claim, or null if the line is not one. */
+export function parseCoverage(claim: string): Coverage | null {
+  const m = COVERAGE_RE.exec(claim);
+  if (!m) return null;
+  return {
+    subject: m[1],
+    chokepoint: m[2],
+    residual: m[5],
+    verb: m[6] ?? "",
+    oracle: m[7] ?? "",
     crossing: m[3] && m[4] ? { from: m[3], to: m[4] } : null,
   };
 }
 
+/**
+ * Does this oracle name PROMISE COVERAGE OF A WHOLE DOMAIN? Lexical on purpose — the word
+ * is what a reader believes, so the word is what must be backed. `totality` and `total`
+ * both, as whole words, because "keysets are total" and "keyset totality" make the identical
+ * promise and a rule that caught only one spelling would teach authors the other.
+ *
+ * NOT a general universal-term lint. `any`/`never`/`pure`/`deterministic`/`exact` make
+ * related over-claims and are deliberately out of scope here: each needs its own
+ * qualification suite, and shipping one enforceable rule beats gesturing at five.
+ */
+export const TOTALITY_RE = /\b(totality|total)\b/i;
+export const claimsTotality = (oracleName: string): boolean => TOTALITY_RE.test(oracleName);
+
+/**
+ * Symbol kinds that can BE an enumeration — a set this code owns and something can iterate.
+ * An ALLOW-LIST, not a deny-list, and that direction is the whole point: a deny-list would
+ * let a language pack whose captures this file has never seen (`@func`, `@constant`) slip a
+ * predicate through as an enumeration, silently, which is the green-by-absence this feature
+ * exists to remove. An unknown kind therefore REFUSES and names itself in the failure, so
+ * the fix is one entry here rather than a debugging session.
+ *
+ * Kinds are tree-sitter capture names (adapters/tree-sitter.ts: "CAPTURE NAME IS SYMBOL
+ * KIND"). `function`/`method`/`class` are absent BY CONSTRUCTION — a predicate has no
+ * members, and naming one as your domain is precisely the open-domain mistake.
+ */
+export const ENUMERABLE_SYMBOL_KINDS = new Set(["const", "let", "enum", "interface", "type", "module"]);
+
 /** Full contract reference, unlike verdict lookup: crossing edits also expire links.
- * List position and display names are excluded; owner relocation needs explicit review. */
+ * List position and display names are excluded; owner relocation needs explicit review.
+ *
+ * `over` is INSIDE the hash, and deliberately: naming the enumeration narrows what the
+ * boundary promises, so a binding written against the unnamed form was written against a
+ * weaker contract and must be re-made rather than silently inherited. That is the same
+ * reason `crossing` is here — a link survives cosmetic edits, never contract edits.
+ *
+ * It is APPENDED ONLY WHEN PRESENT, so the hashed array of an `over`-less claim is
+ * byte-identical to what it was before this clause existed. Every `g-…` ref already written
+ * into a consumer's spec keeps resolving; only a claim that actually gains an enumeration
+ * gets a new identity. A rehash of the whole population would have expired every binding in
+ * every adopter to add a field most of them do not use. */
 export function guaranteeRef(owner: string, boundary: Boundary): string {
-  const { inv, chokepoint, verb, oracle, crossing } = boundary;
+  const { inv, chokepoint, over, verb, oracle, crossing } = boundary;
   return `g-${createHash("sha256").update(JSON.stringify([owner, inv, chokepoint, verb, oracle,
-    crossing ? [crossing.from, crossing.to] : null])).digest("hex")}`;
+    crossing ? [crossing.from, crossing.to] : null, ...(over ? [over] : [])])).digest("hex")}`;
 }
 
 /** The crossing clause is PURELY DECLARATIVE (topology, never a runtime check) — so it must
@@ -63,11 +170,16 @@ export function guaranteeRef(owner: string, boundary: Boundary): string {
  *  reconstructs the canonical claim WITHOUT the crossing clause; non-boundary claims pass
  *  through verbatim. Two claims that collide after stripping share inv+chokepoint+verb+oracle
  *  — genuinely the same gate. Applied on BOTH sides of every record lookup (store + read);
- *  verify still WRITES the raw claim — normalization is strictly a lookup concern. */
+ *  verify still WRITES the raw claim — normalization is strictly a lookup concern.
+ *
+ *  `over` SURVIVES this normalization while `crossing` does not, and the asymmetry is the
+ *  point: a crossing is declarative topology verify never evaluates, but `over` names the
+ *  enumeration the totality gate checks against — two claims differing in it are checked
+ *  differently and must not share a verdict record. */
 export function normalizeBoundaryClaim(claim: string): string {
   const m = BOUNDARY_RE.exec(claim);
-  if (!m || !(m[3] && m[4])) return claim;   // not a boundary, or no crossing → verbatim
-  return `boundary "${m[1]}" at ${m[2]}${m[5] ? ` via ${m[5]} "${m[6]}"` : ""}`;
+  if (!m || !(m[4] && m[5])) return claim;   // not a boundary, or no crossing → verbatim
+  return `boundary "${m[1]}" at ${m[2]}${m[3] ? ` over ${m[3]}` : ""}${m[6] ? ` via ${m[6]} "${m[7]}"` : ""}`;
 }
 
 /** The BRAND that makes raw-string record lookup a compile error. Only `claimKey` can mint

@@ -74,6 +74,8 @@ export interface PromiseGate {
   chokepoint: string;
   verb: "test" | "guard" | "";
   oracle: string;
+  over: string | null;        // the enumeration a totality gate is total OVER; null when
+                              // the claim names none (its chokepoint may still be one)
   crossing: { from: string; to: string } | null; // declared topology; null = UNPLACED
                               // (the gate exists but the spec hasn't said what it
                               // separates — rendered as perimeter pressure)

@@ -5,7 +5,7 @@ import type { PromiseComponent, PromiseGate, PromiseModel } from "../src/reading
 import type { Graph } from "../src/types.ts";
 
 const gate = (inv: string, crossing: PromiseGate["crossing"] = null): PromiseGate => ({
-  inv, chokepoint: `${inv}At`, verb: "test", oracle: `${inv} test`, crossing,
+  inv, chokepoint: `${inv}At`, verb: "test", oracle: `${inv} test`, over: null, crossing,
   grade: "A", verdict: "pass", reliants: [],
 });
 

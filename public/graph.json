@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-09 14:23Z",
+  "generatedAt": "2026-09-10 14:37Z",
   "root": "coherence",
   "absRoot": "/Users/daniloc/Documents/Dev/coherence",
   "nodes": [
@@ -141,6 +141,9 @@
       "sub": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
       "claimed": true,
       "claims": [
+        "boundary \"declared import aliases resolve only unique walked targets and refuse malformed configuration\" at compileImportAliases via guard \"import aliases — only unique declared in-population targets become canonical edges\"",
+        "boundary \"declared import aliases resolve only unique walked targets and refuse malformed configuration\" at compileImportAliases via guard \"import aliases — malformed and escaping declarations refuse; alternatives never guess precedence\"",
+        "boundary \"Python local imports resolve only at the declared direct-module grade\" at pythonImportCandidates via guard \"python imports — unique dotted local modules become canonical edges; ambiguity and missing modules do not\"",
         "boundary \"spec containment follows declared ancestry without inventing dependencies\" at buildGraph via guard \"spec containment — deepest declared ancestor is canonical parent, never an invented import\"",
         "derive.ts imports ./walk.ts",
         "boundary \"harness source remains searchable text rather than silently becoming binary\" at sourceTextIsNavigable via guard \"source text — every live TypeScript source remains NUL-free and searchable\"",
@@ -148,14 +151,18 @@
         "boundary \"a built-in language pack is data: queries, patterns, and named strategies, never code\" at builtinLanguagePacks via guard \"language packs — every built-in pack is function-free data across all five instrument tables\""
       ],
       "prose": "Language packs and adapters supply syntax knowledge. This assembly owns the walk and graph construction, not the verdicts later computed from that graph.",
-      "why": "**spec containment follows declared ancestry without inventing dependencies.** Repository and subsystem containment explain ownership even where no source import exists. Treating that relationship as an import fabricates reliance; omitting it turns the enclosing project into an unexplained island. The same deepest-spec rule that assigns file ownership supplies component ancestry.\n\n**harness source remains searchable text rather than silently becoming binary.** Agent\nnavigation depends on ordinary repository search seeing every source file. A single literal\nzero byte can make common tools classify an otherwise textual module as binary and omit its\nmatches without a syntax or type error. Keeping control ranges escaped in source preserves\nruntime meaning while making disappearance from the reading surface a loud regression.\n\n**a declared language resolves to a real adapter or refuses, never a silent fallback.**\nThe graph is the one derivation everything downstream consumes, and the adapter decides\nwhat that derivation can see. The old `?? typescript` fallback meant a typo'd language\nname walked the wrong grammar and reported on the garbage with full confidence — the\nsame walking-a-different-tree failure the config loader refuses for, one seam later. So\nan unknown bare name now refuses with the live built-in list, and the same seam is where\na project brings its own language: a `./`-relative module exporting the LanguageAdapter\nshape, validated field-by-field so the refusal names the line that needs fixing.\nImporting project code is not new trust — the atlas already declares at the loadConfig\ncrossing that running the harness in a tree executes that tree's config. What a custom\nadapter buys is the graph tier: symbols, import edges, prose, claims over them. The\nper-language instrument arms (surface counting, oracle analysis, redundancy, sinks,\nbatch formats) remain harness contributions, and the documentation says so, because an\nadapter author who is not told the boundary believes they have the full field when they\nhave half.\n\n**a built-in language pack is data: queries, patterns, and named strategies, never\ncode.** The declarative baseline is what keeps \"add a language\" a table-row act instead\nof an expert contribution — and it is a rule that erodes one convenient function at a\ntime unless something refuses. So the packs are inspectable values aggregated in one\nplace, and a guard sweeps them for function-valued fields by path: the hand-rolled\nscanner class is unrepresentable at the seam, not merely discouraged. The rule's edge\nis honest about what a pack may name — strategies from a closed, mechanism-owned set\n(\"jsdoc\", \"docstring\", \"cooked-string\") — because some knowledge is genuinely\nprocedural; naming it keeps the procedure written once where every language can reach\nit. Project adapter modules remain code territory by definition: purity governs what\nships built in, where a single spelling is the entire point.",
+      "why": "**declared import aliases resolve only unique walked targets and refuse malformed configuration.** Aliases are part of a project's declared module address space, not relationships for a renderer to guess. Exact or trailing-star mappings resolve against the one canonical walked population. The most specific declaration owns a match; missing targets never fall back to broader mappings, and multiple candidates remain explicitly ambiguous. Root-relative targets and safe captures prevent traversal. This direct-module grade does not execute build configuration, infer reexports, or promise TypeScript resolution parity. Existing relative and Python resolution retain their declared grades.\n\n**Python local imports resolve only at the declared direct-module grade.** A graph\nthat captures a local module but calls it external erases the relationships every\nreading surface needs. Resolve dotted names against the existing file population,\nnot a second walk or Python execution. Ambiguous modules stay external because\nguessing runtime search-path precedence would exceed this instrument's evidence.\n\n**spec containment follows declared ancestry without inventing dependencies.** Repository and subsystem containment explain ownership even where no source import exists. Treating that relationship as an import fabricates reliance; omitting it turns the enclosing project into an unexplained island. The same deepest-spec rule that assigns file ownership supplies component ancestry.\n\n**harness source remains searchable text rather than silently becoming binary.** Agent\nnavigation depends on ordinary repository search seeing every source file. A single literal\nzero byte can make common tools classify an otherwise textual module as binary and omit its\nmatches without a syntax or type error. Keeping control ranges escaped in source preserves\nruntime meaning while making disappearance from the reading surface a loud regression.\n\n**a declared language resolves to a real adapter or refuses, never a silent fallback.**\nThe graph is the one derivation everything downstream consumes, and the adapter decides\nwhat that derivation can see. The old `?? typescript` fallback meant a typo'd language\nname walked the wrong grammar and reported on the garbage with full confidence — the\nsame walking-a-different-tree failure the config loader refuses for, one seam later. So\nan unknown bare name now refuses with the live built-in list, and the same seam is where\na project brings its own language: a `./`-relative module exporting the LanguageAdapter\nshape, validated field-by-field so the refusal names the line that needs fixing.\nImporting project code is not new trust — the atlas already declares at the loadConfig\ncrossing that running the harness in a tree executes that tree's config. What a custom\nadapter buys is the graph tier: symbols, import edges, prose, claims over them. The\nper-language instrument arms (surface counting, oracle analysis, redundancy, sinks,\nbatch formats) remain harness contributions, and the documentation says so, because an\nadapter author who is not told the boundary believes they have the full field when they\nhave half.\n\n**a built-in language pack is data: queries, patterns, and named strategies, never\ncode.** The declarative baseline is what keeps \"add a language\" a table-row act instead\nof an expert contribution — and it is a rule that erodes one convenient function at a\ntime unless something refuses. So the packs are inspectable values aggregated in one\nplace, and a guard sweeps them for function-valued fields by path: the hand-rolled\nscanner class is unrepresentable at the seam, not merely discouraged. The rule's edge\nis honest about what a pack may name — strategies from a closed, mechanism-owned set\n(\"jsdoc\", \"docstring\", \"cooked-string\") — because some knowledge is genuinely\nprocedural; naming it keeps the procedure written once where every language can reach\nit. Project adapter modules remain code territory by definition: purity governs what\nships built in, where a single spelling is the entire point.",
       "invariants": [
+        "declared import aliases resolve only unique walked targets and refuse malformed configuration",
+        "Python local imports resolve only at the declared direct-module grade",
         "spec containment follows declared ancestry without inventing dependencies",
         "harness source remains searchable text rather than silently becoming binary",
         "a declared language resolves to a real adapter or refuses, never a silent fallback",
         "a built-in language pack is data: queries, patterns, and named strategies, never code"
       ],
       "refutations": [
+        "declared import aliases resolve only unique walked targets and refuse malformed configuration: the pinned PostHog ingestion fixture had 42 alias import occurrences targeting copied files, but the relative-only resolver hid 15 component relations and rejected 7 of 8 declared guarantee reliances. The same source population must recover those relations when its root aliases are declared; omitting the declarations remains an explicit external-module negative control.",
+        "Python local imports resolve only at the declared direct-module grade: the pinned PostHog slice contained both imported Redis and object-storage files but Scope derived zero relations. The resolver treated every absolute dotted module as external. With the Python address strategy the same slice derives five canonical relations; ambiguous modules and unresolved imports remain external.",
         "harness source remains searchable text rather than silently becoming binary: two new render/validation regexes carried literal NUL bytes, and `rg` classified `src/consequence.ts` as binary instead of returning navigable source matches. The ranges now use escaped source notation and the focused guard enumerates every live TypeScript source, so the same byte turns the claim red rather than degrading repository navigation silently."
       ],
       "guaranteeLinks": {
@@ -227,7 +234,7 @@
         "boundary \"a committed decision population cannot disappear into adoption from zero\" at readTrustedJournal via guard \"trusted journal — any malformed, forged, displaced, conflicting, or dangling row refuses the verdict projection\"",
         "boundary \"decision ratification follows explicit subject and authority, never prose similarity or recency\" at analyzeDecisionPositions via guard \"local alternatives need ratification; an explicit stronger choice settles them\"",
         "boundary \"a skipped run never clobbers an oracle's recorded verdict\" at recordVerify via guard \"merge — a skip never clobbers a real verdict; the old verdict rides through with its own stamp\"",
-        "boundary \"experiment outcomes require criterion-total evidence\" at closeExperiment via guard \"close — total nonempty evidence is mandatory and outcome is derived, never supplied\"",
+        "boundary \"experiment outcomes require criterion-total evidence\" at closeExperiment over ExperimentOpened via guard \"close — total nonempty evidence is mandatory and outcome is derived, never supplied\"",
         "boundary \"experiment telemetry preserves its weakest provable attribution\" at closeExperiment via guard \"Codex parent-only tool events close the loop as an aggregate, never exact owner evidence\"",
         "boundary \"surviving agent-assessed defect evidence is attributable and internally consistent\" at recordDefect via guard \"defects — agent-assessed evidence is attributable, content-addressed, and strict on inconsistent rows\"",
         "boundary \"defect writes refuse pre-existing symlink redirection\" at recordDefect via guard \"defect containment — pre-existing directory and session symlinks refuse external append targets\"",
@@ -413,6 +420,11 @@
       "sub": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
       "claimed": true,
       "claims": [
+        "boundary \"catalog binding support requires a named oracle check at unchanged explicit inputs\" at bindRunEvidence via guard \"catalog bindings — only unchanged executed inputs earn support; edits and historical reports cannot renew it\"",
+        "boundary \"catalog binding support requires a named oracle check at unchanged explicit inputs\" at projectBindings via guard \"catalog bindings — exact scoped declarations retain failures and never borrow example support\"",
+        "boundary \"catalog binding support requires a named oracle check at unchanged explicit inputs\" at projectBindings via guard \"catalog bindings — flow endpoints require owned pinned symbols and changed paths cannot borrow support\"",
+        "boundary \"candidate guarantee vocabulary stays project-independent and never activates obligations\" at runGuaranteeCatalog via guard \"guarantee catalog — public lookup never loads project configuration or reads its ledgers\"",
+        "boundary \"candidate guarantee vocabulary stays project-independent and never activates obligations\" at runGuaranteeCatalog via guard \"guarantee catalog — list and detail preserve the canonical population, qualifications and refusal semantics\"",
         "boundary \"explicit guarantee links expire with their premises and never prove satisfaction\" at resolveGuaranteeLinks via guard \"guarantee links — expired premises never become current and passing evidence never proves satisfaction\"",
         "boundary \"a claim goes green only on positive evidence its oracle ran\" at execNamedTest via guard \"testMatch — a runner exiting 0 with no matching output FAILS (the renamed-test trap)\"",
         "boundary \"a vanished oracle reds its claim, never green-by-absence\" at resolveFromBatch via guard \"match — ZERO matching tests is its OWN state: the vanished oracle, named as such\"",
@@ -427,8 +439,10 @@
         "boundary \"an undeclared root refuses the walk, never wanders\" at requireDeclaredRoot via guard \"declared root — a configless directory refuses the walk and an empty config declares it\""
       ],
       "prose": "Oracle discovery, execution and record lookup converge here. A passing process is not a passing claim unless the named oracle demonstrably ran.",
-      "why": "**explicit guarantee links expire with their premises and never prove satisfaction.**\nA taxonomy suggestion names an obligation, not the claim that enforces it. Spec-owned\nlinks preserve that caller's assessment without letting a passing oracle certify the\nmapping itself. Claim edits, missing providers, revised assessments and changed subject\ncontent invalidate or expire the reference. Unlinked obligations stay visible. The v0\nconsumer grade requires direct import adjacency and makes no claim of proving consumption;\nrecorded oracle evidence remains distinct from future immutable verification receipts.\n\n**a claim goes green only on positive evidence its oracle ran.** The verifier's whole\nauthority rests on this one property, and until now no claim cited it: an audit deleted\nthe rule and the tree stayed \"✓ coherent\" while the unit test failed unseen. An exit\ncode is the runner's statement about itself, not about the named test — a filter that\nmatched nothing exits clean on every runner class this repo has measured — so green\nmust require output that names the run, the one reading absence cannot produce.\n\n**a vanished oracle reds its claim, never green-by-absence.** A renamed or deleted test\nleaves a claim citing a name nothing owns, and that claim then guards nothing while\nwearing green. Absence has to be its own observable verdict, distinct from ran-and-failed,\nbecause the two demand different repairs: a red test needs the code fixed, a vanished\noracle needs the contract re-tied to something that exists.\n\n**fast oracle absence requires a complete direct-declaration population.** Absence is a\nstronger statement than failure: it says the registry owns no matching name. The static\nfloor may say that only when every registration mechanism it recognizes was enumerable;\ndynamic titles, fixture DSLs, registration-time module loads, custom includes, and damaged\nsource must poison absence into UNKNOWN while still allowing positive direct matches.\nOtherwise the cheap tier would turn its own inability to see a live oracle into evidence\nthat the oracle vanished.\n\n**a declared invariant unanchored by any boundary fails coverage.** A spec may not\nassert a property that nothing enforces: that is the ratchet the whole harness turns on,\nand if it silently loosened, specs would drift back into aspiration prose. The gap has to\ncost a red at the run that opened it, while the person who opened it still holds the\ncontext to close it.\n\n**a via-test oracle that iterates no live domain fails its claim.** A totality label on a\nsampling test is worse than no label: it retires the reader's suspicion without retiring\nthe risk. Deriving the checked set from the live registry the chokepoint actually serves\nis what makes \"covers every case\" a fact about the system rather than about the fixture\nlist the author remembered.\n\n**a named oracle that no test runs cannot pass.** The serial runner is the component the\nexecutable tier leans its trust on, and it was outside the evidence perimeter — unclaimed,\nuntested, and (measured) willing to exit clean when the cited title survived only as a\nstring in a file. The runner itself must refuse a name it cannot show ran, because every\ngreen above it inherits that refusal.\n\n**an empty derivation against a remembered surface refuses, never passes.** Every verdict\nin this file rests on the graph deriving non-empty, and nothing checked that premise:\ngutting `buildGraph` left the gate printing \"claims: 0\" and \"✓ coherent\", exit 0 —\ndeeper than a vanished oracle, because it empties every check at once while announcing\nthey all passed. The record remembers how many claims the last run graded, so a run that\nsuddenly sees zero must refuse rather than report success over nothing; the only\nlegitimate zero (a project adopting from nothing) is exactly the one with no memory, and\nit gets the adoption ladder instead. The floor deliberately stops at zero: a partial\ncollapse where every component keeps a claim is observationally identical to deliberate\npruning, and deletion has to stay free or people stop deleting. What the complement\nunderneath it actually reaches is narrower than it first appears — a component stripped of\nits claims is still a node someone can red, while a component the walk never discovered\nleaves nothing behind to notice, so an N→1 slide reads as N ordinary prunings. Pinning the\npopulation as a mass dimension is the honest answer there, because the question it settles\nis not whether anything survived but whether as much survived as last time.\n\n**python sources feed the same instruments as typescript at their declared grade.**\nThe adapter seam always promised language-agnosticism, but three analyzers and two\nscanners parsed TypeScript directly, so a python project's surface grew invisibly — the\nzero-anchor alarm never fired, parity claims skipped `.py` oracles, duplicated domains\nwent unranked, batch oracles knew one report format, and f-string interpolations were not\nsites. Each instrument now reads python at a DECLARED grade: most through the shared\ngrammar queries of phase 2b (surface, sites, sinks), the oracle arms at the pinned\nindent-block grade their guards froze — in-harness, no subprocess, and since the arms\nported, no compiler dependency at all. The grade is declared, not hidden —\nprecision is preferred over recall everywhere, because an advisory that cries wolf\nretires the reader's attention without retiring risk, and with no compiler behind `.py`\na false positive can never be rescued downstream. What the regex grade deliberately does\nnot count is journaled beside each instrument, so the next reader inherits the boundary\nof the instrument instead of rediscovering it.\n\n**an undeclared root refuses the walk, never wanders.** A configless run walks whatever\ndirectory the shell happened to be in and grades that population with full confidence —\nthe incident run was `npx coherence verify` from a home directory, which is not exotic;\nit is the first thing a curious adopter types. The config file's PRESENCE is the\ndeclaration, so `{}` is a complete first rung of the adoption ladder, and the refusal\nprints exactly that one-line bootstrap. Journal, hook, and reference commands never\nwalk, so they stay available in an undeclared directory — the field does not require a\nconfig to remember decisions.\n\n**fast verification rejects a statically vanished Vitest oracle without executing\ntests.** Name ownership is cheaper than test outcome: a literal Vitest declaration either\nstill supplies a runner-style full name or it does not. The edit loop should answer that\nstructural question without buying remote credentials or a suite boot, while refusing to\nturn dynamic or damaged source into false certainty. Static presence therefore remains a\nskip. A complete current population can prove absence; independently, a concrete Git\n`HEAD` owner disappearing from a deleted or still-complete former path proves an ownership\nloss even when unrelated current source is incomplete. If that same path becomes dynamic\nor damaged, it stays explicitly unknown; everything else does too. The\nexecutable tier alone can supply pass/fail evidence. This is a direct-declaration grade,\nnot an evaluator for arbitrary runtime registration; projects beyond it disable\n`staticOracleExistence` or resolve a fresh report.",
+      "why": "**catalog binding support requires a named oracle check at unchanged explicit inputs.**\nA catalog's good example does not verify another adoption, and a prior test pass\ncannot speak for edited applicability or source. The existing claim record therefore\nretains the binding input identity observed on both sides of an executable check.\nStructural failure, imported history and changed inputs cannot mint that support.\nOptional authored flow endpoints must resolve to owned symbols and belong to the\nexplicit pinned input set. Their role titles and direction remain caller-assessed;\nthe local boundary remains the only promise string. Changing that mapping changes\nthe binding identity, so an old observation cannot endorse a new visual relationship.\nThis is a bounded freshness relation, not immutable receipt integrity or semantic\nproof that a caller chose the right guarantee and complete dependency population.\n\n**candidate guarantee vocabulary stays project-independent and never activates obligations.**\nA reusable reference is not a project assessment. Loading a project's configuration\nor damaged ledger to look up a definition creates a false dependency, while treating\ncandidate presence as an obligation would create promises nobody adopted. The lookup\ntherefore has no project input and preserves its candidate and evidence qualifications\nin both list and detail. Existing taxonomy history, spec bindings and oracle verdicts\nretain their independent meanings; candidate IDs cannot silently replace them.\n\n**explicit guarantee links expire with their premises and never prove satisfaction.**\nA taxonomy suggestion names an obligation, not the claim that enforces it. Spec-owned\nlinks preserve that caller's assessment without letting a passing oracle certify the\nmapping itself. Claim edits, missing providers, revised assessments and changed subject\ncontent invalidate or expire the reference. Unlinked obligations stay visible. The v0\nconsumer grade requires direct import adjacency and makes no claim of proving consumption;\nrecorded oracle evidence remains distinct from future immutable verification receipts.\n\n**a claim goes green only on positive evidence its oracle ran.** The verifier's whole\nauthority rests on this one property, and until now no claim cited it: an audit deleted\nthe rule and the tree stayed \"✓ coherent\" while the unit test failed unseen. An exit\ncode is the runner's statement about itself, not about the named test — a filter that\nmatched nothing exits clean on every runner class this repo has measured — so green\nmust require output that names the run, the one reading absence cannot produce.\n\n**a vanished oracle reds its claim, never green-by-absence.** A renamed or deleted test\nleaves a claim citing a name nothing owns, and that claim then guards nothing while\nwearing green. Absence has to be its own observable verdict, distinct from ran-and-failed,\nbecause the two demand different repairs: a red test needs the code fixed, a vanished\noracle needs the contract re-tied to something that exists.\n\n**fast oracle absence requires a complete direct-declaration population.** Absence is a\nstronger statement than failure: it says the registry owns no matching name. The static\nfloor may say that only when every registration mechanism it recognizes was enumerable;\ndynamic titles, fixture DSLs, registration-time module loads, custom includes, and damaged\nsource must poison absence into UNKNOWN while still allowing positive direct matches.\nOtherwise the cheap tier would turn its own inability to see a live oracle into evidence\nthat the oracle vanished.\n\n**a declared invariant unanchored by any boundary fails coverage.** A spec may not\nassert a property that nothing enforces: that is the ratchet the whole harness turns on,\nand if it silently loosened, specs would drift back into aspiration prose. The gap has to\ncost a red at the run that opened it, while the person who opened it still holds the\ncontext to close it.\n\n**a via-test oracle that iterates no live domain fails its claim.** A totality label on a\nsampling test is worse than no label: it retires the reader's suspicion without retiring\nthe risk. Deriving the checked set from the live registry the chokepoint actually serves\nis what makes \"covers every case\" a fact about the system rather than about the fixture\nlist the author remembered.\n\n**a named oracle that no test runs cannot pass.** The serial runner is the component the\nexecutable tier leans its trust on, and it was outside the evidence perimeter — unclaimed,\nuntested, and (measured) willing to exit clean when the cited title survived only as a\nstring in a file. The runner itself must refuse a name it cannot show ran, because every\ngreen above it inherits that refusal.\n\n**an empty derivation against a remembered surface refuses, never passes.** Every verdict\nin this file rests on the graph deriving non-empty, and nothing checked that premise:\ngutting `buildGraph` left the gate printing \"claims: 0\" and \"✓ coherent\", exit 0 —\ndeeper than a vanished oracle, because it empties every check at once while announcing\nthey all passed. The record remembers how many claims the last run graded, so a run that\nsuddenly sees zero must refuse rather than report success over nothing; the only\nlegitimate zero (a project adopting from nothing) is exactly the one with no memory, and\nit gets the adoption ladder instead. The floor deliberately stops at zero: a partial\ncollapse where every component keeps a claim is observationally identical to deliberate\npruning, and deletion has to stay free or people stop deleting. What the complement\nunderneath it actually reaches is narrower than it first appears — a component stripped of\nits claims is still a node someone can red, while a component the walk never discovered\nleaves nothing behind to notice, so an N→1 slide reads as N ordinary prunings. Pinning the\npopulation as a mass dimension is the honest answer there, because the question it settles\nis not whether anything survived but whether as much survived as last time.\n\n**python sources feed the same instruments as typescript at their declared grade.**\nThe adapter seam always promised language-agnosticism, but three analyzers and two\nscanners parsed TypeScript directly, so a python project's surface grew invisibly — the\nzero-anchor alarm never fired, parity claims skipped `.py` oracles, duplicated domains\nwent unranked, batch oracles knew one report format, and f-string interpolations were not\nsites. Each instrument now reads python at a DECLARED grade: most through the shared\ngrammar queries of phase 2b (surface, sites, sinks), the oracle arms at the pinned\nindent-block grade their guards froze — in-harness, no subprocess, and since the arms\nported, no compiler dependency at all. The grade is declared, not hidden —\nprecision is preferred over recall everywhere, because an advisory that cries wolf\nretires the reader's attention without retiring risk, and with no compiler behind `.py`\na false positive can never be rescued downstream. What the regex grade deliberately does\nnot count is journaled beside each instrument, so the next reader inherits the boundary\nof the instrument instead of rediscovering it.\n\n**an undeclared root refuses the walk, never wanders.** A configless run walks whatever\ndirectory the shell happened to be in and grades that population with full confidence —\nthe incident run was `npx coherence verify` from a home directory, which is not exotic;\nit is the first thing a curious adopter types. The config file's PRESENCE is the\ndeclaration, so `{}` is a complete first rung of the adoption ladder, and the refusal\nprints exactly that one-line bootstrap. Journal, hook, and reference commands never\nwalk, so they stay available in an undeclared directory — the field does not require a\nconfig to remember decisions.\n\n**fast verification rejects a statically vanished Vitest oracle without executing\ntests.** Name ownership is cheaper than test outcome: a literal Vitest declaration either\nstill supplies a runner-style full name or it does not. The edit loop should answer that\nstructural question without buying remote credentials or a suite boot, while refusing to\nturn dynamic or damaged source into false certainty. Static presence therefore remains a\nskip. A complete current population can prove absence; independently, a concrete Git\n`HEAD` owner disappearing from a deleted or still-complete former path proves an ownership\nloss even when unrelated current source is incomplete. If that same path becomes dynamic\nor damaged, it stays explicitly unknown; everything else does too. The\nexecutable tier alone can supply pass/fail evidence. This is a direct-declaration grade,\nnot an evaluator for arbitrary runtime registration; projects beyond it disable\n`staticOracleExistence` or resolve a fresh report.",
       "invariants": [
+        "catalog binding support requires a named oracle check at unchanged explicit inputs",
+        "candidate guarantee vocabulary stays project-independent and never activates obligations",
         "explicit guarantee links expire with their premises and never prove satisfaction",
         "a claim goes green only on positive evidence its oracle ran",
         "a vanished oracle reds its claim, never green-by-absence",
@@ -442,6 +456,9 @@
         "an undeclared root refuses the walk, never wanders"
       ],
       "refutations": [
+        "catalog binding support requires a named oracle check at unchanged explicit inputs: removed the flow-endpoint file pin check; the flow-endpoint guard failed because an owned symbol in an unpinned second file produced no missing-pin issue. Restored the check and the guard passed. This proves endpoint input inclusion, not authored direction or semantic entailment.",
+        "catalog binding support requires a named oracle check at unchanged explicit inputs: removed the pre/post input-digest equality in bindRunEvidence. The guard then observed a populated bindingInputs record after a spec changed during the execution interval, where no support was allowed. Restored the comparison. This controls input freshness, not semantic entailment or immutable receipt integrity.",
+        "candidate guarantee vocabulary stays project-independent and never activates obligations: the initial catalog branch ran after loadConfig. The public CLI guard supplied damaged configuration and a torn journal and observed exit 2 before reference lookup. Dispatching catalog lookup before configuration makes those project inputs irrelevant; the same guard then passes. Population/detail guards separately retain all 36 definitions, their limits, non-activation metadata and pinned evidence grades. These guards test the catalog product, not PostHog satisfaction or cross-project portability.",
         "explicit guarantee links expire with their premises and never prove satisfaction: disabled the subject-staleness check in resolveGuaranteeLinks (2026-09-08). The named guard failed with actual current versus expected stale, exposing the incorrectly retained mapping. Restored the check; the focused suite passes. This control tests link expiration, not semantic satisfaction.",
         "fast verification rejects a statically vanished Vitest oracle without executing tests: changed `resolveStaticOracle`'s complete zero-match branch from `absent` to `unknown` (2026-08-20), laundering the motivating Mnemion rename into an ordinary fast-tier skip — the focused boundary guard failed and captured the dangerous verdict: `claims: 1 · 0 green · 0 red · 1 skipped`, followed by `✓ coherent`. Restored; the same fixture now reds `VANISHED ORACLE (static)` without Vitest installed or invoked.",
         "fast verification rejects a statically vanished Vitest oracle without executing tests: 0.36.2 made incompleteness project-wide, so Mnemion's finite data-driven titles made an unrelated renamed clipboard oracle UNKNOWN forever. Reproduced against current main: renaming the literal clipboard test left fast verify green. The scanner now retains concrete runner names and owner paths from Git `HEAD`; losing a name from a deleted or still-complete former owner reds before unrelated current uncertainty is consulted, while a former owner that itself became dynamic remains UNKNOWN. No prefix guess or partial JavaScript evaluator is allowed to manufacture global completeness.",
@@ -562,7 +579,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/adapters/tree-sitter.ts",
-      "line": 65,
+      "line": 66,
       "prose": "Ruby at query grade: methods, singleton methods, classes, modules, constants;\n `require`/`require_relative` string arguments as import edges; `#` doc blocks."
     },
     {
@@ -572,7 +589,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/adapters/tree-sitter.ts",
-      "line": 182,
+      "line": 183,
       "prose": "TypeScript at query grade: exported top-level declarations + class methods. Mirrors\n the retired regex adapter's declared intent; corpus-diffed against it before the\n swap (63 files, 625 symbols, zero missed — the 2 deltas are regex over-reports)."
     },
     {
@@ -582,7 +599,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/adapters/tree-sitter.ts",
-      "line": 208,
+      "line": 209,
       "prose": "Python at query grade: module-level defs/classes/assignments + class methods,\n decorated forms included. Corpus-diffed against the retired regex adapter over\n flask/src (24 files, 430 symbols; the 8 deltas were regex nesting mistakes)."
     },
     {
@@ -592,7 +609,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/adapters/tree-sitter.ts",
-      "line": 235
+      "line": 237
     },
     {
       "id": "s:src/adapters/tree-sitter.ts#GrammarHandle",
@@ -601,7 +618,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/adapters/tree-sitter.ts",
-      "line": 311,
+      "line": 314,
       "prose": "One memoized {language, parser} per built-in grammar — the graph adapter AND the\n instrument arms (phase 2b) query the same loaded grammar instead of re-reading wasm."
     },
     {
@@ -611,7 +628,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/adapters/tree-sitter.ts",
-      "line": 313
+      "line": 316
     },
     {
       "id": "s:src/adapters/tree-sitter.ts#BUILTIN_LANGUAGES",
@@ -620,7 +637,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/adapters/tree-sitter.ts",
-      "line": 339
+      "line": 342
     },
     {
       "id": "x:node:url",
@@ -644,7 +661,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/cli.ts",
-      "line": 98
+      "line": 99
     },
     {
       "id": "f:src/commands.ts",
@@ -1722,13 +1739,23 @@
       "prose": "derive.ts — build the coherence Graph from a project, using the walker plus the\nconfig-selected language and platform adapters. This is the ONE source every\nrenderer and verify consumes (no second walk anywhere)."
     },
     {
+      "id": "s:src/derivation/derive.ts#pythonImportCandidates",
+      "parent": "f:src/derivation/derive.ts",
+      "label": "pythonImportCandidates",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/derivation/derive.ts",
+      "line": 33,
+      "prose": "Direct-module grade only: no sys.path, reexports or execution. Ambiguity stays external."
+    },
+    {
       "id": "s:src/derivation/derive.ts#resolveLanguageAdapter",
       "parent": "f:src/derivation/derive.ts",
       "label": "resolveLanguageAdapter",
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/derive.ts",
-      "line": 41,
+      "line": 56,
       "prose": "Resolve `cfg.language` to an adapter: a built-in name, or a `./`-relative project\nmodule (conventionally `.coherence/adapters/<lang>.mjs`) exporting a LanguageAdapter.\n\nAN UNKNOWN BARE NAME REFUSES. The `?? typescript` fallback this replaces meant\n`\"language\": \"go\"` silently walked Go files with the TypeScript grammar and reported\non the garbage with full confidence — the same walking-a-DIFFERENT-tree failure\nloadConfig refuses for when the config itself is unreadable. Importing a project\nmodule executes project code, which is the trust the atlas already declares at the\nloadConfig crossing: running the harness in a tree executes that tree's config."
     },
     {
@@ -1738,7 +1765,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/derivation/derive.ts",
-      "line": 87,
+      "line": 102,
       "prose": "THE documented-symbol predicate — one spelling, homed with the code that SETS `prose`\n (the `add({ …, prose: what || undefined })` call below). verify's coverage line\n (\"symbols N/M documented\"), its `[doc]` jobs, and mass's `undocumented|symbols`\n dimension all read this, so a symbol the coverage advisory calls undocumented is\n exactly one the ratchet counts. It was spelled twice inside verify.ts alone before this\n — the harness's own `redundancy` finding, fixed the way that advisory prescribes:\n derive one spelling from the other, here by deleting the others."
     },
     {
@@ -1748,7 +1775,25 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/derive.ts",
-      "line": 89
+      "line": 104
+    },
+    {
+      "id": "f:src/derivation/import-aliases.ts",
+      "parent": "c:src/derivation",
+      "label": "import-aliases.ts",
+      "kind": "file",
+      "sub": "src/derivation/import-aliases.ts",
+      "path": "src/derivation/import-aliases.ts"
+    },
+    {
+      "id": "s:src/derivation/import-aliases.ts#compileImportAliases",
+      "parent": "f:src/derivation/import-aliases.ts",
+      "label": "compileImportAliases",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/derivation/import-aliases.ts",
+      "line": 5,
+      "prose": "Exact and trailing-star aliases, deliberately not a TypeScript module resolver.\nOnly a unique member of the canonical walked population can become an edge."
     },
     {
       "id": "f:src/derivation/language-packs.ts",
@@ -1872,7 +1917,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 121,
+      "line": 122,
       "prose": "WHICH INVARIANTS A `## refutations` LIST WITNESSES — the ONE spelling of the key rule.\n\nA refutation line is `<invariant>: <what was broken> -> <what was seen>`, so the invariant\nname is the text before the FIRST colon. That one-line rule was spelled three times —\nrender-claude.ts's invariant table, verify's refutation coverage line, and verify's\nnever-red decoration filter — which is `redundancy`'s own finding about other people's\ncode: one enumerated domain, several spellings, tied together by nothing. Homed here\nbecause this is the parser that produced the strings; every consumer now derives from it.\n\nBEHAVIOUR-PRESERVING, deliberately. A line with no colon still keys on the whole line,\nexactly as all three call sites did — an extraction that also changes what it computes\ncannot be reviewed as an extraction, and a project whose refutation count moved would\nhave no way to tell which half did it. Whether a colonless line should witness anything\nis a real and separate question; it is not settled here."
     },
     {
@@ -1882,7 +1927,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/derivation/walk.ts",
-      "line": 131,
+      "line": 132,
       "prose": "One declared trust zone from a `## zones` section (PROMISE GRAPH topology). Parsed here\n because walk.ts is the single home of spec-section parsing; the promise layer is the only\n consumer, so zones ride as their own standalone parse rather than through ParsedSpec/the\n graph (nothing else needs them, and the graph stays untouched)."
     },
     {
@@ -1892,7 +1937,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 140,
+      "line": 141,
       "prose": "Parse a `## zones` section — same shape as `## invariants`: a bullet list, and the\n DECLARED ORDER is the canonical trust order (most-trusted first). Each line is either\n `- <name>: <intent>` or `- <name> inside <parent>: <intent>` (the `: <intent>` is\n optional — a bare `- <name>` or `- <name> inside <parent>` is a zone with \"\" intent).\n Single-home doctrine: only the ENTRY component's zones are authoritative, so this is run\n against the entry spec alone — a `## zones` in a non-entry spec is simply never read\n (ignored, not an error). Returns [] when the spec has no zones section."
     },
     {
@@ -1902,7 +1947,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 160
+      "line": 161
     },
     {
       "id": "s:src/derivation/walk.ts#nodeDirs",
@@ -1911,7 +1956,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 167,
+      "line": 168,
       "prose": "Folders that contain a *.spec.md, relative to root (root = \".\")."
     },
     {
@@ -1921,7 +1966,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 179
+      "line": 180
     },
     {
       "id": "s:src/derivation/walk.ts#ownerOf",
@@ -1930,7 +1975,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 211,
+      "line": 212,
       "prose": "The deepest node dir that is a prefix of the file's dir — or NULL when no node dir owns\nit at all.\n\nTHE NULL IS THE POINT. This used to return `\".\"` unconditionally on a miss, which is\nthe same value it returns when a root `*.spec.md` genuinely owns the file, so no caller\ncould tell \"the root component owns this\" from \"nothing owns this\". On a project with\nno root component that fabricated a component out of a miss, and\n`affectedComponents` fed it straight into verify's scope set: measured 2026-07-31 on a\nhealthy two-component tree whose only change was an unowned root-level file, `verify\n--staged` printed `scoped to 1 changed component(s): .`, graded `claims: 0 · 0 green`,\nand pronounced `✓ coherent` — a LIVE vacuous green needing no mutation to reach.\n\nAn unowned file is ordinary, not an error: a root config, a build script, a stray\nmodule in a tree that is still being decomposed. So the miss is REPRESENTED rather than\nrefused, and each of the three callers says what it does with one (derive: an unparented\nfile node; verify and structural: out of every component's scope)."
     },
     {
@@ -5136,7 +5181,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/status.ts",
-      "line": 40
+      "line": 41
     },
     {
       "id": "s:src/evidence/status.ts#AtlasSection",
@@ -5145,7 +5190,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/status.ts",
-      "line": 74
+      "line": 75
     },
     {
       "id": "s:src/evidence/status.ts#DriftSection",
@@ -5154,7 +5199,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/status.ts",
-      "line": 93
+      "line": 94
     },
     {
       "id": "s:src/evidence/status.ts#MassSection",
@@ -5163,7 +5208,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/status.ts",
-      "line": 106,
+      "line": 107,
       "prose": "What the mass ratchet measured, and what it was measured AGAINST. `baseline` is per\n dimension and optional because a key can be new — the record has to be able to say\n \"measured, never pinned\" without inventing a number. `series` is the net-LOC-per-\n window shape the report prints; absent on a `--check`, which does not read history."
     },
     {
@@ -5173,7 +5218,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/status.ts",
-      "line": 123,
+      "line": 124,
       "prose": "The READ-side cost record: the context closure of a change over the recent window —\n what a reader must load to modify one thing safely. `mass` says how much machine there\n is; this says how much of it one change makes you hold.\n\n `considered` is the SAMPLE SIZE and is not optional, for evolution.ts:139-140's reason:\n a median over three commits and one over three hundred should never look alike, and a\n stored median with no count is a number a consumer cannot weigh.\n\n Lines are measured against the CURRENT tree — an approximation for historical commits,\n named in the report that produced them. `series` is median closure FILES per window,\n oldest → newest. Not yet read by the panel; the energy-strip follow-up owns that."
     },
     {
@@ -5183,7 +5228,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/status.ts",
-      "line": 131
+      "line": 132
     },
     {
       "id": "s:src/evidence/status.ts#statusPath",
@@ -5192,7 +5237,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/status.ts",
-      "line": 133
+      "line": 134
     },
     {
       "id": "s:src/evidence/status.ts#readStatus",
@@ -5201,7 +5246,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/status.ts",
-      "line": 145,
+      "line": 146,
       "prose": "THE RECORD, or a fresh one — and a REFUSAL when there is a record here that cannot be\nread (floor.ts's `readJsonOrRefuse`). This was `catch → return { version: 1 }`, which\ncould not tell a project that has never filed a report from one whose report is\ncorrupt, and the second reading is what every floor in the harness is measured\nagainst. Truncating this file (a crashed write; the file is untracked in most\nprojects, so there is no diff either) turned `verify`'s `✗ [floor]` refusal into the\nadoption ladder and exit 0 — and the run then filed a fresh empty record over the\nremains, so verify and all six guarded generators passed forever after."
     },
     {
@@ -5211,7 +5256,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/status.ts",
-      "line": 202,
+      "line": 203,
       "prose": "Short HEAD + dirty flag — the provenance every section stamps itself with."
     },
     {
@@ -5221,7 +5266,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/status.ts",
-      "line": 218,
+      "line": 219,
       "prose": "Index claim records by their ONE lookup identity (`claimKey`, boundary.ts) — the single\nmap-mint every reader of `status.verify.claims` goes through. The key is BRANDED, so a\nraw `` `${node} ${claim}` `` probe is a compile error rather than a silent miss: before\nthis, three sites (this merge, the panel, verify's never-red filter) keyed on the raw\nstring and quietly erased a claim's failure history when a boundary was annotated with a\npurely declarative `crossing` clause — the exact annotation `normalizeBoundaryClaim`\nexists to make safe. Last-wins on a key collision, same as Map semantics always were."
     },
     {
@@ -5231,7 +5276,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/status.ts",
-      "line": 232,
+      "line": 233,
       "prose": "Merge a run's fresh claim verdicts over the previous record.\n- scope null (a full-tree run): the fresh set REPLACES the record, so claims that\n  vanished from the specs vanish from the record (no ghost rows).\n- scoped (--staged/--since): only the evaluated components' entries are replaced;\n  out-of-scope records ride through untouched — their own stamps keep aging.\n- A SKIP never clobbers a real verdict. Under --fast the executable tier skips, and\n  overwriting last week's oracle PASS with \"skipped (--fast)\" would erase the last\n  known truth; the old verdict is kept, its stamp saying how old it is. A skip only\n  lands where nothing real exists underneath (dialect gaps, never-run claims)."
     },
     {
@@ -5241,7 +5286,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/status.ts",
-      "line": 252,
+      "line": 253,
       "prose": "What runVerify hands the record-keeper (already computed for its own report)."
     },
     {
@@ -5251,7 +5296,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/status.ts",
-      "line": 266
+      "line": 267
     },
     {
       "id": "s:src/evidence/status.ts#recordAtlas",
@@ -5260,7 +5305,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/status.ts",
-      "line": 296
+      "line": 297
     },
     {
       "id": "s:src/evidence/status.ts#recordDrift",
@@ -5269,7 +5314,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/status.ts",
-      "line": 300
+      "line": 301
     },
     {
       "id": "s:src/evidence/status.ts#recordMass",
@@ -5278,7 +5323,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/status.ts",
-      "line": 304
+      "line": 305
     },
     {
       "id": "s:src/evidence/status.ts#recordEconomy",
@@ -5287,7 +5332,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/status.ts",
-      "line": 311
+      "line": 312
     },
     {
       "id": "x:node:timers/promises",
@@ -6991,7 +7036,7 @@
       "kind": "symbol",
       "sub": "type",
       "path": "src/readings/promise-model.ts",
-      "line": 89,
+      "line": 91,
       "prose": "The enforced ordinal. A total function of recorded signals (promise.ts documents the\n exact doctrine); the renderer treats it as opaque and ordinal. U prints, always."
     },
     {
@@ -7001,7 +7046,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/promise-model.ts",
-      "line": 99,
+      "line": 101,
       "prose": "One reliance edge: this component imports `to`. Covered iff a declared gate sits on\n the wall the edge crosses; NAKED is a first-class finding, not an absence."
     },
     {
@@ -7011,7 +7056,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/promise-model.ts",
-      "line": 109
+      "line": 111
     },
     {
       "id": "s:src/readings/promise-model.ts#PromiseEvent",
@@ -7020,7 +7065,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/promise-model.ts",
-      "line": 133,
+      "line": 135,
       "prose": "The CLOSED event vocabulary. Every contract-relevant change between base and head is\n exactly one of these; nothing else may claim to be a review finding.\n   covered    — a gate now exists that didn't (a promise made)\n   placed     — an existing gate's crossing was declared (unplaced → placed: the\n                promise finally states what it separates)\n   withdrawn  — a gate that existed is gone (a promise withdrawn)\n   promoted   — a gate's grade rose (with from/to and the reason)\n   demoted    — a gate's grade fell (the alarm case; blast = reliants)\n   naked      — a reliance is newly uncovered (new import crossing an ungated wall,\n                or its gate vanished)\n   sealed     — a reliance that was NOT covered (naked, or unassessable under\n                undeclared residence) is now covered — coverage gains always leave\n                a ledger trace\n   arrived    — a component appeared\n   razed      — a component vanished (its gates report withdrawn individually too)\n   rezoned    — a component's declared residence changed"
     },
     {
@@ -7030,7 +7075,7 @@
       "kind": "symbol",
       "sub": "type",
       "path": "src/readings/promise-model.ts",
-      "line": 152,
+      "line": 154,
       "prose": "The renderer's exact signature (src/readings/render-contract.ts implements this). One COMPLETE\n self-contained HTML document: inline CSS/JS, embedded model JSON, zero external\n resources. The standing anatomy is canonical (zone bands in declared order, components\n in spec-tree order, one fixed pose per component); a review model additionally renders\n the ledger with untouched rows receded. No coordinate exists that a human could not\n rederive from the committed spec text."
     },
     {
@@ -7040,7 +7085,7 @@
       "kind": "symbol",
       "sub": "type",
       "path": "src/readings/promise-model.ts",
-      "line": 156,
+      "line": 158,
       "prose": "The ledger's text form (`coherence review` prints this; promise.ts implements).\n Deterministic, plain, one event per line group — the bulletin register."
     },
     {
@@ -7368,7 +7413,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/scope-model.ts",
-      "line": 69,
+      "line": 70,
       "prose": "Project-authored atlas semantics. No tier or verdict is inferred from this text."
     },
     {
@@ -7378,7 +7423,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/readings/scope-model.ts",
-      "line": 81
+      "line": 82
     },
     {
       "id": "s:src/readings/scope-model.ts#SCOPE_CARD_HEIGHT",
@@ -7387,7 +7432,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/readings/scope-model.ts",
-      "line": 82
+      "line": 83
     },
     {
       "id": "s:src/readings/scope-model.ts#SCOPE_RING_RADIUS",
@@ -7396,7 +7441,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/readings/scope-model.ts",
-      "line": 83
+      "line": 84
     },
     {
       "id": "s:src/readings/scope-model.ts#scopeCenter",
@@ -7405,7 +7450,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/readings/scope-model.ts",
-      "line": 110,
+      "line": 111,
       "prose": "Weighted graph medoid. Disconnected vertices receive one stable step beyond the\nlargest possible connected distance: they influence the choice without inventing a\npath. Lexical component identity breaks exact ties."
     },
     {
@@ -7415,7 +7460,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/readings/scope-model.ts",
-      "line": 126
+      "line": 127
     },
     {
       "id": "f:src/scaffold.ts",
@@ -7802,7 +7847,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 15
+      "line": 16
     },
     {
       "id": "s:src/types.ts#Bindings",
@@ -7811,7 +7856,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 17
+      "line": 18
     },
     {
       "id": "s:src/types.ts#Graph",
@@ -7820,7 +7865,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 27
+      "line": 28
     },
     {
       "id": "s:src/types.ts#SpecGuaranteeLinks",
@@ -7829,7 +7874,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 33,
+      "line": 34,
       "prose": "A raw spec parsed from a *.spec.md file."
     },
     {
@@ -7839,7 +7884,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 34
+      "line": 35
     },
     {
       "id": "s:src/types.ts#LanguageAdapter",
@@ -7848,7 +7893,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 37,
+      "line": 38,
       "prose": "How to read a language's code — symbols, imports, and where docblocks live."
     },
     {
@@ -7858,7 +7903,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 46,
+      "line": 48,
       "prose": "How to read a platform's infra config (optional — null platform = none)."
     },
     {
@@ -7868,7 +7913,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 54
+      "line": 56
     },
     {
       "id": "f:src/verification/boundary.ts",
@@ -7877,7 +7922,7 @@
       "kind": "file",
       "sub": "src/verification/boundary.ts",
       "path": "src/verification/boundary.ts",
-      "prose": "boundary.ts — the ONE home of the boundary-claim grammar.\n\n`boundary \"<invariant>\" at <chokepoint> [crossing <zone> -> <zone>] [via (test|guard) \"<oracle>\"]`\n\nThis regex used to live (identically, in intent) at three sites — structural.ts,\nverify.ts, and render-claude.ts — and the render-claude copy drifted: it matched\n`via test` only, so `via guard` boundaries silently vanished from the generated\nCLAUDE.md invariants table. One exported regex + one parser is the structural fix:\nthe grammar cannot drift again because it has nowhere else to live.\n\nThe OPTIONAL `crossing <from> -> <to>` clause states what wall (which pair of declared\ntrust zones) this gate sits on — the PROMISE GRAPH's topology axiom (a gate declares\nwhat it separates). It is purely declarative: verify ignores it (a crossing is not a\nruntime check), scene/atlas/structural read only the fields they already read, and every\npre-crossing spec parses UNCHANGED because both the crossing clause and the via clause\nare optional and independently absent. The clause sits BETWEEN chokepoint and via, so a\ngate may declare a crossing with or without an oracle, in any combination.\n\nCapture groups: 1=invariant, 2=chokepoint symbol, 3=crossing-from, 4=crossing-to,\n5=verb (test|guard), 6=oracle name. Groups 3/4 are undefined when the crossing clause is\nabsent; groups 5/6 are undefined when the via clause is absent."
+      "prose": "boundary.ts — the ONE home of the boundary- and coverage-claim grammars.\n\n`boundary \"<invariant>\" at <chokepoint> [over <enumeration>] [crossing <zone> -> <zone>] [via (test|guard) \"<oracle>\"]`\n`coverage \"<subject>\" at <chokepoint> [crossing <zone> -> <zone>] residual \"<what is NOT covered>\" [via (test|guard) \"<oracle>\"]`\n\n── WHY TWO VERBS, AND WHY `over` ─────────────────────────────────────────────────────\n\nMEASURED, in a consumer, not here: mnemion carries 15 oracles whose names end in\n\"totality\", and they are not the same kind of promise. Two of them:\n\n  boundary \"egress-sensitivity totality\" at SENSITIVE_COLUMNS  via test  \"…\"\n  boundary \"SSRF block-host totality\"    at isBlockedFederationHost via guard \"…\"\n\nThe first is total and can be finished: SENSITIVE_COLUMNS is a `const` — a list THIS\nCODE OWNS — so \"every member is classified\" is a finite check with an end. The second\ncannot be finished by anyone: `isBlockedFederationHost` is a PREDICATE, its last line is\n`return false`, and there is no enumeration of \"every private host\" to iterate. Its own\nsource says so (\"A public hostname whose DNS resolves to a private IP cannot be caught\nhere\"). One is a fact; the other is a hope wearing the same word — and both render green.\n\nThe discriminator is not decidability. It is WHO OWNS THE DOMAIN. If the artifact\ndefines the set, the claim closes. If the world defines it (\"private\", \"sensitive\",\n\"malicious\"), it can only be sampled, and the sample must say what it left out.\n\nSo: a claim whose oracle NAMES totality must NAME THE ENUMERATION it is total over —\neither because its chokepoint IS one, or through an explicit `over <enumeration>`. A\nsymbol that is `function`/`method`/`class` is a predicate, not an enumeration, and\nnaming one is exactly the open-domain mistake. A claim that genuinely has no enumeration\nis spelled `coverage` and must declare its `residual`. This is deliberately a PARSE, not\na judgment: the model that authors a claim cannot be asked whether the claim is closable\n(that is the same failure one level up), so the grammar decides instead of the author.\n\nThe `over` clause mirrors `parity … over <domain> …`, which has required a resolvable\nenumeration since it shipped. This is that rule, applied to the other totality verb.\n\nThis regex used to live (identically, in intent) at three sites — structural.ts,\nverify.ts, and render-claude.ts — and the render-claude copy drifted: it matched\n`via test` only, so `via guard` boundaries silently vanished from the generated\nCLAUDE.md invariants table. One exported regex + one parser is the structural fix:\nthe grammar cannot drift again because it has nowhere else to live.\n\nThe OPTIONAL `crossing <from> -> <to>` clause states what wall (which pair of declared\ntrust zones) this gate sits on — the PROMISE GRAPH's topology axiom (a gate declares\nwhat it separates). It is purely declarative: verify ignores it (a crossing is not a\nruntime check), scene/atlas/structural read only the fields they already read, and every\npre-crossing spec parses UNCHANGED because both the crossing clause and the via clause\nare optional and independently absent. The clause sits BETWEEN chokepoint and via, so a\ngate may declare a crossing with or without an oracle, in any combination.\n\nCapture groups: 1=invariant, 2=chokepoint symbol, 3=enumeration (`over`), 4=crossing-from,\n5=crossing-to, 6=verb (test|guard), 7=oracle name. Group 3 is undefined without an `over`\nclause, 4/5 without a crossing, 6/7 without a via — each independently optional, so every\npre-`over` spec in every consumer parses unchanged."
     },
     {
       "id": "s:src/verification/boundary.ts#BOUNDARY_RE",
@@ -7886,7 +7931,17 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/verification/boundary.ts",
-      "line": 24
+      "line": 56
+    },
+    {
+      "id": "s:src/verification/boundary.ts#COVERAGE_RE",
+      "parent": "f:src/verification/boundary.ts",
+      "label": "COVERAGE_RE",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/verification/boundary.ts",
+      "line": 64,
+      "prose": "The COVERAGE grammar — the honest verb for an open domain. `residual` is REQUIRED and\n the regex is where that is enforced: a coverage claim with nothing to say about what it\n does not cover is the green-by-absence this verb exists to prevent, so it simply does\n not parse as one. Capture groups: 1=subject, 2=chokepoint, 3=crossing-from,\n 4=crossing-to, 5=residual, 6=verb, 7=oracle."
     },
     {
       "id": "s:src/verification/boundary.ts#Boundary",
@@ -7895,8 +7950,18 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/boundary.ts",
-      "line": 29,
-      "prose": "A parsed boundary claim. `verb`/`oracle` are `\"\"` when the claim has no `via` clause;\n `crossing` is null when it declares no `crossing <from> -> <to>` wall."
+      "line": 70,
+      "prose": "A parsed boundary claim. `verb`/`oracle` are `\"\"` when the claim has no `via` clause;\n `crossing` is null when it declares no `crossing <from> -> <to>` wall; `over` is null\n when it names no explicit enumeration (the chokepoint may still be one)."
+    },
+    {
+      "id": "s:src/verification/boundary.ts#Coverage",
+      "parent": "f:src/verification/boundary.ts",
+      "label": "Coverage",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/verification/boundary.ts",
+      "line": 82,
+      "prose": "A parsed coverage claim. `residual` is never empty — COVERAGE_RE will not match without\n it. Same shape as Boundary otherwise, so renderers can treat the two uniformly where the\n distinction does not matter (and MUST NOT where it does — see `verify`'s two tallies)."
     },
     {
       "id": "s:src/verification/boundary.ts#parseBoundary",
@@ -7905,8 +7970,47 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/boundary.ts",
-      "line": 38,
+      "line": 92,
       "prose": "Parse a boundary claim, or null if the line is not one."
+    },
+    {
+      "id": "s:src/verification/boundary.ts#parseCoverage",
+      "parent": "f:src/verification/boundary.ts",
+      "label": "parseCoverage",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/verification/boundary.ts",
+      "line": 106,
+      "prose": "Parse a coverage claim, or null if the line is not one."
+    },
+    {
+      "id": "s:src/verification/boundary.ts#TOTALITY_RE",
+      "parent": "f:src/verification/boundary.ts",
+      "label": "TOTALITY_RE",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/verification/boundary.ts",
+      "line": 129,
+      "prose": "Does this oracle name PROMISE COVERAGE OF A WHOLE DOMAIN? Lexical on purpose — the word\nis what a reader believes, so the word is what must be backed. `totality` and `total`\nboth, as whole words, because \"keysets are total\" and \"keyset totality\" make the identical\npromise and a rule that caught only one spelling would teach authors the other.\n\nNOT a general universal-term lint. `any`/`never`/`pure`/`deterministic`/`exact` make\nrelated over-claims and are deliberately out of scope here: each needs its own\nqualification suite, and shipping one enforceable rule beats gesturing at five."
+    },
+    {
+      "id": "s:src/verification/boundary.ts#claimsTotality",
+      "parent": "f:src/verification/boundary.ts",
+      "label": "claimsTotality",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/verification/boundary.ts",
+      "line": 130
+    },
+    {
+      "id": "s:src/verification/boundary.ts#ENUMERABLE_SYMBOL_KINDS",
+      "parent": "f:src/verification/boundary.ts",
+      "label": "ENUMERABLE_SYMBOL_KINDS",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/verification/boundary.ts",
+      "line": 144,
+      "prose": "Symbol kinds that can BE an enumeration — a set this code owns and something can iterate.\nAn ALLOW-LIST, not a deny-list, and that direction is the whole point: a deny-list would\nlet a language pack whose captures this file has never seen (`@func`, `@constant`) slip a\npredicate through as an enumeration, silently, which is the green-by-absence this feature\nexists to remove. An unknown kind therefore REFUSES and names itself in the failure, so\nthe fix is one entry here rather than a debugging session.\n\nKinds are tree-sitter capture names (adapters/tree-sitter.ts: \"CAPTURE NAME IS SYMBOL\nKIND\"). `function`/`method`/`class` are absent BY CONSTRUCTION — a predicate has no\nmembers, and naming one as your domain is precisely the open-domain mistake."
     },
     {
       "id": "s:src/verification/boundary.ts#guaranteeRef",
@@ -7915,8 +8019,8 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/boundary.ts",
-      "line": 52,
-      "prose": "Full contract reference, unlike verdict lookup: crossing edits also expire links.\nList position and display names are excluded; owner relocation needs explicit review."
+      "line": 159,
+      "prose": "Full contract reference, unlike verdict lookup: crossing edits also expire links.\nList position and display names are excluded; owner relocation needs explicit review.\n\n`over` is INSIDE the hash, and deliberately: naming the enumeration narrows what the\nboundary promises, so a binding written against the unnamed form was written against a\nweaker contract and must be re-made rather than silently inherited. That is the same\nreason `crossing` is here — a link survives cosmetic edits, never contract edits.\n\nIt is APPENDED ONLY WHEN PRESENT, so the hashed array of an `over`-less claim is\nbyte-identical to what it was before this clause existed. Every `g-…` ref already written\ninto a consumer's spec keeps resolving; only a claim that actually gains an enumeration\ngets a new identity. A rehash of the whole population would have expired every binding in\nevery adopter to add a field most of them do not use."
     },
     {
       "id": "s:src/verification/boundary.ts#normalizeBoundaryClaim",
@@ -7925,8 +8029,8 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/boundary.ts",
-      "line": 67,
-      "prose": "The crossing clause is PURELY DECLARATIVE (topology, never a runtime check) — so it must\n not leak into verify-record identity. Records are keyed on the verbatim claim string, and\n without this normalization, ANNOTATING an existing boundary with a crossing orphans its\n prior verdict (the post-crossing claim no longer matches the pre-crossing record key —\n every such gate silently drops from its earned grade on pure annotation). This\n reconstructs the canonical claim WITHOUT the crossing clause; non-boundary claims pass\n through verbatim. Two claims that collide after stripping share inv+chokepoint+verb+oracle\n — genuinely the same gate. Applied on BOTH sides of every record lookup (store + read);\n verify still WRITES the raw claim — normalization is strictly a lookup concern."
+      "line": 179,
+      "prose": "The crossing clause is PURELY DECLARATIVE (topology, never a runtime check) — so it must\n not leak into verify-record identity. Records are keyed on the verbatim claim string, and\n without this normalization, ANNOTATING an existing boundary with a crossing orphans its\n prior verdict (the post-crossing claim no longer matches the pre-crossing record key —\n every such gate silently drops from its earned grade on pure annotation). This\n reconstructs the canonical claim WITHOUT the crossing clause; non-boundary claims pass\n through verbatim. Two claims that collide after stripping share inv+chokepoint+verb+oracle\n — genuinely the same gate. Applied on BOTH sides of every record lookup (store + read);\n verify still WRITES the raw claim — normalization is strictly a lookup concern.\n\n `over` SURVIVES this normalization while `crossing` does not, and the asymmetry is the\n point: a crossing is declarative topology verify never evaluates, but `over` names the\n enumeration the totality gate checks against — two claims differing in it are checked\n differently and must not share a verdict record."
     },
     {
       "id": "s:src/verification/boundary.ts#ClaimKey",
@@ -7935,7 +8039,7 @@
       "kind": "symbol",
       "sub": "type",
       "path": "src/verification/boundary.ts",
-      "line": 78
+      "line": 190
     },
     {
       "id": "s:src/verification/boundary.ts#claimKey",
@@ -7944,7 +8048,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/verification/boundary.ts",
-      "line": 84,
+      "line": 196,
       "prose": "The ONE record-lookup key EVERY consumer of `status.verify.claims` uses (store AND read)\n — the promise graph, the panel, the merge, and verify's decoration filter —\n so a pre-crossing record matches a post-crossing claim and vice versa. Returns the\n branded `ClaimKey`: there is no other way to mint one."
     },
     {
@@ -8064,6 +8168,134 @@
       "prose": "THE ON-RAMP — which rung of the adoption ladder this project stands on, or null once\nit has graduated (oracle-backed claims + at least one recorded refutation). Re-runnable\nby design: each run names the state and prints THE ONE NEXT ACTION, so `verify` walks\na bare repo up one step at a time instead of dumping a checklist.\n\nThis is what replaced `coherence onboard` (evicted 2026-07-31, v0.22.x): a repo with\nzero specs and a repo with a gutted graph produced identical output, so the same code\npath now answers both — by knowing, via the record, which one it is looking at."
     },
     {
+      "id": "f:src/verification/guarantee-bindings.ts",
+      "parent": "c:src/verification",
+      "label": "guarantee-bindings.ts",
+      "kind": "file",
+      "sub": "src/verification/guarantee-bindings.ts",
+      "path": "src/verification/guarantee-bindings.ts",
+      "prose": "Explicit catalog adoption. Reuses spec boundaries, contained evidence reads and\nverifier records; neither taxonomy nor a catalog example can confer support."
+    },
+    {
+      "id": "s:src/verification/guarantee-bindings.ts#GuaranteeBinding",
+      "parent": "f:src/verification/guarantee-bindings.ts",
+      "label": "GuaranteeBinding",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/verification/guarantee-bindings.ts",
+      "line": 11
+    },
+    {
+      "id": "s:src/verification/guarantee-bindings.ts#BindingReading",
+      "parent": "f:src/verification/guarantee-bindings.ts",
+      "label": "BindingReading",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/verification/guarantee-bindings.ts",
+      "line": 17
+    },
+    {
+      "id": "s:src/verification/guarantee-bindings.ts#BindingProjection",
+      "parent": "f:src/verification/guarantee-bindings.ts",
+      "label": "BindingProjection",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/verification/guarantee-bindings.ts",
+      "line": 23
+    },
+    {
+      "id": "s:src/verification/guarantee-bindings.ts#bindingDigest",
+      "parent": "f:src/verification/guarantee-bindings.ts",
+      "label": "bindingDigest",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/verification/guarantee-bindings.ts",
+      "line": 28
+    },
+    {
+      "id": "s:src/verification/guarantee-bindings.ts#projectBindings",
+      "parent": "f:src/verification/guarantee-bindings.ts",
+      "label": "projectBindings",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/verification/guarantee-bindings.ts",
+      "line": 35,
+      "prose": "Preserve every declaration, including malformed ones. No verdict is synthesized."
+    },
+    {
+      "id": "s:src/verification/guarantee-bindings.ts#bindRunEvidence",
+      "parent": "f:src/verification/guarantee-bindings.ts",
+      "label": "bindRunEvidence",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/verification/guarantee-bindings.ts",
+      "line": 115,
+      "prose": "Join THIS run's named signals to unchanged pre/post inputs, never carried verdicts."
+    },
+    {
+      "id": "f:src/verification/guarantee-catalog-cli.ts",
+      "parent": "c:src/verification",
+      "label": "guarantee-catalog-cli.ts",
+      "kind": "file",
+      "sub": "src/verification/guarantee-catalog-cli.ts",
+      "path": "src/verification/guarantee-catalog-cli.ts"
+    },
+    {
+      "id": "s:src/verification/guarantee-catalog-cli.ts#GUARANTEE_CATALOG_USAGE",
+      "parent": "f:src/verification/guarantee-catalog-cli.ts",
+      "label": "GUARANTEE_CATALOG_USAGE",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/verification/guarantee-catalog-cli.ts",
+      "line": 3
+    },
+    {
+      "id": "s:src/verification/guarantee-catalog-cli.ts#runGuaranteeCatalog",
+      "parent": "f:src/verification/guarantee-catalog-cli.ts",
+      "label": "runGuaranteeCatalog",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/verification/guarantee-catalog-cli.ts",
+      "line": 6,
+      "prose": "Reference lookup has no graph, configuration, ledger or test-runner dependency."
+    },
+    {
+      "id": "f:src/verification/guarantee-catalog.ts",
+      "parent": "c:src/verification",
+      "label": "guarantee-catalog.ts",
+      "kind": "file",
+      "sub": "src/verification/guarantee-catalog.ts",
+      "path": "src/verification/guarantee-catalog.ts"
+    },
+    {
+      "id": "s:src/verification/guarantee-catalog.ts#GuaranteeExample",
+      "parent": "f:src/verification/guarantee-catalog.ts",
+      "label": "GuaranteeExample",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/verification/guarantee-catalog.ts",
+      "line": 1
+    },
+    {
+      "id": "s:src/verification/guarantee-catalog.ts#GuaranteeDefinition",
+      "parent": "f:src/verification/guarantee-catalog.ts",
+      "label": "GuaranteeDefinition",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/verification/guarantee-catalog.ts",
+      "line": 9
+    },
+    {
+      "id": "s:src/verification/guarantee-catalog.ts#GUARANTEE_CATALOG",
+      "parent": "f:src/verification/guarantee-catalog.ts",
+      "label": "GUARANTEE_CATALOG",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/verification/guarantee-catalog.ts",
+      "line": 43,
+      "prose": "Candidate reference vocabulary. It does not participate in taxonomy activation or verdict derivation."
+    },
+    {
       "id": "f:src/verification/guarantees-cli.ts",
       "parent": "c:src/verification",
       "label": "guarantees-cli.ts",
@@ -8078,7 +8310,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/guarantees-cli.ts",
-      "line": 10,
+      "line": 12,
       "prose": "Damage is a visible unavailable reading, not an empty healthy taxonomy."
     },
     {
@@ -8088,7 +8320,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/guarantees-cli.ts",
-      "line": 15,
+      "line": 17,
       "prose": "Load canonical evidence once and project the same inventory consumed by Scope."
     },
     {
@@ -8098,7 +8330,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/guarantees-cli.ts",
-      "line": 26,
+      "line": 39,
       "prose": "Strict read-only CLI: checks referential integrity without running any oracle."
     },
     {
@@ -8351,13 +8583,23 @@
       "prose": "phrasebook.ts — the claim grammar as DATA. Every claim form `evalClaim` (verify.ts)\nunderstands lives here as an ordered `ClaimForm` registry: first match wins, and the\norder below IS the precedence (identical to the historical if-chain in evalClaim).\n\nTwo payoffs of moving the grammar out of the engine and into a registry:\n  1. `coherence phrasebook` renders the form table straight from this array, so the\n     README's hand-kept table gains a generated authority (it can't silently drift).\n  2. The dictionary (`conforms to <Word>`) is just one more form — a macro that\n     expands a word file's commitment list back through this same registry.\n\nThe boundary form imports BOUNDARY_RE from boundary.ts (its single home); it is NOT\nduplicated here."
     },
     {
+      "id": "s:src/verification/phrasebook.ts#totalityGateFailure",
+      "parent": "f:src/verification/phrasebook.ts",
+      "label": "totalityGateFailure",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/verification/phrasebook.ts",
+      "line": 46,
+      "prose": "THE TOTALITY GATE — a claim that says \"totality\" must NAME THE SET it is total over.\n\nReturns a failure detail, or null when the claim is entitled to the word. Shared by\n`boundary` and `passes test` so the word cannot be laundered by changing verb: measured in\nmnemion, the same oracle name appears as both a boundary at a `const` and a bare\n`passes test`, and only the first form was ever domain-analyzed.\n\nThe enumeration is `over <sym>` when given, else the chokepoint itself — because a\nboundary AT a list (\"at SENSITIVE_COLUMNS\") already names one, and demanding it twice\nwould be ceremony. What is refused is a `function`/`method`/`class`: a predicate has no\nmembers to iterate, so a totality claim anchored to one is promising a coverage nobody\ncan compute. That is not a lint about wording — `isBlockedFederationHost` ends in\n`return false`, and every host encoding nobody enumerated is admitted by construction.\n\nBoth the invariant and the oracle name are checked, because both are read as the promise:\nthe invariant is what lands in the generated CLAUDE.md table, the oracle is what lands in\nthe verify report, and a reader believes whichever one they saw."
+    },
+    {
       "id": "s:src/verification/phrasebook.ts#ClaimResult",
       "parent": "f:src/verification/phrasebook.ts",
       "label": "ClaimResult",
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/phrasebook.ts",
-      "line": 33,
+      "line": 72,
       "prose": "The verdict a claim form returns — adapted into verify's `Sig` (which adds claim + node).\n\n `ms` is the HOLDING COST the form can attest to from the RUNNER'S OWN report, and only\n the batch-resolved executable arm supplies it (see `execNamedTest`). Every other form\n leaves it absent, so verify falls back to its own wall clock there — deliberately, since\n a wall-clock reading over a batch lookup would measure a map hit, not the oracle."
     },
     {
@@ -8367,7 +8609,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/phrasebook.ts",
-      "line": 49,
+      "line": 88,
       "prose": "Everything a claim form needs to evaluate, threaded from runVerify. `nodeDir`/`node`\nare the DECLARING component's disk dir + label; `anchor` records a boundary-anchored\ninvariant for that component (so the coverage gate sees it — even when the boundary is\nreached through a `conforms to` word). `typecheck` is memoized upstream (one run/verify).\n`wordStack` is the `conforms to` expansion stack for cycle/depth safety.\n\n`oracles` is the EXECUTABLE-TIER seam, memoized upstream exactly like `typecheck`: at\nmost one whole-suite resolution per verify, LAZILY — a `--fast` run or a project with no\nexecutable claims never calls it. It answers with a batch report when one is available,\nand otherwise says whether the SERIAL per-claim path is permitted at all. A null report\nwith `serialAllowed: false` is a refusal (no batch, no report, nobody asked for serial),\nand the claim skips rather than quietly costing a full pool boot."
     },
     {
@@ -8377,7 +8619,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/phrasebook.ts",
-      "line": 65
+      "line": 105
     },
     {
       "id": "s:src/verification/phrasebook.ts#Word",
@@ -8386,7 +8628,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/phrasebook.ts",
-      "line": 80,
+      "line": 120,
       "prose": "── the dictionary word file ──────────────────────────────────────────────────────────\n`<coherence root>/<dictionary>/<Word>.md`: a `# <Word>` heading, first non-blank line =\nintent, a `## commitments` bullet list where each bullet is a claim line in THIS grammar\n(including `boundary …` and nested `conforms to <OtherWord>`). Parsed with walk.ts's\nregex-heading style + markdown-unescape so a prettified word file still parses."
     },
     {
@@ -8396,7 +8638,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/phrasebook.ts",
-      "line": 84,
+      "line": 124,
       "prose": "Parse a dictionary word file, or null if it is not a well-formed word (a broken\n reference must go RED, not skip — a word is a contract)."
     },
     {
@@ -8406,7 +8648,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/verification/phrasebook.ts",
-      "line": 103,
+      "line": 143,
       "prose": "Where a word file resolves, relative to the coherence root."
     },
     {
@@ -8416,7 +8658,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/phrasebook.ts",
-      "line": 111,
+      "line": 151,
       "prose": "A dictionary word plus the components that `conforms to` it — for the overview render."
     },
     {
@@ -8426,7 +8668,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/verification/phrasebook.ts",
-      "line": 116,
+      "line": 156,
       "prose": "The `conforms to <Word>` grammar — SINGLE HOME. Consumed by the claim form's `match`,\n the dictionary cross-reference in `loadDictionary`, and the `--staged`/`--since` word-edit\n propagation scope in structural.ts. Capture group 1 is the word token."
     },
     {
@@ -8436,7 +8678,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/verification/phrasebook.ts",
-      "line": 120,
+      "line": 160,
       "prose": "Regex-escape a string so it matches literally when interpolated into a RegExp or passed\n to a test runner whose `-t <name>` treats the arg as a regex (vitest, jest)."
     },
     {
@@ -8446,7 +8688,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/phrasebook.ts",
-      "line": 144,
+      "line": 184,
       "prose": "Resolve ONE named test — the shared executable arm of `passes test`,\n`boundary … via test`, and `parity … via test`. THE SINGLE FRONT DOOR: every runner\ninvocation coherence makes on a project's behalf goes through here, which is why\nbatching is a change to this one function rather than to three claim forms.\n\nTwo arms, one contract:\n  BATCH — a whole-suite report is available, so the answer is a lookup (`resolveFromBatch`).\n  PER-CLAIM — shell `config.test` with the name appended, regex-escaped for the runner's\n    `-t`; exit 0 alone is not trusted (`testMatch` requires positive evidence the named\n    test actually ran — an exit-0 runner that matched zero tests would otherwise pass a\n    renamed/deleted oracle).\n\nBoth arms require positive evidence and both go red on zero matches, so which one\nanswered is an operational detail, never a difference in what green means.\n\n`ms` — the claim's HOLDING COST, and ONLY the batch arm can report it. The report carries\nthe runner's own per-test durations, so a batched claim's cost is measured by the thing\nthat ran it. The serial arm returns none: what a wall clock sees there is a whole test-pool\nboot charged to whichever claim happened to trigger it, which is a fact about the profile,\nnot about the claim. Verify's own wall clock takes over when this is absent."
     },
     {
@@ -8456,7 +8698,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/phrasebook.ts",
-      "line": 155,
+      "line": 196,
       "prose": "The SERIAL arm of `execNamedTest`, factored so the canary below probes the EXACT code\n path a claim's verdict rides on — same spawn, same exit-code reading, same `testMatch`\n evidence rule. Exit 0 alone is not trusted: `testMatch` requires positive evidence the\n named test actually ran (a zero-match runner that exits 0 would otherwise pass a\n renamed/deleted oracle)."
     },
     {
@@ -8466,7 +8708,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/phrasebook.ts",
-      "line": 177,
+      "line": 218,
       "prose": "THE SERIAL CANARY — the repo's own doctrine applied to the instrument: a checker never\nobserved to fail has not been shown to be a checker. The batch path proves a vanished\noracle structurally (zero matches in the report is its own red); the serial path had to\nTRUST `config.test` + `testMatch`, on a runner class this repo has itself documented as\nun-guardable by testMatch (node:test multi-file: a real name and a name existing nowhere\nproduce byte-identical passing output — measured, test-batch.ts:110, types.ts).\n\nSo, once per serial verify, run the runner with a name that provably exists nowhere and\nrequire it to FAIL (nonzero exit, or a `testMatch` miss — the same reading a claim gets).\nA runner that PASSES the canary cannot filter by name: every green it would produce is\ngreen-by-absence, and verify must refuse it exactly as the batch path refuses. Cost is\none extra runner boot per serial run."
     },
     {
@@ -8476,7 +8718,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/phrasebook.ts",
-      "line": 201,
+      "line": 242,
       "prose": "Scan the dictionary dir + cross-reference the graph's `conforms to` claims. Empty when\n the project has no dictionary dir (so the overview's Dictionary section is omitted)."
     },
     {
@@ -8486,7 +8728,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/verification/phrasebook.ts",
-      "line": 219
+      "line": 260
     },
     {
       "id": "f:src/verification/run-named-test.ts",
@@ -8835,7 +9077,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 38,
+      "line": 39,
       "prose": "record subagent verdicts (the mechanical notary; judge ≠ notary, axiom #5)."
     },
     {
@@ -8845,7 +9087,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 82,
+      "line": 83,
       "prose": "Rank doc gaps HOTTEST-FIRST by the churn share of the file that defines them — the same\n`fileChurn` reading `atlas` grades crossings' heat against.\n\nWHY THE JOB LIST HAS AN ORDER AT ALL. Undocumented symbols come out of the graph in walk\norder, which is alphabetical by path and says nothing about anything. A list of ninety\n`[doc]` jobs in that order is a list nobody works from the top of; the first one worth\nwriting is the symbol in the file half the recent history touched, because that is the\none somebody is about to read.\n\nZERO-CHURN GAPS KEEP THEIR SOURCE ORDER: `Array.prototype.sort` is required to be stable\n(ECMA-262), so a project with no git history — every share 0 — gets exactly the list it\ngot before this ranking existed, rather than a set that reshuffles between runs."
     },
     {
@@ -8855,7 +9097,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 144,
+      "line": 145,
       "prose": "How much a missing refutation should WORRY you, by the shape of the claim's evidence.\n\n MEASURED, NOT REASONED. The first real `verify --raise` ever run against hoist spent its\n three-question budget like this: one genuinely valuable question (the `served responses\n are shaped` boundary, never watched fail), one marginal, and one on\n `README.md exists at root — 146 run(s), never observed failing`. The list was emitted in\n DERIVATION order, so the cap — which exists precisely because attention is the scarce\n resource — was spent on the least informative finding in an 81-item list.\n\n THE RANKING IS BY WHETHER A REFUTATION WOULD TEACH ANYTHING, and the three tiers fall\n out of what the claim's evidence actually is:\n\n   ORACLE-BACKED (`via test`, `via guard`, `passes test`, `conforms to`) ranks highest,\n   because this is where VACUOUS GREEN lives. An oracle can stop testing what it names\n   and nothing says so — this project has found that exact defect repeatedly, including\n   one oracle satisfied by a different error thrown earlier than the one under test, and\n   a `.rejects.toThrow()` passing on a why-gate rather than the seal it claimed to guard.\n   An unrefuted oracle is a claim whose instrument has never been checked.\n\n   BOUNDARY-ONLY (a crossing with no executable oracle) ranks next: it names a real\n   chokepoint, so the property matters, but the evidence is anchoring rather than\n   execution and its failure mode is narrower.\n\n   STRUCTURAL (`X exists at …`, `X imports …`) ranks LAST, and this is the tier the\n   incident was about. Such a claim can be broken — delete the file — but doing so\n   demonstrates nothing except that `stat` works. Its greenness was never in doubt and a\n   refutation would be theatre. Note the run count argues the same way and is deliberately\n   NOT used: 146 runs green says the claim is stable, not that it is informative, and\n   ranking on it would put the oldest trivia first.\n\n This orders the printed list too, not just the raise queue — the reader of a capped list\n deserves the same triage as the queue that spends the budget."
     },
     {
@@ -8865,7 +9107,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 151
+      "line": 152
     },
     {
       "id": "s:src/verification/verify.ts#costFinding",
@@ -8874,7 +9116,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 189,
+      "line": 190,
       "prose": "A claim that is expensive to KEEP TRUE. Every claim is a standing bill: the oracle behind\n it runs on every verify, forever, and one claim taking a quarter of the whole tier is a\n fact about the design of that oracle, not about the code it guards. This is the WEAKEST\n finding the harness raises — an expensive claim can be entirely correct, and often the\n honest answer is \"the domain really is that big\" — so it never displaces a correctness\n question (see the raise order below).\n\n IDENTITY IS THE CLAIM AND ITS NODE, WITH NO NUMBER IN IT. The millisecond reading is the\n most volatile thing here — it moves with machine load, cache state and the pool's mood —\n so it lives in the sentence, exactly like never-red's run count."
     },
     {
@@ -8884,7 +9126,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 219,
+      "line": 220,
       "prose": "A named invariant with no observed negative control. Broader and weaker than never-red\n — it says nothing about how the claim has behaved — so it is raised LAST and only for\n invariants never-red did not already name."
     },
     {
@@ -8894,7 +9136,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 242,
+      "line": 243,
       "prose": "A claim on a kind the project flagged. The project decided this category is one it\n distrusts; the advisory prints it every run and then forgets it."
     },
     {
@@ -8904,7 +9146,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/verify.ts",
-      "line": 269
+      "line": 270
     },
     {
       "id": "s:src/verification/verify.ts#runVerify",
@@ -8913,7 +9155,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 281
+      "line": 282
     },
     {
       "id": "f:test/_helpers.ts",
@@ -8980,8 +9222,8 @@
       "kind": "symbol",
       "sub": "function",
       "path": "test/_helpers.ts",
-      "line": 79,
-      "prose": "A symbol graph node — what a boundary claim's chokepoint resolves against.\n `parent` (a `f:<path>` file id) is optional because most callers only need the symbol to\n EXIST; supply it when the test is about which COMPONENT owns the symbol, which is the\n chain `buildMap` walks to join a guarded crossing to the organ that holds it."
+      "line": 82,
+      "prose": "A symbol graph node — what a boundary claim's chokepoint resolves against.\n `parent` (a `f:<path>` file id) is optional because most callers only need the symbol to\n EXIST; supply it when the test is about which COMPONENT owns the symbol, which is the\n chain `buildMap` walks to join a guarded crossing to the organ that holds it.\n `sub` is the SYMBOL KIND, defaulting to the realistic case — a chokepoint is a function.\n Pass \"const\" (or another enumerable kind) when the fixture is about a totality claim's\n enumeration, which a `function` deliberately cannot be."
     },
     {
       "id": "s:test/_helpers.ts#graph",
@@ -8990,7 +9232,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "test/_helpers.ts",
-      "line": 83
+      "line": 86
     },
     {
       "id": "s:test/_helpers.ts#fileNode",
@@ -8999,7 +9241,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "test/_helpers.ts",
-      "line": 88,
+      "line": 91,
       "prose": "A file graph node owned by component `dir` — what componentMap maps git paths against."
     },
     {
@@ -9009,7 +9251,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "test/_helpers.ts",
-      "line": 93,
+      "line": 96,
       "prose": "An `imports` edge between two file nodes — what the decompose fan-in (hubs) reads."
     },
     {
@@ -9280,6 +9522,31 @@
       "prose": "floor.test.ts — the NON-VACUITY FLOOR and the adoption on-ramp (src/verification/floor.ts).\n\nThe defect the floor closes, reproduced by hand twice before it existed (2026-07-31):\ngut `buildGraph` to return an empty graph and verify printed `claims: 0 · 0 green ·\n0 red · 0 skipped` and `✓ coherent`, exit 0 — the entire verification surface vanished\nfrom derivation and the gate reported success. Every claim-defended verdict rests on\nthe graph deriving non-empty, so that premise is now checked FIRST (the same\ninstrument-check-first idiom commands.test.ts applies to its AST scanner).\n\nThe same observation — zero components, zero claims — is also what a repo that never\nadopted the harness looks like. What separates them is the record's memory, so the\nsecond half of this file pins the other answer: the adoption ladder, one rung per run."
     },
     {
+      "id": "f:test/guarantee-bindings.test.ts",
+      "parent": "c:test",
+      "label": "guarantee-bindings.test.ts",
+      "kind": "file",
+      "sub": "test/guarantee-bindings.test.ts",
+      "path": "test/guarantee-bindings.test.ts"
+    },
+    {
+      "id": "s:test/guarantee-bindings.test.ts#bindingFixture",
+      "parent": "f:test/guarantee-bindings.test.ts",
+      "label": "bindingFixture",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "test/guarantee-bindings.test.ts",
+      "line": 18
+    },
+    {
+      "id": "f:test/guarantee-catalog.test.ts",
+      "parent": "c:test",
+      "label": "guarantee-catalog.test.ts",
+      "kind": "file",
+      "sub": "test/guarantee-catalog.test.ts",
+      "path": "test/guarantee-catalog.test.ts"
+    },
+    {
       "id": "f:test/guarantees.test.ts",
       "parent": "c:test",
       "label": "guarantees.test.ts",
@@ -9313,6 +9580,14 @@
       "sub": "test/hooks-cli.test.ts",
       "path": "test/hooks-cli.test.ts",
       "prose": "hooks-cli.test.ts — the host selector is a public control boundary, not an internal API."
+    },
+    {
+      "id": "f:test/import-aliases.test.ts",
+      "parent": "c:test",
+      "label": "import-aliases.test.ts",
+      "kind": "file",
+      "sub": "test/import-aliases.test.ts",
+      "path": "test/import-aliases.test.ts"
     },
     {
       "id": "f:test/index.test.ts",
@@ -9482,6 +9757,14 @@
       "sub": "test/pytest-batch.test.ts",
       "path": "test/pytest-batch.test.ts",
       "prose": "pytest-batch.test.ts — the \"pytest-json\" batch format (pytest-json-report's file,\n`pytest --json-report --json-report-file=<path>`), held to the same invariants the\nvitest-json format pinned in test-batch.test.ts:\n  · a vanished oracle reds its claim, never green-by-absence — zero matching nodeids\n    is its own named state;\n  · a claim goes green only on positive evidence its oracle ran — outcomes come from\n    report entries, never exit codes;\n  · an unknown testBatchFormat is a hard error; a torn report falls back LOUDLY to\n    the serial per-claim path.\n\nTHE FIXTURE IS SHAPED LIKE THE REAL THING: a top-level `tests` array whose entries\ncarry `nodeid` (path::Class::function, parametrized ids appending \"[param]\"),\n`outcome` (passed | failed | error | skipped | xfailed | xpassed), and per-phase\nsetup/call/teardown timings in SECONDS. No real pytest is booted here.\n\nMATCHING IS EQUALITY WITH THE FUNCTION SEGMENT, not substring: the fixture contains\n\"test_rejects_unknown_kind\" (all cases green) alongside a FAILING\n\"test_rejects_unknown_kind_extended\" — under `-k`-style substring matching the claim\nbelow would inherit that failure, so its green is the proof of the equality rule."
+    },
+    {
+      "id": "f:test/python-imports.test.ts",
+      "parent": "c:test",
+      "label": "python-imports.test.ts",
+      "kind": "file",
+      "sub": "test/python-imports.test.ts",
+      "path": "test/python-imports.test.ts"
     },
     {
       "id": "f:test/python-oracle.test.ts",
@@ -9688,7 +9971,16 @@
       "kind": "file",
       "sub": "test/test-batch.test.ts",
       "path": "test/test-batch.test.ts",
-      "prose": "test-batch.test.ts — BATCHED ORACLE EXECUTION. Two halves: the pure report layer\n(parse + match) driven directly, and the whole feature driven end-to-end through\nrunVerify against a fake batch runner.\n\nTHE FIXTURE IS REAL. `VITEST_REPORT` below was captured from an actual\n`npx vitest run --reporter=json --outputFile=…` on vitest 4.1.10 (stack traces pared\ndown, timings dropped; every field name, nesting level, and `fullName` value is\nverbatim). The schema was not guessed — the whole feature rests on `fullName` being\nthe runner's own suite-path concatenation and on `-t` matching it unanchored, and both\nwere verified by running the real thing before any of this was written.\n\nNote the fixture contains \"write policy totality covers every op\" AND\n\"write policy totality covers every op extended\" — the prefix edge, where a claim name\nthat is a strict prefix of a longer test's name must match BOTH, because that is what\nthe runner's `-t` does."
+      "prose": "test-batch.test.ts — BATCHED ORACLE EXECUTION. Two halves: the pure report layer\n(parse + match) driven directly, and the whole feature driven end-to-end through\nrunVerify against a fake batch runner.\n\nTHE FIXTURE IS REAL. `VITEST_REPORT` below was captured from an actual\n`npx vitest run --reporter=json --outputFile=…` on vitest 4.1.10 (stack traces pared\ndown, timings dropped; every field name, nesting level, and `fullName` value is\nverbatim). The schema was not guessed — the whole feature rests on `fullName` being\nthe runner's own suite-path concatenation and on `-t` matching it unanchored, and both\nwere verified by running the real thing before any of this was written.\n\nNote the fixture contains \"write policy audit covers every op\" AND\n\"write policy audit covers every op extended\" — the prefix edge, where a claim name\nthat is a strict prefix of a longer test's name must match BOTH, because that is what\nthe runner's `-t` does."
+    },
+    {
+      "id": "f:test/totality.test.ts",
+      "parent": "c:test",
+      "label": "totality.test.ts",
+      "kind": "file",
+      "sub": "test/totality.test.ts",
+      "path": "test/totality.test.ts",
+      "prose": "totality.test.ts — the gate that makes an unbackable totality claim UNSAYABLE.\n\nThe finding this pins, measured in a consumer (mnemion) rather than here: 15 oracle names\nending in \"totality\", covering two incompatible promises. `egress-sensitivity totality` is\nanchored to `SENSITIVE_COLUMNS`, a `const` this code owns — finite, iterable, finishable.\n`SSRF block-host totality` is anchored to `isBlockedFederationHost`, a predicate whose last\nline is `return false` — no enumeration exists, so every host encoding nobody thought of is\nadmitted by construction. Both rendered green, in the same words.\n\nThe gate does not ask an author (or a model) which kind a claim is — that judgment is the\nsame failure one level up. It reads the shape: an enumeration is a data symbol, a predicate\nis a `function`, and the grammar decides."
     },
     {
       "id": "f:test/tree-sitter-adapter.test.ts",
@@ -10113,6 +10405,12 @@
       "kind": "imports"
     },
     {
+      "id": "f:src/cli.ts->f:src/verification/guarantee-catalog-cli.ts:imports",
+      "source": "f:src/cli.ts",
+      "target": "f:src/verification/guarantee-catalog-cli.ts",
+      "kind": "imports"
+    },
+    {
       "id": "f:src/config.ts->x:node:path:imports",
       "source": "f:src/config.ts",
       "target": "x:node:path",
@@ -10332,6 +10630,18 @@
       "id": "f:src/derivation/derive.ts->f:src/adapters/cloudflare.ts:imports",
       "source": "f:src/derivation/derive.ts",
       "target": "f:src/adapters/cloudflare.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/derivation/derive.ts->f:src/derivation/import-aliases.ts:imports",
+      "source": "f:src/derivation/derive.ts",
+      "target": "f:src/derivation/import-aliases.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/derivation/import-aliases.ts->f:src/verification/floor.ts:imports",
+      "source": "f:src/derivation/import-aliases.ts",
+      "target": "f:src/verification/floor.ts",
       "kind": "imports"
     },
     {
@@ -12081,6 +12391,48 @@
       "kind": "imports"
     },
     {
+      "id": "f:src/verification/guarantee-bindings.ts->x:node:crypto:imports",
+      "source": "f:src/verification/guarantee-bindings.ts",
+      "target": "x:node:crypto",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/verification/guarantee-bindings.ts->f:src/types.ts:imports",
+      "source": "f:src/verification/guarantee-bindings.ts",
+      "target": "f:src/types.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/verification/guarantee-bindings.ts->f:src/evidence/status.ts:imports",
+      "source": "f:src/verification/guarantee-bindings.ts",
+      "target": "f:src/evidence/status.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/verification/guarantee-bindings.ts->f:src/taxonomy/taxonomy.ts:imports",
+      "source": "f:src/verification/guarantee-bindings.ts",
+      "target": "f:src/taxonomy/taxonomy.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/verification/guarantee-bindings.ts->f:src/verification/guarantee-catalog.ts:imports",
+      "source": "f:src/verification/guarantee-bindings.ts",
+      "target": "f:src/verification/guarantee-catalog.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/verification/guarantee-bindings.ts->f:src/verification/boundary.ts:imports",
+      "source": "f:src/verification/guarantee-bindings.ts",
+      "target": "f:src/verification/boundary.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/verification/guarantee-catalog-cli.ts->f:src/verification/guarantee-catalog.ts:imports",
+      "source": "f:src/verification/guarantee-catalog-cli.ts",
+      "target": "f:src/verification/guarantee-catalog.ts",
+      "kind": "imports"
+    },
+    {
       "id": "f:src/verification/guarantees-cli.ts->f:src/types.ts:imports",
       "source": "f:src/verification/guarantees-cli.ts",
       "target": "f:src/types.ts",
@@ -12120,6 +12472,18 @@
       "id": "f:src/verification/guarantees-cli.ts->f:src/verification/guarantees.ts:imports",
       "source": "f:src/verification/guarantees-cli.ts",
       "target": "f:src/verification/guarantees.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/verification/guarantees-cli.ts->f:src/verification/guarantee-catalog-cli.ts:imports",
+      "source": "f:src/verification/guarantees-cli.ts",
+      "target": "f:src/verification/guarantee-catalog-cli.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/verification/guarantees-cli.ts->f:src/verification/guarantee-bindings.ts:imports",
+      "source": "f:src/verification/guarantees-cli.ts",
+      "target": "f:src/verification/guarantee-bindings.ts",
       "kind": "imports"
     },
     {
@@ -12420,6 +12784,12 @@
       "id": "f:src/verification/verify.ts->f:src/verification/static-oracles.ts:imports",
       "source": "f:src/verification/verify.ts",
       "target": "f:src/verification/static-oracles.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/verification/verify.ts->f:src/verification/guarantee-bindings.ts:imports",
+      "source": "f:src/verification/verify.ts",
+      "target": "f:src/verification/guarantee-bindings.ts",
       "kind": "imports"
     },
     {
@@ -13809,6 +14179,156 @@
       "kind": "imports"
     },
     {
+      "id": "f:test/guarantee-bindings.test.ts->x:node:test:imports",
+      "source": "f:test/guarantee-bindings.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-bindings.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/guarantee-bindings.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-bindings.test.ts->x:node:crypto:imports",
+      "source": "f:test/guarantee-bindings.test.ts",
+      "target": "x:node:crypto",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-bindings.test.ts->x:node:fs/promises:imports",
+      "source": "f:test/guarantee-bindings.test.ts",
+      "target": "x:node:fs/promises",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-bindings.test.ts->x:node:path:imports",
+      "source": "f:test/guarantee-bindings.test.ts",
+      "target": "x:node:path",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-bindings.test.ts->f:test/_helpers.ts:imports",
+      "source": "f:test/guarantee-bindings.test.ts",
+      "target": "f:test/_helpers.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-bindings.test.ts->f:src/derivation/derive.ts:imports",
+      "source": "f:test/guarantee-bindings.test.ts",
+      "target": "f:src/derivation/derive.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-bindings.test.ts->f:src/verification/guarantee-bindings.ts:imports",
+      "source": "f:test/guarantee-bindings.test.ts",
+      "target": "f:src/verification/guarantee-bindings.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-bindings.test.ts->f:src/verification/guarantee-catalog.ts:imports",
+      "source": "f:test/guarantee-bindings.test.ts",
+      "target": "f:src/verification/guarantee-catalog.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-bindings.test.ts->f:src/verification/boundary.ts:imports",
+      "source": "f:test/guarantee-bindings.test.ts",
+      "target": "f:src/verification/boundary.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-bindings.test.ts->f:src/verification/verify.ts:imports",
+      "source": "f:test/guarantee-bindings.test.ts",
+      "target": "f:src/verification/verify.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-bindings.test.ts->f:src/evidence/status.ts:imports",
+      "source": "f:test/guarantee-bindings.test.ts",
+      "target": "f:src/evidence/status.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-bindings.test.ts->f:src/verification/guarantees-cli.ts:imports",
+      "source": "f:test/guarantee-bindings.test.ts",
+      "target": "f:src/verification/guarantees-cli.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-catalog.test.ts->x:node:test:imports",
+      "source": "f:test/guarantee-catalog.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-catalog.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/guarantee-catalog.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-catalog.test.ts->x:node:crypto:imports",
+      "source": "f:test/guarantee-catalog.test.ts",
+      "target": "x:node:crypto",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-catalog.test.ts->x:node:child_process:imports",
+      "source": "f:test/guarantee-catalog.test.ts",
+      "target": "x:node:child_process",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-catalog.test.ts->x:node:path:imports",
+      "source": "f:test/guarantee-catalog.test.ts",
+      "target": "x:node:path",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-catalog.test.ts->x:node:fs/promises:imports",
+      "source": "f:test/guarantee-catalog.test.ts",
+      "target": "x:node:fs/promises",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-catalog.test.ts->x:node:url:imports",
+      "source": "f:test/guarantee-catalog.test.ts",
+      "target": "x:node:url",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-catalog.test.ts->f:src/verification/guarantee-catalog.ts:imports",
+      "source": "f:test/guarantee-catalog.test.ts",
+      "target": "f:src/verification/guarantee-catalog.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-catalog.test.ts->f:src/verification/guarantee-catalog-cli.ts:imports",
+      "source": "f:test/guarantee-catalog.test.ts",
+      "target": "f:src/verification/guarantee-catalog-cli.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-catalog.test.ts->f:src/verification/guarantees-cli.ts:imports",
+      "source": "f:test/guarantee-catalog.test.ts",
+      "target": "f:src/verification/guarantees-cli.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-catalog.test.ts->f:src/taxonomy/taxonomy-catalog.ts:imports",
+      "source": "f:test/guarantee-catalog.test.ts",
+      "target": "f:src/taxonomy/taxonomy-catalog.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/guarantee-catalog.test.ts->f:test/_helpers.ts:imports",
+      "source": "f:test/guarantee-catalog.test.ts",
+      "target": "f:test/_helpers.ts",
+      "kind": "imports"
+    },
+    {
       "id": "f:test/guarantees.test.ts->x:node:test:imports",
       "source": "f:test/guarantees.test.ts",
       "target": "x:node:test",
@@ -14063,6 +14583,36 @@
     {
       "id": "f:test/hooks-cli.test.ts->f:test/_helpers.ts:imports",
       "source": "f:test/hooks-cli.test.ts",
+      "target": "f:test/_helpers.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/import-aliases.test.ts->x:node:test:imports",
+      "source": "f:test/import-aliases.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/import-aliases.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/import-aliases.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/import-aliases.test.ts->f:src/derivation/derive.ts:imports",
+      "source": "f:test/import-aliases.test.ts",
+      "target": "f:src/derivation/derive.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/import-aliases.test.ts->f:src/derivation/import-aliases.ts:imports",
+      "source": "f:test/import-aliases.test.ts",
+      "target": "f:src/derivation/import-aliases.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/import-aliases.test.ts->f:test/_helpers.ts:imports",
+      "source": "f:test/import-aliases.test.ts",
       "target": "f:test/_helpers.ts",
       "kind": "imports"
     },
@@ -14861,6 +15411,30 @@
     {
       "id": "f:test/pytest-batch.test.ts->f:test/_helpers.ts:imports",
       "source": "f:test/pytest-batch.test.ts",
+      "target": "f:test/_helpers.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/python-imports.test.ts->x:node:test:imports",
+      "source": "f:test/python-imports.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/python-imports.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/python-imports.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/python-imports.test.ts->f:src/derivation/derive.ts:imports",
+      "source": "f:test/python-imports.test.ts",
+      "target": "f:src/derivation/derive.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/python-imports.test.ts->f:test/_helpers.ts:imports",
+      "source": "f:test/python-imports.test.ts",
       "target": "f:test/_helpers.ts",
       "kind": "imports"
     },
@@ -15863,6 +16437,36 @@
     {
       "id": "f:test/test-batch.test.ts->f:test/_helpers.ts:imports",
       "source": "f:test/test-batch.test.ts",
+      "target": "f:test/_helpers.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/totality.test.ts->x:node:test:imports",
+      "source": "f:test/totality.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/totality.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/totality.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/totality.test.ts->f:src/verification/verify.ts:imports",
+      "source": "f:test/totality.test.ts",
+      "target": "f:src/verification/verify.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/totality.test.ts->f:src/verification/boundary.ts:imports",
+      "source": "f:test/totality.test.ts",
+      "target": "f:src/verification/boundary.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/totality.test.ts->f:test/_helpers.ts:imports",
+      "source": "f:test/totality.test.ts",
       "target": "f:test/_helpers.ts",
       "kind": "imports"
     },

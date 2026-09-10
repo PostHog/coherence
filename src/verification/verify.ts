@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import type { Config, Graph } from "../types.ts";
 import { CLAIM_FORMS, proveSerialRunnerCanFail, type ClaimCtx } from "./phrasebook.ts";
 import { ownerOf, refutedInvariants } from "../derivation/walk.ts";
-import { claimKey } from "./boundary.ts";
+import { claimKey, parseCoverage } from "./boundary.ts";
 import { recordVerify, readStatus, indexClaimRecords } from "../evidence/status.ts";
 import { readJournal } from "../evidence/decisions.ts";
 import { raiseFindings, formatRaise, type Finding } from "../diagnostics/raise.ts";
@@ -510,6 +510,22 @@ export async function runVerify(cfg: Config, graph: Graph, opts: VerifyOpts): Pr
   }
   const red = sigs.filter((s) => s.kind === "fail").length;
   console.log(`claims: ${sigs.length} · ${sigs.filter((s) => s.kind === "pass").length} green · ${red} red · ${sigs.filter((s) => s.kind === "skip").length} skipped`);
+  // THE TWO POPULATIONS, AND WHY THEY ARE NEVER SUMMED. A `coverage` claim has declared that
+  // its domain is open — that it samples, and that its `residual` names what it did not
+  // reach. A `boundary … totality` claim has named a set it covers entirely. Adding them
+  // produces a number that means nothing: "43 green" over a mixed population tells a reader
+  // that 43 things are settled when some of them are, by their own declaration, sampled.
+  // So they are counted apart, and the coverage line CARRIES ITS RESIDUALS — an unread
+  // residual is the source comment this verb exists to drag into the open.
+  const covered = sigs.filter((s) => parseCoverage(s.claim));
+  if (covered.length) {
+    const cGreen = covered.filter((s) => s.kind === "pass").length;
+    console.log(`  of which SAMPLED (coverage, open domain): ${covered.length} · ${cGreen} green — counted apart from totality, never added to it`);
+    for (const s of covered) {
+      const c = parseCoverage(s.claim)!;
+      console.log(`    ~ [${s.node}] ${c.subject} @ ${c.chokepoint} — NOT covered: ${c.residual}`);
+    }
+  }
   for (const s of sigs) if (s.kind !== "pass") console.log(`  ${s.kind === "fail" ? "✗" : "·"} [${s.node}] ${s.claim}${s.detail ? ` — ${s.detail}` : ""}`);
 
   // ── KINDS. Advisory by design: adoption is gradual, so an unkinded claim in a project
