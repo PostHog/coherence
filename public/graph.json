@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-09-11 16:59Z",
+  "generatedAt": "2026-09-11 21:50Z",
   "root": "coherence",
-  "absRoot": "/private/Users/daniloc/Documents/Dev/coherence",
+  "absRoot": "/Users/daniloc/Documents/Dev/coherence-scope-local",
   "nodes": [
     {
       "id": "c:.",
@@ -366,18 +366,29 @@
         "boundary \"task context is bounded and names its approximations\" at renderContextProjection via guard \"renderContext — bounded projection is route-first, byte-stable, and accounts for every omission\"",
         "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at buildScopeModel via guard \"scope model — graph/promise population mismatch refuses rather than drawing partial truth\"",
         "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at buildScopeModel via guard \"scope model — original spec explanation and unanchored declarations survive projection\"",
-        "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at renderScope via guard \"scope cards — titles have an opaque title bar and explicit contrast, with full text retained in the inspector\""
+        "boundary \"Scope views select complete attributed assets through data-only configuration\" at resolveScopeConfiguration via guard \"Scope configuration — every default is ordinary project configuration and every asset family is selectable\"",
+        "boundary \"Scope views select complete attributed assets through data-only configuration\" at projectView via guard \"Scope projections — filtering, typed sorting and pagination conserve assets and disclose omitted edges\"",
+        "boundary \"Scope views select complete attributed assets through data-only configuration\" at DEFAULT_SCOPE via guard \"Scope layout — twelve-component default remains readable and every supported layout clears rectangles\"",
+        "boundary \"Scope views select complete attributed assets through data-only configuration\" at captureScope via guard \"Scope assets — damage remains visible outside filters and invalid project configuration never becomes defaults\"",
+        "boundary \"Scope views select complete attributed assets through data-only configuration\" at captureScope via guard \"Scope journal assets — shared session-opening ids and repeated decision envelopes preserve every occurrence\"",
+        "boundary \"Scope views select complete attributed assets through data-only configuration\" at renderScope via guard \"scope renderer — one self-contained bundle preserves data without admitting markup\"",
+        "boundary \"Scope preserves every authored spec content category without inventing evidence\" at captureScope via guard \"Scope specs — every content category and custom section survives with canonical semantics and exact authored text\""
       ],
       "prose": "These projections can explain evidence but cannot create it. Scope, promise views and agent context retain the identities and limits of their canonical inputs.",
-      "why": "**task context is bounded and names its approximations.** A focused context packet is\nuseful only when its one-hop and heuristic limits stay visible; otherwise convenience is\nmisread as completeness and recreates the omission gradient this project exists to oppose.\nRoutes, named limitations, and omission accounting are mandatory framing; a byte budget\nthat cannot hold them refuses with its exact minimum. Everything else is included in a\nstable priority order, and the withheld item and byte totals make truncation observable.\nRepository-level, generated, and explicitly requested ignored files remain navigable even\nwhen the source graph owns no component for them; `graphOwner: null` is evidence, not a miss.\n\n**Scope projects the canonical promise population with deterministic gravity and honest\nabsence.** A visualization is especially capable of making missing state look calm: a\npartial component population still forms a convincing picture, and an unmeasured component\ncan inherit the visual language of a passing one. Scope therefore receives its subjects\nonly from the canonical graph/promise join, refuses when their component populations or\nreliance targets disagree, and serializes stable geometry from that model. The renderer\nmay move the viewport but never the project; absence remains visible ink.",
+      "why": "**task context is bounded and names its approximations.** A focused context packet is\nuseful only when its one-hop and heuristic limits stay visible; otherwise convenience is\nmisread as completeness and recreates the omission gradient this project exists to oppose.\nRoutes, named limitations, and omission accounting are mandatory framing; a byte budget\nthat cannot hold them refuses with its exact minimum. Everything else is included in a\nstable priority order, and the withheld item and byte totals make truncation observable.\nRepository-level, generated, and explicitly requested ignored files remain navigable even\nwhen the source graph owns no component for them; `graphOwner: null` is evidence, not a miss.\n\n**Scope projects the canonical promise population with deterministic gravity and honest\nabsence.** A visualization is especially capable of making missing state look calm: a\npartial component population still forms a convincing picture, and an unmeasured component\ncan inherit the visual language of a passing one. Scope therefore receives its subjects\nonly from the canonical graph/promise join, refuses when their component populations or\nreliance targets disagree, and serializes stable geometry from that model. The renderer\nmay move the viewport but never the project; absence remains visible ink.\n\n**Scope views select complete attributed assets through data-only configuration.** The\nold CLI canvas and four independently implemented preview panels duplicated presentation\npolicy and prevented projects from asking a different question without editing React.\nOne catalog now adapts canonical readers into assets, attributes, explicit relationships\nand source readings. Every shipped view is ordinary configuration consumed by the same\ngraph, table and card renderers as a project view. JSON selects and presents evidence;\nit cannot execute code or establish a new verdict. Failed sources stay visible outside\nfilters. Pagination names its withheld population and graph connections. The old semantic\npromise join remains shared with the guarantees command; its former canvas and preview\npanels are removed, and layout is a generic Cytoscape projection over selected assets.\n\n**Scope preserves every authored spec content category without inventing evidence.** A\ncomponent containing an invariants array is insufficient when the project needs a view\nof individual unanchored invariants. Specs, sections, intent/prose, rationale, claims,\ninvariants, refutations, zones and authored guarantee declarations retain addresses.\nThe complete original spec survives beside canonical parsed meaning. Custom sections,\nduplicate headings and malformed declarations remain text rather than being upgraded to\nclaims or silently discarded. Only the entry spec's zones have topology authority.",
       "invariants": [
         "task context is bounded and names its approximations",
-        "Scope projects the canonical promise population with deterministic gravity and honest absence"
+        "Scope projects the canonical promise population with deterministic gravity and honest absence",
+        "Scope views select complete attributed assets through data-only configuration",
+        "Scope preserves every authored spec content category without inventing evidence"
       ],
       "refutations": [
         "Scope projects the canonical promise population with deterministic gravity and honest absence: projected absent spec fields as explicit undefined; the live server parity guard went red because JSON dropped those keys. Empty JSON values restore parity; the spec projection guard now also checks a round trip with absent spec content.",
-        "Scope projects the canonical promise population with deterministic gravity and honest absence: the first canvas's dark-mode screenshot (2026-09-04) showed black titles over dense white hatch fills, with long labels extending beyond circular nodes. Scope now places text on opaque rounded cards with separate title bars, explicit foreground colors, and isolated status badges. The renderer guard pins those contrast and text-region requirements; browser inspection checks the actual project titles.",
-        "Scope projects the canonical promise population with deterministic gravity and honest absence: supplied a PromiseModel whose component population exceeded the Graph and a reliance whose target did not exist; the projection previously had enough information to draw a plausible partial canvas. The parity guard now refuses both inputs, while the render guard distinguishes an empty model and a component with no guarantees from a passing component."
+        "Scope projects the canonical promise population with deterministic gravity and honest absence: the first canvas's dark-mode screenshot (2026-09-04) showed black titles over dense white hatch fills, with long labels extending beyond circular nodes. That renderer was retired; the generic asset cards retain opaque backgrounds, explicit text colors and full text in the inspector, checked in the browser.",
+        "Scope projects the canonical promise population with deterministic gravity and honest absence: supplied a PromiseModel whose component population exceeded the Graph and a reliance whose target did not exist; the projection previously had enough information to draw a plausible partial canvas. The parity guard now refuses both inputs, while the render guard distinguishes an empty model and a component with no guarantees from a passing component.",
+        "Scope views select complete attributed assets through data-only configuration: real-repository capture refused on d-b9bbda31, shared by distinct session openings, then on d-8046a2df, repeated decision envelopes with distinct timestamps. Canonical decisions now contain their entire occurrence population; session openings use envelope addresses. Attribution survives without asserting globally unique row ids.",
+        "Scope views select complete attributed assets through data-only configuration: a 1440-by-1000 real-repository screenshot of the first generic concentric default showed twelve cards around 67 screen pixels wide despite passing DOM-population checks. The shipped configuration now selects an aspect-aware grid; the browser guard measures at least 14 screen pixels for opening titles on a twelve-component fixture and checks rectangle clearance for every supported layout.",
+        "Scope preserves every authored spec content category without inventing evidence: the first declarative inventory left invariants and refutations only inside component attributes and mislabeled atlas charts as zones. A spec containing every supported section, a custom heading, nested heading, fenced pseudo-heading and malformed link now proves independent section navigation plus exact original text; named invariants and refutations have their own assets and zones retain entry-spec authority."
       ],
       "guaranteeLinks": {
         "addresses": [],
@@ -683,7 +694,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/cli.ts",
-      "line": 100
+      "line": 102
     },
     {
       "id": "f:src/commands.ts",
@@ -7527,8 +7538,7 @@
       "label": "render-scope.ts",
       "kind": "file",
       "sub": "src/readings/render-scope.ts",
-      "path": "src/readings/render-scope.ts",
-      "prose": "render-scope.ts — a self-contained card canvas over the canonical Scope model.\nOpaque cards own their title and text regions. Status occupies a separate badge,\nso evidence decoration cannot obscure the component's name or authored intent."
+      "path": "src/readings/render-scope.ts"
     },
     {
       "id": "s:src/readings/render-scope.ts#renderScope",
@@ -7537,7 +7547,297 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/readings/render-scope.ts",
+      "line": 5,
+      "prose": "One bundled renderer ships to consumers; viewing needs no npm install or CDN."
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts",
+      "parent": "c:src/readings",
+      "label": "capture.ts",
+      "kind": "file",
+      "sub": "src/readings/scope/capture.ts",
+      "path": "src/readings/scope/capture.ts",
+      "prose": "Canonical readers adapt evidence into assets once. Renderers never interpret ledgers."
+    },
+    {
+      "id": "s:src/readings/scope/capture.ts#ScopeSnapshot",
+      "parent": "f:src/readings/scope/capture.ts",
+      "label": "ScopeSnapshot",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/capture.ts",
+      "line": 34
+    },
+    {
+      "id": "s:src/readings/scope/capture.ts#AssetCatalog",
+      "parent": "f:src/readings/scope/capture.ts",
+      "label": "AssetCatalog",
+      "kind": "symbol",
+      "sub": "class",
+      "path": "src/readings/scope/capture.ts",
+      "line": 43,
+      "prose": "Source transactions prevent a failed reader from publishing a healthy-looking subset."
+    },
+    {
+      "id": "s:src/readings/scope/capture.ts#add()",
+      "parent": "f:src/readings/scope/capture.ts",
+      "label": "add()",
+      "kind": "symbol",
+      "sub": "method",
+      "path": "src/readings/scope/capture.ts",
+      "line": 45
+    },
+    {
+      "id": "s:src/readings/scope/capture.ts#link()",
+      "parent": "f:src/readings/scope/capture.ts",
+      "label": "link()",
+      "kind": "symbol",
+      "sub": "method",
+      "path": "src/readings/scope/capture.ts",
       "line": 50
+    },
+    {
+      "id": "s:src/readings/scope/capture.ts#read()",
+      "parent": "f:src/readings/scope/capture.ts",
+      "label": "read()",
+      "kind": "symbol",
+      "sub": "method",
+      "path": "src/readings/scope/capture.ts",
+      "line": 53
+    },
+    {
+      "id": "s:src/readings/scope/capture.ts#finish()",
+      "parent": "f:src/readings/scope/capture.ts",
+      "label": "finish()",
+      "kind": "symbol",
+      "sub": "method",
+      "path": "src/readings/scope/capture.ts",
+      "line": 63
+    },
+    {
+      "id": "s:src/readings/scope/capture.ts#readScopeConfiguration",
+      "parent": "f:src/readings/scope/capture.ts",
+      "label": "readScopeConfiguration",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/readings/scope/capture.ts",
+      "line": 89
+    },
+    {
+      "id": "s:src/readings/scope/capture.ts#captureScope",
+      "parent": "f:src/readings/scope/capture.ts",
+      "label": "captureScope",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/readings/scope/capture.ts",
+      "line": 115
+    },
+    {
+      "id": "f:src/readings/scope/catalog.ts",
+      "parent": "c:src/readings",
+      "label": "catalog.ts",
+      "kind": "file",
+      "sub": "src/readings/scope/catalog.ts",
+      "path": "src/readings/scope/catalog.ts",
+      "prose": "Scope's transport is data. Readers own evidence; views own selection and presentation."
+    },
+    {
+      "id": "s:src/readings/scope/catalog.ts#Value",
+      "parent": "f:src/readings/scope/catalog.ts",
+      "label": "Value",
+      "kind": "symbol",
+      "sub": "type",
+      "path": "src/readings/scope/catalog.ts",
+      "line": 2,
+      "prose": "Scope's transport is data. Readers own evidence; views own selection and presentation."
+    },
+    {
+      "id": "s:src/readings/scope/catalog.ts#Asset",
+      "parent": "f:src/readings/scope/catalog.ts",
+      "label": "Asset",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/catalog.ts",
+      "line": 3
+    },
+    {
+      "id": "s:src/readings/scope/catalog.ts#Relation",
+      "parent": "f:src/readings/scope/catalog.ts",
+      "label": "Relation",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/catalog.ts",
+      "line": 7
+    },
+    {
+      "id": "s:src/readings/scope/catalog.ts#SourceReading",
+      "parent": "f:src/readings/scope/catalog.ts",
+      "label": "SourceReading",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/catalog.ts",
+      "line": 11
+    },
+    {
+      "id": "s:src/readings/scope/catalog.ts#Catalog",
+      "parent": "f:src/readings/scope/catalog.ts",
+      "label": "Catalog",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/catalog.ts",
+      "line": 14
+    },
+    {
+      "id": "s:src/readings/scope/catalog.ts#ASSET_KINDS",
+      "parent": "f:src/readings/scope/catalog.ts",
+      "label": "ASSET_KINDS",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/readings/scope/catalog.ts",
+      "line": 23,
+      "prose": "This inventory declares adapter ownership, including families with zero instances."
+    },
+    {
+      "id": "s:src/readings/scope/catalog.ts#valueAt",
+      "parent": "f:src/readings/scope/catalog.ts",
+      "label": "valueAt",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/readings/scope/catalog.ts",
+      "line": 39
+    },
+    {
+      "id": "s:src/readings/scope/catalog.ts#textOf",
+      "parent": "f:src/readings/scope/catalog.ts",
+      "label": "textOf",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/readings/scope/catalog.ts",
+      "line": 47
+    },
+    {
+      "id": "s:src/readings/scope/catalog.ts#compare",
+      "parent": "f:src/readings/scope/catalog.ts",
+      "label": "compare",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/readings/scope/catalog.ts",
+      "line": 48
+    },
+    {
+      "id": "s:src/readings/scope/catalog.ts#catalogSchema",
+      "parent": "f:src/readings/scope/catalog.ts",
+      "label": "catalogSchema",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/readings/scope/catalog.ts",
+      "line": 50
+    },
+    {
+      "id": "f:src/readings/scope/configuration.ts",
+      "parent": "c:src/readings",
+      "label": "configuration.ts",
+      "kind": "file",
+      "sub": "src/readings/scope/configuration.ts",
+      "path": "src/readings/scope/configuration.ts"
+    },
+    {
+      "id": "s:src/readings/scope/configuration.ts#Filter",
+      "parent": "f:src/readings/scope/configuration.ts",
+      "label": "Filter",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/configuration.ts",
+      "line": 3
+    },
+    {
+      "id": "s:src/readings/scope/configuration.ts#Field",
+      "parent": "f:src/readings/scope/configuration.ts",
+      "label": "Field",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/configuration.ts",
+      "line": 4
+    },
+    {
+      "id": "s:src/readings/scope/configuration.ts#View",
+      "parent": "f:src/readings/scope/configuration.ts",
+      "label": "View",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/configuration.ts",
+      "line": 5
+    },
+    {
+      "id": "s:src/readings/scope/configuration.ts#ScopeConfiguration",
+      "parent": "f:src/readings/scope/configuration.ts",
+      "label": "ScopeConfiguration",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/configuration.ts",
+      "line": 12
+    },
+    {
+      "id": "s:src/readings/scope/configuration.ts#DEFAULT_SCOPE",
+      "parent": "f:src/readings/scope/configuration.ts",
+      "label": "DEFAULT_SCOPE",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/readings/scope/configuration.ts",
+      "line": 20,
+      "prose": "Defaults use exactly the same language and renderers as a project-authored view."
+    },
+    {
+      "id": "s:src/readings/scope/configuration.ts#resolveScopeConfiguration",
+      "parent": "f:src/readings/scope/configuration.ts",
+      "label": "resolveScopeConfiguration",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/readings/scope/configuration.ts",
+      "line": 57,
+      "prose": "Unknown syntax refuses. There are no callbacks, expressions, imports or executable templates."
+    },
+    {
+      "id": "s:src/readings/scope/configuration.ts#Projection",
+      "parent": "f:src/readings/scope/configuration.ts",
+      "label": "Projection",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/configuration.ts",
+      "line": 143
+    },
+    {
+      "id": "s:src/readings/scope/configuration.ts#projectView",
+      "parent": "f:src/readings/scope/configuration.ts",
+      "label": "projectView",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/readings/scope/configuration.ts",
+      "line": 145,
+      "prose": "One selection mechanism for every renderer. No kind-specific view branches."
+    },
+    {
+      "id": "f:src/readings/scope/server.ts",
+      "parent": "c:src/readings",
+      "label": "server.ts",
+      "kind": "file",
+      "sub": "src/readings/scope/server.ts",
+      "path": "src/readings/scope/server.ts"
+    },
+    {
+      "id": "s:src/readings/scope/server.ts#startScopeServer",
+      "parent": "f:src/readings/scope/server.ts",
+      "label": "startScopeServer",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/readings/scope/server.ts",
+      "line": 37
+    },
+    {
+      "id": "x:node:http",
+      "label": "node:http",
+      "kind": "external",
+      "sub": "module"
     },
     {
       "id": "f:src/readings/scope-model.ts",
@@ -10076,6 +10376,45 @@
       "prose": "run-named-test.test.ts — the serial oracle runner's own contract, now INSIDE the\nevidence perimeter (src/verification/run-named-test.ts; scripts/run-named-test.mjs is a thin entry).\nThe property that matters is the one the whole executable tier leans on: a name that\nexists NOWHERE exits nonzero — a claim citing a vanished oracle must fail, not pass\nquietly. This is the runner-side half of what the serial canary probes at verify time."
     },
     {
+      "id": "f:test/scope-capture.test.ts",
+      "parent": "c:test",
+      "label": "scope-capture.test.ts",
+      "kind": "file",
+      "sub": "test/scope-capture.test.ts",
+      "path": "test/scope-capture.test.ts"
+    },
+    {
+      "id": "s:test/scope-capture.test.ts#scopeFixture",
+      "parent": "f:test/scope-capture.test.ts",
+      "label": "scopeFixture",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "test/scope-capture.test.ts",
+      "line": 14
+    },
+    {
+      "id": "f:test/scope-configuration.test.ts",
+      "parent": "c:test",
+      "label": "scope-configuration.test.ts",
+      "kind": "file",
+      "sub": "test/scope-configuration.test.ts",
+      "path": "test/scope-configuration.test.ts"
+    },
+    {
+      "id": "f:test/scope-layout.test.ts",
+      "parent": "c:test",
+      "label": "scope-layout.test.ts",
+      "kind": "file",
+      "sub": "test/scope-layout.test.ts",
+      "path": "test/scope-layout.test.ts"
+    },
+    {
+      "id": "x:@xyflow/react",
+      "label": "@xyflow/react",
+      "kind": "external",
+      "sub": "module"
+    },
+    {
       "id": "f:test/scope-model.test.ts",
       "parent": "c:test",
       "label": "scope-model.test.ts",
@@ -10619,6 +10958,18 @@
       "id": "f:src/cli.ts->f:src/readings/render-scope.ts:imports",
       "source": "f:src/cli.ts",
       "target": "f:src/readings/render-scope.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/cli.ts->f:src/readings/scope/capture.ts:imports",
+      "source": "f:src/cli.ts",
+      "target": "f:src/readings/scope/capture.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/cli.ts->f:src/readings/scope/server.ts:imports",
+      "source": "f:src/cli.ts",
+      "target": "f:src/readings/scope/server.ts",
       "kind": "imports"
     },
     {
@@ -12482,9 +12833,267 @@
       "kind": "imports"
     },
     {
-      "id": "f:src/readings/render-scope.ts->f:src/readings/scope-model.ts:imports",
+      "id": "f:src/readings/render-scope.ts->x:node:fs/promises:imports",
       "source": "f:src/readings/render-scope.ts",
+      "target": "x:node:fs/promises",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/render-scope.ts->f:src/readings/scope/capture.ts:imports",
+      "source": "f:src/readings/render-scope.ts",
+      "target": "f:src/readings/scope/capture.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->x:node:crypto:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "x:node:crypto",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->x:node:fs/promises:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "x:node:fs/promises",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->x:node:path:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "x:node:path",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/types.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/types.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/derivation/derive.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/derivation/derive.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/derivation/walk.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/derivation/walk.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/verification/boundary.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/verification/boundary.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/readings/promise.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/readings/promise.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/readings/scope-model.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
       "target": "f:src/readings/scope-model.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/evidence/status.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/evidence/status.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/evidence/decisions.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/evidence/decisions.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/evidence/defects.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/evidence/defects.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/evidence/experiment.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/evidence/experiment.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/coordination/work.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/coordination/work.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/coordination/consequence.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/coordination/consequence.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/evidence/receipts.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/evidence/receipts.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/coordination/doctrine.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/coordination/doctrine.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/taxonomy/taxonomy-ledger.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/taxonomy/taxonomy-ledger.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/taxonomy/taxonomy-catalog.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/taxonomy/taxonomy-catalog.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/verification/guarantee-catalog.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/verification/guarantee-catalog.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/verification/guarantee-bindings.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/verification/guarantee-bindings.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/verification/phrasebook.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/verification/phrasebook.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/lifecycle/control.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/lifecycle/control.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/lifecycle/hooks.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/lifecycle/hooks.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/lifecycle/hook-text.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/lifecycle/hook-text.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/lifecycle/activity.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/lifecycle/activity.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/lifecycle/read-trace.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/lifecycle/read-trace.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/diagnostics/calibration.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/diagnostics/calibration.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/diagnostics/sidecar.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/diagnostics/sidecar.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/readings/scope/catalog.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/readings/scope/catalog.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/capture.ts->f:src/readings/scope/configuration.ts:imports",
+      "source": "f:src/readings/scope/capture.ts",
+      "target": "f:src/readings/scope/configuration.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/configuration.ts->f:src/readings/scope/catalog.ts:imports",
+      "source": "f:src/readings/scope/configuration.ts",
+      "target": "f:src/readings/scope/catalog.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/server.ts->x:node:http:imports",
+      "source": "f:src/readings/scope/server.ts",
+      "target": "x:node:http",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/server.ts->x:node:crypto:imports",
+      "source": "f:src/readings/scope/server.ts",
+      "target": "x:node:crypto",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/server.ts->x:node:fs/promises:imports",
+      "source": "f:src/readings/scope/server.ts",
+      "target": "x:node:fs/promises",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/server.ts->x:node:path:imports",
+      "source": "f:src/readings/scope/server.ts",
+      "target": "x:node:path",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/server.ts->f:src/types.ts:imports",
+      "source": "f:src/readings/scope/server.ts",
+      "target": "f:src/types.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/server.ts->f:src/config.ts:imports",
+      "source": "f:src/readings/scope/server.ts",
+      "target": "f:src/config.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/server.ts->f:src/derivation/walk.ts:imports",
+      "source": "f:src/readings/scope/server.ts",
+      "target": "f:src/derivation/walk.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/server.ts->f:src/adapters/tree-sitter.ts:imports",
+      "source": "f:src/readings/scope/server.ts",
+      "target": "f:src/adapters/tree-sitter.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/server.ts->f:src/readings/scope/capture.ts:imports",
+      "source": "f:src/readings/scope/server.ts",
+      "target": "f:src/readings/scope/capture.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/server.ts->f:src/readings/render-scope.ts:imports",
+      "source": "f:src/readings/scope/server.ts",
+      "target": "f:src/readings/render-scope.ts",
       "kind": "imports"
     },
     {
@@ -16262,9 +16871,15 @@
       "kind": "imports"
     },
     {
-      "id": "f:test/render-scope.test.ts->f:src/readings/scope-model.ts:imports",
+      "id": "f:test/render-scope.test.ts->f:src/readings/scope/capture.ts:imports",
       "source": "f:test/render-scope.test.ts",
-      "target": "f:src/readings/scope-model.ts",
+      "target": "f:src/readings/scope/capture.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/render-scope.test.ts->f:src/readings/scope/configuration.ts:imports",
+      "source": "f:test/render-scope.test.ts",
+      "target": "f:src/readings/scope/configuration.ts",
       "kind": "imports"
     },
     {
@@ -16313,6 +16928,138 @@
       "id": "f:test/run-named-test.test.ts->f:src/verification/run-named-test.ts:imports",
       "source": "f:test/run-named-test.test.ts",
       "target": "f:src/verification/run-named-test.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-capture.test.ts->x:node:test:imports",
+      "source": "f:test/scope-capture.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-capture.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/scope-capture.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-capture.test.ts->x:node:fs/promises:imports",
+      "source": "f:test/scope-capture.test.ts",
+      "target": "x:node:fs/promises",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-capture.test.ts->x:node:path:imports",
+      "source": "f:test/scope-capture.test.ts",
+      "target": "x:node:path",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-capture.test.ts->x:node:os:imports",
+      "source": "f:test/scope-capture.test.ts",
+      "target": "x:node:os",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-capture.test.ts->f:src/config.ts:imports",
+      "source": "f:test/scope-capture.test.ts",
+      "target": "f:src/config.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-capture.test.ts->f:src/readings/scope/capture.ts:imports",
+      "source": "f:test/scope-capture.test.ts",
+      "target": "f:src/readings/scope/capture.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-capture.test.ts->f:src/evidence/defects.ts:imports",
+      "source": "f:test/scope-capture.test.ts",
+      "target": "f:src/evidence/defects.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-capture.test.ts->f:src/coordination/work.ts:imports",
+      "source": "f:test/scope-capture.test.ts",
+      "target": "f:src/coordination/work.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-capture.test.ts->f:src/evidence/decisions.ts:imports",
+      "source": "f:test/scope-capture.test.ts",
+      "target": "f:src/evidence/decisions.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-capture.test.ts->f:src/evidence/receipts.ts:imports",
+      "source": "f:test/scope-capture.test.ts",
+      "target": "f:src/evidence/receipts.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-capture.test.ts->x:node:child_process:imports",
+      "source": "f:test/scope-capture.test.ts",
+      "target": "x:node:child_process",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-configuration.test.ts->x:node:test:imports",
+      "source": "f:test/scope-configuration.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-configuration.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/scope-configuration.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-configuration.test.ts->f:src/readings/scope/catalog.ts:imports",
+      "source": "f:test/scope-configuration.test.ts",
+      "target": "f:src/readings/scope/catalog.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-configuration.test.ts->f:src/readings/scope/capture.ts:imports",
+      "source": "f:test/scope-configuration.test.ts",
+      "target": "f:src/readings/scope/capture.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-configuration.test.ts->f:src/readings/scope/configuration.ts:imports",
+      "source": "f:test/scope-configuration.test.ts",
+      "target": "f:src/readings/scope/configuration.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-layout.test.ts->x:node:test:imports",
+      "source": "f:test/scope-layout.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-layout.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/scope-layout.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-layout.test.ts->x:@xyflow/react:imports",
+      "source": "f:test/scope-layout.test.ts",
+      "target": "x:@xyflow/react",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-layout.test.ts->f:src/readings/scope/configuration.ts:imports",
+      "source": "f:test/scope-layout.test.ts",
+      "target": "f:src/readings/scope/configuration.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-layout.test.ts->f:src/readings/scope/catalog.ts:imports",
+      "source": "f:test/scope-layout.test.ts",
+      "target": "f:src/readings/scope/catalog.ts",
       "kind": "imports"
     },
     {

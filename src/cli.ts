@@ -70,6 +70,8 @@ import {
 import { observeOrientation, renderOrientation } from "./coordination/orient.ts";
 import { buildScopeModel } from "./readings/scope-model.ts";
 import { renderScope } from "./readings/render-scope.ts";
+import { captureScope } from "./readings/scope/capture.ts";
+import { startScopeServer } from "./readings/scope/server.ts";
 import { runTaxonomyCommand } from "./taxonomy/taxonomy-cli.ts";
 import { runGuaranteesCommand, readGuaranteeTaxonomy, projectGuarantees } from "./verification/guarantees-cli.ts";
 import { runGuaranteeCatalog } from "./verification/guarantee-catalog-cli.ts";
@@ -200,12 +202,9 @@ async function doGraph(): Promise<string[]> {
 }
 
 async function doScope(): Promise<string[]> {
-  const model = await projectGuarantees(cfg);
-  // Scope's model and renderer deliberately read no clock, checkout path, or browser
-  // state. Exact comparison is therefore the determinism oracle: unlike the older graph
-  // artifact, there is no normalization seam through which meaningful drift can vanish.
-  const json = JSON.stringify(model, null, 2) + "\n";
-  const html = renderScope(model);
+  const snapshot = await captureScope(cfg);
+  const json = JSON.stringify(snapshot, null, 2) + "\n";
+  const html = await renderScope(snapshot);
   if (check) {
     const stale: string[] = [];
     if (json !== await read(out("scope.json"))) stale.push("scope.json");
@@ -215,7 +214,7 @@ async function doScope(): Promise<string[]> {
   await writeOutputs();
   await writeFile(out("scope.json"), json);
   await writeFile(out("_scope.html"), html);
-  console.log(`scope: ${model.nodes.length} component(s), center ${model.center ?? "none"} → _scope.html`);
+  console.log(`scope: ${snapshot.catalog.assets.length} assets, ${snapshot.configuration.views.length} configured views → _scope.html`);
   return [];
 }
 
@@ -358,8 +357,17 @@ if (cmd === "guarantees") {
   const stale = await doGraph();
   if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "graph current"); await exit(stale.length ? 1 : 0); }
 } else if (cmd === "scope") {
-  const stale = await doScope();
-  if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "scope current"); await exit(stale.length ? 1 : 0); }
+  if (argv.some(a => !["--check", "--serve"].includes(a)) || new Set(argv).size !== argv.length || (check && argv.includes("--serve"))) {
+    console.error("usage: coherence scope [--check | --serve]"); await exit(2);
+  }
+  if (argv.includes("--serve")) {
+    const live = await startScopeServer({ cfg });
+    console.log(`Scope live (read-only): ${live.url}\nConfiguration: coherence.scope.json · Ctrl-C stops the server.`);
+    for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => { void live.close().then(() => process.exit(0)); });
+  } else {
+    const stale = await doScope();
+    if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "scope current"); await exit(stale.length ? 1 : 0); }
+  }
 } else if (cmd === "overview") {
   const stale = await doOverview();
   if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "overview current"); await exit(stale.length ? 1 : 0); }

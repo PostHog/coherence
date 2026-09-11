@@ -2407,32 +2407,28 @@ self-defeating.
 
 ## Watch agents work in Scope
 
-From this source checkout, run `npm run serve --prefix scripts/scope-preview` and open
-the printed local URL. Structure, Hooks, Journal and Taxonomy update automatically as
-project files and evidence change; no manual snapshot rebuild or page reload is needed.
-The view preserves zoom, layout parameters, tab and selection, with pause/resume controls.
+Run `coherence scope --serve` in a project and open the printed loopback URL. Scope
+ships with configurable Structure, Guarantees, Specs, Work, Journal, Taxonomy,
+Evidence, Hooks and All assets views. `coherence scope` writes an offline
+`<outputDir>/_scope.html` and the complete `scope.json` asset catalog.
 
-Coherence adopts its own component model through real source ownership: `src/` keeps
-the CLI composition, configuration and shared contracts; nested assemblies own derivation,
-verification, durable evidence, lifecycle integration, coordination, taxonomy, readings,
-diagnostics and adapters. Their existing guarantees, rationale and recorded refutations
-live with the enforcing code. The adoption guard checks that boundary chokepoints and
-their specs have the same owner.
+Every view is a declarative configuration over the same assets and attributes.
+Add `coherence.scope.json` to replace defaults or add project-specific graphs,
+tables and grouped cards. The **Configure** editor previews changes and downloads
+the configuration and attribute inventory. No frontend code is needed.
 
-Scope separates project containment, implementation reliance and configured test imports.
-Tests remain inspectable evidence surfaces but do not pull the runtime center toward the
-test suite. The library view opens a bounded assembly group with explicit omitted counts;
-the component index and whole-project overview retain access to every subject. Its inspector
-also projects the existing atlas's trust domains, transition meanings and named enforcement
-references. A declaration is not a verification result. Historical taxonomy assessments
-are not reassigned or renewed by moving files: changed subjects remain visibly stale until
-explicitly reassessed.
+The catalog includes source structure, every authored spec section, individual claims,
+invariants and refutations, guarantees, taxonomy, journal records, work, consequences,
+verification evidence, agent lifecycle observations and recorded instruments.
+Unavailable sources remain visible independently of filters. Views neither execute
+verification nor infer component health from recorded evidence.
 
-This is live inspection, not continuous verification: watching never runs tests or
-authors evidence. Guarantee marks show recorded verdicts, and failed derivation leaves
-the last model explicitly unavailable until recovery. The standalone `_scope-library.html`
-remains an offline snapshot. See [Scope setup and limits](scripts/scope-preview/README.md)
-for dependencies, polling behavior and the built-in-adapter restriction.
+Live updates preserve graph cameras; Pause holds incoming snapshots. The standalone
+HTML makes no network requests. Both use the same bundled React, Radix, React Flow
+and Cytoscape implementation. The former separate library preview is retired.
+
+See [Scope configuration, asset inventory and limits](docs/scope.md). From this source
+checkout, run `npm run build`, then `node src/cli.ts scope --serve`.
 
 ## Taxonomy: discover obligations before verifying them
 
@@ -2595,16 +2591,9 @@ mappings. A current link can have a failing oracle. A passing oracle cannot prov
 mapping adequate. Immutable verification receipts and satisfaction assessment are not
 implemented by this layer.
 
-Scope uses the same resolver for saved snapshots and live updates. Each card switches
-between the complete spec description and named guarantees, keeping taxonomy visible
-in either reading. Guarantees include unlinked obligation counts; inspectors separate each direction,
-the author's rationale, link health and recorded test evidence. Unmapped connections say
-“No guarantee linked.” No browser action writes an assessment or reruns an oracle.
+Scope uses the same canonical guarantee resolver for offline and live asset captures. Configured views select which fields to show; the inspector retains the complete reading and its explicit relationships.
 
-The [Scope library preview](scripts/scope-preview/README.md) has a Taxonomy tab
-with the same canonical projection, shared session filtering, search, evidence
-details and unverified obligation suggestions. Its optional read-only server updates
-both new revisions and source-file staleness. The browser never writes classifications.
+The default Scope Taxonomy view shows canonical assessments and obligations. Role, facet, question and suggestion definitions are also selectable assets; they do not acquire verification verdicts.
 
 The [Coherence field exercise — Codex's take](TAXONOMY-COHERENCE-FIELD-REPORT-CODEX-TAKE.md)
 records 22 assessed subjects, unresolved catalog fits, and two reproduced evidence
@@ -2673,7 +2662,7 @@ any is in **In detail** below — that half is authored, and does not cover all 
 **Derive the artifacts**
 
 - `coherence graph [--check]` — emit `graph.json` + `_graph.html` (the outline) to `outputDir`
-- `coherence scope [--check]` — emit deterministic `scope.json` + `_scope.html` around the project's center of gravity
+- `coherence scope [--check | --serve]` — project the asset catalog through `coherence.scope.json`; emit `scope.json` + `_scope.html` or serve live read-only views
 - `coherence overview [--check]` — emit `_overview.html` + `AGENTS.md`
 - `coherence docs [--check]` — graph + overview + this command index; `--check` fails on any stale artifact
 - `coherence claude [--check]` — regenerate the owned fenced block inside `CLAUDE.md`

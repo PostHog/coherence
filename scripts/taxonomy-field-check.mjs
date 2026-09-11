@@ -46,19 +46,22 @@ const summary = {
   catalog: { coreRoles: catalog.roles.filter(r => r.pack === 'core').length,
     coreRolesWithoutDirectSuggestions: catalog.roles.filter(r => r.pack === 'core' && !core.some(g => g.when === r.id)).map(r => r.id),
     coreFacetsWithoutEnabledSuggestions: catalog.facets.filter(f => f.pack === 'core' && !core.some(g => g.when === f.id)).map(f => f.id) },
-  probes: [probe('src'), probe('c:src'), probe('scripts/scope-preview/app.jsx'),
+  probes: [probe('src'), probe('c:src'), probe('src/readings/scope/app.jsx'),
     probe('src/derivation/walk.ts#parseSpec', representation), probe('src/types.ts', representation),
     probe('src/readings/scope-model.ts', [...representation, '--answer', 'signal:transforms-form=yes', '--role', 'role:lowerer-domain-transformer', '--facet', 'facet:deterministic']),
     probe('test/taxonomy.test.ts', allNo), probe('src/cli.ts')],
 };
 if (process.argv.includes('--check-preview')) {
-  const readings = JSON.parse(readFileSync(new URL('../public/scope-readings.json', import.meta.url), 'utf8'));
-  const ids = rows => rows.map(i => i.record.id).sort();
-  assert.deepEqual(ids(readings.taxonomy.items), ids(items), 'Recapture Scope: recorded population differs');
-  assert.deepEqual(readings.taxonomy.items, items, 'Recapture Scope: classification or freshness differs');
-  const html = readFileSync(new URL('../public/_scope-library.html', import.meta.url), 'utf8');
+  const snapshot = JSON.parse(readFileSync(new URL('../public/scope.json', import.meta.url), 'utf8'));
+  const assessments = snapshot.catalog.assets.filter(a => a.kind === 'assessment' && a.attributes.status !== 'superseded');
+  assert.deepEqual(assessments.map(a => a.attributes.record.id).sort(), items.map(i => i.record.id).sort(), 'Recapture Scope: recorded population differs');
+  for (const item of items) {
+    const asset = assessments.find(a => a.attributes.record.id === item.record.id);
+    for (const [field, value] of Object.entries(item)) assert.deepEqual(asset.attributes[field], value, `Recapture Scope: ${field} differs`);
+  }
+  const html = readFileSync(new URL('../public/_scope.html', import.meta.url), 'utf8');
   const embedded = JSON.parse(html.match(/<script type="application\/json" id="scope-data">([\s\S]*?)<\/script>/)?.[1] ?? 'null');
-  assert.deepEqual(embedded?.readings.taxonomy, readings.taxonomy, 'Rebuild Scope: embedded taxonomy differs');
+  assert.deepEqual(embedded?.catalog, snapshot.catalog, 'Rebuild Scope: embedded catalog differs');
   summary.preview = { matchedSubjects: items.length, projectionParity: true };
 }
 console.log(JSON.stringify(summary, null, 2));

@@ -170,6 +170,24 @@ try {
   assert.ok(existsSync(join(installed, "docs/assays/posthog-guarantees-v0/evidence.json")));
   assert.ok(existsSync(join(installed, "dist/verification/guarantee-bindings.js")), "input-bound guarantee projection must ship");
   assert.ok(existsSync(join(installed, "docs/assays/posthog-scope-v0/README-CODEX-TAKE.md")), "binding adoption documentation must ship");
+  assert.ok(existsSync(join(installed, "docs/scope.md")), "declarative Scope guide must ship");
+  assert.ok(existsSync(join(installed, "dist/readings/scope/client.js")), "Scope must ship its bundled browser libraries");
+  const scopeConsumer = join(temporaryRoot, "scope-consumer");
+  await mkdir(scopeConsumer);
+  await writeFile(join(scopeConsumer, "coherence.config.json"), JSON.stringify({ name: "Scope consumer", outputDir: "artifacts", test: [], typecheck: [] }));
+  await writeFile(join(scopeConsumer, "project.spec.md"), '# Consumer\n\nPackaged asset fixture.\n\n## invariants\n\n- explicit absence\n');
+  await writeFile(join(scopeConsumer, "coherence.scope.json"), JSON.stringify({ version: 1, extends: false, views: [
+    { id: "custom", title: "Consumer invariants", renderer: "cards", kinds: ["invariant"], fields: [{ field: "attributes.anchored" }] },
+  ] }));
+  run(coherence, ["scope"], { cwd: scopeConsumer });
+  run(coherence, ["scope", "--check"], { cwd: scopeConsumer });
+  const scopeSnapshot = JSON.parse(await readFile(join(scopeConsumer, "artifacts/scope.json"), "utf8"));
+  assert.equal(scopeSnapshot.configuration.views.length, 1);
+  assert.equal(scopeSnapshot.configuration.views[0].title, "Consumer invariants");
+  assert.ok(scopeSnapshot.catalog.assets.some(a => a.kind === "invariant" && a.attributes.anchored === false));
+  const scopeHtml = await readFile(join(scopeConsumer, "artifacts/_scope.html"), "utf8");
+  assert.doesNotMatch(scopeHtml, /<(script|link)[^>]+(?:src|href)=/);
+  assert.deepEqual(JSON.parse(scopeHtml.match(/<script type="application\/json" id="scope-data">([\s\S]*?)<\/script>/)[1]), scopeSnapshot);
   assert.match(run(coherence, ["guarantees", "--help"], { cwd: consumer }).stdout, /guarantee bindings/);
   for (const definition of guaranteeCatalog.definitions) {
     for (const evidence of definition.example.runEvidence)

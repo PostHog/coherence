@@ -121,7 +121,7 @@ export const COMMANDS: Command[] = [
   { name: "taxonomy", group: "perceive", usage: "<catalog|profile|inspect|record|list|show|help> [options]", summary: "evidence-addressed role/facet classification and unverified obligation suggestions; only record writes" },
   // ── derive ───────────────────────────────────────────────────────────────────────────
   { name: "graph", group: "derive", usage: "[--check]", summary: "emit `graph.json` + `_graph.html` (the outline) to `outputDir`", writesArtifacts: true },
-  { name: "scope", group: "derive", usage: "[--check]", summary: "emit deterministic `scope.json` + `_scope.html` around the project's center of gravity", writesArtifacts: true },
+  { name: "scope", group: "derive", usage: "[--check | --serve]", summary: "project the asset catalog through `coherence.scope.json`; emit `scope.json` + `_scope.html` or serve live read-only views", writesArtifacts: true },
   { name: "guarantees", group: "perceive", usage: "[catalog [guarantee:ID]] [--check] [--json]", summary: "inspect candidate vocabulary or spec guarantees and links; --check applies only to project link integrity, not satisfaction" },
   { name: "overview", group: "derive", usage: "[--check]", summary: "emit `_overview.html` + `AGENTS.md`", writesArtifacts: true },
   { name: "docs", group: "derive", usage: "[--check]", summary: "graph + overview + this command index; `--check` fails on any stale artifact", writesArtifacts: true },
