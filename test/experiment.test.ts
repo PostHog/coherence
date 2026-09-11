@@ -186,7 +186,7 @@ test("plan actions are inert text — shell syntax is recorded and never execute
   } finally { await cleanup(root); }
 });
 
-test("close — total nonempty evidence is mandatory and outcome is derived, never supplied", async () => {
+test("close — evidence for every criterion is mandatory and outcome is derived, never supplied", async () => {
   const { root, config } = await project();
   try {
     const opened = createExperiment(config, plan());

@@ -1269,6 +1269,43 @@ right first hypothesis, and the discriminating test is the refutation you owe an
 
 ## The meta-oracle: what it proves — and what it does NOT
 
+Claims whose invariant or oracle name explicitly says `total` or `totality` first pass
+a stricter domain-admission check. Both `via test` and `via guard` must name an oracle
+and a uniquely resolved domain. The TS/JS source grade is a concrete, nonempty
+top-level TS/JS `const` array/object literal or runtime enum, with a direct iteration
+of that same source binding in the named oracle. Direct named-import aliases are
+supported when the source declaration is directly exported and the relative import
+names its exact source-file path. Extensionless resolution, emitted `.js` to `.ts`
+rewriting, and re-export chains are unsupported. Traversal must match the domain shape: array operations require arrays, while
+objects and enums use property iteration. Ambiguous names, scalar/interface/type declarations, dynamic construction,
+spreads, unsupported source syntax and filtered domains refuse. `over <ENUMERATION>`
+names the domain separately from the applying chokepoint when needed.
+
+Python supports nonempty module-level literal tuples, lists, sets and dictionaries,
+including direct imported aliases and package-relative imports. A uniquely named test
+function or direct test method must iterate that binding with `for`; dictionaries also
+support `.keys()`, `.values()` and `.items()`. Inspection uses the Python grammar and
+does not execute the project. Named execution evidence is still required for a pass.
+
+The Python grade refuses scalars, empty or dynamically constructed collections, dynamic
+members, splats, comprehensions, rebinding (including pattern captures and conflicting
+import aliases), and sliced or filtered traversal. Module/package collisions and a
+test-local module shadowing the declared source refuse instead of guessing the import
+path. Python Enum, decorated/parameterized tests, nested registration, early exits and
+qualified method selectors are unsupported; duplicate bare test names refuse. Runtime
+search-path changes and indirect mutation remain outside this source-inspection grade.
+
+This establishes a bounded structural relationship, not semantic totality: it does not
+prove that assertions are adequate, that an early exit cannot skip members, that runtime
+mutation preserves the population, or that the declared set completely models the world.
+Fast verification still cannot turn structural admission into an executed pass. Narrow
+an unsupported claim or state its open-domain residual with `coverage`; do not substitute
+a type name for runtime membership. `totalityEnumeration: false` explicitly disables
+this admission check. Disabling `oracleDomain` alone does not bypass it.
+
+For other `via test` claims, the existing live-root analysis below remains a weaker,
+separate instrument:
+
 A `boundary … via test "<oracle>"` claim already checks the chokepoint symbol exists
 and the named test passes. Those two say NOTHING about whether the oracle is a real
 totality check: a test that loops a hand-written array passes, looks total, and

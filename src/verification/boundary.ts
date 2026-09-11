@@ -11,24 +11,13 @@
 //   boundary "egress-sensitivity totality" at SENSITIVE_COLUMNS  via test  "…"
 //   boundary "SSRF block-host totality"    at isBlockedFederationHost via guard "…"
 //
-// The first is total and can be finished: SENSITIVE_COLUMNS is a `const` — a list THIS
-// CODE OWNS — so "every member is classified" is a finite check with an end. The second
-// cannot be finished by anyone: `isBlockedFederationHost` is a PREDICATE, its last line is
-// `return false`, and there is no enumeration of "every private host" to iterate. Its own
-// source says so ("A public hostname whose DNS resolves to a private IP cannot be caught
-// here"). One is a fact; the other is a hope wearing the same word — and both render green.
-//
-// The discriminator is not decidability. It is WHO OWNS THE DOMAIN. If the artifact
-// defines the set, the claim closes. If the world defines it ("private", "sensitive",
-// "malicious"), it can only be sampled, and the sample must say what it left out.
-//
-// So: a claim whose oracle NAMES totality must NAME THE ENUMERATION it is total over —
-// either because its chokepoint IS one, or through an explicit `over <enumeration>`. A
-// symbol that is `function`/`method`/`class` is a predicate, not an enumeration, and
-// naming one is exactly the open-domain mistake. A claim that genuinely has no enumeration
-// is spelled `coverage` and must declare its `residual`. This is deliberately a PARSE, not
-// a judgment: the model that authors a claim cannot be asked whether the claim is closable
-// (that is the same failure one level up), so the grammar decides instead of the author.
+// A concrete source-owned list can bound a population; a predicate over external inputs
+// cannot supply such a list merely by existing. Naming the domain is necessary, but a
+// declaration KIND is insufficient: consts can be scalars and interfaces are erased.
+// totality.ts therefore checks concrete runtime collection shape, unique source identity,
+// and direct iteration by the named oracle at a bounded TS/JS grade. It does not infer
+// semantic totality from those syntactic facts. Unsupported shapes refuse explicitly;
+// a genuinely sampled open-domain claim uses coverage and declares its residual.
 //
 // The `over` clause mirrors `parity … over <domain> …`, which has required a resolvable
 // enumeration since it shipped. This is that rule, applied to the other totality verb.
@@ -128,20 +117,6 @@ export function parseCoverage(claim: string): Coverage | null {
  */
 export const TOTALITY_RE = /\b(totality|total)\b/i;
 export const claimsTotality = (oracleName: string): boolean => TOTALITY_RE.test(oracleName);
-
-/**
- * Symbol kinds that can BE an enumeration — a set this code owns and something can iterate.
- * An ALLOW-LIST, not a deny-list, and that direction is the whole point: a deny-list would
- * let a language pack whose captures this file has never seen (`@func`, `@constant`) slip a
- * predicate through as an enumeration, silently, which is the green-by-absence this feature
- * exists to remove. An unknown kind therefore REFUSES and names itself in the failure, so
- * the fix is one entry here rather than a debugging session.
- *
- * Kinds are tree-sitter capture names (adapters/tree-sitter.ts: "CAPTURE NAME IS SYMBOL
- * KIND"). `function`/`method`/`class` are absent BY CONSTRUCTION — a predicate has no
- * members, and naming one as your domain is precisely the open-domain mistake.
- */
-export const ENUMERABLE_SYMBOL_KINDS = new Set(["const", "let", "enum", "interface", "type", "module"]);
 
 /** Full contract reference, unlike verdict lookup: crossing edits also expire links.
  * List position and display names are excluded; owner relocation needs explicit review.

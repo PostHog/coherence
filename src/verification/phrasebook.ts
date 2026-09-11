@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import type { Config, Graph } from "../types.ts";
-import { BOUNDARY_RE, COVERAGE_RE, claimsTotality, ENUMERABLE_SYMBOL_KINDS } from "./boundary.ts";
+import { BOUNDARY_RE, COVERAGE_RE, claimsTotality } from "./boundary.ts";
 import { PARITY_RE } from "./parity.ts";
 import { analyzeOracle, analyzeParityOracle } from "./oracle-domain.ts";
 import { unescapeMd } from "../derivation/walk.ts";
@@ -24,44 +24,7 @@ import { staticFastVerdict, type StaticOracleIndex } from "./static-oracles.ts";
 
 const fileExists = async (p: string) => { try { await stat(p); return true; } catch { return false; } };
 
-/**
- * THE TOTALITY GATE — a claim that says "totality" must NAME THE SET it is total over.
- *
- * Returns a failure detail, or null when the claim is entitled to the word. Shared by
- * `boundary` and `passes test` so the word cannot be laundered by changing verb: measured in
- * mnemion, the same oracle name appears as both a boundary at a `const` and a bare
- * `passes test`, and only the first form was ever domain-analyzed.
- *
- * The enumeration is `over <sym>` when given, else the chokepoint itself — because a
- * boundary AT a list ("at SENSITIVE_COLUMNS") already names one, and demanding it twice
- * would be ceremony. What is refused is a `function`/`method`/`class`: a predicate has no
- * members to iterate, so a totality claim anchored to one is promising a coverage nobody
- * can compute. That is not a lint about wording — `isBlockedFederationHost` ends in
- * `return false`, and every host encoding nobody enumerated is admitted by construction.
- *
- * Both the invariant and the oracle name are checked, because both are read as the promise:
- * the invariant is what lands in the generated CLAUDE.md table, the oracle is what lands in
- * the verify report, and a reader believes whichever one they saw.
- */
-export function totalityGateFailure(
-  ctx: ClaimCtx, inv: string, chokepoint: string, over: string | null, oracle: string,
-): string | null {
-  if (ctx.cfg.totalityEnumeration === false) return null;
-  const promise = claimsTotality(oracle) ? oracle : claimsTotality(inv) ? inv : null;
-  if (!promise) return null;
-  const named = over ?? chokepoint;
-  const node = ctx.graph.nodes.find((n) => n.kind === "symbol" && n.label === named);
-  if (!node)
-    return `[totality] "${promise}" promises totality but its enumeration \`${named}\` is not in the code graph. Name the list it is total over: \`boundary "…" at ${chokepoint} over <ENUMERATION> …\`.`;
-  const kind = node.sub ?? "(unknown)";
-  if (ENUMERABLE_SYMBOL_KINDS.has(kind)) return null;
-  return [
-    `[totality] "${promise}" promises totality, but \`${named}\` is a ${kind} — a predicate, not an enumeration.`,
-    `A ${kind} has no members to iterate, so nothing can check that every member is covered; whatever it does not recognize is admitted by construction.`,
-    `Either name the set this is total OVER — \`boundary "${inv}" at ${chokepoint} over <ENUMERATION> …\` (an enumeration is one of: ${[...ENUMERABLE_SYMBOL_KINDS].sort().join(", ")}) —`,
-    `or say the honest thing, that this samples an open domain: \`coverage "${inv}" at ${chokepoint} residual "<what this does NOT cover>" …\`.`,
-  ].join(" ");
-}
+import { totalityGateFailure } from "./totality.ts";
 
 /** The verdict a claim form returns — adapted into verify's `Sig` (which adds claim + node).
  *
@@ -351,18 +314,19 @@ export const CLAIM_FORMS: ClaimForm[] = [
     // THE TOTALITY GATE RUNS FOR BOTH VERBS, and that is deliberate: `via guard` is the
     // declared exemption from the live-domain meta-oracle, and it had become the place an
     // unbackable totality claim could sit undisturbed (measured: mnemion's SSRF block-host
-    // "totality" is a guard on a `return false` predicate). An exemption from domain
-    // ANALYSIS is not an exemption from naming the domain.
+    // "totality" is a guard on a `return false` predicate). Totality promises require concrete source domains and
+    // directly bound oracle iteration for BOTH verbs, independent of oracleDomain.
     evaluate: async (ctx, m) => {
       const inv = m[1], sym = m[2], over = m[3] ?? null, verb = m[6], test = m[7];
       ctx.anchor(inv);
       if (!ctx.graph.nodes.some((n) => n.kind === "symbol" && n.label === sym)) return { kind: "fail", detail: `chokepoint symbol "${sym}" not found in the code graph` };
       if (over && !ctx.graph.nodes.some((n) => n.kind === "symbol" && n.label === over))
         return { kind: "fail", detail: `enumeration "${over}" (over) not found in the code graph` };
-      const totality = totalityGateFailure(ctx, inv, sym, over, test ?? "");
+      const totality = await totalityGateFailure(ctx.cfg, ctx.graph, inv, sym, over, test ?? "");
       if (totality) return { kind: "fail", detail: totality };
       if (!test) return { kind: "pass", detail: `${inv} @ ${sym} (no oracle)` };
-      if (verb === "test" && ctx.cfg.oracleDomain !== false) {
+      if (verb === "test" && ctx.cfg.oracleDomain !== false
+        && !(ctx.cfg.totalityEnumeration !== false && (claimsTotality(inv) || claimsTotality(test)))) {
         const a = await analyzeOracle(ctx.cfg, test);
         if (a.verdict === "literal")
           return { kind: "fail", detail: `[oracle] "${test}" iterates a LITERAL domain (${a.detail}) — a sampling oracle, not totality. Derive its domain from the live SSOT behind \`${sym}\` (or, if it is a source-property guard, declare it \`via guard\` not \`via test\`).` };
@@ -376,7 +340,7 @@ export const CLAIM_FORMS: ClaimForm[] = [
       const r = execNamedTest(ctx, test);
       if (!r.ok) return { kind: "fail", detail: r.detail, ms: r.ms };
       const domain = over ? ` over ${over}` : "";
-      return { kind: "pass", detail: `${inv} @ ${sym}${domain}${verb === "guard" ? " (source-property guard)" : ""}`, ms: r.ms };
+      return { kind: "pass", detail: `${inv} @ ${sym}${domain}${verb === "guard" ? " (source-property guard)" : ""}${ctx.cfg.totalityEnumeration !== false && (claimsTotality(inv) || claimsTotality(test)) ? " (concrete-domain/direct-iteration grade; semantic coverage is caller-assessed)" : ""}`, ms: r.ms };
     },
   },
   {

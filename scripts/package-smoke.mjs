@@ -115,6 +115,25 @@ try {
   await executable(coherence);
   await executable(coherenceHook);
 
+  // Packaged Python parsing must admit a real collection and refuse a scalar.
+  // Fast mode checks structure; it must not claim that the Python oracle ran.
+  const pythonConsumer = join(temporaryRoot, "python-consumer");
+  await mkdir(pythonConsumer);
+  await writeFile(join(pythonConsumer, "coherence.config.json"), JSON.stringify({
+    language: "python", codeExt: ["py"], typecheck: [], test: [],
+  }) + "\n");
+  await writeFile(join(pythonConsumer, "project.spec.md"),
+    '# Policy\n\n## invariants\n\n- policy totality\n\n## works when\n\n- boundary "policy totality" at DOMAIN via guard "test_domain"\n\n## why\n\nThe policy has two states.\n');
+  await writeFile(join(pythonConsumer, "policy.py"), 'DOMAIN = ("a", "b")\n');
+  await writeFile(join(pythonConsumer, "test_policy.py"),
+    'from policy import DOMAIN\ndef test_domain():\n    for item in DOMAIN:\n        assert item\n');
+  const pythonAdmission = run(coherence, ["verify", "--fast"], { cwd: pythonConsumer });
+  assert.match(pythonAdmission.stdout, /1 skipped/);
+  assert.doesNotMatch(pythonAdmission.stdout, /\[totality\]/);
+  await writeFile(join(pythonConsumer, "policy.py"), "DOMAIN = 7\n");
+  const pythonRefusal = run(coherence, ["verify", "--fast"], { cwd: pythonConsumer, status: 1 });
+  assert.match(pythonRefusal.stdout + pythonRefusal.stderr, /\[totality\]/);
+
   const guaranteeCatalog = JSON.parse(run(coherence, ["guarantees", "catalog", "--json"], { cwd: consumer }).stdout);
   assert.equal(guaranteeCatalog.definitions.length, 36);
   assert.equal(guaranteeCatalog.maturity, "candidate");

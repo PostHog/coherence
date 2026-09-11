@@ -6,6 +6,8 @@ Oracle discovery, execution and record lookup converge here. A passing process i
 
 ## invariants
 
+- enumeration promises require concrete domains and bound oracles
+
 - catalog binding support requires a named oracle check at unchanged explicit inputs
 - candidate guarantee vocabulary stays project-independent and never activates obligations
 - explicit guarantee links expire with their premises and never prove satisfaction
@@ -21,6 +23,14 @@ Oracle discovery, execution and record lookup converge here. A passing process i
 - an undeclared root refuses the walk, never wanders
 
 ## refutations
+
+- enumeration promises require concrete domains and bound oracles: independent Python review executed a passing decoy oracle after `from registry import DOMAIN, OTHER as DOMAIN`; statement-level import permission had hidden its second binding. Import admission now checks every local target within the permitted statement, refusing duplicate bare or aliased targets before borrowing source identity.
+
+- enumeration promises require concrete domains and bound oracles: the first Python helper accepted `match ("decoy",): case DOMAIN:` before a loop over imported DOMAIN because captures are bindings without assignment nodes. Root's independent probe returned null admission; conservative pattern binding targets now refuse that probe along with assignment, parameter, walrus, with and except shadows. Executed Python collection/alias/package/unittest controls retain the positive direction; a Python assignment's graph kind alone still supplies no population evidence.
+
+- enumeration promises require concrete domains and bound oracles: independent implementation review found accepted catch/named-function/destructured shadows, an export alias pointing at another collection, a sole __proto__ setter, and object populations passed to empty Array.from or an authored forEach method. Regression cases now require direct export identity and shape-compatible traversal and refuse those shadows. These are source-binding controls, not a claim about arbitrary JavaScript mutation or control flow.
+
+- enumeration promises require concrete domains and bound oracles: the campaign reproduced scalar/interface declarations, ambiguous global labels, unrelated live-domain iteration and no-oracle claims receiving unsupported passes. The prior focused fixtures themselves pinned graph-only const symbols without source or oracles as green. Concrete-domain admission now refuses those cases through runVerify; bound alias/array/object/enum positive controls execute real node:test oracles, and fast checks remain skipped. This pins declaration shape and direct binding, not semantic exhaustion.
 - catalog binding support requires a named oracle check at unchanged explicit inputs: removed the flow-endpoint file pin check; the flow-endpoint guard failed because an owned symbol in an unpinned second file produced no missing-pin issue. Restored the check and the guard passed. This proves endpoint input inclusion, not authored direction or semantic entailment.
 
 - catalog binding support requires a named oracle check at unchanged explicit inputs: removed the pre/post input-digest equality in bindRunEvidence. The guard then observed a populated bindingInputs record after a spec changed during the execution interval, where no support was allowed. Restored the comparison. This controls input freshness, not semantic entailment or immutable receipt integrity.
@@ -37,6 +47,15 @@ Oracle discovery, execution and record lookup converge here. A passing process i
 - an empty derivation against a remembered surface refuses, never passes: mutated BOTH ends (2026-07-31). (a) gutted `buildGraph` to return an empty graph — the original defect, which before the floor printed `claims: 0 · 0 green · 0 red · 0 skipped` and `✓ coherent`, exit 0: now full verify refuses before grading (`✗ [floor] the derived graph is EMPTY of claims — 0 component(s), 0 claims — but the record remembers 27 claim(s)`), exit 1, on the scoped path too, and the record is left un-clobbered so the refusal repeats. (b) made `vacuityRefusal` return null unconditionally — the floor itself deleted: full verify red BY NAME, `claims: 28 · 27 green · 1 red`, this claim failing through its guard. Restored, 28/28. (b) is the direction that matters: a floor that cannot fail is the vacuity it exists to catch.
 
 ## works when
+
+- boundary "enumeration promises require concrete domains and bound oracles" at totalityGateFailure via guard "enumeration admission — concrete domains and bound oracles reject the measured false positives"
+- boundary "enumeration promises require concrete domains and bound oracles" at totalityGateFailure via guard "enumeration admission — unique source binding preserves aliases and finite domain positive controls"
+- boundary "enumeration promises require concrete domains and bound oracles" at totalityGateFailure via guard "enumeration admission — no oracle cannot pass while explicit disabling retains its documented escape"
+- boundary "enumeration promises require concrete domains and bound oracles" at pythonTotalityFailure via guard "Python enumeration admission — literal collections and direct aliases retain executed positive controls"
+- boundary "enumeration promises require concrete domains and bound oracles" at pythonTotalityFailure via guard "Python enumeration admission — genuine graph derivation and package-relative aliases reach public verification"
+- boundary "enumeration promises require concrete domains and bound oracles" at pythonTotalityFailure via guard "Python enumeration admission — scalar, empty, dynamic and rebound assignments cannot borrow collection evidence"
+- boundary "enumeration promises require concrete domains and bound oracles" at pythonTotalityFailure via guard "Python enumeration admission — wrong modules, module-package collisions and search-root shadows refuse"
+- boundary "enumeration promises require concrete domains and bound oracles" at pythonTotalityFailure via guard "Python enumeration admission — shadows and partial traversal never acquire direct-domain identity"
 
 - boundary "catalog binding support requires a named oracle check at unchanged explicit inputs" at bindRunEvidence via guard "catalog bindings — only unchanged executed inputs earn support; edits and historical reports cannot renew it"
 - boundary "catalog binding support requires a named oracle check at unchanged explicit inputs" at projectBindings via guard "catalog bindings — exact scoped declarations retain failures and never borrow example support"
@@ -61,6 +80,41 @@ Oracle discovery, execution and record lookup converge here. A passing process i
 - {"claim":"g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf","provider":"src/evidence","because":"runVerify publishes scoped and fast results through recordVerify. A skipped oracle must retain its prior dated verdict rather than erase the evidence used by subsequent readers."}
 
 ## why
+
+**enumeration promises require concrete domains and bound oracles.** A parser kind is
+not a population: an interface has no runtime members and a const may hold a scalar.
+The bounded TS/JS grade requires one globally unambiguous source symbol backed by a
+nonempty top-level const array/object literal or runtime enum. Dynamic constructors,
+spreads, computed keys, erased declarations and unsupported languages refuse explicitly.
+A named top-level test/it/describe oracle must directly iterate that declaration through
+a same-file binding or a direct named import using an explicit relative source-file path
+to a directly exported declaration,
+including import aliases. Object/enum domains require for-in or Object.keys/values/entries;
+Array.from and array methods cannot borrow traversal semantics for an authored object. A wrong module,
+shadowed name, filtered subset or absent oracle cannot borrow another collection's
+liveness. Both verbs owe this check independently of the older oracleDomain setting;
+totalityEnumeration: false remains the explicit opt-out. Fast admission is still a skip,
+and only named execution evidence can make the claim pass. This is a source-shape and
+identity grade: it does not prove assertion correctness, control-flow reachability,
+runtime immutability, exhaustive iteration or completeness of the author's domain.
+Extensionless/emitted-path resolution, escaped specifiers/keys, re-export chasing, arbitrary type/member resolution and compiler evaluation remain outside that grade.
+
+The Python grammar supplies a separate bounded grade without importing or executing
+project code during admission. One module-level assignment must hold a nonempty literal
+tuple, list, set or dictionary; members are literals, and keys/set elements must have a
+statically hashable literal shape. Direct rebinding, deletion, mutation methods and
+scope-wide shadows refuse. A unique bare-named test function or direct class test method
+must contain a direct unfiltered for loop over that binding (or dictionary keys/values/items).
+Same-file bindings and direct `from module import DOMAIN as alias` imports are supported
+at the existing root-relative/explicit-relative direct-module grade, with actual source
+module/package collisions, conflicting package prefixes and test-directory alternatives
+refusing identity even when the graph excluded them. Duplicate method names across
+classes refuse rather than guessing a qualified target. Python Enum classes, dynamic
+members/constructors, comprehensions, splats, decorators/parameterization, async/nested
+oracles, wrapper calls, early exits, re-exports and runtime search-path changes are outside
+this grade. Pattern captures participate in conservative shadow checks. This does not
+prove runtime reachability, absence of indirect mutation, assertion adequacy or completeness
+of the authored population; named execution remains separate evidence.
 
 **catalog binding support requires a named oracle check at unchanged explicit inputs.**
 A catalog's good example does not verify another adoption, and a prior test pass

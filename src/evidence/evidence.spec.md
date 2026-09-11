@@ -11,7 +11,7 @@ Each ledger keeps its own evidence contract. Readers validate surviving records;
 - a committed decision population cannot disappear into adoption from zero
 - decision ratification follows explicit subject and authority, never prose similarity or recency
 - a skipped run never clobbers an oracle's recorded verdict
-- experiment outcomes require criterion-total evidence
+- experiment outcomes require evidence for every criterion
 - experiment telemetry preserves its weakest provable attribution
 - surviving agent-assessed defect evidence is attributable and internally consistent
 - defect writes refuse pre-existing symlink redirection
@@ -36,7 +36,7 @@ Each ledger keeps its own evidence contract. Readers validate surviving records;
 - boundary "a committed decision population cannot disappear into adoption from zero" at readTrustedJournal via guard "trusted journal — any malformed, forged, displaced, conflicting, or dangling row refuses the verdict projection"
 - boundary "decision ratification follows explicit subject and authority, never prose similarity or recency" at analyzeDecisionPositions via guard "local alternatives need ratification; an explicit stronger choice settles them"
 - boundary "a skipped run never clobbers an oracle's recorded verdict" at recordVerify via guard "merge — a skip never clobbers a real verdict; the old verdict rides through with its own stamp"
-- boundary "experiment outcomes require criterion-total evidence" at closeExperiment over ExperimentOpened via guard "close — total nonempty evidence is mandatory and outcome is derived, never supplied"
+- boundary "experiment outcomes require evidence for every criterion" at closeExperiment via guard "close — evidence for every criterion is mandatory and outcome is derived, never supplied"
 - boundary "experiment telemetry preserves its weakest provable attribution" at closeExperiment via guard "Codex parent-only tool events close the loop as an aggregate, never exact owner evidence"
 - boundary "surviving agent-assessed defect evidence is attributable and internally consistent" at recordDefect via guard "defects — agent-assessed evidence is attributable, content-addressed, and strict on inconsistent rows"
 - boundary "defect writes refuse pre-existing symlink redirection" at recordDefect via guard "defect containment — pre-existing directory and session symlinks refuse external append targets"
@@ -78,7 +78,7 @@ known truth, honestly dated. A fast tier that skips the executable claims every 
 would otherwise erase last week's real pass — or, worse, a real fail — with "did not
 look", and history that can be overwritten by not looking is not history.
 
-**experiment outcomes require criterion-total evidence.** A
+**experiment outcomes require evidence for every criterion.** A
 plan is frozen before work with its predicted context, actions, criteria, and evidence
 cursors. Closure answers every action and criterion exactly once, preserves the assessor,
 and derives success, failure, or inconclusive from criterion statuses rather than accepting
