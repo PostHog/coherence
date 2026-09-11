@@ -51,8 +51,8 @@ test("work CLI carries authority through lifecycle and orientation demands expli
     assert.equal(linked.code, 0, linked.stderr);
     assert.equal(JSON.parse(linked.stdout).relation, "verifies");
     const settled = JSON.parse((await run(root, ["orient", "--json"])).stdout);
-    assert.equal(settled.action, "steady");
-    assert.deepEqual(settled.consequences.unverifiedCompletedWork, []);
+    assert.equal(settled.action, "verify", "an authored legacy label is not a witnessed receipt");
+    assert.deepEqual(settled.consequences.unverifiedCompletedWork, ["wrk-root"]);
   } finally { await cleanup(root); }
 });
 

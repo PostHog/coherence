@@ -85,6 +85,10 @@ export function agentInstructions(session: string, cli = "npx coherence", agent?
     "Owners advance only the exact assignment printed by SessionStart. Re-inspect after",
     "each mutation because predecessor tokens deliberately expire instead of last-writer-win.",
     `Navigate explicit provenance with: ${cli} consequence inspect "work:WORK_ID"`,
+    `Record a run for work with: ${cli} verify --receipt --work WORK_ID ${scope}`,
+    `Inspect its evidence and retention files with: ${cli} receipts verification:sha256-ID`,
+    "Only link a current work-bound receipt after assessing that its checks cover the work criteria.",
+    "Receipts are local executor testimony, not authenticated proof; legacy verification labels do not clear work.",
     "",
     "WHEN EDITING GUARANTEE LINKS — specs own addresses and relies-on declarations:",
     `  ${cli} guarantees --check`,
@@ -182,6 +186,7 @@ export async function assignedWorkInstructions(
         `    authority: ${item.opened.authority.kind} by ${instructionValue(item.opened.authority.grantedBy)} — ${instructionValue(item.opened.authority.boundary)}`,
         `    write scope: ${item.opened.writeScopes.length ? item.opened.writeScopes.map(instructionValue).join(" · ") : "none declared"}`,
         `    inspect: ${cli} work inspect ${JSON.stringify(item.work)}`,
+        `    verify evidence: ${cli} verify --receipt --work ${JSON.stringify(item.work)} ${mutationScope}`,
       );
       if (item.blockedBy.length) lines.push(`    blocked by: ${item.blockedBy.map(instructionValue).join(" · ")}`);
       if (item.conflictsWith.length) lines.push(`    WRITE CONFLICT: ${item.conflictsWith.map(instructionValue).join(" · ")}`);

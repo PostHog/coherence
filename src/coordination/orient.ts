@@ -1,3 +1,4 @@
+import { readReceipt, receiptWorkProblem } from "../evidence/receipts.ts";
 // orient.ts — one compact, deterministic heading across the swarm's durable instruments.
 //
 // Each source keeps its own epistemic boundary: the work ledger owns coordination state,
@@ -73,7 +74,7 @@ export interface Orientation {
     links: number;
     dangling: DanglingConsequenceRef[];
     uncheckedVerificationRefs: string[];
-    /** Completed work with no explicit `verification --verifies--> work` edge. */
+    /** Completed work without an explicit edge to eligible work-bound receipt evidence. */
     unverifiedCompletedWork: string[];
   } | null;
   verification: VerificationOrientation | null;
@@ -167,9 +168,12 @@ function auditRefs(
   const uncheckedVerificationRefs: string[] = [];
   for (const { ref, links } of byRef.values()) {
     if (ref.kind === "verification") {
-      // Verification runs are currently a rolling status record, not an append-only
-      // identity registry. Keep the ceiling explicit instead of calling them dangling.
-      uncheckedVerificationRefs.push(formatConsequenceRef(ref));
+      // Only content-addressed receipts have a resolvable run identity. Keep
+      // historical free-form labels visible without granting verification credit.
+      if (/^sha256-/.test(ref.id)) {
+        try { readReceipt(cfg, ref.id); }
+        catch (error) { dangling.push({ ref, links: [...links].sort(byteCompare), reason: errorText(error) }); }
+      } else uncheckedVerificationRefs.push(formatConsequenceRef(ref));
       continue;
     }
     const present = ref.kind === "commit" ? commitExists(cfg.root, ref.id) : known.get(ref.kind)?.has(ref.id) === true;
@@ -299,6 +303,7 @@ export async function observeOrientation(cfg: Config): Promise<Orientation> {
     const audited = auditRefs(cfg, consequenceLedger, known);
     const verifiedWork = new Set(consequenceLedger.records
       .filter((record) => record.relation === "verifies" && record.from.kind === "verification" && record.to.kind === "work")
+      .filter((record) => receiptWorkProblem(cfg, record.from.id, record.to.id) === null)
       .map((record) => record.to.id));
     consequences = {
       links: consequenceLedger.records.length,
@@ -341,7 +346,7 @@ export async function observeOrientation(cfg: Config): Promise<Orientation> {
     reasons = work!.active.map((id) => `${id} is active`);
   } else if ((consequences?.unverifiedCompletedWork.length ?? 0) > 0) {
     action = "verify";
-    reasons = consequences!.unverifiedCompletedWork.map((id) => `${id} is completed without an explicit verification link`);
+    reasons = consequences!.unverifiedCompletedWork.map((id) => `${id} is completed without a current work-bound verification receipt and explicit link`);
   } else if (verification?.state === "failing" || verification?.state === "stale") {
     action = "verify";
     reasons = [`last verification is ${verification.state}`];
@@ -361,7 +366,7 @@ export async function observeOrientation(cfg: Config): Promise<Orientation> {
       "orientation selects one heading from recorded evidence; it neither executes work nor proves semantic correctness",
       "historical journal blocked reports remain visible evidence but only closeable work state selects a live unblock heading",
       "pending child results select synthesis only after that parent's direct children are terminal",
-      "verification references remain unchecked until verification receipts become append-only identities",
+      "legacy verification references remain unchecked; work verification requires intact current work-bound local receipts and explicit assessor links",
       "shared paths, commits, and timestamps never create consequence links",
     ],
   };
@@ -402,7 +407,7 @@ export function renderOrientation(reading: Orientation): string {
     for (const item of reading.consequences.dangling) lines.push(`  ! ${visible(formatConsequenceRef(item.ref))} — ${visible(item.reason)}`);
     for (const id of reading.consequences.unverifiedCompletedWork) lines.push(`  ? completed ${visible(id)} has no explicit verification link`);
     if (reading.consequences.uncheckedVerificationRefs.length) {
-      lines.push(`  ? ${reading.consequences.uncheckedVerificationRefs.length} verification reference(s) cannot yet be existence-checked`);
+      lines.push(`  ? ${reading.consequences.uncheckedVerificationRefs.length} legacy verification reference(s) cannot be existence-checked`);
     }
   }
   lines.push("", "LIMITS", ...reading.limitations.map((limit) => `  - ${limit}`));

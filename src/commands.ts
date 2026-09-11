@@ -130,7 +130,7 @@ export const COMMANDS: Command[] = [
   // ── verify ───────────────────────────────────────────────────────────────────────────
   {
     name: "verify", group: "verify",
-    usage: "[--fast] [--staged | --since <ref>] [--raise [--raise-cap N]] [--apply <verdicts>] [--from-report <file>] [--serial-oracles]",
+    usage: "[--fast] [--staged | --since <ref>] [--raise [--raise-cap N]] [--apply <verdicts>] [--from-report <file>] [--serial-oracles] [--receipt [--work W]]",
     summary: "run the claims, the evidence chain and coverage — the gate",
   },
   {
@@ -145,6 +145,8 @@ export const COMMANDS: Command[] = [
     name: "regulate", group: "verify", usage: "[--check] [--since <ref>] [--host <claude|codex>] [--json]",
     summary: "apply the anti-entropy doctrine to live readings and emit exactly one next action",
   },
+
+  { name: "receipts", group: "verify", usage: "[verification:sha256-ID] [--json]", summary: "inspect immutable local verification evidence, required files and incomplete runs" },
 
   // ── journal ──────────────────────────────────────────────────────────────────────────
   { name: "decide", group: "journal", usage: '"<chose>" [--over "<alt>" ...] --because "<why>" [--work W] [--subject S] [--authority A] [--scope-component C] [--scope-file p] [--scope-symbol S] [--environment E] [--session S]', summary: "log one choice, any rejected alternatives, and optional swarm-addressable authority" },

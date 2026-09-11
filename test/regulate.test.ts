@@ -1,3 +1,4 @@
+import { beginReceipt, finishReceipt } from "../src/evidence/receipts.ts";
 // regulate.test.ts — the anti-entropy regulator selects one strongest obligation.
 //
 // The doctrine is the domain. These tests deliberately derive rule ids, responses, and
@@ -352,6 +353,15 @@ test("regulate — completed work requires an explicit verification link before 
       to: { kind: "work", id: opened.work }, evidence: "the focused suite passed after the implementation",
       now: "2026-01-01T00:02:00.000Z",
     });
+    const legacy = selectRegulation(await observeRegulation(config, undefined, { host: "claude" }));
+    assert.equal(legacy.selected?.rule, "completed-work-needs-explicit-verification");
+    // Storage/projection fixture; receipts.test.ts separately witnesses real execution.
+    const receipt = finishReceipt(config, beginReceipt(config, { work: opened.work }), {
+      outcome: "completed", exitCode: 0, failures: 0, pending: 0, onramp: false,
+      observations: [{ node: "fixture", claim: 'passes test "focused"', kind: "pass", executed: true }],
+    });
+    recordConsequence(config, { session: "reviewer", from: parseConsequenceRef(`verification:${receipt}`),
+      relation: "verifies", to: { kind: "work", id: opened.work }, evidence: "the selected check covers this work criterion" });
     const linked = selectRegulation(await observeRegulation(config, undefined, { host: "claude" }));
     assert.equal(linked.action, "release");
   } finally { await cleanup(root); }

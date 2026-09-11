@@ -6,6 +6,8 @@ Each ledger keeps its own evidence contract. Readers validate surviving records;
 
 ## invariants
 
+- immutable receipts preserve witnessed runs and refuse damaged dependencies
+
 - concurrent status writers preserve complete independent reports
 - verdict-bearing decision reads fail closed on surviving journal damage
 - a committed decision population cannot disappear into adoption from zero
@@ -20,6 +22,10 @@ Each ledger keeps its own evidence contract. Readers validate surviving records;
 
 ## refutations
 
+- immutable receipts preserve witnessed runs and refuse damaged dependencies: a context-free reviewer made `test.skip` and failing `test.todo` clear work through public receipt mode; attempted lookup was wrongly labeled execution. Receipt mode now requires named non-skipped TAP or fully passed structured matches. The same review reused a report less than two seconds old after a runner exited without tests; private fresh report destinations and successful termination remove that reuse path. Renaming an incomplete start under `.pending-` also hid it; pending publication now refuses instead of shrinking inventory.
+
+- immutable receipts preserve witnessed runs and refuse damaged dependencies: the initial repository-root comparison rejected real macOS checkouts through /var because Git reports /private/var. Canonical filesystem identity now admits those executable fixtures; changed or redirected evidence still refuses.
+
 - concurrent status writers preserve complete independent reports: the taxonomy field probe overlapped atlas and mass writes in twenty temporary repositories. Both writers returned successfully, but eighteen final files were unreadable and two lost a report. A sequential control kept both. One exclusive read/merge/publish transaction plus atomic rename replaces the independent whole-file writes; an abandoned lock refuses instead of being stolen.
 - verdict-bearing decision reads fail closed on surviving journal damage: a symlinked `.coherence` could supply external valid rows, a renamed or blank/torn file silently shrank the trusted population, and case-distinct `Owner`/`owner` sessions collided on case-folding filesystems. The trusted projection now validates containment, every directory entry, append framing, and domain-separated hashed session addresses before admitting any row.
 - a committed decision population cannot disappear into adoption from zero: two valid conflicting decision files produced `RESOLVE-CONFLICT`; deleting the entire tracked directory then produced zero trusted rows and `STEADY`. The strict empty projection now asks current Git `HEAD` whether tracked decision files disappeared, while a repository that never owned a ledger remains valid first-use adoption.
@@ -30,6 +36,14 @@ Each ledger keeps its own evidence contract. Readers validate surviving records;
 - a streamed journal entry renders exactly once across appends and compaction: deleted the `seen` dedupe from `tailJournal`'s parse loop — every parsed line pushed unconditionally, so a compaction fold replays its whole record set (2026-08-04) — full verify red BY NAME, `claims: 31 · 30 green · 1 red`, this claim failing through its guard (the fold fixture observed the replay). Restored, back to 31/31. This is the loosening direction and the quiet one: a feed that duplicates does not crash, it just teaches the orchestrator that a question was decided twice — the exact lie the content address exists to prevent.
 
 ## works when
+
+- boundary "immutable receipts preserve witnessed runs and refuse damaged dependencies" at readReceipt via guard "receipts — raw executed results survive reruns without borrowing sticky passes"
+- boundary "immutable receipts preserve witnessed runs and refuse damaged dependencies" at readReceipt via guard "receipts — explicit work binding and selected files reconstruct in a fresh clone"
+- boundary "immutable receipts preserve witnessed runs and refuse damaged dependencies" at readReceipt via guard "receipts — tampered, missing and noncanonical dependencies refuse instead of shrinking evidence"
+- boundary "immutable receipts preserve witnessed runs and refuse damaged dependencies" at beginReceipt via guard "receipts — a killed verifier leaves an incomplete start and no inferred pass"
+- boundary "immutable receipts preserve witnessed runs and refuse damaged dependencies" at finishReceipt via guard "receipts — publication refuses repeat terminals and surviving conflict objects"
+- boundary "immutable receipts preserve witnessed runs and refuse damaged dependencies" at readReceipt via guard "receipts — skipped and todo executable oracles cannot acquire execution credit"
+- boundary "immutable receipts preserve witnessed runs and refuse damaged dependencies" at readReceipt via guard "receipts — prior batch files cannot impersonate a fresh successful runner"
 
 - boundary "concurrent status writers preserve complete independent reports" at recordVerify via guard "status publication — concurrent processes preserve independent reports and readers see complete JSON"
 - boundary "verdict-bearing decision reads fail closed on surviving journal damage" at readTrustedJournal via guard "trusted journal — any malformed, forged, displaced, conflicting, or dangling row refuses the verdict projection"
@@ -49,6 +63,17 @@ Each ledger keeps its own evidence contract. Readers validate surviving records;
 - {"claim":"g-e8d24eb9de00abbec60bc1f3876c94517c970228bad3d4cf4f3b63d51bec89cf","subject":"src/evidence/status.ts#recordVerify","obligation":"guarantee:G-PERSISTENCE","assessment":"t-43387dcec74b31d96afdd95ba168f59db2ee996d511ef3d565958514ebeadb59","because":"The merge preserves the dated prior oracle verdict when a later run skips it. This addresses retained report history, not immutable evidence or complete crash recovery."}
 
 ## why
+
+**immutable receipts preserve witnessed runs and refuse damaged dependencies.** A rolling
+status display can retain an old pass through a new skip, so it cannot identify one run.
+Receipt mode captures the current run before status merging, binds Git-visible working
+bytes and effective configuration, and publishes immutable start, manifest, terminal seal
+and result objects. One atomic seal selects one terminal digest. Missing or damaged
+required bytes refuse; a started run is never inferred successful. A work link needs the
+same work definition and criteria, unchanged tested bytes, witnessed full execution and
+an explicit assessor. Local hashes detect altered addresses, not fabricated testimony;
+semantic adequacy and executor trust remain assessed. Ignored dependencies, runtime
+services and the named output/coordination exclusions are outside this input grade.
 
 **concurrent status writers preserve complete independent reports.** A successful report
 write is a promise that later readers can recover it. Independent instruments must not

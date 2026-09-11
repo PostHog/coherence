@@ -1,3 +1,5 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 // test-batch.ts — BATCHED ORACLE EXECUTION. Run the consuming project's test runner
 // ONCE, with a machine-readable reporter, and resolve every executable claim from that
 // single report instead of booting the runner per claim.
@@ -391,8 +393,20 @@ export function readReportFile(root: string, file: string, format: TestBatchForm
  * running (spawn error, timeout, signal) or a report that will not parse — never "some
  * test was red".
  */
-export function runTestBatch(cmd: string[], root: string, format: TestBatchFormat): BatchOutcome {
+export function runTestBatch(cmd: string[], root: string, format: TestBatchFormat, receiptMode = false): BatchOutcome {
   if (!cmd.length) return { report: null, note: "the batch command is empty" };
+  let privateReport: string | null = null;
+  if (receiptMode && outputFileOf(cmd)) {
+    privateReport = mkdtempSync(join(tmpdir(), "coherence-receipt-report-"));
+    const path = join(privateReport, "report.json");
+    cmd = [...cmd];
+    for (let i = 0; i < cmd.length; i++) {
+      if (/^(?:--outputFile(?:\.[A-Za-z0-9_-]+)?|--json-report-file)=/.test(cmd[i]))
+        cmd[i] = cmd[i].slice(0, cmd[i].indexOf("=") + 1) + path;
+      else if (/^(?:--outputFile(?:\.[A-Za-z0-9_-]+)?|--json-report-file)$/.test(cmd[i]) && i + 1 < cmd.length) cmd[++i] = path;
+    }
+  }
+  try {
   // Taken BEFORE the spawn so the report file can be proved to postdate this run.
   const startedAt = Date.now();
   const r = spawnSync(cmd[0], cmd.slice(1), {
@@ -400,6 +414,7 @@ export function runTestBatch(cmd: string[], root: string, format: TestBatchForma
   });
   if (r.error) return { report: null, note: `the runner did not complete: ${(r.error as Error).message}` };
   if (r.status === null) return { report: null, note: `the runner was killed by signal ${r.signal ?? "unknown"}` };
+  if (receiptMode && r.status !== 0) return { report: null, note: "receipt batch runner did not exit successfully" };
 
   const outFile = outputFileOf(cmd);
   let text: string;
@@ -432,6 +447,7 @@ export function runTestBatch(cmd: string[], root: string, format: TestBatchForma
   } catch (e) {
     return { report: null, note: `the report could not be parsed: ${(e as Error).message}` };
   }
+  } finally { if (privateReport) rmSync(privateReport, { recursive: true, force: true }); }
 }
 
 /**
@@ -499,7 +515,7 @@ export function matchesVitestOracleName(fullName: string, name: string): boolean
 // vitest path treats a skipped match.
 const PYTEST_FAIL_OUTCOMES: ReadonlySet<string> = new Set(["failed", "error", "xpassed"]);
 
-export function resolveFromBatch(report: BatchReport, name: string): { ok: boolean; detail: string; ms?: number } {
+export function resolveFromBatch(report: BatchReport, name: string, requireAllPassed = false): { ok: boolean; detail: string; ms?: number; executed?: boolean } {
   // MATCHING IS PER FORMAT, because each mirrors what a claim NAMES on that runner:
   //   vitest-json — an unanchored literal substring of `fullName`, the exact behaviour of
   //     an escaped `-t` (see the block comment above).
@@ -511,6 +527,7 @@ export function resolveFromBatch(report: BatchReport, name: string): { ok: boole
   const pytest = report.format === "pytest-json";
   const matches = report.tests.filter((t) =>
     pytest ? pytestFunctionName(t.fullName) === name : matchesVitestOracleName(t.fullName, name));
+  const execution = requireAllPassed ? { executed: matches.some(t => t.status === "passed" || t.status === "failed") } : {};
   const timed = matches.filter((t) => typeof t.duration === "number");
   const ms = timed.length ? timed.reduce((n, t) => n + (t.duration as number), 0) : undefined;
   if (!matches.length)
@@ -523,7 +540,7 @@ export function resolveFromBatch(report: BatchReport, name: string): { ok: boole
   const failed = matches.filter((t) => (pytest ? PYTEST_FAIL_OUTCOMES.has(t.status) : t.status === "failed"));
   if (failed.length)
     return {
-      ok: false, ms,
+      ok: false, ms, ...execution,
       detail: `test "${name}" — matching test FAILED in the batch report: "${failed[0].fullName}"`
         + (failed[0].status !== "failed" ? ` (outcome: ${failed[0].status})` : "")
         + (failed.length > 1 ? ` (+${failed.length - 1} more matching failure(s))` : ""),
@@ -533,9 +550,11 @@ export function resolveFromBatch(report: BatchReport, name: string): { ok: boole
   // "N passed" then finds nothing to count.
   if (!matches.some((t) => t.status === "passed"))
     return {
-      ok: false, ms,
+      ok: false, ms, ...execution,
       detail: `test "${name}" — ${matches.length} matching test(s), none of which ran`
         + ` (${[...new Set(matches.map((m) => m.status))].sort().join(", ")}) — no positive evidence`,
     };
-  return { ok: true, detail: "", ms };
+  if (requireAllPassed && matches.some(t => t.status !== "passed"))
+    return { ok: false, ...execution, detail: `test "${name}" includes skipped, pending or unexecuted matching cases; receipt mode requires every selected case to pass`, ms };
+  return { ok: true, detail: "", ms, ...execution };
 }

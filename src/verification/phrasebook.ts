@@ -49,6 +49,8 @@ export interface ClaimResult { kind: "pass" | "fail" | "skip"; detail?: string; 
  * and the claim skips rather than quietly costing a full pool boot.
  */
 export interface ClaimCtx {
+  receiptMode?: boolean;
+  oracleExecuted?: () => void;
   oracleChecked?: () => void; // observation only; does not change a verdict
   cfg: Config;
   graph: Graph;
@@ -147,8 +149,10 @@ export const reEscape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 export function execNamedTest(ctx: ClaimCtx, name: string): { ok: boolean; detail: string; ms?: number } {
   ctx.oracleChecked?.();
   const o = ctx.oracles?.();
-  if (o?.report) return resolveFromBatch(o.report, name);
-  return runSerialNamedTest(ctx.cfg, ctx.root, name);
+  const result = o?.report ? resolveFromBatch(o.report, name, ctx.receiptMode)
+    : runSerialNamedTest(ctx.cfg, ctx.root, name, ctx.receiptMode);
+  if (ctx.receiptMode && result.executed) ctx.oracleExecuted?.();
+  return result;
 }
 
 /** The SERIAL arm of `execNamedTest`, factored so the canary below probes the EXACT code
@@ -156,12 +160,21 @@ export function execNamedTest(ctx: ClaimCtx, name: string): { ok: boolean; detai
  *  evidence rule. Exit 0 alone is not trusted: `testMatch` requires positive evidence the
  *  named test actually ran (a zero-match runner that exits 0 would otherwise pass a
  *  renamed/deleted oracle). */
-export function runSerialNamedTest(cfg: Config, root: string, name: string): { ok: boolean; detail: string } {
+export function runSerialNamedTest(cfg: Config, root: string, name: string, receiptMode = false): { ok: boolean; detail: string; executed?: boolean } {
   const r = spawnSync(cfg.test[0], [...cfg.test.slice(1), reEscape(name)], { cwd: root, encoding: "utf8", timeout: 120000 });
   const out = (r.stderr || "") + (r.stdout || "");
-  if (r.status !== 0) return { ok: false, detail: out.split("\n").filter(Boolean).slice(-3).join(" | ").slice(0, 200) };
-  if (cfg.testMatch && !new RegExp(cfg.testMatch).test(out)) return { ok: false, detail: `test "${name}" matched no run (testMatch)` };
-  return { ok: true, detail: "" };
+  // Attempt, execution and success are three different facts. A named failed TAP
+  // assertion executed; skipped/todo rows and an unrecognized report did not prove it.
+  const lines = (r.stdout || "").split(/\r?\n/);
+  const rows = lines.map(line => /^\s*(not ok|ok) \d+ - (.*)$/.exec(line)).filter((row): row is RegExpExecArray => !!row);
+  const deferred = (row: RegExpExecArray) => /\s+#\s*(?:SKIP|TODO)\b/i.test(row[2]);
+  const named = rows.filter(row => row[2].split(/\s+#\s*/)[0] === name);
+  const executed = receiptMode && lines.includes("TAP version 13") && named.some(row => !deferred(row));
+  if (r.status !== 0) return { ok: false, executed, detail: out.split("\n").filter(Boolean).slice(-3).join(" | ").slice(0, 200) };
+  if (cfg.testMatch && !new RegExp(cfg.testMatch).test(out)) return { ok: false, executed, detail: `test "${name}" matched no run (testMatch)` };
+  if (receiptMode && (!executed || rows.some(row => row[1] !== "ok" || deferred(row))))
+    return { ok: false, executed, detail: `test "${name}" has no complete non-skipped named TAP execution evidence; use supported batch reports for other runners` };
+  return { ok: true, detail: "", ...(receiptMode ? { executed } : {}) };
 }
 
 /**

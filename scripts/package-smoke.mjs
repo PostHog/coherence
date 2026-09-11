@@ -30,6 +30,7 @@ function withoutHostSession(env = process.env) {
     "COHERENCE_JOB",
     "COHERENCE_PROJECT_ROOT",
     "COHERENCE_SESSION",
+    "NODE_TEST_CONTEXT",
   ]) delete clean[key];
   return clean;
 }
@@ -69,6 +70,8 @@ function parseHookEmission(stdout, event, session) {
   assert.match(text, /coherence defect "<what failed>" --evidence/);
   assert.match(text, /coherence orient/);
   assert.match(text, /coherence work inspect/);
+  assert.match(text, /coherence verify --receipt --work WORK_ID/);
+  assert.match(text, /coherence receipts verification:sha256-ID/);
   assert.match(text, /coherence work create/);
   assert.match(text, /coherence consequence inspect "work:WORK_ID"/);
   assert.ok(text.includes(`YOUR SESSION ID IS ${session}.`), "SessionStart omitted the exact session id");
@@ -133,6 +136,29 @@ try {
   await writeFile(join(pythonConsumer, "policy.py"), "DOMAIN = 7\n");
   const pythonRefusal = run(coherence, ["verify", "--fast"], { cwd: pythonConsumer, status: 1 });
   assert.match(pythonRefusal.stdout + pythonRefusal.stderr, /\[totality\]/);
+
+  // Witness a real assertion through the installed verifier, then resolve its receipt.
+  const receiptConsumer = join(temporaryRoot, "receipt-consumer");
+  await mkdir(receiptConsumer);
+  await writeFile(join(receiptConsumer, ".gitignore"), ".coherence/verification/\n.coherence/status.json\n.coherence/verify-jobs.json\n");
+  await writeFile(join(receiptConsumer, "package.json"), '{"type":"module"}\n');
+  await writeFile(join(receiptConsumer, "coherence.config.json"), JSON.stringify({
+    codeExt: ["js"], typecheck: [], oracleExecution: "serial",
+    test: [process.execPath, "--test", "--test-reporter=tap", "--test-name-pattern"],
+    testMatch: "ok [0-9]+ - packed receipt assertion",
+  }));
+  await writeFile(join(receiptConsumer, "project.spec.md"), '# Receipt\n\n## works when\n\n- passes test "packed receipt assertion"\n\n## why\n\nA real assertion supplies execution evidence.\n');
+  await writeFile(join(receiptConsumer, "receipt.test.js"), 'import test from "node:test"; import assert from "node:assert/strict"; test("packed receipt assertion", () => assert.equal(2 + 2, 4));\n');
+  run(git, ["init", "-q"], { cwd: receiptConsumer });
+  const witnessed = run(coherence, ["verify", "--receipt"], { cwd: receiptConsumer });
+  const receiptAddress = witnessed.stdout.match(/receipt: (verification:sha256-[a-f0-9]{64})/)?.[1];
+  assert.ok(receiptAddress, witnessed.stdout);
+  const receipt = JSON.parse(run(coherence, ["receipts", receiptAddress, "--json"], { cwd: receiptConsumer }).stdout);
+  assert.deepEqual(receipt.problems, []);
+  assert.equal(receipt.receipt.observations[0].executed, true);
+  assert.ok(receipt.files.some((path) => path.endsWith(".done.json")));
+  const receiptList = JSON.parse(run(coherence, ["receipts", "--json"], { cwd: receiptConsumer }).stdout);
+  assert.deepEqual(receiptList.completed, [receiptAddress]);
 
   const guaranteeCatalog = JSON.parse(run(coherence, ["guarantees", "catalog", "--json"], { cwd: consumer }).stdout);
   assert.equal(guaranteeCatalog.definitions.length, 36);

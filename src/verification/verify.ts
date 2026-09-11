@@ -1,3 +1,5 @@
+import { beginReceipt, finishReceipt, type VerificationReceipt } from "../evidence/receipts.ts";
+import { buildGraph } from "../derivation/derive.ts";
 // verify.ts — the coherence engine: deterministic claim verifiers + the narrative
 // evidence chain (emits inference jobs for a subagent) + coverage meta-claims
 // (what auto-generates, why is human-authored). Config-driven; consumes the Graph.
@@ -268,6 +270,7 @@ export function warnedKindFinding(node: string, claim: string, kind: string, why
 }
 
 export interface VerifyOpts {
+  receipt?: boolean; work?: string;
   fast?: boolean; only?: Set<string>;
   raise?: boolean; raiseCap?: number; session?: string; agent?: string;
   /** `--from-report <file>`: resolve the executable tier from a report the project ALREADY
@@ -280,6 +283,34 @@ export interface VerifyOpts {
 }
 
 export async function runVerify(cfg: Config, graph: Graph, opts: VerifyOpts): Promise<number> {
+  if (!opts.receipt) return runVerifyObserved(cfg, graph, opts);
+  const start = beginReceipt(cfg, opts);
+  console.log(`receipt started: ${start.run}`);
+  let observed: Pick<VerificationReceipt, "outcome" | "exitCode" | "failures" | "pending" | "onramp" | "observations"> | undefined;
+  let code = 1;
+  try {
+    // Derive after the input sample; a caller's previously built graph cannot supply
+    // stale source facts to a new receipt. Effective configuration is fingerprinted.
+    graph = await buildGraph(cfg);
+    code = await runVerifyObserved(cfg, graph, opts, result => { observed = result; });
+  } catch (error) {
+    const id = finishReceipt(cfg, start, { outcome: "error", exitCode: 1, failures: 1, pending: 0, onramp: false, observations: [] });
+    console.log(`receipt: verification:${id}`);
+    throw error;
+  }
+  if (!opts.fast && !opts.fromReport && observed
+    && (!observed.observations.some(o => o.executed) || observed.observations.some(o => o.kind !== "pass"))) {
+    code = 1; observed.exitCode = 1; observed.failures = Math.max(observed.failures, 1);
+    console.log("receipt execution evidence is incomplete or failed");
+  }
+  const id = finishReceipt(cfg, start, observed ?? { outcome: "error", exitCode: code || 1, failures: 1, pending: 0, onramp: false, observations: [] });
+  console.log(`receipt: verification:${id}`);
+  return code;
+}
+
+async function runVerifyObserved(cfg: Config, graph: Graph, opts: VerifyOpts,
+  observe?: (result: Pick<VerificationReceipt, "outcome" | "exitCode" | "failures" | "pending" | "onramp" | "observations">) => void,
+): Promise<number> {
   const root = cfg.root;
   const bindingsBefore = projectBindings(cfg, graph);
   // THE NON-VACUITY FLOOR, checked before anything is graded — the instrument-check-first
@@ -408,7 +439,7 @@ export async function runVerify(cfg: Config, graph: Graph, opts: VerifyOpts): Pr
       access = engage(readReportFile(root, mode.file, batchFormat), `--from-report ${mode.file}`);
     } else if (mode.kind === "batch") {
       console.log(`oracles: batched — running the whole suite ONCE${mode.derived ? " (command derived from config.test)" : ""}: ${mode.cmd.join(" ")}`);
-      access = engage(runTestBatch(mode.cmd, root, batchFormat), "the batch run");
+      access = engage(runTestBatch(mode.cmd, root, batchFormat, !!opts.receipt), "the batch run");
     } else if (mode.kind === "serial") {
       access = grantSerial(mode.why);
     } else {
@@ -427,7 +458,7 @@ export async function runVerify(cfg: Config, graph: Graph, opts: VerifyOpts): Pr
   // runner's own per-test duration (the only honest reading for a batch-resolved claim, whose
   // wall time here is a map lookup), "wall" is verify's own clock around evalClaim (the only
   // reading available for everything else — a typecheck, a fetch, a serial runner boot).
-  type Sig = { kind: "pass" | "fail" | "skip"; claim: string; node: string; detail?: string; declaredKind?: string; ms?: number; msSource?: "wall" | "report"; oracleChecked?: boolean };
+  type Sig = { kind: "pass" | "fail" | "skip"; claim: string; node: string; detail?: string; declaredKind?: string; ms?: number; msSource?: "wall" | "report"; oracleChecked?: boolean; oracleExecuted?: boolean };
   // Undeclared (the default) leaves the whole mechanism off: kinds are neither required
   // nor checked, and every existing spec in the world parses unchanged.
   const kindPolicy = cfg.claimKinds;
@@ -446,15 +477,17 @@ export async function runVerify(cfg: Config, graph: Graph, opts: VerifyOpts): Pr
     if (kindPolicy && declaredKind && !kindPolicy[declaredKind])
       return { kind: "fail", claim, node, declaredKind,
         detail: `unknown claim kind "${declaredKind}" — config.claimKinds declares: ${Object.keys(kindPolicy).join(", ")}` };
-    let oracleChecked = false;
+    let oracleChecked = false, oracleExecuted = false;
     const ctx: ClaimCtx = {
+      receiptMode: !!opts.receipt,
+      oracleExecuted: () => { oracleExecuted = true; },
       oracleChecked: () => { oracleChecked = true; },
       cfg, graph, root, nodeDir, node, fast: !!opts.fast, typecheck, wordStack: [], oracles, staticOracles,
       anchor: (inv) => { let set = anchored.get(node); if (!set) { set = new Set(); anchored.set(node, set); } set.add(inv); },
     };
     for (const form of CLAIM_FORMS) {
       const m = form.match(claim);
-      if (m) { const r = await form.evaluate(ctx, m); return { kind: r.kind, claim, node, detail: r.detail, declaredKind, ms: r.ms, ...(oracleChecked ? { oracleChecked } : {}) }; }
+      if (m) { const r = await form.evaluate(ctx, m); return { kind: r.kind, claim, node, detail: r.detail, declaredKind, ms: r.ms, ...(oracleChecked ? { oracleChecked } : {}), ...(oracleExecuted ? { oracleExecuted } : {}) }; }
     }
     return { kind: "skip", claim, node, detail: "no verifier (dialect gap)", declaredKind };
   };
@@ -765,6 +798,12 @@ export async function runVerify(cfg: Config, graph: Graph, opts: VerifyOpts): Pr
     console.log(failures === 0 ? (verifyJobs.length ? `\n• ${verifyJobs.length} verification job(s) pending` : "\n✓ coherent") : `\n✗ ${failures} coherence failure(s) — ${red} claim · ${broken} broken · ${covGaps} coverage${refused ? " · 1 executable tier refused (see [oracles] above)" : ""}`);
     if (ladder) { console.log(""); for (const l of ladder.lines) console.log(l); }
   }
+
+  observe?.({ outcome: "completed", exitCode: onramp || failures === 0 ? 0 : 1,
+    failures: onramp ? 0 : failures, pending: verifyJobs.length, onramp,
+    observations: sigs.map(s => ({ node: s.node, claim: s.claim, kind: s.kind,
+      executed: !opts.fast && !opts.fromReport && s.oracleExecuted === true && s.kind !== "skip" })),
+  });
 
   // File the report (`.coherence/status.json`) — the run record the panel (and any
   // other consumer) reads. Coverage + invariant TOTALS are static full-tree graph

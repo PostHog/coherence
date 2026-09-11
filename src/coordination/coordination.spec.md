@@ -145,8 +145,10 @@ without acquiring scheduler semantics.
 passing command nearby in time cannot establish which work it assessed. V2 regulation
 therefore treats a completed work order without a `verification --verifies--> work` edge
 as an obligation. This is deliberately stronger than command success and deliberately
-weaker than a proof of semantic correctness; append-only verification receipts remain a
-named future limit.
+weaker than a proof of semantic correctness. The edge must now resolve an intact current
+local receipt bound to the same work definition and criteria; arbitrary legacy labels,
+fast/imported evidence, skipped checks and changed inputs cannot clear it. Relevance and
+executor trust remain explicit assessor judgments.
 
 **runnable work with overlapping write scopes is a collision, never concurrent
 permission.** Read and write scopes are repository-relative addresses. Dependency order

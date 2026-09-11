@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { listReceipts, readReceipt } from "./evidence/receipts.ts";
 // cli.ts — the coherence harness entrypoint. Run from a project root:
 //   node <coherence>/cli.ts <command> [options]     # no args prints every command
 // It loads coherence.config.json from the cwd and operates on that project.
@@ -368,7 +369,28 @@ if (cmd === "guarantees") {
 } else if (cmd === "claude") {
   const stale = await doClaude();
   if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "CLAUDE.md current"); await exit(stale.length ? 1 : 0); }
+} else if (cmd === "receipts") {
+  try {
+    const result = positional[0] ? readReceipt(cfg, positional[0], true) : listReceipts(cfg);
+    if (argv.includes("--json")) console.log(JSON.stringify(result, null, 2));
+    else if ("receipt" in result) {
+      console.log(result.id);
+      console.log(result.problems.length ? `ineligible: ${result.problems.join("; ")}` : "intact, current local execution evidence; relevance remains assessor-judged");
+      console.log("Retain these files together:");
+      for (const path of result.files) console.log(`  ${path}`);
+    } else {
+      for (const id of result.completed) console.log(id);
+      for (const run of result.incomplete) console.log(`incomplete: ${run}`);
+      if (!result.completed.length && !result.incomplete.length) console.log("No verification receipts.");
+    }
+    await exit("problems" in result && result.problems.length ? 1 : 0);
+  } catch (error) { console.error(error instanceof Error ? error.message : String(error)); await exit(2); }
 } else if (cmd === "verify") {
+  if (argv.includes("--receipt")) {
+    const repeated = repeatedSingletonFlags(argv, ["--receipt", "--work", "--session", "--agent"]);
+    if (repeated.length || applyPath) { console.error("receipt mode refuses repeated identity flags and --apply"); await exit(2); }
+  } else if (one("--work")) { console.error("verify --work requires --receipt"); await exit(2); }
+
   if (applyPath) await exit(await applyVerdicts(cfg, applyPath));
   const graph = await buildGraph(cfg);
   // Edit-loop scoping: --staged (working changes vs HEAD + untracked) or --since <ref>
@@ -377,7 +399,7 @@ if (cmd === "guarantees") {
   let only: Set<string> | undefined;
   if (argv.includes("--staged") || since) {
     only = await affectedComponents(cfg, graph, changedFiles(cfg, since));
-    if (!only.size) {
+    if (!only.size && !argv.includes("--receipt")) {
       // THE FLOOR APPLIES HERE TOO: a gutted deriver leaves a graph with no components,
       // which maps NO changed file to a component — and this early exit would then grade
       // the evisceration "nothing to check", exit 0. Same reading, same refusal.
@@ -388,6 +410,7 @@ if (cmd === "guarantees") {
     console.log(`verify (scoped to ${only.size} changed component(s)): ${[...only].join(", ")}`);
   }
   await exit(await runVerify(cfg, graph, {
+    receipt: argv.includes("--receipt"), work: one("--work") ?? undefined,
     fast, only, raise, raiseCap, session: one("--session") ?? undefined, agent: one("--agent") ?? undefined,
     // `--from-report <file>`: the executable tier resolves from a report the project already
     // produced (an outer gate's suite run) instead of coherence running the suite again.

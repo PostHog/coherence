@@ -21,9 +21,11 @@ const CLI = join(REPO, "src", "cli.ts");
 interface RunResult { code: number; stdout: string; stderr: string }
 
 async function run(root: string, args: string[]): Promise<RunResult> {
+  const env: NodeJS.ProcessEnv = { ...process.env, COHERENCE_SESSION: "", CODEX_THREAD_ID: "" };
+  delete env.NODE_TEST_CONTEXT;
   return exec(process.execPath, [CLI, ...args], {
     cwd: root,
-    env: { ...process.env, COHERENCE_SESSION: "", CODEX_THREAD_ID: "" },
+    env,
   }).then(({ stdout, stderr }) => ({ code: 0, stdout, stderr }))
     .catch((error: { code: number; stdout: string; stderr: string }) => ({
       code: error.code, stdout: error.stdout, stderr: error.stderr,
@@ -102,16 +104,23 @@ test("field journey — competing duties settle into reconstructable evidence an
   const root = await tmpProject({
     "coherence.config.json": JSON.stringify({
       entryDir: "app", codeExt: ["ts"], language: "typescript", platform: null,
+      typecheck: [], oracleExecution: "serial",
+      test: [process.execPath, "--test", "--test-reporter=tap", "--test-name-pattern"],
+      testMatch: "ok [0-9]+ - field execution control",
     }),
     "app/app.spec.md": [
       "# App", "", "A real source surface for transcript-free context.", "",
-      "## works when", "", "- integration.ts exists at this node", "",
+      "## works when", "", "- integration.ts exists at this node", '- passes test "field execution control"', "",
       "## why", "", "The field reader must recover the integration choice without a transcript.", "",
     ].join("\n"),
     "app/integration.ts": "export const strategy = 'staged';\n",
+    "app/integration.test.ts": 'import test from "node:test"; import assert from "node:assert/strict"; import {strategy} from "./integration.ts"; test("field execution control", () => assert.equal(strategy,"staged"));\n',
+    ".gitignore": ".coherence/verification/\n.coherence/status.json\n.coherence/verify-jobs.json\n",
+
   });
 
   try {
+    for (const args of [["init", "-q"], ["config", "user.email", "field@invalid.example"], ["config", "user.name", "Field test"], ["add", "."], ["commit", "-qm", "field fixture"]]) await exec("git", args, { cwd: root });
     for (const args of [
       create("wrk-field-root", "deliver the field canary", "field-parent", ["--write-scope", "README.md"]),
       create("wrk-field-alpha", "implement the shared seam", "alpha", [
@@ -233,15 +242,20 @@ test("field journey — competing duties settle into reconstructable evidence an
     ]);
     assert.equal(linkedDecision.code, 0, linkedDecision.stderr);
     for (const work of ["wrk-field-alpha", "wrk-field-beta", "wrk-field-root"]) {
+      const verification = await run(root, ["verify", "--receipt", "--work", work]);
+      assert.equal(verification.code, 0, verification.stdout + verification.stderr);
+      const receipt = verification.stdout.match(/receipt: (verification:sha256-[a-f0-9]{64})/)?.[1];
+      assert.ok(receipt, verification.stdout);
       const linked = await run(root, [
-        "consequence", "add", "verification:field-native-at-head", "verifies", `work:${work}`,
+        "consequence", "add", receipt, "verifies", `work:${work}`,
         "--evidence", "the native field acceptance passed after synthesis", "--session", "reviewer", "--json",
       ]);
       assert.equal(linked.code, 0, linked.stderr);
     }
 
     const settled = parsed(await run(root, ["orient", "--json"]));
-    assert.equal(settled.action, "steady");
+    assert.deepEqual(settled.consequences.unverifiedCompletedWork, []);
+    assert.equal(settled.action, "verify", "work receipts are satisfied; the separate dirty-tree dashboard remains stale");
     assert.ok(settled.sources.every((source: any) => source.ok));
     assert.equal(settled.decisions.positions[0].selected.id, acceptedDecision);
 
@@ -272,7 +286,8 @@ test("field journey — competing duties settle into reconstructable evidence an
 
     await writeFile(workPath, pristine);
     const recovered = parsed(await run(root, ["orient", "--json"]));
-    assert.equal(recovered.action, "steady");
+    assert.deepEqual(recovered.consequences.unverifiedCompletedWork, []);
+    assert.equal(recovered.action, settled.action);
     assert.ok(recovered.sources.every((source: any) => source.ok));
   } finally {
     await cleanup(root);

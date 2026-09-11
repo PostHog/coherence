@@ -371,8 +371,8 @@ export async function observeRegulation(
         rule: "completed-work-needs-explicit-verification",
         status: unverified.length ? "violated" : "satisfied",
         evidence: unverified.length
-          ? `${unverified.length} completed work order(s) lack an explicit verification link: ${unverified.join(", ")}`
-          : "every completed work order has explicit verification evidence, or no work is completed",
+          ? `${unverified.length} completed work order(s) lack a current work-bound receipt and explicit verification link: ${unverified.join(", ")}`
+          : "every completed work order has a current work-bound receipt and explicit assessment link, or no work is completed",
       });
     }
   } catch (error) {

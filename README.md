@@ -174,18 +174,23 @@ work or commit ──repairs─────▶ defect
 ```sh
 npx coherence consequence add "decision:$DECISION_ID" authorizes "work:$WORK_ID" \
   --evidence "the accepted decision grants this work order" --session "$COHERENCE_SESSION"
-npx coherence consequence add "verification:full@$(git rev-parse HEAD)" verifies "work:$WORK_ID" \
-  --evidence "full coherence verification passed at this commit" --session "$COHERENCE_SESSION"
+npx coherence verify --receipt --work "$WORK_ID" --session "$COHERENCE_SESSION"
+# Inspect the printed address, then set RECEIPT_ID to that verification:sha256-… value.
+npx coherence receipts "$RECEIPT_ID"
+npx coherence consequence add "$RECEIPT_ID" verifies "work:$WORK_ID" \
+  --evidence "these checks cover the work criteria against these outputs" --session "$COHERENCE_SESSION"
 npx coherence consequence inspect "work:$WORK_ID"
 ```
 
 The consequence ledger preserves the authored direction and renders both directions for
 navigation. Its typed relation table rejects nonsense, but an edge remains an attributable
 assessment—not proof of causality. A completed work order stays visibly unverified until a
-`verification --verifies--> work` edge names it. Today that verification reference is an
-assessor-authored address, not an existence-checked append-only receipt; record it only
-after the named check actually ran. The output and Known limits section keep that ceiling
-explicit.
+`verification --verifies--> work` edge names an intact, current receipt bound to that work
+definition. The assessor must still judge whether the checks cover its criteria. Legacy
+free-form verification labels remain historical context and cannot clear work.
+
+The [receipt design and remaining limits](docs/verification-receipts-design.md) explains
+the implemented local evidence grade and stronger future requirements.
 
 Commit `.coherence/work/` and `.coherence/consequences/`. They are repository evidence,
 not machine-local queues; configure blanket `.coherence/*` ignore rules to re-include both.
@@ -276,7 +281,7 @@ post-hoc score. A few matched tasks are a pilot, not a population claim.
 Keep attribution at its weakest provable grade. Exact work owners and journal writers do not
 make Codex descendant `PostToolUse` rows exact: those remain a `parent-session-aggregate`.
 Explicit-path traces are a lower bound, shell/editor/remembered reads are absent, and current
-verification references are not receipt-checked. Score per-child behavior only from exact
+legacy verification references cannot resolve receipts. Score per-child behavior only from exact
 records, label aggregate measures as aggregate, and retain manual scope and verification
 evidence rather than upgrading either ceiling by inference.
 
@@ -1266,6 +1271,48 @@ its current colour.
 instead of a line on a terminal — `[instrument]` ("the oracle is vacuous") is exactly the
 right first hypothesis, and the discriminating test is the refutation you owe anyway. See
 "`--raise`".
+
+## Immutable verification receipts
+
+`coherence verify --receipt` records one run independently of the rolling status display.
+Use `--work WORK_ID` to bind it to the work definition and criteria. The command prints
+`verification:sha256-…`; `coherence receipts <address> --json` inspects its results,
+current eligibility and the exact files needed to retain it. `coherence receipts` lists
+completed receipts and incomplete starts. These commands require a Git repository root.
+
+Receipts live in `.coherence/verification/`: `starts/<run-id>.json` records the beginning,
+`starts/<run-id>.done.json` fixes the one terminal digest, `receipts/<hash>.json` holds
+raw observations, and `artifacts/<hash>` holds input manifests. Writers publish complete
+files without replacement and synchronize them. Readers validate canonical bytes,
+shapes, hashes and required dependencies. A killed run cannot become an inferred pass.
+A later skip remains a skip in its own receipt even if the dashboard retains an old pass.
+Receipt-mode serial execution requires exact named TAP results without skipped/todo cases;
+other serial output formats refuse. Supported Vitest/pytest batch reports require every
+matching case to pass. File-report batches use a private fresh destination and require
+successful termination, so an old report cannot impersonate the new run.
+
+After assessing that the checks cover the work criteria, record the ordinary consequence
+edge: `coherence consequence add verification:sha256-ID verifies work:WORK_ID --evidence
+"why these checks cover the criteria" --session SESSION`. Completed work stays unverified
+unless that edge names a current, intact, work-bound receipt with full local execution,
+no failed/skipped checks and no pending narrative verification. Legacy free-form verification
+labels remain navigable history and cannot clear the obligation. Criterion adequacy is
+still assessor-judged; the receipt does not infer it from the command's success.
+
+The input grade captures Git-visible working files, executable bits, index provenance,
+effective configuration and executor identity. Committing unchanged working bytes does
+not invalidate a receipt. Status and its UUID publication scratch files, receipt output,
+verification jobs/narrative and the work
+and consequence ledgers are declared exclusions; the selected work definition is bound
+separately. Tests that consume excluded data, ignored dependencies, environment values or
+external services need additional evidence. Matching before/after samples do not prove
+snapshot isolation. Local receipts are **unattested testimony**, not authenticated proof.
+
+Keep exploratory receipts local (this repository already ignores the directory). To retain
+one, review the dependency list printed by `receipts`, then force-add only those ignored
+files alongside its work and consequence records. A fresh clone needs all those files;
+missing required evidence refuses. Source reconstruction also needs its Git objects or
+another retained snapshot. No automatic commit, pruning, upload or revocation is performed.
 
 ## The meta-oracle: what it proves — and what it does NOT
 
@@ -2608,7 +2655,7 @@ both is exactly what drifted.
      edit by hand — add the command to the registry and re-run. Everything OUTSIDE these
      markers is authored prose. -->
 
-_48 commands. This index is derived from the registry the dispatch is checked
+_49 commands. This index is derived from the registry the dispatch is checked
 against (`test/commands.test.ts` enumerates the live `cmd === …` chain and asserts the two
 sets are equal), so it cannot fall behind the CLI. The reasoning for the commands that have
 any is in **In detail** below — that half is authored, and does not cover all of them._
@@ -2633,10 +2680,11 @@ any is in **In detail** below — that half is authored, and does not cover all 
 
 **Verify, and diff what is enforced**
 
-- `coherence verify [--fast] [--staged | --since <ref>] [--raise [--raise-cap N]] [--apply <verdicts>] [--from-report <file>] [--serial-oracles]` — run the claims, the evidence chain and coverage — the gate
+- `coherence verify [--fast] [--staged | --since <ref>] [--raise [--raise-cap N]] [--apply <verdicts>] [--from-report <file>] [--serial-oracles] [--receipt [--work W]]` — run the claims, the evidence chain and coverage — the gate
 - `coherence log [<refA> [<refB>]] [--strict]` — structural diff of the invariant/boundary set between two refs, then the novelty advisory
 - `coherence signal [--check] [--since <ref>] [--attest-no-invariant --because <why>]` — require significant behavioral growth to gain an anchor or a patch-bound decision
 - `coherence regulate [--check] [--since <ref>] [--host <claude|codex>] [--json]` — apply the anti-entropy doctrine to live readings and emit exactly one next action
+- `coherence receipts [verification:sha256-ID] [--json]` — inspect immutable local verification evidence, required files and incomplete runs
 
 **Durable agent record — appends only, gates nothing**
 
@@ -3473,9 +3521,9 @@ meant.
   history rewrite, or detect partial loss while any valid row survives.
 - **Consequence edges are assessed provenance, not causal proof.** They are never inferred
   from co-presence. Commit identities can be checked against Git and durable record ids
-  against their strict ledgers; verification is still a rolling status record rather than
-  an append-only receipt registry, so verification references remain explicitly
-  existence-unchecked.
+  against their strict ledgers. Content-addressed verification receipts resolve strict local
+  evidence; legacy verification labels remain existence-unchecked. Receipt authenticity,
+  assertion adequacy and complete environmental capture are not established by hashes.
 - **Orientation is one bounded heading, not an overall correctness verdict.** It refuses
   unavailable required evidence and orders known coordination obligations. Unrecorded
   work, wrong-but-well-formed decisions, and facts outside its listed sources remain

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-11 15:32Z",
+  "generatedAt": "2026-09-11 16:59Z",
   "root": "coherence",
   "absRoot": "/private/Users/daniloc/Documents/Dev/coherence",
   "nodes": [
@@ -99,7 +99,7 @@
         "boundary \"completed work remains unverified until an explicit verification edge names it\" at observeRegulation via guard \"regulate — completed work requires an explicit verification link before release\""
       ],
       "prose": "Work orders remain inert records rather than an execution engine. Orientation and regulation select obligations without granting new authority or disguising unavailable evidence as a clean state.",
-      "why": "**a weaker regulation obligation never masks a stronger one.** Regulation compares live\nobligations by a lexicographic potential, with missing observations failing closed instead\nof becoming zero, and returns the single strongest action owed. V2 evaluates only rules\ndeclared in the live doctrine registry; even a no-action result makes no claim of overall\nsafety.\n\n**regulation evaluates and repairs the selected agent host.** A canonical Claude control\ncannot create a field around a Codex session, even though both hosts implement the same\nlifecycle domain. The sensor therefore names the explicit or current host in its reading,\nthe decision identity retains it, and a lifecycle redirect installs that same host. A\nforeign host value refuses before it can release or author a shell command.\n\n**work state is append-only, attributable, and predecessor-checked.** A shared task board\nthat mutates in place loses the handoffs and rejected transitions a swarm most needs after\ncontext loss. Each work order and transition is content-addressed in its writer session,\nand the current state is a strict replay. Broken predecessors, competing successors,\ndetached histories, damaged rows, and missing graph referents refuse instead of resolving\nby last-write-wins. The ledger is repository evidence rather than a machine-local queue;\nthe repository control therefore writes one through the public boundary, commits it,\nclones the repository, and requires the strict reader to reconstruct it.\n\n**work cannot activate or complete before every dependency completes.** Readiness is not\nadvice layered over the lifecycle; it is the lifecycle's ordering law. Every transition\nand closure validates its prospective graph before append, so a caller cannot bypass a\nwaiting projection by naming `active` or `completed` directly. Cancellation remains a\nterminal non-success and therefore does not satisfy a dependency that requires completed\noutput.\n\n**authored work text is single-line data, never model-instruction control.** Work records\nare repository-authored evidence on read, even when they were valid on write. Their text\ncrosses into SessionStart's model-instruction channel, so public writes reject C0/C1\ncontrols and the hook renderer escapes such bytes again. A newline can remain visible as\ndata but cannot acquire the grammar of a peer instruction.\n\n**consequence navigation contains only explicit assessed edges.** Decisions, work,\ncommits, experiments, verification, and defects already have addresses; temporal or path\nproximity does not make one cause another. The consequence ledger stores an assessor,\nevidence, typed endpoints, and a constrained relation per edge. Its graph traverses both\ndirections for navigation while retaining the authored direction, and strict reads refuse\nforged, displaced, conflicting, or symlink-redirected evidence. Those edges are durable\nonly if they cross a clone boundary, so the repository control writes a typed edge to a\nreal commit, transports it through Git, and requires a dangling-free cloned orientation.\n\n**specialized consequence relations admit only their declared endpoint kinds.** A generic\n`relates-to` edge can connect any two supported addresses, but verbs such as `produces`,\n`verifies`, `reveals`, and `repairs` carry lifecycle meaning. Their source and target kinds\nare checked as a pair, keeping the typed graph from accepting grammatically valid nonsense\nthat its render would otherwise state with unwarranted confidence.\n\n**consequence evidence refuses surviving storage damage instead of shrinking navigation.**\nAbsence is a legitimate first-use state; a surviving but unreadable, displaced, renamed,\nor torn edge is not. If damaged bytes could disappear from the population, removing one\nfile suffix or final newline could erase the only path from a defect to its repair while\nleaving an innocent empty graph. Storage framing and containment therefore belong to the\nevidence contract, not merely to filesystem hygiene.\n\n**orientation refuses damaged evidence before selecting a swarm heading.** The gyroscope\nis a projection over independent instruments, not a new source of truth. It reads each\nstrictly, preserves source availability and denominators, and selects one deterministic\nheading: refuse, resolve a collision, repair navigation, unblock, synthesize, dispatch,\ncontinue, verify, or steady. A damaged source outranks every actionable-looking empty list.\n\n**orientation admits verification state only with valid shape and comparable provenance.**\nThe status file is persisted JSON, not a TypeScript value at runtime. Orientation validates\nthe fields it uses—canonical time, commit shape, dirty bit, tier, and nonnegative failure\ncount—and refuses malformed evidence. A green report is current only when both repository\nand report commit addresses exist and agree; missing provenance is stale, never an\nimplicit match.\n\n**orientation selects synthesis only when parent closure can execute it.** Synthesis is\nrepresented by the parent's terminal close, not by a separate mutable checkbox. A completed\nchild can therefore remain visibly unsynthesized while a ready, active, or blocked sibling\nstill owes work; selecting synthesis then would demand an operation the lifecycle refuses.\nOnly when that parent's children are terminal does synthesis become the executable highest\nheading.\n\n**orientation derives live blockage only from closeable work state.** A journaled impasse\nis historical testimony and has no event that later marks it complete. Treating such rows\nas the live scheduler makes the heading demand an action the record cannot ever discharge.\nThe work lifecycle owns current blocked state; journal incidents remain visible context\nwithout acquiring scheduler semantics.\n\n**completed work remains unverified until an explicit verification edge names it.** A\npassing command nearby in time cannot establish which work it assessed. V2 regulation\ntherefore treats a completed work order without a `verification --verifies--> work` edge\nas an obligation. This is deliberately stronger than command success and deliberately\nweaker than a proof of semantic correctness; append-only verification receipts remain a\nnamed future limit.\n\n**runnable work with overlapping write scopes is a collision, never concurrent\npermission.** Read and write scopes are repository-relative addresses. Dependency order\ncan make an overlap merely potential, but two dependency-clear or active writers whose\nexact/tree scopes intersect are a live conflict. The projection blocks dispatch and names\nboth work ids and both scopes; ownership is explicit rather than reverse-engineered from a\nshared diff.\n\n**a terminal parent has no live child and explicitly synthesizes every completed direct\nchild.** A child returning is not evidence that its parent incorporated the result, and a\nlive child whose join target is closed has nowhere truthful to report. Prospective graph\nvalidation therefore refuses parent closure until every direct child is terminal, requires\nevery completed child in the synthesis set, and refuses a late live child beneath a\nterminal parent. Cancellation can settle a child but cannot masquerade as synthesized\nsuccess.\n\n**verification currency follows material repository state without invalidating its own\nreceipt.** Matching `HEAD` identifies a commit, not the live index and working tree layered\nover it. A source, staged, or untracked change therefore makes a clean report stale even\nwhen `HEAD` did not move. The status file itself is the one excluded path because recording\nthe report happens after its Git sample; counting that receipt would make every successful\nverification invalidate itself immediately.",
+      "why": "**a weaker regulation obligation never masks a stronger one.** Regulation compares live\nobligations by a lexicographic potential, with missing observations failing closed instead\nof becoming zero, and returns the single strongest action owed. V2 evaluates only rules\ndeclared in the live doctrine registry; even a no-action result makes no claim of overall\nsafety.\n\n**regulation evaluates and repairs the selected agent host.** A canonical Claude control\ncannot create a field around a Codex session, even though both hosts implement the same\nlifecycle domain. The sensor therefore names the explicit or current host in its reading,\nthe decision identity retains it, and a lifecycle redirect installs that same host. A\nforeign host value refuses before it can release or author a shell command.\n\n**work state is append-only, attributable, and predecessor-checked.** A shared task board\nthat mutates in place loses the handoffs and rejected transitions a swarm most needs after\ncontext loss. Each work order and transition is content-addressed in its writer session,\nand the current state is a strict replay. Broken predecessors, competing successors,\ndetached histories, damaged rows, and missing graph referents refuse instead of resolving\nby last-write-wins. The ledger is repository evidence rather than a machine-local queue;\nthe repository control therefore writes one through the public boundary, commits it,\nclones the repository, and requires the strict reader to reconstruct it.\n\n**work cannot activate or complete before every dependency completes.** Readiness is not\nadvice layered over the lifecycle; it is the lifecycle's ordering law. Every transition\nand closure validates its prospective graph before append, so a caller cannot bypass a\nwaiting projection by naming `active` or `completed` directly. Cancellation remains a\nterminal non-success and therefore does not satisfy a dependency that requires completed\noutput.\n\n**authored work text is single-line data, never model-instruction control.** Work records\nare repository-authored evidence on read, even when they were valid on write. Their text\ncrosses into SessionStart's model-instruction channel, so public writes reject C0/C1\ncontrols and the hook renderer escapes such bytes again. A newline can remain visible as\ndata but cannot acquire the grammar of a peer instruction.\n\n**consequence navigation contains only explicit assessed edges.** Decisions, work,\ncommits, experiments, verification, and defects already have addresses; temporal or path\nproximity does not make one cause another. The consequence ledger stores an assessor,\nevidence, typed endpoints, and a constrained relation per edge. Its graph traverses both\ndirections for navigation while retaining the authored direction, and strict reads refuse\nforged, displaced, conflicting, or symlink-redirected evidence. Those edges are durable\nonly if they cross a clone boundary, so the repository control writes a typed edge to a\nreal commit, transports it through Git, and requires a dangling-free cloned orientation.\n\n**specialized consequence relations admit only their declared endpoint kinds.** A generic\n`relates-to` edge can connect any two supported addresses, but verbs such as `produces`,\n`verifies`, `reveals`, and `repairs` carry lifecycle meaning. Their source and target kinds\nare checked as a pair, keeping the typed graph from accepting grammatically valid nonsense\nthat its render would otherwise state with unwarranted confidence.\n\n**consequence evidence refuses surviving storage damage instead of shrinking navigation.**\nAbsence is a legitimate first-use state; a surviving but unreadable, displaced, renamed,\nor torn edge is not. If damaged bytes could disappear from the population, removing one\nfile suffix or final newline could erase the only path from a defect to its repair while\nleaving an innocent empty graph. Storage framing and containment therefore belong to the\nevidence contract, not merely to filesystem hygiene.\n\n**orientation refuses damaged evidence before selecting a swarm heading.** The gyroscope\nis a projection over independent instruments, not a new source of truth. It reads each\nstrictly, preserves source availability and denominators, and selects one deterministic\nheading: refuse, resolve a collision, repair navigation, unblock, synthesize, dispatch,\ncontinue, verify, or steady. A damaged source outranks every actionable-looking empty list.\n\n**orientation admits verification state only with valid shape and comparable provenance.**\nThe status file is persisted JSON, not a TypeScript value at runtime. Orientation validates\nthe fields it uses—canonical time, commit shape, dirty bit, tier, and nonnegative failure\ncount—and refuses malformed evidence. A green report is current only when both repository\nand report commit addresses exist and agree; missing provenance is stale, never an\nimplicit match.\n\n**orientation selects synthesis only when parent closure can execute it.** Synthesis is\nrepresented by the parent's terminal close, not by a separate mutable checkbox. A completed\nchild can therefore remain visibly unsynthesized while a ready, active, or blocked sibling\nstill owes work; selecting synthesis then would demand an operation the lifecycle refuses.\nOnly when that parent's children are terminal does synthesis become the executable highest\nheading.\n\n**orientation derives live blockage only from closeable work state.** A journaled impasse\nis historical testimony and has no event that later marks it complete. Treating such rows\nas the live scheduler makes the heading demand an action the record cannot ever discharge.\nThe work lifecycle owns current blocked state; journal incidents remain visible context\nwithout acquiring scheduler semantics.\n\n**completed work remains unverified until an explicit verification edge names it.** A\npassing command nearby in time cannot establish which work it assessed. V2 regulation\ntherefore treats a completed work order without a `verification --verifies--> work` edge\nas an obligation. This is deliberately stronger than command success and deliberately\nweaker than a proof of semantic correctness. The edge must now resolve an intact current\nlocal receipt bound to the same work definition and criteria; arbitrary legacy labels,\nfast/imported evidence, skipped checks and changed inputs cannot clear it. Relevance and\nexecutor trust remain explicit assessor judgments.\n\n**runnable work with overlapping write scopes is a collision, never concurrent\npermission.** Read and write scopes are repository-relative addresses. Dependency order\ncan make an overlap merely potential, but two dependency-clear or active writers whose\nexact/tree scopes intersect are a live conflict. The projection blocks dispatch and names\nboth work ids and both scopes; ownership is explicit rather than reverse-engineered from a\nshared diff.\n\n**a terminal parent has no live child and explicitly synthesizes every completed direct\nchild.** A child returning is not evidence that its parent incorporated the result, and a\nlive child whose join target is closed has nowhere truthful to report. Prospective graph\nvalidation therefore refuses parent closure until every direct child is terminal, requires\nevery completed child in the synthesis set, and refuses a late live child beneath a\nterminal parent. Cancellation can settle a child but cannot masquerade as synthesized\nsuccess.\n\n**verification currency follows material repository state without invalidating its own\nreceipt.** Matching `HEAD` identifies a commit, not the live index and working tree layered\nover it. A source, staged, or untracked change therefore makes a clean report stale even\nwhen `HEAD` did not move. The status file itself is the one excluded path because recording\nthe report happens after its Git sample; counting that receipt would make every successful\nverification invalidate itself immediately.",
       "invariants": [
         "a weaker regulation obligation never masks a stronger one",
         "regulation evaluates and repairs the selected agent host",
@@ -229,6 +229,13 @@
       "sub": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
       "claimed": true,
       "claims": [
+        "boundary \"immutable receipts preserve witnessed runs and refuse damaged dependencies\" at readReceipt via guard \"receipts — raw executed results survive reruns without borrowing sticky passes\"",
+        "boundary \"immutable receipts preserve witnessed runs and refuse damaged dependencies\" at readReceipt via guard \"receipts — explicit work binding and selected files reconstruct in a fresh clone\"",
+        "boundary \"immutable receipts preserve witnessed runs and refuse damaged dependencies\" at readReceipt via guard \"receipts — tampered, missing and noncanonical dependencies refuse instead of shrinking evidence\"",
+        "boundary \"immutable receipts preserve witnessed runs and refuse damaged dependencies\" at beginReceipt via guard \"receipts — a killed verifier leaves an incomplete start and no inferred pass\"",
+        "boundary \"immutable receipts preserve witnessed runs and refuse damaged dependencies\" at finishReceipt via guard \"receipts — publication refuses repeat terminals and surviving conflict objects\"",
+        "boundary \"immutable receipts preserve witnessed runs and refuse damaged dependencies\" at readReceipt via guard \"receipts — skipped and todo executable oracles cannot acquire execution credit\"",
+        "boundary \"immutable receipts preserve witnessed runs and refuse damaged dependencies\" at readReceipt via guard \"receipts — prior batch files cannot impersonate a fresh successful runner\"",
         "boundary \"concurrent status writers preserve complete independent reports\" at recordVerify via guard \"status publication — concurrent processes preserve independent reports and readers see complete JSON\"",
         "boundary \"verdict-bearing decision reads fail closed on surviving journal damage\" at readTrustedJournal via guard \"trusted journal — any malformed, forged, displaced, conflicting, or dangling row refuses the verdict projection\"",
         "boundary \"a committed decision population cannot disappear into adoption from zero\" at readTrustedJournal via guard \"trusted journal — any malformed, forged, displaced, conflicting, or dangling row refuses the verdict projection\"",
@@ -242,8 +249,9 @@
         "boundary \"a streamed journal entry renders exactly once across appends and compaction\" at tailJournal via guard \"tail — an appended record arrives exactly once, a compaction fold re-emits nothing and drops nothing, and a half-written line waits for its bytes\""
       ],
       "prose": "Each ledger keeps its own evidence contract. Readers validate surviving records; journal streaming preserves content identity across appends and compaction.",
-      "why": "**concurrent status writers preserve complete independent reports.** A successful report\nwrite is a promise that later readers can recover it. Independent instruments must not\nerase one another merely because their finish times overlap, and a reader must never\ninherit half of a report. Availability after a killed writer is less valuable than\ninventing ownership of a still-live writer's critical section.\n\n**verdict-bearing decision reads fail closed on surviving journal damage.** The journal's\ntolerant reader is useful for a human salvaging old history, but a regulator or waiver\ncannot turn its skipped lines into a smaller trusted population. The strict projection\nvalidates wire version, canonical shape and time, content identity, session/file\nattribution, containment, append framing, duplicate agreement, and terminal references\nas one relation. Domain-separated session hashes retain case-sensitive identity on\ncase-folding filesystems while an owned historical filename remains readable. Any damage\nmakes the verdict-bearing population unavailable while the historical render stays\nbackward-compatible.\n\n**a committed decision population cannot disappear into adoption from zero.** An absent\nledger is legitimate before first use, so filesystem absence alone proves nothing. Once\ncurrent Git `HEAD` owns decision files, however, their wholesale deletion is an external\nwitness that zero rows means lost evidence rather than adoption. The witness is consulted\nonly at zero: populated compaction remains legal, while non-Git and unborn repositories\nretain an honestly unproven empty state.\n\n**a skipped run never clobbers an oracle's recorded verdict.** The record is the last\nknown truth, honestly dated. A fast tier that skips the executable claims every commit\nwould otherwise erase last week's real pass — or, worse, a real fail — with \"did not\nlook\", and history that can be overwritten by not looking is not history.\n\n**experiment outcomes require evidence for every criterion.** A\nplan is frozen before work with its predicted context, actions, criteria, and evidence\ncursors. Closure answers every action and criterion exactly once, preserves the assessor,\nand derives success, failure, or inconclusive from criterion statuses rather than accepting\nan outcome label. Otherwise the ledger would turn an incomplete story into a measured loop.\n\n**experiment telemetry preserves its weakest provable attribution.** Trace and activity\nwindows may be empty, prove an exact owner session, or only prove a parent-session aggregate\nthat can include descendants; older trace may carry no observation metadata at all. Those\nfour scopes remain distinct in the immutable close record. Damaged prefixes, unreadable\nrows, and unknown or inconsistent scope refuse. That keeps compatible history without\nturning absence or uncertainty into false precision.\n\n**surviving agent-assessed defect evidence is attributable and internally consistent.** A\nconjecture keeps uncertainty alive; a defect record says an agent crossed that epistemic\nboundary and must therefore carry the evidence for doing so, the repository subject it\njudged, and the caller-attributed writer labels attached to the assessment. Records append per session and\ndedupe exact retries, while the merged reader recomputes the ordinary content address and\nrefuses malformed, inconsistent, or displaced surviving rows. That detects partial damage;\nit does not prove that a valid row was never rewritten with a recomputed id. Committed Git\nhistory is this first recorder's external rewrite and deletion witness, and an independently\nanchored head is future work.\n\n**defect writes refuse pre-existing symlink redirection.** A path beneath the repository\nis not containment when its stable components redirect through a symlink. The reader\ntherefore refuses linked ledger directories and entries, while the writer validates both\ndirectory components and opens the session target without following its final link, then\ncompares the opened descriptor with the standing path before appending. This prevents the\nmeasured stable-state redirects; it is not an `openat`-grade promise against a privileged\nprocess racing parent-directory renames during the append.\n\n**defect provenance is data, never terminal control.** Repository identity is captured by\nthe machine, but the committed row is still untrusted input on its next read. A commit is\ntherefore null or has lowercase SHA-1/SHA-256 object-name shape, never merely a nonempty string; the\nhuman renderer also neutralizes its bytes. Without both the semantic constraint and the\noutput encoding, an edited but re-addressed row could turn provenance into a terminal\ninstruction while remaining structurally valid.\n\n**a streamed journal entry renders exactly once across appends and compaction.** The live\nstream exists for the one reader the settled render cannot serve — an orchestrator watching\nfive subagents mid-flight — and that reader has no way to audit the feed against the files.\nA dropped entry is a decision the orchestrator never saw, indistinguishable from one never\nmade; a duplicate teaches the opposite lie, that a question was decided twice. Both are\ncheap to produce, because the journal's files do not strictly grow: compaction moves lines\nbetween files and unlinks the originals, which a position-addressed reader replays in full.\nSo a record's identity in the stream comes from its content — the same triple the merged\ntimeline sorts by — and a moved line is one the feed already carried.\n\n**decision ratification follows explicit subject and authority, never prose similarity or\nrecency.** Independent agents can word the same question differently and can mention the\nsame noun while answering different questions. Conflict detection therefore compares only\nstanding decisions that share a machine-authored subject. Local alternatives remain\nproposals; one explicit orchestrator-accepted or user-directed choice can ratify them;\nincompatible choices tied at the highest authority stay contested.",
+      "why": "**immutable receipts preserve witnessed runs and refuse damaged dependencies.** A rolling\nstatus display can retain an old pass through a new skip, so it cannot identify one run.\nReceipt mode captures the current run before status merging, binds Git-visible working\nbytes and effective configuration, and publishes immutable start, manifest, terminal seal\nand result objects. One atomic seal selects one terminal digest. Missing or damaged\nrequired bytes refuse; a started run is never inferred successful. A work link needs the\nsame work definition and criteria, unchanged tested bytes, witnessed full execution and\nan explicit assessor. Local hashes detect altered addresses, not fabricated testimony;\nsemantic adequacy and executor trust remain assessed. Ignored dependencies, runtime\nservices and the named output/coordination exclusions are outside this input grade.\n\n**concurrent status writers preserve complete independent reports.** A successful report\nwrite is a promise that later readers can recover it. Independent instruments must not\nerase one another merely because their finish times overlap, and a reader must never\ninherit half of a report. Availability after a killed writer is less valuable than\ninventing ownership of a still-live writer's critical section.\n\n**verdict-bearing decision reads fail closed on surviving journal damage.** The journal's\ntolerant reader is useful for a human salvaging old history, but a regulator or waiver\ncannot turn its skipped lines into a smaller trusted population. The strict projection\nvalidates wire version, canonical shape and time, content identity, session/file\nattribution, containment, append framing, duplicate agreement, and terminal references\nas one relation. Domain-separated session hashes retain case-sensitive identity on\ncase-folding filesystems while an owned historical filename remains readable. Any damage\nmakes the verdict-bearing population unavailable while the historical render stays\nbackward-compatible.\n\n**a committed decision population cannot disappear into adoption from zero.** An absent\nledger is legitimate before first use, so filesystem absence alone proves nothing. Once\ncurrent Git `HEAD` owns decision files, however, their wholesale deletion is an external\nwitness that zero rows means lost evidence rather than adoption. The witness is consulted\nonly at zero: populated compaction remains legal, while non-Git and unborn repositories\nretain an honestly unproven empty state.\n\n**a skipped run never clobbers an oracle's recorded verdict.** The record is the last\nknown truth, honestly dated. A fast tier that skips the executable claims every commit\nwould otherwise erase last week's real pass — or, worse, a real fail — with \"did not\nlook\", and history that can be overwritten by not looking is not history.\n\n**experiment outcomes require evidence for every criterion.** A\nplan is frozen before work with its predicted context, actions, criteria, and evidence\ncursors. Closure answers every action and criterion exactly once, preserves the assessor,\nand derives success, failure, or inconclusive from criterion statuses rather than accepting\nan outcome label. Otherwise the ledger would turn an incomplete story into a measured loop.\n\n**experiment telemetry preserves its weakest provable attribution.** Trace and activity\nwindows may be empty, prove an exact owner session, or only prove a parent-session aggregate\nthat can include descendants; older trace may carry no observation metadata at all. Those\nfour scopes remain distinct in the immutable close record. Damaged prefixes, unreadable\nrows, and unknown or inconsistent scope refuse. That keeps compatible history without\nturning absence or uncertainty into false precision.\n\n**surviving agent-assessed defect evidence is attributable and internally consistent.** A\nconjecture keeps uncertainty alive; a defect record says an agent crossed that epistemic\nboundary and must therefore carry the evidence for doing so, the repository subject it\njudged, and the caller-attributed writer labels attached to the assessment. Records append per session and\ndedupe exact retries, while the merged reader recomputes the ordinary content address and\nrefuses malformed, inconsistent, or displaced surviving rows. That detects partial damage;\nit does not prove that a valid row was never rewritten with a recomputed id. Committed Git\nhistory is this first recorder's external rewrite and deletion witness, and an independently\nanchored head is future work.\n\n**defect writes refuse pre-existing symlink redirection.** A path beneath the repository\nis not containment when its stable components redirect through a symlink. The reader\ntherefore refuses linked ledger directories and entries, while the writer validates both\ndirectory components and opens the session target without following its final link, then\ncompares the opened descriptor with the standing path before appending. This prevents the\nmeasured stable-state redirects; it is not an `openat`-grade promise against a privileged\nprocess racing parent-directory renames during the append.\n\n**defect provenance is data, never terminal control.** Repository identity is captured by\nthe machine, but the committed row is still untrusted input on its next read. A commit is\ntherefore null or has lowercase SHA-1/SHA-256 object-name shape, never merely a nonempty string; the\nhuman renderer also neutralizes its bytes. Without both the semantic constraint and the\noutput encoding, an edited but re-addressed row could turn provenance into a terminal\ninstruction while remaining structurally valid.\n\n**a streamed journal entry renders exactly once across appends and compaction.** The live\nstream exists for the one reader the settled render cannot serve — an orchestrator watching\nfive subagents mid-flight — and that reader has no way to audit the feed against the files.\nA dropped entry is a decision the orchestrator never saw, indistinguishable from one never\nmade; a duplicate teaches the opposite lie, that a question was decided twice. Both are\ncheap to produce, because the journal's files do not strictly grow: compaction moves lines\nbetween files and unlinks the originals, which a position-addressed reader replays in full.\nSo a record's identity in the stream comes from its content — the same triple the merged\ntimeline sorts by — and a moved line is one the feed already carried.\n\n**decision ratification follows explicit subject and authority, never prose similarity or\nrecency.** Independent agents can word the same question differently and can mention the\nsame noun while answering different questions. Conflict detection therefore compares only\nstanding decisions that share a machine-authored subject. Local alternatives remain\nproposals; one explicit orchestrator-accepted or user-directed choice can ratify them;\nincompatible choices tied at the highest authority stay contested.",
       "invariants": [
+        "immutable receipts preserve witnessed runs and refuse damaged dependencies",
         "concurrent status writers preserve complete independent reports",
         "verdict-bearing decision reads fail closed on surviving journal damage",
         "a committed decision population cannot disappear into adoption from zero",
@@ -257,6 +265,8 @@
         "a streamed journal entry renders exactly once across appends and compaction"
       ],
       "refutations": [
+        "immutable receipts preserve witnessed runs and refuse damaged dependencies: a context-free reviewer made `test.skip` and failing `test.todo` clear work through public receipt mode; attempted lookup was wrongly labeled execution. Receipt mode now requires named non-skipped TAP or fully passed structured matches. The same review reused a report less than two seconds old after a runner exited without tests; private fresh report destinations and successful termination remove that reuse path. Renaming an incomplete start under `.pending-` also hid it; pending publication now refuses instead of shrinking inventory.",
+        "immutable receipts preserve witnessed runs and refuse damaged dependencies: the initial repository-root comparison rejected real macOS checkouts through /var because Git reports /private/var. Canonical filesystem identity now admits those executable fixtures; changed or redirected evidence still refuses.",
         "concurrent status writers preserve complete independent reports: the taxonomy field probe overlapped atlas and mass writes in twenty temporary repositories. Both writers returned successfully, but eighteen final files were unreadable and two lost a report. A sequential control kept both. One exclusive read/merge/publish transaction plus atomic rename replaces the independent whole-file writes; an abandoned lock refuses instead of being stolen.",
         "verdict-bearing decision reads fail closed on surviving journal damage: a symlinked `.coherence` could supply external valid rows, a renamed or blank/torn file silently shrank the trusted population, and case-distinct `Owner`/`owner` sessions collided on case-folding filesystems. The trusted projection now validates containment, every directory entry, append framing, and domain-separated hashed session addresses before admitting any row.",
         "a committed decision population cannot disappear into adoption from zero: two valid conflicting decision files produced `RESOLVE-CONFLICT`; deleting the entire tracked directory then produced zero trusted rows and `STEADY`. The strict empty projection now asks current Git `HEAD` whether tracked decision files disappeared, while a repository that never owned a ledger remains valid first-use adoption.",
@@ -664,8 +674,7 @@
       "label": "cli.ts",
       "kind": "file",
       "sub": "src/cli.ts",
-      "path": "src/cli.ts",
-      "prose": "cli.ts — the coherence harness entrypoint. Run from a project root:\n  node <coherence>/cli.ts <command> [options]     # no args prints every command\nIt loads coherence.config.json from the cwd and operates on that project.\n\nTHE COMMAND LIST IS NOT SPELLED HERE. Which verbs exist, what each takes and what each\nis for live in src/commands.ts; the usage banner and README.md's command index are both\nderived from it, and test/commands.test.ts reads the `cmd === \"…\"` chain below out of\nthis file's AST and asserts it matches the registry exactly. Adding a branch here without\na registry entry (or the reverse) fails the suite."
+      "path": "src/cli.ts"
     },
     {
       "id": "s:src/cli.ts#repeatedSingletonFlags",
@@ -674,7 +683,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/cli.ts",
-      "line": 99
+      "line": 100
     },
     {
       "id": "f:src/commands.ts",
@@ -758,7 +767,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/commands.ts",
-      "line": 283,
+      "line": 285,
       "prose": "Every command name, in registry order. The `<a|b|c>` list — aliases excluded."
     },
     {
@@ -768,7 +777,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/commands.ts",
-      "line": 287,
+      "line": 289,
       "prose": "Every token the dispatch must accept: names AND aliases. The totality oracle compares\n THIS against the `cmd === \"…\"` literals it reads out of cli.ts."
     },
     {
@@ -778,7 +787,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/commands.ts",
-      "line": 300,
+      "line": 302,
       "prose": "The registry entry a typed token names — BY NAME OR BY ALIAS. The one lookup any guard\nkeyed on a flag (`writesArtifacts`, `writesBaseline`) may use.\n\nThe floor guarding the generators matched `c.name === cmd` and nothing else, which is a\nlatent bypass with no current victim: the only alias in the registry, `resolve`, writes\nnothing. But `aliases` exists precisely so a writing command can acquire a second\nspelling, and the day one does, the guard would silently exempt it — a gate that fails\nopen on a rename is the class of defect this whole file exists to end. Closed here\nrather than at the call site, because the call site is where it was forgotten once."
     },
     {
@@ -788,7 +797,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/commands.ts",
-      "line": 328,
+      "line": 330,
       "prose": "SPELLING ONE — the usage banner, printed to stderr when the verb is unknown or absent.\nDerived in full: there is no command-name string literal left in cli.ts's help text, so\nthe banner cannot be 29 while the dispatch is 30, and two branches editing different\ncommands can no longer conflict on one line."
     },
     {
@@ -798,7 +807,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/commands.ts",
-      "line": 361,
+      "line": 363,
       "prose": "SPELLING TWO — the README's command index, markers inclusive, ready for `spliceBlock`.\n\nA BULLET LIST, not a markdown table, and that is a real constraint rather than taste:\n`redundancy` reads the first column of every markdown table as an enumerated domain, so\na generated table would hand it a fresh README↔dispatch pair to report — trading the\nfinding this change exists to remove for an identical one. A generated block that the\nproject's own detector still flags has not fixed anything.\n\nThe block is an INDEX and nothing more: name, arg shape, one line. The authored\nper-command reasoning lives OUTSIDE the markers, below the block, and is not expected to\ncover every command — completeness is what the derivation owes, depth is what the prose\nowes, and confusing the two is how the reference got twelve commands behind."
     },
     {
@@ -808,7 +817,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/commands.ts",
-      "line": 402,
+      "line": 404,
       "prose": "The lightweight command catalog is imported by the lifecycle hook's due-work reader.\nKeep the executable claim registry on the docs side of this parameter boundary: a\nstatic import here makes every PostToolUse load parsers before it can record one path."
     },
     {
@@ -818,7 +827,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/commands.ts",
-      "line": 409
+      "line": 411
     },
     {
       "id": "f:src/config.ts",
@@ -1147,8 +1156,7 @@
       "label": "orient.ts",
       "kind": "file",
       "sub": "src/coordination/orient.ts",
-      "path": "src/coordination/orient.ts",
-      "prose": "orient.ts — one compact, deterministic heading across the swarm's durable instruments.\n\nEach source keeps its own epistemic boundary: the work ledger owns coordination state,\nthe trusted journal owns decisions, consequences own assessed relationships, and the\nstatus record owns the last verification verdict. Orientation composes those readings;\nit does not mutate any of them and never promotes proximity into a relationship."
+      "path": "src/coordination/orient.ts"
     },
     {
       "id": "s:src/coordination/orient.ts#OrientationAction",
@@ -1157,7 +1165,7 @@
       "kind": "symbol",
       "sub": "type",
       "path": "src/coordination/orient.ts",
-      "line": 19
+      "line": 20
     },
     {
       "id": "s:src/coordination/orient.ts#OrientationSource",
@@ -1166,7 +1174,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/coordination/orient.ts",
-      "line": 30
+      "line": 31
     },
     {
       "id": "s:src/coordination/orient.ts#DanglingConsequenceRef",
@@ -1175,7 +1183,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/coordination/orient.ts",
-      "line": 36
+      "line": 37
     },
     {
       "id": "s:src/coordination/orient.ts#VerificationOrientation",
@@ -1184,7 +1192,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/coordination/orient.ts",
-      "line": 42
+      "line": 43
     },
     {
       "id": "s:src/coordination/orient.ts#Orientation",
@@ -1193,7 +1201,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/coordination/orient.ts",
-      "line": 50
+      "line": 51
     },
     {
       "id": "s:src/coordination/orient.ts#verifyOrientation",
@@ -1202,7 +1210,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/coordination/orient.ts",
-      "line": 102
+      "line": 103
     },
     {
       "id": "s:src/coordination/orient.ts#observeOrientation",
@@ -1211,7 +1219,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/coordination/orient.ts",
-      "line": 218,
+      "line": 222,
       "prose": "Read every ledger independently. A failed source is preserved as a source failure and\nmakes the heading REFUSE; it never turns into an empty population."
     },
     {
@@ -1221,7 +1229,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/coordination/orient.ts",
-      "line": 375
+      "line": 380
     },
     {
       "id": "f:src/coordination/regulate.ts",
@@ -5170,6 +5178,172 @@
       "prose": "What the caller sees. One or two lines — this runs once per tracked metric per run,\n so a paragraph per row would bury the report the project already prints."
     },
     {
+      "id": "f:src/evidence/receipts.ts",
+      "parent": "c:src/evidence",
+      "label": "receipts.ts",
+      "kind": "file",
+      "sub": "src/evidence/receipts.ts",
+      "path": "src/evidence/receipts.ts",
+      "prose": "Immutable local execution evidence. Hashes detect changed addressed bytes; they do\nnot authenticate a local executor or prove the relevance/adequacy of its assertions."
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#RECEIPT_EXCLUSIONS",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "RECEIPT_EXCLUSIONS",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/evidence/receipts.ts",
+      "line": 17,
+      "prose": "These are declared outputs/coordination, not arbitrary .coherence evidence. Tests\nconsuming them, ignored files, environment, services or external dependencies need\nadditional evidence; this grade does not capture those inputs."
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#InputFile",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "InputFile",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/evidence/receipts.ts",
+      "line": 18
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#InputManifest",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "InputManifest",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/evidence/receipts.ts",
+      "line": 19
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#ReceiptStart",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "ReceiptStart",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/evidence/receipts.ts",
+      "line": 20
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#ReceiptObservation",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "ReceiptObservation",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/evidence/receipts.ts",
+      "line": 27
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#VerificationReceipt",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "VerificationReceipt",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/evidence/receipts.ts",
+      "line": 28
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#ReceiptRead",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "ReceiptRead",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/evidence/receipts.ts",
+      "line": 34
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#ReceiptError",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "ReceiptError",
+      "kind": "symbol",
+      "sub": "class",
+      "path": "src/evidence/receipts.ts",
+      "line": 35
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#receiptCanonical",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "receiptCanonical",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/evidence/receipts.ts",
+      "line": 37
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#receiptHash",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "receiptHash",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/evidence/receipts.ts",
+      "line": 44
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#captureReceiptInputs",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "captureReceiptInputs",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/evidence/receipts.ts",
+      "line": 101,
+      "prose": "Capture the declared Git-visible working bytes, independently of the graph walker.\nThe index is separate run provenance; committing unchanged bytes does not stale them."
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#beginReceipt",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "beginReceipt",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/evidence/receipts.ts",
+      "line": 132
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#finishReceipt",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "finishReceipt",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/evidence/receipts.ts",
+      "line": 148
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#readReceipt",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "readReceipt",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/evidence/receipts.ts",
+      "line": 221,
+      "prose": "Resolve immutable bytes and their required dependencies. Current eligibility is a\nseparate reading; a valid historical receipt never silently becomes a current pass."
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#receiptWorkProblem",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "receiptWorkProblem",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/evidence/receipts.ts",
+      "line": 242
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#listReceipts",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "listReceipts",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/evidence/receipts.ts",
+      "line": 251
+    },
+    {
+      "id": "s:src/evidence/receipts.ts#readReceiptStart",
+      "parent": "f:src/evidence/receipts.ts",
+      "label": "readReceiptStart",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/evidence/receipts.ts",
+      "line": 259,
+      "prose": "Read a start through the same strict corpus admission as terminal receipts."
+    },
+    {
       "id": "f:src/evidence/status.ts",
       "parent": "c:src/evidence",
       "label": "status.ts",
@@ -6007,7 +6181,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 162,
+      "line": 166,
       "prose": "The exact-session work order injected beside the durable journal instructions.\nLoaded dynamically so PostToolUse's startup closure does not acquire the coordination\nledger. Failure is rendered as unavailable evidence, never thrown through a host's\nlifecycle boundary."
     },
     {
@@ -6017,7 +6191,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 218,
+      "line": 223,
       "prose": "A Stop feedback turn stops again. Hosts mark that second pass so a non-blocking nudge\ncan be emitted exactly once instead of accidentally becoming an eight-turn gate."
     },
     {
@@ -6027,7 +6201,7 @@
       "kind": "symbol",
       "sub": "type",
       "path": "src/lifecycle/hooks.ts",
-      "line": 223
+      "line": 228
     },
     {
       "id": "s:src/lifecycle/hooks.ts#composeStopFeedback",
@@ -6036,7 +6210,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 233,
+      "line": 238,
       "prose": "Host semantics make this distinction consequential: any `additionalContext` continues\nthe conversation. A subagent's parent may genuinely need the final report restated;\nthe main user just read it. Main Stop therefore emits nothing. Shared-worktree state\ncannot be promoted into a task-local obligation merely because this agent stopped."
     },
     {
@@ -6046,7 +6220,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 255,
+      "line": 260,
       "prose": "`coherence hook <event>` — the hook body itself, so nothing has to be written to\n disk or kept in sync with a script file. Reads the event payload on stdin (unused\n today, but hooks are fed JSON and ignoring it silently would be rude to the next\n person who needs a field from it) and prints the documented output shape."
     },
     {
@@ -6056,7 +6230,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 416,
+      "line": 421,
       "prose": "What a subagent is told as it finishes. Split out of `runHook` so it is reachable\n without a stdin pipe — the hook body drains stdin, and a report you can only observe\n by feeding a process is a report nobody tests."
     },
     {
@@ -6066,7 +6240,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/lifecycle/hooks.ts",
-      "line": 491
+      "line": 496
     },
     {
       "id": "s:src/lifecycle/hooks.ts#CurrentHookObservation",
@@ -6075,7 +6249,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/lifecycle/hooks.ts",
-      "line": 503
+      "line": 508
     },
     {
       "id": "s:src/lifecycle/hooks.ts#activeHookHost",
@@ -6084,7 +6258,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 528,
+      "line": 533,
       "prose": "Which host owns the current shell. Explicit selection always wins."
     },
     {
@@ -6094,7 +6268,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 534,
+      "line": 539,
       "prose": "Never pick the newest session: concurrency makes \"latest\" an attribution bug."
     },
     {
@@ -6104,7 +6278,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 562
+      "line": 567
     },
     {
       "id": "s:src/lifecycle/hooks.ts#hookStatus",
@@ -6113,7 +6287,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 638,
+      "line": 643,
       "prose": "Structural configuration, historical memory, and this exact session stay separate."
     },
     {
@@ -6123,7 +6297,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 719,
+      "line": 724,
       "prose": "`coherence hooks status` — report the switch and the observation beside it."
     },
     {
@@ -6133,7 +6307,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 726,
+      "line": 731,
       "prose": "`coherence hooks --check` — the binary current-control gate. Observation never redeems absence."
     },
     {
@@ -6143,7 +6317,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 736
+      "line": 741
     },
     {
       "id": "s:src/lifecycle/hooks.ts#uninstallHooks",
@@ -6152,7 +6326,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 753
+      "line": 758
     },
     {
       "id": "s:src/lifecycle/hooks.ts#reviewHooks",
@@ -6161,7 +6335,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 770,
+      "line": 775,
       "prose": "`coherence hooks review` — every event's EFFECTIVE emission, with its provenance.\n The hook body degrades an unreadable customization to canon silently, because a torn\n file must not break a session; THIS is the loud surface where that damage lands, and\n the exit code carries it."
     },
     {
@@ -6171,7 +6345,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 818,
+      "line": 823,
       "prose": "`coherence hooks` — print one host's canonical block, plus the\n instruction text so a reader can see what agents will actually be told."
     },
     {
@@ -8612,7 +8786,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/phrasebook.ts",
-      "line": 68
+      "line": 70
     },
     {
       "id": "s:src/verification/phrasebook.ts#Word",
@@ -8621,7 +8795,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/phrasebook.ts",
-      "line": 83,
+      "line": 85,
       "prose": "── the dictionary word file ──────────────────────────────────────────────────────────\n`<coherence root>/<dictionary>/<Word>.md`: a `# <Word>` heading, first non-blank line =\nintent, a `## commitments` bullet list where each bullet is a claim line in THIS grammar\n(including `boundary …` and nested `conforms to <OtherWord>`). Parsed with walk.ts's\nregex-heading style + markdown-unescape so a prettified word file still parses."
     },
     {
@@ -8631,7 +8805,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/phrasebook.ts",
-      "line": 87,
+      "line": 89,
       "prose": "Parse a dictionary word file, or null if it is not a well-formed word (a broken\n reference must go RED, not skip — a word is a contract)."
     },
     {
@@ -8641,7 +8815,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/verification/phrasebook.ts",
-      "line": 106,
+      "line": 108,
       "prose": "Where a word file resolves, relative to the coherence root."
     },
     {
@@ -8651,7 +8825,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/phrasebook.ts",
-      "line": 114,
+      "line": 116,
       "prose": "A dictionary word plus the components that `conforms to` it — for the overview render."
     },
     {
@@ -8661,7 +8835,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/verification/phrasebook.ts",
-      "line": 119,
+      "line": 121,
       "prose": "The `conforms to <Word>` grammar — SINGLE HOME. Consumed by the claim form's `match`,\n the dictionary cross-reference in `loadDictionary`, and the `--staged`/`--since` word-edit\n propagation scope in structural.ts. Capture group 1 is the word token."
     },
     {
@@ -8671,7 +8845,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/verification/phrasebook.ts",
-      "line": 123,
+      "line": 125,
       "prose": "Regex-escape a string so it matches literally when interpolated into a RegExp or passed\n to a test runner whose `-t <name>` treats the arg as a regex (vitest, jest)."
     },
     {
@@ -8681,7 +8855,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/phrasebook.ts",
-      "line": 147,
+      "line": 149,
       "prose": "Resolve ONE named test — the shared executable arm of `passes test`,\n`boundary … via test`, and `parity … via test`. THE SINGLE FRONT DOOR: every runner\ninvocation coherence makes on a project's behalf goes through here, which is why\nbatching is a change to this one function rather than to three claim forms.\n\nTwo arms, one contract:\n  BATCH — a whole-suite report is available, so the answer is a lookup (`resolveFromBatch`).\n  PER-CLAIM — shell `config.test` with the name appended, regex-escaped for the runner's\n    `-t`; exit 0 alone is not trusted (`testMatch` requires positive evidence the named\n    test actually ran — an exit-0 runner that matched zero tests would otherwise pass a\n    renamed/deleted oracle).\n\nBoth arms require positive evidence and both go red on zero matches, so which one\nanswered is an operational detail, never a difference in what green means.\n\n`ms` — the claim's HOLDING COST, and ONLY the batch arm can report it. The report carries\nthe runner's own per-test durations, so a batched claim's cost is measured by the thing\nthat ran it. The serial arm returns none: what a wall clock sees there is a whole test-pool\nboot charged to whichever claim happened to trigger it, which is a fact about the profile,\nnot about the claim. Verify's own wall clock takes over when this is absent."
     },
     {
@@ -8691,7 +8865,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/phrasebook.ts",
-      "line": 159,
+      "line": 163,
       "prose": "The SERIAL arm of `execNamedTest`, factored so the canary below probes the EXACT code\n path a claim's verdict rides on — same spawn, same exit-code reading, same `testMatch`\n evidence rule. Exit 0 alone is not trusted: `testMatch` requires positive evidence the\n named test actually ran (a zero-match runner that exits 0 would otherwise pass a\n renamed/deleted oracle)."
     },
     {
@@ -8701,7 +8875,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/phrasebook.ts",
-      "line": 181,
+      "line": 194,
       "prose": "THE SERIAL CANARY — the repo's own doctrine applied to the instrument: a checker never\nobserved to fail has not been shown to be a checker. The batch path proves a vanished\noracle structurally (zero matches in the report is its own red); the serial path had to\nTRUST `config.test` + `testMatch`, on a runner class this repo has itself documented as\nun-guardable by testMatch (node:test multi-file: a real name and a name existing nowhere\nproduce byte-identical passing output — measured, test-batch.ts:110, types.ts).\n\nSo, once per serial verify, run the runner with a name that provably exists nowhere and\nrequire it to FAIL (nonzero exit, or a `testMatch` miss — the same reading a claim gets).\nA runner that PASSES the canary cannot filter by name: every green it would produce is\ngreen-by-absence, and verify must refuse it exactly as the batch path refuses. Cost is\none extra runner boot per serial run."
     },
     {
@@ -8711,7 +8885,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/phrasebook.ts",
-      "line": 205,
+      "line": 218,
       "prose": "Scan the dictionary dir + cross-reference the graph's `conforms to` claims. Empty when\n the project has no dictionary dir (so the overview's Dictionary section is omitted)."
     },
     {
@@ -8721,7 +8895,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/verification/phrasebook.ts",
-      "line": 223
+      "line": 236
     },
     {
       "id": "f:src/verification/python-totality.ts",
@@ -8833,8 +9007,7 @@
       "label": "test-batch.ts",
       "kind": "file",
       "sub": "src/verification/test-batch.ts",
-      "path": "src/verification/test-batch.ts",
-      "prose": "test-batch.ts — BATCHED ORACLE EXECUTION. Run the consuming project's test runner\nONCE, with a machine-readable reporter, and resolve every executable claim from that\nsingle report instead of booting the runner per claim.\n\nWHY THIS EXISTS. The per-claim arm (`execNamedTest` in phrasebook.ts) shells\n`config.test` + the claim name once per executable claim. It needs no reporter, no\nschema, and no trust in a report file — which is why it survives as the explicit\nescape hatch — but the cost is a whole runner boot per claim, and on a project whose\npool is expensive to start (a workerd/vitest pool: 15-30s) it is pure redundancy —\nmeasured at 20-35 minutes for ~70 executable claims in a suite that runs end-to-end\nin under two. One boot, then N lookups, is the same evidence for one two-hundredth\nof the wall clock; as of v0.17.0 the serial profile runs only when NAMED\n(--serial-oracles), never as a default.\n\nTHE GUARANTEE IS THE POINT, NOT THE SPEED. This module is only allowed to exist\nbecause it can reproduce the per-claim path's verdicts exactly, including the one\nthat took a regression to learn (`config.testMatch`): a claim whose test was renamed\nor deleted must go RED, never green-by-absence. Here that protection is structural\nrather than configured — zero matching tests in the report is a red with a reason,\nand there is no exit code to misread."
+      "path": "src/verification/test-batch.ts"
     },
     {
       "id": "s:src/verification/test-batch.ts#TEST_BATCH_FORMATS",
@@ -8843,7 +9016,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/verification/test-batch.ts",
-      "line": 32,
+      "line": 34,
       "prose": "The report formats v1 understands. An unknown `config.testBatchFormat` is a hard\n error, never a fallback: a typo'd format that silently reverted to the per-claim\n path would look exactly like a working batch that happened to be slow.\n   vitest-json — `vitest run --reporter=json` (the default when the format is unset)\n   pytest-json — the pytest-json-report plugin's file\n                 (`pytest --json-report --json-report-file=<path>`)"
     },
     {
@@ -8853,7 +9026,7 @@
       "kind": "symbol",
       "sub": "type",
       "path": "src/verification/test-batch.ts",
-      "line": 33
+      "line": 35
     },
     {
       "id": "s:src/verification/test-batch.ts#BatchTest",
@@ -8862,7 +9035,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/test-batch.ts",
-      "line": 43,
+      "line": 45,
       "prose": "One test as the report described it. `fullName` is the runner's OWN concatenation of\n the suite path and the test title — the exact string its `-t` filter matches against,\n which is what makes batch matching a mirror rather than a re-implementation.\n\n `duration` is the runner's own per-assertion timing in milliseconds, and it is OPTIONAL\n ON PURPOSE: a report that omits it (an older reporter, a hand-written fixture) must not\n be read as \"this test took zero time\". Absence is absence — every consumer below carries\n that distinction rather than defaulting to 0."
     },
     {
@@ -8872,7 +9045,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/test-batch.ts",
-      "line": 44
+      "line": 46
     },
     {
       "id": "s:src/verification/test-batch.ts#BatchOutcome",
@@ -8881,7 +9054,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/test-batch.ts",
-      "line": 47,
+      "line": 49,
       "prose": "A batch attempt: the report, or null with the reason the run must fall back."
     },
     {
@@ -8891,7 +9064,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/test-batch.ts",
-      "line": 51,
+      "line": 53,
       "prose": "What the executable tier is allowed to do this run. `serialAllowed: false` with a null\n report is a REFUSAL — the claim skips rather than quietly taking the slow path."
     },
     {
@@ -8901,7 +9074,7 @@
       "kind": "symbol",
       "sub": "type",
       "path": "src/verification/test-batch.ts",
-      "line": 62,
+      "line": 64,
       "prose": "HOW THE EXECUTABLE TIER WILL RUN — decided once, from config + flags, before any claim.\n\nThe serial per-claim path is not reachable by accident any more. It boots the project's\nwhole test pool once per claim, and on a real repo that is 20-35 minutes for evidence one\nboot already contains; a default nobody chose should not have that shape. So the mode is\nexplicit: batch when we can (configured or DERIVED), read a report when handed one, and\notherwise REFUSE — a consumer has to type the name of the slow profile to get it."
     },
     {
@@ -8911,7 +9084,7 @@
       "kind": "symbol",
       "sub": "type",
       "path": "src/verification/test-batch.ts",
-      "line": 69,
+      "line": 71,
       "prose": "Which runner `config.test` is driving, as far as we can tell from the command itself."
     },
     {
@@ -8921,7 +9094,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 71
+      "line": 73
     },
     {
       "id": "s:src/verification/test-batch.ts#DERIVED_REPORT_PATH",
@@ -8930,7 +9103,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/verification/test-batch.ts",
-      "line": 83,
+      "line": 85,
       "prose": "Where a derived batch command writes its report. Inside `.coherence/` because that dir\n already exists, is already the harness's, and is already committed-or-ignored per project."
     },
     {
@@ -8940,7 +9113,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 98,
+      "line": 100,
       "prose": "Derive a whole-suite batch command from `config.test`, so a project that never heard of\n`testBatch` still gets batching. Vitest only in v1, and deliberately so: the safety\nargument for batching is that matching MIRRORS the runner's own name filter, and that was\nverified for vitest against the real binary. It does NOT hold for `node --test`, whose\n`--test-name-pattern` matches each individual test name rather than a concatenated one\n(measured), and which ships no JSON reporter at all — so node:test is recognized and\nrefused with instructions instead of guessed at."
     },
     {
@@ -8950,7 +9123,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 146,
+      "line": 148,
       "prose": "Decide the mode. Order is precedence: an explicit flag always beats a derivation."
     },
     {
@@ -8960,7 +9133,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 176,
+      "line": 178,
       "prose": "The cost framing the serial path prints EVERY time it runs — explicit opt-in or crash\n fallback alike. A profile this expensive should never be quiet about what it is doing."
     },
     {
@@ -8970,7 +9143,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 198,
+      "line": 200,
       "prose": "Resolve the configured format, or say why it cannot be. An omitted format defaults to\n vitest-json (the v1 format, kept for compatibility — a pytest project names its format\n alongside its testBatch); an unknown one is an error the run must surface."
     },
     {
@@ -8980,7 +9153,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 214,
+      "line": 216,
       "prose": "Every top-level `{…}` region in a string, brace-balanced and string-literal aware.\n\nNeeded because a reporter that writes to stdout does not own stdout: a test calling\n`process.stdout.write` puts its bytes in the same stream, and a whole-string\n`JSON.parse` then throws on the first stray character (measured — see the release\nnotes). Scanning for the object is what makes the obvious `--reporter=json` command\nwork anyway; `--outputFile` avoids the question entirely and is what the docs advise."
     },
     {
@@ -8990,7 +9163,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 275,
+      "line": 277,
       "prose": "Parse a `vitest run --reporter=json` report. Throws (never returns an empty report)\nwhen no report can be found — an empty report and an unreadable one must not look\nalike, because one of them would resolve every claim RED on a healthy suite.\n\nSCHEMA, verified against vitest 4.1.10 rather than assumed:\n  { testResults: [ { name: <abs file>, status, assertionResults: [\n      { ancestorTitles: string[], fullName: string, title: string,\n        status: \"passed\" | \"failed\" | \"skipped\" | …, failureMessages: string[],\n        duration?: number } ] } ] }\nand `fullName === [...ancestorTitles, title].join(\" \")`.\n\n`duration` is the per-assertion runtime in MILLISECONDS as the runner measured it, and\nit is what the holding-cost report prefers over coherence's own wall clock (which, on a\nbatch-resolved claim, would be timing a map lookup). It is optional in the schema and\noptional here: a report without it yields tests with no `duration`, never zeroes."
     },
     {
@@ -9000,7 +9173,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 325,
+      "line": 327,
       "prose": "Parse a pytest-json-report file (`pytest --json-report --json-report-file=<path>`) —\nthe sibling of `parseVitestJson`, holding the same line: it THROWS when no report can\nbe found, because an empty report and an unreadable one must not look alike.\n\nSCHEMA (pytest-json-report, current stable): a JSON object with a top-level `tests`\narray; each entry carries\n  { nodeid: \"tests/test_x.py::test_name\" | \"tests/test_x.py::TestClass::test_method\"\n            (parametrized ids append \"[param]\"),\n    outcome: \"passed\" | \"failed\" | \"error\" | \"skipped\" | \"xfailed\" | \"xpassed\",\n    setup/call/teardown: { duration: <seconds>, outcome: … } }\n\nThe same brace scan + LAST-WINS walk as the vitest parser, for the same reason: the\nfile form never interleaves, but a report handed over via `--from-report` may arrive\nembedded in captured output, and the scan costs nothing when the text is clean."
     },
     {
@@ -9010,7 +9183,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 339,
+      "line": 341,
       "prose": "One report text → one BatchReport, per format. The unknown case cannot reach here —\n `resolveBatchFormat` refuses it as a hard error before any runner is spawned — so the\n switch is exhaustive by type and a new format extends it or fails to compile."
     },
     {
@@ -9020,7 +9193,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 351,
+      "line": 353,
       "prose": "Where the command tells the runner to write its report, if it does. Covers\n `--outputFile=p`, `--outputFile.json=p` (vitest's per-reporter form) and\n `--outputFile p` — plus `--json-report-file=p` / `--json-report-file p`, the\n pytest-json-report spelling of the same thing (that plugin writes ONLY to a file,\n never stdout, so missing this flag would read pytest's human output instead)."
     },
     {
@@ -9030,7 +9203,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 370,
+      "line": 372,
       "prose": "Read a report the project ALREADY produced (`verify --from-report <file>`) instead of\nrunning the suite ourselves.\n\nWHY THIS IS THE CHEAPEST TIER. A project with an outer gate — a `check.mjs`, a CI step —\nhas usually just run the whole suite for its own reasons. Without this flag coherence\nruns it a SECOND time to learn what that run already knew. Measured in a consuming repo:\ntheir outer gate ran 298 tests, then the full tier paid the same suite's import cost 18\nmore times. With `--from-report` the full tier is one suite run plus a file read."
     },
     {
@@ -9040,7 +9213,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 394,
+      "line": 396,
       "prose": "Run the whole suite once and return the report, or null plus the reason a fallback is\nowed. Never throws — a batch that cannot be trusted degrades to the per-claim path,\nloudly, and the caller prints the note.\n\nTHE EXIT CODE IS DELIBERATELY IGNORED. A suite with a failing test exits nonzero, and\nthat is precisely the run whose report is most worth reading. A crash is the runner not\nrunning (spawn error, timeout, signal) or a report that will not parse — never \"some\ntest was red\"."
     },
     {
@@ -9050,7 +9223,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 481,
+      "line": 497,
       "prose": "The function segment of a pytest nodeid: the final `::` part, with any parametrize\n suffix stripped — `tests/test_x.py::TestClass::test_method[case-1]` → `test_method`.\n This is the name a `passes test \"…\"` claim carries on a pytest project."
     },
     {
@@ -9060,7 +9233,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 490,
+      "line": 506,
       "prose": "The ONE Vitest oracle-name predicate. Both a collected JSON report and the static\n fast-tier floor ask the same question: would Vitest's escaped, unanchored `-t` filter\n select this runner-supplied `fullName`? Keeping the literal substring relation here\n prevents the cheap existence floor and the executable verdict from disagreeing."
     },
     {
@@ -9070,7 +9243,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/test-batch.ts",
-      "line": 502
+      "line": 518
     },
     {
       "id": "f:src/verification/totality.ts",
@@ -9097,8 +9270,7 @@
       "label": "verify.ts",
       "kind": "file",
       "sub": "src/verification/verify.ts",
-      "path": "src/verification/verify.ts",
-      "prose": "verify.ts — the coherence engine: deterministic claim verifiers + the narrative\nevidence chain (emits inference jobs for a subagent) + coverage meta-claims\n(what auto-generates, why is human-authored). Config-driven; consumes the Graph."
+      "path": "src/verification/verify.ts"
     },
     {
       "id": "s:src/verification/verify.ts#applyVerdicts",
@@ -9107,7 +9279,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 39,
+      "line": 41,
       "prose": "record subagent verdicts (the mechanical notary; judge ≠ notary, axiom #5)."
     },
     {
@@ -9117,7 +9289,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 83,
+      "line": 85,
       "prose": "Rank doc gaps HOTTEST-FIRST by the churn share of the file that defines them — the same\n`fileChurn` reading `atlas` grades crossings' heat against.\n\nWHY THE JOB LIST HAS AN ORDER AT ALL. Undocumented symbols come out of the graph in walk\norder, which is alphabetical by path and says nothing about anything. A list of ninety\n`[doc]` jobs in that order is a list nobody works from the top of; the first one worth\nwriting is the symbol in the file half the recent history touched, because that is the\none somebody is about to read.\n\nZERO-CHURN GAPS KEEP THEIR SOURCE ORDER: `Array.prototype.sort` is required to be stable\n(ECMA-262), so a project with no git history — every share 0 — gets exactly the list it\ngot before this ranking existed, rather than a set that reshuffles between runs."
     },
     {
@@ -9127,7 +9299,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 145,
+      "line": 147,
       "prose": "How much a missing refutation should WORRY you, by the shape of the claim's evidence.\n\n MEASURED, NOT REASONED. The first real `verify --raise` ever run against hoist spent its\n three-question budget like this: one genuinely valuable question (the `served responses\n are shaped` boundary, never watched fail), one marginal, and one on\n `README.md exists at root — 146 run(s), never observed failing`. The list was emitted in\n DERIVATION order, so the cap — which exists precisely because attention is the scarce\n resource — was spent on the least informative finding in an 81-item list.\n\n THE RANKING IS BY WHETHER A REFUTATION WOULD TEACH ANYTHING, and the three tiers fall\n out of what the claim's evidence actually is:\n\n   ORACLE-BACKED (`via test`, `via guard`, `passes test`, `conforms to`) ranks highest,\n   because this is where VACUOUS GREEN lives. An oracle can stop testing what it names\n   and nothing says so — this project has found that exact defect repeatedly, including\n   one oracle satisfied by a different error thrown earlier than the one under test, and\n   a `.rejects.toThrow()` passing on a why-gate rather than the seal it claimed to guard.\n   An unrefuted oracle is a claim whose instrument has never been checked.\n\n   BOUNDARY-ONLY (a crossing with no executable oracle) ranks next: it names a real\n   chokepoint, so the property matters, but the evidence is anchoring rather than\n   execution and its failure mode is narrower.\n\n   STRUCTURAL (`X exists at …`, `X imports …`) ranks LAST, and this is the tier the\n   incident was about. Such a claim can be broken — delete the file — but doing so\n   demonstrates nothing except that `stat` works. Its greenness was never in doubt and a\n   refutation would be theatre. Note the run count argues the same way and is deliberately\n   NOT used: 146 runs green says the claim is stable, not that it is informative, and\n   ranking on it would put the oldest trivia first.\n\n This orders the printed list too, not just the raise queue — the reader of a capped list\n deserves the same triage as the queue that spends the budget."
     },
     {
@@ -9137,7 +9309,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 152
+      "line": 154
     },
     {
       "id": "s:src/verification/verify.ts#costFinding",
@@ -9146,7 +9318,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 190,
+      "line": 192,
       "prose": "A claim that is expensive to KEEP TRUE. Every claim is a standing bill: the oracle behind\n it runs on every verify, forever, and one claim taking a quarter of the whole tier is a\n fact about the design of that oracle, not about the code it guards. This is the WEAKEST\n finding the harness raises — an expensive claim can be entirely correct, and often the\n honest answer is \"the domain really is that big\" — so it never displaces a correctness\n question (see the raise order below).\n\n IDENTITY IS THE CLAIM AND ITS NODE, WITH NO NUMBER IN IT. The millisecond reading is the\n most volatile thing here — it moves with machine load, cache state and the pool's mood —\n so it lives in the sentence, exactly like never-red's run count."
     },
     {
@@ -9156,7 +9328,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 220,
+      "line": 222,
       "prose": "A named invariant with no observed negative control. Broader and weaker than never-red\n — it says nothing about how the claim has behaved — so it is raised LAST and only for\n invariants never-red did not already name."
     },
     {
@@ -9166,7 +9338,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 243,
+      "line": 245,
       "prose": "A claim on a kind the project flagged. The project decided this category is one it\n distrusts; the advisory prints it every run and then forgets it."
     },
     {
@@ -9176,7 +9348,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/verification/verify.ts",
-      "line": 270
+      "line": 272
     },
     {
       "id": "s:src/verification/verify.ts#runVerify",
@@ -9185,7 +9357,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/verification/verify.ts",
-      "line": 282
+      "line": 285
     },
     {
       "id": "f:test/_helpers.ts",
@@ -9832,6 +10004,20 @@
       "prose": "raise.test.ts — AN ADVISORY OPENS A QUESTION INSTEAD OF PRINTING ONE.\n\nWhat these pin, in order of how badly it hurts when it breaks:\n  1. IDENTITY IS DERIVED, AND IT HOLDS STILL. `observed` deduped on a label the caller\n     supplied; an advisory has nobody to ask. If the derived key picks up anything that\n     moves — a score, a run count, a line number — every run opens a new question and\n     `--open` is unreadable inside a week. This is the whole feature and it is the first\n     four tests.\n  2. ...AND IT IS NOT TOO COARSE. The opposite failure is silent and therefore worse:\n     two genuinely different findings collapsing means the second one is never asked,\n     and nothing anywhere says so.\n  3. VOLUME. A large repo's first run must not open two hundred questions. Three layers\n     — opt-in, the advisory's own floor, a per-run cap — and the cap must SAY what it\n     withheld, because a truncated list that looks complete is the defect this harness\n     exists to hunt.\n  4. DISMISSAL IS PERMANENT AND IS NOT AN ANSWER. If a dismissed finding can be\n     re-raised, the only defence against a noisy question does not work and the feature\n     gets switched off. If a dismissal RENDERS as a resolution, the journal tells a\n     reader an unanswered question has been answered — which is the one lie it cannot\n     afford."
     },
     {
+      "id": "f:test/receipts.test.ts",
+      "parent": "c:test",
+      "label": "receipts.test.ts",
+      "kind": "file",
+      "sub": "test/receipts.test.ts",
+      "path": "test/receipts.test.ts"
+    },
+    {
+      "id": "x:node:events",
+      "label": "node:events",
+      "kind": "external",
+      "sub": "module"
+    },
+    {
       "id": "f:test/redundancy.test.ts",
       "parent": "c:test",
       "label": "redundancy.test.ts",
@@ -9855,8 +10041,7 @@
       "label": "regulate.test.ts",
       "kind": "file",
       "sub": "test/regulate.test.ts",
-      "path": "test/regulate.test.ts",
-      "prose": "regulate.test.ts — the anti-entropy regulator selects one strongest obligation.\n\nThe doctrine is the domain. These tests deliberately derive rule ids, responses, and\ncommands from its live registry: adding or changing a rule must change the contract,\nrather than slipping past a hand-maintained fixture list."
+      "path": "test/regulate.test.ts"
     },
     {
       "id": "f:test/render-contract.test.ts",
@@ -10140,6 +10325,12 @@
       "id": "f:src/adapters/tree-sitter.ts->f:src/types.ts:imports",
       "source": "f:src/adapters/tree-sitter.ts",
       "target": "f:src/types.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/cli.ts->f:src/evidence/receipts.ts:imports",
+      "source": "f:src/cli.ts",
+      "target": "f:src/evidence/receipts.ts",
       "kind": "imports"
     },
     {
@@ -10494,6 +10685,12 @@
       "id": "f:src/coordination/consequence.ts->f:src/types.ts:imports",
       "source": "f:src/coordination/consequence.ts",
       "target": "f:src/types.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/coordination/orient.ts->f:src/evidence/receipts.ts:imports",
+      "source": "f:src/coordination/orient.ts",
+      "target": "f:src/evidence/receipts.ts",
       "kind": "imports"
     },
     {
@@ -11715,6 +11912,48 @@
       "kind": "imports"
     },
     {
+      "id": "f:src/evidence/receipts.ts->x:node:crypto:imports",
+      "source": "f:src/evidence/receipts.ts",
+      "target": "x:node:crypto",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/evidence/receipts.ts->x:node:child_process:imports",
+      "source": "f:src/evidence/receipts.ts",
+      "target": "x:node:child_process",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/evidence/receipts.ts->x:node:fs:imports",
+      "source": "f:src/evidence/receipts.ts",
+      "target": "x:node:fs",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/evidence/receipts.ts->x:node:path:imports",
+      "source": "f:src/evidence/receipts.ts",
+      "target": "x:node:path",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/evidence/receipts.ts->x:node:url:imports",
+      "source": "f:src/evidence/receipts.ts",
+      "target": "x:node:url",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/evidence/receipts.ts->f:src/types.ts:imports",
+      "source": "f:src/evidence/receipts.ts",
+      "target": "f:src/types.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/evidence/receipts.ts->f:src/coordination/work.ts:imports",
+      "source": "f:src/evidence/receipts.ts",
+      "target": "f:src/coordination/work.ts",
+      "kind": "imports"
+    },
+    {
       "id": "f:src/evidence/status.ts->x:node:fs/promises:imports",
       "source": "f:src/evidence/status.ts",
       "target": "x:node:fs/promises",
@@ -12753,15 +12992,21 @@
       "kind": "imports"
     },
     {
-      "id": "f:src/verification/test-batch.ts->x:node:child_process:imports",
-      "source": "f:src/verification/test-batch.ts",
-      "target": "x:node:child_process",
-      "kind": "imports"
-    },
-    {
       "id": "f:src/verification/test-batch.ts->x:node:fs:imports",
       "source": "f:src/verification/test-batch.ts",
       "target": "x:node:fs",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/verification/test-batch.ts->x:node:os:imports",
+      "source": "f:src/verification/test-batch.ts",
+      "target": "x:node:os",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/verification/test-batch.ts->x:node:child_process:imports",
+      "source": "f:src/verification/test-batch.ts",
+      "target": "x:node:child_process",
       "kind": "imports"
     },
     {
@@ -12822,6 +13067,18 @@
       "id": "f:src/verification/totality.ts->f:src/verification/python-totality.ts:imports",
       "source": "f:src/verification/totality.ts",
       "target": "f:src/verification/python-totality.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/verification/verify.ts->f:src/evidence/receipts.ts:imports",
+      "source": "f:src/verification/verify.ts",
+      "target": "f:src/evidence/receipts.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/verification/verify.ts->f:src/derivation/derive.ts:imports",
+      "source": "f:src/verification/verify.ts",
+      "target": "f:src/derivation/derive.ts",
       "kind": "imports"
     },
     {
@@ -12888,12 +13145,6 @@
       "id": "f:src/verification/verify.ts->f:src/diagnostics/raise.ts:imports",
       "source": "f:src/verification/verify.ts",
       "target": "f:src/diagnostics/raise.ts",
-      "kind": "imports"
-    },
-    {
-      "id": "f:src/verification/verify.ts->f:src/derivation/derive.ts:imports",
-      "source": "f:src/verification/verify.ts",
-      "target": "f:src/derivation/derive.ts",
       "kind": "imports"
     },
     {
@@ -15735,6 +15986,66 @@
       "kind": "imports"
     },
     {
+      "id": "f:test/receipts.test.ts->x:node:test:imports",
+      "source": "f:test/receipts.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/receipts.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/receipts.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/receipts.test.ts->x:node:child_process:imports",
+      "source": "f:test/receipts.test.ts",
+      "target": "x:node:child_process",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/receipts.test.ts->x:node:events:imports",
+      "source": "f:test/receipts.test.ts",
+      "target": "x:node:events",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/receipts.test.ts->x:node:fs/promises:imports",
+      "source": "f:test/receipts.test.ts",
+      "target": "x:node:fs/promises",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/receipts.test.ts->x:node:path:imports",
+      "source": "f:test/receipts.test.ts",
+      "target": "x:node:path",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/receipts.test.ts->x:node:url:imports",
+      "source": "f:test/receipts.test.ts",
+      "target": "x:node:url",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/receipts.test.ts->f:test/_helpers.ts:imports",
+      "source": "f:test/receipts.test.ts",
+      "target": "f:test/_helpers.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/receipts.test.ts->f:src/config.ts:imports",
+      "source": "f:test/receipts.test.ts",
+      "target": "f:src/config.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/receipts.test.ts->f:src/evidence/receipts.ts:imports",
+      "source": "f:test/receipts.test.ts",
+      "target": "f:src/evidence/receipts.ts",
+      "kind": "imports"
+    },
+    {
       "id": "f:test/redundancy.test.ts->x:node:test:imports",
       "source": "f:test/redundancy.test.ts",
       "target": "x:node:test",
@@ -15822,6 +16133,12 @@
       "id": "f:test/regulate-cli.test.ts->f:src/coordination/doctrine.ts:imports",
       "source": "f:test/regulate-cli.test.ts",
       "target": "f:src/coordination/doctrine.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/regulate.test.ts->f:src/evidence/receipts.ts:imports",
+      "source": "f:test/regulate.test.ts",
+      "target": "f:src/evidence/receipts.ts",
       "kind": "imports"
     },
     {

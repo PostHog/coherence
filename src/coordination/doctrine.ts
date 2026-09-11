@@ -75,7 +75,7 @@ export const ANTI_ENTROPY_DOCTRINE: {
       invariant: "completed work names the verification evidence that assessed it",
       sensor: "observeOrientation",
       response: "require-decision" as const,
-      remedy: "run the relevant verification and record its explicit verification-to-work consequence link",
+      remedy: "run verify --receipt --work WORK_ID, assess its relevance and record its explicit verification-to-work consequence link",
     }),
     Object.freeze({
       id: "significant-growth-needs-address",
@@ -88,7 +88,7 @@ export const ANTI_ENTROPY_DOCTRINE: {
   limits: Object.freeze([
     "v2 does not prove that the change is correct or that its anchors are semantically adequate",
     "v2 attributes declared work and journal records but cannot attribute unrecorded shared-worktree changes",
-    "v2 requires an explicit verification link for completed work but does not yet retain verification receipts as an append-only identity registry",
+    "completed work requires an explicit link to intact current work-bound local receipt evidence; executor authenticity and semantic criterion coverage remain assessor-judged",
     "v2 does not yet fold premise expiry or maintenance cadence into its potential",
   ]),
 });
