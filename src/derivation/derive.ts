@@ -10,6 +10,7 @@ import { Unrunnable, requireDeclaredRoot } from "../verification/floor.ts";
 import { BUILTIN_LANGUAGES } from "../adapters/tree-sitter.ts";
 import { cloudflare } from "../adapters/cloudflare.ts";
 import { compileImportAliases } from "./import-aliases.ts";
+import { resolveArchitecture } from "./architecture.ts";
 
 const PLATFORMS: Record<string, PlatformAdapter> = { cloudflare };
 
@@ -139,6 +140,10 @@ export async function buildGraph(cfg: Config): Promise<Graph> {
     const parent = d === "." ? null : ownerOf(d, dirs);
     add({ id: compId(d), ...(parent === null ? {} : { parent: compId(parent) }), label: spec.name || basename(d), kind: "component", sub: spec.intent, claimed: spec.claims.length > 0, claims: spec.claims, prose: spec.prose || undefined, why: spec.why || undefined, invariants: spec.invariants.length ? spec.invariants : undefined, refutations: spec.refutations.length ? spec.refutations : undefined, claimKinds: Object.keys(spec.claimKinds).length ? spec.claimKinds : undefined });
     if (spec.guaranteeLinks) nodes[nodes.length - 1].guaranteeLinks = spec.guaranteeLinks;
+    if (spec.architecture) {
+      nodes[nodes.length - 1].architecture = spec.architecture;
+      nodes[nodes.length - 1].specPath = relative(root, (await findSpec(join(root, d === "." ? "" : d)))!);
+    }
     if (spec.guaranteeLinks?.bindings) nodes[nodes.length - 1].specPath = relative(root, (await findSpec(join(root, d === "." ? "" : d)))!);
     classToDir[spec.name || basename(d)] = d;
   }
@@ -202,5 +207,6 @@ export async function buildGraph(cfg: Config): Promise<Graph> {
   // `docs --check` report byte-correct artifacts stale in any checkout whose directory
   // is named differently). `absRoot` is deliberately still the absolute path: it is
   // normalized away by the staleness comparison rather than committed as truth.
-  return { generatedAt: new Date().toISOString().slice(0, 16).replace("T", " ") + "Z", root: cfg.name?.trim() || basename(resolve(root)), absRoot: resolve(root), nodes, edges, bindings };
+  const architecture = resolveArchitecture(nodes);
+  return { generatedAt: new Date().toISOString().slice(0, 16).replace("T", " ") + "Z", root: cfg.name?.trim() || basename(resolve(root)), absRoot: resolve(root), nodes, edges, bindings, ...(architecture ? { architecture } : {}) };
 }

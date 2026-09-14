@@ -1,0 +1,482 @@
+[
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "opening",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 4,
+    "ownershipLinks": 0,
+    "continuations": 0,
+    "promises": 0,
+    "zoom": 0.599688,
+    "titlePixels": 15.591888,
+    "intentPixels": 11.394072,
+    "labelPixels": 10.794384,
+    "transform": "translate(173.684px, 138.142px) scale(0.599688)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "body-selection",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 4,
+    "ownershipLinks": 0,
+    "continuations": 0,
+    "promises": 0,
+    "zoom": 0.599688,
+    "titlePixels": 15.591888,
+    "intentPixels": 11.394072,
+    "labelPixels": 10.794384,
+    "transform": "translate(173.684px, 138.142px) scale(0.599688)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "expanded-stationary",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 4,
+    "ownershipLinks": 1,
+    "continuations": 2,
+    "promises": 3,
+    "zoom": 0.599688,
+    "titlePixels": 15.591888,
+    "intentPixels": 11.394072,
+    "labelPixels": 10.794384,
+    "transform": "translate(173.684px, 138.142px) scale(0.599688)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "expanded",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [
+      "Supplies subjectsand claims",
+      "Records scopedverdicts",
+      "Requests the projectmodel",
+      "Preserves sessioncontinuity"
+    ],
+    "routes": 4,
+    "ownershipLinks": 1,
+    "continuations": 2,
+    "promises": 3,
+    "zoom": 0.85,
+    "titlePixels": 22.099999999999998,
+    "intentPixels": 16.15,
+    "labelPixels": 15.299999999999999,
+    "transform": "translate(-630px, -754.775px) scale(0.85)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "guarantee",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 1,
+    "ownershipLinks": 1,
+    "continuations": 2,
+    "promises": 3,
+    "zoom": 0.85,
+    "titlePixels": 22.099999999999998,
+    "intentPixels": 16.15,
+    "labelPixels": 15.299999999999999,
+    "transform": "translate(-630px, -754.775px) scale(0.85)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "all-handoffs",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 12,
+    "ownershipLinks": 0,
+    "continuations": 0,
+    "promises": 0,
+    "zoom": 0.532574,
+    "titlePixels": 13.846924,
+    "intentPixels": 10.118905999999999,
+    "labelPixels": 9.586332,
+    "transform": "translate(221.777px, 136.591px) scale(0.532574)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "derivation-collapsed",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [
+      "Addressesclassificationsubjects"
+    ],
+    "routes": 7,
+    "ownershipLinks": 0,
+    "continuations": 0,
+    "promises": 0,
+    "zoom": 0.599688,
+    "titlePixels": 15.591888,
+    "intentPixels": 11.394072,
+    "labelPixels": 10.794384,
+    "transform": "translate(173.684px, 138.142px) scale(0.599688)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "derivation-unfurled-stationary",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [
+      "Addressesclassificationsubjects"
+    ],
+    "routes": 7,
+    "ownershipLinks": 2,
+    "continuations": 1,
+    "promises": 3,
+    "zoom": 0.599688,
+    "titlePixels": 15.591888,
+    "intentPixels": 11.394072,
+    "labelPixels": 10.794384,
+    "transform": "translate(173.684px, 138.142px) scale(0.599688)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "derivation-multiple",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [
+      "Addressesclassificationsubjects"
+    ],
+    "routes": 7,
+    "ownershipLinks": 6,
+    "continuations": 3,
+    "promises": 9,
+    "zoom": 0.599688,
+    "titlePixels": 15.591888,
+    "intentPixels": 11.394072,
+    "labelPixels": 10.794384,
+    "transform": "translate(173.684px, 138.142px) scale(0.599688)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "derivation-reopened",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [
+      "Addressesclassificationsubjects"
+    ],
+    "routes": 7,
+    "ownershipLinks": 5,
+    "continuations": 1,
+    "promises": 6,
+    "zoom": 0.599688,
+    "titlePixels": 15.591888,
+    "intentPixels": 11.394072,
+    "labelPixels": 10.794384,
+    "transform": "translate(173.684px, 138.142px) scale(0.599688)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "derivation-context",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [
+      "Supplies subjectsand claims",
+      "Requests the projectmodel",
+      "Makes architecturenavigable",
+      "Makes changemeasurable",
+      "Addressesclassificationsubjects",
+      "Delegates languageinterpretation"
+    ],
+    "routes": 7,
+    "ownershipLinks": 5,
+    "continuations": 1,
+    "promises": 6,
+    "zoom": 0.85,
+    "titlePixels": 22.099999999999998,
+    "intentPixels": 16.15,
+    "labelPixels": 15.299999999999999,
+    "transform": "translate(186px, -1014.45px) scale(0.85)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "opening",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 4,
+    "ownershipLinks": 0,
+    "continuations": 0,
+    "promises": 0,
+    "zoom": 0.52648,
+    "titlePixels": 13.688479999999998,
+    "intentPixels": 10.00312,
+    "labelPixels": 9.47664,
+    "transform": "translate(160.377px, 121.452px) scale(0.52648)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "body-selection",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 4,
+    "ownershipLinks": 0,
+    "continuations": 0,
+    "promises": 0,
+    "zoom": 0.52648,
+    "titlePixels": 13.688479999999998,
+    "intentPixels": 10.00312,
+    "labelPixels": 9.47664,
+    "transform": "translate(160.377px, 121.452px) scale(0.52648)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "expanded-stationary",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 4,
+    "ownershipLinks": 1,
+    "continuations": 2,
+    "promises": 3,
+    "zoom": 0.52648,
+    "titlePixels": 13.688479999999998,
+    "intentPixels": 10.00312,
+    "labelPixels": 9.47664,
+    "transform": "translate(160.377px, 121.452px) scale(0.52648)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "expanded",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [
+      "Supplies subjectsand claims",
+      "Records scopedverdicts",
+      "Requests the projectmodel",
+      "Preserves sessioncontinuity"
+    ],
+    "routes": 4,
+    "ownershipLinks": 1,
+    "continuations": 2,
+    "promises": 3,
+    "zoom": 0.767241,
+    "titlePixels": 19.948266,
+    "intentPixels": 14.577578999999998,
+    "labelPixels": 13.810338,
+    "transform": "translate(-594.138px, -691.272px) scale(0.767241)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "guarantee",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 1,
+    "ownershipLinks": 1,
+    "continuations": 2,
+    "promises": 3,
+    "zoom": 0.767241,
+    "titlePixels": 19.948266,
+    "intentPixels": 14.577578999999998,
+    "labelPixels": 13.810338,
+    "transform": "translate(-594.138px, -691.272px) scale(0.767241)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "all-handoffs",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 12,
+    "ownershipLinks": 0,
+    "continuations": 0,
+    "promises": 0,
+    "zoom": 0.468494,
+    "titlePixels": 12.180844,
+    "intentPixels": 8.901386,
+    "labelPixels": 8.432892,
+    "transform": "translate(201.724px, 119.608px) scale(0.468494)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "derivation-collapsed",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [
+      "Addressesclassificationsubjects"
+    ],
+    "routes": 7,
+    "ownershipLinks": 0,
+    "continuations": 0,
+    "promises": 0,
+    "zoom": 0.52648,
+    "titlePixels": 13.688479999999998,
+    "intentPixels": 10.00312,
+    "labelPixels": 9.47664,
+    "transform": "translate(160.377px, 121.452px) scale(0.52648)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "derivation-unfurled-stationary",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [
+      "Addressesclassificationsubjects"
+    ],
+    "routes": 7,
+    "ownershipLinks": 2,
+    "continuations": 1,
+    "promises": 3,
+    "zoom": 0.52648,
+    "titlePixels": 13.688479999999998,
+    "intentPixels": 10.00312,
+    "labelPixels": 9.47664,
+    "transform": "translate(160.377px, 121.452px) scale(0.52648)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "derivation-multiple",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [
+      "Addressesclassificationsubjects"
+    ],
+    "routes": 7,
+    "ownershipLinks": 6,
+    "continuations": 3,
+    "promises": 9,
+    "zoom": 0.52648,
+    "titlePixels": 13.688479999999998,
+    "intentPixels": 10.00312,
+    "labelPixels": 9.47664,
+    "transform": "translate(160.377px, 121.452px) scale(0.52648)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "derivation-reopened",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [
+      "Addressesclassificationsubjects"
+    ],
+    "routes": 7,
+    "ownershipLinks": 5,
+    "continuations": 1,
+    "promises": 6,
+    "zoom": 0.52648,
+    "titlePixels": 13.688479999999998,
+    "intentPixels": 10.00312,
+    "labelPixels": 9.47664,
+    "transform": "translate(160.377px, 121.452px) scale(0.52648)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "derivation-context",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [
+      "Supplies subjectsand claims",
+      "Requests the projectmodel",
+      "Makes architecturenavigable",
+      "Makes changemeasurable",
+      "Addressesclassificationsubjects",
+      "Delegates languageinterpretation"
+    ],
+    "routes": 7,
+    "ownershipLinks": 5,
+    "continuations": 1,
+    "promises": 6,
+    "zoom": 0.767241,
+    "titlePixels": 19.948266,
+    "intentPixels": 14.577578999999998,
+    "labelPixels": 13.810338,
+    "transform": "translate(143.414px, -925.664px) scale(0.767241)"
+  }
+]

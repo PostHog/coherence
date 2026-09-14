@@ -67,7 +67,8 @@ over earlier suggestions from the discussion.
 | Agent control | An MCP surface must let an agent open and direct Scope, including comparisons for the user. |
 | Evidence | Distinguish uncertainty from observed failure, with attention informed by the significance of the affected fact. |
 | Detail | A sidebar explains the selected card or connection. |
-| Validation | Stress-test the design on a real project. Coherence is the proposed first project. |
+| First gate | Structure tells the story of Coherence itself. A reader can explain the actual project through the current-state map and sidebar. |
+| Validation | Stress-test the design on Coherence, using its real declarations and recorded evidence. |
 | Extensibility | Both configured views and their renderers must be extensible or replaceable. |
 | Libraries | Continue using React, Radix, React Flow and Cytoscape, with the existing bundling foundation. |
 
@@ -253,14 +254,35 @@ unattributed interpretation.
 
 ### 8.3 Geometry and continuity
 
-Expansion may require nearby stacks to yield space. Stable camera position does not
-require all surrounding positions to remain mathematically fixed during expansion.
-Test a short, understandable transition that preserves the selected component's
-anchor, ownership boundaries, and external connection continuity.
+**Shared objects have constant layout across disclosure states.** Expanding or
+collapsing a stack must preserve the map positions of every component, entrance,
+relationship label and already revealed card shared with the previous state.
+An unchanged relationship should retain its path. Adding detail must not repack
+existing objects, including apparently minor labels: the observed movement of
+“Addresses classification subjects” between collapsed Structure and Source
+derivation's unfurl made the same architecture harder to recognize.
 
-By contrast, panning, zoom detail changes and evidence-only updates should not rerun
-the architectural arrangement. Closing a stack should restore a predictable compact
-composition. Opening a sidebar should not trigger an unsolicited fit or lose focus.
+Compute placement independently from visibility. Add revealed cards in vacant or
+reserved space, preserving their addresses when another stack opens or closes.
+The current prototype direction uses a stable named guarantee terminal on the
+provider component. The external reliance ends at that terminal in both collapsed
+and unfurled views. Expansion reveals a local continuation to the exact guarantee
+card; that continuation represents the same declared reliance, not another dependency.
+It retains the original declaration identities and is excluded from relationship
+counts. Terminal aliases are presentation configuration; full authored guarantee text
+and evidence remain inspectable.
+
+This replaces the earlier prototype's moving external endpoint. Animate the newly
+revealed local continuation while the external network stays fixed. Honor reduced
+motion and retain exact promise correspondence through collapse and zoom. Architecture
+labels remain anchored; named guarantee terminals make generic reliance label boxes
+unnecessary. Animation does not excuse a changed landmark.
+
+Unfurl and fold also preserve the current camera transform. Offer explicit framing
+when new detail lies outside the viewport. Panning, zoom detail, evidence-only
+updates and opening the sidebar must not rerun the architectural arrangement.
+Closing a stack removes its detail without compacting the surviving map. Test
+world coordinates and screen continuity across repeated and multiple-stack reveals.
 
 Cytoscape remains the layout foundation; React Flow owns canvas interaction and
 connection rendering. The precise nested layout, region growth policy, routing and
@@ -770,11 +792,47 @@ than claiming the generic rebuild's browser passes establish these properties.
 
 ## 18. Real-project design experiment
 
-Use Coherence first. It supplies real nested ownership, substantial specs, many
+**First gate: Structure tells the story of Coherence itself.** This is the first
+acceptance milestone, confirmed by the user on 2026-09-14. Coherence supplies real
+nested ownership, substantial specs, many
 guarantees, assessments and declared transitions. The adapter/derivation area is
 useful for ownership and local guarantees; evidence and coordination provide useful
 boundary and uncertainty investigations. Audit their actual semantic declarations
 before choosing cross-stack arrows.
+
+### 18.1 First gate: understanding the current project
+
+A reader unfamiliar with Coherence should be able to use Structure and its sidebar
+to explain:
+
+1. Why Coherence exists and what it helps a project accomplish.
+2. Where a human or an agent enters the system, including its declared CLI and
+   lifecycle entrances.
+3. How source and authored specs become the shared model, and how the major
+   responsibilities use that model, evaluate claims, retain evidence, coordinate
+   work and produce reading surfaces.
+4. Why the major components are separate and what meaningful relationships connect them.
+5. Which promises matter at those boundaries, who owns and explicitly consumes them,
+   where they are enforced, and what their recorded evidence does or does not establish.
+
+The map and sidebar must carry that explanation without requiring an IDE or an
+agent's spoken explanation to supply missing architectural meaning. A storyboard
+first makes the expected story reviewable; a current-state Structure prototype must
+then demonstrate it. Rendering all components or passing browser tests alone does
+not satisfy the gate.
+
+Record each missing part of the story as a spec-content, canonical-projection or
+presentation gap. Improve the responsible layer instead of hard-coding Coherence's
+explanation into the renderer. All project-specific meaning remains spec-owned and
+the default presentation remains usable through the public configuration contract.
+
+This first gate concerns current-state architectural comprehension. Comparison and
+MCP remain foundational design requirements, but their full implementation is not
+a prerequisite for demonstrating that Structure explains Coherence. Record the
+reader's account and misunderstandings as acceptance evidence; do not declare the
+gate passed from a screenshot or an implementation checklist alone.
+
+### 18.2 Broader stress scenarios
 
 Produce a saved scenario set with named source inputs:
 
@@ -808,11 +866,11 @@ the thesis. Each phase should record its own falsifiable experiment when underta
 
 | Phase | Work | Reviewable result |
 | --- | --- | --- |
-| 1. Semantic inventory and storyboard | Measure declarations, spec density inputs, missing relationships and available comparisons; map the real project through opening, expansion, zoom, sidebar and removal states. | A source-attributed storyboard and a precise list of canonical data gaps. |
+| 1. Semantic inventory and storyboard | Establish Coherence's actual story, measure declarations and spec density inputs, and identify missing entrances or meaningful relationships. Storyboard current-state opening, expansion, zoom and sidebar; retain representative change scenarios for later validation. | A source-attributed explanation of Coherence and a precise list of gaps that would prevent the first comprehension gate. |
 | 2. Canonical identity and spec contracts | Design needed spec additions, shared relationship resolution, snapshot provenance and correspondence policy. Resolve compatibility and uncertain matching. | Validated canonical records and deterministic comparison examples, independent of rendering. |
 | 3. Shared presentation and control contracts | Define renderer registration, declarative projection/stack/detail recipes, shared navigation and MCP request/acknowledgment behavior. | A replaceable renderer boundary and validated configuration/control examples. |
-| 4. End-to-end Structure slice | Implement two meaningful connected stacks, local guarantees, variable zoom, sidebar and one comparison using ghosted removals; let MCP open and focus that same experience. | A runnable explanation that tests the full design across data, layout, comparison and control. |
-| 5. Full default composition | Apply spec-driven prominence, taxonomy, sensitivity, all architectural variants, dense ownership and live reconciliation. | Coherence's default Structure expressed through ordinary project-capable configuration. |
+| 4. First-gate Structure prototype | Present Coherence's major responsibilities and entrances, with meaningful connected stacks, local guarantees, variable zoom and sidebar. Review what a reader can explain from the current-state map. | Evidence that Structure tells Coherence's story, with remaining misunderstandings recorded and addressed. |
+| 5. Full default composition and comparisons | Extend the proven explanation with taxonomy, sensitivity, dense ownership, comparison with ghosted removals, MCP control and live reconciliation. | Coherence's default Structure and agent-directed change investigations expressed through ordinary project-capable contracts. |
 | 6. Acceptance and packaging | Run semantic, browser, performance and installed-consumer checks; review comprehension; document customization and agent control. | A shippable default with measured limits and no privileged private data path. |
 
 Do not postpone comparison identity until after polishing cards, or defer MCP until
@@ -822,6 +880,10 @@ shared contracts even though current-state browsing is the first human experienc
 ## 20. Acceptance criteria
 
 These criteria describe intended observable behavior, not existing test results.
+
+The first acceptance decision is the Coherence comprehension gate in section 18.1.
+The criteria below support that gate and the broader implementation; they do not
+replace a reader demonstrating that the project story is understandable.
 
 ### Architecture and authoring
 
@@ -842,8 +904,10 @@ These criteria describe intended observable behavior, not existing test results.
 - Nested ownership stays understandable with several open stacks and shared guarantees.
 - Far, medium and near presentations remain readable and preserve asset identity.
 - Zoom detail transitions do not rearrange the architecture or flicker at thresholds.
-- Expansion and sidebar changes preserve camera intent, with understandable layout
-  movement and explicit fit controls.
+- Shared cards, entrances and relationship labels retain exact map positions across
+  unfurl, neighboring unfurl, fold and repeated reveal; unchanged connections retain
+  their paths. Expansion and sidebar changes preserve camera intent, with explicit
+  fit controls for detail outside the viewport.
 - Keyboard selection, expansion, connection inspection and return navigation work.
 - Removed, uncertain and changed states are distinguishable without color alone.
 

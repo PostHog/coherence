@@ -176,7 +176,7 @@ export async function captureScope(cfg: Config, options: { graph?: Graph; config
       for (const row of scope.guaranteeLinks?.links ?? []) {
         const id = c.add("guarantee-link", key(row), `${row.owner} ${row.kind} ${row.claim ?? "?"}`, row, "structure");
         if (row.claim) c.link("references", id, `guarantee:${row.claim}`);
-        if (row.kind === "relies" && row.provider) c.link("relies", `component:${row.owner}`, `component:${row.provider}`, row);
+        if (row.kind === "relies" && row.provider) c.link("relies", `component:${row.owner}`, `component:${row.provider}`, { ...row, declaration: id });
       }
       for (const row of scope.guaranteeLinks?.obligations ?? []) {
         const id = c.add("obligation", key([row.subject, row.obligation]), row.text, row, "structure");
@@ -191,6 +191,24 @@ export async function captureScope(cfg: Config, options: { graph?: Graph; config
       }
     }
     graph = reading;
+  });
+  await c.read("architecture", () => {
+    if (!graph) throw new Error("Structural population unavailable");
+    const architecture = graph.architecture;
+    if (!architecture) return;
+    for (const [index, message] of architecture.problems.entries())
+      c.add("architecture-issue", key([message, index]), "Architecture issue", { message }, "architecture");
+    for (const row of architecture.declarations) {
+      if (row.kind === "purpose") {
+        c.add("description", `architecture:${row.owner}:${row.id}`, "Project purpose", { ...row, category: "project-purpose", declaration: `${row.spec}:${row.line}` }, "architecture");
+      } else if (row.kind === "entrance") {
+        const id = c.add("entrance", `${row.owner}:${row.id}`, row.label, { ...row, declaration: `${row.spec}:${row.line}` }, "architecture");
+        c.link("enters", id, `component:${row.component}`, { description: row.description });
+      } else {
+        const id = c.add("architectural-link", `${row.owner}:${row.id}`, row.label, { ...row, declaration: `${row.spec}:${row.line}` }, "architecture");
+        c.link("architecture", `component:${row.from}`, `component:${row.to}`, { ...row, declaration: id }, `architecture:${row.owner}:${row.id}`);
+      }
+    }
   });
   await c.read("specs", async () => {
     if (!graph) throw new Error("Structural population unavailable; specs cannot be selected independently of their canonical owners.");

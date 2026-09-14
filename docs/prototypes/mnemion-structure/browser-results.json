@@ -1,0 +1,2062 @@
+[
+  {
+    "width": 1440,
+    "scene": "opening",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": null,
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(457.859px, 139.736px) scale(0.608215)",
+    "sidebar": null
+  },
+  {
+    "width": 1440,
+    "scene": "inspected",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "component",
+      "id": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(457.859px, 139.736px) scale(0.608215)",
+    "sidebar": "Hive"
+  },
+  {
+    "width": 1440,
+    "scene": "expanded-stationary",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "component",
+      "id": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(457.859px, 139.736px) scale(0.608215)",
+    "sidebar": "Hive"
+  },
+  {
+    "width": 1440,
+    "scene": "promises",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "component",
+      "id": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(186px, -637.475px) scale(0.85)",
+    "sidebar": "Hive"
+  },
+  {
+    "width": 1440,
+    "scene": "guarantee",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(186px, -637.475px) scale(0.85)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1440,
+    "scene": "before-zoom",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(186px, -637.475px) scale(0.85)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1440,
+    "scene": "far",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": true,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(379.637px, -94.6303px) scale(0.409915)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1440,
+    "scene": "folded",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": true,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(379.637px, -94.6303px) scale(0.409915)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1440,
+    "scene": "all-handoffs",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": null,
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540",
+      "relation:architecture:.:credentials": "M 410 683 L 410 711 C 410 715.97056275 405.97056275 720 401 720 L 315 720 C 312.23857625 720 310 717.76142375 310 715 L 310 715 C 310 712.23857625 307.76142375 710 305 710 L 305 710 C 302.23857625 710 300 712.23857625 300 715 L 300 733.5 L 300 772.5 L 300 792.5 C 300 804 430 815.5 430 827 L 430 863",
+      "relation:architecture:.:external-content": "M 470 683 L 470 719 C 470 759.8534576260076 510.14654237399236 760 551 760 L 571 760 L 769 760 L 781 760 C 785.97056275 760 790 764.02943725 790 769 L 790 825 C 790 838.80711875 778.80711875 850 765 850 L 765 850 C 751.19288125 850 740 861.19288125 740 875 L 740 938 C 740 944.627417 745.372583 950 752 950 L 780 950",
+      "relation:architecture:.:ui-vocabulary": "M -50 863 L -50 827 C -50 786.9272536503922 -109.07274634960774 740 -69 740 L -49 740 L 149 740 L 164.5 740 C 173.060413625 740 180 733.060413625 180 724.5 L 180 720 C 180 708.954305 188.954305 700 200 700 L 420 700 C 425.5228475 700 430 704.4771525 430 710 L 430 715 C 430 717.76142375 432.23857625 720 435 720 L 435 720 C 437.76142375 720 440 717.76142375 440 715 L 440 683",
+      "relation:architecture:.:feature-routes": "M 1150 23 L 1150 -13 C 1150 -47.65292195472122 1123.6529219547213 -60 1089 -60 L 1069 -60 L 871 -60 L 855.5 -60 C 846.939586375 -60 840 -53.060413625 840 -44.5 L 840 178 C 840 195.673112 825.673112 210 808 210 L 392 210 C 374.326888 210 360 195.673112 360 178 L 360 122 C 360 115.372583 354.627417 110 348 110 L 320 110",
+      "relation:architecture:web:browser-vocabulary": "M -80 863 L -80 827 C -80 749.8333333333334 -160 672.6666666666666 -160 595.5 L -160 575.5 L -160 490.5 L -160 255 C -160 241.19288125 -148.80711875 230 -135 230 L -135 230 C -121.19288125 230 -110 218.80711875 -110 205 L -110 142 C -110 129.8497355 -119.8497355 120 -132 120 L -160 120",
+      "relation:architecture:.:feature-storage": "M 1020 110 L 984 110 C 959 110 934 430 909 430 L 889 430 L 691 430 L 671 430 C 659.3333333333334 430 647.6666666666666 510 636 510 L 600 510"
+    },
+    "camera": "translate(465.349px, 147.487px) scale(0.590837)",
+    "sidebar": null
+  },
+  {
+    "width": 1440,
+    "scene": "reliances",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": null,
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [],
+    "external": {
+      "relation:ba2d97873e0cb8ae1bab537c20be9ae870c77b880a0be3c7521df6e482045a1d": "M 540 110 L 504 110 C 415.9551108808694 110 520 216.95511088086943 520 305 L 520 341",
+      "relation:6722a99a5233af565791bcfb22d6177e024dd212eb2dc71a800a21cf024dbb33": "M 320 80 L 356 80 C 457.2659987360022 80 360 203.7340012639978 360 305 L 360 341"
+    },
+    "camera": "translate(465.349px, 147.487px) scale(0.590837)",
+    "sidebar": null
+  },
+  {
+    "width": 1280,
+    "scene": "opening",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": null,
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(377.859px, 139.736px) scale(0.608215)",
+    "sidebar": null
+  },
+  {
+    "width": 1280,
+    "scene": "inspected",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "component",
+      "id": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(377.859px, 139.736px) scale(0.608215)",
+    "sidebar": "Hive"
+  },
+  {
+    "width": 1280,
+    "scene": "expanded-stationary",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "component",
+      "id": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(377.859px, 139.736px) scale(0.608215)",
+    "sidebar": "Hive"
+  },
+  {
+    "width": 1280,
+    "scene": "promises",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "component",
+      "id": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(143.414px, -535.392px) scale(0.767241)",
+    "sidebar": "Hive"
+  },
+  {
+    "width": 1280,
+    "scene": "guarantee",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(143.414px, -535.392px) scale(0.767241)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1280,
+    "scene": "before-zoom",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(143.414px, -535.392px) scale(0.767241)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1280,
+    "scene": "far",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": true,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(285.216px, -136.681px) scale(0.444005)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1280,
+    "scene": "folded",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": true,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540"
+    },
+    "camera": "translate(285.216px, -136.681px) scale(0.444005)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1280,
+    "scene": "all-handoffs",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": null,
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [],
+    "external": {
+      "relation:architecture:web:browser-api": "M -160 90 L -132 90 C -125.372583 90 -120 95.372583 -120 102 L -120 235 C -120 237.76142375 -122.23857625 240 -125 240 L -125 240 C -127.76142375 240 -130 242.23857625 -130 245 L -130 271 C -130 275.97056275 -125.97056275 280 -121 280 L -109 280 L 89 280 L 101 280 C 105.97056275 280 110 275.97056275 110 271 L 110 242 C 110 224.326888 95.673112 210 78 210 L 52 210 C 34.326888 210 20 195.673112 20 178 L 20 122 C 20 115.372583 25.372583 110 32 110 L 60 110",
+      "relation:architecture:.:session-memory": "M 670 197 L 670 233 C 670 246 750 259 750 272 L 750 292 L 750 354 L 750 372 C 750 381.9411255 741.9411255 390 732 390 L 672 390 C 654.326888 390 640 404.326888 640 422 L 640 528 C 640 534.627417 634.627417 540 628 540 L 600 540",
+      "relation:architecture:.:http-memory": "M 190 197 L 190 233 C 190 269.8333333333333 130 306.6666666666667 130 343.5 L 130 363.5 L 130 402.5 L 130 422.5 C 130 496.171267296009 170.32873270399102 540 244 540 L 280 540",
+      "relation:architecture:.:credentials": "M 410 683 L 410 711 C 410 715.97056275 405.97056275 720 401 720 L 315 720 C 312.23857625 720 310 717.76142375 310 715 L 310 715 C 310 712.23857625 307.76142375 710 305 710 L 305 710 C 302.23857625 710 300 712.23857625 300 715 L 300 733.5 L 300 772.5 L 300 792.5 C 300 804 430 815.5 430 827 L 430 863",
+      "relation:architecture:.:external-content": "M 470 683 L 470 719 C 470 759.8534576260076 510.14654237399236 760 551 760 L 571 760 L 769 760 L 781 760 C 785.97056275 760 790 764.02943725 790 769 L 790 825 C 790 838.80711875 778.80711875 850 765 850 L 765 850 C 751.19288125 850 740 861.19288125 740 875 L 740 938 C 740 944.627417 745.372583 950 752 950 L 780 950",
+      "relation:architecture:.:ui-vocabulary": "M -50 863 L -50 827 C -50 786.9272536503922 -109.07274634960774 740 -69 740 L -49 740 L 149 740 L 164.5 740 C 173.060413625 740 180 733.060413625 180 724.5 L 180 720 C 180 708.954305 188.954305 700 200 700 L 420 700 C 425.5228475 700 430 704.4771525 430 710 L 430 715 C 430 717.76142375 432.23857625 720 435 720 L 435 720 C 437.76142375 720 440 717.76142375 440 715 L 440 683",
+      "relation:architecture:.:feature-routes": "M 1150 23 L 1150 -13 C 1150 -47.65292195472122 1123.6529219547213 -60 1089 -60 L 1069 -60 L 871 -60 L 855.5 -60 C 846.939586375 -60 840 -53.060413625 840 -44.5 L 840 178 C 840 195.673112 825.673112 210 808 210 L 392 210 C 374.326888 210 360 195.673112 360 178 L 360 122 C 360 115.372583 354.627417 110 348 110 L 320 110",
+      "relation:architecture:web:browser-vocabulary": "M -80 863 L -80 827 C -80 749.8333333333334 -160 672.6666666666666 -160 595.5 L -160 575.5 L -160 490.5 L -160 255 C -160 241.19288125 -148.80711875 230 -135 230 L -135 230 C -121.19288125 230 -110 218.80711875 -110 205 L -110 142 C -110 129.8497355 -119.8497355 120 -132 120 L -160 120",
+      "relation:architecture:.:feature-storage": "M 1020 110 L 984 110 C 959 110 934 430 909 430 L 889 430 L 691 430 L 671 430 C 659.3333333333334 430 647.6666666666666 510 636 510 L 600 510"
+    },
+    "camera": "translate(385.349px, 147.487px) scale(0.590837)",
+    "sidebar": null
+  },
+  {
+    "width": 1280,
+    "scene": "reliances",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": null,
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        540,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:web",
+        -420,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ],
+      [
+        "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        280,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        446,
+        341,
+        154,
+        54
+      ]
+    ],
+    "promises": [],
+    "external": {
+      "relation:ba2d97873e0cb8ae1bab537c20be9ae870c77b880a0be3c7521df6e482045a1d": "M 540 110 L 504 110 C 415.9551108808694 110 520 216.95511088086943 520 305 L 520 341",
+      "relation:6722a99a5233af565791bcfb22d6177e024dd212eb2dc71a800a21cf024dbb33": "M 320 80 L 356 80 C 457.2659987360022 80 360 203.7340012639978 360 305 L 360 341"
+    },
+    "camera": "translate(385.349px, 147.487px) scale(0.590837)",
+    "sidebar": null
+  }
+]

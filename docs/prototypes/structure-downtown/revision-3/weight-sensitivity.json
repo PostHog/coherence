@@ -1,0 +1,215 @@
+{
+  "catalogHash": "c92e4efd20c0cfe5d12fec5dc3c725a18df9cb78c6f1eeef57ccd81c466b7365",
+  "capturedAt": "2026-09-14T15:36:04.644Z",
+  "method": "All sixteen combinations of 0.75x and 1.25x each of the four default weights",
+  "cases": [
+    {
+      "weights": {
+        "peers": 2.25,
+        "guarantees": 1.5,
+        "security": 0.75,
+        "consumers": 1.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 2.25,
+        "guarantees": 1.5,
+        "security": 0.75,
+        "consumers": 2.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 2.25,
+        "guarantees": 1.5,
+        "security": 1.25,
+        "consumers": 1.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 2.25,
+        "guarantees": 1.5,
+        "security": 1.25,
+        "consumers": 2.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 2.25,
+        "guarantees": 2.5,
+        "security": 0.75,
+        "consumers": 1.5
+      },
+      "core": [
+        "Durable evidence",
+        "Verification",
+        "Source derivation"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 2.25,
+        "guarantees": 2.5,
+        "security": 0.75,
+        "consumers": 2.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 2.25,
+        "guarantees": 2.5,
+        "security": 1.25,
+        "consumers": 1.5
+      },
+      "core": [
+        "Durable evidence",
+        "Verification",
+        "Coordination"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 2.25,
+        "guarantees": 2.5,
+        "security": 1.25,
+        "consumers": 2.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 3.75,
+        "guarantees": 1.5,
+        "security": 0.75,
+        "consumers": 1.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 3.75,
+        "guarantees": 1.5,
+        "security": 0.75,
+        "consumers": 2.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 3.75,
+        "guarantees": 1.5,
+        "security": 1.25,
+        "consumers": 1.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 3.75,
+        "guarantees": 1.5,
+        "security": 1.25,
+        "consumers": 2.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 3.75,
+        "guarantees": 2.5,
+        "security": 0.75,
+        "consumers": 1.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 3.75,
+        "guarantees": 2.5,
+        "security": 0.75,
+        "consumers": 2.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 3.75,
+        "guarantees": 2.5,
+        "security": 1.25,
+        "consumers": 1.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    },
+    {
+      "weights": {
+        "peers": 3.75,
+        "guarantees": 2.5,
+        "security": 1.25,
+        "consumers": 2.5
+      },
+      "core": [
+        "Durable evidence",
+        "Source derivation",
+        "Verification"
+      ]
+    }
+  ]
+}

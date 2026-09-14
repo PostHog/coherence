@@ -1,0 +1,94 @@
+diff --git a/mnemion-js/Mnemion.spec.md b/mnemion-js/Mnemion.spec.md
+index 3457b0a..79c3836 100644
+--- a/mnemion-js/Mnemion.spec.md
++++ b/mnemion-js/Mnemion.spec.md
+@@ -20,3 +20,17 @@ Cloudflare Worker entry: an OAuth-wrapped MCP server whose one declarative route
+ ## why
+ 
+ The worker entry keeps the entire HTTP surface as one scannable declarative route table (method, pattern, auth gate, handler per line) so the system's shape is graspable from the declarations alone, per the "code as schematic" principle. OAuthProvider wraps the worker to own the OAuth 2.1 / DCR / token flow and intercept `/mcp`, `/token`, `/register` before dispatch, so the rest of the code never re-implements auth plumbing.
++
++
++## architecture
++
++- {"kind": "purpose", "id": "shared-memory", "text": "Mnemion gives people and their AI agents shared, evolving memory. People use a live browser workspace while agents use MCP. The browser and other HTTP clients pass through Routing; both access paths reach one Hive, which owns data and enforces read and write boundaries. Shared declarations give agents and browser renderers the same UI vocabulary."}
++- {"kind": "entrance", "id": "mcp", "label": "An agent recalls or changes memory", "component": "entities/Session", "anchor": "entities/Session/session.ts", "description": "OAuth routes /mcp into a per-session McpAgent. SessionDO registers tools and resources, binds actor identity and delegates memory operations over RPC to HiveDO."}
++- {"kind": "entrance", "id": "http", "label": "An HTTP client accesses memory", "component": "shared/Routing", "anchor": "shared/Routing/router.ts#createRouter", "description": "The Worker passes its core and feature route table to createRouter. Authenticated APIs, scoped public reads and ingress handlers call the Hive under their declared gates."}
++- {"kind": "relationship", "id": "session-memory", "from": "entities/Session", "to": "entities/Hive", "label": "Reads and reshapes memory", "because": "SessionDO getHive and tool handlers call Hive query, prime, mutate and schema evolution over RPC; Session binds authenticated actor identity. See entities/Session/session.ts and Session.spec.md."}
++- {"kind": "relationship", "id": "http-memory", "from": "shared/Routing", "to": "entities/Hive", "label": "Serves HTTP access", "because": "Routing routes/pages.ts invokes Hive query, mutate and schema changes; routes/io.ts invokes served reads and ingress. The Hive distinguishes owner access from untrusted served access."}
++- {"kind": "relationship", "id": "credentials", "from": "entities/Hive", "to": "shared/Auth", "label": "Checks credentials", "because": "HiveDO credential RPC methods delegate token and membership checks to shared/Auth/credentials.ts with the Hive-owned database. See entities/Hive/hive.ts credential methods and shared/Auth/Auth.spec.md."}
++- {"kind": "relationship", "id": "external-content", "from": "entities/Hive", "to": "shared/IO", "label": "Resolves external content", "because": "HiveDO resolveWeb delegates to shared/IO/web.ts through webCtx; IO owns fetching, extraction and durable cache policy. See hive.ts resolveWeb and IO.spec.md."}
++- {"kind": "relationship", "id": "feature-storage", "from": "entities/features", "to": "entities/Hive", "label": "Declares storage behavior", "because": "Feature manifests feed schema patterns, migrations and post-mutation effects through shared composers; Hive effects.ts derives PATTERN_EFFECTS from FEATURES. See Features.spec.md and entities/features/compose.ts."}
++- {"kind": "relationship", "id": "feature-routes", "from": "entities/features", "to": "shared/Routing", "label": "Contributes HTTP routes", "because": "Worker src/index.ts combines CORE_ROUTES with composeRoutes(FEATURES) and passes the result to createRouter. The declaration controls route handler, method, path and auth."}
++- {"kind": "relationship", "id": "ui-vocabulary", "from": "shared/core", "to": "entities/Hive", "label": "Defines shared UI vocabulary", "because": "Core declares view, format, block and chart vocabularies. The kernel derives validation of agent-authored UI from those declarations. See shared/core/Core.spec.md and Hive evolution and kernel code."}
+diff --git a/mnemion-js/coherence.config.json b/mnemion-js/coherence.config.json
+index bbca78b..f862466 100644
+--- a/mnemion-js/coherence.config.json
++++ b/mnemion-js/coherence.config.json
+@@ -5,14 +5,14 @@
+   "entryDir": ".",
+   "tooling": [],
+   "ignore": ["node_modules", ".git", "dist", ".wrangler", ".coherence", "docs", "public", "__tests__", "pages", "system-docs", "worker-configuration.d.ts"],
+-  "codeExt": ["ts"],
++  "codeExt": ["ts", "tsx"],
+   "typecheck": ["npm", "run", "types"],
+   "test": ["npx", "vitest", "run", "-t"],
+   "testMatch": "[1-9][0-9]* passed",
+   "language": "typescript",
+   "platform": "cloudflare",
+ 
+-  "sources": ["entities", "shared", "src"],
++  "sources": ["entities", "shared", "src", "web"],
+   "testDir": "__tests__",
+   "conventions": {
+     "seed": ["seal", "sealAll", "servedQuery", "currentHost", "inertHeaders", "scopeMatches", "applyKernelRules", "normalizeHost", "writeClass"],
+diff --git a/mnemion-js/entities/Session/Session.spec.md b/mnemion-js/entities/Session/Session.spec.md
+index b75b0ec..3bd5785 100644
+--- a/mnemion-js/entities/Session/Session.spec.md
++++ b/mnemion-js/entities/Session/Session.spec.md
+@@ -18,3 +18,8 @@ The per-session McpAgent Durable Object that speaks the MCP protocol and proxies
+ (SessionDO is one Durable Object per MCP session: it handles the MCP protocol — tools, resources, init instructions — and proxies to the single HiveDO over RPC, keeping protocol concerns out of the data substrate. It also stamps the authenticated actor onto writes from its OAuth props, so attribution is enforced at the protocol edge.)
+ 
+ **tools SSOT totality.** Tool metadata feeds two consumers — the MCP `.tool(`/`.registerTool(` registrations and the `/api/tools` frontend — and the rejected design was "two parallel hand-lists, keep them in sync." The real failure shipped when `render` was registered inline without a corresponding `TOOLS` row: a live MCP tool invisible to `/api/tools`, visible to one consumer and not the other, with no warning anywhere. A tool present in one place and absent from the other is what the boundary makes unrepresentable.
++
++
++## relies on
++
++- {"claim": "g-d3b23a6cacaeeb963f8df170e51abe452b29f012549357afec440d1cdde43d41", "provider": "entities/Hive", "because": "MCP mutate and schema tools rely on the Hive write-policy boundary to refuse unclassified or forbidden kernel writes; Session cannot authorize bypassing that storage boundary. See Session.spec.md and entities/Session/session.ts mutate consent dispatch."}
+diff --git a/mnemion-js/shared/Routing/Routing.spec.md b/mnemion-js/shared/Routing/Routing.spec.md
+index 4170dcc..1e06d77 100644
+--- a/mnemion-js/shared/Routing/Routing.spec.md
++++ b/mnemion-js/shared/Routing/Routing.spec.md
+@@ -25,3 +25,8 @@ Declarative HTTP dispatch and session machinery: pattern-matched route table plu
+ **Served-read gating.** The auth dual of inertness: where inertness governs HOW served content is emitted, this governs WHETHER a visibility-gated resource is served at all. The rejected design was a 5-call-site block-list — "any new served read route remembers to gate" — that fails open the moment one route forgets, a real risk because adding a served read path is otherwise a cheap edit. A secretless deploy was an additional silent failure mode: with no master secret configured, owner-only APIs returned 503 but served reads still went through the bearer check against a NULL secret. Both failure modes are killed at one chokepoint with a fixed enumeration over the gated route-shape set. Anchored `via guard` rather than `via test` because the domain is a known route table, not a runtime-varying live domain.
+ 
+ (Operational protection of the public surfaces is cost/availability, not a security boundary, so it isn't a declared invariant. Two layers, both fail-OPEN so absence is harmless: `rateLimit` over the GA `ratelimit` bindings caps the public WRITE surface per endpoint and the public READ surfaces per client IP, and `cached` wraps the public GET reads in `caches.default` so a hit returns from Cloudflare's per-colo edge without running the Worker or touching the DO. Together they answer the single-DO contention ceiling: hot public reads offload to the edge, and what reaches the DO — writes, cache misses, cache-busting enumeration — is throttled. Early `Content-Length` caps on the buffered text bodies bound Worker memory before the transform DSL runs.)
++
++
++## relies on
++
++- {"claim": "g-6a304f32237a75008f487ab83dbc48ce4b3facc8b4a6601c4c6307c47c26996c", "provider": "entities/Hive", "because": "HTTP served-content and ingress handlers rely on the Hive servedDataCtx capability to prevent untrusted access to kernel patterns. See Routing routes/io.ts and Hive.spec.md kernel read+write capability rationale."}
+diff --git a/mnemion-js/web/Browser.spec.md b/mnemion-js/web/Browser.spec.md
+new file mode 100644
+index 0000000..0fe5a92
+--- /dev/null
++++ b/mnemion-js/web/Browser.spec.md
+@@ -0,0 +1,19 @@
++# Browser workspace
++
++The human workspace for browsing and editing shared memory, rendering agent-authored views and pages, and reflecting live changes from the Hive through the HTTP API and WebSocket.
++
++## why
++
++The browser is a consumer of the same memory an agent reaches through MCP. `src/main.tsx` mounts `App`; `App` loads `/api/index`, opens patterns through `/api/query/:pattern`, and interprets the returned `_views` and `_pages` declarations. `views.tsx` and `FacetValue.tsx` send edits through `/api/mutate/:pattern`. Routing owns session authentication and API dispatch; the browser does not reach Hive storage directly or become a security authority by hiding controls.
++
++`App` receives `/ws` change messages. `store.ts` applies granular entry deltas to a normalized in-memory store, while schema, view and page changes cause the index to be refreshed. This is how a person's workspace can reflect an agent's work without a separate browser-owned copy of the domain model. These are observed implementation responsibilities, not a claim that reconnect recovery, optimistic edits, or every page block has a tested live-update guarantee.
++
++The renderer set consumes Core's shared vocabulary: `views.tsx` uses `ViewTypeId`, `resolveFormat`, `resolveChart` and `chartQuery`; `FacetValue.tsx` uses the format vocabulary; `Chart.tsx` uses the shared chart specification. Typed renderer records express intended view and format coverage. `PageView.tsx` dispatches declared block types through a fixed switch. No new named invariant is asserted here: existing palette tests exercise shared validators and the kernel, and the route tests exercise delivery of the SPA shell, but neither proves browser interaction behavior. The current project typecheck also excludes `web`; the record types alone are not a recorded passing oracle.
++
++The seven runtime modules remain one component because they share this responsibility and one browser entrypoint. Views, charts, page blocks and the live store are local details, not independent entry surfaces or separately enforced ownership boundaries.
++
++## architecture
++
++- {"kind": "entrance", "id": "browser", "label": "A person opens their workspace", "component": "web", "anchor": "web/src/main.tsx", "description": "The Worker serves the React SPA shell through its ASSETS fallback for browser routes. main.tsx mounts App, which loads the memory index and redirects an unauthenticated index request to /login."}
++- {"kind": "relationship", "id": "browser-api", "from": "web", "to": "shared/Routing", "label": "Browses and edits memory", "because": "web/src/App.tsx loads /api/index and /api/query/:pattern and subscribes to /ws; views.tsx and FacetValue.tsx post edits to /api/mutate/:pattern. src/index.ts declares these endpoints with Auth.SESSION and Routing routes/pages.ts delegates them to Hive. The socket returns live changes over this same authenticated access surface."}
++- {"kind": "relationship", "id": "browser-vocabulary", "from": "shared/core", "to": "web", "label": "Defines browser renderers' vocabulary", "because": "web/src/views.tsx consumes ViewTypeId, resolveFormat, resolveChart and chartQuery from Core; FacetValue.tsx consumes FormatId and resolveFormat; Chart.tsx consumes the shared chart specification. The browser interprets the vocabulary whose validators the Hive also uses; this relationship describes shared declarations, not a proven parity guarantee."}

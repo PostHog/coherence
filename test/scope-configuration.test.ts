@@ -42,6 +42,22 @@ test("Scope configuration — malformed, ambiguous and executable-looking declar
   assert.equal(valueAt({}, "constructor"), undefined);
 });
 
+test("Scope configuration — Structure is an ordinary configured renderer with bounded declarative detail options", () => {
+  const structure = DEFAULT_SCOPE.views.find(view => view.id === "structure")!;
+  assert.equal(structure.renderer, "structure");
+  assert.deepEqual(structure.structure, { summaryGuarantees: 2, tileZoom: 0.5, detailZoom: 0.95, columns: 3 });
+  const config = resolveScopeConfiguration({ version: 1, extends: false, views: [{
+    id: "architecture", title: "Architecture", kinds: ["component"], renderer: "structure", fields: [], structure: { columns: 4, summaryGuarantees: 1, tileZoom: 0.4, detailZoom: 1.1 },
+  }] });
+  assert.deepEqual(config.views[0].structure, { summaryGuarantees: 1, tileZoom: 0.4, detailZoom: 1.1, columns: 4 });
+  const valid = { version: 1, extends: false, views: [{ id: "architecture", title: "Architecture", kinds: ["component"], renderer: "structure", fields: [] }] };
+  for (const structure of [{ tileZoom: 1, detailZoom: 0.8 }, { columns: 0 }, { summaryGuarantees: -1 }, { arbitrary: true }]) {
+    assert.throws(() => resolveScopeConfiguration({ ...valid, views: [{ ...valid.views[0], structure }] }), /Scope configuration/);
+  }
+  assert.throws(() => resolveScopeConfiguration({ ...valid, views: [{ ...valid.views[0], fields: [{ field: "label" }] }] }), /does not accept generic fields/);
+  assert.throws(() => resolveScopeConfiguration({ ...valid, views: [{ ...valid.views[0], renderer: "table", fields: [{ field: "label" }], structure: {} }] }), /only structure views/);
+});
+
 test("Scope projections — filtering, typed sorting and pagination conserve assets and disclose omitted edges", () => {
   const c = new AssetCatalog();
   for (const [id, n] of [["a", 2], ["b", 10], ["c", 3]] as const) c.add("work", id, id, { n, state: "active" }, "work");

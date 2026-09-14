@@ -1,8 +1,8 @@
 # Declarative Scope
 
 Scope is a configurable reading surface over Coherence's asset catalog. The shipped
-views and project views use the same configuration language and three renderers:
-graphs, tables and cards. React and Radix own interaction, React Flow owns the canvas,
+views and project views use the same configuration language and four renderers:
+architectural stacks, graphs, tables and cards. React and Radix own interaction, React Flow owns the canvas,
 and Cytoscape owns layout. Projects do not need to edit or install the frontend.
 
 ```sh
@@ -83,7 +83,7 @@ The defaults are `structure`, `guarantees`, `specs`, `work`, `journal`, `taxonom
 | Property | Meaning |
 | --- | --- |
 | `id`, `title`, `description` | Stable view slug, tab label, optional explanation |
-| `renderer` | `graph`, `table`, or `cards` |
+| `renderer` | `structure`, `graph`, `table`, or `cards` |
 | `kinds` | Asset kinds below; `["*"]` selects every kind |
 | `where` | All listed filters must match |
 | `sort` | Ordered fields with `asc`/`desc`; asset ID breaks ties |
@@ -95,6 +95,9 @@ The defaults are `structure`, `guarantees`, `specs`, `work`, `journal`, `taxonom
 | `graph.weight` | Numeric attribute used by concentric layout; default `attributes.mass.total` |
 | `graph.width`, `height`, `gap` | Card geometry; rectangular clearance is enforced |
 | `graph.edgeLabel` | Optional relation attribute path; defaults to relation kind |
+| `structure.summaryGuarantees` | Number of promises previewed on a stack, 0–12; default 2 |
+| `structure.tileZoom`, `detailZoom` | Ordered semantic zoom thresholds; defaults 0.5 and 0.95 |
+| `structure.columns` | Layout columns, 1–8; default 3 |
 
 Fields address `id`, `kind`, `label`, `source`, or nested `attributes.path`. Relation
 labels may also address `target`. Optional field formats are `text`, `json`, and
@@ -110,6 +113,58 @@ renderers, filter operators, formats and layouts refuse. Missing attribute value
 not become zero or a passing verdict. No executable callbacks, HTML templates, module
 imports or arbitrary expressions are accepted.
 
+## Structure: authored architecture
+
+The first default view uses the `structure` renderer. It projects project purpose,
+named entrances, component stacks and meaningful responsibility relationships from
+the same catalog that other views can inspect. Stack expansion is separate from
+zoom detail and sidebar selection. Files remain references in evidence, not cards
+on this map. Imports do not supply architectural arrows.
+
+The initial Structure renderer takes the full canonical component population. Its
+configuration uses `kinds: ["component"]` and `fields: []`; generic `where`, `sort`,
+`groupBy`, and `pageSize` are rejected. The four `structure` options customize its
+detail and geometry. Filtered arbitrary-asset projections remain available through
+the graph, table and cards renderers. Extending Structure's selection language is
+later work, not an implied capability of the current options.
+
+A specification may author an `## architecture` section with one JSON object per
+bullet. Component addresses are the repository-relative spec owners (`.` for the
+root); an optional entrance anchor addresses a file or `path#symbol` belonging to
+that component. IDs are stable lowercase slugs unique within the owning specification.
+For example:
+
+```markdown
+## architecture
+
+- {"kind":"purpose","id":"purpose","text":"Orchard dispatch turns harvest requests into retained picking orders."}
+- {"kind":"entrance","id":"request","label":"Request a harvest","component":".","description":"A grower submits a harvest request.","anchor":"main.ts#request"}
+- {"kind":"relationship","id":"retain","from":".","to":"store","label":"Retains picking orders","because":"Dispatch hands accepted requests to the order store."}
+```
+
+These are authored architectural assessments. The graph checks their shape and
+addresses; it does not prove that a responsibility is fulfilled. Source locations
+travel with the declarations. Malformed declarations and unresolved addresses remain
+visible problems, and fenced examples do not become declarations. Projects without
+this section retain their spec-owned components and promises, with explicit absence
+for purpose or entrances.
+
+Existing spec `relies on` declarations supply the separate guarantee-consumer
+relationship. An architectural handoff does not imply that the receiving component
+consumes every guarantee of its neighbor. Atlas transitions provide owned boundary
+detail. Taxonomy summaries concern exact owned assessment subjects and retain evidence
+limits; they are not a new classification of the whole component.
+
+The first prototype focuses on current state. Snapshot comparison, removed-card ghosts,
+change-story navigation and Scope-control MCP remain planned. A project can replace
+the default tab through ordinary configuration. Adding a new renderer implementation
+still requires frontend registration; a packaged third-party renderer loading protocol
+is not implemented by this prototype.
+
+See [the implementation plan](scope-structure-plan.md),
+[Coherence's declaration inventory](scope-coherence-inventory.md), and
+[the real-project walkthrough](scope-structure-walkthrough.md).
+
 ## Asset inventory
 
 Each asset has `{ id, kind, label, source, attributes }`. Original domain IDs remain
@@ -121,7 +176,8 @@ to those addresses. Every record retains its canonical reader's evidence grade.
 | `project`, `component`, `file`, `symbol`, `resource` | Canonical source graph, ownership, paths, source docs, imports, platform bindings; components also expose promise mass and per-guarantee readings |
 | `spec` | Entire original spec text and every canonical parsed field, path and owner |
 | `spec-section` | Every authored heading and section body, including custom/duplicate headings and malformed declarations, with line and heading level |
-| `description`, `rationale` | Parsed intent/prose and `why`, separately selectable by owner |
+| `description`, `rationale` | Parsed intent/prose and `why`, separately selectable by owner; authored architecture purpose has category `project-purpose` |
+| `entrance`, `architectural-link`, `architecture-issue` | Spec-owned entrance descriptions and anchors, assessed responsibility relationships with rationale, and retained declaration/resolution problems |
 | `claim` | Every parsed `works when` claim, owner, and optional declared claim kind |
 | `invariant` | Each named invariant, matching boundary claims, anchored state and recorded-refutation presence |
 | `refutation` | Each authored negative control and its canonical invariant-name association |
@@ -142,7 +198,7 @@ to those addresses. Every record retains its canonical reader's evidence grade.
 | `instrument`, `baseline`, `calibration` | Persisted verification/atlas/drift/mass/economy readings; mass/sinks/conventions baselines; calibration samples |
 | `word`, `doctrine`, `configuration`, `source` | Dictionary definitions, coordination doctrine, Coherence/Scope settings, and source availability independent of filters |
 
-There are 50 declared kinds, including kinds with zero instances in a given project.
+There are 53 declared kinds, including kinds with zero instances in a given project.
 The live registry is [`ASSET_KINDS`](../src/readings/scope/catalog.ts); adapters live
 in [`captureScope`](../src/readings/scope/capture.ts). New canonical asset families
 must be added there, documented here, and exercised through the generic projection
@@ -161,7 +217,7 @@ section. Custom sections are navigable text and acquire no execution semantics.
 The guard uses a spec with all supported sections, claim-kind annotations, a custom
 section, a nested heading, a fenced pseudo-heading and malformed declaration text.
 It compares exact source text and canonical meanings, including unanchored invariants
-and zone authority. Coverage is over the canonical spec population selected by the
+and zone authority. Architecture declarations have additional parsing and resolution guards. Coverage is over the canonical spec population selected by the
 source walker, not ignored files elsewhere in the repository.
 
 ## Relationships and evidence
@@ -171,7 +227,8 @@ These include `contains`, graph edge kinds, `declares`, `defines`, `anchors`, `r
 `reliance`, `evidence-import`, `relies`, `references`, `addresses`, `binds`, `assesses`,
 journal terminal relations, `parent-work`, `depends-on`, canonical consequence verbs,
 `bound-to`, `recorded-by`, `observes`, `observed-session`, `work-history`,
-`experiment-history`, `binding-subject`, `binding-flow`, `translates`, and `zone-inside`.
+`experiment-history`, `binding-subject`, `binding-flow`, `translates`, `zone-inside`,
+`enters`, and `architecture`.
 Receipt/work binding does not manufacture an
 assessor's `verifies` edge. Shared times or paths do not create causal connections.
 
@@ -212,12 +269,15 @@ agent action, caller-assessed taxonomy into proof, or local receipts into truste
 
 ```sh
 npm run build
-node --test test/scope-configuration.test.ts test/scope-capture.test.ts test/render-scope.test.ts
+node --test test/structure-semantics.test.ts test/structure-layout.test.ts test/scope-configuration.test.ts test/scope-capture.test.ts test/render-scope.test.ts
+node scripts/scope-structure-check.mjs
 node scripts/scope-browser-check.mjs
 SCOPE_BROWSER_ENGINE=webkit node scripts/scope-browser-check.mjs
 ```
 
-Browser checks exercise every default view, custom JSON without frontend changes,
+Structure checks exercise a differently named fixture and the current Coherence checkout,
+retaining screenshots and offline artifacts for human review. Generic browser checks
+exercise a configured graph and the remaining default views, custom JSON without frontend changes,
 inspector text, all four layouts, offline network silence, live config/source updates,
 pause/resume, malformed-config recovery, HTTP boundaries and mobile overflow. They
 require the corresponding Playwright browser installation, or an installed Chrome

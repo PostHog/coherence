@@ -10,6 +10,7 @@ These projections can explain evidence but cannot create it. Scope, promise view
 - Scope projects the canonical promise population with deterministic gravity and honest absence
 - Scope views select complete attributed assets through data-only configuration
 - Scope preserves every authored spec content category without inventing evidence
+- Structure connections retain declared architectural meaning and exact guarantee ownership
 
 ## refutations
 
@@ -22,6 +23,8 @@ These projections can explain evidence but cannot create it. Scope, promise view
 
 ## works when
 
+- boundary "Structure connections retain declared architectural meaning and exact guarantee ownership" at buildStructureModel via guard "Structure projection — declared promises and only meaningful edges retain catalog identity and evidence limits"
+
 - boundary "Scope projects the canonical promise population with deterministic gravity and honest absence" at buildScopeModel via guard "scope roles — declared test imports are not runtime gravity or proof of a named oracle"
 
 - boundary "Scope projects the canonical promise population with deterministic gravity and honest absence" at buildScopeModel via guard "scope semantics — containment and atlas meanings preserve ownership without inventing dependencies or verdicts"
@@ -31,7 +34,7 @@ These projections can explain evidence but cannot create it. Scope, promise view
 - boundary "Scope projects the canonical promise population with deterministic gravity and honest absence" at buildScopeModel via guard "scope model — original spec explanation and unanchored declarations survive projection"
 - boundary "Scope views select complete attributed assets through data-only configuration" at resolveScopeConfiguration via guard "Scope configuration — every default is ordinary project configuration and every asset family is selectable"
 - boundary "Scope views select complete attributed assets through data-only configuration" at projectView via guard "Scope projections — filtering, typed sorting and pagination conserve assets and disclose omitted edges"
-- boundary "Scope views select complete attributed assets through data-only configuration" at DEFAULT_SCOPE via guard "Scope layout — twelve-component default remains readable and every supported layout clears rectangles"
+- boundary "Scope views select complete attributed assets through data-only configuration" at resolveScopeConfiguration via guard "Scope layout — configured twelve-component graph remains readable and every supported layout clears rectangles"
 - boundary "Scope views select complete attributed assets through data-only configuration" at captureScope via guard "Scope assets — damage remains visible outside filters and invalid project configuration never becomes defaults"
 - boundary "Scope views select complete attributed assets through data-only configuration" at captureScope via guard "Scope journal assets — shared session-opening ids and repeated decision envelopes preserve every occurrence"
 - boundary "Scope views select complete attributed assets through data-only configuration" at renderScope via guard "scope renderer — one self-contained bundle preserves data without admitting markup"
@@ -65,7 +68,7 @@ old CLI canvas and four independently implemented preview panels duplicated pres
 policy and prevented projects from asking a different question without editing React.
 One catalog now adapts canonical readers into assets, attributes, explicit relationships
 and source readings. Every shipped view is ordinary configuration consumed by the same
-graph, table and card renderers as a project view. JSON selects and presents evidence;
+Structure, graph, table and card renderers as a project view. JSON selects and presents evidence;
 it cannot execute code or establish a new verdict. Failed sources stay visible outside
 filters. Pagination names its withheld population and graph connections. The old semantic
 promise join remains shared with the guarantees command; its former canvas and preview
@@ -78,3 +81,11 @@ invariants, refutations, zones and authored guarantee declarations retain addres
 The complete original spec survives beside canonical parsed meaning. Custom sections,
 duplicate headings and malformed declarations remain text rather than being upgraded to
 claims or silently discarded. Only the entry spec's zones have topology authority.
+
+**Structure connections retain declared architectural meaning and exact guarantee
+ownership.** A pile of import arrows names syntax while leaving a reader to infer
+responsibilities. The Structure projection instead joins authored architecture and
+explicit guarantee reliance with spec-owned stacks. Imports cannot create these
+connections. Stable catalog identities connect selection, ownership and evidence;
+unanchored promises and unresolved declarations remain visible. Zoom changes
+presentation detail, not the meaning or confidence of a relationship.

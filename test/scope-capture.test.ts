@@ -89,6 +89,50 @@ test("Scope atlas — chart transitions are explicit selectable edges rather tha
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
+test("Scope architecture — declarations retain provenance and one unresolved endpoint does not erase valid meaning", async () => {
+  const { root, cfg } = await scopeFixture();
+  try {
+    await writeFile(join(root, "project.spec.md"), `# Fixture
+
+Authored purpose.
+
+## architecture
+
+- {"kind":"purpose","id":"purpose","text":"A canonical project purpose."}
+- {"kind":"entrance","id":"start","label":"Start here","component":".","description":"The supported entrance.","anchor":"src/main.ts"}
+- {"kind":"relationship","id":"missing","from":".","to":"absent","label":"Names an unresolved participant","because":"The declaration must remain inspectable."}
+`);
+    const catalog = (await captureScope(cfg)).catalog;
+    const purpose = catalog.assets.find(asset => asset.id === "description:architecture:.:purpose")!;
+    assert.match(String(purpose.attributes.declaration), /project\.spec\.md:\d+$/);
+    assert.ok(catalog.assets.some(asset => asset.id === "entrance:.:start"));
+    assert.ok(catalog.assets.some(asset => asset.kind === "architecture-issue" && String(asset.attributes.message).includes("absent")));
+    assert.ok(catalog.relations.some(relation => relation.kind === "architecture" && relation.target === "component:absent"));
+    assert.equal(catalog.sources.find(source => source.id === "architecture")!.status, "available");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("Scope architecture parser — fenced examples and duplicate or malformed declarations are explicit problems", async () => {
+  const { parseSpec } = await import("../src/derivation/walk.ts");
+  const parsed = parseSpec(`# Example
+
+Purpose.
+
+\`\`\`
+## architecture
+- {"kind":"purpose","id":"example","text":"Not live."}
+\`\`\`
+
+## architecture
+- {"kind":"purpose","id":"live","text":"Live."}
+- {"kind":"purpose","id":"live","text":"Duplicate."}
+- {"kind":"purpose","id":"bad","text":"line\\nbreak"}
+`);
+  assert.deepEqual(parsed.architecture?.declarations.map(row => row.id), ["live"]);
+  assert.ok(parsed.architecture?.problems.some(problem => problem.includes("duplicate id live")));
+  assert.ok(parsed.architecture?.problems.some(problem => problem.includes("single-line")));
+});
+
 test("Scope journal assets — shared session-opening ids and repeated decision envelopes preserve every occurrence", async () => {
   const { root, cfg } = await scopeFixture();
   try {

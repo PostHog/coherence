@@ -13,12 +13,14 @@ Language packs and adapters supply syntax knowledge. This assembly owns the walk
 - harness source remains searchable text rather than silently becoming binary
 - a declared language resolves to a real adapter or refuses, never a silent fallback
 - a built-in language pack is data: queries, patterns, and named strategies, never code
+- spec-owned architecture remains attributable and unresolved meaning stays explicit
 
 ## refutations
 
 - declared import aliases resolve only unique walked targets and refuse malformed configuration: the pinned PostHog ingestion fixture had 42 alias import occurrences targeting copied files, but the relative-only resolver hid 15 component relations and rejected 7 of 8 declared guarantee reliances. The same source population must recover those relations when its root aliases are declared; omitting the declarations remains an explicit external-module negative control.
 - Python local imports resolve only at the declared direct-module grade: the pinned PostHog slice contained both imported Redis and object-storage files but Scope derived zero relations. The resolver treated every absolute dotted module as external. With the Python address strategy the same slice derives five canonical relations; ambiguous modules and unresolved imports remain external.
 - harness source remains searchable text rather than silently becoming binary: two new render/validation regexes carried literal NUL bytes, and `rg` classified `src/consequence.ts` as binary instead of returning navigable source matches. The ranges now use escaped source notation and the focused guard enumerates every live TypeScript source, so the same byte turns the claim red rather than degrading repository navigation silently.
+- spec-owned architecture remains attributable and unresolved meaning stays explicit: one unresolved component caused the architecture catalog transaction to roll back valid purpose and entrance declarations; the focused Scope architecture guard now retains each valid declaration, its spec line and the unresolved issue.
 
 ## works when
 
@@ -31,6 +33,7 @@ Language packs and adapters supply syntax knowledge. This assembly owns the walk
 - boundary "harness source remains searchable text rather than silently becoming binary" at sourceTextIsNavigable via guard "source text — every live TypeScript source remains NUL-free and searchable"
 - boundary "a declared language resolves to a real adapter or refuses, never a silent fallback" at resolveLanguageAdapter via guard "language adapter — a project path loads and shapes the graph; unknown names refuse, never fall back"
 - boundary "a built-in language pack is data: queries, patterns, and named strategies, never code" at builtinLanguagePacks via guard "language packs — every built-in pack is function-free data across all five instrument tables"
+- boundary "spec-owned architecture remains attributable and unresolved meaning stays explicit" at resolveArchitecture via guard "Scope architecture — declarations retain provenance and one unresolved endpoint does not erase valid meaning"
 
 ## addresses
 

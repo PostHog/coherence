@@ -21,6 +21,7 @@ export interface Catalog {
 
 /** This inventory declares adapter ownership, including families with zero instances. */
 export const ASSET_KINDS = {
+  entrance: "Declared entrances", "architectural-link": "Authored architectural relationships", "architecture-issue": "Architecture declaration issues",
   project: "Project", component: "Components", file: "Files", symbol: "Symbols", resource: "Platform resources",
   spec: "Specifications", "spec-section": "Authored spec sections", description: "Intent and prose", rationale: "Why",
   invariant: "Named invariants", refutation: "Recorded refutations", chart: "Atlas charts",

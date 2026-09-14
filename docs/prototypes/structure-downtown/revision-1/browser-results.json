@@ -1,0 +1,172 @@
+[
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "opening",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 4,
+    "zoom": 0.650528,
+    "titlePixels": 16.913728,
+    "intentPixels": 12.360032,
+    "labelPixels": 11.709503999999999,
+    "transform": "translate(48.36px, 110.999px) scale(0.650528)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "body-selection",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 6,
+    "zoom": 0.650528,
+    "titlePixels": 16.913728,
+    "intentPixels": 12.360032,
+    "labelPixels": 11.709503999999999,
+    "transform": "translate(48.36px, 110.999px) scale(0.650528)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "expanded",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 6,
+    "zoom": 0.548063,
+    "titlePixels": 14.249638,
+    "intentPixels": 10.413197,
+    "labelPixels": 9.865134,
+    "transform": "translate(99.3529px, 42.8364px) scale(0.548063)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "guarantee",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 1,
+    "zoom": 0.548063,
+    "titlePixels": 14.249638,
+    "intentPixels": 10.413197,
+    "labelPixels": 9.865134,
+    "transform": "translate(99.3529px, 42.8364px) scale(0.548063)"
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "scene": "all-handoffs",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 12,
+    "zoom": 0.614458,
+    "titlePixels": 15.975907999999999,
+    "intentPixels": 11.674702,
+    "labelPixels": 11.060243999999999,
+    "transform": "translate(61.6747px, 98.1777px) scale(0.614458)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "opening",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 4,
+    "zoom": 0.557418,
+    "titlePixels": 14.492868,
+    "intentPixels": 10.590942,
+    "labelPixels": 10.033524,
+    "transform": "translate(41.5909px, 105.227px) scale(0.557418)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "body-selection",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 6,
+    "zoom": 0.557418,
+    "titlePixels": 14.492868,
+    "intentPixels": 10.590942,
+    "labelPixels": 10.033524,
+    "transform": "translate(41.5909px, 105.227px) scale(0.557418)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "expanded",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 6,
+    "zoom": 0.483501,
+    "titlePixels": 12.571026,
+    "intentPixels": 9.186519,
+    "labelPixels": 8.703018,
+    "transform": "translate(73.6176px, 37.3845px) scale(0.483501)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "guarantee",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 1,
+    "zoom": 0.483501,
+    "titlePixels": 12.571026,
+    "intentPixels": 9.186519,
+    "labelPixels": 8.703018,
+    "transform": "translate(73.6176px, 37.3845px) scale(0.483501)"
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "scene": "all-handoffs",
+    "error": null,
+    "collisions": [],
+    "contentOverruns": [],
+    "clippedLabels": [],
+    "routes": 12,
+    "zoom": 0.526506,
+    "titlePixels": 13.689156,
+    "intentPixels": 10.003614,
+    "labelPixels": 9.477108000000001,
+    "transform": "translate(54.0036px, 94.2425px) scale(0.526506)"
+  }
+]

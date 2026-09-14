@@ -1,0 +1,1232 @@
+[
+  {
+    "width": 1440,
+    "name": "opening",
+    "selected": null,
+    "mode": "opening",
+    "focus": null,
+    "paths": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "cards": [
+      [
+        "component:src/evidence",
+        1240,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/derivation",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/verification",
+        760,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/coordination",
+        1500,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/lifecycle",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/diagnostics",
+        540,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:src/taxonomy",
+        60,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/readings",
+        540,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/adapters",
+        1020,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:test",
+        1500,
+        863,
+        260,
+        192
+      ],
+      [
+        "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        1240,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        1406,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        345,
+        341,
+        190,
+        54
+      ]
+    ],
+    "camera": "translate(173.684px, 138.142px) scale(0.599688)",
+    "sidebar": null,
+    "error": null,
+    "roundTrip": "unchanged"
+  },
+  {
+    "width": 1440,
+    "name": "inspected",
+    "selected": {
+      "kind": "component",
+      "id": "component:src/derivation"
+    },
+    "mode": "opening",
+    "focus": null,
+    "paths": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "cards": [
+      [
+        "component:src/evidence",
+        1240,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/derivation",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/verification",
+        760,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/coordination",
+        1500,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/lifecycle",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/diagnostics",
+        540,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:src/taxonomy",
+        60,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/readings",
+        540,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/adapters",
+        1020,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:test",
+        1500,
+        863,
+        260,
+        192
+      ],
+      [
+        "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        1240,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        1406,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        345,
+        341,
+        190,
+        54
+      ]
+    ],
+    "camera": "translate(173.684px, 138.142px) scale(0.599688)",
+    "sidebar": "Source derivation",
+    "error": null,
+    "roundTrip": "unchanged"
+  },
+  {
+    "width": 1440,
+    "name": "focused",
+    "selected": {
+      "kind": "component",
+      "id": "component:src/derivation"
+    },
+    "mode": "opening",
+    "focus": {
+      "kind": "component",
+      "id": "component:src/derivation",
+      "label": "Source derivation"
+    },
+    "paths": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:readable-model": "M 440 683 L 440 711 C 440 715.97056275 444.02943725 720 449 720 L 525 720 C 527.76142375 720 530 717.76142375 530 715 L 530 715 C 530 712.23857625 532.23857625 710 535 710 L 535 710 C 537.76142375 710 540 712.23857625 540 715 L 540 732 L 540 794 L 540 814 C 540 877.3078194222483 440.6921805777517 950 504 950 L 540 950",
+      "relation:architecture:.:model-diagnostics": "M 600 510 L 628 510 C 640.1502645 510 650 500.1502645 650 488 L 650 412 C 650 394.326888 635.673112 380 618 380 L 582 380 C 564.326888 380 550 365.673112 550 348 L 550 262 C 550 244.326888 535.673112 230 518 230 L 402 230 C 384.326888 230 370 215.673112 370 198 L 370 -51 C 370 -55.97056275 374.02943725 -60 379 -60 L 391 -60 L 589 -60 L 601 -60 C 605.97056275 -60 610 -55.97056275 610 -51 L 610 -22 C 610 -4.326888 595.673112 10 578 10 L 532 10 C 514.326888 10 500 24.326888 500 42 L 500 108 C 500 114.627417 505.372583 120 512 120 L 540 120",
+      "relation:architecture:.:model-taxonomy": "M 410 683 L 410 1038 C 410 1055.673112 424.326888 1070 442 1070 L 580 1070 C 596.5685425 1070 610 1083.4314575 610 1100 L 610 1121 C 610 1125.97056275 605.97056275 1130 601 1130 L 589 1130 L 391 1130 L 371 1130 C 366 1130 361 950 356 950 L 320 950",
+      "relation:architecture:.:language-seam": "M 600 570 L 636 570 C 647.6666666666666 570 659.3333333333334 760 671 760 L 691 760 L 889 760 L 909 760 C 934 760 959 950 984 950 L 1020 950",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1": "M 540 920 L 372 920 C 354.326888 920 340 905.673112 340 888 L 340 732 C 340 714.326888 325.673112 700 308 700 L 292 700 C 274.326888 700 260 685.673112 260 668 L 260 402 C 260 384.326888 274.326888 370 292 370 L 298 370 C 315.673112 370 330 355.673112 330 338 L 330 332 C 330 314.326888 344.326888 300 362 300 L 427 300 C 434.17970175 300 440 305.82029825 440 313 L 440 341"
+    },
+    "cards": [
+      [
+        "component:src/evidence",
+        1240,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/derivation",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/verification",
+        760,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/coordination",
+        1500,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/lifecycle",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/diagnostics",
+        540,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:src/taxonomy",
+        60,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/readings",
+        540,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/adapters",
+        1020,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:test",
+        1500,
+        863,
+        260,
+        192
+      ],
+      [
+        "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        1240,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        1406,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        345,
+        341,
+        190,
+        54
+      ]
+    ],
+    "camera": "translate(173.684px, 138.142px) scale(0.599688)",
+    "sidebar": "Source derivation",
+    "error": null,
+    "roundTrip": "unchanged"
+  },
+  {
+    "width": 1440,
+    "name": "guarantee-inspected",
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "owner": "component:src/derivation"
+    },
+    "mode": "opening",
+    "focus": {
+      "kind": "component",
+      "id": "component:src/derivation",
+      "label": "Source derivation"
+    },
+    "paths": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:readable-model": "M 440 683 L 440 711 C 440 715.97056275 444.02943725 720 449 720 L 525 720 C 527.76142375 720 530 717.76142375 530 715 L 530 715 C 530 712.23857625 532.23857625 710 535 710 L 535 710 C 537.76142375 710 540 712.23857625 540 715 L 540 732 L 540 794 L 540 814 C 540 877.3078194222483 440.6921805777517 950 504 950 L 540 950",
+      "relation:architecture:.:model-diagnostics": "M 600 510 L 628 510 C 640.1502645 510 650 500.1502645 650 488 L 650 412 C 650 394.326888 635.673112 380 618 380 L 582 380 C 564.326888 380 550 365.673112 550 348 L 550 262 C 550 244.326888 535.673112 230 518 230 L 402 230 C 384.326888 230 370 215.673112 370 198 L 370 -51 C 370 -55.97056275 374.02943725 -60 379 -60 L 391 -60 L 589 -60 L 601 -60 C 605.97056275 -60 610 -55.97056275 610 -51 L 610 -22 C 610 -4.326888 595.673112 10 578 10 L 532 10 C 514.326888 10 500 24.326888 500 42 L 500 108 C 500 114.627417 505.372583 120 512 120 L 540 120",
+      "relation:architecture:.:model-taxonomy": "M 410 683 L 410 1038 C 410 1055.673112 424.326888 1070 442 1070 L 580 1070 C 596.5685425 1070 610 1083.4314575 610 1100 L 610 1121 C 610 1125.97056275 605.97056275 1130 601 1130 L 589 1130 L 391 1130 L 371 1130 C 366 1130 361 950 356 950 L 320 950",
+      "relation:architecture:.:language-seam": "M 600 570 L 636 570 C 647.6666666666666 570 659.3333333333334 760 671 760 L 691 760 L 889 760 L 909 760 C 934 760 959 950 984 950 L 1020 950",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1": "M 540 920 L 372 920 C 354.326888 920 340 905.673112 340 888 L 340 732 C 340 714.326888 325.673112 700 308 700 L 292 700 C 274.326888 700 260 685.673112 260 668 L 260 402 C 260 384.326888 274.326888 370 292 370 L 298 370 C 315.673112 370 330 355.673112 330 338 L 330 332 C 330 314.326888 344.326888 300 362 300 L 427 300 C 434.17970175 300 440 305.82029825 440 313 L 440 341"
+    },
+    "cards": [
+      [
+        "component:src/evidence",
+        1240,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/derivation",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/verification",
+        760,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/coordination",
+        1500,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/lifecycle",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/diagnostics",
+        540,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:src/taxonomy",
+        60,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/readings",
+        540,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/adapters",
+        1020,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:test",
+        1500,
+        863,
+        260,
+        192
+      ],
+      [
+        "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        1240,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        1406,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        345,
+        341,
+        190,
+        54
+      ]
+    ],
+    "camera": "translate(173.684px, 138.142px) scale(0.599688)",
+    "sidebar": "spec containment follows declared ancestry without inventing dependencies",
+    "error": null,
+    "roundTrip": "unchanged"
+  },
+  {
+    "width": 1440,
+    "name": "guarantee-focused",
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "owner": "component:src/derivation"
+    },
+    "mode": "opening",
+    "focus": {
+      "kind": "guarantee",
+      "id": "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "owner": "component:src/derivation",
+      "label": "spec containment follows declared ancestry without inventing dependencies"
+    },
+    "paths": {
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1": "M 540 920 L 372 920 C 354.326888 920 340 905.673112 340 888 L 340 732 C 340 714.326888 325.673112 700 308 700 L 292 700 C 274.326888 700 260 685.673112 260 668 L 260 402 C 260 384.326888 274.326888 370 292 370 L 298 370 C 315.673112 370 330 355.673112 330 338 L 330 332 C 330 314.326888 344.326888 300 362 300 L 427 300 C 434.17970175 300 440 305.82029825 440 313 L 440 341"
+    },
+    "cards": [
+      [
+        "component:src/evidence",
+        1240,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/derivation",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/verification",
+        760,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/coordination",
+        1500,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/lifecycle",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/diagnostics",
+        540,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:src/taxonomy",
+        60,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/readings",
+        540,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/adapters",
+        1020,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:test",
+        1500,
+        863,
+        260,
+        192
+      ],
+      [
+        "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        1240,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        1406,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        345,
+        341,
+        190,
+        54
+      ]
+    ],
+    "camera": "translate(173.684px, 138.142px) scale(0.599688)",
+    "sidebar": "spec containment follows declared ancestry without inventing dependencies",
+    "error": null,
+    "roundTrip": "unchanged"
+  },
+  {
+    "width": 1280,
+    "name": "opening",
+    "selected": null,
+    "mode": "opening",
+    "focus": null,
+    "paths": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "cards": [
+      [
+        "component:src/evidence",
+        1240,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/derivation",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/verification",
+        760,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/coordination",
+        1500,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/lifecycle",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/diagnostics",
+        540,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:src/taxonomy",
+        60,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/readings",
+        540,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/adapters",
+        1020,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:test",
+        1500,
+        863,
+        260,
+        192
+      ],
+      [
+        "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        1240,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        1406,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        345,
+        341,
+        190,
+        54
+      ]
+    ],
+    "camera": "translate(93.6838px, 138.142px) scale(0.599688)",
+    "sidebar": null,
+    "error": null,
+    "roundTrip": "unchanged"
+  },
+  {
+    "width": 1280,
+    "name": "inspected",
+    "selected": {
+      "kind": "component",
+      "id": "component:src/derivation"
+    },
+    "mode": "opening",
+    "focus": null,
+    "paths": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "cards": [
+      [
+        "component:src/evidence",
+        1240,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/derivation",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/verification",
+        760,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/coordination",
+        1500,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/lifecycle",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/diagnostics",
+        540,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:src/taxonomy",
+        60,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/readings",
+        540,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/adapters",
+        1020,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:test",
+        1500,
+        863,
+        260,
+        192
+      ],
+      [
+        "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        1240,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        1406,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        345,
+        341,
+        190,
+        54
+      ]
+    ],
+    "camera": "translate(93.6838px, 138.142px) scale(0.599688)",
+    "sidebar": "Source derivation",
+    "error": null,
+    "roundTrip": "unchanged"
+  },
+  {
+    "width": 1280,
+    "name": "focused",
+    "selected": {
+      "kind": "component",
+      "id": "component:src/derivation"
+    },
+    "mode": "opening",
+    "focus": {
+      "kind": "component",
+      "id": "component:src/derivation",
+      "label": "Source derivation"
+    },
+    "paths": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:readable-model": "M 440 683 L 440 711 C 440 715.97056275 444.02943725 720 449 720 L 525 720 C 527.76142375 720 530 717.76142375 530 715 L 530 715 C 530 712.23857625 532.23857625 710 535 710 L 535 710 C 537.76142375 710 540 712.23857625 540 715 L 540 732 L 540 794 L 540 814 C 540 877.3078194222483 440.6921805777517 950 504 950 L 540 950",
+      "relation:architecture:.:model-diagnostics": "M 600 510 L 628 510 C 640.1502645 510 650 500.1502645 650 488 L 650 412 C 650 394.326888 635.673112 380 618 380 L 582 380 C 564.326888 380 550 365.673112 550 348 L 550 262 C 550 244.326888 535.673112 230 518 230 L 402 230 C 384.326888 230 370 215.673112 370 198 L 370 -51 C 370 -55.97056275 374.02943725 -60 379 -60 L 391 -60 L 589 -60 L 601 -60 C 605.97056275 -60 610 -55.97056275 610 -51 L 610 -22 C 610 -4.326888 595.673112 10 578 10 L 532 10 C 514.326888 10 500 24.326888 500 42 L 500 108 C 500 114.627417 505.372583 120 512 120 L 540 120",
+      "relation:architecture:.:model-taxonomy": "M 410 683 L 410 1038 C 410 1055.673112 424.326888 1070 442 1070 L 580 1070 C 596.5685425 1070 610 1083.4314575 610 1100 L 610 1121 C 610 1125.97056275 605.97056275 1130 601 1130 L 589 1130 L 391 1130 L 371 1130 C 366 1130 361 950 356 950 L 320 950",
+      "relation:architecture:.:language-seam": "M 600 570 L 636 570 C 647.6666666666666 570 659.3333333333334 760 671 760 L 691 760 L 889 760 L 909 760 C 934 760 959 950 984 950 L 1020 950",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1": "M 540 920 L 372 920 C 354.326888 920 340 905.673112 340 888 L 340 732 C 340 714.326888 325.673112 700 308 700 L 292 700 C 274.326888 700 260 685.673112 260 668 L 260 402 C 260 384.326888 274.326888 370 292 370 L 298 370 C 315.673112 370 330 355.673112 330 338 L 330 332 C 330 314.326888 344.326888 300 362 300 L 427 300 C 434.17970175 300 440 305.82029825 440 313 L 440 341"
+    },
+    "cards": [
+      [
+        "component:src/evidence",
+        1240,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/derivation",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/verification",
+        760,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/coordination",
+        1500,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/lifecycle",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/diagnostics",
+        540,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:src/taxonomy",
+        60,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/readings",
+        540,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/adapters",
+        1020,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:test",
+        1500,
+        863,
+        260,
+        192
+      ],
+      [
+        "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        1240,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        1406,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        345,
+        341,
+        190,
+        54
+      ]
+    ],
+    "camera": "translate(93.6838px, 138.142px) scale(0.599688)",
+    "sidebar": "Source derivation",
+    "error": null,
+    "roundTrip": "unchanged"
+  },
+  {
+    "width": 1280,
+    "name": "guarantee-inspected",
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "owner": "component:src/derivation"
+    },
+    "mode": "opening",
+    "focus": {
+      "kind": "component",
+      "id": "component:src/derivation",
+      "label": "Source derivation"
+    },
+    "paths": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:readable-model": "M 440 683 L 440 711 C 440 715.97056275 444.02943725 720 449 720 L 525 720 C 527.76142375 720 530 717.76142375 530 715 L 530 715 C 530 712.23857625 532.23857625 710 535 710 L 535 710 C 537.76142375 710 540 712.23857625 540 715 L 540 732 L 540 794 L 540 814 C 540 877.3078194222483 440.6921805777517 950 504 950 L 540 950",
+      "relation:architecture:.:model-diagnostics": "M 600 510 L 628 510 C 640.1502645 510 650 500.1502645 650 488 L 650 412 C 650 394.326888 635.673112 380 618 380 L 582 380 C 564.326888 380 550 365.673112 550 348 L 550 262 C 550 244.326888 535.673112 230 518 230 L 402 230 C 384.326888 230 370 215.673112 370 198 L 370 -51 C 370 -55.97056275 374.02943725 -60 379 -60 L 391 -60 L 589 -60 L 601 -60 C 605.97056275 -60 610 -55.97056275 610 -51 L 610 -22 C 610 -4.326888 595.673112 10 578 10 L 532 10 C 514.326888 10 500 24.326888 500 42 L 500 108 C 500 114.627417 505.372583 120 512 120 L 540 120",
+      "relation:architecture:.:model-taxonomy": "M 410 683 L 410 1038 C 410 1055.673112 424.326888 1070 442 1070 L 580 1070 C 596.5685425 1070 610 1083.4314575 610 1100 L 610 1121 C 610 1125.97056275 605.97056275 1130 601 1130 L 589 1130 L 391 1130 L 371 1130 C 366 1130 361 950 356 950 L 320 950",
+      "relation:architecture:.:language-seam": "M 600 570 L 636 570 C 647.6666666666666 570 659.3333333333334 760 671 760 L 691 760 L 889 760 L 909 760 C 934 760 959 950 984 950 L 1020 950",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1": "M 540 920 L 372 920 C 354.326888 920 340 905.673112 340 888 L 340 732 C 340 714.326888 325.673112 700 308 700 L 292 700 C 274.326888 700 260 685.673112 260 668 L 260 402 C 260 384.326888 274.326888 370 292 370 L 298 370 C 315.673112 370 330 355.673112 330 338 L 330 332 C 330 314.326888 344.326888 300 362 300 L 427 300 C 434.17970175 300 440 305.82029825 440 313 L 440 341"
+    },
+    "cards": [
+      [
+        "component:src/evidence",
+        1240,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/derivation",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/verification",
+        760,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/coordination",
+        1500,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/lifecycle",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/diagnostics",
+        540,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:src/taxonomy",
+        60,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/readings",
+        540,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/adapters",
+        1020,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:test",
+        1500,
+        863,
+        260,
+        192
+      ],
+      [
+        "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        1240,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        1406,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        345,
+        341,
+        190,
+        54
+      ]
+    ],
+    "camera": "translate(93.6838px, 138.142px) scale(0.599688)",
+    "sidebar": "spec containment follows declared ancestry without inventing dependencies",
+    "error": null,
+    "roundTrip": "unchanged"
+  },
+  {
+    "width": 1280,
+    "name": "guarantee-focused",
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "owner": "component:src/derivation"
+    },
+    "mode": "opening",
+    "focus": {
+      "kind": "guarantee",
+      "id": "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "owner": "component:src/derivation",
+      "label": "spec containment follows declared ancestry without inventing dependencies"
+    },
+    "paths": {
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1": "M 540 920 L 372 920 C 354.326888 920 340 905.673112 340 888 L 340 732 C 340 714.326888 325.673112 700 308 700 L 292 700 C 274.326888 700 260 685.673112 260 668 L 260 402 C 260 384.326888 274.326888 370 292 370 L 298 370 C 315.673112 370 330 355.673112 330 338 L 330 332 C 330 314.326888 344.326888 300 362 300 L 427 300 C 434.17970175 300 440 305.82029825 440 313 L 440 341"
+    },
+    "cards": [
+      [
+        "component:src/evidence",
+        1240,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/derivation",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/verification",
+        760,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:src/coordination",
+        1500,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/lifecycle",
+        1020,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:src/diagnostics",
+        540,
+        23,
+        260,
+        192
+      ],
+      [
+        "component:src/taxonomy",
+        60,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/readings",
+        540,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src/adapters",
+        1020,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:src",
+        60,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:test",
+        1500,
+        863,
+        260,
+        192
+      ],
+      [
+        "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        1240,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        1406,
+        341,
+        154,
+        54
+      ],
+      [
+        "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        345,
+        341,
+        190,
+        54
+      ]
+    ],
+    "camera": "translate(93.6838px, 138.142px) scale(0.599688)",
+    "sidebar": "spec containment follows declared ancestry without inventing dependencies",
+    "error": null,
+    "roundTrip": "unchanged"
+  }
+]

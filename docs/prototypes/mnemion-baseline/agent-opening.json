@@ -1,0 +1,304 @@
+{
+  "project": "Mnemion",
+  "capturedAt": "2026-09-14T20:19:49.916Z",
+  "catalogHash": "74d8e93271a34976390e38806737e28c3c7031076926de1eee5f92ceab3a707f",
+  "purpose": [],
+  "notice": null,
+  "gaps": [
+    {
+      "source": "specs",
+      "message": "No project-purpose declaration"
+    },
+    {
+      "source": "specs",
+      "message": "No entry-point declarations"
+    },
+    {
+      "source": "specs",
+      "message": "No architectural handoffs or guarantee consumers declared"
+    }
+  ],
+  "components": [
+    {
+      "id": "component:entities/Hive",
+      "label": "Hive",
+      "purpose": "The single per-user Durable Object that owns all SQLite data and funnels every agent write through one kernel-enforced chokepoint.",
+      "parent": "component:.",
+      "downtown": true,
+      "score": 7.475339236566738,
+      "counts": {
+        "peers": 0,
+        "guarantees": 13,
+        "security": 8,
+        "consumers": 0
+      },
+      "guarantees": [
+        {
+          "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+          "label": "kernel read+write capability",
+          "verdict": "fail"
+        },
+        {
+          "id": "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+          "label": "credential-mint gating",
+          "verdict": "fail"
+        },
+        {
+          "id": "invariant:4a65257ec4e30d26aef5f6d6086c23426142f17472b9ad9c287099c4fb8687bf",
+          "label": "immutable-field enforcement",
+          "verdict": "fail"
+        },
+        {
+          "id": "invariant:5d22812393c26ba2adc7090f5b3458d7f302ddda4aa69cd5be3ce2164f82983c",
+          "label": "SSRF block-host coverage",
+          "verdict": "fail"
+        },
+        {
+          "id": "invariant:6559b7dc8d99889dbc9d69f663ac8b2de944f5f8aa492852f67a1fdccaa3ff94",
+          "label": "instance-identity host",
+          "verdict": "stale"
+        },
+        {
+          "id": "invariant:6720842d301b07394784d293b5c5cf9e04250ed2ef7cf8f4aa251e9e31d0cd8f",
+          "label": "data-is-destiny no-hybrid",
+          "verdict": "fail"
+        },
+        {
+          "id": "invariant:67867a13ad16d9580c12899b661c69e0aff16bfb2087c4a06f66d2cce61f8235",
+          "label": "token-scope-grammar",
+          "verdict": "fail"
+        },
+        {
+          "id": "invariant:736e54001f2b77553dec57cdfa27b47ded817a9bc51272c404f8f71f105758a6",
+          "label": "egress-sensitivity totality",
+          "verdict": "stale"
+        },
+        {
+          "id": "invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+          "label": "kernel write boundary",
+          "verdict": "fail"
+        },
+        {
+          "id": "invariant:c7bae0959d191549848d843b944e5a0dc88da7dd290bd40a3b18d7919b6d39df",
+          "label": "pattern-effects totality",
+          "verdict": "stale"
+        },
+        {
+          "id": "invariant:d189e2717a2d9b3ab32c09e0c35f35a6d0177ed4b3d49e5b8e54ccd71759a46c",
+          "label": "facet/kernel-column collision",
+          "verdict": "stale"
+        },
+        {
+          "id": "invariant:d6359b3321c9861f9b291b57da69f0acd951c922399c50f08f2f1ff0ec0e6308",
+          "label": "sql-identifier quoting",
+          "verdict": "stale"
+        },
+        {
+          "id": "invariant:e1612b7060c4b7757b853d0c81dff433d79ab0f8044aec6f622ef205448ec111",
+          "label": "born-hashed secrets",
+          "verdict": "stale"
+        }
+      ]
+    },
+    {
+      "id": "component:shared/Routing",
+      "label": "Routing",
+      "purpose": "Declarative HTTP dispatch and session machinery: pattern-matched route table plus constant-time, revocable session auth helpers.",
+      "parent": "component:.",
+      "downtown": false,
+      "score": 3.2958368660043287,
+      "counts": {
+        "peers": 0,
+        "guarantees": 2,
+        "security": 2,
+        "consumers": 0
+      },
+      "guarantees": [
+        {
+          "id": "invariant:53c84470cb6984ffb4050088ae299ef1bf7830154d4394a21652b02e6ba2ad66",
+          "label": "served-content inertness",
+          "verdict": "fail"
+        },
+        {
+          "id": "invariant:98c04921f8eaab2e69ed9c220d5dfb774ada45335321714348aeb548ef85e9da",
+          "label": "served-read gating",
+          "verdict": "fail"
+        }
+      ]
+    },
+    {
+      "id": "component:entities/Session",
+      "label": "Session",
+      "purpose": "The per-session McpAgent Durable Object that speaks the MCP protocol and proxies tool calls to the hive over RPC.",
+      "parent": "component:.",
+      "downtown": false,
+      "score": 1.3862943611198906,
+      "counts": {
+        "peers": 0,
+        "guarantees": 1,
+        "security": 0,
+        "consumers": 0
+      },
+      "guarantees": [
+        {
+          "id": "invariant:c633faabc83f96dbda3372046e35796ed80f3ef10e84ace7f737b9ad00be07ca",
+          "label": "tools SSOT totality",
+          "verdict": "stale"
+        }
+      ]
+    },
+    {
+      "id": "component:shared/core",
+      "label": "Core",
+      "purpose": "Cross-cutting primitives shared by both the worker and the SPA: product identity, the declarative UI palettes (view / format / block / chart) an agent authors against, and dev-only seed data.",
+      "parent": "component:.",
+      "downtown": false,
+      "score": 0.6931471805599453,
+      "counts": {
+        "peers": 0,
+        "guarantees": 0,
+        "security": 1,
+        "consumers": 0
+      },
+      "guarantees": []
+    },
+    {
+      "id": "component:.",
+      "label": "Mnemion",
+      "purpose": "Cloudflare Worker entry: an OAuth-wrapped MCP server whose one declarative route table is the whole HTTP surface.",
+      "parent": null,
+      "downtown": false,
+      "score": 0,
+      "counts": {
+        "peers": 0,
+        "guarantees": 0,
+        "security": 0,
+        "consumers": 0
+      },
+      "guarantees": []
+    },
+    {
+      "id": "component:entities/features",
+      "label": "Features",
+      "purpose": "Per-feature manifests that FEED the scattered registries from one declaration; composers derive each registry from the `FEATURES` array.",
+      "parent": "component:.",
+      "downtown": false,
+      "score": 0,
+      "counts": {
+        "peers": 0,
+        "guarantees": 0,
+        "security": 0,
+        "consumers": 0
+      },
+      "guarantees": []
+    },
+    {
+      "id": "component:shared/Auth",
+      "label": "Auth",
+      "purpose": "Credential primitives — multi-member passkeys and scoped access/register tokens — isolated as pure db-accessor functions.",
+      "parent": "component:.",
+      "downtown": false,
+      "score": 0,
+      "counts": {
+        "peers": 0,
+        "guarantees": 0,
+        "security": 0,
+        "consumers": 0
+      },
+      "guarantees": []
+    },
+    {
+      "id": "component:shared/IO",
+      "label": "IO",
+      "purpose": "Outbound and inbound adapters: derived publication renderers, web-URL resolution with caching, git pack assembly, and text extraction.",
+      "parent": "component:.",
+      "downtown": false,
+      "score": 0,
+      "counts": {
+        "peers": 0,
+        "guarantees": 0,
+        "security": 0,
+        "consumers": 0
+      },
+      "guarantees": []
+    }
+  ],
+  "entrances": [],
+  "relationships": [],
+  "view": {
+    "mode": "opening",
+    "focus": null,
+    "selected": null,
+    "expanded": [],
+    "sparse": false,
+    "camera": "translate(446.708px, 28.5967px) scale(0.801115)",
+    "visibleRelationships": [],
+    "objects": [
+      {
+        "id": "component:entities/Hive",
+        "x": 671.0204467773438,
+        "y": 529.446044921875,
+        "width": 256.35687255859375,
+        "height": 224.31231689453125,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "component:shared/Routing",
+        "x": 302.5074462890625,
+        "y": 225.02230834960938,
+        "width": 208.28997802734375,
+        "height": 139.39404296875,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "component:entities/Session",
+        "x": 687.042724609375,
+        "y": 225.02230834960938,
+        "width": 208.28997802734375,
+        "height": 139.39404296875,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "component:shared/core",
+        "x": 1071.578125,
+        "y": 225.02230834960938,
+        "width": 208.2899169921875,
+        "height": 139.39404296875,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "component:entities/features",
+        "x": 302.5074462890625,
+        "y": 897.9591064453125,
+        "width": 208.28997802734375,
+        "height": 139.39404296875,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "component:shared/Auth",
+        "x": 687.042724609375,
+        "y": 897.9591064453125,
+        "width": 208.28997802734375,
+        "height": 139.39404296875,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "component:shared/IO",
+        "x": 1071.578125,
+        "y": 897.9591064453125,
+        "width": 208.2899169921875,
+        "height": 139.39404296875,
+        "inViewport": true,
+        "fullyVisible": true
+      }
+    ]
+  },
+  "routingError": null,
+  "browserErrors": []
+}

@@ -7,6 +7,7 @@ import './style.css';
 import { valueAt, textOf } from './catalog.ts';
 import { projectView, resolveScopeConfiguration } from './configuration.ts';
 import { layoutProjection } from './layout.mjs';
+import { StructureRenderer, StructureSidebar } from './structure-renderer.jsx';
 
 const initial = JSON.parse(document.getElementById('scope-data').textContent);
 function fieldText(asset, field) {
@@ -69,7 +70,7 @@ function CardView({ projection, view, onSelect }) {
     <article className="asset-card" key={asset.id}><header><span className="kind">{asset.kind}</span><button className="asset-link" onClick={() => onSelect(asset.id)}>{asset.label}</button></header><Fields asset={asset} fields={view.fields}/></article>
   )}</div></section>)}</div>;
 }
-const renderers = { graph: GraphView, table: TableView, cards: CardView };
+const renderers = { graph: GraphView, table: TableView, cards: CardView, structure: StructureRenderer };
 const viewState = new Map();
 function Projection({ catalog, view, onSelect }) {
   const [search, setSearch] = useState(viewState.get(view.id)?.search ?? ''), [page, setPage] = useState(viewState.get(view.id)?.page ?? 0);
@@ -77,6 +78,7 @@ function Projection({ catalog, view, onSelect }) {
   const projection = useMemo(() => projectView(catalog, view, search, page), [catalog, view, search, page]);
   const Renderer = renderers[view.renderer], lastPage = Math.max(0, Math.ceil(projection.matched / (view.pageSize ?? 50)) - 1);
   useEffect(() => { if (page > lastPage) setPage(lastPage); }, [lastPage]);
+  if (view.renderer === 'structure') return <section className="projection" aria-label={view.title}><ReactFlowProvider><Renderer catalog={catalog} view={view} onSelect={onSelect}/></ReactFlowProvider></section>;
   return <section className="projection" aria-label={view.title}><div className="view-toolbar"><div><h1>{view.title}</h1><p>{view.description ?? 'Select an asset to inspect its complete attributes and explicit relationships.'}</p></div>
     <label className="search">Search assets<input type="search" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search all attributes"/></label></div>
     <div className="population"><span>{projection.assets.length} displayed · {projection.matched} matched · {projection.total} in population{projection.withheld > 0 ? ` · ${projection.withheld} on other pages` : ''}{projection.withheldRelations > 0 ? ` · ${projection.withheldRelations} connections to assets outside this view` : ''}</span>
@@ -142,7 +144,9 @@ function App() {
       {configuration.views.map(view => <Tabs.Content value={view.id} key={view.id}><Projection catalog={snapshot.catalog} view={view} onSelect={setSelected}/></Tabs.Content>)}
     </Tabs.Root>
     <footer className="app-footer"><span>{snapshot.catalog.assets.length} assets · {snapshot.catalog.relations.length} explicit relationships</span><details><summary>Evidence and projection limits</summary>{snapshot.catalog.limits.map(t => <p key={t}>{t}</p>)}</details></footer>
-    {selected && <Inspector catalog={snapshot.catalog} id={selected} onSelect={setSelected} onClose={() => setSelected(null)}/>}
+    {selected && (configuration.views.find(v => v.id === tab)?.renderer === 'structure'
+      ? <StructureSidebar catalog={snapshot.catalog} id={selected} onSelect={setSelected} onClose={() => setSelected(null)}/>
+      : <Inspector catalog={snapshot.catalog} id={selected} onSelect={setSelected} onClose={() => setSelected(null)}/>)}
   </>;
 }
 createRoot(document.getElementById('root')).render(<App/>);

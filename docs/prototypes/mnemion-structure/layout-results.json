@@ -1,0 +1,28 @@
+[
+  {
+    "project": "structure-downtown",
+    "stacks": 11,
+    "downtown": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification"
+    ],
+    "positionsUnchanged": true
+  },
+  {
+    "project": "mnemion-baseline",
+    "stacks": 7,
+    "downtown": [
+      "component:entities/Hive"
+    ],
+    "positionsUnchanged": true
+  },
+  {
+    "project": "mnemion-structure",
+    "stacks": 7,
+    "downtown": [
+      "component:entities/Hive"
+    ],
+    "positionsUnchanged": true
+  }
+]

@@ -1,0 +1,7 @@
+{
+  "notice": "Study proposal: entrances and connections are drafted spec additions; existing guarantees are unchanged.",
+  "terminalNames": {
+    "kernel write boundary": "Kernel writes",
+    "kernel read+write capability": "Kernel access"
+  }
+}

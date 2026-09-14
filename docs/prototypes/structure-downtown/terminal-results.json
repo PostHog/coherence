@@ -1,0 +1,1410 @@
+[
+  {
+    "name": "collapsed",
+    "error": null,
+    "terminals": {
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ]
+    },
+    "external": [
+      {
+        "id": "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb",
+        "target": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412"
+        ],
+        "path": "M 1080 510 L 1158 510 C 1175.673112 510 1190 495.673112 1190 478 L 1190 385 C 1190 376.71572875 1196.71572875 370 1205 370 L 1205 370 C 1213.28427125 370 1220 363.28427125 1220 355 L 1220 332 C 1220 314.326888 1234.326888 300 1252 300 L 1307 300 C 1314.17970175 300 1320 305.82029825 1320 313 L 1320 341",
+        "endpoint": [
+          1320,
+          341
+        ],
+        "port": {
+          "x": 1320,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      },
+      {
+        "id": "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7",
+        "target": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a"
+        ],
+        "path": "M 1280 80 L 1316 80 C 1441.2916697151093 80 1480 179.70833028489085 1480 305 L 1480 341",
+        "endpoint": [
+          1480,
+          341
+        ],
+        "port": {
+          "x": 1480,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      }
+    ],
+    "continuations": [],
+    "cards": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ]
+    },
+    "promises": [],
+    "semanticCount": 6,
+    "declaredCount": 15,
+    "camera": "translate(-367.107px, 267.324px) scale(0.755331)",
+    "labelOverruns": [],
+    "animations": [],
+    "dependencyHeadsOnDetail": 0
+  },
+  {
+    "name": "reveal-start",
+    "error": null,
+    "terminals": {
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ]
+    },
+    "external": [
+      {
+        "id": "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb",
+        "target": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412"
+        ],
+        "path": "M 1080 510 L 1158 510 C 1175.673112 510 1190 495.673112 1190 478 L 1190 385 C 1190 376.71572875 1196.71572875 370 1205 370 L 1205 370 C 1213.28427125 370 1220 363.28427125 1220 355 L 1220 332 C 1220 314.326888 1234.326888 300 1252 300 L 1307 300 C 1314.17970175 300 1320 305.82029825 1320 313 L 1320 341",
+        "endpoint": [
+          1320,
+          341
+        ],
+        "port": {
+          "x": 1320,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      },
+      {
+        "id": "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7",
+        "target": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a"
+        ],
+        "path": "M 1280 80 L 1316 80 C 1441.2916697151093 80 1480 179.70833028489085 1480 305 L 1480 341",
+        "endpoint": [
+          1480,
+          341
+        ],
+        "port": {
+          "x": 1480,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      }
+    ],
+    "continuations": [
+      {
+        "id": "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "source": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "target": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "relationshipIds": [
+          "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7"
+        ],
+        "start": {
+          "x": 1560,
+          "y": 370,
+          "side": "right",
+          "dx": 1,
+          "dy": 0,
+          "lead": 36
+        },
+        "end": {
+          "x": 1400,
+          "y": 1263,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      },
+      {
+        "id": "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "source": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "target": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "relationshipIds": [
+          "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb"
+        ],
+        "start": {
+          "x": 1240,
+          "y": 370,
+          "side": "left",
+          "dx": -1,
+          "dy": 0,
+          "lead": 36
+        },
+        "end": {
+          "x": 1140,
+          "y": 1360,
+          "side": "right",
+          "dx": 1,
+          "dy": 0,
+          "lead": 36
+        }
+      }
+    ],
+    "cards": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ]
+    },
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199
+      }
+    ],
+    "semanticCount": 6,
+    "declaredCount": 15,
+    "camera": "translate(-367.107px, 267.324px) scale(0.755331)",
+    "labelOverruns": [],
+    "animations": [
+      {
+        "id": "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "offset": "0.978466px"
+      },
+      {
+        "id": "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "offset": "0.978466px"
+      }
+    ],
+    "dependencyHeadsOnDetail": 0
+  },
+  {
+    "name": "expanded",
+    "error": null,
+    "terminals": {
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ]
+    },
+    "external": [
+      {
+        "id": "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb",
+        "target": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412"
+        ],
+        "path": "M 1080 510 L 1158 510 C 1175.673112 510 1190 495.673112 1190 478 L 1190 385 C 1190 376.71572875 1196.71572875 370 1205 370 L 1205 370 C 1213.28427125 370 1220 363.28427125 1220 355 L 1220 332 C 1220 314.326888 1234.326888 300 1252 300 L 1307 300 C 1314.17970175 300 1320 305.82029825 1320 313 L 1320 341",
+        "endpoint": [
+          1320,
+          341
+        ],
+        "port": {
+          "x": 1320,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      },
+      {
+        "id": "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7",
+        "target": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a"
+        ],
+        "path": "M 1280 80 L 1316 80 C 1441.2916697151093 80 1480 179.70833028489085 1480 305 L 1480 341",
+        "endpoint": [
+          1480,
+          341
+        ],
+        "port": {
+          "x": 1480,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      }
+    ],
+    "continuations": [
+      {
+        "id": "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "source": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "target": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "relationshipIds": [
+          "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7"
+        ],
+        "start": {
+          "x": 1560,
+          "y": 370,
+          "side": "right",
+          "dx": 1,
+          "dy": 0,
+          "lead": 36
+        },
+        "end": {
+          "x": 1400,
+          "y": 1263,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      },
+      {
+        "id": "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "source": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "target": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "relationshipIds": [
+          "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb"
+        ],
+        "start": {
+          "x": 1240,
+          "y": 370,
+          "side": "left",
+          "dx": -1,
+          "dy": 0,
+          "lead": 36
+        },
+        "end": {
+          "x": 1140,
+          "y": 1360,
+          "side": "right",
+          "dx": 1,
+          "dy": 0,
+          "lead": 36
+        }
+      }
+    ],
+    "cards": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ]
+    },
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199
+      }
+    ],
+    "semanticCount": 6,
+    "declaredCount": 15,
+    "camera": "translate(-367.107px, 267.324px) scale(0.755331)",
+    "labelOverruns": [],
+    "animations": [
+      {
+        "id": "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "offset": "0px"
+      },
+      {
+        "id": "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "offset": "0px"
+      }
+    ],
+    "dependencyHeadsOnDetail": 0
+  },
+  {
+    "name": "tiles",
+    "error": null,
+    "terminals": {
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ]
+    },
+    "external": [
+      {
+        "id": "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb",
+        "target": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412"
+        ],
+        "path": "M 1080 510 L 1158 510 C 1175.673112 510 1190 495.673112 1190 478 L 1190 385 C 1190 376.71572875 1196.71572875 370 1205 370 L 1205 370 C 1213.28427125 370 1220 363.28427125 1220 355 L 1220 332 C 1220 314.326888 1234.326888 300 1252 300 L 1307 300 C 1314.17970175 300 1320 305.82029825 1320 313 L 1320 341",
+        "endpoint": [
+          1320,
+          341
+        ],
+        "port": {
+          "x": 1320,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      },
+      {
+        "id": "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7",
+        "target": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a"
+        ],
+        "path": "M 1280 80 L 1316 80 C 1441.2916697151093 80 1480 179.70833028489085 1480 305 L 1480 341",
+        "endpoint": [
+          1480,
+          341
+        ],
+        "port": {
+          "x": 1480,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      }
+    ],
+    "continuations": [
+      {
+        "id": "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "source": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "target": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "relationshipIds": [
+          "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7"
+        ],
+        "start": {
+          "x": 1560,
+          "y": 370,
+          "side": "right",
+          "dx": 1,
+          "dy": 0,
+          "lead": 36
+        },
+        "end": {
+          "x": 1400,
+          "y": 1263,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      },
+      {
+        "id": "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "source": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "target": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "relationshipIds": [
+          "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb"
+        ],
+        "start": {
+          "x": 1240,
+          "y": 370,
+          "side": "left",
+          "dx": -1,
+          "dy": 0,
+          "lead": 36
+        },
+        "end": {
+          "x": 1140,
+          "y": 1360,
+          "side": "right",
+          "dx": 1,
+          "dy": 0,
+          "lead": 36
+        }
+      }
+    ],
+    "cards": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ]
+    },
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199
+      }
+    ],
+    "semanticCount": 6,
+    "declaredCount": 15,
+    "camera": "translate(23.48px, 454.243px) scale(0.437113)",
+    "labelOverruns": [],
+    "animations": [
+      {
+        "id": "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "offset": "0.224462px"
+      },
+      {
+        "id": "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "offset": "0.224462px"
+      }
+    ],
+    "dependencyHeadsOnDetail": 0
+  },
+  {
+    "name": "near-again",
+    "error": null,
+    "terminals": {
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ]
+    },
+    "external": [
+      {
+        "id": "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb",
+        "target": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412"
+        ],
+        "path": "M 1080 510 L 1158 510 C 1175.673112 510 1190 495.673112 1190 478 L 1190 385 C 1190 376.71572875 1196.71572875 370 1205 370 L 1205 370 C 1213.28427125 370 1220 363.28427125 1220 355 L 1220 332 C 1220 314.326888 1234.326888 300 1252 300 L 1307 300 C 1314.17970175 300 1320 305.82029825 1320 313 L 1320 341",
+        "endpoint": [
+          1320,
+          341
+        ],
+        "port": {
+          "x": 1320,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      },
+      {
+        "id": "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7",
+        "target": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a"
+        ],
+        "path": "M 1280 80 L 1316 80 C 1441.2916697151093 80 1480 179.70833028489085 1480 305 L 1480 341",
+        "endpoint": [
+          1480,
+          341
+        ],
+        "port": {
+          "x": 1480,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      }
+    ],
+    "continuations": [
+      {
+        "id": "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "source": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "target": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "relationshipIds": [
+          "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7"
+        ],
+        "start": {
+          "x": 1560,
+          "y": 370,
+          "side": "right",
+          "dx": 1,
+          "dy": 0,
+          "lead": 36
+        },
+        "end": {
+          "x": 1400,
+          "y": 1263,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      },
+      {
+        "id": "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "source": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "target": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "relationshipIds": [
+          "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb"
+        ],
+        "start": {
+          "x": 1240,
+          "y": 370,
+          "side": "left",
+          "dx": -1,
+          "dy": 0,
+          "lead": 36
+        },
+        "end": {
+          "x": 1140,
+          "y": 1360,
+          "side": "right",
+          "dx": 1,
+          "dy": 0,
+          "lead": 36
+        }
+      }
+    ],
+    "cards": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ]
+    },
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199
+      }
+    ],
+    "semanticCount": 6,
+    "declaredCount": 15,
+    "camera": "translate(-552.528px, 178.589px) scale(0.906397)",
+    "labelOverruns": [],
+    "animations": [
+      {
+        "id": "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "offset": "0px"
+      },
+      {
+        "id": "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "offset": "0px"
+      }
+    ],
+    "dependencyHeadsOnDetail": 0
+  },
+  {
+    "name": "folded",
+    "error": null,
+    "terminals": {
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ]
+    },
+    "external": [
+      {
+        "id": "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb",
+        "target": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412"
+        ],
+        "path": "M 1080 510 L 1158 510 C 1175.673112 510 1190 495.673112 1190 478 L 1190 385 C 1190 376.71572875 1196.71572875 370 1205 370 L 1205 370 C 1213.28427125 370 1220 363.28427125 1220 355 L 1220 332 C 1220 314.326888 1234.326888 300 1252 300 L 1307 300 C 1314.17970175 300 1320 305.82029825 1320 313 L 1320 341",
+        "endpoint": [
+          1320,
+          341
+        ],
+        "port": {
+          "x": 1320,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      },
+      {
+        "id": "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7",
+        "target": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a"
+        ],
+        "path": "M 1280 80 L 1316 80 C 1441.2916697151093 80 1480 179.70833028489085 1480 305 L 1480 341",
+        "endpoint": [
+          1480,
+          341
+        ],
+        "port": {
+          "x": 1480,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      }
+    ],
+    "continuations": [],
+    "cards": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ]
+    },
+    "promises": [],
+    "semanticCount": 6,
+    "declaredCount": 15,
+    "camera": "translate(-552.528px, 178.589px) scale(0.906397)",
+    "labelOverruns": [],
+    "animations": [],
+    "dependencyHeadsOnDetail": 0
+  },
+  {
+    "name": "reduced-motion",
+    "error": null,
+    "terminals": {
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ]
+    },
+    "external": [
+      {
+        "id": "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb",
+        "target": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412"
+        ],
+        "path": "M 1080 510 L 1158 510 C 1175.673112 510 1190 495.673112 1190 478 L 1190 385 C 1190 376.71572875 1196.71572875 370 1205 370 L 1205 370 C 1213.28427125 370 1220 363.28427125 1220 355 L 1220 332 C 1220 314.326888 1234.326888 300 1252 300 L 1307 300 C 1314.17970175 300 1320 305.82029825 1320 313 L 1320 341",
+        "endpoint": [
+          1320,
+          341
+        ],
+        "port": {
+          "x": 1320,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      },
+      {
+        "id": "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7",
+        "target": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "provider": "component:src/evidence",
+        "guarantees": [
+          "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a"
+        ],
+        "path": "M 1280 80 L 1316 80 C 1441.2916697151093 80 1480 179.70833028489085 1480 305 L 1480 341",
+        "endpoint": [
+          1480,
+          341
+        ],
+        "port": {
+          "x": 1480,
+          "y": 341,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      }
+    ],
+    "continuations": [
+      {
+        "id": "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "source": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "target": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "relationshipIds": [
+          "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7"
+        ],
+        "start": {
+          "x": 1560,
+          "y": 370,
+          "side": "right",
+          "dx": 1,
+          "dy": 0,
+          "lead": 36
+        },
+        "end": {
+          "x": 1400,
+          "y": 1263,
+          "side": "top",
+          "dx": 0,
+          "dy": -1,
+          "lead": 36
+        }
+      },
+      {
+        "id": "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "source": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "target": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "relationshipIds": [
+          "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb"
+        ],
+        "start": {
+          "x": 1240,
+          "y": 370,
+          "side": "left",
+          "dx": -1,
+          "dy": 0,
+          "lead": 36
+        },
+        "end": {
+          "x": 1140,
+          "y": 1360,
+          "side": "right",
+          "dx": 1,
+          "dy": 0,
+          "lead": 36
+        }
+      }
+    ],
+    "cards": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ]
+    },
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199
+      }
+    ],
+    "semanticCount": 6,
+    "declaredCount": 15,
+    "camera": "translate(-552.528px, 178.589px) scale(0.906397)",
+    "labelOverruns": [],
+    "animations": [
+      {
+        "id": "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "offset": "0px"
+      },
+      {
+        "id": "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "offset": "0px"
+      }
+    ],
+    "dependencyHeadsOnDetail": 0
+  }
+]

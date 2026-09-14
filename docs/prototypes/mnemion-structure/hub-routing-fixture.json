@@ -1,0 +1,204 @@
+{
+  "cards": [
+    {
+      "id": "component:entities/Hive",
+      "label": "Hive",
+      "x": 280,
+      "y": 403,
+      "width": 320,
+      "height": 280,
+      "nodeKind": "component"
+    },
+    {
+      "id": "component:shared/Routing",
+      "label": "Routing",
+      "x": 300,
+      "y": 23,
+      "width": 260,
+      "height": 174,
+      "nodeKind": "component"
+    },
+    {
+      "id": "component:shared/core",
+      "label": "Core",
+      "x": -180,
+      "y": 863,
+      "width": 260,
+      "height": 174,
+      "nodeKind": "component"
+    },
+    {
+      "id": "component:entities/Session",
+      "label": "Session",
+      "x": -180,
+      "y": 23,
+      "width": 260,
+      "height": 174,
+      "nodeKind": "component"
+    },
+    {
+      "id": "component:entities/features",
+      "label": "Features",
+      "x": 780,
+      "y": 23,
+      "width": 260,
+      "height": 174,
+      "nodeKind": "component"
+    },
+    {
+      "id": "component:shared/Auth",
+      "label": "Auth",
+      "x": 300,
+      "y": 863,
+      "width": 260,
+      "height": 174,
+      "nodeKind": "component"
+    },
+    {
+      "id": "component:shared/IO",
+      "label": "IO",
+      "x": 780,
+      "y": 863,
+      "width": 260,
+      "height": 174,
+      "nodeKind": "component"
+    },
+    {
+      "id": "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "label": "Kernel access",
+      "x": 280,
+      "y": 341,
+      "width": 154,
+      "height": 54,
+      "nodeKind": "terminal",
+      "owner": "component:entities/Hive"
+    },
+    {
+      "id": "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+      "label": "Kernel writes",
+      "x": 446,
+      "y": 341,
+      "width": 154,
+      "height": 54,
+      "nodeKind": "terminal",
+      "owner": "component:entities/Hive"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "entrance:.:http",
+      "x": 280,
+      "y": -167,
+      "width": 300,
+      "height": 190
+    },
+    {
+      "id": "entrance:.:mcp",
+      "x": -200,
+      "y": -167,
+      "width": 300,
+      "height": 190
+    }
+  ],
+  "relationships": [
+    {
+      "id": "relation:6722a99a5233af565791bcfb22d6177e024dd212eb2dc71a800a21cf024dbb33",
+      "source": "component:shared/Routing",
+      "target": "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "kind": "guarantee-reliance",
+      "label": "kernel read+write capability",
+      "priority": 0,
+      "targetPort": {
+        "x": 360,
+        "y": 341,
+        "side": "top",
+        "dx": 0,
+        "dy": -1,
+        "lead": 36
+      }
+    },
+    {
+      "id": "relation:architecture:.:credentials",
+      "source": "component:entities/Hive",
+      "target": "component:shared/Auth",
+      "kind": "architecture",
+      "label": "Checks credentials",
+      "priority": 0
+    },
+    {
+      "id": "relation:architecture:.:external-content",
+      "source": "component:entities/Hive",
+      "target": "component:shared/IO",
+      "kind": "architecture",
+      "label": "Resolves external content",
+      "priority": 0
+    },
+    {
+      "id": "relation:architecture:.:feature-routes",
+      "source": "component:entities/features",
+      "target": "component:shared/Routing",
+      "kind": "architecture",
+      "label": "Contributes HTTP routes",
+      "priority": 0
+    },
+    {
+      "id": "relation:architecture:.:feature-storage",
+      "source": "component:entities/features",
+      "target": "component:entities/Hive",
+      "kind": "architecture",
+      "label": "Declares storage behavior",
+      "priority": 0
+    },
+    {
+      "id": "relation:architecture:.:http-memory",
+      "source": "component:shared/Routing",
+      "target": "component:entities/Hive",
+      "kind": "architecture",
+      "label": "Serves HTTP access",
+      "priority": 1
+    },
+    {
+      "id": "relation:architecture:.:session-memory",
+      "source": "component:entities/Session",
+      "target": "component:entities/Hive",
+      "kind": "architecture",
+      "label": "Reads and reshapes memory",
+      "priority": 1
+    },
+    {
+      "id": "relation:architecture:.:ui-vocabulary",
+      "source": "component:shared/core",
+      "target": "component:entities/Hive",
+      "kind": "architecture",
+      "label": "Defines shared UI vocabulary",
+      "priority": 0
+    },
+    {
+      "id": "relation:ba2d97873e0cb8ae1bab537c20be9ae870c77b880a0be3c7521df6e482045a1d",
+      "source": "component:entities/Session",
+      "target": "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+      "kind": "guarantee-reliance",
+      "label": "kernel write boundary",
+      "priority": 0,
+      "targetPort": {
+        "x": 520,
+        "y": 341,
+        "side": "top",
+        "dx": 0,
+        "dy": -1,
+        "lead": 36
+      }
+    }
+  ],
+  "coreId": "component:entities/Hive",
+  "negative": [
+    {
+      "id": "relation:architecture:.:http-memory",
+      "path": "M 430 197 L 430 288 C 430 305.673112 415.673112 320 398 320 L 292 320 C 274.326888 320 260 334.326888 260 352 L 260 698 C 260 715.673112 274.326888 730 292 730 L 418.5 730 C 424.851274625 730 430 735.148725375 430 741.5 L 430 753.5 L 430 792.5 L 430 806.25 C 430 813.8439153125 436.1560846875 820 443.75 820 L 518 820 C 535.673112 820 550 805.673112 550 788 L 550 752 C 550 734.326888 535.673112 720 518 720 L 449 720 C 444.02943725 720 440 715.97056275 440 711 L 440 683"
+    },
+    {
+      "id": "relation:architecture:.:session-memory",
+      "path": "M -50 197 L -50 233 C -50 276.2796141387605 -52.27961413876052 320 -9 320 L 11 320 L 209 320 L 229 320 C 234 320 239 540 244 540 L 280 540"
+    }
+  ]
+}

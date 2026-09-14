@@ -1,0 +1,22 @@
+{
+  "prefix": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292",
+  "matchesRenderedPath": true,
+  "minForwardStep": 0.25,
+  "maxLateralOffset": 0,
+  "start": [
+    190,
+    197
+  ],
+  "end": [
+    190,
+    292
+  ],
+  "sourceBottom": 197,
+  "labelTop": 292,
+  "clip": {
+    "x": 199.6651153564453,
+    "y": 399.2803649902344,
+    "width": 175.9189910888672,
+    "height": 144.15109252929688
+  }
+}

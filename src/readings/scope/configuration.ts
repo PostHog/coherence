@@ -1,27 +1,30 @@
 import { ASSET_KINDS, compare, textOf, valueAt, type Asset, type Catalog, type Relation, type Value } from "./catalog.ts";
+import { DEFAULT_STRUCTURE_OPTIONS, type StructureOptions } from "./structure-contract.ts";
 
 export interface Filter { field: string; op: "eq" | "ne" | "in" | "contains" | "exists" | "gt" | "gte" | "lt" | "lte"; value?: Value }
 export interface Field { field: string; label?: string; format?: "text" | "json" | "count" }
 export interface View {
-  id: string; title: string; description?: string; renderer: "graph" | "table" | "cards";
+  id: string; title: string; description?: string; renderer: "graph" | "table" | "cards" | "structure";
   kinds: string[]; where?: Filter[]; sort?: { field: string; direction?: "asc" | "desc" }[];
   fields: Field[]; groupBy?: string; pageSize?: number;
   graph?: { relations: string[]; layout: "concentric" | "grid" | "breadthfirst" | "circle";
     weight?: string; width?: number; height?: number; gap?: number; edgeLabel?: string };
+  /** Presentation thresholds only; they never author architectural relationships. */
+  structure?: StructureOptions;
 }
 export interface ScopeConfiguration {
   version: 1; title: string; initialView: string; views: View[];
 }
 const field = (path: string, label?: string): Field => ({ field: path, ...(label ? { label } : {}) });
 const view = (id: string, title: string, kinds: string[], fields: Field[], extra: Partial<View> = {}): View =>
-  ({ id, title, kinds, renderer: "table", fields, pageSize: 50, ...extra });
+  ({ id, title, kinds, renderer: "table", fields, ...extra, ...((extra.renderer ?? "table") === "structure" ? {} : { pageSize: extra.pageSize ?? 50 }) });
 
 // Defaults use exactly the same language and renderers as a project-authored view.
 export const DEFAULT_SCOPE: ScopeConfiguration = {
   version: 1, title: "Scope", initialView: "structure", views: [
-    view("structure", "Structure", ["component"], [field("attributes.intent", "Purpose"), field("attributes.mass.ownedFiles", "Files"), { ...field("attributes.guarantees", "Guarantees"), format: "count" }], {
-      renderer: "graph", description: "Declared ownership and dependencies. Guarantee evidence belongs to each guarantee; it is not component health.",
-      graph: { relations: ["contains", "reliance", "evidence-import", "relies"], layout: "grid", width: 330, height: 220, gap: 48 }, pageSize: 100,
+    view("structure", "Structure", ["component"], [], {
+      renderer: "structure", description: "Declared responsibility, architectural crossings, and promises. Evidence is shown per promise, never as component health.",
+      structure: DEFAULT_STRUCTURE_OPTIONS,
     }),
     view("guarantees", "Guarantees", ["guarantee", "binding", "guarantee-link", "obligation"], [field("kind"), field("attributes.verdict"), field("attributes.status"), field("attributes.component"), field("attributes.oracle")]),
     view("specs", "Specs", ["spec", "spec-section", "invariant", "refutation", "description", "rationale", "zone"], [field("kind"), field("attributes.owner"), field("attributes.category"), field("attributes.text")]),
@@ -71,11 +74,11 @@ export function resolveScopeConfiguration(raw?: unknown): ScopeConfiguration {
   const ids = new Set<string>();
   for (const [index, candidate] of ((input.views ?? []) as unknown[]).entries()) {
     const path = `views[${index}]`, v = object(candidate, path);
-    keys(v, ["id", "title", "description", "renderer", "kinds", "where", "sort", "fields", "groupBy", "pageSize", "graph"], path);
+    keys(v, ["id", "title", "description", "renderer", "kinds", "where", "sort", "fields", "groupBy", "pageSize", "graph", "structure"], path);
     string(v.id, `${path}.id`); string(v.title, `${path}.title`);
     if (!/^[a-z][a-z0-9-]*$/.test(v.id) || ids.has(v.id)) bad(`${path}.id`, "expected a unique lowercase slug");
     ids.add(v.id);
-    if (!["graph", "table", "cards"].includes(v.renderer as string)) bad(`${path}.renderer`, "expected graph, table or cards");
+    if (!["graph", "table", "cards", "structure"].includes(v.renderer as string)) bad(`${path}.renderer`, "expected graph, table, cards or structure");
     strings(v.kinds, `${path}.kinds`);
     if (!v.kinds.length || v.kinds.some(k => k !== "*" && !Object.hasOwn(ASSET_KINDS, k))) bad(`${path}.kinds`, "unknown or empty asset population");
     if (v.description !== undefined) string(v.description, `${path}.description`);
@@ -84,7 +87,7 @@ export function resolveScopeConfiguration(raw?: unknown): ScopeConfiguration {
       if (v.renderer !== "cards") bad(`${path}.groupBy`, "grouping is supported by cards views");
     }
     if (v.pageSize !== undefined && (!Number.isInteger(v.pageSize) || Number(v.pageSize) < 1 || Number(v.pageSize) > 500)) bad(`${path}.pageSize`, "expected 1–500");
-    if (!Array.isArray(v.fields) || !v.fields.length) bad(`${path}.fields`, "expected at least one field");
+    if (!Array.isArray(v.fields) || (v.renderer !== "structure" && !v.fields.length)) bad(`${path}.fields`, "expected at least one field");
     for (const [i, entry] of (v.fields as unknown[]).entries()) {
       const p = `${path}.fields[${i}]`, f = object(entry, p); keys(f, ["field", "label", "format"], p); attr(f.field, p);
       if (f.label !== undefined) string(f.label, `${p}.label`);
@@ -115,6 +118,19 @@ export function resolveScopeConfiguration(raw?: unknown): ScopeConfiguration {
       if (g.edgeLabel !== undefined) attr(g.edgeLabel, `${path}.graph.edgeLabel`);
       for (const dim of ["width", "height", "gap"]) if (g[dim] !== undefined && (typeof g[dim] !== "number" || !Number.isFinite(g[dim]) || Number(g[dim]) < (dim === "gap" ? 0 : 100) || Number(g[dim]) > 2000)) bad(`${path}.graph.${dim}`, "invalid layout dimension");
     } else if (v.graph !== undefined) bad(`${path}.graph`, "only graph views accept graph configuration");
+    if (v.renderer === "structure") {
+      if ((v.kinds as string[]).length !== 1 || v.kinds[0] !== "component") bad(`${path}.kinds`, "Structure uses the canonical component population");
+      if ((v.fields as unknown[]).length) bad(`${path}.fields`, "Structure explains canonical architecture and does not accept generic fields");
+      for (const property of ["where", "sort", "groupBy", "pageSize"] as const) if (v[property] !== undefined) bad(`${path}.${property}`, "Structure does not accept generic selection or pagination");
+      const supplied = v.structure === undefined ? {} : object(v.structure, `${path}.structure`);
+      keys(supplied, ["summaryGuarantees", "tileZoom", "detailZoom", "columns"], `${path}.structure`);
+      const options = { ...DEFAULT_STRUCTURE_OPTIONS, ...supplied };
+      if (!Number.isInteger(options.summaryGuarantees) || options.summaryGuarantees < 0 || options.summaryGuarantees > 12) bad(`${path}.structure.summaryGuarantees`, "expected an integer from 0 to 12");
+      for (const name of ["tileZoom", "detailZoom"] as const) if (typeof options[name] !== "number" || !Number.isFinite(options[name]) || options[name] < 0.1 || options[name] > 2) bad(`${path}.structure.${name}`, "expected a zoom threshold from 0.1 to 2");
+      if (options.tileZoom >= options.detailZoom) bad(`${path}.structure`, "tileZoom must be below detailZoom");
+      if (!Number.isInteger(options.columns) || options.columns < 1 || options.columns > 8) bad(`${path}.structure.columns`, "expected an integer from 1 to 8");
+      v.structure = options;
+    } else if (v.structure !== undefined) bad(`${path}.structure`, "only structure views accept structure configuration");
     const validated = structuredClone(v) as unknown as View;
     const existing = config.views.findIndex(item => item.id === v.id);
     if (existing < 0) config.views.push(validated); else config.views[existing] = validated;

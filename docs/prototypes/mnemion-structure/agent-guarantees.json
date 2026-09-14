@@ -1,0 +1,513 @@
+{
+  "project": "Mnemion",
+  "capturedAt": "2026-09-14T21:57:26.828Z",
+  "catalogHash": "78124607a26733c383d1d98599c99797e59f12c1f913ec8f702ce50fce333cac",
+  "purpose": [
+    "Mnemion gives people and their AI agents shared, evolving memory. People use a live browser workspace while agents use MCP. The browser and other HTTP clients pass through Routing; both access paths reach one Hive, which owns data and enforces read and write boundaries. Shared declarations give agents and browser renderers the same UI vocabulary."
+  ],
+  "notice": "Study proposal: entrances and connections are drafted spec additions; existing guarantees are unchanged.",
+  "gaps": [],
+  "components": [
+    {
+      "id": "component:entities/Hive",
+      "label": "Hive",
+      "purpose": "The single per-user Durable Object that owns all SQLite data and funnels every agent write through one kernel-enforced chokepoint.",
+      "parent": "component:.",
+      "downtown": true,
+      "score": 15.510294261068896,
+      "counts": {
+        "peers": 6,
+        "guarantees": 13,
+        "security": 8,
+        "consumers": 2
+      },
+      "guarantees": [
+        {
+          "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+          "label": "kernel read+write capability",
+          "verdict": "unknown"
+        },
+        {
+          "id": "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+          "label": "credential-mint gating",
+          "verdict": "unknown"
+        },
+        {
+          "id": "invariant:4a65257ec4e30d26aef5f6d6086c23426142f17472b9ad9c287099c4fb8687bf",
+          "label": "immutable-field enforcement",
+          "verdict": "unknown"
+        },
+        {
+          "id": "invariant:5d22812393c26ba2adc7090f5b3458d7f302ddda4aa69cd5be3ce2164f82983c",
+          "label": "SSRF block-host coverage",
+          "verdict": "unknown"
+        },
+        {
+          "id": "invariant:6559b7dc8d99889dbc9d69f663ac8b2de944f5f8aa492852f67a1fdccaa3ff94",
+          "label": "instance-identity host",
+          "verdict": "unknown"
+        },
+        {
+          "id": "invariant:6720842d301b07394784d293b5c5cf9e04250ed2ef7cf8f4aa251e9e31d0cd8f",
+          "label": "data-is-destiny no-hybrid",
+          "verdict": "unknown"
+        },
+        {
+          "id": "invariant:67867a13ad16d9580c12899b661c69e0aff16bfb2087c4a06f66d2cce61f8235",
+          "label": "token-scope-grammar",
+          "verdict": "unknown"
+        },
+        {
+          "id": "invariant:736e54001f2b77553dec57cdfa27b47ded817a9bc51272c404f8f71f105758a6",
+          "label": "egress-sensitivity totality",
+          "verdict": "unknown"
+        },
+        {
+          "id": "invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+          "label": "kernel write boundary",
+          "verdict": "unknown"
+        },
+        {
+          "id": "invariant:c7bae0959d191549848d843b944e5a0dc88da7dd290bd40a3b18d7919b6d39df",
+          "label": "pattern-effects totality",
+          "verdict": "unknown"
+        },
+        {
+          "id": "invariant:d189e2717a2d9b3ab32c09e0c35f35a6d0177ed4b3d49e5b8e54ccd71759a46c",
+          "label": "facet/kernel-column collision",
+          "verdict": "unknown"
+        },
+        {
+          "id": "invariant:d6359b3321c9861f9b291b57da69f0acd951c922399c50f08f2f1ff0ec0e6308",
+          "label": "sql-identifier quoting",
+          "verdict": "unknown"
+        },
+        {
+          "id": "invariant:e1612b7060c4b7757b853d0c81dff433d79ab0f8044aec6f622ef205448ec111",
+          "label": "born-hashed secrets",
+          "verdict": "unknown"
+        }
+      ]
+    },
+    {
+      "id": "component:shared/Routing",
+      "label": "Routing",
+      "purpose": "Declarative HTTP dispatch and session machinery: pattern-matched route table plus constant-time, revocable session auth helpers.",
+      "parent": "component:.",
+      "downtown": false,
+      "score": 7.454719949364,
+      "counts": {
+        "peers": 3,
+        "guarantees": 2,
+        "security": 2,
+        "consumers": 0
+      },
+      "guarantees": [
+        {
+          "id": "invariant:53c84470cb6984ffb4050088ae299ef1bf7830154d4394a21652b02e6ba2ad66",
+          "label": "served-content inertness",
+          "verdict": "unknown"
+        },
+        {
+          "id": "invariant:98c04921f8eaab2e69ed9c220d5dfb774ada45335321714348aeb548ef85e9da",
+          "label": "served-read gating",
+          "verdict": "unknown"
+        }
+      ]
+    },
+    {
+      "id": "component:shared/core",
+      "label": "Core",
+      "purpose": "Cross-cutting primitives shared by both the worker and the SPA: product identity, the declarative UI palettes (view / format / block / chart) an agent authors against, and dev-only seed data.",
+      "parent": "component:.",
+      "downtown": false,
+      "score": 3.988984046564274,
+      "counts": {
+        "peers": 2,
+        "guarantees": 0,
+        "security": 1,
+        "consumers": 0
+      },
+      "guarantees": []
+    },
+    {
+      "id": "component:entities/Session",
+      "label": "Session",
+      "purpose": "The per-session McpAgent Durable Object that speaks the MCP protocol and proxies tool calls to the hive over RPC.",
+      "parent": "component:.",
+      "downtown": false,
+      "score": 3.465735902799726,
+      "counts": {
+        "peers": 1,
+        "guarantees": 1,
+        "security": 0,
+        "consumers": 0
+      },
+      "guarantees": [
+        {
+          "id": "invariant:c633faabc83f96dbda3372046e35796ed80f3ef10e84ace7f737b9ad00be07ca",
+          "label": "tools SSOT totality",
+          "verdict": "unknown"
+        }
+      ]
+    },
+    {
+      "id": "component:entities/features",
+      "label": "Features",
+      "purpose": "Per-feature manifests that FEED the scattered registries from one declaration; composers derive each registry from the `FEATURES` array.",
+      "parent": "component:.",
+      "downtown": false,
+      "score": 3.2958368660043287,
+      "counts": {
+        "peers": 2,
+        "guarantees": 0,
+        "security": 0,
+        "consumers": 0
+      },
+      "guarantees": []
+    },
+    {
+      "id": "component:web",
+      "label": "Browser workspace",
+      "purpose": "The human workspace for browsing and editing shared memory, rendering agent-authored views and pages, and reflecting live changes from the Hive through the HTTP API and WebSocket.",
+      "parent": "component:.",
+      "downtown": false,
+      "score": 3.2958368660043287,
+      "counts": {
+        "peers": 2,
+        "guarantees": 0,
+        "security": 0,
+        "consumers": 0
+      },
+      "guarantees": []
+    },
+    {
+      "id": "component:shared/Auth",
+      "label": "Auth",
+      "purpose": "Credential primitives — multi-member passkeys and scoped access/register tokens — isolated as pure db-accessor functions.",
+      "parent": "component:.",
+      "downtown": false,
+      "score": 2.0794415416798357,
+      "counts": {
+        "peers": 1,
+        "guarantees": 0,
+        "security": 0,
+        "consumers": 0
+      },
+      "guarantees": []
+    },
+    {
+      "id": "component:shared/IO",
+      "label": "IO",
+      "purpose": "Outbound and inbound adapters: derived publication renderers, web-URL resolution with caching, git pack assembly, and text extraction.",
+      "parent": "component:.",
+      "downtown": false,
+      "score": 2.0794415416798357,
+      "counts": {
+        "peers": 1,
+        "guarantees": 0,
+        "security": 0,
+        "consumers": 0
+      },
+      "guarantees": []
+    },
+    {
+      "id": "component:.",
+      "label": "Mnemion",
+      "purpose": "Cloudflare Worker entry: an OAuth-wrapped MCP server whose one declarative route table is the whole HTTP surface.",
+      "parent": null,
+      "downtown": false,
+      "score": 0,
+      "counts": {
+        "peers": 0,
+        "guarantees": 0,
+        "security": 0,
+        "consumers": 0
+      },
+      "guarantees": []
+    }
+  ],
+  "entrances": [
+    {
+      "id": "entrance:.:http",
+      "label": "An HTTP client accesses memory",
+      "component": "shared/Routing",
+      "anchor": "shared/Routing/router.ts#createRouter",
+      "description": "The Worker passes its core and feature route table to createRouter. Authenticated APIs, scoped public reads and ingress handlers call the Hive under their declared gates."
+    },
+    {
+      "id": "entrance:.:mcp",
+      "label": "An agent recalls or changes memory",
+      "component": "entities/Session",
+      "anchor": "entities/Session/session.ts",
+      "description": "OAuth routes /mcp into a per-session McpAgent. SessionDO registers tools and resources, binds actor identity and delegates memory operations over RPC to HiveDO."
+    },
+    {
+      "id": "entrance:web:browser",
+      "label": "A person opens their workspace",
+      "component": "web",
+      "anchor": "web/src/main.tsx",
+      "description": "The Worker serves the React SPA shell through its ASSETS fallback for browser routes. main.tsx mounts App, which loads the memory index and redirects an unauthenticated index request to /login."
+    }
+  ],
+  "relationships": [
+    {
+      "id": "relation:6722a99a5233af565791bcfb22d6177e024dd212eb2dc71a800a21cf024dbb33",
+      "kind": "guarantee-reliance",
+      "from": "component:shared/Routing",
+      "to": "component:entities/Hive",
+      "label": "kernel read+write capability",
+      "because": "HTTP served-content and ingress handlers rely on the Hive servedDataCtx capability to prevent untrusted access to kernel patterns. See Routing routes/io.ts and Hive.spec.md kernel read+write capability rationale.",
+      "declaration": "guarantee-link:8bc7c0d72f423e1bf5e8e45c20e0436d2cfa3775fd510dd514859b030a6a2204",
+      "guarantees": [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a"
+      ],
+      "problems": []
+    },
+    {
+      "id": "relation:architecture:.:credentials",
+      "kind": "architecture",
+      "from": "component:entities/Hive",
+      "to": "component:shared/Auth",
+      "label": "Checks credentials",
+      "because": "HiveDO credential RPC methods delegate token and membership checks to shared/Auth/credentials.ts with the Hive-owned database. See entities/Hive/hive.ts credential methods and shared/Auth/Auth.spec.md.",
+      "declaration": "architectural-link:.:credentials",
+      "guarantees": [],
+      "problems": []
+    },
+    {
+      "id": "relation:architecture:.:external-content",
+      "kind": "architecture",
+      "from": "component:entities/Hive",
+      "to": "component:shared/IO",
+      "label": "Resolves external content",
+      "because": "HiveDO resolveWeb delegates to shared/IO/web.ts through webCtx; IO owns fetching, extraction and durable cache policy. See hive.ts resolveWeb and IO.spec.md.",
+      "declaration": "architectural-link:.:external-content",
+      "guarantees": [],
+      "problems": []
+    },
+    {
+      "id": "relation:architecture:.:feature-routes",
+      "kind": "architecture",
+      "from": "component:entities/features",
+      "to": "component:shared/Routing",
+      "label": "Contributes HTTP routes",
+      "because": "Worker src/index.ts combines CORE_ROUTES with composeRoutes(FEATURES) and passes the result to createRouter. The declaration controls route handler, method, path and auth.",
+      "declaration": "architectural-link:.:feature-routes",
+      "guarantees": [],
+      "problems": []
+    },
+    {
+      "id": "relation:architecture:.:feature-storage",
+      "kind": "architecture",
+      "from": "component:entities/features",
+      "to": "component:entities/Hive",
+      "label": "Declares storage behavior",
+      "because": "Feature manifests feed schema patterns, migrations and post-mutation effects through shared composers; Hive effects.ts derives PATTERN_EFFECTS from FEATURES. See Features.spec.md and entities/features/compose.ts.",
+      "declaration": "architectural-link:.:feature-storage",
+      "guarantees": [],
+      "problems": []
+    },
+    {
+      "id": "relation:architecture:.:http-memory",
+      "kind": "architecture",
+      "from": "component:shared/Routing",
+      "to": "component:entities/Hive",
+      "label": "Serves HTTP access",
+      "because": "Routing routes/pages.ts invokes Hive query, mutate and schema changes; routes/io.ts invokes served reads and ingress. The Hive distinguishes owner access from untrusted served access.",
+      "declaration": "architectural-link:.:http-memory",
+      "guarantees": [],
+      "problems": []
+    },
+    {
+      "id": "relation:architecture:.:session-memory",
+      "kind": "architecture",
+      "from": "component:entities/Session",
+      "to": "component:entities/Hive",
+      "label": "Reads and reshapes memory",
+      "because": "SessionDO getHive and tool handlers call Hive query, prime, mutate and schema evolution over RPC; Session binds authenticated actor identity. See entities/Session/session.ts and Session.spec.md.",
+      "declaration": "architectural-link:.:session-memory",
+      "guarantees": [],
+      "problems": []
+    },
+    {
+      "id": "relation:architecture:.:ui-vocabulary",
+      "kind": "architecture",
+      "from": "component:shared/core",
+      "to": "component:entities/Hive",
+      "label": "Defines shared UI vocabulary",
+      "because": "Core declares view, format, block and chart vocabularies. The kernel derives validation of agent-authored UI from those declarations. See shared/core/Core.spec.md and Hive evolution and kernel code.",
+      "declaration": "architectural-link:.:ui-vocabulary",
+      "guarantees": [],
+      "problems": []
+    },
+    {
+      "id": "relation:architecture:web:browser-api",
+      "kind": "architecture",
+      "from": "component:web",
+      "to": "component:shared/Routing",
+      "label": "Browses and edits memory",
+      "because": "web/src/App.tsx loads /api/index and /api/query/:pattern and subscribes to /ws; views.tsx and FacetValue.tsx post edits to /api/mutate/:pattern. src/index.ts declares these endpoints with Auth.SESSION and Routing routes/pages.ts delegates them to Hive. The socket returns live changes over this same authenticated access surface.",
+      "declaration": "architectural-link:web:browser-api",
+      "guarantees": [],
+      "problems": []
+    },
+    {
+      "id": "relation:architecture:web:browser-vocabulary",
+      "kind": "architecture",
+      "from": "component:shared/core",
+      "to": "component:web",
+      "label": "Defines browser renderers' vocabulary",
+      "because": "web/src/views.tsx consumes ViewTypeId, resolveFormat, resolveChart and chartQuery from Core; FacetValue.tsx consumes FormatId and resolveFormat; Chart.tsx consumes the shared chart specification. The browser interprets the vocabulary whose validators the Hive also uses; this relationship describes shared declarations, not a proven parity guarantee.",
+      "declaration": "architectural-link:web:browser-vocabulary",
+      "guarantees": [],
+      "problems": []
+    },
+    {
+      "id": "relation:ba2d97873e0cb8ae1bab537c20be9ae870c77b880a0be3c7521df6e482045a1d",
+      "kind": "guarantee-reliance",
+      "from": "component:entities/Session",
+      "to": "component:entities/Hive",
+      "label": "kernel write boundary",
+      "because": "MCP mutate and schema tools rely on the Hive write-policy boundary to refuse unclassified or forbidden kernel writes; Session cannot authorize bypassing that storage boundary. See Session.spec.md and entities/Session/session.ts mutate consent dispatch.",
+      "declaration": "guarantee-link:191f2b0fd246199db5024ef75ba3b8a0fe0a0aa5200fe2ac74f34d802125756e",
+      "guarantees": [
+        "invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d"
+      ],
+      "problems": []
+    }
+  ],
+  "view": {
+    "mode": "guarantees",
+    "focus": null,
+    "selected": null,
+    "expanded": [],
+    "sparse": false,
+    "camera": "translate(514.028px, 165.076px) scale(0.663507)",
+    "visibleRelationships": [
+      "relation:ba2d97873e0cb8ae1bab537c20be9ae870c77b880a0be3c7521df6e482045a1d",
+      "relation:6722a99a5233af565791bcfb22d6177e024dd212eb2dc71a800a21cf024dbb33"
+    ],
+    "objects": [
+      {
+        "id": "component:entities/Hive",
+        "x": 699.8104248046875,
+        "y": 610.46923828125,
+        "width": 212.322265625,
+        "height": 185.781982421875,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "component:shared/Routing",
+        "x": 553.8388671875,
+        "y": 358.33648681640625,
+        "width": 172.5118408203125,
+        "height": 115.45025634765625,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "component:shared/core",
+        "x": 394.59716796875,
+        "y": 915.6824951171875,
+        "width": 172.5118408203125,
+        "height": 115.4501953125,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "component:entities/Session",
+        "x": 872.322265625,
+        "y": 358.33648681640625,
+        "width": 172.5118408203125,
+        "height": 115.45025634765625,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "component:entities/features",
+        "x": 1190.8056640625,
+        "y": 358.33648681640625,
+        "width": 172.5118408203125,
+        "height": 115.45025634765625,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "component:web",
+        "x": 235.35546875,
+        "y": 358.33648681640625,
+        "width": 172.5118408203125,
+        "height": 127.39337158203125,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "component:shared/Auth",
+        "x": 713.08056640625,
+        "y": 915.6824951171875,
+        "width": 172.5118408203125,
+        "height": 115.4501953125,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "component:shared/IO",
+        "x": 1031.56396484375,
+        "y": 915.6824951171875,
+        "width": 172.5118408203125,
+        "height": 115.4501953125,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "terminal:invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        "x": 699.8104248046875,
+        "y": 569.331787109375,
+        "width": 102.18011474609375,
+        "height": 35.829345703125,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "terminal:invariant:87331ba47778610cb7f4b1e922e3299254fb498f75fe0acf499700d98b944c9d",
+        "x": 809.95263671875,
+        "y": 569.331787109375,
+        "width": 102.1800537109375,
+        "height": 35.829345703125,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "entrance:.:http",
+        "x": 540.5687255859375,
+        "y": 232.2701416015625,
+        "width": 199.0521240234375,
+        "height": 126.06634521484375,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "entrance:.:mcp",
+        "x": 859.0521240234375,
+        "y": 232.2701416015625,
+        "width": 199.0521240234375,
+        "height": 126.06634521484375,
+        "inViewport": true,
+        "fullyVisible": true
+      },
+      {
+        "id": "entrance:web:browser",
+        "x": 222.0853271484375,
+        "y": 232.2701416015625,
+        "width": 199.0521240234375,
+        "height": 126.06634521484375,
+        "inViewport": true,
+        "fullyVisible": true
+      }
+    ]
+  },
+  "routingError": null,
+  "browserErrors": []
+}

@@ -4,6 +4,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative, dirname } from "node:path";
 import type { ParsedSpec } from "../types.ts";
+import { architectureDeclaration, type ArchitectureSection } from "./architecture.ts";
 
 /** Split a docblock/section into its derivable description (what) and its protected rationale (@why). */
 export function splitWhy(text: string): { what: string; why: string } {
@@ -21,6 +22,29 @@ export const unescapeMd = (s: string) => s.replace(/\\([_*])/g, "$1");
 
 export function parseSpec(text: string): ParsedSpec {
   const lines = text.split("\n");
+  const architecture: ArchitectureSection = { declarations: [], problems: [] };
+  const architectureLines = new Set<number>(), architectureIds = new Set<string>();
+  let inArchitecture = false, architectureSeen = false, fence = "";
+  for (let line = 0; line < lines.length; line++) {
+    const marker = /^\s{0,3}(`{3,}|~{3,})/.exec(lines[line]);
+    if (marker) { if (!fence) fence = marker[1]; else if (marker[1][0] === fence[0] && marker[1].length >= fence.length) fence = ""; }
+    if (fence || marker) continue;
+    if (/^##\s+/.test(lines[line])) {
+      inArchitecture = /^##\s+architecture\s*$/i.test(lines[line]);
+      if (inArchitecture) { if (architectureSeen) architecture.problems.push("duplicate architecture section"); architectureSeen = true; architectureLines.add(line); }
+      continue;
+    }
+    if (!inArchitecture) continue;
+    architectureLines.add(line);
+    if (!lines[line].trim()) continue;
+    try {
+      const bullet = /^-\s+(.+)$/.exec(lines[line]);
+      if (!bullet) throw new Error("expected a JSON object bullet");
+      const declaration = architectureDeclaration(JSON.parse(bullet[1]));
+      if (architectureIds.has(declaration.id)) throw new Error(`duplicate id ${declaration.id}`);
+      architectureIds.add(declaration.id); architecture.declarations.push({ ...declaration, line: line + 1 });
+    } catch (error) { architecture.problems.push(`architecture line ${line + 1}: ${(error as Error).message}`); }
+  }
   let name = "", intent = "", i = 0, intentLine = -1;
   for (; i < lines.length; i++) { const m = /^#\s+(.+?)\s*$/.exec(lines[i]); if (m) { name = m[1]; i++; break; } }
   // The intent is the first PARAGRAPH, not the first line. Specs are hard-wrapped at 80
@@ -92,6 +116,7 @@ export function parseSpec(text: string): ParsedSpec {
     j--;
   }
   for (let k = (intentLine >= 0 ? intentLine + 1 : i); k < lines.length; k++) {
+    if (architectureLines.has(k)) continue;
     if (linkLines.has(k)) continue;
     if (ws >= 0 && k >= ws && k < we) continue;
     if (wy >= 0 && k >= wy && k < wye) continue;
@@ -100,7 +125,7 @@ export function parseSpec(text: string): ParsedSpec {
     prose.push(lines[k]);
   }
   return { name, intent, claims, claimKinds, prose: prose.join("\n").trim(), why, invariants, refutations,
-    ...(seenSections.size ? { guaranteeLinks } : {}) };
+    ...(seenSections.size ? { guaranteeLinks } : {}), ...(architectureSeen ? { architecture } : {}) };
 }
 
 /**

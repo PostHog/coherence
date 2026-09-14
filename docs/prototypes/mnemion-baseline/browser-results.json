@@ -1,0 +1,1552 @@
+[
+  {
+    "width": 1440,
+    "scene": "opening",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": null,
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [],
+    "external": {},
+    "camera": "translate(404.414px, 24.8532px) scale(0.715613)",
+    "sidebar": null
+  },
+  {
+    "width": 1440,
+    "scene": "inspected",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "component",
+      "id": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [],
+    "external": {},
+    "camera": "translate(404.414px, 24.8532px) scale(0.715613)",
+    "sidebar": "Hive"
+  },
+  {
+    "width": 1440,
+    "scene": "expanded-stationary",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "component",
+      "id": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:4a65257ec4e30d26aef5f6d6086c23426142f17472b9ad9c287099c4fb8687bf",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {},
+    "camera": "translate(404.414px, 24.8532px) scale(0.715613)",
+    "sidebar": "Hive"
+  },
+  {
+    "width": 1440,
+    "scene": "promises",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "component",
+      "id": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:4a65257ec4e30d26aef5f6d6086c23426142f17472b9ad9c287099c4fb8687bf",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {},
+    "camera": "translate(186px, -637.475px) scale(0.85)",
+    "sidebar": "Hive"
+  },
+  {
+    "width": 1440,
+    "scene": "guarantee",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:4a65257ec4e30d26aef5f6d6086c23426142f17472b9ad9c287099c4fb8687bf",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {},
+    "camera": "translate(186px, -637.475px) scale(0.85)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1440,
+    "scene": "before-zoom",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:4a65257ec4e30d26aef5f6d6086c23426142f17472b9ad9c287099c4fb8687bf",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {},
+    "camera": "translate(186px, -637.475px) scale(0.85)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1440,
+    "scene": "far",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": true,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:4a65257ec4e30d26aef5f6d6086c23426142f17472b9ad9c287099c4fb8687bf",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {},
+    "camera": "translate(379.637px, -94.6303px) scale(0.409915)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1440,
+    "scene": "folded",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": true,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [],
+    "external": {},
+    "camera": "translate(379.637px, -94.6303px) scale(0.409915)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1440,
+    "scene": "all-handoffs",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": null,
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [],
+    "external": {},
+    "camera": "translate(413.431px, 34.9145px) scale(0.695167)",
+    "sidebar": null
+  },
+  {
+    "width": 1440,
+    "scene": "reliances",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": null,
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [],
+    "external": {},
+    "camera": "translate(413.431px, 34.9145px) scale(0.695167)",
+    "sidebar": null
+  },
+  {
+    "width": 1280,
+    "scene": "opening",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": null,
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [],
+    "external": {},
+    "camera": "translate(324.414px, 24.8532px) scale(0.715613)",
+    "sidebar": null
+  },
+  {
+    "width": 1280,
+    "scene": "inspected",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "component",
+      "id": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [],
+    "external": {},
+    "camera": "translate(324.414px, 24.8532px) scale(0.715613)",
+    "sidebar": "Hive"
+  },
+  {
+    "width": 1280,
+    "scene": "expanded-stationary",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "component",
+      "id": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:4a65257ec4e30d26aef5f6d6086c23426142f17472b9ad9c287099c4fb8687bf",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {},
+    "camera": "translate(324.414px, 24.8532px) scale(0.715613)",
+    "sidebar": "Hive"
+  },
+  {
+    "width": 1280,
+    "scene": "promises",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "component",
+      "id": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:4a65257ec4e30d26aef5f6d6086c23426142f17472b9ad9c287099c4fb8687bf",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {},
+    "camera": "translate(143.414px, -535.392px) scale(0.767241)",
+    "sidebar": "Hive"
+  },
+  {
+    "width": 1280,
+    "scene": "guarantee",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:4a65257ec4e30d26aef5f6d6086c23426142f17472b9ad9c287099c4fb8687bf",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {},
+    "camera": "translate(143.414px, -535.392px) scale(0.767241)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1280,
+    "scene": "before-zoom",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:4a65257ec4e30d26aef5f6d6086c23426142f17472b9ad9c287099c4fb8687bf",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {},
+    "camera": "translate(143.414px, -535.392px) scale(0.767241)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1280,
+    "scene": "far",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": true,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [
+      [
+        "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+        -140,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:1fc04060d47b69cd2113796a66a4db85beebc4d9196009bf49393040b3382668",
+        280,
+        1163,
+        320,
+        141
+      ],
+      [
+        "invariant:4a65257ec4e30d26aef5f6d6086c23426142f17472b9ad9c287099c4fb8687bf",
+        700,
+        1163,
+        320,
+        141
+      ]
+    ],
+    "external": {},
+    "camera": "translate(285.216px, -136.681px) scale(0.444005)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1280,
+    "scene": "folded",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": {
+      "kind": "guarantee",
+      "id": "invariant:0e24d1bac8cafc29ded727554e570d91976f14e00c4ba5c3d93bf4e78787cd1a",
+      "owner": "component:entities/Hive"
+    },
+    "sparse": true,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [],
+    "external": {},
+    "camera": "translate(285.216px, -136.681px) scale(0.444005)",
+    "sidebar": "kernel read+write capability"
+  },
+  {
+    "width": 1280,
+    "scene": "all-handoffs",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": null,
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [],
+    "external": {},
+    "camera": "translate(333.431px, 34.9145px) scale(0.695167)",
+    "sidebar": null
+  },
+  {
+    "width": 1280,
+    "scene": "reliances",
+    "error": null,
+    "collisions": [],
+    "clippedText": [],
+    "selected": null,
+    "sparse": false,
+    "cards": [
+      [
+        "component:entities/Hive",
+        280,
+        403,
+        320,
+        280
+      ],
+      [
+        "component:shared/Routing",
+        -180,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/Session",
+        300,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:shared/core",
+        780,
+        23,
+        260,
+        174
+      ],
+      [
+        "component:entities/features",
+        -180,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/Auth",
+        300,
+        863,
+        260,
+        174
+      ],
+      [
+        "component:shared/IO",
+        780,
+        863,
+        260,
+        174
+      ]
+    ],
+    "promises": [],
+    "external": {},
+    "camera": "translate(333.431px, 34.9145px) scale(0.695167)",
+    "sidebar": null
+  }
+]

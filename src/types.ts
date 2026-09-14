@@ -3,6 +3,7 @@
 // behind LanguageAdapter (how to read code) and PlatformAdapter (how to read infra).
 
 export interface GraphNode {
+  architecture?: import("./derivation/architecture.ts").ArchitectureSection;
   specPath?: string; // source address retained when a spec owns catalog bindings
   guaranteeLinks?: SpecGuaranteeLinks;
   id: string; parent?: string; label: string; kind: string;
@@ -26,13 +27,14 @@ export interface Bindings {
   meta: Record<string, string>;
 }
 export interface Graph {
+  architecture?: import("./derivation/architecture.ts").ArchitectureModel;
   generatedAt: string; root: string; absRoot: string;
   nodes: GraphNode[]; edges: GraphEdge[]; bindings: Bindings | null;
 }
 
 /** A raw spec parsed from a *.spec.md file. */
 export interface SpecGuaranteeLinks { addresses: unknown[]; relies: unknown[]; bindings?: unknown[]; problems: string[] }
-export interface ParsedSpec { name: string; intent: string; claims: string[]; claimKinds: Record<string, string>; prose: string; why: string; invariants: string[]; refutations: string[]; guaranteeLinks?: SpecGuaranteeLinks }
+export interface ParsedSpec { name: string; intent: string; claims: string[]; claimKinds: Record<string, string>; prose: string; why: string; invariants: string[]; refutations: string[]; guaranteeLinks?: SpecGuaranteeLinks; architecture?: import("./derivation/architecture.ts").ArchitectureSection }
 
 /** How to read a language's code — symbols, imports, and where docblocks live. */
 export interface LanguageAdapter {

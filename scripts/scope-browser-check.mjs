@@ -27,6 +27,11 @@ try {
     await mkdir(join(root, `part-${i}`));
     await writeFile(join(root, `part-${i}/component.spec.md`), `# Component ${i}\n\nOwns a bounded responsibility.\n`);
   }
+  // Exercise the generic graph as ordinary project configuration; Structure has its own check.
+  await writeFile(join(root, 'coherence.scope.json'), JSON.stringify({ version: 1, views: [{
+    id: 'structure', title: 'Structure', renderer: 'graph', kinds: ['component'], fields: [{ field: "attributes.intent", label: "Purpose" }],
+    graph: { relations: ['contains', 'reliance', 'evidence-import', 'relies'], layout: 'grid', width: 330, height: 220, gap: 48 }, pageSize: 100,
+  }] }));
   const cfg = await loadConfig(root);
   await mkdir(join(root, 'ignored-evidence')); await writeFile(join(root, 'ignored-evidence/pin.txt'), 'original evidence');
   recordTaxonomy(cfg, await buildGraph(cfg), { target: 'core/core.ts#commit', expected: null, session: 'browser', because: 'Fixture assessment',

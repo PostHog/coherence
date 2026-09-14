@@ -1,0 +1,5590 @@
+[
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "transition": "evidence unfurl",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:recorded-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:session-memory"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:recorded-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:session-memory"
+    ],
+    "camera": "translate(173.684px, 138.142px) scale(0.599688)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:recorded-verification": [
+        1061,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:session-memory": [
+        991,
+        292,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:recorded-verification": [
+        1061,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:session-memory": [
+        991,
+        292,
+        198,
+        62
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "transition": "evidence fold",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "entrance:.:agent-session",
+      "entrance:.:cli"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7"
+    ],
+    "camera": "translate(-431.667px, -560.479px) scale(0.708333)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "transition": "derivation unfurl",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1"
+    ],
+    "camera": "translate(173.684px, 138.142px) scale(0.599688)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "transition": "additional unfurl component:src/evidence",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0",
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1"
+    ],
+    "camera": "translate(173.684px, 138.142px) scale(0.599688)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "transition": "additional unfurl component:src/taxonomy",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0",
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37",
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1"
+    ],
+    "camera": "translate(173.684px, 138.142px) scale(0.599688)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "invariant:7eeea716f332e734c44dc9e5c554aebfbb80c3f306c4e15a11801f5677d50d85": [
+        -390,
+        1917,
+        320,
+        199
+      ],
+      "invariant:8fe5c46a453b41ba15ed5ba1b473607e80f98384fe02a935ddd663dc62ab2e98": [
+        30,
+        1917,
+        320,
+        170
+      ],
+      "invariant:d522ee0ed2df5ac720cf6beb92b0980756b9985a0fde5830ce2e949b6f07ac1d": [
+        450,
+        1917,
+        320,
+        228
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "transition": "three-stack reveal",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0",
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1"
+    ],
+    "camera": "translate(173.684px, 138.142px) scale(0.599688)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "invariant:7eeea716f332e734c44dc9e5c554aebfbb80c3f306c4e15a11801f5677d50d85": [
+        -390,
+        1917,
+        320,
+        199
+      ],
+      "invariant:8fe5c46a453b41ba15ed5ba1b473607e80f98384fe02a935ddd663dc62ab2e98": [
+        30,
+        1917,
+        320,
+        170
+      ],
+      "invariant:d522ee0ed2df5ac720cf6beb92b0980756b9985a0fde5830ce2e949b6f07ac1d": [
+        450,
+        1917,
+        320,
+        228
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "transition": "neighbor fold",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0",
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37",
+      "invariant:7eeea716f332e734c44dc9e5c554aebfbb80c3f306c4e15a11801f5677d50d85",
+      "invariant:8fe5c46a453b41ba15ed5ba1b473607e80f98384fe02a935ddd663dc62ab2e98",
+      "invariant:d522ee0ed2df5ac720cf6beb92b0980756b9985a0fde5830ce2e949b6f07ac1d",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1"
+    ],
+    "camera": "translate(173.684px, 138.142px) scale(0.599688)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "invariant:7eeea716f332e734c44dc9e5c554aebfbb80c3f306c4e15a11801f5677d50d85": [
+        -390,
+        1917,
+        320,
+        199
+      ],
+      "invariant:8fe5c46a453b41ba15ed5ba1b473607e80f98384fe02a935ddd663dc62ab2e98": [
+        30,
+        1917,
+        320,
+        170
+      ],
+      "invariant:d522ee0ed2df5ac720cf6beb92b0980756b9985a0fde5830ce2e949b6f07ac1d": [
+        450,
+        1917,
+        320,
+        228
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "invariant:7eeea716f332e734c44dc9e5c554aebfbb80c3f306c4e15a11801f5677d50d85": [
+        -390,
+        1917,
+        320,
+        199
+      ],
+      "invariant:8fe5c46a453b41ba15ed5ba1b473607e80f98384fe02a935ddd663dc62ab2e98": [
+        30,
+        1917,
+        320,
+        170
+      ],
+      "invariant:d522ee0ed2df5ac720cf6beb92b0980756b9985a0fde5830ce2e949b6f07ac1d": [
+        450,
+        1917,
+        320,
+        228
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1440,
+      "height": 1000
+    },
+    "transition": "repeat reveal",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0",
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1"
+    ],
+    "camera": "translate(173.684px, 138.142px) scale(0.599688)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:7eeea716f332e734c44dc9e5c554aebfbb80c3f306c4e15a11801f5677d50d85": [
+        -390,
+        1917,
+        320,
+        199
+      ],
+      "invariant:8fe5c46a453b41ba15ed5ba1b473607e80f98384fe02a935ddd663dc62ab2e98": [
+        30,
+        1917,
+        320,
+        170
+      ],
+      "invariant:d522ee0ed2df5ac720cf6beb92b0980756b9985a0fde5830ce2e949b6f07ac1d": [
+        450,
+        1917,
+        320,
+        228
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "transition": "evidence unfurl",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:recorded-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:session-memory"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:recorded-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:session-memory"
+    ],
+    "camera": "translate(160.377px, 121.452px) scale(0.52648)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:recorded-verification": [
+        1061,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:session-memory": [
+        991,
+        292,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:recorded-verification": [
+        1061,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:session-memory": [
+        991,
+        292,
+        198,
+        62
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "transition": "evidence fold",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "entrance:.:agent-session",
+      "entrance:.:cli"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7"
+    ],
+    "camera": "translate(-415.115px, -515.893px) scale(0.639368)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "transition": "derivation unfurl",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1"
+    ],
+    "camera": "translate(160.377px, 121.452px) scale(0.52648)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "transition": "additional unfurl component:src/evidence",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0",
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1"
+    ],
+    "camera": "translate(160.377px, 121.452px) scale(0.52648)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "transition": "additional unfurl component:src/taxonomy",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0",
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37",
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1"
+    ],
+    "camera": "translate(160.377px, 121.452px) scale(0.52648)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "invariant:7eeea716f332e734c44dc9e5c554aebfbb80c3f306c4e15a11801f5677d50d85": [
+        -390,
+        1917,
+        320,
+        199
+      ],
+      "invariant:8fe5c46a453b41ba15ed5ba1b473607e80f98384fe02a935ddd663dc62ab2e98": [
+        30,
+        1917,
+        320,
+        170
+      ],
+      "invariant:d522ee0ed2df5ac720cf6beb92b0980756b9985a0fde5830ce2e949b6f07ac1d": [
+        450,
+        1917,
+        320,
+        228
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "transition": "three-stack reveal",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0",
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1"
+    ],
+    "camera": "translate(160.377px, 121.452px) scale(0.52648)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "invariant:7eeea716f332e734c44dc9e5c554aebfbb80c3f306c4e15a11801f5677d50d85": [
+        -390,
+        1917,
+        320,
+        199
+      ],
+      "invariant:8fe5c46a453b41ba15ed5ba1b473607e80f98384fe02a935ddd663dc62ab2e98": [
+        30,
+        1917,
+        320,
+        170
+      ],
+      "invariant:d522ee0ed2df5ac720cf6beb92b0980756b9985a0fde5830ce2e949b6f07ac1d": [
+        450,
+        1917,
+        320,
+        228
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "transition": "neighbor fold",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0",
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37",
+      "invariant:7eeea716f332e734c44dc9e5c554aebfbb80c3f306c4e15a11801f5677d50d85",
+      "invariant:8fe5c46a453b41ba15ed5ba1b473607e80f98384fe02a935ddd663dc62ab2e98",
+      "invariant:d522ee0ed2df5ac720cf6beb92b0980756b9985a0fde5830ce2e949b6f07ac1d",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1"
+    ],
+    "camera": "translate(160.377px, 121.452px) scale(0.52648)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        820,
+        1263,
+        320,
+        188
+      ],
+      "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1240,
+        1263,
+        320,
+        217
+      ],
+      "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": [
+        1660,
+        1263,
+        320,
+        199
+      ],
+      "invariant:7eeea716f332e734c44dc9e5c554aebfbb80c3f306c4e15a11801f5677d50d85": [
+        -390,
+        1917,
+        320,
+        199
+      ],
+      "invariant:8fe5c46a453b41ba15ed5ba1b473607e80f98384fe02a935ddd663dc62ab2e98": [
+        30,
+        1917,
+        320,
+        170
+      ],
+      "invariant:d522ee0ed2df5ac720cf6beb92b0980756b9985a0fde5830ce2e949b6f07ac1d": [
+        450,
+        1917,
+        320,
+        228
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "invariant:7eeea716f332e734c44dc9e5c554aebfbb80c3f306c4e15a11801f5677d50d85": [
+        -390,
+        1917,
+        320,
+        199
+      ],
+      "invariant:8fe5c46a453b41ba15ed5ba1b473607e80f98384fe02a935ddd663dc62ab2e98": [
+        30,
+        1917,
+        320,
+        170
+      ],
+      "invariant:d522ee0ed2df5ac720cf6beb92b0980756b9985a0fde5830ce2e949b6f07ac1d": [
+        450,
+        1917,
+        320,
+        228
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    }
+  },
+  {
+    "size": {
+      "width": 1280,
+      "height": 900
+    },
+    "transition": "repeat reveal",
+    "unchangedObjects": [
+      "component:src/evidence",
+      "component:src/derivation",
+      "component:src/verification",
+      "component:src/coordination",
+      "component:src/lifecycle",
+      "component:src/diagnostics",
+      "component:src/taxonomy",
+      "component:src/readings",
+      "component:src/adapters",
+      "component:src",
+      "component:test",
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0",
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37",
+      "entrance:.:agent-session",
+      "entrance:.:cli",
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam"
+    ],
+    "unchangedArchitecturePaths": [
+      "relation:architecture:.:model-verification",
+      "relation:architecture:.:command-model",
+      "relation:architecture:.:readable-model",
+      "relation:architecture:.:model-diagnostics",
+      "relation:architecture:.:model-taxonomy",
+      "relation:architecture:.:language-seam",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1"
+    ],
+    "camera": "translate(160.377px, 121.452px) scale(0.52648)",
+    "before": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    },
+    "after": {
+      "component:src/evidence": [
+        1240,
+        403,
+        320,
+        280
+      ],
+      "component:src/derivation": [
+        280,
+        403,
+        320,
+        280
+      ],
+      "component:src/verification": [
+        760,
+        403,
+        320,
+        280
+      ],
+      "component:src/coordination": [
+        1500,
+        23,
+        260,
+        174
+      ],
+      "component:src/lifecycle": [
+        1020,
+        23,
+        260,
+        174
+      ],
+      "component:src/diagnostics": [
+        540,
+        23,
+        260,
+        192
+      ],
+      "component:src/taxonomy": [
+        60,
+        863,
+        260,
+        174
+      ],
+      "component:src/readings": [
+        540,
+        863,
+        260,
+        174
+      ],
+      "component:src/adapters": [
+        1020,
+        863,
+        260,
+        174
+      ],
+      "component:src": [
+        60,
+        23,
+        260,
+        174
+      ],
+      "component:test": [
+        1500,
+        863,
+        260,
+        192
+      ],
+      "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": [
+        1240,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": [
+        1406,
+        341,
+        154,
+        54
+      ],
+      "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        345,
+        341,
+        190,
+        54
+      ],
+      "invariant:7eeea716f332e734c44dc9e5c554aebfbb80c3f306c4e15a11801f5677d50d85": [
+        -390,
+        1917,
+        320,
+        199
+      ],
+      "invariant:8fe5c46a453b41ba15ed5ba1b473607e80f98384fe02a935ddd663dc62ab2e98": [
+        30,
+        1917,
+        320,
+        170
+      ],
+      "invariant:d522ee0ed2df5ac720cf6beb92b0980756b9985a0fde5830ce2e949b6f07ac1d": [
+        450,
+        1917,
+        320,
+        228
+      ],
+      "invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9": [
+        -140,
+        1563,
+        320,
+        199
+      ],
+      "invariant:08f162e238d24ea8931c45a256b14b9c099a7b58112bdb7e8c689200344152e0": [
+        280,
+        1563,
+        320,
+        228
+      ],
+      "invariant:4ef466a43e19e1fe6019cc61863b86320e9971cca976d5fb89ab48792ce38f37": [
+        700,
+        1563,
+        320,
+        199
+      ],
+      "entrance:.:agent-session": [
+        1000,
+        -167,
+        300,
+        190
+      ],
+      "entrance:.:cli": [
+        40,
+        -167,
+        300,
+        190
+      ],
+      "relation:architecture:.:model-verification": [
+        591,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:command-model": [
+        91,
+        292,
+        198,
+        62
+      ],
+      "relation:architecture:.:readable-model": [
+        441,
+        732,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-diagnostics": [
+        391,
+        -88,
+        198,
+        62
+      ],
+      "relation:architecture:.:model-taxonomy": [
+        391,
+        1090.5,
+        198,
+        85
+      ],
+      "relation:architecture:.:language-seam": [
+        691,
+        732,
+        198,
+        62
+      ]
+    }
+  }
+]

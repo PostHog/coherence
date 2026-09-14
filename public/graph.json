@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-11 21:50Z",
+  "generatedAt": "2026-09-14 14:38Z",
   "root": "coherence",
   "absRoot": "/Users/daniloc/Documents/Dev/coherence-scope-local",
   "nodes": [
@@ -19,7 +19,145 @@
       "why": "The subsystem map must describe enforced ownership rather than presentation labels. Moving a chokepoint without its contract detaches the reading surface from the code it explains, while restoring a flat source bucket hides the boundaries again. The repository adoption guard therefore reconciles live anchors with their defining owners and keeps the composition root limited to its six entry and shared-contract modules.\n\nAn agent should encounter the project's purpose and its ownership seams before source\ndetail. The project hook wiring also records which repository reads informed a change and\nwhich decisions survived it. Keeping coordination separate from implementation makes that\nfirst read small while still checking that every deeper entry point is reachable.\n\nThis spec once claimed five obvious files existed at root; three were pruned rather than\ndressed up, because a root claim earns its line only when the failure it detects would\notherwise be SILENT. `package.json`, `README.md`, and `src/cli.ts` fail loudly on their\nown — npm, the reader, and the CLI itself all scream within seconds of their absence —\nso claiming them was green weight that could never turn red for an interesting reason\n(the Known-limits section calls that spec \"coherent and worthless\"). The two claims\nkept from that pruning are the ones whose absence the system absorbs without a sound:\n`loadConfig`\nfalls back to defaults when `coherence.config.json` is missing (verify would silently\nrun with no test runner, no serial pin, and the wrong testMatch), and a missing lifecycle\ncontrol kills the journal hooks with no host error at all. The latter used to be the weak\nstructural claim `.claude/settings.json exists at root`; now the root claims the binary\ncontrol reading itself for every host this repository supports. Its oracle checks each\nhost's three tracked parts—settings, stable launcher, and root mapping—their exact\ncomposition, host-specific exclusion controls, the absence of a competing path, and the\nrunnable target. One meaningful claim is lighter and stronger than six\ngreen file-existence claims. Fewer claims, honestly scoped, is still the trade this\nharness teaches; making its own root spec take it is the least it owes.\n\nThe repository-specific SessionStart appendix is a third silent surface: if it vanishes,\nthe canonical consumer hook correctly falls back and no host reports an error, but a\ncontributor can add an agent-facing capability without reviewing the global startup\ncontract, protocol identity, host controls, or docs. Its claim therefore exercises the\nreal composition crossing and pins the maintenance trigger's named surfaces while proving\nthat the reminder stays out of consumer canon. This is project policy carried by the\nproject voice, not maintenance detail imposed on every adopter.",
       "refutations": [
         "repository assembly ownership: the first migration retained nine line-wrapped rationale paragraphs at the old Harness core while their invariants moved. Global text conservation passed, but why-lint reported detached rationale at the new owners. The adoption guard now checks per-owner rationale as well as chokepoint ownership; the original paragraph text was relocated unchanged."
-      ]
+      ],
+      "architecture": {
+        "declarations": [
+          {
+            "kind": "purpose",
+            "id": "project-purpose",
+            "text": "Coherence helps people and agents keep a software project understandable and accountable as it changes. Authored specs name responsibilities and promises; a shared source model makes them navigable; verification tests declared claims; durable evidence carries decisions and results into the next session.",
+            "line": 11
+          },
+          {
+            "kind": "entrance",
+            "id": "cli",
+            "label": "Explore or check a project",
+            "component": "src",
+            "anchor": "src/cli.ts",
+            "description": "The CLI loads the project configuration and dispatches commands to derive maps, inspect evidence, verify promises and record work. Begin here for the command-driven life of a project.",
+            "line": 12
+          },
+          {
+            "kind": "entrance",
+            "id": "agent-session",
+            "label": "Start an agent session",
+            "component": "src/lifecycle",
+            "anchor": "src/lifecycle/hooks.ts#runHook",
+            "description": "Lifecycle hooks connect an agent host to repository instructions, prior decisions, assigned work and attributable observations. Begin here for continuity across sessions.",
+            "line": 13
+          },
+          {
+            "kind": "relationship",
+            "id": "command-model",
+            "from": "src",
+            "to": "src/derivation",
+            "label": "Requests the project model",
+            "because": "CLI reading and checking commands ask buildGraph for the source and spec population selected by project configuration. Derivation owns what enters that model.",
+            "line": 14
+          },
+          {
+            "kind": "relationship",
+            "id": "language-seam",
+            "from": "src/derivation",
+            "to": "src/adapters",
+            "label": "Delegates language interpretation",
+            "because": "Graph derivation resolves the configured language adapter and obtains symbols, imports and source prose through its shared adapter interface. Adapters own syntax and platform knowledge.",
+            "line": 15
+          },
+          {
+            "kind": "relationship",
+            "id": "model-verification",
+            "from": "src/derivation",
+            "to": "src/verification",
+            "label": "Supplies subjects and claims",
+            "because": "runVerify evaluates claims over the derived graph. Oracle discovery and named execution evidence determine which promises can receive recorded verdicts.",
+            "line": 16
+          },
+          {
+            "kind": "relationship",
+            "id": "model-diagnostics",
+            "from": "src/derivation",
+            "to": "src/diagnostics",
+            "label": "Makes change measurable",
+            "because": "Diagnostics combine the graph with source, Git observations and recorded baselines to measure declared populations, growth and evidence gaps. Each instrument retains its own limits.",
+            "line": 17
+          },
+          {
+            "kind": "relationship",
+            "id": "model-taxonomy",
+            "from": "src/derivation",
+            "to": "src/taxonomy",
+            "label": "Addresses classification subjects",
+            "because": "Taxonomy captures graph-resolved files and symbols for caller-assessed roles and facets. The resulting obligations remain suggestions until explicitly mapped and assessed.",
+            "line": 18
+          },
+          {
+            "kind": "relationship",
+            "id": "recorded-verification",
+            "from": "src/verification",
+            "to": "src/evidence",
+            "label": "Records scoped verdicts",
+            "because": "Verification publishes claim readings through recordVerify and can retain work-bound receipts. Skipped checks do not erase prior dated evidence.",
+            "line": 19
+          },
+          {
+            "kind": "relationship",
+            "id": "evidence-orientation",
+            "from": "src/evidence",
+            "to": "src/coordination",
+            "label": "Informs the next action owed",
+            "because": "Orientation strictly reads decisions, defects, experiments and verification state alongside work and consequence ledgers. Damaged evidence outranks an actionable-looking empty projection.",
+            "line": 20
+          },
+          {
+            "kind": "relationship",
+            "id": "work-instructions",
+            "from": "src/coordination",
+            "to": "src/lifecycle",
+            "label": "Supplies assigned work context",
+            "because": "Lifecycle startup reads the work graph for the exact owner session and renders its assignment without granting new authority or promoting peer work into an assignment.",
+            "line": 21
+          },
+          {
+            "kind": "relationship",
+            "id": "session-memory",
+            "from": "src/lifecycle",
+            "to": "src/evidence",
+            "label": "Preserves session continuity",
+            "because": "Lifecycle startup opens attributable journal sessions and reads trusted decisions. Later hooks retain activity and observations that explain what a session actually encountered.",
+            "line": 22
+          },
+          {
+            "kind": "relationship",
+            "id": "readable-model",
+            "from": "src/derivation",
+            "to": "src/readings",
+            "label": "Makes architecture navigable",
+            "because": "Reading surfaces project the canonical component hierarchy and declared promises into maps, context packets and human or agent explanations. Presentation creates no new verification authority.",
+            "line": 23
+          },
+          {
+            "kind": "relationship",
+            "id": "readable-evidence",
+            "from": "src/evidence",
+            "to": "src/readings",
+            "label": "Explains what was observed",
+            "because": "Reading surfaces join retained evidence to the subjects they describe, preserving unavailable sources, dated results and explicit attribution.",
+            "line": 24
+          },
+          {
+            "kind": "relationship",
+            "id": "executable-contracts",
+            "from": "test",
+            "to": "src/verification",
+            "label": "Exercises the harness contracts",
+            "because": "The configured test population supplies focused and end-to-end oracles. A test import alone is never proof that a named oracle executed or passed.",
+            "line": 25
+          }
+        ],
+        "problems": []
+      },
+      "specPath": "coherence.spec.md"
     },
     {
       "id": "c:src",
@@ -148,7 +286,8 @@
         "derive.ts imports ./walk.ts",
         "boundary \"harness source remains searchable text rather than silently becoming binary\" at sourceTextIsNavigable via guard \"source text — every live TypeScript source remains NUL-free and searchable\"",
         "boundary \"a declared language resolves to a real adapter or refuses, never a silent fallback\" at resolveLanguageAdapter via guard \"language adapter — a project path loads and shapes the graph; unknown names refuse, never fall back\"",
-        "boundary \"a built-in language pack is data: queries, patterns, and named strategies, never code\" at builtinLanguagePacks via guard \"language packs — every built-in pack is function-free data across all five instrument tables\""
+        "boundary \"a built-in language pack is data: queries, patterns, and named strategies, never code\" at builtinLanguagePacks via guard \"language packs — every built-in pack is function-free data across all five instrument tables\"",
+        "boundary \"spec-owned architecture remains attributable and unresolved meaning stays explicit\" at resolveArchitecture via guard \"Scope architecture — declarations retain provenance and one unresolved endpoint does not erase valid meaning\""
       ],
       "prose": "Language packs and adapters supply syntax knowledge. This assembly owns the walk and graph construction, not the verdicts later computed from that graph.",
       "why": "**declared import aliases resolve only unique walked targets and refuse malformed configuration.** Aliases are part of a project's declared module address space, not relationships for a renderer to guess. Exact or trailing-star mappings resolve against the one canonical walked population. The most specific declaration owns a match; missing targets never fall back to broader mappings, and multiple candidates remain explicitly ambiguous. Root-relative targets and safe captures prevent traversal. This direct-module grade does not execute build configuration, infer reexports, or promise TypeScript resolution parity. Existing relative and Python resolution retain their declared grades.\n\n**Python local imports resolve only at the declared direct-module grade.** A graph\nthat captures a local module but calls it external erases the relationships every\nreading surface needs. Resolve dotted names against the existing file population,\nnot a second walk or Python execution. Ambiguous modules stay external because\nguessing runtime search-path precedence would exceed this instrument's evidence.\n\n**spec containment follows declared ancestry without inventing dependencies.** Repository and subsystem containment explain ownership even where no source import exists. Treating that relationship as an import fabricates reliance; omitting it turns the enclosing project into an unexplained island. The same deepest-spec rule that assigns file ownership supplies component ancestry.\n\n**harness source remains searchable text rather than silently becoming binary.** Agent\nnavigation depends on ordinary repository search seeing every source file. A single literal\nzero byte can make common tools classify an otherwise textual module as binary and omit its\nmatches without a syntax or type error. Keeping control ranges escaped in source preserves\nruntime meaning while making disappearance from the reading surface a loud regression.\n\n**a declared language resolves to a real adapter or refuses, never a silent fallback.**\nThe graph is the one derivation everything downstream consumes, and the adapter decides\nwhat that derivation can see. The old `?? typescript` fallback meant a typo'd language\nname walked the wrong grammar and reported on the garbage with full confidence — the\nsame walking-a-different-tree failure the config loader refuses for, one seam later. So\nan unknown bare name now refuses with the live built-in list, and the same seam is where\na project brings its own language: a `./`-relative module exporting the LanguageAdapter\nshape, validated field-by-field so the refusal names the line that needs fixing.\nImporting project code is not new trust — the atlas already declares at the loadConfig\ncrossing that running the harness in a tree executes that tree's config. What a custom\nadapter buys is the graph tier: symbols, import edges, prose, claims over them. The\nper-language instrument arms (surface counting, oracle analysis, redundancy, sinks,\nbatch formats) remain harness contributions, and the documentation says so, because an\nadapter author who is not told the boundary believes they have the full field when they\nhave half.\n\n**a built-in language pack is data: queries, patterns, and named strategies, never\ncode.** The declarative baseline is what keeps \"add a language\" a table-row act instead\nof an expert contribution — and it is a rule that erodes one convenient function at a\ntime unless something refuses. So the packs are inspectable values aggregated in one\nplace, and a guard sweeps them for function-valued fields by path: the hand-rolled\nscanner class is unrepresentable at the seam, not merely discouraged. The rule's edge\nis honest about what a pack may name — strategies from a closed, mechanism-owned set\n(\"jsdoc\", \"docstring\", \"cooked-string\") — because some knowledge is genuinely\nprocedural; naming it keeps the procedure written once where every language can reach\nit. Project adapter modules remain code territory by definition: purity governs what\nships built in, where a single spelling is the entire point.",
@@ -158,12 +297,14 @@
         "spec containment follows declared ancestry without inventing dependencies",
         "harness source remains searchable text rather than silently becoming binary",
         "a declared language resolves to a real adapter or refuses, never a silent fallback",
-        "a built-in language pack is data: queries, patterns, and named strategies, never code"
+        "a built-in language pack is data: queries, patterns, and named strategies, never code",
+        "spec-owned architecture remains attributable and unresolved meaning stays explicit"
       ],
       "refutations": [
         "declared import aliases resolve only unique walked targets and refuse malformed configuration: the pinned PostHog ingestion fixture had 42 alias import occurrences targeting copied files, but the relative-only resolver hid 15 component relations and rejected 7 of 8 declared guarantee reliances. The same source population must recover those relations when its root aliases are declared; omitting the declarations remains an explicit external-module negative control.",
         "Python local imports resolve only at the declared direct-module grade: the pinned PostHog slice contained both imported Redis and object-storage files but Scope derived zero relations. The resolver treated every absolute dotted module as external. With the Python address strategy the same slice derives five canonical relations; ambiguous modules and unresolved imports remain external.",
-        "harness source remains searchable text rather than silently becoming binary: two new render/validation regexes carried literal NUL bytes, and `rg` classified `src/consequence.ts` as binary instead of returning navigable source matches. The ranges now use escaped source notation and the focused guard enumerates every live TypeScript source, so the same byte turns the claim red rather than degrading repository navigation silently."
+        "harness source remains searchable text rather than silently becoming binary: two new render/validation regexes carried literal NUL bytes, and `rg` classified `src/consequence.ts` as binary instead of returning navigable source matches. The ranges now use escaped source notation and the focused guard enumerates every live TypeScript source, so the same byte turns the claim red rather than degrading repository navigation silently.",
+        "spec-owned architecture remains attributable and unresolved meaning stays explicit: one unresolved component caused the architecture catalog transaction to roll back valid purpose and entrance declarations; the focused Scope architecture guard now retains each valid declaration, its spec line and the unresolved issue."
       ],
       "guaranteeLinks": {
         "addresses": [
@@ -361,6 +502,7 @@
       "sub": "Projects existing models into context packets, diagrams, component maps and inspectable reading surfaces.",
       "claimed": true,
       "claims": [
+        "boundary \"Structure connections retain declared architectural meaning and exact guarantee ownership\" at buildStructureModel via guard \"Structure projection — declared promises and only meaningful edges retain catalog identity and evidence limits\"",
         "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at buildScopeModel via guard \"scope roles — declared test imports are not runtime gravity or proof of a named oracle\"",
         "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at buildScopeModel via guard \"scope semantics — containment and atlas meanings preserve ownership without inventing dependencies or verdicts\"",
         "boundary \"task context is bounded and names its approximations\" at renderContextProjection via guard \"renderContext — bounded projection is route-first, byte-stable, and accounts for every omission\"",
@@ -368,19 +510,20 @@
         "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at buildScopeModel via guard \"scope model — original spec explanation and unanchored declarations survive projection\"",
         "boundary \"Scope views select complete attributed assets through data-only configuration\" at resolveScopeConfiguration via guard \"Scope configuration — every default is ordinary project configuration and every asset family is selectable\"",
         "boundary \"Scope views select complete attributed assets through data-only configuration\" at projectView via guard \"Scope projections — filtering, typed sorting and pagination conserve assets and disclose omitted edges\"",
-        "boundary \"Scope views select complete attributed assets through data-only configuration\" at DEFAULT_SCOPE via guard \"Scope layout — twelve-component default remains readable and every supported layout clears rectangles\"",
+        "boundary \"Scope views select complete attributed assets through data-only configuration\" at resolveScopeConfiguration via guard \"Scope layout — configured twelve-component graph remains readable and every supported layout clears rectangles\"",
         "boundary \"Scope views select complete attributed assets through data-only configuration\" at captureScope via guard \"Scope assets — damage remains visible outside filters and invalid project configuration never becomes defaults\"",
         "boundary \"Scope views select complete attributed assets through data-only configuration\" at captureScope via guard \"Scope journal assets — shared session-opening ids and repeated decision envelopes preserve every occurrence\"",
         "boundary \"Scope views select complete attributed assets through data-only configuration\" at renderScope via guard \"scope renderer — one self-contained bundle preserves data without admitting markup\"",
         "boundary \"Scope preserves every authored spec content category without inventing evidence\" at captureScope via guard \"Scope specs — every content category and custom section survives with canonical semantics and exact authored text\""
       ],
       "prose": "These projections can explain evidence but cannot create it. Scope, promise views and agent context retain the identities and limits of their canonical inputs.",
-      "why": "**task context is bounded and names its approximations.** A focused context packet is\nuseful only when its one-hop and heuristic limits stay visible; otherwise convenience is\nmisread as completeness and recreates the omission gradient this project exists to oppose.\nRoutes, named limitations, and omission accounting are mandatory framing; a byte budget\nthat cannot hold them refuses with its exact minimum. Everything else is included in a\nstable priority order, and the withheld item and byte totals make truncation observable.\nRepository-level, generated, and explicitly requested ignored files remain navigable even\nwhen the source graph owns no component for them; `graphOwner: null` is evidence, not a miss.\n\n**Scope projects the canonical promise population with deterministic gravity and honest\nabsence.** A visualization is especially capable of making missing state look calm: a\npartial component population still forms a convincing picture, and an unmeasured component\ncan inherit the visual language of a passing one. Scope therefore receives its subjects\nonly from the canonical graph/promise join, refuses when their component populations or\nreliance targets disagree, and serializes stable geometry from that model. The renderer\nmay move the viewport but never the project; absence remains visible ink.\n\n**Scope views select complete attributed assets through data-only configuration.** The\nold CLI canvas and four independently implemented preview panels duplicated presentation\npolicy and prevented projects from asking a different question without editing React.\nOne catalog now adapts canonical readers into assets, attributes, explicit relationships\nand source readings. Every shipped view is ordinary configuration consumed by the same\ngraph, table and card renderers as a project view. JSON selects and presents evidence;\nit cannot execute code or establish a new verdict. Failed sources stay visible outside\nfilters. Pagination names its withheld population and graph connections. The old semantic\npromise join remains shared with the guarantees command; its former canvas and preview\npanels are removed, and layout is a generic Cytoscape projection over selected assets.\n\n**Scope preserves every authored spec content category without inventing evidence.** A\ncomponent containing an invariants array is insufficient when the project needs a view\nof individual unanchored invariants. Specs, sections, intent/prose, rationale, claims,\ninvariants, refutations, zones and authored guarantee declarations retain addresses.\nThe complete original spec survives beside canonical parsed meaning. Custom sections,\nduplicate headings and malformed declarations remain text rather than being upgraded to\nclaims or silently discarded. Only the entry spec's zones have topology authority.",
+      "why": "**task context is bounded and names its approximations.** A focused context packet is\nuseful only when its one-hop and heuristic limits stay visible; otherwise convenience is\nmisread as completeness and recreates the omission gradient this project exists to oppose.\nRoutes, named limitations, and omission accounting are mandatory framing; a byte budget\nthat cannot hold them refuses with its exact minimum. Everything else is included in a\nstable priority order, and the withheld item and byte totals make truncation observable.\nRepository-level, generated, and explicitly requested ignored files remain navigable even\nwhen the source graph owns no component for them; `graphOwner: null` is evidence, not a miss.\n\n**Scope projects the canonical promise population with deterministic gravity and honest\nabsence.** A visualization is especially capable of making missing state look calm: a\npartial component population still forms a convincing picture, and an unmeasured component\ncan inherit the visual language of a passing one. Scope therefore receives its subjects\nonly from the canonical graph/promise join, refuses when their component populations or\nreliance targets disagree, and serializes stable geometry from that model. The renderer\nmay move the viewport but never the project; absence remains visible ink.\n\n**Scope views select complete attributed assets through data-only configuration.** The\nold CLI canvas and four independently implemented preview panels duplicated presentation\npolicy and prevented projects from asking a different question without editing React.\nOne catalog now adapts canonical readers into assets, attributes, explicit relationships\nand source readings. Every shipped view is ordinary configuration consumed by the same\nStructure, graph, table and card renderers as a project view. JSON selects and presents evidence;\nit cannot execute code or establish a new verdict. Failed sources stay visible outside\nfilters. Pagination names its withheld population and graph connections. The old semantic\npromise join remains shared with the guarantees command; its former canvas and preview\npanels are removed, and layout is a generic Cytoscape projection over selected assets.\n\n**Scope preserves every authored spec content category without inventing evidence.** A\ncomponent containing an invariants array is insufficient when the project needs a view\nof individual unanchored invariants. Specs, sections, intent/prose, rationale, claims,\ninvariants, refutations, zones and authored guarantee declarations retain addresses.\nThe complete original spec survives beside canonical parsed meaning. Custom sections,\nduplicate headings and malformed declarations remain text rather than being upgraded to\nclaims or silently discarded. Only the entry spec's zones have topology authority.\n\n**Structure connections retain declared architectural meaning and exact guarantee\nownership.** A pile of import arrows names syntax while leaving a reader to infer\nresponsibilities. The Structure projection instead joins authored architecture and\nexplicit guarantee reliance with spec-owned stacks. Imports cannot create these\nconnections. Stable catalog identities connect selection, ownership and evidence;\nunanchored promises and unresolved declarations remain visible. Zoom changes\npresentation detail, not the meaning or confidence of a relationship.",
       "invariants": [
         "task context is bounded and names its approximations",
         "Scope projects the canonical promise population with deterministic gravity and honest absence",
         "Scope views select complete attributed assets through data-only configuration",
-        "Scope preserves every authored spec content category without inventing evidence"
+        "Scope preserves every authored spec content category without inventing evidence",
+        "Structure connections retain declared architectural meaning and exact guarantee ownership"
       ],
       "refutations": [
         "Scope projects the canonical promise population with deterministic gravity and honest absence: projected absent spec fields as explicit undefined; the live server parity guard went red because JSON dropped those keys. Empty JSON values restore parity; the spec projection guard now also checks a round trip with absent spec content.",
@@ -1762,6 +1905,70 @@
       "line": 1182
     },
     {
+      "id": "f:src/derivation/architecture.ts",
+      "parent": "c:src/derivation",
+      "label": "architecture.ts",
+      "kind": "file",
+      "sub": "src/derivation/architecture.ts",
+      "path": "src/derivation/architecture.ts"
+    },
+    {
+      "id": "s:src/derivation/architecture.ts#ArchitectureDeclaration",
+      "parent": "f:src/derivation/architecture.ts",
+      "label": "ArchitectureDeclaration",
+      "kind": "symbol",
+      "sub": "type",
+      "path": "src/derivation/architecture.ts",
+      "line": 3
+    },
+    {
+      "id": "s:src/derivation/architecture.ts#LocatedArchitectureDeclaration",
+      "parent": "f:src/derivation/architecture.ts",
+      "label": "LocatedArchitectureDeclaration",
+      "kind": "symbol",
+      "sub": "type",
+      "path": "src/derivation/architecture.ts",
+      "line": 7
+    },
+    {
+      "id": "s:src/derivation/architecture.ts#ArchitectureSection",
+      "parent": "f:src/derivation/architecture.ts",
+      "label": "ArchitectureSection",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/derivation/architecture.ts",
+      "line": 8
+    },
+    {
+      "id": "s:src/derivation/architecture.ts#ArchitectureModel",
+      "parent": "f:src/derivation/architecture.ts",
+      "label": "ArchitectureModel",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/derivation/architecture.ts",
+      "line": 9
+    },
+    {
+      "id": "s:src/derivation/architecture.ts#architectureDeclaration",
+      "parent": "f:src/derivation/architecture.ts",
+      "label": "architectureDeclaration",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/derivation/architecture.ts",
+      "line": 14,
+      "prose": "Validate authored data once; a renderer never supplies missing architectural meaning."
+    },
+    {
+      "id": "s:src/derivation/architecture.ts#resolveArchitecture",
+      "parent": "f:src/derivation/architecture.ts",
+      "label": "resolveArchitecture",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/derivation/architecture.ts",
+      "line": 30,
+      "prose": "Canonical graph resolution preserves unavailable declarations as explicit problems."
+    },
+    {
       "id": "f:src/derivation/derive.ts",
       "parent": "c:src/derivation",
       "label": "derive.ts",
@@ -1777,7 +1984,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/derive.ts",
-      "line": 33,
+      "line": 34,
       "prose": "Direct-module grade only: no sys.path, reexports or execution. Ambiguity stays external."
     },
     {
@@ -1787,7 +1994,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/derive.ts",
-      "line": 56,
+      "line": 57,
       "prose": "Resolve `cfg.language` to an adapter: a built-in name, or a `./`-relative project\nmodule (conventionally `.coherence/adapters/<lang>.mjs`) exporting a LanguageAdapter.\n\nAN UNKNOWN BARE NAME REFUSES. The `?? typescript` fallback this replaces meant\n`\"language\": \"go\"` silently walked Go files with the TypeScript grammar and reported\non the garbage with full confidence — the same walking-a-DIFFERENT-tree failure\nloadConfig refuses for when the config itself is unreadable. Importing a project\nmodule executes project code, which is the trust the atlas already declares at the\nloadConfig crossing: running the harness in a tree executes that tree's config."
     },
     {
@@ -1797,7 +2004,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/derivation/derive.ts",
-      "line": 102,
+      "line": 103,
       "prose": "THE documented-symbol predicate — one spelling, homed with the code that SETS `prose`\n (the `add({ …, prose: what || undefined })` call below). verify's coverage line\n (\"symbols N/M documented\"), its `[doc]` jobs, and mass's `undocumented|symbols`\n dimension all read this, so a symbol the coverage advisory calls undocumented is\n exactly one the ratchet counts. It was spelled twice inside verify.ts alone before this\n — the harness's own `redundancy` finding, fixed the way that advisory prescribes:\n derive one spelling from the other, here by deleting the others."
     },
     {
@@ -1807,7 +2014,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/derive.ts",
-      "line": 104
+      "line": 105
     },
     {
       "id": "f:src/derivation/import-aliases.ts",
@@ -1920,7 +2127,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 9,
+      "line": 10,
       "prose": "Split a docblock/section into its derivable description (what) and its protected rationale (@why)."
     },
     {
@@ -1930,7 +2137,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/derivation/walk.ts",
-      "line": 20,
+      "line": 21,
       "prose": "Markdown formatters (markdownlint/prettier --fix) escape `_` and `*` in prose —\n including inside claim lines (`at \\_load` → unresolvable symbol). Claims are a\n grammar, not prose: strip those escapes so a formatted spec still parses."
     },
     {
@@ -1940,7 +2147,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 22
+      "line": 23
     },
     {
       "id": "s:src/derivation/walk.ts#refutedInvariants",
@@ -1949,7 +2156,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 122,
+      "line": 147,
       "prose": "WHICH INVARIANTS A `## refutations` LIST WITNESSES — the ONE spelling of the key rule.\n\nA refutation line is `<invariant>: <what was broken> -> <what was seen>`, so the invariant\nname is the text before the FIRST colon. That one-line rule was spelled three times —\nrender-claude.ts's invariant table, verify's refutation coverage line, and verify's\nnever-red decoration filter — which is `redundancy`'s own finding about other people's\ncode: one enumerated domain, several spellings, tied together by nothing. Homed here\nbecause this is the parser that produced the strings; every consumer now derives from it.\n\nBEHAVIOUR-PRESERVING, deliberately. A line with no colon still keys on the whole line,\nexactly as all three call sites did — an extraction that also changes what it computes\ncannot be reviewed as an extraction, and a project whose refutation count moved would\nhave no way to tell which half did it. Whether a colonless line should witness anything\nis a real and separate question; it is not settled here."
     },
     {
@@ -1959,7 +2166,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/derivation/walk.ts",
-      "line": 132,
+      "line": 157,
       "prose": "One declared trust zone from a `## zones` section (PROMISE GRAPH topology). Parsed here\n because walk.ts is the single home of spec-section parsing; the promise layer is the only\n consumer, so zones ride as their own standalone parse rather than through ParsedSpec/the\n graph (nothing else needs them, and the graph stays untouched)."
     },
     {
@@ -1969,7 +2176,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 141,
+      "line": 166,
       "prose": "Parse a `## zones` section — same shape as `## invariants`: a bullet list, and the\n DECLARED ORDER is the canonical trust order (most-trusted first). Each line is either\n `- <name>: <intent>` or `- <name> inside <parent>: <intent>` (the `: <intent>` is\n optional — a bare `- <name>` or `- <name> inside <parent>` is a zone with \"\" intent).\n Single-home doctrine: only the ENTRY component's zones are authoritative, so this is run\n against the entry spec alone — a `## zones` in a non-entry spec is simply never read\n (ignored, not an error). Returns [] when the spec has no zones section."
     },
     {
@@ -1979,7 +2186,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 161
+      "line": 186
     },
     {
       "id": "s:src/derivation/walk.ts#nodeDirs",
@@ -1988,7 +2195,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 168,
+      "line": 193,
       "prose": "Folders that contain a *.spec.md, relative to root (root = \".\")."
     },
     {
@@ -1998,7 +2205,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 180
+      "line": 205
     },
     {
       "id": "s:src/derivation/walk.ts#ownerOf",
@@ -2007,7 +2214,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/derivation/walk.ts",
-      "line": 212,
+      "line": 237,
       "prose": "The deepest node dir that is a prefix of the file's dir — or NULL when no node dir owns\nit at all.\n\nTHE NULL IS THE POINT. This used to return `\".\"` unconditionally on a miss, which is\nthe same value it returns when a root `*.spec.md` genuinely owns the file, so no caller\ncould tell \"the root component owns this\" from \"nothing owns this\". On a project with\nno root component that fabricated a component out of a miss, and\n`affectedComponents` fed it straight into verify's scope set: measured 2026-07-31 on a\nhealthy two-component tree whose only change was an unowned root-level file, `verify\n--staged` printed `scoped to 1 changed component(s): .`, graded `claims: 0 · 0 green`,\nand pronounced `✓ coherent` — a LIVE vacuous green needing no mutation to reach.\n\nAn unowned file is ordinary, not an error: a root config, a build script, a stray\nmodule in a tree that is still being decomposed. So the miss is REPRESENTED rather than\nrefused, and each of the three callers says what it does with one (derive: an unparented\nfile node; verify and structural: out of every component's scope)."
     },
     {
@@ -7704,7 +7911,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/readings/scope/catalog.ts",
-      "line": 39
+      "line": 40
     },
     {
       "id": "s:src/readings/scope/catalog.ts#textOf",
@@ -7713,7 +7920,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/readings/scope/catalog.ts",
-      "line": 47
+      "line": 48
     },
     {
       "id": "s:src/readings/scope/catalog.ts#compare",
@@ -7722,7 +7929,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/readings/scope/catalog.ts",
-      "line": 48
+      "line": 49
     },
     {
       "id": "s:src/readings/scope/catalog.ts#catalogSchema",
@@ -7731,7 +7938,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/readings/scope/catalog.ts",
-      "line": 50
+      "line": 51
     },
     {
       "id": "f:src/readings/scope/configuration.ts",
@@ -7748,7 +7955,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/scope/configuration.ts",
-      "line": 3
+      "line": 4
     },
     {
       "id": "s:src/readings/scope/configuration.ts#Field",
@@ -7757,7 +7964,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/scope/configuration.ts",
-      "line": 4
+      "line": 5
     },
     {
       "id": "s:src/readings/scope/configuration.ts#View",
@@ -7766,7 +7973,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/scope/configuration.ts",
-      "line": 5
+      "line": 6
     },
     {
       "id": "s:src/readings/scope/configuration.ts#ScopeConfiguration",
@@ -7775,7 +7982,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/scope/configuration.ts",
-      "line": 12
+      "line": 15
     },
     {
       "id": "s:src/readings/scope/configuration.ts#DEFAULT_SCOPE",
@@ -7784,7 +7991,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/readings/scope/configuration.ts",
-      "line": 20,
+      "line": 23,
       "prose": "Defaults use exactly the same language and renderers as a project-authored view."
     },
     {
@@ -7794,7 +8001,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/readings/scope/configuration.ts",
-      "line": 57,
+      "line": 60,
       "prose": "Unknown syntax refuses. There are no callbacks, expressions, imports or executable templates."
     },
     {
@@ -7804,7 +8011,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/scope/configuration.ts",
-      "line": 143
+      "line": 159
     },
     {
       "id": "s:src/readings/scope/configuration.ts#projectView",
@@ -7813,7 +8020,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/readings/scope/configuration.ts",
-      "line": 145,
+      "line": 161,
       "prose": "One selection mechanism for every renderer. No kind-specific view branches."
     },
     {
@@ -7838,6 +8045,87 @@
       "label": "node:http",
       "kind": "external",
       "sub": "module"
+    },
+    {
+      "id": "f:src/readings/scope/structure-contract.ts",
+      "parent": "c:src/readings",
+      "label": "structure-contract.ts",
+      "kind": "file",
+      "sub": "src/readings/scope/structure-contract.ts",
+      "path": "src/readings/scope/structure-contract.ts"
+    },
+    {
+      "id": "s:src/readings/scope/structure-contract.ts#StructureOptions",
+      "parent": "f:src/readings/scope/structure-contract.ts",
+      "label": "StructureOptions",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/structure-contract.ts",
+      "line": 5,
+      "prose": "Shared projection contract for the first current-state Structure prototype.\nMeanings and IDs come from canonical declarations; layout never supplies them."
+    },
+    {
+      "id": "s:src/readings/scope/structure-contract.ts#DEFAULT_STRUCTURE_OPTIONS",
+      "parent": "f:src/readings/scope/structure-contract.ts",
+      "label": "DEFAULT_STRUCTURE_OPTIONS",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/readings/scope/structure-contract.ts",
+      "line": 11
+    },
+    {
+      "id": "s:src/readings/scope/structure-contract.ts#StructureGuarantee",
+      "parent": "f:src/readings/scope/structure-contract.ts",
+      "label": "StructureGuarantee",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/structure-contract.ts",
+      "line": 14
+    },
+    {
+      "id": "s:src/readings/scope/structure-contract.ts#StructureComponent",
+      "parent": "f:src/readings/scope/structure-contract.ts",
+      "label": "StructureComponent",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/structure-contract.ts",
+      "line": 26
+    },
+    {
+      "id": "s:src/readings/scope/structure-contract.ts#StructureRelationship",
+      "parent": "f:src/readings/scope/structure-contract.ts",
+      "label": "StructureRelationship",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/structure-contract.ts",
+      "line": 41
+    },
+    {
+      "id": "s:src/readings/scope/structure-contract.ts#StructureModel",
+      "parent": "f:src/readings/scope/structure-contract.ts",
+      "label": "StructureModel",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/structure-contract.ts",
+      "line": 52
+    },
+    {
+      "id": "f:src/readings/scope/structure-model.ts",
+      "parent": "c:src/readings",
+      "label": "structure-model.ts",
+      "kind": "file",
+      "sub": "src/readings/scope/structure-model.ts",
+      "path": "src/readings/scope/structure-model.ts"
+    },
+    {
+      "id": "s:src/readings/scope/structure-model.ts#buildStructureModel",
+      "parent": "f:src/readings/scope/structure-model.ts",
+      "label": "buildStructureModel",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/readings/scope/structure-model.ts",
+      "line": 15,
+      "prose": "Pure architectural projection. It selects canonical meanings without reading source,\nevaluating evidence, or interpreting imports as architecture."
     },
     {
       "id": "f:src/readings/scope-model.ts",
@@ -8334,7 +8622,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 16
+      "line": 17
     },
     {
       "id": "s:src/types.ts#Bindings",
@@ -8343,7 +8631,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 18
+      "line": 19
     },
     {
       "id": "s:src/types.ts#Graph",
@@ -8352,7 +8640,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 28
+      "line": 29
     },
     {
       "id": "s:src/types.ts#SpecGuaranteeLinks",
@@ -8361,7 +8649,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 34,
+      "line": 36,
       "prose": "A raw spec parsed from a *.spec.md file."
     },
     {
@@ -8371,7 +8659,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 35
+      "line": 37
     },
     {
       "id": "s:src/types.ts#LanguageAdapter",
@@ -8380,7 +8668,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 38,
+      "line": 40,
       "prose": "How to read a language's code — symbols, imports, and where docblocks live."
     },
     {
@@ -8390,7 +8678,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 48,
+      "line": 50,
       "prose": "How to read a platform's infra config (optional — null platform = none)."
     },
     {
@@ -8400,7 +8688,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/types.ts",
-      "line": 56
+      "line": 58
     },
     {
       "id": "f:src/verification/boundary.ts",
@@ -10494,6 +10782,22 @@
       "prose": "structural.test.ts — the temporal ledger that powers `coherence log [--strict]`. Its\nwhole job is to make a LOSS loud: a dropped invariant, a removed boundary anchor, or a\nsilently-rewired chokepoint is exactly the diff a prose review misses. diffGraphs is the\npure core; renderDiff returns the loss count that --strict turns into a nonzero exit."
     },
     {
+      "id": "f:test/structure-layout.test.ts",
+      "parent": "c:test",
+      "label": "structure-layout.test.ts",
+      "kind": "file",
+      "sub": "test/structure-layout.test.ts",
+      "path": "test/structure-layout.test.ts"
+    },
+    {
+      "id": "f:test/structure-semantics.test.ts",
+      "parent": "c:test",
+      "label": "structure-semantics.test.ts",
+      "kind": "file",
+      "sub": "test/structure-semantics.test.ts",
+      "path": "test/structure-semantics.test.ts"
+    },
+    {
       "id": "f:test/subsystem-ownership.test.ts",
       "parent": "c:test",
       "label": "subsystem-ownership.test.ts",
@@ -11171,6 +11475,12 @@
       "kind": "imports"
     },
     {
+      "id": "f:src/derivation/architecture.ts->f:src/types.ts:imports",
+      "source": "f:src/derivation/architecture.ts",
+      "target": "f:src/types.ts",
+      "kind": "imports"
+    },
+    {
       "id": "f:src/derivation/derive.ts->x:node:fs/promises:imports",
       "source": "f:src/derivation/derive.ts",
       "target": "x:node:fs/promises",
@@ -11222,6 +11532,12 @@
       "id": "f:src/derivation/derive.ts->f:src/derivation/import-aliases.ts:imports",
       "source": "f:src/derivation/derive.ts",
       "target": "f:src/derivation/import-aliases.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/derivation/derive.ts->f:src/derivation/architecture.ts:imports",
+      "source": "f:src/derivation/derive.ts",
+      "target": "f:src/derivation/architecture.ts",
       "kind": "imports"
     },
     {
@@ -11306,6 +11622,12 @@
       "id": "f:src/derivation/walk.ts->f:src/types.ts:imports",
       "source": "f:src/derivation/walk.ts",
       "target": "f:src/types.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/derivation/walk.ts->f:src/derivation/architecture.ts:imports",
+      "source": "f:src/derivation/walk.ts",
+      "target": "f:src/derivation/architecture.ts",
       "kind": "imports"
     },
     {
@@ -13037,6 +13359,12 @@
       "kind": "imports"
     },
     {
+      "id": "f:src/readings/scope/configuration.ts->f:src/readings/scope/structure-contract.ts:imports",
+      "source": "f:src/readings/scope/configuration.ts",
+      "target": "f:src/readings/scope/structure-contract.ts",
+      "kind": "imports"
+    },
+    {
       "id": "f:src/readings/scope/server.ts->x:node:http:imports",
       "source": "f:src/readings/scope/server.ts",
       "target": "x:node:http",
@@ -13094,6 +13422,24 @@
       "id": "f:src/readings/scope/server.ts->f:src/readings/render-scope.ts:imports",
       "source": "f:src/readings/scope/server.ts",
       "target": "f:src/readings/render-scope.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/structure-contract.ts->f:src/readings/scope/catalog.ts:imports",
+      "source": "f:src/readings/scope/structure-contract.ts",
+      "target": "f:src/readings/scope/catalog.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/structure-model.ts->f:src/readings/scope/catalog.ts:imports",
+      "source": "f:src/readings/scope/structure-model.ts",
+      "target": "f:src/readings/scope/catalog.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/structure-model.ts->f:src/readings/scope/structure-contract.ts:imports",
+      "source": "f:src/readings/scope/structure-model.ts",
+      "target": "f:src/readings/scope/structure-contract.ts",
       "kind": "imports"
     },
     {
@@ -17435,6 +17781,54 @@
       "kind": "imports"
     },
     {
+      "id": "f:test/structure-layout.test.ts->x:node:test:imports",
+      "source": "f:test/structure-layout.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/structure-layout.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/structure-layout.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/structure-layout.test.ts->x:@xyflow/react:imports",
+      "source": "f:test/structure-layout.test.ts",
+      "target": "x:@xyflow/react",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/structure-layout.test.ts->f:src/readings/scope/structure-contract.ts:imports",
+      "source": "f:test/structure-layout.test.ts",
+      "target": "f:src/readings/scope/structure-contract.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/structure-semantics.test.ts->x:node:test:imports",
+      "source": "f:test/structure-semantics.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/structure-semantics.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/structure-semantics.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/structure-semantics.test.ts->f:src/readings/scope/catalog.ts:imports",
+      "source": "f:test/structure-semantics.test.ts",
+      "target": "f:src/readings/scope/catalog.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/structure-semantics.test.ts->f:src/readings/scope/structure-model.ts:imports",
+      "source": "f:test/structure-semantics.test.ts",
+      "target": "f:src/readings/scope/structure-model.ts",
+      "kind": "imports"
+    },
+    {
       "id": "f:test/subsystem-ownership.test.ts->x:node:test:imports",
       "source": "f:test/subsystem-ownership.test.ts",
       "target": "x:node:test",
@@ -18053,5 +18447,187 @@
       "kind": "imports"
     }
   ],
-  "bindings": null
+  "bindings": null,
+  "architecture": {
+    "declarations": [
+      {
+        "kind": "purpose",
+        "id": "project-purpose",
+        "text": "Coherence helps people and agents keep a software project understandable and accountable as it changes. Authored specs name responsibilities and promises; a shared source model makes them navigable; verification tests declared claims; durable evidence carries decisions and results into the next session.",
+        "line": 11,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "entrance",
+        "id": "cli",
+        "label": "Explore or check a project",
+        "component": "src",
+        "anchor": "src/cli.ts",
+        "description": "The CLI loads the project configuration and dispatches commands to derive maps, inspect evidence, verify promises and record work. Begin here for the command-driven life of a project.",
+        "line": 12,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "entrance",
+        "id": "agent-session",
+        "label": "Start an agent session",
+        "component": "src/lifecycle",
+        "anchor": "src/lifecycle/hooks.ts#runHook",
+        "description": "Lifecycle hooks connect an agent host to repository instructions, prior decisions, assigned work and attributable observations. Begin here for continuity across sessions.",
+        "line": 13,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "relationship",
+        "id": "command-model",
+        "from": "src",
+        "to": "src/derivation",
+        "label": "Requests the project model",
+        "because": "CLI reading and checking commands ask buildGraph for the source and spec population selected by project configuration. Derivation owns what enters that model.",
+        "line": 14,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "relationship",
+        "id": "language-seam",
+        "from": "src/derivation",
+        "to": "src/adapters",
+        "label": "Delegates language interpretation",
+        "because": "Graph derivation resolves the configured language adapter and obtains symbols, imports and source prose through its shared adapter interface. Adapters own syntax and platform knowledge.",
+        "line": 15,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "relationship",
+        "id": "model-verification",
+        "from": "src/derivation",
+        "to": "src/verification",
+        "label": "Supplies subjects and claims",
+        "because": "runVerify evaluates claims over the derived graph. Oracle discovery and named execution evidence determine which promises can receive recorded verdicts.",
+        "line": 16,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "relationship",
+        "id": "model-diagnostics",
+        "from": "src/derivation",
+        "to": "src/diagnostics",
+        "label": "Makes change measurable",
+        "because": "Diagnostics combine the graph with source, Git observations and recorded baselines to measure declared populations, growth and evidence gaps. Each instrument retains its own limits.",
+        "line": 17,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "relationship",
+        "id": "model-taxonomy",
+        "from": "src/derivation",
+        "to": "src/taxonomy",
+        "label": "Addresses classification subjects",
+        "because": "Taxonomy captures graph-resolved files and symbols for caller-assessed roles and facets. The resulting obligations remain suggestions until explicitly mapped and assessed.",
+        "line": 18,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "relationship",
+        "id": "recorded-verification",
+        "from": "src/verification",
+        "to": "src/evidence",
+        "label": "Records scoped verdicts",
+        "because": "Verification publishes claim readings through recordVerify and can retain work-bound receipts. Skipped checks do not erase prior dated evidence.",
+        "line": 19,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "relationship",
+        "id": "evidence-orientation",
+        "from": "src/evidence",
+        "to": "src/coordination",
+        "label": "Informs the next action owed",
+        "because": "Orientation strictly reads decisions, defects, experiments and verification state alongside work and consequence ledgers. Damaged evidence outranks an actionable-looking empty projection.",
+        "line": 20,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "relationship",
+        "id": "work-instructions",
+        "from": "src/coordination",
+        "to": "src/lifecycle",
+        "label": "Supplies assigned work context",
+        "because": "Lifecycle startup reads the work graph for the exact owner session and renders its assignment without granting new authority or promoting peer work into an assignment.",
+        "line": 21,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "relationship",
+        "id": "session-memory",
+        "from": "src/lifecycle",
+        "to": "src/evidence",
+        "label": "Preserves session continuity",
+        "because": "Lifecycle startup opens attributable journal sessions and reads trusted decisions. Later hooks retain activity and observations that explain what a session actually encountered.",
+        "line": 22,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "relationship",
+        "id": "readable-model",
+        "from": "src/derivation",
+        "to": "src/readings",
+        "label": "Makes architecture navigable",
+        "because": "Reading surfaces project the canonical component hierarchy and declared promises into maps, context packets and human or agent explanations. Presentation creates no new verification authority.",
+        "line": 23,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "relationship",
+        "id": "readable-evidence",
+        "from": "src/evidence",
+        "to": "src/readings",
+        "label": "Explains what was observed",
+        "because": "Reading surfaces join retained evidence to the subjects they describe, preserving unavailable sources, dated results and explicit attribution.",
+        "line": 24,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      },
+      {
+        "kind": "relationship",
+        "id": "executable-contracts",
+        "from": "test",
+        "to": "src/verification",
+        "label": "Exercises the harness contracts",
+        "because": "The configured test population supplies focused and end-to-end oracles. A test import alone is never proof that a named oracle executed or passed.",
+        "line": 25,
+        "owner": ".",
+        "spec": "coherence.spec.md",
+        "problems": []
+      }
+    ],
+    "problems": []
+  }
 }
