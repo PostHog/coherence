@@ -1,0 +1,4028 @@
+[
+  {
+    "width": 1440,
+    "name": "opening",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "selected": null,
+    "titles": [
+      14.72340087890625,
+      14.72340087890625,
+      14.72340087890625,
+      14.723402404785157,
+      14.723403549194336,
+      14.723403549194336,
+      14.723403549194336,
+      14.72340087890625,
+      14.723402404785157,
+      14.72340087890625,
+      14.72340087890625
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [],
+    "camera": "translate(210.344px, 118.57px) scale(0.566285)"
+  },
+  {
+    "width": 1440,
+    "name": "inspected",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "selected": "component:src/evidence",
+    "titles": [
+      14.72340087890625,
+      14.72340087890625,
+      14.72340087890625,
+      14.723402404785157,
+      14.723403549194336,
+      14.723403549194336,
+      14.723403549194336,
+      14.72340087890625,
+      14.723402404785157,
+      14.72340087890625,
+      14.72340087890625
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [],
+    "camera": "translate(210.344px, 118.57px) scale(0.566285)",
+    "sidebar": "Durable evidence"
+  },
+  {
+    "width": 1440,
+    "name": "expanded",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": "M 1560 370 L 1588 370 C 1594.627417 370 1600 375.372583 1600 382 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1432 850 C 1414.326888 850 1400 864.326888 1400 882 L 1400 1263",
+      "ownership:invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": "M 1560 540 L 1588 540 C 1594.627417 540 1600 545.372583 1600 552 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1496 850 C 1487.163444 850 1480 857.163444 1480 866 L 1480 1218 C 1480 1235.673112 1494.326888 1250 1512 1250 L 1588 1250 C 1605.673112 1250 1620 1264.326888 1620 1282 L 1620 1348 C 1620 1354.627417 1625.372583 1360 1632 1360 L 1660 1360",
+      "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": "M 1240 370 L 1212 370 C 1205.372583 370 1200 375.372583 1200 382 L 1200 688 C 1200 705.673112 1214.326888 720 1232 720 L 1258 720 C 1275.673112 720 1290 734.326888 1290 752 L 1290 845 C 1290 847.76142375 1292.23857625 850 1295 850 L 1295 850 C 1297.76142375 850 1300 852.23857625 1300 855 L 1300 1218 C 1300 1235.673112 1285.673112 1250 1268 1250 L 1212 1250 C 1194.326888 1250 1180 1264.326888 1180 1282 L 1180 1348 C 1180 1354.627417 1174.627417 1360 1168 1360 L 1140 1360"
+    },
+    "selected": "component:src/evidence",
+    "titles": [
+      14.72340087890625,
+      14.72340087890625,
+      14.72340087890625,
+      14.723402404785157,
+      14.723403549194336,
+      14.723403549194336,
+      14.723403549194336,
+      14.72340087890625,
+      14.723402404785157,
+      14.72340087890625,
+      14.72340087890625
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      }
+    ],
+    "camera": "translate(210.344px, 118.57px) scale(0.566285)",
+    "sidebar": "Durable evidence"
+  },
+  {
+    "width": 1440,
+    "name": "local-promises",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": "M 1560 370 L 1588 370 C 1594.627417 370 1600 375.372583 1600 382 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1432 850 C 1414.326888 850 1400 864.326888 1400 882 L 1400 1263",
+      "ownership:invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": "M 1560 540 L 1588 540 C 1594.627417 540 1600 545.372583 1600 552 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1496 850 C 1487.163444 850 1480 857.163444 1480 866 L 1480 1218 C 1480 1235.673112 1494.326888 1250 1512 1250 L 1588 1250 C 1605.673112 1250 1620 1264.326888 1620 1282 L 1620 1348 C 1620 1354.627417 1625.372583 1360 1632 1360 L 1660 1360",
+      "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": "M 1240 370 L 1212 370 C 1205.372583 370 1200 375.372583 1200 382 L 1200 688 C 1200 705.673112 1214.326888 720 1232 720 L 1258 720 C 1275.673112 720 1290 734.326888 1290 752 L 1290 845 C 1290 847.76142375 1292.23857625 850 1295 850 L 1295 850 C 1297.76142375 850 1300 852.23857625 1300 855 L 1300 1218 C 1300 1235.673112 1285.673112 1250 1268 1250 L 1212 1250 C 1194.326888 1250 1180 1264.326888 1180 1282 L 1180 1348 C 1180 1354.627417 1174.627417 1360 1168 1360 L 1140 1360"
+    },
+    "selected": "component:src/evidence",
+    "titles": [
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      }
+    ],
+    "camera": "translate(-630px, -795.775px) scale(0.85)",
+    "sidebar": "Durable evidence"
+  },
+  {
+    "width": 1440,
+    "name": "guarantee",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": "M 1560 370 L 1588 370 C 1594.627417 370 1600 375.372583 1600 382 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1432 850 C 1414.326888 850 1400 864.326888 1400 882 L 1400 1263",
+      "ownership:invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": "M 1560 540 L 1588 540 C 1594.627417 540 1600 545.372583 1600 552 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1496 850 C 1487.163444 850 1480 857.163444 1480 866 L 1480 1218 C 1480 1235.673112 1494.326888 1250 1512 1250 L 1588 1250 C 1605.673112 1250 1620 1264.326888 1620 1282 L 1620 1348 C 1620 1354.627417 1625.372583 1360 1632 1360 L 1660 1360",
+      "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": "M 1240 370 L 1212 370 C 1205.372583 370 1200 375.372583 1200 382 L 1200 688 C 1200 705.673112 1214.326888 720 1232 720 L 1258 720 C 1275.673112 720 1290 734.326888 1290 752 L 1290 845 C 1290 847.76142375 1292.23857625 850 1295 850 L 1295 850 C 1297.76142375 850 1300 852.23857625 1300 855 L 1300 1218 C 1300 1235.673112 1285.673112 1250 1268 1250 L 1212 1250 C 1194.326888 1250 1180 1264.326888 1180 1282 L 1180 1348 C 1180 1354.627417 1174.627417 1360 1168 1360 L 1140 1360"
+    },
+    "selected": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+    "titles": [
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      }
+    ],
+    "camera": "translate(-630px, -795.775px) scale(0.85)",
+    "sidebar": "a skipped run never clobbers an oracle's recorded verdict"
+  },
+  {
+    "width": 1440,
+    "name": "near",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": "M 1560 370 L 1588 370 C 1594.627417 370 1600 375.372583 1600 382 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1432 850 C 1414.326888 850 1400 864.326888 1400 882 L 1400 1263",
+      "ownership:invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": "M 1560 540 L 1588 540 C 1594.627417 540 1600 545.372583 1600 552 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1496 850 C 1487.163444 850 1480 857.163444 1480 866 L 1480 1218 C 1480 1235.673112 1494.326888 1250 1512 1250 L 1588 1250 C 1605.673112 1250 1620 1264.326888 1620 1282 L 1620 1348 C 1620 1354.627417 1625.372583 1360 1632 1360 L 1660 1360",
+      "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": "M 1240 370 L 1212 370 C 1205.372583 370 1200 375.372583 1200 382 L 1200 688 C 1200 705.673112 1214.326888 720 1232 720 L 1258 720 C 1275.673112 720 1290 734.326888 1290 752 L 1290 845 C 1290 847.76142375 1292.23857625 850 1295 850 L 1295 850 C 1297.76142375 850 1300 852.23857625 1300 855 L 1300 1218 C 1300 1235.673112 1285.673112 1250 1268 1250 L 1212 1250 C 1194.326888 1250 1180 1264.326888 1180 1282 L 1180 1348 C 1180 1354.627417 1174.627417 1360 1168 1360 L 1140 1360"
+    },
+    "selected": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+    "titles": [
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1,
+      22.1
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      }
+    ],
+    "camera": "translate(-630px, -795.775px) scale(0.85)",
+    "sidebar": "a skipped run never clobbers an oracle's recorded verdict"
+  },
+  {
+    "width": 1440,
+    "name": "far",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": "M 1560 370 L 1588 370 C 1594.627417 370 1600 375.372583 1600 382 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1432 850 C 1414.326888 850 1400 864.326888 1400 882 L 1400 1263",
+      "ownership:invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": "M 1560 540 L 1588 540 C 1594.627417 540 1600 545.372583 1600 552 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1496 850 C 1487.163444 850 1480 857.163444 1480 866 L 1480 1218 C 1480 1235.673112 1494.326888 1250 1512 1250 L 1588 1250 C 1605.673112 1250 1620 1264.326888 1620 1282 L 1620 1348 C 1620 1354.627417 1625.372583 1360 1632 1360 L 1660 1360",
+      "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": "M 1240 370 L 1212 370 C 1205.372583 370 1200 375.372583 1200 382 L 1200 688 C 1200 705.673112 1214.326888 720 1232 720 L 1258 720 C 1275.673112 720 1290 734.326888 1290 752 L 1290 845 C 1290 847.76142375 1292.23857625 850 1295 850 L 1295 850 C 1297.76142375 850 1300 852.23857625 1300 855 L 1300 1218 C 1300 1235.673112 1285.673112 1250 1268 1250 L 1212 1250 C 1194.326888 1250 1180 1264.326888 1180 1282 L 1180 1348 C 1180 1354.627417 1174.627417 1360 1168 1360 L 1140 1360"
+    },
+    "selected": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+    "titles": [
+      6.167706298828125,
+      6.1677001953125,
+      6.167703247070312,
+      6.167703247070312,
+      6.167705154418945,
+      6.167705154418945,
+      6.167705154418945,
+      6.167703247070312,
+      6.167703247070312,
+      6.1677001953125,
+      6.167706298828125
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "0",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "0",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "0",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      }
+    ],
+    "camera": "translate(227.893px, 44.6536px) scale(0.237219)",
+    "sidebar": "a skipped run never clobbers an oracle's recorded verdict"
+  },
+  {
+    "width": 1440,
+    "name": "folded",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "selected": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+    "titles": [
+      6.167706298828125,
+      6.1677001953125,
+      6.167703247070312,
+      6.167703247070312,
+      6.167705154418945,
+      6.167705154418945,
+      6.167705154418945,
+      6.167703247070312,
+      6.167703247070312,
+      6.1677001953125,
+      6.167706298828125
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "0",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "0",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "0",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [],
+    "camera": "translate(227.893px, 44.6536px) scale(0.237219)",
+    "sidebar": "a skipped run never clobbers an oracle's recorded verdict"
+  },
+  {
+    "width": 1440,
+    "name": "all-handoffs",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "relation:architecture:.:work-instructions": "M 1630 23 L 1630 -13 C 1630 -47.65292195472122 1603.6529219547213 -60 1569 -60 L 1549 -60 L 1351 -60 L 1331 -60 C 1326 -60 1321 110 1316 110 L 1280 110",
+      "relation:architecture:.:readable-model": "M 440 683 L 440 711 C 440 715.97056275 444.02943725 720 449 720 L 525 720 C 527.76142375 720 530 717.76142375 530 715 L 530 715 C 530 712.23857625 532.23857625 710 535 710 L 535 710 C 537.76142375 710 540 712.23857625 540 715 L 540 732 L 540 794 L 540 814 C 540 877.3078194222483 440.6921805777517 950 504 950 L 540 950",
+      "relation:architecture:.:model-diagnostics": "M 600 510 L 628 510 C 640.1502645 510 650 500.1502645 650 488 L 650 412 C 650 394.326888 635.673112 380 618 380 L 582 380 C 564.326888 380 550 365.673112 550 348 L 550 262 C 550 244.326888 535.673112 230 518 230 L 402 230 C 384.326888 230 370 215.673112 370 198 L 370 -51 C 370 -55.97056275 374.02943725 -60 379 -60 L 391 -60 L 589 -60 L 601 -60 C 605.97056275 -60 610 -55.97056275 610 -51 L 610 -22 C 610 -4.326888 595.673112 10 578 10 L 532 10 C 514.326888 10 500 24.326888 500 42 L 500 108 C 500 114.627417 505.372583 120 512 120 L 540 120",
+      "relation:architecture:.:model-taxonomy": "M 410 683 L 410 1038 C 410 1055.673112 424.326888 1070 442 1070 L 580 1070 C 596.5685425 1070 610 1083.4314575 610 1100 L 610 1121 C 610 1125.97056275 605.97056275 1130 601 1130 L 589 1130 L 391 1130 L 371 1130 C 366 1130 361 950 356 950 L 320 950",
+      "relation:architecture:.:evidence-orientation": "M 1560 540 L 1596 540 C 1686.6188722066215 540 1710 464.6188722066215 1710 374 L 1710 354 L 1710 292 L 1710 242 C 1710 224.326888 1695.673112 210 1678 210 L 1492 210 C 1474.326888 210 1460 195.673112 1460 178 L 1460 122 C 1460 115.372583 1465.372583 110 1472 110 L 1500 110",
+      "relation:architecture:.:language-seam": "M 600 570 L 636 570 C 647.6666666666666 570 659.3333333333334 760 671 760 L 691 760 L 889 760 L 909 760 C 934 760 959 950 984 950 L 1020 950",
+      "relation:architecture:.:executable-contracts": "M 1500 960 L 1472 960 C 1465.372583 960 1460 954.627417 1460 948 L 1460 842 C 1460 824.326888 1474.326888 810 1492 810 L 1505 810 C 1518.80711875 810 1530 798.80711875 1530 785 L 1530 769 C 1530 764.02943725 1525.97056275 760 1521 760 L 1509 760 L 1311 760 L 1299 760 C 1294.02943725 760 1290 755.97056275 1290 751 L 1290 735 C 1290 721.19288125 1278.80711875 710 1265 710 L 1152 710 C 1134.326888 710 1120 695.673112 1120 678 L 1120 552 C 1120 545.372583 1114.627417 540 1108 540 L 1080 540",
+      "relation:architecture:.:readable-evidence": "M 1240 570 L 1132 570 C 1114.326888 570 1100 584.326888 1100 602 L 1100 688 C 1100 705.673112 1085.673112 720 1068 720 L 1032 720 C 1014.326888 720 1000 734.326888 1000 752 L 1000 1048 C 1000 1065.673112 1014.326888 1080 1032 1080 L 1130 1080 C 1141.045695 1080 1150 1088.954305 1150 1100 L 1150 1111 C 1150 1115.97056275 1145.97056275 1120 1141 1120 L 1129 1120 L 931 1120 L 911 1120 C 886 1120 861 950 836 950 L 800 950"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "relation:architecture:.:work-instructions": "M 1630 23 L 1630 -13 C 1630 -47.65292195472122 1603.6529219547213 -60 1569 -60 L 1549 -60 L 1351 -60 L 1331 -60 C 1326 -60 1321 110 1316 110 L 1280 110",
+      "relation:architecture:.:readable-model": "M 440 683 L 440 711 C 440 715.97056275 444.02943725 720 449 720 L 525 720 C 527.76142375 720 530 717.76142375 530 715 L 530 715 C 530 712.23857625 532.23857625 710 535 710 L 535 710 C 537.76142375 710 540 712.23857625 540 715 L 540 732 L 540 794 L 540 814 C 540 877.3078194222483 440.6921805777517 950 504 950 L 540 950",
+      "relation:architecture:.:model-diagnostics": "M 600 510 L 628 510 C 640.1502645 510 650 500.1502645 650 488 L 650 412 C 650 394.326888 635.673112 380 618 380 L 582 380 C 564.326888 380 550 365.673112 550 348 L 550 262 C 550 244.326888 535.673112 230 518 230 L 402 230 C 384.326888 230 370 215.673112 370 198 L 370 -51 C 370 -55.97056275 374.02943725 -60 379 -60 L 391 -60 L 589 -60 L 601 -60 C 605.97056275 -60 610 -55.97056275 610 -51 L 610 -22 C 610 -4.326888 595.673112 10 578 10 L 532 10 C 514.326888 10 500 24.326888 500 42 L 500 108 C 500 114.627417 505.372583 120 512 120 L 540 120",
+      "relation:architecture:.:model-taxonomy": "M 410 683 L 410 1038 C 410 1055.673112 424.326888 1070 442 1070 L 580 1070 C 596.5685425 1070 610 1083.4314575 610 1100 L 610 1121 C 610 1125.97056275 605.97056275 1130 601 1130 L 589 1130 L 391 1130 L 371 1130 C 366 1130 361 950 356 950 L 320 950",
+      "relation:architecture:.:evidence-orientation": "M 1560 540 L 1596 540 C 1686.6188722066215 540 1710 464.6188722066215 1710 374 L 1710 354 L 1710 292 L 1710 242 C 1710 224.326888 1695.673112 210 1678 210 L 1492 210 C 1474.326888 210 1460 195.673112 1460 178 L 1460 122 C 1460 115.372583 1465.372583 110 1472 110 L 1500 110",
+      "relation:architecture:.:language-seam": "M 600 570 L 636 570 C 647.6666666666666 570 659.3333333333334 760 671 760 L 691 760 L 889 760 L 909 760 C 934 760 959 950 984 950 L 1020 950",
+      "relation:architecture:.:executable-contracts": "M 1500 960 L 1472 960 C 1465.372583 960 1460 954.627417 1460 948 L 1460 842 C 1460 824.326888 1474.326888 810 1492 810 L 1505 810 C 1518.80711875 810 1530 798.80711875 1530 785 L 1530 769 C 1530 764.02943725 1525.97056275 760 1521 760 L 1509 760 L 1311 760 L 1299 760 C 1294.02943725 760 1290 755.97056275 1290 751 L 1290 735 C 1290 721.19288125 1278.80711875 710 1265 710 L 1152 710 C 1134.326888 710 1120 695.673112 1120 678 L 1120 552 C 1120 545.372583 1114.627417 540 1108 540 L 1080 540",
+      "relation:architecture:.:readable-evidence": "M 1240 570 L 1132 570 C 1114.326888 570 1100 584.326888 1100 602 L 1100 688 C 1100 705.673112 1085.673112 720 1068 720 L 1032 720 C 1014.326888 720 1000 734.326888 1000 752 L 1000 1048 C 1000 1065.673112 1014.326888 1080 1032 1080 L 1130 1080 C 1141.045695 1080 1150 1088.954305 1150 1100 L 1150 1111 C 1150 1115.97056275 1145.97056275 1120 1141 1120 L 1129 1120 L 931 1120 L 911 1120 C 886 1120 861 950 836 950 L 800 950"
+    },
+    "selected": null,
+    "titles": [
+      14.3404296875,
+      14.340423583984375,
+      14.340423583984375,
+      14.340426635742187,
+      14.340421676635742,
+      14.340426635742187,
+      14.340426635742187,
+      14.340423583984375,
+      14.340426635742187,
+      14.340423583984375,
+      14.3404296875
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [],
+    "camera": "translate(223.601px, 126.11px) scale(0.551555)"
+  },
+  {
+    "width": 1440,
+    "name": "reliances",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb": "M 1080 510 L 1158 510 C 1175.673112 510 1190 495.673112 1190 478 L 1190 385 C 1190 376.71572875 1196.71572875 370 1205 370 L 1205 370 C 1213.28427125 370 1220 363.28427125 1220 355 L 1220 332 C 1220 314.326888 1234.326888 300 1252 300 L 1307 300 C 1314.17970175 300 1320 305.82029825 1320 313 L 1320 341",
+      "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7": "M 1280 80 L 1316 80 C 1441.2916697151093 80 1480 179.70833028489085 1480 305 L 1480 341",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1": "M 540 920 L 372 920 C 354.326888 920 340 905.673112 340 888 L 340 732 C 340 714.326888 325.673112 700 308 700 L 292 700 C 274.326888 700 260 685.673112 260 668 L 260 402 C 260 384.326888 274.326888 370 292 370 L 298 370 C 315.673112 370 330 355.673112 330 338 L 330 332 C 330 314.326888 344.326888 300 362 300 L 427 300 C 434.17970175 300 440 305.82029825 440 313 L 440 341"
+    },
+    "allRoutes": {
+      "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb": "M 1080 510 L 1158 510 C 1175.673112 510 1190 495.673112 1190 478 L 1190 385 C 1190 376.71572875 1196.71572875 370 1205 370 L 1205 370 C 1213.28427125 370 1220 363.28427125 1220 355 L 1220 332 C 1220 314.326888 1234.326888 300 1252 300 L 1307 300 C 1314.17970175 300 1320 305.82029825 1320 313 L 1320 341",
+      "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7": "M 1280 80 L 1316 80 C 1441.2916697151093 80 1480 179.70833028489085 1480 305 L 1480 341",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1": "M 540 920 L 372 920 C 354.326888 920 340 905.673112 340 888 L 340 732 C 340 714.326888 325.673112 700 308 700 L 292 700 C 274.326888 700 260 685.673112 260 668 L 260 402 C 260 384.326888 274.326888 370 292 370 L 298 370 C 315.673112 370 330 355.673112 330 338 L 330 332 C 330 314.326888 344.326888 300 362 300 L 427 300 C 434.17970175 300 440 305.82029825 440 313 L 440 341"
+    },
+    "selected": null,
+    "titles": [
+      14.3404296875,
+      14.340423583984375,
+      14.340423583984375,
+      14.340426635742187,
+      14.340421676635742,
+      14.340426635742187,
+      14.340426635742187,
+      14.340423583984375,
+      14.340426635742187,
+      14.340423583984375,
+      14.3404296875
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [],
+    "camera": "translate(223.601px, 126.11px) scale(0.551555)"
+  },
+  {
+    "width": 1440,
+    "name": "all-fields",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 440 860 L 440 896 C 440 1103.0865579896483 353.9134420103516 1340 561 1340 L 581 1340 L 779 1340 L 799.5 1340 C 810.821837375 1340 820 1330.821837375 820 1319.5 L 820 932 C 820 914.326888 805.673112 900 788 900 L 752 900 C 734.326888 900 720 885.673112 720 868 L 720 692 C 720 685.372583 725.372583 680 732 680 L 760 680",
+      "relation:architecture:.:recorded-verification": "M 890 885 L 890 921 C 890 1121.420320826008 840.579679173992 1340 1041 1340 L 1061 1340 L 1259 1340 L 1271 1340 C 1275.97056275 1340 1280 1335.97056275 1280 1331 L 1280 1310 C 1280 1293.4314575 1266.5685425 1280 1250 1280 L 1032 1280 C 1014.326888 1280 1000 1265.673112 1000 1248 L 1000 932 C 1000 914.326888 1014.326888 900 1032 900 L 1168 900 C 1185.673112 900 1200 885.673112 1200 868 L 1200 702 C 1200 695.372583 1205.372583 690 1212 690 L 1240 690",
+      "relation:architecture:.:command-model": "M 190 352 L 190 380 C 190 385.5228475 185.5228475 390 180 390 L 145 390 C 142.23857625 390 140 387.76142375 140 385 L 140 385 C 140 382.23857625 137.76142375 380 135 380 L 135 380 C 132.23857625 380 130 382.23857625 130 385 L 130 402 L 130 464 L 130 484 C 130 536.4237541578243 191.5762458421757 660 244 660 L 280 660",
+      "relation:architecture:.:session-memory": "M 1280 160 L 1308 160 C 1320.1502645 160 1330 150.1502645 1330 138 L 1330 -78 C 1330 -95.673112 1344.326888 -110 1362 -110 L 1440 -110 C 1445.5228475 -110 1450 -105.5228475 1450 -100 L 1450 -88 L 1450 -26 L 1450 358 C 1450 375.673112 1435.673112 390 1418 390 L 1232 390 C 1214.326888 390 1200 404.326888 1200 422 L 1200 648 C 1200 654.627417 1205.372583 660 1212 660 L 1240 660"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 440 860 L 440 896 C 440 1103.0865579896483 353.9134420103516 1340 561 1340 L 581 1340 L 779 1340 L 799.5 1340 C 810.821837375 1340 820 1330.821837375 820 1319.5 L 820 932 C 820 914.326888 805.673112 900 788 900 L 752 900 C 734.326888 900 720 885.673112 720 868 L 720 692 C 720 685.372583 725.372583 680 732 680 L 760 680",
+      "relation:architecture:.:recorded-verification": "M 890 885 L 890 921 C 890 1121.420320826008 840.579679173992 1340 1041 1340 L 1061 1340 L 1259 1340 L 1271 1340 C 1275.97056275 1340 1280 1335.97056275 1280 1331 L 1280 1310 C 1280 1293.4314575 1266.5685425 1280 1250 1280 L 1032 1280 C 1014.326888 1280 1000 1265.673112 1000 1248 L 1000 932 C 1000 914.326888 1014.326888 900 1032 900 L 1168 900 C 1185.673112 900 1200 885.673112 1200 868 L 1200 702 C 1200 695.372583 1205.372583 690 1212 690 L 1240 690",
+      "relation:architecture:.:command-model": "M 190 352 L 190 380 C 190 385.5228475 185.5228475 390 180 390 L 145 390 C 142.23857625 390 140 387.76142375 140 385 L 140 385 C 140 382.23857625 137.76142375 380 135 380 L 135 380 C 132.23857625 380 130 382.23857625 130 385 L 130 402 L 130 464 L 130 484 C 130 536.4237541578243 191.5762458421757 660 244 660 L 280 660",
+      "relation:architecture:.:session-memory": "M 1280 160 L 1308 160 C 1320.1502645 160 1330 150.1502645 1330 138 L 1330 -78 C 1330 -95.673112 1344.326888 -110 1362 -110 L 1440 -110 C 1445.5228475 -110 1450 -105.5228475 1450 -100 L 1450 -88 L 1450 -26 L 1450 358 C 1450 375.673112 1435.673112 390 1418 390 L 1232 390 C 1214.326888 390 1200 404.326888 1200 422 L 1200 648 C 1200 654.627417 1205.372583 660 1212 660 L 1240 660"
+    },
+    "selected": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+    "titles": [
+      12.348663330078125,
+      12.3486572265625,
+      12.348660278320313,
+      12.348660278320313,
+      12.348661041259765,
+      12.348661041259765,
+      12.348661041259765,
+      12.348660278320313,
+      12.348660278320313,
+      12.3486572265625,
+      12.348663330078125
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 360
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 465,
+        "width": 320,
+        "height": 445
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 465,
+        "width": 320,
+        "height": 395
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 465,
+        "width": 320,
+        "height": 420
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 930,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 930,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 930,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 930,
+        "width": 260,
+        "height": 360
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 403,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 403,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 403,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [],
+    "camera": "translate(132.546px, 103.316px) scale(0.474949)",
+    "sidebar": "a skipped run never clobbers an oracle's recorded verdict"
+  },
+  {
+    "width": 1440,
+    "name": "reconfigured-promises",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 440 860 L 440 896 C 440 1103.0865579896483 353.9134420103516 1340 561 1340 L 581 1340 L 779 1340 L 799.5 1340 C 810.821837375 1340 820 1330.821837375 820 1319.5 L 820 932 C 820 914.326888 805.673112 900 788 900 L 752 900 C 734.326888 900 720 885.673112 720 868 L 720 692 C 720 685.372583 725.372583 680 732 680 L 760 680",
+      "relation:architecture:.:recorded-verification": "M 890 885 L 890 921 C 890 1121.420320826008 840.579679173992 1340 1041 1340 L 1061 1340 L 1259 1340 L 1271 1340 C 1275.97056275 1340 1280 1335.97056275 1280 1331 L 1280 1310 C 1280 1293.4314575 1266.5685425 1280 1250 1280 L 1032 1280 C 1014.326888 1280 1000 1265.673112 1000 1248 L 1000 932 C 1000 914.326888 1014.326888 900 1032 900 L 1168 900 C 1185.673112 900 1200 885.673112 1200 868 L 1200 702 C 1200 695.372583 1205.372583 690 1212 690 L 1240 690",
+      "relation:architecture:.:command-model": "M 190 352 L 190 380 C 190 385.5228475 185.5228475 390 180 390 L 145 390 C 142.23857625 390 140 387.76142375 140 385 L 140 385 C 140 382.23857625 137.76142375 380 135 380 L 135 380 C 132.23857625 380 130 382.23857625 130 385 L 130 402 L 130 464 L 130 484 C 130 536.4237541578243 191.5762458421757 660 244 660 L 280 660",
+      "relation:architecture:.:session-memory": "M 1280 160 L 1308 160 C 1320.1502645 160 1330 150.1502645 1330 138 L 1330 -78 C 1330 -95.673112 1344.326888 -110 1362 -110 L 1440 -110 C 1445.5228475 -110 1450 -105.5228475 1450 -100 L 1450 -88 L 1450 -26 L 1450 358 C 1450 375.673112 1435.673112 390 1418 390 L 1232 390 C 1214.326888 390 1200 404.326888 1200 422 L 1200 648 C 1200 654.627417 1205.372583 660 1212 660 L 1240 660"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 440 860 L 440 896 C 440 1103.0865579896483 353.9134420103516 1340 561 1340 L 581 1340 L 779 1340 L 799.5 1340 C 810.821837375 1340 820 1330.821837375 820 1319.5 L 820 932 C 820 914.326888 805.673112 900 788 900 L 752 900 C 734.326888 900 720 885.673112 720 868 L 720 692 C 720 685.372583 725.372583 680 732 680 L 760 680",
+      "relation:architecture:.:recorded-verification": "M 890 885 L 890 921 C 890 1121.420320826008 840.579679173992 1340 1041 1340 L 1061 1340 L 1259 1340 L 1271 1340 C 1275.97056275 1340 1280 1335.97056275 1280 1331 L 1280 1310 C 1280 1293.4314575 1266.5685425 1280 1250 1280 L 1032 1280 C 1014.326888 1280 1000 1265.673112 1000 1248 L 1000 932 C 1000 914.326888 1014.326888 900 1032 900 L 1168 900 C 1185.673112 900 1200 885.673112 1200 868 L 1200 702 C 1200 695.372583 1205.372583 690 1212 690 L 1240 690",
+      "relation:architecture:.:command-model": "M 190 352 L 190 380 C 190 385.5228475 185.5228475 390 180 390 L 145 390 C 142.23857625 390 140 387.76142375 140 385 L 140 385 C 140 382.23857625 137.76142375 380 135 380 L 135 380 C 132.23857625 380 130 382.23857625 130 385 L 130 402 L 130 464 L 130 484 C 130 536.4237541578243 191.5762458421757 660 244 660 L 280 660",
+      "relation:architecture:.:session-memory": "M 1280 160 L 1308 160 C 1320.1502645 160 1330 150.1502645 1330 138 L 1330 -78 C 1330 -95.673112 1344.326888 -110 1362 -110 L 1440 -110 C 1445.5228475 -110 1450 -105.5228475 1450 -100 L 1450 -88 L 1450 -26 L 1450 358 C 1450 375.673112 1435.673112 390 1418 390 L 1232 390 C 1214.326888 390 1200 404.326888 1200 422 L 1200 648 C 1200 654.627417 1205.372583 660 1212 660 L 1240 660",
+      "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": "M 1240 430 L 1132 430 C 1114.326888 430 1100 444.326888 1100 462 L 1100 878 C 1100 895.673112 1085.673112 910 1068 910 L 1032 910 C 1014.326888 910 1000 924.326888 1000 942 L 1000 1518 C 1000 1535.673112 1014.326888 1550 1032 1550 L 1388 1550 C 1394.627417 1550 1400 1555.372583 1400 1562 L 1400 1590"
+    },
+    "selected": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+    "titles": [
+      12.348663330078125,
+      12.3486572265625,
+      12.348660278320313,
+      12.348660278320313,
+      12.348661041259765,
+      12.348661041259765,
+      12.348661041259765,
+      12.348660278320313,
+      12.348660278320313,
+      12.3486572265625,
+      12.348663330078125
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 360
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 465,
+        "width": 320,
+        "height": 445
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 465,
+        "width": 320,
+        "height": 395
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 465,
+        "width": 320,
+        "height": 420
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 930,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 930,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 930,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 930,
+        "width": 260,
+        "height": 360
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 403,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 403,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 403,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 1590,
+        "width": 320,
+        "height": 188,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      }
+    ],
+    "camera": "translate(132.546px, 103.316px) scale(0.474949)",
+    "sidebar": "a skipped run never clobbers an oracle's recorded verdict"
+  },
+  {
+    "width": 1280,
+    "name": "opening",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "selected": null,
+    "titles": [
+      14.72340087890625,
+      14.72340087890625,
+      14.72340087890625,
+      14.723402404785157,
+      14.723403549194336,
+      14.723403549194336,
+      14.723403549194336,
+      14.72340087890625,
+      14.723402404785157,
+      14.72340087890625,
+      14.72340087890625
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [],
+    "camera": "translate(130.344px, 118.57px) scale(0.566285)"
+  },
+  {
+    "width": 1280,
+    "name": "inspected",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "selected": "component:src/evidence",
+    "titles": [
+      14.72340087890625,
+      14.72340087890625,
+      14.72340087890625,
+      14.723402404785157,
+      14.723403549194336,
+      14.723403549194336,
+      14.723403549194336,
+      14.72340087890625,
+      14.723402404785157,
+      14.72340087890625,
+      14.72340087890625
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [],
+    "camera": "translate(130.344px, 118.57px) scale(0.566285)",
+    "sidebar": "Durable evidence"
+  },
+  {
+    "width": 1280,
+    "name": "expanded",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": "M 1560 370 L 1588 370 C 1594.627417 370 1600 375.372583 1600 382 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1432 850 C 1414.326888 850 1400 864.326888 1400 882 L 1400 1263",
+      "ownership:invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": "M 1560 540 L 1588 540 C 1594.627417 540 1600 545.372583 1600 552 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1496 850 C 1487.163444 850 1480 857.163444 1480 866 L 1480 1218 C 1480 1235.673112 1494.326888 1250 1512 1250 L 1588 1250 C 1605.673112 1250 1620 1264.326888 1620 1282 L 1620 1348 C 1620 1354.627417 1625.372583 1360 1632 1360 L 1660 1360",
+      "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": "M 1240 370 L 1212 370 C 1205.372583 370 1200 375.372583 1200 382 L 1200 688 C 1200 705.673112 1214.326888 720 1232 720 L 1258 720 C 1275.673112 720 1290 734.326888 1290 752 L 1290 845 C 1290 847.76142375 1292.23857625 850 1295 850 L 1295 850 C 1297.76142375 850 1300 852.23857625 1300 855 L 1300 1218 C 1300 1235.673112 1285.673112 1250 1268 1250 L 1212 1250 C 1194.326888 1250 1180 1264.326888 1180 1282 L 1180 1348 C 1180 1354.627417 1174.627417 1360 1168 1360 L 1140 1360"
+    },
+    "selected": "component:src/evidence",
+    "titles": [
+      14.72340087890625,
+      14.72340087890625,
+      14.72340087890625,
+      14.723402404785157,
+      14.723403549194336,
+      14.723403549194336,
+      14.723403549194336,
+      14.72340087890625,
+      14.723402404785157,
+      14.72340087890625,
+      14.72340087890625
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      }
+    ],
+    "camera": "translate(130.344px, 118.57px) scale(0.566285)",
+    "sidebar": "Durable evidence"
+  },
+  {
+    "width": 1280,
+    "name": "local-promises",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": "M 1560 370 L 1588 370 C 1594.627417 370 1600 375.372583 1600 382 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1432 850 C 1414.326888 850 1400 864.326888 1400 882 L 1400 1263",
+      "ownership:invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": "M 1560 540 L 1588 540 C 1594.627417 540 1600 545.372583 1600 552 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1496 850 C 1487.163444 850 1480 857.163444 1480 866 L 1480 1218 C 1480 1235.673112 1494.326888 1250 1512 1250 L 1588 1250 C 1605.673112 1250 1620 1264.326888 1620 1282 L 1620 1348 C 1620 1354.627417 1625.372583 1360 1632 1360 L 1660 1360",
+      "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": "M 1240 370 L 1212 370 C 1205.372583 370 1200 375.372583 1200 382 L 1200 688 C 1200 705.673112 1214.326888 720 1232 720 L 1258 720 C 1275.673112 720 1290 734.326888 1290 752 L 1290 845 C 1290 847.76142375 1292.23857625 850 1295 850 L 1295 850 C 1297.76142375 850 1300 852.23857625 1300 855 L 1300 1218 C 1300 1235.673112 1285.673112 1250 1268 1250 L 1212 1250 C 1194.326888 1250 1180 1264.326888 1180 1282 L 1180 1348 C 1180 1354.627417 1174.627417 1360 1168 1360 L 1140 1360"
+    },
+    "selected": "component:src/evidence",
+    "titles": [
+      19.94827880859375,
+      19.94827880859375,
+      19.948275756835937,
+      19.948275756835937,
+      19.94827346801758,
+      19.9482759475708,
+      19.94827346801758,
+      19.948275756835937,
+      19.948275756835937,
+      19.94827880859375,
+      19.94827880859375
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      }
+    ],
+    "camera": "translate(-594.138px, -682.272px) scale(0.767241)",
+    "sidebar": "Durable evidence"
+  },
+  {
+    "width": 1280,
+    "name": "guarantee",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": "M 1560 370 L 1588 370 C 1594.627417 370 1600 375.372583 1600 382 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1432 850 C 1414.326888 850 1400 864.326888 1400 882 L 1400 1263",
+      "ownership:invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": "M 1560 540 L 1588 540 C 1594.627417 540 1600 545.372583 1600 552 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1496 850 C 1487.163444 850 1480 857.163444 1480 866 L 1480 1218 C 1480 1235.673112 1494.326888 1250 1512 1250 L 1588 1250 C 1605.673112 1250 1620 1264.326888 1620 1282 L 1620 1348 C 1620 1354.627417 1625.372583 1360 1632 1360 L 1660 1360",
+      "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": "M 1240 370 L 1212 370 C 1205.372583 370 1200 375.372583 1200 382 L 1200 688 C 1200 705.673112 1214.326888 720 1232 720 L 1258 720 C 1275.673112 720 1290 734.326888 1290 752 L 1290 845 C 1290 847.76142375 1292.23857625 850 1295 850 L 1295 850 C 1297.76142375 850 1300 852.23857625 1300 855 L 1300 1218 C 1300 1235.673112 1285.673112 1250 1268 1250 L 1212 1250 C 1194.326888 1250 1180 1264.326888 1180 1282 L 1180 1348 C 1180 1354.627417 1174.627417 1360 1168 1360 L 1140 1360"
+    },
+    "selected": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+    "titles": [
+      19.94827880859375,
+      19.94827880859375,
+      19.948275756835937,
+      19.948275756835937,
+      19.94827346801758,
+      19.9482759475708,
+      19.94827346801758,
+      19.948275756835937,
+      19.948275756835937,
+      19.94827880859375,
+      19.94827880859375
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      }
+    ],
+    "camera": "translate(-594.138px, -682.272px) scale(0.767241)",
+    "sidebar": "a skipped run never clobbers an oracle's recorded verdict"
+  },
+  {
+    "width": 1280,
+    "name": "near",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": "M 1560 370 L 1588 370 C 1594.627417 370 1600 375.372583 1600 382 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1432 850 C 1414.326888 850 1400 864.326888 1400 882 L 1400 1263",
+      "ownership:invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": "M 1560 540 L 1588 540 C 1594.627417 540 1600 545.372583 1600 552 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1496 850 C 1487.163444 850 1480 857.163444 1480 866 L 1480 1218 C 1480 1235.673112 1494.326888 1250 1512 1250 L 1588 1250 C 1605.673112 1250 1620 1264.326888 1620 1282 L 1620 1348 C 1620 1354.627417 1625.372583 1360 1632 1360 L 1660 1360",
+      "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": "M 1240 370 L 1212 370 C 1205.372583 370 1200 375.372583 1200 382 L 1200 688 C 1200 705.673112 1214.326888 720 1232 720 L 1258 720 C 1275.673112 720 1290 734.326888 1290 752 L 1290 845 C 1290 847.76142375 1292.23857625 850 1295 850 L 1295 850 C 1297.76142375 850 1300 852.23857625 1300 855 L 1300 1218 C 1300 1235.673112 1285.673112 1250 1268 1250 L 1212 1250 C 1194.326888 1250 1180 1264.326888 1180 1282 L 1180 1348 C 1180 1354.627417 1174.627417 1360 1168 1360 L 1140 1360"
+    },
+    "selected": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+    "titles": [
+      19.94827880859375,
+      19.94827880859375,
+      19.948275756835937,
+      19.948275756835937,
+      19.94827346801758,
+      19.9482759475708,
+      19.94827346801758,
+      19.948275756835937,
+      19.948275756835937,
+      19.94827880859375,
+      19.94827880859375
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      }
+    ],
+    "camera": "translate(-594.138px, -682.272px) scale(0.767241)",
+    "sidebar": "a skipped run never clobbers an oracle's recorded verdict"
+  },
+  {
+    "width": 1280,
+    "name": "far",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "detail:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a": "M 1560 370 L 1588 370 C 1594.627417 370 1600 375.372583 1600 382 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1432 850 C 1414.326888 850 1400 864.326888 1400 882 L 1400 1263",
+      "ownership:invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7": "M 1560 540 L 1588 540 C 1594.627417 540 1600 545.372583 1600 552 L 1600 818 C 1600 835.673112 1585.673112 850 1568 850 L 1496 850 C 1487.163444 850 1480 857.163444 1480 866 L 1480 1218 C 1480 1235.673112 1494.326888 1250 1512 1250 L 1588 1250 C 1605.673112 1250 1620 1264.326888 1620 1282 L 1620 1348 C 1620 1354.627417 1625.372583 1360 1632 1360 L 1660 1360",
+      "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": "M 1240 370 L 1212 370 C 1205.372583 370 1200 375.372583 1200 382 L 1200 688 C 1200 705.673112 1214.326888 720 1232 720 L 1258 720 C 1275.673112 720 1290 734.326888 1290 752 L 1290 845 C 1290 847.76142375 1292.23857625 850 1295 850 L 1295 850 C 1297.76142375 850 1300 852.23857625 1300 855 L 1300 1218 C 1300 1235.673112 1285.673112 1250 1268 1250 L 1212 1250 C 1194.326888 1250 1180 1264.326888 1180 1282 L 1180 1348 C 1180 1354.627417 1174.627417 1360 1168 1360 L 1140 1360"
+    },
+    "selected": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+    "titles": [
+      5.567193603515625,
+      5.56719970703125,
+      5.567196655273437,
+      5.567196655273437,
+      5.567197036743164,
+      5.567197036743164,
+      5.5671995162963865,
+      5.567196655273437,
+      5.567196655273437,
+      5.56719970703125,
+      5.567193603515625
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "0",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "0",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "0",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 820,
+        "y": 1263,
+        "width": 320,
+        "height": 188,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1240,
+        "y": 1263,
+        "width": 320,
+        "height": 217,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      },
+      {
+        "id": "invariant:06a8d58a5785eb0bd559fe037642410eb33783f84b1976c903943dcccd8c8cd7",
+        "x": 1660,
+        "y": 1263,
+        "width": 320,
+        "height": 199,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      }
+    ],
+    "camera": "translate(180.228px, 76.3303px) scale(0.214123)",
+    "sidebar": "a skipped run never clobbers an oracle's recorded verdict"
+  },
+  {
+    "width": 1280,
+    "name": "folded",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510"
+    },
+    "selected": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+    "titles": [
+      5.567193603515625,
+      5.56719970703125,
+      5.567196655273437,
+      5.567196655273437,
+      5.567197036743164,
+      5.567197036743164,
+      5.5671995162963865,
+      5.567196655273437,
+      5.567196655273437,
+      5.56719970703125,
+      5.567193603515625
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "0",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "0",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "0",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [],
+    "camera": "translate(180.228px, 76.3303px) scale(0.214123)",
+    "sidebar": "a skipped run never clobbers an oracle's recorded verdict"
+  },
+  {
+    "width": 1280,
+    "name": "all-handoffs",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "relation:architecture:.:work-instructions": "M 1630 23 L 1630 -13 C 1630 -47.65292195472122 1603.6529219547213 -60 1569 -60 L 1549 -60 L 1351 -60 L 1331 -60 C 1326 -60 1321 110 1316 110 L 1280 110",
+      "relation:architecture:.:readable-model": "M 440 683 L 440 711 C 440 715.97056275 444.02943725 720 449 720 L 525 720 C 527.76142375 720 530 717.76142375 530 715 L 530 715 C 530 712.23857625 532.23857625 710 535 710 L 535 710 C 537.76142375 710 540 712.23857625 540 715 L 540 732 L 540 794 L 540 814 C 540 877.3078194222483 440.6921805777517 950 504 950 L 540 950",
+      "relation:architecture:.:model-diagnostics": "M 600 510 L 628 510 C 640.1502645 510 650 500.1502645 650 488 L 650 412 C 650 394.326888 635.673112 380 618 380 L 582 380 C 564.326888 380 550 365.673112 550 348 L 550 262 C 550 244.326888 535.673112 230 518 230 L 402 230 C 384.326888 230 370 215.673112 370 198 L 370 -51 C 370 -55.97056275 374.02943725 -60 379 -60 L 391 -60 L 589 -60 L 601 -60 C 605.97056275 -60 610 -55.97056275 610 -51 L 610 -22 C 610 -4.326888 595.673112 10 578 10 L 532 10 C 514.326888 10 500 24.326888 500 42 L 500 108 C 500 114.627417 505.372583 120 512 120 L 540 120",
+      "relation:architecture:.:model-taxonomy": "M 410 683 L 410 1038 C 410 1055.673112 424.326888 1070 442 1070 L 580 1070 C 596.5685425 1070 610 1083.4314575 610 1100 L 610 1121 C 610 1125.97056275 605.97056275 1130 601 1130 L 589 1130 L 391 1130 L 371 1130 C 366 1130 361 950 356 950 L 320 950",
+      "relation:architecture:.:evidence-orientation": "M 1560 540 L 1596 540 C 1686.6188722066215 540 1710 464.6188722066215 1710 374 L 1710 354 L 1710 292 L 1710 242 C 1710 224.326888 1695.673112 210 1678 210 L 1492 210 C 1474.326888 210 1460 195.673112 1460 178 L 1460 122 C 1460 115.372583 1465.372583 110 1472 110 L 1500 110",
+      "relation:architecture:.:language-seam": "M 600 570 L 636 570 C 647.6666666666666 570 659.3333333333334 760 671 760 L 691 760 L 889 760 L 909 760 C 934 760 959 950 984 950 L 1020 950",
+      "relation:architecture:.:executable-contracts": "M 1500 960 L 1472 960 C 1465.372583 960 1460 954.627417 1460 948 L 1460 842 C 1460 824.326888 1474.326888 810 1492 810 L 1505 810 C 1518.80711875 810 1530 798.80711875 1530 785 L 1530 769 C 1530 764.02943725 1525.97056275 760 1521 760 L 1509 760 L 1311 760 L 1299 760 C 1294.02943725 760 1290 755.97056275 1290 751 L 1290 735 C 1290 721.19288125 1278.80711875 710 1265 710 L 1152 710 C 1134.326888 710 1120 695.673112 1120 678 L 1120 552 C 1120 545.372583 1114.627417 540 1108 540 L 1080 540",
+      "relation:architecture:.:readable-evidence": "M 1240 570 L 1132 570 C 1114.326888 570 1100 584.326888 1100 602 L 1100 688 C 1100 705.673112 1085.673112 720 1068 720 L 1032 720 C 1014.326888 720 1000 734.326888 1000 752 L 1000 1048 C 1000 1065.673112 1014.326888 1080 1032 1080 L 1130 1080 C 1141.045695 1080 1150 1088.954305 1150 1100 L 1150 1111 C 1150 1115.97056275 1145.97056275 1120 1141 1120 L 1129 1120 L 931 1120 L 911 1120 C 886 1120 861 950 836 950 L 800 950"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 600 540 L 628 540 C 634.627417 540 640 534.627417 640 528 L 640 402 C 640 384.326888 625.673112 370 608 370 L 595 370 C 581.19288125 370 570 358.80711875 570 345 L 570 329 C 570 324.02943725 574.02943725 320 579 320 L 591 320 L 789 320 L 801 320 C 805.97056275 320 810 324.02943725 810 329 L 810 358 C 810 375.673112 795.673112 390 778 390 L 752 390 C 734.326888 390 720 404.326888 720 422 L 720 528 C 720 534.627417 725.372583 540 732 540 L 760 540",
+      "relation:architecture:.:recorded-verification": "M 920 683 L 920 719 C 920 776.4909123253406 983.5090876746594 760 1041 760 L 1061 760 L 1259 760 L 1271 760 C 1275.97056275 760 1280 755.97056275 1280 751 L 1280 730 C 1280 713.4314575 1266.5685425 700 1250 700 L 1232 700 C 1214.326888 700 1200 685.673112 1200 668 L 1200 552 C 1200 545.372583 1205.372583 540 1212 540 L 1240 540",
+      "relation:architecture:.:command-model": "M 190 197 L 190 233 C 190 246 190 259 190 272 L 190 292 L 190 354 L 190 374 C 190 452.5530394065055 165.4469605934945 540 244 540 L 280 540",
+      "relation:architecture:.:session-memory": "M 1150 197 L 1150 233 C 1150 246 1090 259 1090 272 L 1090 292 L 1090 354 L 1090 374 C 1090 453.8569345767792 1124.1430654232208 510 1204 510 L 1240 510",
+      "relation:architecture:.:work-instructions": "M 1630 23 L 1630 -13 C 1630 -47.65292195472122 1603.6529219547213 -60 1569 -60 L 1549 -60 L 1351 -60 L 1331 -60 C 1326 -60 1321 110 1316 110 L 1280 110",
+      "relation:architecture:.:readable-model": "M 440 683 L 440 711 C 440 715.97056275 444.02943725 720 449 720 L 525 720 C 527.76142375 720 530 717.76142375 530 715 L 530 715 C 530 712.23857625 532.23857625 710 535 710 L 535 710 C 537.76142375 710 540 712.23857625 540 715 L 540 732 L 540 794 L 540 814 C 540 877.3078194222483 440.6921805777517 950 504 950 L 540 950",
+      "relation:architecture:.:model-diagnostics": "M 600 510 L 628 510 C 640.1502645 510 650 500.1502645 650 488 L 650 412 C 650 394.326888 635.673112 380 618 380 L 582 380 C 564.326888 380 550 365.673112 550 348 L 550 262 C 550 244.326888 535.673112 230 518 230 L 402 230 C 384.326888 230 370 215.673112 370 198 L 370 -51 C 370 -55.97056275 374.02943725 -60 379 -60 L 391 -60 L 589 -60 L 601 -60 C 605.97056275 -60 610 -55.97056275 610 -51 L 610 -22 C 610 -4.326888 595.673112 10 578 10 L 532 10 C 514.326888 10 500 24.326888 500 42 L 500 108 C 500 114.627417 505.372583 120 512 120 L 540 120",
+      "relation:architecture:.:model-taxonomy": "M 410 683 L 410 1038 C 410 1055.673112 424.326888 1070 442 1070 L 580 1070 C 596.5685425 1070 610 1083.4314575 610 1100 L 610 1121 C 610 1125.97056275 605.97056275 1130 601 1130 L 589 1130 L 391 1130 L 371 1130 C 366 1130 361 950 356 950 L 320 950",
+      "relation:architecture:.:evidence-orientation": "M 1560 540 L 1596 540 C 1686.6188722066215 540 1710 464.6188722066215 1710 374 L 1710 354 L 1710 292 L 1710 242 C 1710 224.326888 1695.673112 210 1678 210 L 1492 210 C 1474.326888 210 1460 195.673112 1460 178 L 1460 122 C 1460 115.372583 1465.372583 110 1472 110 L 1500 110",
+      "relation:architecture:.:language-seam": "M 600 570 L 636 570 C 647.6666666666666 570 659.3333333333334 760 671 760 L 691 760 L 889 760 L 909 760 C 934 760 959 950 984 950 L 1020 950",
+      "relation:architecture:.:executable-contracts": "M 1500 960 L 1472 960 C 1465.372583 960 1460 954.627417 1460 948 L 1460 842 C 1460 824.326888 1474.326888 810 1492 810 L 1505 810 C 1518.80711875 810 1530 798.80711875 1530 785 L 1530 769 C 1530 764.02943725 1525.97056275 760 1521 760 L 1509 760 L 1311 760 L 1299 760 C 1294.02943725 760 1290 755.97056275 1290 751 L 1290 735 C 1290 721.19288125 1278.80711875 710 1265 710 L 1152 710 C 1134.326888 710 1120 695.673112 1120 678 L 1120 552 C 1120 545.372583 1114.627417 540 1108 540 L 1080 540",
+      "relation:architecture:.:readable-evidence": "M 1240 570 L 1132 570 C 1114.326888 570 1100 584.326888 1100 602 L 1100 688 C 1100 705.673112 1085.673112 720 1068 720 L 1032 720 C 1014.326888 720 1000 734.326888 1000 752 L 1000 1048 C 1000 1065.673112 1014.326888 1080 1032 1080 L 1130 1080 C 1141.045695 1080 1150 1088.954305 1150 1100 L 1150 1111 C 1150 1115.97056275 1145.97056275 1120 1141 1120 L 1129 1120 L 931 1120 L 911 1120 C 886 1120 861 950 836 950 L 800 950"
+    },
+    "selected": null,
+    "titles": [
+      14.3404296875,
+      14.340423583984375,
+      14.340423583984375,
+      14.340425109863281,
+      14.340421676635742,
+      14.340426635742187,
+      14.340426635742187,
+      14.340423583984375,
+      14.340425109863281,
+      14.340423583984375,
+      14.3404296875
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [],
+    "camera": "translate(143.601px, 126.11px) scale(0.551555)"
+  },
+  {
+    "width": 1280,
+    "name": "reliances",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb": "M 1080 510 L 1158 510 C 1175.673112 510 1190 495.673112 1190 478 L 1190 385 C 1190 376.71572875 1196.71572875 370 1205 370 L 1205 370 C 1213.28427125 370 1220 363.28427125 1220 355 L 1220 332 C 1220 314.326888 1234.326888 300 1252 300 L 1307 300 C 1314.17970175 300 1320 305.82029825 1320 313 L 1320 341",
+      "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7": "M 1280 80 L 1316 80 C 1441.2916697151093 80 1480 179.70833028489085 1480 305 L 1480 341",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1": "M 540 920 L 372 920 C 354.326888 920 340 905.673112 340 888 L 340 732 C 340 714.326888 325.673112 700 308 700 L 292 700 C 274.326888 700 260 685.673112 260 668 L 260 402 C 260 384.326888 274.326888 370 292 370 L 298 370 C 315.673112 370 330 355.673112 330 338 L 330 332 C 330 314.326888 344.326888 300 362 300 L 427 300 C 434.17970175 300 440 305.82029825 440 313 L 440 341"
+    },
+    "allRoutes": {
+      "relation:d2eb46a298f2a04191e02732c9c41d6a2d497ed7e25767f53580702b825dd3fb": "M 1080 510 L 1158 510 C 1175.673112 510 1190 495.673112 1190 478 L 1190 385 C 1190 376.71572875 1196.71572875 370 1205 370 L 1205 370 C 1213.28427125 370 1220 363.28427125 1220 355 L 1220 332 C 1220 314.326888 1234.326888 300 1252 300 L 1307 300 C 1314.17970175 300 1320 305.82029825 1320 313 L 1320 341",
+      "relation:703e80494c4c7c95855290f09bb98d780f7f5bf99829f50dcf411852d3cab1f7": "M 1280 80 L 1316 80 C 1441.2916697151093 80 1480 179.70833028489085 1480 305 L 1480 341",
+      "relation:9e1a63b9e9962d287ea07cc676ed1b71eee3ca04f79708ec0268f3424c407df1": "M 540 920 L 372 920 C 354.326888 920 340 905.673112 340 888 L 340 732 C 340 714.326888 325.673112 700 308 700 L 292 700 C 274.326888 700 260 685.673112 260 668 L 260 402 C 260 384.326888 274.326888 370 292 370 L 298 370 C 315.673112 370 330 355.673112 330 338 L 330 332 C 330 314.326888 344.326888 300 362 300 L 427 300 C 434.17970175 300 440 305.82029825 440 313 L 440 341"
+    },
+    "selected": null,
+    "titles": [
+      14.3404296875,
+      14.340423583984375,
+      14.340423583984375,
+      14.340425109863281,
+      14.340421676635742,
+      14.340426635742187,
+      14.340426635742187,
+      14.340423583984375,
+      14.340425109863281,
+      14.340423583984375,
+      14.3404296875
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 403,
+        "width": 320,
+        "height": 280
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 863,
+        "width": 260,
+        "height": 174
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 863,
+        "width": 260,
+        "height": 192
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 341,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 341,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [],
+    "camera": "translate(143.601px, 126.11px) scale(0.551555)"
+  },
+  {
+    "width": 1280,
+    "name": "all-fields",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 440 860 L 440 896 C 440 1103.0865579896483 353.9134420103516 1340 561 1340 L 581 1340 L 779 1340 L 799.5 1340 C 810.821837375 1340 820 1330.821837375 820 1319.5 L 820 932 C 820 914.326888 805.673112 900 788 900 L 752 900 C 734.326888 900 720 885.673112 720 868 L 720 692 C 720 685.372583 725.372583 680 732 680 L 760 680",
+      "relation:architecture:.:recorded-verification": "M 890 885 L 890 921 C 890 1121.420320826008 840.579679173992 1340 1041 1340 L 1061 1340 L 1259 1340 L 1271 1340 C 1275.97056275 1340 1280 1335.97056275 1280 1331 L 1280 1310 C 1280 1293.4314575 1266.5685425 1280 1250 1280 L 1032 1280 C 1014.326888 1280 1000 1265.673112 1000 1248 L 1000 932 C 1000 914.326888 1014.326888 900 1032 900 L 1168 900 C 1185.673112 900 1200 885.673112 1200 868 L 1200 702 C 1200 695.372583 1205.372583 690 1212 690 L 1240 690",
+      "relation:architecture:.:command-model": "M 190 352 L 190 380 C 190 385.5228475 185.5228475 390 180 390 L 145 390 C 142.23857625 390 140 387.76142375 140 385 L 140 385 C 140 382.23857625 137.76142375 380 135 380 L 135 380 C 132.23857625 380 130 382.23857625 130 385 L 130 402 L 130 464 L 130 484 C 130 536.4237541578243 191.5762458421757 660 244 660 L 280 660",
+      "relation:architecture:.:session-memory": "M 1280 160 L 1308 160 C 1320.1502645 160 1330 150.1502645 1330 138 L 1330 -78 C 1330 -95.673112 1344.326888 -110 1362 -110 L 1440 -110 C 1445.5228475 -110 1450 -105.5228475 1450 -100 L 1450 -88 L 1450 -26 L 1450 358 C 1450 375.673112 1435.673112 390 1418 390 L 1232 390 C 1214.326888 390 1200 404.326888 1200 422 L 1200 648 C 1200 654.627417 1205.372583 660 1212 660 L 1240 660"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 440 860 L 440 896 C 440 1103.0865579896483 353.9134420103516 1340 561 1340 L 581 1340 L 779 1340 L 799.5 1340 C 810.821837375 1340 820 1330.821837375 820 1319.5 L 820 932 C 820 914.326888 805.673112 900 788 900 L 752 900 C 734.326888 900 720 885.673112 720 868 L 720 692 C 720 685.372583 725.372583 680 732 680 L 760 680",
+      "relation:architecture:.:recorded-verification": "M 890 885 L 890 921 C 890 1121.420320826008 840.579679173992 1340 1041 1340 L 1061 1340 L 1259 1340 L 1271 1340 C 1275.97056275 1340 1280 1335.97056275 1280 1331 L 1280 1310 C 1280 1293.4314575 1266.5685425 1280 1250 1280 L 1032 1280 C 1014.326888 1280 1000 1265.673112 1000 1248 L 1000 932 C 1000 914.326888 1014.326888 900 1032 900 L 1168 900 C 1185.673112 900 1200 885.673112 1200 868 L 1200 702 C 1200 695.372583 1205.372583 690 1212 690 L 1240 690",
+      "relation:architecture:.:command-model": "M 190 352 L 190 380 C 190 385.5228475 185.5228475 390 180 390 L 145 390 C 142.23857625 390 140 387.76142375 140 385 L 140 385 C 140 382.23857625 137.76142375 380 135 380 L 135 380 C 132.23857625 380 130 382.23857625 130 385 L 130 402 L 130 464 L 130 484 C 130 536.4237541578243 191.5762458421757 660 244 660 L 280 660",
+      "relation:architecture:.:session-memory": "M 1280 160 L 1308 160 C 1320.1502645 160 1330 150.1502645 1330 138 L 1330 -78 C 1330 -95.673112 1344.326888 -110 1362 -110 L 1440 -110 C 1445.5228475 -110 1450 -105.5228475 1450 -100 L 1450 -88 L 1450 -26 L 1450 358 C 1450 375.673112 1435.673112 390 1418 390 L 1232 390 C 1214.326888 390 1200 404.326888 1200 422 L 1200 648 C 1200 654.627417 1205.372583 660 1212 660 L 1240 660"
+    },
+    "selected": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+    "titles": [
+      12.348663330078125,
+      12.3486572265625,
+      12.348663330078125,
+      12.348660278320313,
+      12.348661041259765,
+      12.348662281036377,
+      12.348661041259765,
+      12.348663330078125,
+      12.348660278320313,
+      12.3486572265625,
+      12.348663330078125
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 360
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 465,
+        "width": 320,
+        "height": 445
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 465,
+        "width": 320,
+        "height": 395
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 465,
+        "width": 320,
+        "height": 420
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 930,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 930,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 930,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 930,
+        "width": 260,
+        "height": 360
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 403,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 403,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 403,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [],
+    "camera": "translate(52.5463px, 103.316px) scale(0.474949)",
+    "sidebar": "a skipped run never clobbers an oracle's recorded verdict"
+  },
+  {
+    "width": 1280,
+    "name": "reconfigured-promises",
+    "error": null,
+    "collisions": [],
+    "clipped": [],
+    "external": {
+      "relation:architecture:.:model-verification": "M 440 860 L 440 896 C 440 1103.0865579896483 353.9134420103516 1340 561 1340 L 581 1340 L 779 1340 L 799.5 1340 C 810.821837375 1340 820 1330.821837375 820 1319.5 L 820 932 C 820 914.326888 805.673112 900 788 900 L 752 900 C 734.326888 900 720 885.673112 720 868 L 720 692 C 720 685.372583 725.372583 680 732 680 L 760 680",
+      "relation:architecture:.:recorded-verification": "M 890 885 L 890 921 C 890 1121.420320826008 840.579679173992 1340 1041 1340 L 1061 1340 L 1259 1340 L 1271 1340 C 1275.97056275 1340 1280 1335.97056275 1280 1331 L 1280 1310 C 1280 1293.4314575 1266.5685425 1280 1250 1280 L 1032 1280 C 1014.326888 1280 1000 1265.673112 1000 1248 L 1000 932 C 1000 914.326888 1014.326888 900 1032 900 L 1168 900 C 1185.673112 900 1200 885.673112 1200 868 L 1200 702 C 1200 695.372583 1205.372583 690 1212 690 L 1240 690",
+      "relation:architecture:.:command-model": "M 190 352 L 190 380 C 190 385.5228475 185.5228475 390 180 390 L 145 390 C 142.23857625 390 140 387.76142375 140 385 L 140 385 C 140 382.23857625 137.76142375 380 135 380 L 135 380 C 132.23857625 380 130 382.23857625 130 385 L 130 402 L 130 464 L 130 484 C 130 536.4237541578243 191.5762458421757 660 244 660 L 280 660",
+      "relation:architecture:.:session-memory": "M 1280 160 L 1308 160 C 1320.1502645 160 1330 150.1502645 1330 138 L 1330 -78 C 1330 -95.673112 1344.326888 -110 1362 -110 L 1440 -110 C 1445.5228475 -110 1450 -105.5228475 1450 -100 L 1450 -88 L 1450 -26 L 1450 358 C 1450 375.673112 1435.673112 390 1418 390 L 1232 390 C 1214.326888 390 1200 404.326888 1200 422 L 1200 648 C 1200 654.627417 1205.372583 660 1212 660 L 1240 660"
+    },
+    "allRoutes": {
+      "relation:architecture:.:model-verification": "M 440 860 L 440 896 C 440 1103.0865579896483 353.9134420103516 1340 561 1340 L 581 1340 L 779 1340 L 799.5 1340 C 810.821837375 1340 820 1330.821837375 820 1319.5 L 820 932 C 820 914.326888 805.673112 900 788 900 L 752 900 C 734.326888 900 720 885.673112 720 868 L 720 692 C 720 685.372583 725.372583 680 732 680 L 760 680",
+      "relation:architecture:.:recorded-verification": "M 890 885 L 890 921 C 890 1121.420320826008 840.579679173992 1340 1041 1340 L 1061 1340 L 1259 1340 L 1271 1340 C 1275.97056275 1340 1280 1335.97056275 1280 1331 L 1280 1310 C 1280 1293.4314575 1266.5685425 1280 1250 1280 L 1032 1280 C 1014.326888 1280 1000 1265.673112 1000 1248 L 1000 932 C 1000 914.326888 1014.326888 900 1032 900 L 1168 900 C 1185.673112 900 1200 885.673112 1200 868 L 1200 702 C 1200 695.372583 1205.372583 690 1212 690 L 1240 690",
+      "relation:architecture:.:command-model": "M 190 352 L 190 380 C 190 385.5228475 185.5228475 390 180 390 L 145 390 C 142.23857625 390 140 387.76142375 140 385 L 140 385 C 140 382.23857625 137.76142375 380 135 380 L 135 380 C 132.23857625 380 130 382.23857625 130 385 L 130 402 L 130 464 L 130 484 C 130 536.4237541578243 191.5762458421757 660 244 660 L 280 660",
+      "relation:architecture:.:session-memory": "M 1280 160 L 1308 160 C 1320.1502645 160 1330 150.1502645 1330 138 L 1330 -78 C 1330 -95.673112 1344.326888 -110 1362 -110 L 1440 -110 C 1445.5228475 -110 1450 -105.5228475 1450 -100 L 1450 -88 L 1450 -26 L 1450 358 C 1450 375.673112 1435.673112 390 1418 390 L 1232 390 C 1214.326888 390 1200 404.326888 1200 422 L 1200 648 C 1200 654.627417 1205.372583 660 1212 660 L 1240 660",
+      "detail:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412": "M 1240 430 L 1132 430 C 1114.326888 430 1100 444.326888 1100 462 L 1100 878 C 1100 895.673112 1085.673112 910 1068 910 L 1032 910 C 1014.326888 910 1000 924.326888 1000 942 L 1000 1518 C 1000 1535.673112 1014.326888 1550 1032 1550 L 1388 1550 C 1394.627417 1550 1400 1555.372583 1400 1562 L 1400 1590"
+    },
+    "selected": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+    "titles": [
+      12.348663330078125,
+      12.3486572265625,
+      12.348663330078125,
+      12.348660278320313,
+      12.348661041259765,
+      12.348662281036377,
+      12.348661041259765,
+      12.348663330078125,
+      12.348660278320313,
+      12.3486572265625,
+      12.348663330078125
+    ],
+    "coreIntents": [
+      {
+        "text": "Records decisions, defects, experiments and verification history so later sessions can recover what was observed and decided.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Reads source and specs into the shared graph of components, symbols, claims and imports.",
+        "opacity": "1",
+        "visibility": "visible"
+      },
+      {
+        "text": "Evaluates declared claims against structural checks and named test evidence, refusing missing or incomplete proof.",
+        "opacity": "1",
+        "visibility": "visible"
+      }
+    ],
+    "cards": [
+      {
+        "id": "component:src/coordination",
+        "x": 1500,
+        "y": 23,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/lifecycle",
+        "x": 1020,
+        "y": 23,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/diagnostics",
+        "x": 540,
+        "y": 23,
+        "width": 260,
+        "height": 360
+      },
+      {
+        "id": "component:src",
+        "x": 60,
+        "y": 23,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/evidence",
+        "x": 1240,
+        "y": 465,
+        "width": 320,
+        "height": 445
+      },
+      {
+        "id": "component:src/derivation",
+        "x": 280,
+        "y": 465,
+        "width": 320,
+        "height": 395
+      },
+      {
+        "id": "component:src/verification",
+        "x": 760,
+        "y": 465,
+        "width": 320,
+        "height": 420
+      },
+      {
+        "id": "component:src/readings",
+        "x": 540,
+        "y": 930,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/taxonomy",
+        "x": 60,
+        "y": 930,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:src/adapters",
+        "x": 1020,
+        "y": 930,
+        "width": 260,
+        "height": 329
+      },
+      {
+        "id": "component:test",
+        "x": 1500,
+        "y": 930,
+        "width": 260,
+        "height": 360
+      },
+      {
+        "id": "terminal:invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 403,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:c43e76d07d479c73e285c3342f1399d3c0a72b25cd78c40e8a0ce59bfbc3b32a",
+        "x": 1406,
+        "y": 403,
+        "width": 154,
+        "height": 54
+      },
+      {
+        "id": "terminal:invariant:53aa6061c88b30fdefe28e0bce08d1d44e3502d04f725f12fba741626007d8a9",
+        "x": 345,
+        "y": 403,
+        "width": 190,
+        "height": 54
+      }
+    ],
+    "promises": [
+      {
+        "id": "invariant:7a5ba268bdd11c05641d7ff5ae56005005c58103248499ce23888dc79e8cb412",
+        "x": 1240,
+        "y": 1590,
+        "width": 320,
+        "height": 188,
+        "nodeKind": "promise",
+        "owner": "component:src/evidence"
+      }
+    ],
+    "camera": "translate(52.5463px, 103.316px) scale(0.474949)",
+    "sidebar": "a skipped run never clobbers an oracle's recorded verdict"
+  }
+]

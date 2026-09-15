@@ -1,0 +1,63 @@
+{
+  "negative": [
+    {
+      "id": "relation:architecture:.:http-memory",
+      "targetBottom": 683,
+      "endY": 683,
+      "overshoot": 137,
+      "maxY": 820,
+      "sideArrival": false,
+      "matchesRenderedPath": true
+    },
+    {
+      "id": "relation:architecture:.:session-memory",
+      "targetBottom": 683,
+      "endY": 540,
+      "overshoot": 0,
+      "maxY": 540,
+      "sideArrival": true,
+      "matchesRenderedPath": true
+    }
+  ],
+  "fixed": [
+    {
+      "id": "relation:architecture:.:http-memory",
+      "targetBottom": 683,
+      "endY": 540,
+      "overshoot": 0,
+      "maxY": 540,
+      "sideArrival": true,
+      "matchesRenderedPath": true
+    },
+    {
+      "id": "relation:architecture:.:session-memory",
+      "targetBottom": 683,
+      "endY": 510,
+      "overshoot": 0,
+      "maxY": 510,
+      "sideArrival": true,
+      "matchesRenderedPath": true
+    }
+  ],
+  "current": [
+    {
+      "id": "relation:architecture:.:session-memory",
+      "targetBottom": 683,
+      "endY": 540,
+      "overshoot": 0,
+      "maxY": 540,
+      "sideArrival": true,
+      "matchesRenderedPath": true
+    },
+    {
+      "id": "relation:architecture:.:http-memory",
+      "targetBottom": 683,
+      "endY": 540,
+      "overshoot": 0,
+      "maxY": 540,
+      "sideArrival": true,
+      "matchesRenderedPath": true
+    }
+  ],
+  "routingError": null
+}

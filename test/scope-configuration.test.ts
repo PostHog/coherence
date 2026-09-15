@@ -45,17 +45,43 @@ test("Scope configuration — malformed, ambiguous and executable-looking declar
 test("Scope configuration — Structure is an ordinary configured renderer with bounded declarative detail options", () => {
   const structure = DEFAULT_SCOPE.views.find(view => view.id === "structure")!;
   assert.equal(structure.renderer, "structure");
-  assert.deepEqual(structure.structure, { summaryGuarantees: 2, tileZoom: 0.5, detailZoom: 0.95, columns: 3 });
+  assert.deepEqual(structure.structure, {
+    rankingWeights: { peers: 3, guarantees: 2, security: 1, consumers: 2 }, downtownCount: 3, downtownThreshold: 0.65,
+    spacing: { x: 480, y: 420 }, shortTerminalNames: {}, cardFields: ["intent"], promisePreviewCount: 3,
+    initialRelationshipLayer: "opening", tileZoom: 0.46, detailZoom: 0.50,
+    implementations: { rank: "default", layout: "default", route: "default", card: "default", view: "default" }, extensionOptions: {},
+  });
   const config = resolveScopeConfiguration({ version: 1, extends: false, views: [{
-    id: "architecture", title: "Architecture", kinds: ["component"], renderer: "structure", fields: [], structure: { columns: 4, summaryGuarantees: 1, tileZoom: 0.4, detailZoom: 1.1 },
+    id: "architecture", title: "Architecture", kinds: ["component"], renderer: "structure", fields: [], structure: { downtownCount: 4, promisePreviewCount: 1, tileZoom: 0.4, detailZoom: 1.1 },
   }] });
-  assert.deepEqual(config.views[0].structure, { summaryGuarantees: 1, tileZoom: 0.4, detailZoom: 1.1, columns: 4 });
+  assert.deepEqual(config.views[0].structure, { ...structuredClone(structure.structure), downtownCount: 4, promisePreviewCount: 1, tileZoom: 0.4, detailZoom: 1.1 });
   const valid = { version: 1, extends: false, views: [{ id: "architecture", title: "Architecture", kinds: ["component"], renderer: "structure", fields: [] }] };
-  for (const structure of [{ tileZoom: 1, detailZoom: 0.8 }, { columns: 0 }, { summaryGuarantees: -1 }, { arbitrary: true }]) {
+  for (const structure of [{ tileZoom: 1, detailZoom: 0.8 }, { downtownCount: 0 }, { promisePreviewCount: -1 }, { arbitrary: true }, { columns: 3 }, { summaryGuarantees: 2 }]) {
     assert.throws(() => resolveScopeConfiguration({ ...valid, views: [{ ...valid.views[0], structure }] }), /Scope configuration/);
   }
   assert.throws(() => resolveScopeConfiguration({ ...valid, views: [{ ...valid.views[0], fields: [{ field: "label" }] }] }), /does not accept generic fields/);
   assert.throws(() => resolveScopeConfiguration({ ...valid, views: [{ ...valid.views[0], renderer: "table", fields: [{ field: "label" }], structure: {} }] }), /only structure views/);
+});
+
+test("Scope configuration — extension modules and named Structure implementations are declarative and bounded", () => {
+  const config = resolveScopeConfiguration({ version: 1, extensions: ["./scope/presentation.jsx"], views: [{
+    ...DEFAULT_SCOPE.views[0], structure: { implementations: { rank: "project.rank", card: "project.card" },
+      rankingWeights: { peers: 7 }, spacing: { x: 600 }, shortTerminalNames: { "Long promise": "Short" },
+      cardFields: ["intent", "rationale"], extensionOptions: { project: { accent: "blue" } } },
+  }] });
+  assert.deepEqual(config.extensions, ["./scope/presentation.jsx"]);
+  assert.equal(config.views[0].structure!.implementations.rank, "project.rank");
+  assert.equal(config.views[0].structure!.implementations.route, "default");
+  assert.deepEqual(config.views[0].structure!.spacing, { x: 600, y: 420 });
+  for (const value of [
+    { version: 1, extensions: ["../outside.jsx"] }, { version: 1, extensions: ["/absolute.jsx"] },
+    { version: 1, extensions: ["./same.jsx", "./same.jsx"] },
+  ]) assert.throws(() => resolveScopeConfiguration(value), /Scope configuration extensions/);
+  for (const structure of [{ implementations: { rank: "bare" } }, { cardFields: ["html"] },
+    { rankingWeights: { peers: -1 } }, { spacing: { y: 20 } }, { shortTerminalNames: { label: "" } }, { extensionOptions: [] },
+    { extensionOptions: { run: () => "code" } }, { extensionOptions: { value: Infinity } }]) {
+    assert.throws(() => resolveScopeConfiguration({ version: 1, views: [{ ...DEFAULT_SCOPE.views[0], structure }] }), /Scope configuration/);
+  }
 });
 
 test("Scope projections — filtering, typed sorting and pagination conserve assets and disclose omitted edges", () => {

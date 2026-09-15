@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-14 14:38Z",
+  "generatedAt": "2026-09-15 16:12Z",
   "root": "coherence",
   "absRoot": "/Users/daniloc/Documents/Dev/coherence-scope-local",
   "nodes": [
@@ -502,6 +502,7 @@
       "sub": "Projects existing models into context packets, diagrams, component maps and inspectable reading surfaces.",
       "claimed": true,
       "claims": [
+        "boundary \"Scope extension generation observes every bundled input and publishes one complete live generation\" at startScopeServer via guard \"Scope live extensions — transitive code changes announce a new runtime and failed bundles retain the previous generation\"",
         "boundary \"Structure connections retain declared architectural meaning and exact guarantee ownership\" at buildStructureModel via guard \"Structure projection — declared promises and only meaningful edges retain catalog identity and evidence limits\"",
         "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at buildScopeModel via guard \"scope roles — declared test imports are not runtime gravity or proof of a named oracle\"",
         "boundary \"Scope projects the canonical promise population with deterministic gravity and honest absence\" at buildScopeModel via guard \"scope semantics — containment and atlas meanings preserve ownership without inventing dependencies or verdicts\"",
@@ -517,15 +518,19 @@
         "boundary \"Scope preserves every authored spec content category without inventing evidence\" at captureScope via guard \"Scope specs — every content category and custom section survives with canonical semantics and exact authored text\""
       ],
       "prose": "These projections can explain evidence but cannot create it. Scope, promise views and agent context retain the identities and limits of their canonical inputs.",
-      "why": "**task context is bounded and names its approximations.** A focused context packet is\nuseful only when its one-hop and heuristic limits stay visible; otherwise convenience is\nmisread as completeness and recreates the omission gradient this project exists to oppose.\nRoutes, named limitations, and omission accounting are mandatory framing; a byte budget\nthat cannot hold them refuses with its exact minimum. Everything else is included in a\nstable priority order, and the withheld item and byte totals make truncation observable.\nRepository-level, generated, and explicitly requested ignored files remain navigable even\nwhen the source graph owns no component for them; `graphOwner: null` is evidence, not a miss.\n\n**Scope projects the canonical promise population with deterministic gravity and honest\nabsence.** A visualization is especially capable of making missing state look calm: a\npartial component population still forms a convincing picture, and an unmeasured component\ncan inherit the visual language of a passing one. Scope therefore receives its subjects\nonly from the canonical graph/promise join, refuses when their component populations or\nreliance targets disagree, and serializes stable geometry from that model. The renderer\nmay move the viewport but never the project; absence remains visible ink.\n\n**Scope views select complete attributed assets through data-only configuration.** The\nold CLI canvas and four independently implemented preview panels duplicated presentation\npolicy and prevented projects from asking a different question without editing React.\nOne catalog now adapts canonical readers into assets, attributes, explicit relationships\nand source readings. Every shipped view is ordinary configuration consumed by the same\nStructure, graph, table and card renderers as a project view. JSON selects and presents evidence;\nit cannot execute code or establish a new verdict. Failed sources stay visible outside\nfilters. Pagination names its withheld population and graph connections. The old semantic\npromise join remains shared with the guarantees command; its former canvas and preview\npanels are removed, and layout is a generic Cytoscape projection over selected assets.\n\n**Scope preserves every authored spec content category without inventing evidence.** A\ncomponent containing an invariants array is insufficient when the project needs a view\nof individual unanchored invariants. Specs, sections, intent/prose, rationale, claims,\ninvariants, refutations, zones and authored guarantee declarations retain addresses.\nThe complete original spec survives beside canonical parsed meaning. Custom sections,\nduplicate headings and malformed declarations remain text rather than being upgraded to\nclaims or silently discarded. Only the entry spec's zones have topology authority.\n\n**Structure connections retain declared architectural meaning and exact guarantee\nownership.** A pile of import arrows names syntax while leaving a reader to infer\nresponsibilities. The Structure projection instead joins authored architecture and\nexplicit guarantee reliance with spec-owned stacks. Imports cannot create these\nconnections. Stable catalog identities connect selection, ownership and evidence;\nunanchored promises and unresolved declarations remain visible. Zoom changes\npresentation detail, not the meaning or confidence of a relationship.",
+      "why": "**Scope extension generation observes every bundled input and publishes one complete\nlive generation.** A live picture with fresh data and old presentation code can\nsilently misrepresent a project override. The extension bundle therefore contributes\nits transitive inputs and code digest to live generation. Capture, bundle and input\nvalidation finish before the server advances its current snapshot. A changed code\ndigest requests a viewer reload; data-only refreshes preserve the ordinary live\ninteraction path. Failed builds retain the previous complete generation visibly.\n\n**task context is bounded and names its approximations.** A focused context packet is\nuseful only when its one-hop and heuristic limits stay visible; otherwise convenience is\nmisread as completeness and recreates the omission gradient this project exists to oppose.\nRoutes, named limitations, and omission accounting are mandatory framing; a byte budget\nthat cannot hold them refuses with its exact minimum. Everything else is included in a\nstable priority order, and the withheld item and byte totals make truncation observable.\nRepository-level, generated, and explicitly requested ignored files remain navigable even\nwhen the source graph owns no component for them; `graphOwner: null` is evidence, not a miss.\n\n**Scope projects the canonical promise population with deterministic gravity and honest\nabsence.** A visualization is especially capable of making missing state look calm: a\npartial component population still forms a convincing picture, and an unmeasured component\ncan inherit the visual language of a passing one. Scope therefore receives its subjects\nonly from the canonical graph/promise join, refuses when their component populations or\nreliance targets disagree, and serializes stable geometry from that model. The renderer\nmay move the viewport but never the project; absence remains visible ink.\n\n**Scope views select complete attributed assets through data-only configuration.** The\nold CLI canvas and four independently implemented preview panels duplicated presentation\npolicy and prevented projects from asking a different question without editing React.\nOne catalog now adapts canonical readers into assets, attributes, explicit relationships\nand source readings. Every shipped view is ordinary configuration consumed by the same\nStructure, graph, table and card renderers as a project view. JSON selects and presents evidence;\nit cannot execute code or establish a new verdict. Failed sources stay visible outside\nfilters. Pagination names its withheld population and graph connections. The old semantic\npromise join remains shared with the guarantees command; its former canvas and preview\npanels are removed, and layout is a generic Cytoscape projection over selected assets.\n\n**Scope preserves every authored spec content category without inventing evidence.** A\ncomponent containing an invariants array is insufficient when the project needs a view\nof individual unanchored invariants. Specs, sections, intent/prose, rationale, claims,\ninvariants, refutations, zones and authored guarantee declarations retain addresses.\nThe complete original spec survives beside canonical parsed meaning. Custom sections,\nduplicate headings and malformed declarations remain text rather than being upgraded to\nclaims or silently discarded. Only the entry spec's zones have topology authority.\n\n**Structure connections retain declared architectural meaning and exact guarantee\nownership.** A pile of import arrows names syntax while leaving a reader to infer\nresponsibilities. The Structure projection instead joins authored architecture and\nexplicit guarantee reliance with spec-owned stacks. Imports cannot create these\nconnections. Stable catalog identities connect selection, ownership and evidence;\nunanchored promises and unresolved declarations remain visible. Zoom changes\npresentation detail, not the meaning or confidence of a relationship.",
       "invariants": [
         "task context is bounded and names its approximations",
         "Scope projects the canonical promise population with deterministic gravity and honest absence",
         "Scope views select complete attributed assets through data-only configuration",
         "Scope preserves every authored spec content category without inventing evidence",
-        "Structure connections retain declared architectural meaning and exact guarantee ownership"
+        "Structure connections retain declared architectural meaning and exact guarantee ownership",
+        "Scope extension generation observes every bundled input and publishes one complete live generation"
       ],
       "refutations": [
+        "Enabling all five Structure card fields grew cards after placement and overlapped the next row’s guarantee terminals in both Coherence and Mnemion. The registered default layout now owns text measurement and row clearance together; the real-page all-fields probe selects and inspects that exact configuration.",
+        "The first transplanted promise cards passed rectangle containment while flex shrink cut their labels through the final visible line. Real-page browser acceptance now checks internal line geometry and explicit truncation as well as card bounds.",
+        "Scope extension generation observes every bundled input and publishes one complete live generation: the transitive-edit test retained the same runtime digest after changing an imported module excluded from the source walk. Bundler metadata was relative to the CLI working directory, then reinterpreted relative to the project root; every reported path was nonexistent, including a synthetic stdin entry. The host now uses one project-relative address space and reports only real inputs. The live test also rejects a broken bundle while retaining the previous HTML, then observes recovery and a changed runtime digest.",
         "Scope projects the canonical promise population with deterministic gravity and honest absence: projected absent spec fields as explicit undefined; the live server parity guard went red because JSON dropped those keys. Empty JSON values restore parity; the spec projection guard now also checks a round trip with absent spec content.",
         "Scope projects the canonical promise population with deterministic gravity and honest absence: the first canvas's dark-mode screenshot (2026-09-04) showed black titles over dense white hatch fills, with long labels extending beyond circular nodes. That renderer was retired; the generic asset cards retain opaque backgrounds, explicit text colors and full text in the inspector, checked in the browser.",
         "Scope projects the canonical promise population with deterministic gravity and honest absence: supplied a PromiseModel whose component population exceeded the Graph and a reliance whose target did not exist; the projection previously had enough information to draw a plausible partial canvas. The parity guard now refuses both inputs, while the render guard distinguishes an empty model and a component with no guarantees from a passing component.",
@@ -7754,8 +7759,17 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/readings/render-scope.ts",
-      "line": 5,
+      "line": 7,
       "prose": "One bundled renderer ships to consumers; viewing needs no npm install or CDN."
+    },
+    {
+      "id": "s:src/readings/render-scope.ts#renderScopeDocument",
+      "parent": "f:src/readings/render-scope.ts",
+      "label": "renderScopeDocument",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/readings/render-scope.ts",
+      "line": 11
     },
     {
       "id": "f:src/readings/scope/capture.ts",
@@ -8001,7 +8015,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/readings/scope/configuration.ts",
-      "line": 60,
+      "line": 70,
       "prose": "Unknown syntax refuses. There are no callbacks, expressions, imports or executable templates."
     },
     {
@@ -8011,7 +8025,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/scope/configuration.ts",
-      "line": 159
+      "line": 206
     },
     {
       "id": "s:src/readings/scope/configuration.ts#projectView",
@@ -8020,8 +8034,41 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/readings/scope/configuration.ts",
-      "line": 161,
+      "line": 208,
       "prose": "One selection mechanism for every renderer. No kind-specific view branches."
+    },
+    {
+      "id": "f:src/readings/scope/extension-host/bundle.ts",
+      "parent": "c:src/readings",
+      "label": "bundle.ts",
+      "kind": "file",
+      "sub": "src/readings/scope/extension-host/bundle.ts",
+      "path": "src/readings/scope/extension-host/bundle.ts"
+    },
+    {
+      "id": "s:src/readings/scope/extension-host/bundle.ts#ScopeExtensionBundle",
+      "parent": "f:src/readings/scope/extension-host/bundle.ts",
+      "label": "ScopeExtensionBundle",
+      "kind": "symbol",
+      "sub": "interface",
+      "path": "src/readings/scope/extension-host/bundle.ts",
+      "line": 6
+    },
+    {
+      "id": "s:src/readings/scope/extension-host/bundle.ts#bundleScopeExtensions",
+      "parent": "f:src/readings/scope/extension-host/bundle.ts",
+      "label": "bundleScopeExtensions",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/readings/scope/extension-host/bundle.ts",
+      "line": 28,
+      "prose": "Bundle project presentation code without executing it in the host process."
+    },
+    {
+      "id": "x:esbuild",
+      "label": "esbuild",
+      "kind": "external",
+      "sub": "module"
     },
     {
       "id": "f:src/readings/scope/server.ts",
@@ -8062,7 +8109,7 @@
       "sub": "interface",
       "path": "src/readings/scope/structure-contract.ts",
       "line": 5,
-      "prose": "Shared projection contract for the first current-state Structure prototype.\nMeanings and IDs come from canonical declarations; layout never supplies them."
+      "prose": "Shared projection contract for current-state Structure.\nMeanings and IDs come from canonical declarations; layout never supplies them."
     },
     {
       "id": "s:src/readings/scope/structure-contract.ts#DEFAULT_STRUCTURE_OPTIONS",
@@ -8071,7 +8118,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/readings/scope/structure-contract.ts",
-      "line": 11
+      "line": 19
     },
     {
       "id": "s:src/readings/scope/structure-contract.ts#StructureGuarantee",
@@ -8080,7 +8127,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/scope/structure-contract.ts",
-      "line": 14
+      "line": 27
     },
     {
       "id": "s:src/readings/scope/structure-contract.ts#StructureComponent",
@@ -8089,7 +8136,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/scope/structure-contract.ts",
-      "line": 26
+      "line": 39
     },
     {
       "id": "s:src/readings/scope/structure-contract.ts#StructureRelationship",
@@ -8098,7 +8145,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/scope/structure-contract.ts",
-      "line": 41
+      "line": 54
     },
     {
       "id": "s:src/readings/scope/structure-contract.ts#StructureModel",
@@ -8107,7 +8154,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/readings/scope/structure-contract.ts",
-      "line": 52
+      "line": 65
     },
     {
       "id": "f:src/readings/scope/structure-model.ts",
@@ -10303,6 +10350,65 @@
       "prose": "experiment.test.ts — contracts for the first-class plan/outcome ledger.\n\nThe expensive mistakes here are false attribution and false closure: charging another\nsession's trace to the owner, accepting half a result set, or reading corrupt history as\nan empty ledger. These tests keep those failures louder than the plan they would distort."
     },
     {
+      "id": "f:test/fixtures/scope-extensions/dispatch/dispatch.ts",
+      "parent": "c:test",
+      "label": "dispatch.ts",
+      "kind": "file",
+      "sub": "test/fixtures/scope-extensions/dispatch/dispatch.ts",
+      "path": "test/fixtures/scope-extensions/dispatch/dispatch.ts"
+    },
+    {
+      "id": "s:test/fixtures/scope-extensions/dispatch/dispatch.ts#dispatch",
+      "parent": "f:test/fixtures/scope-extensions/dispatch/dispatch.ts",
+      "label": "dispatch",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "test/fixtures/scope-extensions/dispatch/dispatch.ts",
+      "line": 1
+    },
+    {
+      "id": "f:test/fixtures/scope-extensions/main.ts",
+      "parent": "c:test",
+      "label": "main.ts",
+      "kind": "file",
+      "sub": "test/fixtures/scope-extensions/main.ts",
+      "path": "test/fixtures/scope-extensions/main.ts"
+    },
+    {
+      "id": "s:test/fixtures/scope-extensions/main.ts#submit",
+      "parent": "f:test/fixtures/scope-extensions/main.ts",
+      "label": "submit",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "test/fixtures/scope-extensions/main.ts",
+      "line": 1
+    },
+    {
+      "id": "f:test/fixtures/scope-extensions/parcel.test.ts",
+      "parent": "c:test",
+      "label": "parcel.test.ts",
+      "kind": "file",
+      "sub": "test/fixtures/scope-extensions/parcel.test.ts",
+      "path": "test/fixtures/scope-extensions/parcel.test.ts"
+    },
+    {
+      "id": "f:test/fixtures/scope-extensions/receipts/receipts.ts",
+      "parent": "c:test",
+      "label": "receipts.ts",
+      "kind": "file",
+      "sub": "test/fixtures/scope-extensions/receipts/receipts.ts",
+      "path": "test/fixtures/scope-extensions/receipts/receipts.ts"
+    },
+    {
+      "id": "s:test/fixtures/scope-extensions/receipts/receipts.ts#receipts",
+      "parent": "f:test/fixtures/scope-extensions/receipts/receipts.ts",
+      "label": "receipts",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "test/fixtures/scope-extensions/receipts/receipts.ts",
+      "line": 1
+    },
+    {
       "id": "f:test/floor.test.ts",
       "parent": "c:test",
       "label": "floor.test.ts",
@@ -10689,6 +10795,14 @@
       "path": "test/scope-configuration.test.ts"
     },
     {
+      "id": "f:test/scope-extensions.test.ts",
+      "parent": "c:test",
+      "label": "scope-extensions.test.ts",
+      "kind": "file",
+      "sub": "test/scope-extensions.test.ts",
+      "path": "test/scope-extensions.test.ts"
+    },
+    {
       "id": "f:test/scope-layout.test.ts",
       "parent": "c:test",
       "label": "scope-layout.test.ts",
@@ -10701,6 +10815,14 @@
       "label": "@xyflow/react",
       "kind": "external",
       "sub": "module"
+    },
+    {
+      "id": "f:test/scope-live-extensions.test.ts",
+      "parent": "c:test",
+      "label": "scope-live-extensions.test.ts",
+      "kind": "file",
+      "sub": "test/scope-live-extensions.test.ts",
+      "path": "test/scope-live-extensions.test.ts"
     },
     {
       "id": "f:test/scope-model.test.ts",
@@ -13161,9 +13283,21 @@
       "kind": "imports"
     },
     {
+      "id": "f:src/readings/render-scope.ts->x:node:crypto:imports",
+      "source": "f:src/readings/render-scope.ts",
+      "target": "x:node:crypto",
+      "kind": "imports"
+    },
+    {
       "id": "f:src/readings/render-scope.ts->f:src/readings/scope/capture.ts:imports",
       "source": "f:src/readings/render-scope.ts",
       "target": "f:src/readings/scope/capture.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/render-scope.ts->f:src/readings/scope/extension-host/bundle.ts:imports",
+      "source": "f:src/readings/render-scope.ts",
+      "target": "f:src/readings/scope/extension-host/bundle.ts",
       "kind": "imports"
     },
     {
@@ -13362,6 +13496,30 @@
       "id": "f:src/readings/scope/configuration.ts->f:src/readings/scope/structure-contract.ts:imports",
       "source": "f:src/readings/scope/configuration.ts",
       "target": "f:src/readings/scope/structure-contract.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/extension-host/bundle.ts->x:node:fs/promises:imports",
+      "source": "f:src/readings/scope/extension-host/bundle.ts",
+      "target": "x:node:fs/promises",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/extension-host/bundle.ts->x:node:path:imports",
+      "source": "f:src/readings/scope/extension-host/bundle.ts",
+      "target": "x:node:path",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/extension-host/bundle.ts->x:esbuild:imports",
+      "source": "f:src/readings/scope/extension-host/bundle.ts",
+      "target": "x:esbuild",
+      "kind": "imports"
+    },
+    {
+      "id": "f:src/readings/scope/extension-host/bundle.ts->f:src/readings/scope/configuration.ts:imports",
+      "source": "f:src/readings/scope/extension-host/bundle.ts",
+      "target": "f:src/readings/scope/configuration.ts",
       "kind": "imports"
     },
     {
@@ -15447,6 +15605,30 @@
       "kind": "imports"
     },
     {
+      "id": "f:test/fixtures/scope-extensions/parcel.test.ts->x:node:test:imports",
+      "source": "f:test/fixtures/scope-extensions/parcel.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/fixtures/scope-extensions/parcel.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/fixtures/scope-extensions/parcel.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/fixtures/scope-extensions/parcel.test.ts->f:test/fixtures/scope-extensions/main.ts:imports",
+      "source": "f:test/fixtures/scope-extensions/parcel.test.ts",
+      "target": "f:test/fixtures/scope-extensions/main.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/fixtures/scope-extensions/parcel.test.ts->f:test/fixtures/scope-extensions/dispatch/dispatch.ts:imports",
+      "source": "f:test/fixtures/scope-extensions/parcel.test.ts",
+      "target": "f:test/fixtures/scope-extensions/dispatch/dispatch.ts",
+      "kind": "imports"
+    },
+    {
       "id": "f:test/floor.test.ts->x:node:test:imports",
       "source": "f:test/floor.test.ts",
       "target": "x:node:test",
@@ -17379,6 +17561,60 @@
       "kind": "imports"
     },
     {
+      "id": "f:test/scope-extensions.test.ts->x:node:test:imports",
+      "source": "f:test/scope-extensions.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-extensions.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/scope-extensions.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-extensions.test.ts->x:node:fs/promises:imports",
+      "source": "f:test/scope-extensions.test.ts",
+      "target": "x:node:fs/promises",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-extensions.test.ts->x:node:path:imports",
+      "source": "f:test/scope-extensions.test.ts",
+      "target": "x:node:path",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-extensions.test.ts->x:node:os:imports",
+      "source": "f:test/scope-extensions.test.ts",
+      "target": "x:node:os",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-extensions.test.ts->f:src/readings/scope/extension-host/bundle.ts:imports",
+      "source": "f:test/scope-extensions.test.ts",
+      "target": "f:src/readings/scope/extension-host/bundle.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-extensions.test.ts->f:src/readings/scope/configuration.ts:imports",
+      "source": "f:test/scope-extensions.test.ts",
+      "target": "f:src/readings/scope/configuration.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-extensions.test.ts->f:src/readings/scope/capture.ts:imports",
+      "source": "f:test/scope-extensions.test.ts",
+      "target": "f:src/readings/scope/capture.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-extensions.test.ts->f:src/readings/render-scope.ts:imports",
+      "source": "f:test/scope-extensions.test.ts",
+      "target": "f:src/readings/render-scope.ts",
+      "kind": "imports"
+    },
+    {
       "id": "f:test/scope-layout.test.ts->x:node:test:imports",
       "source": "f:test/scope-layout.test.ts",
       "target": "x:node:test",
@@ -17406,6 +17642,48 @@
       "id": "f:test/scope-layout.test.ts->f:src/readings/scope/catalog.ts:imports",
       "source": "f:test/scope-layout.test.ts",
       "target": "f:src/readings/scope/catalog.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-live-extensions.test.ts->x:node:test:imports",
+      "source": "f:test/scope-live-extensions.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-live-extensions.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/scope-live-extensions.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-live-extensions.test.ts->x:node:fs/promises:imports",
+      "source": "f:test/scope-live-extensions.test.ts",
+      "target": "x:node:fs/promises",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-live-extensions.test.ts->x:node:os:imports",
+      "source": "f:test/scope-live-extensions.test.ts",
+      "target": "x:node:os",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-live-extensions.test.ts->x:node:path:imports",
+      "source": "f:test/scope-live-extensions.test.ts",
+      "target": "x:node:path",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-live-extensions.test.ts->f:src/config.ts:imports",
+      "source": "f:test/scope-live-extensions.test.ts",
+      "target": "f:src/config.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/scope-live-extensions.test.ts->f:src/readings/scope/server.ts:imports",
+      "source": "f:test/scope-live-extensions.test.ts",
+      "target": "f:src/readings/scope/server.ts",
       "kind": "imports"
     },
     {
@@ -17793,15 +18071,9 @@
       "kind": "imports"
     },
     {
-      "id": "f:test/structure-layout.test.ts->x:@xyflow/react:imports",
+      "id": "f:test/structure-layout.test.ts->x:node:fs:imports",
       "source": "f:test/structure-layout.test.ts",
-      "target": "x:@xyflow/react",
-      "kind": "imports"
-    },
-    {
-      "id": "f:test/structure-layout.test.ts->f:src/readings/scope/structure-contract.ts:imports",
-      "source": "f:test/structure-layout.test.ts",
-      "target": "f:src/readings/scope/structure-contract.ts",
+      "target": "x:node:fs",
       "kind": "imports"
     },
     {

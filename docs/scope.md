@@ -3,7 +3,8 @@
 Scope is a configurable reading surface over Coherence's asset catalog. The shipped
 views and project views use the same configuration language and four renderers:
 architectural stacks, graphs, tables and cards. React and Radix own interaction, React Flow owns the canvas,
-and Cytoscape owns layout. Projects do not need to edit or install the frontend.
+and Cytoscape lays out generic graph views. Structure uses its own configurable
+architectural layout and routing. Projects do not need to edit the frontend.
 
 ```sh
 coherence scope             # write <outputDir>/scope.json and _scope.html
@@ -95,9 +96,20 @@ The defaults are `structure`, `guarantees`, `specs`, `work`, `journal`, `taxonom
 | `graph.weight` | Numeric attribute used by concentric layout; default `attributes.mass.total` |
 | `graph.width`, `height`, `gap` | Card geometry; rectangular clearance is enforced |
 | `graph.edgeLabel` | Optional relation attribute path; defaults to relation kind |
-| `structure.summaryGuarantees` | Number of promises previewed on a stack, 0–12; default 2 |
-| `structure.tileZoom`, `detailZoom` | Ordered semantic zoom thresholds; defaults 0.5 and 0.95 |
-| `structure.columns` | Layout columns, 1–8; default 3 |
+| `structure.rankingWeights` | Weights for declared peers, guarantees, security boundaries and consumers |
+| `structure.downtownCount`, `downtownThreshold` | Maximum core population and fraction of the leader’s score |
+| `structure.spacing` | Horizontal and vertical spacing in world units |
+| `structure.shortTerminalNames` | Presentation labels for guarantee terminals |
+| `structure.cardFields` | Supporting card content selected from intent, rationale, boundaries, resources and entrances |
+| `structure.promisePreviewCount` | Number of local promise cards revealed by unfurl |
+| `structure.initialRelationshipLayer` | `opening`, `all`, or `guarantees` |
+| `structure.tileZoom`, `detailZoom` | Content detail thresholds; card geometry remains fixed |
+| `structure.implementations` | Named rank, layout, route, card and view registrations; each defaults to `default` |
+| `structure.extensionOptions` | JSON options interpreted by project implementations |
+
+The former `summaryGuarantees` option is now `promisePreviewCount`. The old
+`columns` grid option has been removed; use `spacing` or a named layout implementation.
+These old keys produce an explicit configuration error rather than being ignored.
 
 Fields address `id`, `kind`, `label`, `source`, or nested `attributes.path`. Relation
 labels may also address `target`. Optional field formats are `text`, `json`, and
@@ -121,10 +133,15 @@ the same catalog that other views can inspect. Stack expansion is separate from
 zoom detail and sidebar selection. Files remain references in evidence, not cards
 on this map. Imports do not supply architectural arrows.
 
-The initial Structure renderer takes the full canonical component population. Its
-configuration uses `kinds: ["component"]` and `fields: []`; generic `where`, `sort`,
-`groupBy`, and `pageSize` are rejected. The four `structure` options customize its
-detail and geometry. Filtered arbitrary-asset projections remain available through
+Structure takes the full canonical component population. The root spec is the
+project frame when it owns child components; a single-component project still has
+a selectable card. Density and declared reliance determine downtown prominence.
+Separate promise cards unfurl into reserved space, leaving existing objects and
+external paths fixed. Guarantee connections stay attached to named terminals.
+
+Its configuration uses `kinds: ["component"]` and `fields: []`; generic `where`, `sort`,
+`groupBy`, and `pageSize` are rejected. The `structure` options customize ranking, layout, card content, disclosure
+and named behavior implementations. Filtered arbitrary-asset projections remain available through
 the graph, table and cards renderers. Extending Structure's selection language is
 later work, not an implied capability of the current options.
 
@@ -155,11 +172,11 @@ consumes every guarantee of its neighbor. Atlas transitions provide owned bounda
 detail. Taxonomy summaries concern exact owned assessment subjects and retain evidence
 limits; they are not a new classification of the whole component.
 
-The first prototype focuses on current state. Snapshot comparison, removed-card ghosts,
-change-story navigation and Scope-control MCP remain planned. A project can replace
-the default tab through ordinary configuration. Adding a new renderer implementation
-still requires frontend registration; a packaged third-party renderer loading protocol
-is not implemented by this prototype.
+Structure focuses on current state. Snapshot comparison, removed-card ghosts,
+change-story navigation and Scope-control MCP remain planned. Projects can replace
+the default tab through configuration or use versioned project modules to replace
+ranking, placement, routing, card content or the entire Structure view.
+See [project behavior extensions](scope-extensions.md) for the contract and examples.
 
 See [the implementation plan](scope-structure-plan.md),
 [Coherence's declaration inventory](scope-coherence-inventory.md), and
@@ -269,14 +286,20 @@ agent action, caller-assessed taxonomy into proof, or local receipts into truste
 
 ```sh
 npm run build
-node --test test/structure-semantics.test.ts test/structure-layout.test.ts test/scope-configuration.test.ts test/scope-capture.test.ts test/render-scope.test.ts
+node --test test/structure-semantics.test.ts test/structure-layout.test.ts test/scope-configuration.test.ts test/scope-capture.test.ts test/render-scope.test.ts test/scope-extensions.test.ts test/scope-live-extensions.test.ts
+node scripts/scope-transplant-check.mjs
 node scripts/scope-structure-check.mjs
 node scripts/scope-browser-check.mjs
 SCOPE_BROWSER_ENGINE=webkit node scripts/scope-browser-check.mjs
 ```
 
-Structure checks exercise a differently named fixture and the current Coherence checkout,
-retaining screenshots and offline artifacts for human review. Generic browser checks
+The transplant check exercises a differently named project through source and packed
+installations, including custom cards, layout, ranking and a replacement view.
+The Structure check reviews the current checkout (or a project root passed as its
+argument), retaining screenshots and offline artifacts for human review. It checks
+opening readability, text clipping, geometry, paths, inspection and disclosure at
+two widths. See the [integrated acceptance report](prototypes/structure-integrated/RESULTS.md)
+for the Coherence and Mnemion observations and captured hub negative control. Generic browser checks
 exercise a configured graph and the remaining default views, custom JSON without frontend changes,
 inspector text, all four layouts, offline network silence, live config/source updates,
 pause/resume, malformed-config recovery, HTTP boundaries and mobile overflow. They

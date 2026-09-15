@@ -1,144 +1,145 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 import { loadConfig } from '../src/config.ts';
 import { captureScope } from '../src/readings/scope/capture.ts';
-import { buildStructureModel } from '../src/readings/scope/structure-model.ts';
 import { renderScope } from '../src/readings/render-scope.ts';
 
-// Assess the current renderer, not an earlier dist bundle left by another run.
-await import('./build-scope.mjs');
-
-// The fixture checks reuse; the actual checkout supplies the architectural review.
-// Screenshots are retained for human review, which this script cannot replace.
-const artifacts = process.env.SCOPE_REVIEW_DIR ?? await mkdtemp(join(tmpdir(), 'coherence-structure-review-'));
+// Run npm run build first: this assesses the same generated HTML as normal Scope.
+const project = resolve(process.argv[2] ?? '.');
+const artifacts = resolve(process.env.SCOPE_REVIEW_DIR ?? 'docs/prototypes/structure-integrated');
 await mkdir(artifacts, { recursive: true });
-const fixture = await mkdtemp(join(tmpdir(), 'structure-project-'));
-let browser;
+const snapshot = await captureScope(await loadConfig(project));
+const html = join(artifacts, 'scope.html');
+await writeFile(html, await renderScope(snapshot, { projectRoot: project }));
+const browser = await chromium.launch();
+const observations = [];
 try {
-  await mkdir(join(fixture, 'store'));
-  await writeFile(join(fixture, 'coherence.config.json'), JSON.stringify({ name: 'Orchard dispatch', test: [], typecheck: [] }));
-  await writeFile(join(fixture, 'orchard.spec.md'), `# Orchard dispatch
-
-Coordinates harvest requests.
-
-## architecture
-
-- {"kind":"purpose","id":"purpose","text":"Orchard dispatch turns harvest requests into retained picking orders."}
-- {"kind":"entrance","id":"request","label":"Request a harvest","component":".","description":"A grower submits a harvest request.","anchor":"main.ts#request"}
-- {"kind":"relationship","id":"retain","from":".","to":"store","label":"Retains picking orders","because":"Dispatch hands accepted requests to the order store."}
-`);
-  await writeFile(join(fixture, 'main.ts'), 'export function request() { return "accepted"; }\n');
-  await writeFile(join(fixture, 'store/store.spec.md'), '# Order store\n\nRetains accepted picking orders.\n\n## invariants\n\n- an accepted order keeps its identity\n');
-  await writeFile(join(fixture, 'store/store.ts'), 'export const orders = [];\n');
-  browser = await chromium.launch(process.env.SCOPE_BROWSER_CHANNEL ? { channel: process.env.SCOPE_BROWSER_CHANNEL } : {});
-  const results = [];
-  for (const [name, root] of [['fixture', fixture], ['coherence', resolve(process.argv[2] ?? '.')]]) {
-    const snapshot = await captureScope(await loadConfig(root));
-    const model = buildStructureModel(snapshot.catalog);
-    assert.ok(model.project.purposes.length, `${name}: missing authored project purpose`);
-    assert.ok(model.project.entrances.length, `${name}: missing authored entrances`);
-    assert.ok(model.relationships.length, `${name}: missing meaningful relationships`);
-    const html = join(artifacts, `${name}.html`);
-    await writeFile(html, await renderScope(snapshot));
-    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-    const errors = [], requests = [];
-    page.setDefaultTimeout(10000);
-    page.on('console', message => { if (/Couldn.t create edge/.test(message.text())) errors.push(message.text()); });
+  for (const width of [1440, 1280]) {
+    const page = await browser.newPage({ viewport: { width, height: 1100 } });
+    const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    page.on('request', request => requests.push(request.url()));
     await page.goto(pathToFileURL(html).href);
     await page.locator('[data-structure-stack]').first().waitFor();
-    assert.equal(await page.locator('[data-structure-stack]').count(), model.components.length);
-    await page.waitForFunction(count => document.querySelectorAll('.react-flow__edge').length === count, model.relationships.length);
-    assert.equal(await page.locator('.react-flow__edge').count(), model.relationships.length);
-    assert.equal(await page.locator('.graph-card').count(), 0, 'Structure unexpectedly uses generic file/import cards');
-    assert.ok((await page.locator('.structure-introduction').innerText()).includes(String(model.project.purposes[0].attributes.text)));
-    const titlePixels = await page.locator('.structure-select').first().evaluate(element => {
-      const node = element.closest('.react-flow__node');
-      return parseFloat(getComputedStyle(element).fontSize) * node.getBoundingClientRect().width / node.offsetWidth;
-    });
-    assert.ok(titlePixels >= 14, `${name}: opening titles are only ${titlePixels}px`);
-    await page.screenshot({ path: join(artifacts, `${name}-overview.png`), fullPage: true });
-    const entrance = model.project.entrances[0];
-    await page.locator('.structure-entrances').getByRole('button', { name: entrance.label, exact: true }).click();
-    await page.locator('[data-structure-sidebar]').waitFor();
-    assert.ok((await page.locator('[data-structure-sidebar]').innerText()).includes(entrance.label));
-    await page.getByRole('button', { name: 'Close architecture detail', exact: true }).click();
-    const component = model.components.find(item => item.guarantees.length > 0);
-    assert.ok(component, 'fixture must exercise an owned promise');
-    const target = page.locator(`[data-structure-expand=${JSON.stringify(component.id)}]`);
-    await target.click();
-    assert.equal(await target.getAttribute('aria-expanded'), 'true');
-    const opened = page.locator(`[data-structure-stack=${JSON.stringify(component.id)}]`);
-    await opened.getByRole('button', { name: component.guarantees[0].label, exact: true }).first().click();
-    assert.equal(await page.locator('[data-structure-sidebar] h2').innerText(), component.guarantees[0].label);
-    const selectedText = await page.locator('[data-structure-sidebar] h2').innerText();
-    for (let i = 0; i < 8; i++) {
-      const control = page.locator('.react-flow__controls-zoomin');
-      if (await control.isDisabled()) break;
-      await control.click();
+    await page.waitForTimeout(500);
+    const read = async name => {
+      await page.waitForTimeout(150);
+      const observation = await page.evaluate(() => {
+        const states = Object.values(globalThis.__SCOPE_STRUCTURE__ ?? {}).flatMap(project => Object.values(project));
+        const state = states.at(-1);
+        if (!state) throw new Error('Structure diagnostics are absent');
+        const boxes = [...document.querySelectorAll('.react-flow__node')].map(node => {
+          const matrix = new DOMMatrixReadOnly(getComputedStyle(node).transform);
+          return { id: node.dataset.id, x: matrix.e, y: matrix.f, width: node.offsetWidth, height: node.offsetHeight };
+        });
+        for (const label of document.querySelectorAll('[data-structure-route-label]')) {
+          const matrix = new DOMMatrixReadOnly(getComputedStyle(label).transform);
+          boxes.push({ id: label.dataset.structureRouteLabel, x: matrix.e, y: matrix.f, width: label.offsetWidth, height: label.offsetHeight });
+        }
+        const inside = (p,b) => p.x>b.x+1 && p.x<b.x+b.width-1 && p.y>b.y+1 && p.y<b.y+b.height-1;
+        const collisions=[];
+        for(let i=0;i<boxes.length;i++) for(let j=i+1;j<boxes.length;j++) {
+          const a=boxes[i],b=boxes[j];
+          if(a.x<b.x+b.width-1 && a.x+a.width>b.x+1 && a.y<b.y+b.height-1 && a.y+a.height>b.y+1) collisions.push(`objects: ${a.id} / ${b.id}`);
+        }
+        const external = {}, allRoutes = {};
+        for(const path of document.querySelectorAll('[data-structure-route]')) {
+          const id=path.dataset.structureRoute, route=state.routes.find(r=>r.id===id);
+          if(!route) throw new Error(`Rendered route lacks diagnostic identity: ${id}`);
+          allRoutes[id]=path.getAttribute('d');
+          if(!/^(detail:|ownership:)/.test(id)) external[id]=path.getAttribute('d');
+          for(let d=2;d<path.getTotalLength()-2;d+=2) {
+            const p=path.getPointAtLength(d),hit=boxes.find(b=>![route.source,route.target,id].includes(b.id)&&inside(p,b));
+            if(hit){collisions.push(`wire: ${id} / ${hit.id}`);break;}
+          }
+        }
+        const clipped=[];
+        for(const stack of document.querySelectorAll('[data-structure-stack]')) {
+          const footer=stack.querySelector('[data-structure-unfurl]').getBoundingClientRect();
+          for(const part of stack.querySelectorAll('[data-structure-card-body] > *')) if(part.getBoundingClientRect().bottom>footer.top+2) clipped.push(stack.dataset.structureStack);
+        }
+        for(const promise of document.querySelectorAll('[data-structure-promise-card]')) {
+          const box=promise.getBoundingClientRect();
+          for(const part of promise.querySelectorAll('button > *')) if(part.getBoundingClientRect().bottom>box.bottom+1) clipped.push(promise.dataset.structurePromiseCard);
+        }
+        // Text can fit inside its card while flex shrink clips through a line.
+        // Long text must end on a whole line and declare its ellipsis policy.
+        for (const text of document.querySelectorAll('[data-structure-promise-card] span, .structure-zoom-intent')) {
+          const css = getComputedStyle(text), line = parseFloat(css.lineHeight);
+          if (css.overflow === 'hidden' && text.scrollHeight > text.clientHeight + 1) {
+            if (!(parseInt(css.webkitLineClamp) > 0)) clipped.push(`unmarked text truncation: ${text.textContent}`);
+            if (Math.abs(text.clientHeight / line - Math.round(text.clientHeight / line)) > .08) clipped.push(`partial line: ${text.textContent}`);
+          }
+        }
+        const titles = [...document.querySelectorAll('[data-structure-stack] h2')].map(title => {
+          const node = title.closest('.react-flow__node');
+          return parseFloat(getComputedStyle(title).fontSize) * node.getBoundingClientRect().width / node.offsetWidth;
+        });
+        const coreIntents = [...document.querySelectorAll('[data-structure-stack][data-downtown="true"] .structure-zoom-intent')].map(el => ({ text:el.textContent, opacity:getComputedStyle(el).opacity, visibility:getComputedStyle(el).visibility }));
+        return { error:state.error,collisions,clipped,external,allRoutes,selected:state.selected,titles,coreIntents,
+          cards:boxes.filter(b=>state.cards.some(c=>c.id===b.id&&c.nodeKind!=='promise')),
+          promises:state.cards.filter(c=>c.nodeKind==='promise'),
+          camera:document.querySelector('.react-flow__viewport').style.transform,
+          sidebar:document.querySelector('[data-structure-sidebar] h2')?.textContent };
+      });
+      observations.push({width,name,...observation});
+      await page.screenshot({path:join(artifacts,`${name}-${width}.png`),fullPage:true});
+      assert.equal(observation.error,null,`${name}: route failure`);
+      assert.deepEqual(observation.collisions,[],`${name}: clearance`);
+      assert.deepEqual(observation.clipped,[],`${name}: card content clipped`);
+      return observation;
+    };
+    const opening=await read('opening');
+    assert.ok(Math.min(...opening.titles) >= (width === 1440 ? 14 : 12), `Opening titles too small: ${Math.min(...opening.titles)}px`);
+    assert.ok(opening.coreIntents.length && opening.coreIntents.every(p=>p.text && p.opacity!=='0' && p.visibility!=='hidden'), 'Opening omits the downtown responsibilities');
+    const stack=page.locator('[data-structure-stack][data-downtown="true"]').first();
+    await stack.locator('[data-structure-card-body]').click();
+    const inspected=await read('inspected');
+    assert.ok(inspected.sidebar);assert.deepEqual(inspected.external,opening.external);
+    await stack.locator('[data-structure-unfurl]').click();
+    const expanded=await read('expanded');
+    assert.ok(expanded.promises.length);assert.deepEqual(expanded.cards,inspected.cards);assert.deepEqual(expanded.external,inspected.external);assert.equal(expanded.camera,inspected.camera);
+    await page.getByRole('button',{name:'Frame local promises',exact:true}).click();
+    await page.waitForTimeout(450);
+    await read('local-promises');
+    await page.locator('[data-structure-promise-card] button').first().click();
+    await read('guarantee');
+    const promiseWorld=await read('near');
+    for(let i=0;i<7;i++) await page.locator('.react-flow__controls-zoomout').click();
+    await page.waitForTimeout(450);
+    const far=await read('far');assert.deepEqual(far.cards,promiseWorld.cards);assert.deepEqual(far.promises,promiseWorld.promises);assert.deepEqual(far.external,promiseWorld.external);
+    await stack.locator('[data-structure-unfurl]').evaluate(el=>el.click());
+    const folded=await read('folded');assert.equal(folded.promises.length,0);assert.deepEqual(folded.selected,far.selected);
+    await page.getByRole('button',{name:'Return to overview',exact:true}).click();await page.waitForTimeout(450);
+    for(const [title,name] of [['All handoffs','all-handoffs'],['Guarantee reliances','reliances']]) {
+      await page.getByRole('button',{name:new RegExp(`^${title} ·`)}).click();
+      await page.locator('.react-flow__controls-fitview').click();await page.waitForTimeout(450);await read(name);
     }
-    await page.getByText('Detailed cards', { exact: true }).waitFor();
-    assert.equal(await page.locator('[data-structure-sidebar] h2').innerText(), selectedText);
-    await page.screenshot({ path: join(artifacts, `${name}-detail.png`), fullPage: true });
-    for (let i = 0; i < 14; i++) {
-      const control = page.locator('.react-flow__controls-zoomout');
-      if (await control.isDisabled()) break;
-      await control.click();
-    }
-    await page.getByText('Tile detail', { exact: true }).waitFor();
-    assert.equal(await target.getAttribute('aria-expanded'), 'true', 'zoom changed explicit expansion');
-    await page.getByRole('tab', { name: 'All assets', exact: true }).click();
-    await page.getByRole('tab', { name: 'Structure', exact: true }).click();
-    await target.waitFor();
-    assert.equal(await target.getAttribute('aria-expanded'), 'true', 'tab switch lost explicit expansion');
-    await page.getByText('Tile detail', { exact: true }).waitFor();
-    const evidence = component.guarantees[0].evidence[0];
-    if (evidence) {
-      await page.locator('[data-structure-sidebar]').getByRole('button', { name: String(evidence.attributes.verdict), exact: true }).first().click();
-      assert.equal(await page.locator('[data-structure-sidebar] h2').count(), 1, 'evidence selection produced conflicting inspectors');
-      assert.ok((await page.locator('[data-structure-sidebar]').innerText()).includes(String(evidence.attributes.oracle)));
-    }
-    await page.getByRole('button', { name: 'Close architecture detail', exact: true }).click();
-    await page.getByRole('button', { name: 'Fit architecture', exact: true }).click();
-    await page.locator('[data-structure-relationships] summary').click();
-    await page.locator('[data-structure-relationships] button').first().focus();
-    await page.keyboard.press('Enter');
-    await page.locator('[data-structure-sidebar]').waitFor();
-    assert.ok((await page.locator('[data-structure-sidebar]').innerText()).includes('Declared meaning'));
-    await page.locator('.structure-edge-focused').waitFor({ state: 'attached' });
-    assert.equal(await page.locator('.structure-edge-focused').count(), 1);
-    assert.equal(await page.locator('.relationship-focused').count(), 2);
-    await page.locator('[data-structure-relationships] summary').click();
-    await page.screenshot({ path: join(artifacts, `${name}-relationship.png`), fullPage: true });
-    const reliance = model.relationships.find(item => item.kind === 'guarantee-reliance' && item.guaranteeIds.length);
-    if (reliance) {
-      await page.getByRole('button', { name: 'Close architecture detail', exact: true }).click();
-      for (const id of [reliance.source, reliance.target]) {
-        const control = page.locator(`[data-structure-expand=${JSON.stringify(id)}]`);
-        if (await control.getAttribute('aria-expanded') !== 'true') await control.click();
-      }
-      const provider = model.components.find(item => item.id === reliance.target);
-      const promise = provider.guarantees.find(item => item.id === reliance.guaranteeIds[0]);
-      assert.ok(promise, 'explicit reliance has no provider promise');
-      await page.locator(`[data-structure-stack=${JSON.stringify(provider.id)}]`).getByRole('button', { name: promise.label, exact: true }).first().waitFor();
-      assert.equal(await page.locator('.react-flow__edge').count(), model.relationships.length, 'opening a promise lost its external relationship');
-      await page.getByRole('button', { name: 'Fit architecture', exact: true }).click();
-      await page.screenshot({ path: join(artifacts, `${name}-connected-stacks.png`), fullPage: true });
-    }
-    assert.deepEqual(errors, [], `${name}: browser errors`);
-    assert.ok(requests.every(url => url.startsWith('file:')), `${name}: offline artifact made a network request`);
-    results.push({ name, titlePixels, components: model.components.length, relationships: model.relationships.length,
-      entrances: model.project.entrances.length, unavailable: model.sources.filter(source => source.status === 'unavailable') });
-    await page.close();
+    const customized = structuredClone(snapshot.configuration);
+    customized.views = [customized.views.find(view => view.renderer === 'structure')];
+    customized.views[0].id = 'all-fields';
+    customized.views[0].structure.cardFields = ['intent','rationale','boundaries','resources','entrances'];
+    customized.initialView = 'all-fields';
+    customized.extends = false;
+    await page.getByRole('button',{name:'Configure',exact:true}).click();
+    await page.getByRole('textbox',{name:'Scope JSON configuration'}).fill(JSON.stringify(customized));
+    await page.getByRole('button',{name:'Apply preview',exact:true}).click();
+    await page.getByRole('region',{name:'Configure Scope'}).getByRole('button',{name:'Close',exact:true}).click();
+    await page.waitForTimeout(500);
+    assert.ok(await page.locator('[data-structure-stack] .structure-zoom-rationale').count(), 'Optional card fields were not rendered');
+    await read('all-fields');
+    await page.locator('[data-structure-stack][data-downtown="true"]').first().locator('[data-structure-unfurl]').click();
+    await page.locator('[data-structure-promise-card]').first().waitFor();
+    customized.views[0].structure.promisePreviewCount = 1;
+    await page.getByRole('button',{name:'Configure',exact:true}).click();
+    await page.getByRole('textbox',{name:'Scope JSON configuration'}).fill(JSON.stringify(customized));
+    await page.getByRole('button',{name:'Apply preview',exact:true}).click();
+    await page.getByRole('region',{name:'Configure Scope'}).getByRole('button',{name:'Close',exact:true}).click();
+    await page.waitForFunction(() => document.querySelectorAll('[data-structure-promise-card]').length === 1);
+    await read('reconfigured-promises');
+    assert.deepEqual(errors,[]);await page.close();
   }
-  await writeFile(join(artifacts, 'review.json'), JSON.stringify(results, null, 2));
-  console.log(JSON.stringify({ artifacts, results }, null, 2));
-} finally {
-  await browser?.close();
-  await rm(fixture, { recursive: true, force: true });
-}
+}finally{await browser.close();await writeFile(join(artifacts,'browser-results.json'),JSON.stringify(observations,null,2));}
+console.log(`Passed ${observations.length} integrated Structure observations; ${artifacts}`);

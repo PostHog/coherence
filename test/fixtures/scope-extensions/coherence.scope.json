@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "extends": "default",
+  "extensions": ["./extension.jsx"],
+  "views": [
+    {
+      "id": "structure",
+      "title": "Structure",
+      "renderer": "structure",
+      "kinds": ["component"],
+      "fields": [],
+      "structure": {
+        "implementations": {
+          "rank": "fixture.reverse",
+          "layout": "fixture.offset",
+          "card": "fixture.hooked-card"
+        },
+        "extensionOptions": { "fixtureLabel": "acceptance" }
+      }
+    },
+    {
+      "id": "audit",
+      "title": "Extension audit",
+      "renderer": "structure",
+      "kinds": ["component"],
+      "fields": [],
+      "structure": {
+        "implementations": { "view": "fixture.audit-view" },
+        "extensionOptions": { "fixtureLabel": "whole-view" }
+      }
+    }
+  ]
+}

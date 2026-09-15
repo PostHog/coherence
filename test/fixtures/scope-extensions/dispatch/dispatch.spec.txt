@@ -1,0 +1,15 @@
+# Dispatcher
+
+Assigns accepted parcels to a route.
+
+## invariants
+
+- parcel identity survives dispatch
+
+## works when
+
+- boundary "parcel identity survives dispatch" at dispatch via guard "parcel identity survives dispatch"
+
+## why
+
+Route choice changes independently from request acceptance and receipt storage.

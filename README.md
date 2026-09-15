@@ -2415,7 +2415,10 @@ Evidence, Hooks and All assets views. `coherence scope` writes an offline
 Every view is a declarative configuration over the same assets and attributes.
 Add `coherence.scope.json` to replace defaults or add project-specific graphs,
 tables and grouped cards. The **Configure** editor previews changes and downloads
-the configuration and attribute inventory. No frontend code is needed.
+the configuration and attribute inventory. Presentation changes need no frontend
+code. Structure also accepts [versioned project modules](docs/scope-extensions.md)
+that replace ranking, layout, routing, card content or the whole view while
+inheriting the remaining defaults. Modules are bundled into the generated HTML.
 
 The catalog includes source structure, every authored spec section, individual claims,
 invariants and refutations, guarantees, taxonomy, journal records, work, consequences,

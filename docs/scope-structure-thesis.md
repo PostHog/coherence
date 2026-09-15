@@ -8,11 +8,14 @@ not a claim that the described experience is already implemented. The current
 configuration syntax and capabilities are documented in `docs/scope.md` on the local
 implementation branch.
 
-**Publication scope:** only this thesis is being published to `main`. The unfinished
-declarative Scope replacement is retained locally on `wip/scope-declarative`; it is
-not a released replacement for the existing Scope. Descriptions of the current
-foundation below refer to that local implementation. Its source paths are given as
-code references because those files are not all available on `main` yet.
+**Publication scope:** the thesis is on `main`; the unfinished rebuild is published
+on `wip/scope-declarative`. It is not a released replacement for the existing Scope.
+The [transplant plan](scope-structure-transplant-plan.md) and
+[extension contract](scope-extensions.md) describe the current-state transplant.
+The [integration report](prototypes/structure-integrated/RESULTS.md) records its
+acceptance evidence and remaining product limits.
+Historical foundation descriptions below refer to the implementation at the time
+of the original design discussion.
 
 Reading guide:
 

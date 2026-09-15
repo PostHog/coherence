@@ -7,7 +7,7 @@ import { loadConfig } from "../../config.ts";
 import { codeFiles } from "../../derivation/walk.ts";
 import { BUILTIN_LANGUAGES } from "../../adapters/tree-sitter.ts";
 import { captureScope, type ScopeSnapshot } from "./capture.ts";
-import { renderScope } from "../render-scope.ts";
+import { renderScopeDocument } from "../render-scope.ts";
 
 // Metadata schedules reads; only canonical readers define the asset population.
 async function inputStamp(cfg: Config, inputs: string[] = []): Promise<string> {
@@ -40,29 +40,39 @@ export async function startScopeServer({ cfg, port = 0, intervalMs = 750 }: { cf
   let origin = "", stamp = "", packet = "", html = "", closed = false;
   let inFlight: Promise<void> | null = null;
   let snapshot: ScopeSnapshot | undefined;
+  let extensionDigest = "", extensionInputs: string[] = [];
   async function refreshOnce() {
     try {
       const current = await loadConfig(cfg.root);
       if (!Object.hasOwn(BUILTIN_LANGUAGES, current.language)) throw new Error("Live Scope requires a built-in language; project adapter code is not executed on browser connections.");
-      const before = await inputStamp(current, snapshot?.inputs);
+      const knownInputs = [...new Set([...(snapshot?.inputs ?? []), ...extensionInputs])].sort();
+      const before = await inputStamp(current, knownInputs);
       if (before === stamp) return;
       let next = await captureScope(current);
-      let after = await inputStamp(current, snapshot?.inputs);
+      let document = await renderScopeDocument(next, { projectRoot: current.root });
+      let after = await inputStamp(current, knownInputs);
       if (before !== after) throw new Error("Project changed during capture; retaining the previous snapshot until the next stable read.");
       // Newly discovered pinned files may live outside the source walk. Establish
       // their interval before a second capture instead of retroactively calling it stable.
-      if (JSON.stringify(next.inputs) !== JSON.stringify(snapshot?.inputs)) {
-        const discovered = await inputStamp(current, next.inputs);
+      const nextInputs = [...new Set([...(next.inputs ?? []), ...document.extensionInputs])].sort();
+      if (JSON.stringify(nextInputs) !== JSON.stringify(knownInputs)) {
+        const discovered = await inputStamp(current, nextInputs);
         const confirmed = await captureScope(current);
-        after = await inputStamp(current, confirmed.inputs);
-        if (discovered !== after) throw new Error("Pinned evidence changed during capture; retrying.");
+        const confirmedDocument = await renderScopeDocument(confirmed, { projectRoot: current.root });
+        const confirmedInputs = [...new Set([...(confirmed.inputs ?? []), ...confirmedDocument.extensionInputs])].sort();
+        after = await inputStamp(current, confirmedInputs);
+        if (JSON.stringify(nextInputs) !== JSON.stringify(confirmedInputs) || discovered !== after) throw new Error("Scope inputs changed during capture; retrying.");
         next = confirmed;
+        document = confirmedDocument;
       }
       const raw = JSON.stringify(next), digest = createHash("sha256").update(raw).digest("hex");
+      // Publish one completed generation. A failed extension bundle must not
+      // advance the input stamp and suppress the retry of unchanged inputs.
       stamp = after;
       snapshot = next; cfg = current;
-      packet = `event: snapshot\nid: ${digest}\ndata: ${raw}\n\n`;
-      html = await renderScope(next);
+      extensionDigest = document.extensionDigest; extensionInputs = document.extensionInputs;
+      packet = `event: runtime\ndata: ${JSON.stringify({ digest: extensionDigest })}\n\nevent: snapshot\nid: ${digest}\ndata: ${raw}\n\n`;
+      html = document.html;
     } catch (error) {
       packet = `event: unavailable\ndata: ${JSON.stringify({ message: String((error as Error).message) })}\n\n`;
       if (!snapshot) throw error;
@@ -83,7 +93,7 @@ export async function startScopeServer({ cfg, port = 0, intervalMs = 750 }: { cf
     if (req.method !== "GET") { res.writeHead(405, { Allow: "GET" }).end("Read-only"); return; }
     if (req.url === basePath) {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(html.replace('<div id="root">', '<meta name="scope-live" content="events"><div id="root">'));
+      res.end(html.replace('<div id="root">', `<meta name="scope-live" content="events"><meta name="scope-runtime" content="${extensionDigest}"><div id="root">`));
     } else if (req.url === basePath + "events") {
       if (clients.size >= 8) { res.writeHead(503).end("Too many viewers"); return; }
       try { await refresh(); } catch { res.writeHead(503).end("Snapshot unavailable"); return; }

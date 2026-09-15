@@ -34,6 +34,7 @@
     "docs/assays/posthog-guarantees-r2",
     "docs/assays/posthog-guarantees-r3",
     "docs/assays/posthog-scope-v0",
+    "docs/scope-extensions.md",
     "docs/scope.md"
   ],
   "engines": {
@@ -50,7 +51,6 @@
     "@types/node": "^22.0.0",
     "@xyflow/react": "12.11.6",
     "cytoscape": "3.34.2",
-    "esbuild": "0.28.2",
     "playwright": "1.62.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -60,6 +60,7 @@
     "typescript": "^5.7.0"
   },
   "dependencies": {
+    "esbuild": "0.28.2",
     "web-tree-sitter": "^0.26.12"
   }
 }

@@ -1,15 +1,28 @@
 import type { Asset, SourceReading } from "./catalog.ts";
 
-/** Shared projection contract for the first current-state Structure prototype.
+/** Shared projection contract for current-state Structure.
  * Meanings and IDs come from canonical declarations; layout never supplies them. */
 export interface StructureOptions {
-  summaryGuarantees: number;
+  rankingWeights: { peers: number; guarantees: number; security: number; consumers: number };
+  downtownCount: number;
+  downtownThreshold: number;
+  spacing: { x: number; y: number };
+  shortTerminalNames: Record<string, string>;
+  cardFields: Array<"intent" | "rationale" | "boundaries" | "resources" | "entrances">;
+  promisePreviewCount: number;
+  initialRelationshipLayer: "opening" | "all" | "guarantees";
   tileZoom: number;
   detailZoom: number;
-  columns: number;
+  implementations: { rank: string; layout: string; route: string; card: string; view: string };
+  extensionOptions: Record<string, unknown>;
 }
 export const DEFAULT_STRUCTURE_OPTIONS: StructureOptions = {
-  summaryGuarantees: 2, tileZoom: 0.5, detailZoom: 0.95, columns: 3,
+  rankingWeights: { peers: 3, guarantees: 2, security: 1, consumers: 2 },
+  downtownCount: 3, downtownThreshold: 0.65, spacing: { x: 480, y: 420 },
+  shortTerminalNames: {}, cardFields: ["intent"],
+  promisePreviewCount: 3, initialRelationshipLayer: "opening", tileZoom: 0.46, detailZoom: 0.50,
+  implementations: { rank: "default", layout: "default", route: "default", card: "default", view: "default" },
+  extensionOptions: {},
 };
 export interface StructureGuarantee {
   id: string;

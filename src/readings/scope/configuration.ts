@@ -13,7 +13,7 @@ export interface View {
   structure?: StructureOptions;
 }
 export interface ScopeConfiguration {
-  version: 1; title: string; initialView: string; views: View[];
+  version: 1; title: string; initialView: string; views: View[]; extensions: string[];
 }
 const field = (path: string, label?: string): Field => ({ field: path, ...(label ? { label } : {}) });
 const view = (id: string, title: string, kinds: string[], fields: Field[], extra: Partial<View> = {}): View =>
@@ -21,7 +21,7 @@ const view = (id: string, title: string, kinds: string[], fields: Field[], extra
 
 // Defaults use exactly the same language and renderers as a project-authored view.
 export const DEFAULT_SCOPE: ScopeConfiguration = {
-  version: 1, title: "Scope", initialView: "structure", views: [
+  version: 1, title: "Scope", initialView: "structure", extensions: [], views: [
     view("structure", "Structure", ["component"], [], {
       renderer: "structure", description: "Declared responsibility, architectural crossings, and promises. Evidence is shown per promise, never as component health.",
       structure: DEFAULT_STRUCTURE_OPTIONS,
@@ -55,15 +55,32 @@ function attr(value: unknown, path: string) {
 function strings(value: unknown, path: string): asserts value is string[] {
   if (!Array.isArray(value) || value.some(v => typeof v !== "string" || !v.trim()) || new Set(value).size !== value.length) bad(path, "expected distinct strings");
 }
+function jsonValue(value: unknown, path: string): void {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return;
+  if (typeof value === "number" && Number.isFinite(value)) return;
+  if (Array.isArray(value)) { value.forEach((item, index) => jsonValue(item, `${path}[${index}]`)); return; }
+  const row = object(value, path);
+  for (const [key, item] of Object.entries(row)) {
+    if (["__proto__", "prototype", "constructor"].includes(key)) bad(`${path}.${key}`, "unsafe property");
+    jsonValue(item, `${path}.${key}`);
+  }
+}
 
 /** Unknown syntax refuses. There are no callbacks, expressions, imports or executable templates. */
 export function resolveScopeConfiguration(raw?: unknown): ScopeConfiguration {
   if (raw === undefined) return structuredClone(DEFAULT_SCOPE);
   const input = object(raw, "root");
-  keys(input, ["version", "extends", "title", "initialView", "views", "removeViews"], "root");
+  keys(input, ["version", "extends", "title", "initialView", "views", "removeViews", "extensions"], "root");
   if (input.version !== 1) bad("version", "supported version is 1");
   if (input.extends !== undefined && input.extends !== "default" && input.extends !== false) bad("extends", 'expected "default" or false');
-  const config = input.extends === false ? { version: 1 as const, title: "Scope", initialView: "", views: [] as View[] } : structuredClone(DEFAULT_SCOPE);
+  const config = input.extends === false ? { version: 1 as const, title: "Scope", initialView: "", views: [] as View[], extensions: [] as string[] } : structuredClone(DEFAULT_SCOPE);
+  if (input.extensions !== undefined) {
+    strings(input.extensions, "extensions");
+    for (const [index, specifier] of input.extensions.entries()) {
+      if (!specifier.startsWith("./") || specifier.includes("\\") || specifier.split("/").some(part => part === ".." || part === "")) bad(`extensions[${index}]`, "expected a project-relative ./ module path without traversal");
+    }
+    config.extensions = [...input.extensions];
+  }
   if (input.title !== undefined) { string(input.title, "title"); config.title = input.title; }
   if (input.removeViews !== undefined) {
     strings(input.removeViews, "removeViews");
@@ -123,12 +140,42 @@ export function resolveScopeConfiguration(raw?: unknown): ScopeConfiguration {
       if ((v.fields as unknown[]).length) bad(`${path}.fields`, "Structure explains canonical architecture and does not accept generic fields");
       for (const property of ["where", "sort", "groupBy", "pageSize"] as const) if (v[property] !== undefined) bad(`${path}.${property}`, "Structure does not accept generic selection or pagination");
       const supplied = v.structure === undefined ? {} : object(v.structure, `${path}.structure`);
-      keys(supplied, ["summaryGuarantees", "tileZoom", "detailZoom", "columns"], `${path}.structure`);
-      const options = { ...DEFAULT_STRUCTURE_OPTIONS, ...supplied };
-      if (!Number.isInteger(options.summaryGuarantees) || options.summaryGuarantees < 0 || options.summaryGuarantees > 12) bad(`${path}.structure.summaryGuarantees`, "expected an integer from 0 to 12");
+      keys(supplied, ["rankingWeights", "downtownCount", "downtownThreshold", "spacing", "shortTerminalNames", "cardFields", "promisePreviewCount", "initialRelationshipLayer", "tileZoom", "detailZoom", "implementations", "extensionOptions"], `${path}.structure`);
+      const options = structuredClone(DEFAULT_STRUCTURE_OPTIONS);
+      if (supplied.rankingWeights !== undefined) {
+        const weights = object(supplied.rankingWeights, `${path}.structure.rankingWeights`); keys(weights, ["peers", "guarantees", "security", "consumers"], `${path}.structure.rankingWeights`);
+        options.rankingWeights = { ...options.rankingWeights, ...weights } as StructureOptions["rankingWeights"];
+      }
+      if (supplied.spacing !== undefined) {
+        const spacing = object(supplied.spacing, `${path}.structure.spacing`); keys(spacing, ["x", "y"], `${path}.structure.spacing`);
+        options.spacing = { ...options.spacing, ...spacing } as StructureOptions["spacing"];
+      }
+      if (supplied.implementations !== undefined) {
+        const implementations = object(supplied.implementations, `${path}.structure.implementations`); keys(implementations, ["rank", "layout", "route", "card", "view"], `${path}.structure.implementations`);
+        options.implementations = { ...options.implementations, ...implementations } as StructureOptions["implementations"];
+      }
+      Object.assign(options, Object.fromEntries(Object.entries(supplied).filter(([key]) => !["rankingWeights", "spacing", "implementations"].includes(key))));
+      for (const [name, weight] of Object.entries(options.rankingWeights)) if (typeof weight !== "number" || !Number.isFinite(weight) || weight < 0 || weight > 100) bad(`${path}.structure.rankingWeights.${name}`, "expected a finite weight from 0 to 100");
+      if (!Number.isInteger(options.downtownCount) || options.downtownCount < 1 || options.downtownCount > 64) bad(`${path}.structure.downtownCount`, "expected an integer from 1 to 64");
+      if (typeof options.downtownThreshold !== "number" || !Number.isFinite(options.downtownThreshold) || options.downtownThreshold < 0 || options.downtownThreshold > 1) bad(`${path}.structure.downtownThreshold`, "expected a threshold from 0 to 1");
+      for (const name of ["x", "y"] as const) {
+        const minimum = name === "x" ? 320 : 260;
+        if (typeof options.spacing[name] !== "number" || !Number.isFinite(options.spacing[name]) || options.spacing[name] < minimum || options.spacing[name] > 2000) bad(`${path}.structure.spacing.${name}`, `expected a spacing from ${minimum} to 2000`);
+      }
+      object(options.shortTerminalNames, `${path}.structure.shortTerminalNames`);
+      for (const [terminal, short] of Object.entries(options.shortTerminalNames)) { string(terminal, `${path}.structure.shortTerminalNames key`); string(short, `${path}.structure.shortTerminalNames.${terminal}`); }
+      strings(options.cardFields, `${path}.structure.cardFields`);
+      if (!options.cardFields.length || options.cardFields.some(name => !["intent", "rationale", "boundaries", "resources", "entrances"].includes(name))) bad(`${path}.structure.cardFields`, "expected distinct known card fields");
+      if (!Number.isInteger(options.promisePreviewCount) || options.promisePreviewCount < 0 || options.promisePreviewCount > 12) bad(`${path}.structure.promisePreviewCount`, "expected an integer from 0 to 12");
+      if (!["opening", "all", "guarantees"].includes(options.initialRelationshipLayer)) bad(`${path}.structure.initialRelationshipLayer`, "expected opening, all or guarantees");
       for (const name of ["tileZoom", "detailZoom"] as const) if (typeof options[name] !== "number" || !Number.isFinite(options[name]) || options[name] < 0.1 || options[name] > 2) bad(`${path}.structure.${name}`, "expected a zoom threshold from 0.1 to 2");
       if (options.tileZoom >= options.detailZoom) bad(`${path}.structure`, "tileZoom must be below detailZoom");
-      if (!Number.isInteger(options.columns) || options.columns < 1 || options.columns > 8) bad(`${path}.structure.columns`, "expected an integer from 1 to 8");
+      for (const [name, implementation] of Object.entries(options.implementations)) {
+        string(implementation, `${path}.structure.implementations.${name}`);
+        if (implementation !== "default" && !/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/.test(implementation)) bad(`${path}.structure.implementations.${name}`, "expected default or a namespaced identifier such as project.name");
+      }
+      object(options.extensionOptions, `${path}.structure.extensionOptions`);
+      jsonValue(options.extensionOptions, `${path}.structure.extensionOptions`);
       v.structure = options;
     } else if (v.structure !== undefined) bad(`${path}.structure`, "only structure views accept structure configuration");
     const validated = structuredClone(v) as unknown as View;

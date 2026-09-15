@@ -1,0 +1,22 @@
+# Parcel exchange
+
+Turns an accepted parcel request into a retained dispatch record.
+
+## architecture
+
+- {"kind":"purpose","id":"purpose","text":"Parcel exchange coordinates acceptance, dispatch, and durable receipt storage."}
+- {"kind":"entrance","id":"submit","label":"Submit a parcel","component":".","description":"A sender submits a parcel for dispatch.","anchor":"main.ts#submit"}
+- {"kind":"relationship","id":"dispatch","from":".","to":"dispatch","label":"Hands accepted parcels to dispatch","because":"The exchange assigns accepted parcels to the dispatcher."}
+- {"kind":"relationship","id":"retain","from":"dispatch","to":"receipts","label":"Retains dispatch receipts","because":"Dispatch records its outcome in the receipt store."}
+
+## invariants
+
+- parcel identity survives dispatch
+
+## works when
+
+- boundary "parcel identity survives dispatch" at submit via guard "parcel identity survives dispatch"
+
+## why
+
+The project boundary owns acceptance while specialized components own movement and retention.

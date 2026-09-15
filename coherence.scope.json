@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "extends": "default",
+  "views": [
+    {
+      "id": "structure",
+      "title": "Structure",
+      "renderer": "structure",
+      "kinds": [
+        "component"
+      ],
+      "fields": [],
+      "structure": {
+        "shortTerminalNames": {
+          "verdict-bearing decision reads fail closed on surviving journal damage": "Journal integrity",
+          "a skipped run never clobbers an oracle's recorded verdict": "Recorded verdict",
+          "spec containment follows declared ancestry without inventing dependencies": "Spec ancestry"
+        }
+      }
+    }
+  ]
+}

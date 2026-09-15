@@ -69,7 +69,6 @@ index 4170dcc..1e06d77 100644
 +- {"claim": "g-6a304f32237a75008f487ab83dbc48ce4b3facc8b4a6601c4c6307c47c26996c", "provider": "entities/Hive", "because": "HTTP served-content and ingress handlers rely on the Hive servedDataCtx capability to prevent untrusted access to kernel patterns. See Routing routes/io.ts and Hive.spec.md kernel read+write capability rationale."}
 diff --git a/mnemion-js/web/Browser.spec.md b/mnemion-js/web/Browser.spec.md
 new file mode 100644
-index 0000000..0fe5a92
 --- /dev/null
 +++ b/mnemion-js/web/Browser.spec.md
 @@ -0,0 +1,19 @@
@@ -92,3 +91,29 @@ index 0000000..0fe5a92
 +- {"kind": "entrance", "id": "browser", "label": "A person opens their workspace", "component": "web", "anchor": "web/src/main.tsx", "description": "The Worker serves the React SPA shell through its ASSETS fallback for browser routes. main.tsx mounts App, which loads the memory index and redirects an unauthenticated index request to /login."}
 +- {"kind": "relationship", "id": "browser-api", "from": "web", "to": "shared/Routing", "label": "Browses and edits memory", "because": "web/src/App.tsx loads /api/index and /api/query/:pattern and subscribes to /ws; views.tsx and FacetValue.tsx post edits to /api/mutate/:pattern. src/index.ts declares these endpoints with Auth.SESSION and Routing routes/pages.ts delegates them to Hive. The socket returns live changes over this same authenticated access surface."}
 +- {"kind": "relationship", "id": "browser-vocabulary", "from": "shared/core", "to": "web", "label": "Defines browser renderers' vocabulary", "because": "web/src/views.tsx consumes ViewTypeId, resolveFormat, resolveChart and chartQuery from Core; FacetValue.tsx consumes FormatId and resolveFormat; Chart.tsx consumes the shared chart specification. The browser interprets the vocabulary whose validators the Hive also uses; this relationship describes shared declarations, not a proven parity guarantee."}
+diff --git a/mnemion-js/coherence.scope.json b/mnemion-js/coherence.scope.json
+new file mode 100644
+--- /dev/null
++++ b/mnemion-js/coherence.scope.json
+@@ -0,0 +1,21 @@
++{
++  "version": 1,
++  "extends": "default",
++  "views": [
++    {
++      "id": "structure",
++      "title": "Structure",
++      "renderer": "structure",
++      "kinds": [
++        "component"
++      ],
++      "fields": [],
++      "structure": {
++        "shortTerminalNames": {
++          "kernel write boundary": "Kernel writes",
++          "kernel read+write capability": "Kernel access"
++        }
++      }
++    }
++  ]
++}

@@ -1,4 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as ReactRuntime from 'react';
+import * as jsxRuntime from 'react/jsx-runtime';
 import { createRoot } from 'react-dom/client';
 import * as Tabs from '@radix-ui/react-tabs';
 import { ReactFlow, ReactFlowProvider, Controls, Handle, Position, MarkerType } from '@xyflow/react';
@@ -7,7 +9,11 @@ import './style.css';
 import { valueAt, textOf } from './catalog.ts';
 import { projectView, resolveScopeConfiguration } from './configuration.ts';
 import { layoutProjection } from './layout.mjs';
-import { StructureRenderer, StructureSidebar } from './structure-renderer.jsx';
+import { StructureRenderer } from './structure-renderer.jsx';
+
+// Project JSX is bundled against these exact namespaces. A second React copy
+// would make a project card's hooks fail even though the default card works.
+globalThis.__SCOPE_REACT_RUNTIME__ = { React: ReactRuntime, jsxRuntime };
 
 const initial = JSON.parse(document.getElementById('scope-data').textContent);
 function fieldText(asset, field) {
@@ -72,13 +78,13 @@ function CardView({ projection, view, onSelect }) {
 }
 const renderers = { graph: GraphView, table: TableView, cards: CardView, structure: StructureRenderer };
 const viewState = new Map();
-function Projection({ catalog, view, onSelect }) {
+function Projection({ catalog, view, onSelect, selected, onClose }) {
   const [search, setSearch] = useState(viewState.get(view.id)?.search ?? ''), [page, setPage] = useState(viewState.get(view.id)?.page ?? 0);
   useEffect(() => { viewState.set(view.id, { search, page }); }, [view.id, search, page]);
   const projection = useMemo(() => projectView(catalog, view, search, page), [catalog, view, search, page]);
   const Renderer = renderers[view.renderer], lastPage = Math.max(0, Math.ceil(projection.matched / (view.pageSize ?? 50)) - 1);
   useEffect(() => { if (page > lastPage) setPage(lastPage); }, [lastPage]);
-  if (view.renderer === 'structure') return <section className="projection" aria-label={view.title}><ReactFlowProvider><Renderer catalog={catalog} view={view} onSelect={onSelect}/></ReactFlowProvider></section>;
+  if (view.renderer === 'structure') return <section className="projection structure-projection" aria-label={view.title}><ReactFlowProvider><Renderer catalog={catalog} view={view} onSelect={onSelect} selected={selected} onClose={onClose} extensions={globalThis.__SCOPE_EXTENSIONS__ ?? []}/></ReactFlowProvider></section>;
   return <section className="projection" aria-label={view.title}><div className="view-toolbar"><div><h1>{view.title}</h1><p>{view.description ?? 'Select an asset to inspect its complete attributes and explicit relationships.'}</p></div>
     <label className="search">Search assets<input type="search" value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Search all attributes"/></label></div>
     <div className="population"><span>{projection.assets.length} displayed · {projection.matched} matched · {projection.total} in population{projection.withheld > 0 ? ` · ${projection.withheld} on other pages` : ''}{projection.withheldRelations > 0 ? ` · ${projection.withheldRelations} connections to assets outside this view` : ''}</span>
@@ -116,37 +122,58 @@ function ConfigurationEditor({ configuration, catalog, onApply, onClose }) {
   </section>;
 }
 function App() {
+  if (globalThis.__SCOPE_EXTENSION_ERROR__) throw new Error(globalThis.__SCOPE_EXTENSION_ERROR__);
   const [snapshot, setSnapshot] = useState(initial), [localConfig, setLocalConfig] = useState(null);
   const configuration = localConfig ?? snapshot.configuration;
   const [tab, setTab] = useState(configuration.initialView), [selected, setSelected] = useState(null), [editing, setEditing] = useState(false);
   const [live, setLive] = useState('Offline snapshot'), [error, setError] = useState(''), [paused, setPaused] = useState(false);
+  const [reloadRequired, setReloadRequired] = useState(false);
   const hold = useRef(false), pending = useRef(null);
   useEffect(() => {
     const meta = document.querySelector('meta[name="scope-live"]'); if (!meta) return;
     const stream = new EventSource(new URL(meta.content, location.href));
+    const runtime = document.querySelector('meta[name="scope-runtime"]')?.content;
+    let changedRuntime = false;
+    stream.addEventListener('runtime', event => {
+      if (runtime && JSON.parse(event.data).digest !== runtime) {
+        changedRuntime = true; pending.current = null;
+        setReloadRequired(true); setLive('Project extensions changed');
+      }
+    });
     stream.addEventListener('snapshot', event => {
+      if (changedRuntime) return;
       const packet = JSON.parse(event.data);
       if (hold.current) pending.current = packet; else setSnapshot(packet);
       setError(''); setLive('Live · read only');
     });
     stream.addEventListener('unavailable', event => { setError(JSON.parse(event.data).message); setLive('Last snapshot · unavailable'); });
-    stream.onerror = () => setLive('Reconnecting · last snapshot');
+    stream.onerror = () => { if (!changedRuntime) setLive('Reconnecting · last snapshot'); };
     return () => stream.close();
   }, []);
   useEffect(() => { if (!configuration.views.some(v => v.id === tab)) setTab(configuration.initialView); }, [configuration, tab]);
   const failures = snapshot.catalog.sources.filter(s => s.status === 'unavailable');
   return <><header className="app-header"><a className="brand" href="#">◉ {configuration.title}</a><span className="project-name">{snapshot.catalog.project}</span><span className="live-state">{paused ? 'Paused · incoming updates held' : live}</span>
+    {reloadRequired && <button onClick={() => location.reload()}>Reload project extensions</button>}
     {live !== 'Offline snapshot' && <button onClick={() => { hold.current = !paused; setPaused(!paused); if (paused && pending.current) { setSnapshot(pending.current); pending.current = null; } }}>{paused ? 'Resume' : 'Pause'}</button>}
     <button onClick={() => setEditing(!editing)}>Configure</button>{localConfig && <button onClick={() => setLocalConfig(null)}>Use project configuration</button>}</header>
     {(error || failures.length > 0) && <div className="source-alert" role="alert">{error}{failures.length > 0 && <details><summary>{failures.length} unavailable sources · this view may be incomplete</summary>{failures.map(s => <p key={s.id}><strong>{s.id}</strong>: {s.message}</p>)}</details>}</div>}
     {editing && <ConfigurationEditor configuration={configuration} catalog={snapshot.catalog} onApply={setLocalConfig} onClose={() => setEditing(false)}/>}
     <Tabs.Root value={tab} onValueChange={setTab} className="scope-tabs"><Tabs.List aria-label="Scope views">{configuration.views.map(v => <Tabs.Trigger key={v.id} value={v.id}>{v.title}</Tabs.Trigger>)}</Tabs.List>
-      {configuration.views.map(view => <Tabs.Content value={view.id} key={view.id}><Projection catalog={snapshot.catalog} view={view} onSelect={setSelected}/></Tabs.Content>)}
+      {configuration.views.map(view => <Tabs.Content value={view.id} key={view.id}><Projection catalog={snapshot.catalog} view={view} onSelect={setSelected} selected={selected} onClose={() => setSelected(null)}/></Tabs.Content>)}
     </Tabs.Root>
     <footer className="app-footer"><span>{snapshot.catalog.assets.length} assets · {snapshot.catalog.relations.length} explicit relationships</span><details><summary>Evidence and projection limits</summary>{snapshot.catalog.limits.map(t => <p key={t}>{t}</p>)}</details></footer>
-    {selected && (configuration.views.find(v => v.id === tab)?.renderer === 'structure'
-      ? <StructureSidebar catalog={snapshot.catalog} id={selected} onSelect={setSelected} onClose={() => setSelected(null)}/>
-      : <Inspector catalog={snapshot.catalog} id={selected} onSelect={setSelected} onClose={() => setSelected(null)}/>)}
+    {selected && configuration.views.find(v => v.id === tab)?.renderer !== 'structure' &&
+      <Inspector catalog={snapshot.catalog} id={selected} onSelect={setSelected} onClose={() => setSelected(null)}/>}
   </>;
 }
-createRoot(document.getElementById('root')).render(<App/>);
+class ScopeBoundary extends React.Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) { return { error }; }
+  render() {
+    return this.state.error ? <main className="source-alert" role="alert"><h1>Scope could not render this configuration</h1><p>{String(this.state.error.message ?? this.state.error)}</p></main> : this.props.children;
+  }
+}
+// renderScope appends the bundled project registrations after this client script.
+const mountScope = () => createRoot(document.getElementById('root')).render(<ScopeBoundary><App/></ScopeBoundary>);
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountScope, { once: true });
+else mountScope();

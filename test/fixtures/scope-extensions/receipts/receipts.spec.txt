@@ -1,0 +1,15 @@
+# Receipt store
+
+Retains the outcome of each dispatched parcel.
+
+## invariants
+
+- receipt follows dispatch
+
+## works when
+
+- boundary "receipt follows dispatch" at receipts via guard "receipt follows dispatch"
+
+## why
+
+Durability is isolated from dispatch policy.

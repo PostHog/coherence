@@ -11,9 +11,15 @@ These projections can explain evidence but cannot create it. Scope, promise view
 - Scope views select complete attributed assets through data-only configuration
 - Scope preserves every authored spec content category without inventing evidence
 - Structure connections retain declared architectural meaning and exact guarantee ownership
+- Scope extension generation observes every bundled input and publishes one complete live generation
 
 ## refutations
 
+- Enabling all five Structure card fields grew cards after placement and overlapped the next row’s guarantee terminals in both Coherence and Mnemion. The registered default layout now owns text measurement and row clearance together; the real-page all-fields probe selects and inspects that exact configuration.
+
+- The first transplanted promise cards passed rectangle containment while flex shrink cut their labels through the final visible line. Real-page browser acceptance now checks internal line geometry and explicit truncation as well as card bounds.
+
+- Scope extension generation observes every bundled input and publishes one complete live generation: the transitive-edit test retained the same runtime digest after changing an imported module excluded from the source walk. Bundler metadata was relative to the CLI working directory, then reinterpreted relative to the project root; every reported path was nonexistent, including a synthetic stdin entry. The host now uses one project-relative address space and reports only real inputs. The live test also rejects a broken bundle while retaining the previous HTML, then observes recovery and a changed runtime digest.
 - Scope projects the canonical promise population with deterministic gravity and honest absence: projected absent spec fields as explicit undefined; the live server parity guard went red because JSON dropped those keys. Empty JSON values restore parity; the spec projection guard now also checks a round trip with absent spec content.
 - Scope projects the canonical promise population with deterministic gravity and honest absence: the first canvas's dark-mode screenshot (2026-09-04) showed black titles over dense white hatch fills, with long labels extending beyond circular nodes. That renderer was retired; the generic asset cards retain opaque backgrounds, explicit text colors and full text in the inspector, checked in the browser.
 - Scope projects the canonical promise population with deterministic gravity and honest absence: supplied a PromiseModel whose component population exceeded the Graph and a reliance whose target did not exist; the projection previously had enough information to draw a plausible partial canvas. The parity guard now refuses both inputs, while the render guard distinguishes an empty model and a component with no guarantees from a passing component.
@@ -22,6 +28,8 @@ These projections can explain evidence but cannot create it. Scope, promise view
 - Scope preserves every authored spec content category without inventing evidence: the first declarative inventory left invariants and refutations only inside component attributes and mislabeled atlas charts as zones. A spec containing every supported section, a custom heading, nested heading, fenced pseudo-heading and malformed link now proves independent section navigation plus exact original text; named invariants and refutations have their own assets and zones retain entry-spec authority.
 
 ## works when
+
+- boundary "Scope extension generation observes every bundled input and publishes one complete live generation" at startScopeServer via guard "Scope live extensions — transitive code changes announce a new runtime and failed bundles retain the previous generation"
 
 - boundary "Structure connections retain declared architectural meaning and exact guarantee ownership" at buildStructureModel via guard "Structure projection — declared promises and only meaningful edges retain catalog identity and evidence limits"
 
@@ -45,6 +53,14 @@ These projections can explain evidence but cannot create it. Scope, promise view
 - {"claim":"g-5f53591b84255486c8670c4aa3ebda33698b3886ceb51e44151e983e674dbe6d","provider":"src/derivation","because":"Reading surfaces consume the derived graph to show component ancestry and imports. They require containment to follow the deepest declared ancestor without inventing dependency connections."}
 
 ## why
+
+**Scope extension generation observes every bundled input and publishes one complete
+live generation.** A live picture with fresh data and old presentation code can
+silently misrepresent a project override. The extension bundle therefore contributes
+its transitive inputs and code digest to live generation. Capture, bundle and input
+validation finish before the server advances its current snapshot. A changed code
+digest requests a viewer reload; data-only refreshes preserve the ordinary live
+interaction path. Failed builds retain the previous complete generation visibly.
 
 **task context is bounded and names its approximations.** A focused context packet is
 useful only when its one-hop and heuristic limits stay visible; otherwise convenience is

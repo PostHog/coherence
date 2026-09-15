@@ -204,7 +204,7 @@ async function doGraph(): Promise<string[]> {
 async function doScope(): Promise<string[]> {
   const snapshot = await captureScope(cfg);
   const json = JSON.stringify(snapshot, null, 2) + "\n";
-  const html = await renderScope(snapshot);
+  const html = await renderScope(snapshot, { projectRoot: cfg.root });
   if (check) {
     const stale: string[] = [];
     if (json !== await read(out("scope.json"))) stale.push("scope.json");

@@ -388,7 +388,7 @@ export async function captureScope(cfg: Config, options: { graph?: Graph; config
     }
   });
   const catalog = c.finish(graph?.root ?? cfg.name ?? "Project");
-  const inputs = new Set<string>();
+  const inputs = new Set<string>(configuration.extensions);
   for (const asset of catalog.assets) {
     const a = asset.attributes;
     if (asset.kind === "spec" && typeof a.path === "string") inputs.add(a.path);

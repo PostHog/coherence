@@ -49,6 +49,8 @@ reading surface needs. Resolve dotted names against the existing file population
 not a second walk or Python execution. Ambiguous modules stay external because
 guessing runtime search-path precedence would exceed this instrument's evidence.
 
+**spec-owned architecture remains attributable and unresolved meaning stays explicit.** Purpose, entrance and relationship declarations are authored in specs, so the architecture catalog must keep each accepted declaration tied to its spec and line. One declaration whose endpoint cannot be resolved is a reported issue on that declaration, not a reason to discard the valid purpose and entrance declarations around it; a transaction that rolled back everything erased attributable meaning and hid which line failed. Unresolved endpoints therefore remain visible as issues while every resolved declaration keeps its provenance.
+
 **spec containment follows declared ancestry without inventing dependencies.** Repository and subsystem containment explain ownership even where no source import exists. Treating that relationship as an import fabricates reliance; omitting it turns the enclosing project into an unexplained island. The same deepest-spec rule that assigns file ownership supplies component ancestry.
 
 **harness source remains searchable text rather than silently becoming binary.** Agent
