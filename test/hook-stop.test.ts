@@ -260,6 +260,10 @@ test("SessionStart teaches the executable swarm loop and exact owned lifecycle",
     assert.doesNotMatch(text, new RegExp(`work transition "wrk-[^"]+" active.*unrelated`));
     assert.doesNotMatch(text, /work inspect --session/,
       "the injected re-read command must be accepted by the fleet-wide inspect CLI");
+    // THE HONEST EXIT IS IN THE MENU from the first state onward, beside start, so an
+    // owner facing an unmeetable criterion sees it before it has anything to fabricate.
+    assert.match(text, new RegExp(`cancel: npx coherence work close "${assigned.work}" cancelled --because "WHY_THE_CRITERION_CANNOT_BE_MET" --expected-previous "${assigned.id}"`));
+    assert.match(text, /cancel is the honest exit when a criterion cannot be met/);
 
     const active = transitionWork(config, {
       session: "codex-thread", agent: "worker", work: assigned.work, to: "active",
@@ -274,6 +278,8 @@ test("SessionStart teaches the executable swarm loop and exact owned lifecycle",
     assert.match(resumedText, new RegExp(`work close "${assigned.work}" completed`));
     assert.match(resumedText, new RegExp(`--expected-previous "${active.id}"`));
     assert.match(resumedText, /--evidence "PROOF"/);
+    assert.match(resumedText, new RegExp(`cancel: npx coherence work close "${assigned.work}" cancelled --because "WHY_THE_CRITERION_CANNOT_BE_MET" --expected-previous "${active.id}"`),
+      "finish and cancel print side by side: the exit from an infeasible criterion is as visible as completion");
   } finally { await cleanup(root); }
 });
 
@@ -301,6 +307,8 @@ test("SessionStart turns an owned write conflict into yield commands, never star
     assert.match(text, /yield: npx coherence work transition "wrk-[^"]+" blocked/);
     assert.doesNotMatch(text, /work transition "wrk-[^"]+" active/);
     assert.doesNotMatch(text, /work close "wrk-[^"]+" completed/);
+    assert.match(text, /cancel: npx coherence work close "wrk-[^"]+" cancelled/,
+      "a conflicted owner may still take the honest exit");
   } finally { await cleanup(root); }
 });
 

@@ -152,6 +152,15 @@ export const COMMANDS: Command[] = [
   { name: "decide", group: "journal", usage: '"<chose>" [--over "<alt>" ...] --because "<why>" [--work W] [--subject S] [--authority A] [--scope-component C] [--scope-file p] [--scope-symbol S] [--environment E] [--session S]', summary: "log one choice, any rejected alternatives, and optional swarm-addressable authority" },
   { name: "blocked", group: "journal", usage: '"<what>" --because "<why>"', summary: "log what you could NOT do — first-class, not a footnote" },
   {
+    name: "escalate", group: "journal",
+    usage: '"<what a human must see>" --because "<why a human, not a peer>" [--file p] [--session S] [--agent A]',
+    summary: "a human must see this before anyone proceeds — heads every read until a person acknowledges it; gates nothing mechanically",
+  },
+  {
+    name: "acknowledge", group: "journal", usage: '<id> --because "<what the human decided>" [--session S]',
+    summary: "a human's record of having seen an escalation and what they decided — the only thing that clears one",
+  },
+  {
     name: "defect", group: "journal",
     usage: '"<what failed>" --evidence "<what proves it>" [--file p] [--session S] [--agent A] [--job J]',
     summary: "record an agent-assessed defect with the evidence that made it a defect",

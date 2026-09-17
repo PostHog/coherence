@@ -14,6 +14,34 @@ evidence inside that record.
 
 ---
 
+## Unreleased — the route to a human (hook protocol v6)
+
+METR's 2026-08-26 field study found 3 to 6 of ~1300 agents that considered alerting a
+human, and zero that did — citing "no route" and "not my task" — and escalated to the
+peer board instead. This repo's own committed journal showed the same shape at smaller
+scale: of 28 `blocked` rows, four were a human's to settle (a maintainer's OTP, a choice
+between two main lineages, authorization for independent reviewers, a CI pin policy),
+and every one was parked under "Could not", the last section of the render.
+
+`coherence escalate "<what a human must see>" --because "<why a human, not a peer>"` is
+the route. It is agent-to-human, not agent-to-record: a new `escalation` kind in the
+decision ledger that stays open until a person appends `coherence acknowledge <id>
+--because "<what the human decided>"` — itself a record, deliberately neither `resolved`
+nor `dismiss`. An open escalation heads `decisions`, the `journal --once` snapshot and
+the stream masthead, is named at SubagentStop, and selects the `AWAIT-HUMAN` orient
+heading directly below refuse and above every actionable heading. It gates nothing
+mechanically: `orient` exits 0 on it and `regulate` never reads it. A hollow escalation —
+an empty because, or one that only restates the what — is refused at the write and
+leaves no row.
+
+The SessionStart owner menu now lists `close cancelled` beside finish, block, yield and
+resume, with one line saying when it is the honest exit, so an owner facing an
+unmeetable criterion sees the exit before it has anything to fabricate. `escalate` is
+taught beside `blocked`. Both change the hook body's meaning, so the protocol is v6 and
+both host controls are regenerated.
+
+---
+
 ## v0.37.1 — the gyroscope reaches the agent
 
 v0.37.0 shipped the swarm work graph, strict orientation, explicit consequence links,

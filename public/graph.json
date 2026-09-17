@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-09-11 16:59Z",
+  "generatedAt": "2026-09-17 14:38Z",
   "root": "coherence",
-  "absRoot": "/private/Users/daniloc/Documents/Dev/coherence",
+  "absRoot": "/Users/daniloc/Documents/Dev/coherence-escalation",
   "nodes": [
     {
       "id": "c:.",
@@ -96,10 +96,11 @@
         "boundary \"verification currency follows material repository state without invalidating its own receipt\" at verifyOrientation via guard \"verification currency ignores its own receipt but rejects tracked source and index changes\"",
         "boundary \"orientation selects synthesis only when parent closure can execute it\" at observeOrientation via guard \"orientation dispatches a ready sibling before asking for parent synthesis\"",
         "boundary \"orientation derives live blockage only from closeable work state\" at observeOrientation via guard \"orientation treats journal blockage as history, not a live work state\"",
+        "boundary \"an open escalation outranks every actionable heading until a human acknowledges it\" at observeOrientation via guard \"orientation — an open escalation outranks ready work until a human acknowledges it\"",
         "boundary \"completed work remains unverified until an explicit verification edge names it\" at observeRegulation via guard \"regulate — completed work requires an explicit verification link before release\""
       ],
       "prose": "Work orders remain inert records rather than an execution engine. Orientation and regulation select obligations without granting new authority or disguising unavailable evidence as a clean state.",
-      "why": "**a weaker regulation obligation never masks a stronger one.** Regulation compares live\nobligations by a lexicographic potential, with missing observations failing closed instead\nof becoming zero, and returns the single strongest action owed. V2 evaluates only rules\ndeclared in the live doctrine registry; even a no-action result makes no claim of overall\nsafety.\n\n**regulation evaluates and repairs the selected agent host.** A canonical Claude control\ncannot create a field around a Codex session, even though both hosts implement the same\nlifecycle domain. The sensor therefore names the explicit or current host in its reading,\nthe decision identity retains it, and a lifecycle redirect installs that same host. A\nforeign host value refuses before it can release or author a shell command.\n\n**work state is append-only, attributable, and predecessor-checked.** A shared task board\nthat mutates in place loses the handoffs and rejected transitions a swarm most needs after\ncontext loss. Each work order and transition is content-addressed in its writer session,\nand the current state is a strict replay. Broken predecessors, competing successors,\ndetached histories, damaged rows, and missing graph referents refuse instead of resolving\nby last-write-wins. The ledger is repository evidence rather than a machine-local queue;\nthe repository control therefore writes one through the public boundary, commits it,\nclones the repository, and requires the strict reader to reconstruct it.\n\n**work cannot activate or complete before every dependency completes.** Readiness is not\nadvice layered over the lifecycle; it is the lifecycle's ordering law. Every transition\nand closure validates its prospective graph before append, so a caller cannot bypass a\nwaiting projection by naming `active` or `completed` directly. Cancellation remains a\nterminal non-success and therefore does not satisfy a dependency that requires completed\noutput.\n\n**authored work text is single-line data, never model-instruction control.** Work records\nare repository-authored evidence on read, even when they were valid on write. Their text\ncrosses into SessionStart's model-instruction channel, so public writes reject C0/C1\ncontrols and the hook renderer escapes such bytes again. A newline can remain visible as\ndata but cannot acquire the grammar of a peer instruction.\n\n**consequence navigation contains only explicit assessed edges.** Decisions, work,\ncommits, experiments, verification, and defects already have addresses; temporal or path\nproximity does not make one cause another. The consequence ledger stores an assessor,\nevidence, typed endpoints, and a constrained relation per edge. Its graph traverses both\ndirections for navigation while retaining the authored direction, and strict reads refuse\nforged, displaced, conflicting, or symlink-redirected evidence. Those edges are durable\nonly if they cross a clone boundary, so the repository control writes a typed edge to a\nreal commit, transports it through Git, and requires a dangling-free cloned orientation.\n\n**specialized consequence relations admit only their declared endpoint kinds.** A generic\n`relates-to` edge can connect any two supported addresses, but verbs such as `produces`,\n`verifies`, `reveals`, and `repairs` carry lifecycle meaning. Their source and target kinds\nare checked as a pair, keeping the typed graph from accepting grammatically valid nonsense\nthat its render would otherwise state with unwarranted confidence.\n\n**consequence evidence refuses surviving storage damage instead of shrinking navigation.**\nAbsence is a legitimate first-use state; a surviving but unreadable, displaced, renamed,\nor torn edge is not. If damaged bytes could disappear from the population, removing one\nfile suffix or final newline could erase the only path from a defect to its repair while\nleaving an innocent empty graph. Storage framing and containment therefore belong to the\nevidence contract, not merely to filesystem hygiene.\n\n**orientation refuses damaged evidence before selecting a swarm heading.** The gyroscope\nis a projection over independent instruments, not a new source of truth. It reads each\nstrictly, preserves source availability and denominators, and selects one deterministic\nheading: refuse, resolve a collision, repair navigation, unblock, synthesize, dispatch,\ncontinue, verify, or steady. A damaged source outranks every actionable-looking empty list.\n\n**orientation admits verification state only with valid shape and comparable provenance.**\nThe status file is persisted JSON, not a TypeScript value at runtime. Orientation validates\nthe fields it uses—canonical time, commit shape, dirty bit, tier, and nonnegative failure\ncount—and refuses malformed evidence. A green report is current only when both repository\nand report commit addresses exist and agree; missing provenance is stale, never an\nimplicit match.\n\n**orientation selects synthesis only when parent closure can execute it.** Synthesis is\nrepresented by the parent's terminal close, not by a separate mutable checkbox. A completed\nchild can therefore remain visibly unsynthesized while a ready, active, or blocked sibling\nstill owes work; selecting synthesis then would demand an operation the lifecycle refuses.\nOnly when that parent's children are terminal does synthesis become the executable highest\nheading.\n\n**orientation derives live blockage only from closeable work state.** A journaled impasse\nis historical testimony and has no event that later marks it complete. Treating such rows\nas the live scheduler makes the heading demand an action the record cannot ever discharge.\nThe work lifecycle owns current blocked state; journal incidents remain visible context\nwithout acquiring scheduler semantics.\n\n**completed work remains unverified until an explicit verification edge names it.** A\npassing command nearby in time cannot establish which work it assessed. V2 regulation\ntherefore treats a completed work order without a `verification --verifies--> work` edge\nas an obligation. This is deliberately stronger than command success and deliberately\nweaker than a proof of semantic correctness. The edge must now resolve an intact current\nlocal receipt bound to the same work definition and criteria; arbitrary legacy labels,\nfast/imported evidence, skipped checks and changed inputs cannot clear it. Relevance and\nexecutor trust remain explicit assessor judgments.\n\n**runnable work with overlapping write scopes is a collision, never concurrent\npermission.** Read and write scopes are repository-relative addresses. Dependency order\ncan make an overlap merely potential, but two dependency-clear or active writers whose\nexact/tree scopes intersect are a live conflict. The projection blocks dispatch and names\nboth work ids and both scopes; ownership is explicit rather than reverse-engineered from a\nshared diff.\n\n**a terminal parent has no live child and explicitly synthesizes every completed direct\nchild.** A child returning is not evidence that its parent incorporated the result, and a\nlive child whose join target is closed has nowhere truthful to report. Prospective graph\nvalidation therefore refuses parent closure until every direct child is terminal, requires\nevery completed child in the synthesis set, and refuses a late live child beneath a\nterminal parent. Cancellation can settle a child but cannot masquerade as synthesized\nsuccess.\n\n**verification currency follows material repository state without invalidating its own\nreceipt.** Matching `HEAD` identifies a commit, not the live index and working tree layered\nover it. A source, staged, or untracked change therefore makes a clean report stale even\nwhen `HEAD` did not move. The status file itself is the one excluded path because recording\nthe report happens after its Git sample; counting that receipt would make every successful\nverification invalidate itself immediately.",
+      "why": "**a weaker regulation obligation never masks a stronger one.** Regulation compares live\nobligations by a lexicographic potential, with missing observations failing closed instead\nof becoming zero, and returns the single strongest action owed. V2 evaluates only rules\ndeclared in the live doctrine registry; even a no-action result makes no claim of overall\nsafety.\n\n**regulation evaluates and repairs the selected agent host.** A canonical Claude control\ncannot create a field around a Codex session, even though both hosts implement the same\nlifecycle domain. The sensor therefore names the explicit or current host in its reading,\nthe decision identity retains it, and a lifecycle redirect installs that same host. A\nforeign host value refuses before it can release or author a shell command.\n\n**work state is append-only, attributable, and predecessor-checked.** A shared task board\nthat mutates in place loses the handoffs and rejected transitions a swarm most needs after\ncontext loss. Each work order and transition is content-addressed in its writer session,\nand the current state is a strict replay. Broken predecessors, competing successors,\ndetached histories, damaged rows, and missing graph referents refuse instead of resolving\nby last-write-wins. The ledger is repository evidence rather than a machine-local queue;\nthe repository control therefore writes one through the public boundary, commits it,\nclones the repository, and requires the strict reader to reconstruct it.\n\n**work cannot activate or complete before every dependency completes.** Readiness is not\nadvice layered over the lifecycle; it is the lifecycle's ordering law. Every transition\nand closure validates its prospective graph before append, so a caller cannot bypass a\nwaiting projection by naming `active` or `completed` directly. Cancellation remains a\nterminal non-success and therefore does not satisfy a dependency that requires completed\noutput.\n\n**authored work text is single-line data, never model-instruction control.** Work records\nare repository-authored evidence on read, even when they were valid on write. Their text\ncrosses into SessionStart's model-instruction channel, so public writes reject C0/C1\ncontrols and the hook renderer escapes such bytes again. A newline can remain visible as\ndata but cannot acquire the grammar of a peer instruction.\n\n**consequence navigation contains only explicit assessed edges.** Decisions, work,\ncommits, experiments, verification, and defects already have addresses; temporal or path\nproximity does not make one cause another. The consequence ledger stores an assessor,\nevidence, typed endpoints, and a constrained relation per edge. Its graph traverses both\ndirections for navigation while retaining the authored direction, and strict reads refuse\nforged, displaced, conflicting, or symlink-redirected evidence. Those edges are durable\nonly if they cross a clone boundary, so the repository control writes a typed edge to a\nreal commit, transports it through Git, and requires a dangling-free cloned orientation.\n\n**specialized consequence relations admit only their declared endpoint kinds.** A generic\n`relates-to` edge can connect any two supported addresses, but verbs such as `produces`,\n`verifies`, `reveals`, and `repairs` carry lifecycle meaning. Their source and target kinds\nare checked as a pair, keeping the typed graph from accepting grammatically valid nonsense\nthat its render would otherwise state with unwarranted confidence.\n\n**consequence evidence refuses surviving storage damage instead of shrinking navigation.**\nAbsence is a legitimate first-use state; a surviving but unreadable, displaced, renamed,\nor torn edge is not. If damaged bytes could disappear from the population, removing one\nfile suffix or final newline could erase the only path from a defect to its repair while\nleaving an innocent empty graph. Storage framing and containment therefore belong to the\nevidence contract, not merely to filesystem hygiene.\n\n**orientation refuses damaged evidence before selecting a swarm heading.** The gyroscope\nis a projection over independent instruments, not a new source of truth. It reads each\nstrictly, preserves source availability and denominators, and selects one deterministic\nheading: refuse, await a human, resolve a collision, repair navigation, unblock, synthesize,\ndispatch, continue, verify, or steady. A damaged source outranks every actionable-looking\nempty list.\n\n**orientation admits verification state only with valid shape and comparable provenance.**\nThe status file is persisted JSON, not a TypeScript value at runtime. Orientation validates\nthe fields it uses—canonical time, commit shape, dirty bit, tier, and nonnegative failure\ncount—and refuses malformed evidence. A green report is current only when both repository\nand report commit addresses exist and agree; missing provenance is stale, never an\nimplicit match.\n\n**orientation selects synthesis only when parent closure can execute it.** Synthesis is\nrepresented by the parent's terminal close, not by a separate mutable checkbox. A completed\nchild can therefore remain visibly unsynthesized while a ready, active, or blocked sibling\nstill owes work; selecting synthesis then would demand an operation the lifecycle refuses.\nOnly when that parent's children are terminal does synthesis become the executable highest\nheading.\n\n**orientation derives live blockage only from closeable work state.** A journaled impasse\nis historical testimony and has no event that later marks it complete. Treating such rows\nas the live scheduler makes the heading demand an action the record cannot ever discharge.\nThe work lifecycle owns current blocked state; journal incidents remain visible context\nwithout acquiring scheduler semantics.\n\n**an open escalation outranks every actionable heading until a human acknowledges it.** An\nescalation is a recorded claim that a person must see something before anyone proceeds, and\nresolving a conflict, repairing a link or dispatching ready work is proceeding. Only\nunreadable evidence outranks it, because a heading over damaged sources cannot be trusted.\nThe heading gates nothing mechanically: `orient` exits zero on it, `regulate` never reads\nit, and the work lifecycle refuses nothing because of it. It clears only when a human\nappends an acknowledgement, which is itself durable evidence of what was decided.\n\n**completed work remains unverified until an explicit verification edge names it.** A\npassing command nearby in time cannot establish which work it assessed. V2 regulation\ntherefore treats a completed work order without a `verification --verifies--> work` edge\nas an obligation. This is deliberately stronger than command success and deliberately\nweaker than a proof of semantic correctness. The edge must now resolve an intact current\nlocal receipt bound to the same work definition and criteria; arbitrary legacy labels,\nfast/imported evidence, skipped checks and changed inputs cannot clear it. Relevance and\nexecutor trust remain explicit assessor judgments.\n\n**runnable work with overlapping write scopes is a collision, never concurrent\npermission.** Read and write scopes are repository-relative addresses. Dependency order\ncan make an overlap merely potential, but two dependency-clear or active writers whose\nexact/tree scopes intersect are a live conflict. The projection blocks dispatch and names\nboth work ids and both scopes; ownership is explicit rather than reverse-engineered from a\nshared diff.\n\n**a terminal parent has no live child and explicitly synthesizes every completed direct\nchild.** A child returning is not evidence that its parent incorporated the result, and a\nlive child whose join target is closed has nowhere truthful to report. Prospective graph\nvalidation therefore refuses parent closure until every direct child is terminal, requires\nevery completed child in the synthesis set, and refuses a late live child beneath a\nterminal parent. Cancellation can settle a child but cannot masquerade as synthesized\nsuccess.\n\n**verification currency follows material repository state without invalidating its own\nreceipt.** Matching `HEAD` identifies a commit, not the live index and working tree layered\nover it. A source, staged, or untracked change therefore makes a clean report stale even\nwhen `HEAD` did not move. The status file itself is the one excluded path because recording\nthe report happens after its Git sample; counting that receipt would make every successful\nverification invalidate itself immediately.",
       "invariants": [
         "a weaker regulation obligation never masks a stronger one",
         "regulation evaluates and repairs the selected agent host",
@@ -116,6 +117,7 @@
         "verification currency follows material repository state without invalidating its own receipt",
         "orientation selects synthesis only when parent closure can execute it",
         "orientation derives live blockage only from closeable work state",
+        "an open escalation outranks every actionable heading until a human acknowledges it",
         "completed work remains unverified until an explicit verification edge names it"
       ],
       "refutations": [
@@ -246,10 +248,13 @@
         "boundary \"surviving agent-assessed defect evidence is attributable and internally consistent\" at recordDefect via guard \"defects — agent-assessed evidence is attributable, content-addressed, and strict on inconsistent rows\"",
         "boundary \"defect writes refuse pre-existing symlink redirection\" at recordDefect via guard \"defect containment — pre-existing directory and session symlinks refuse external append targets\"",
         "boundary \"defect provenance is data, never terminal control\" at readDefects via guard \"defect provenance — commit ids have Git shape and cannot carry terminal controls\"",
-        "boundary \"a streamed journal entry renders exactly once across appends and compaction\" at tailJournal via guard \"tail — an appended record arrives exactly once, a compaction fold re-emits nothing and drops nothing, and a half-written line waits for its bytes\""
+        "boundary \"a streamed journal entry renders exactly once across appends and compaction\" at tailJournal via guard \"tail — an appended record arrives exactly once, a compaction fold re-emits nothing and drops nothing, and a half-written line waits for its bytes\"",
+        "boundary \"an open escalation heads every human-facing journal read until a human acknowledges it\" at renderJournal via guard \"escalation — an open escalation heads the settled render and the stream snapshot until a human acknowledges it\"",
+        "boundary \"an open escalation heads every human-facing journal read until a human acknowledges it\" at acknowledgeableEscalation via guard \"acknowledge — only an open escalation is acknowledgeable, and a retracted acknowledgement reopens it\"",
+        "boundary \"a hollow escalation is refused at the write and leaves no row\" at escalationProblems via guard \"escalation — a hollow because is refused at the write and leaves no row\""
       ],
       "prose": "Each ledger keeps its own evidence contract. Readers validate surviving records; journal streaming preserves content identity across appends and compaction.",
-      "why": "**immutable receipts preserve witnessed runs and refuse damaged dependencies.** A rolling\nstatus display can retain an old pass through a new skip, so it cannot identify one run.\nReceipt mode captures the current run before status merging, binds Git-visible working\nbytes and effective configuration, and publishes immutable start, manifest, terminal seal\nand result objects. One atomic seal selects one terminal digest. Missing or damaged\nrequired bytes refuse; a started run is never inferred successful. A work link needs the\nsame work definition and criteria, unchanged tested bytes, witnessed full execution and\nan explicit assessor. Local hashes detect altered addresses, not fabricated testimony;\nsemantic adequacy and executor trust remain assessed. Ignored dependencies, runtime\nservices and the named output/coordination exclusions are outside this input grade.\n\n**concurrent status writers preserve complete independent reports.** A successful report\nwrite is a promise that later readers can recover it. Independent instruments must not\nerase one another merely because their finish times overlap, and a reader must never\ninherit half of a report. Availability after a killed writer is less valuable than\ninventing ownership of a still-live writer's critical section.\n\n**verdict-bearing decision reads fail closed on surviving journal damage.** The journal's\ntolerant reader is useful for a human salvaging old history, but a regulator or waiver\ncannot turn its skipped lines into a smaller trusted population. The strict projection\nvalidates wire version, canonical shape and time, content identity, session/file\nattribution, containment, append framing, duplicate agreement, and terminal references\nas one relation. Domain-separated session hashes retain case-sensitive identity on\ncase-folding filesystems while an owned historical filename remains readable. Any damage\nmakes the verdict-bearing population unavailable while the historical render stays\nbackward-compatible.\n\n**a committed decision population cannot disappear into adoption from zero.** An absent\nledger is legitimate before first use, so filesystem absence alone proves nothing. Once\ncurrent Git `HEAD` owns decision files, however, their wholesale deletion is an external\nwitness that zero rows means lost evidence rather than adoption. The witness is consulted\nonly at zero: populated compaction remains legal, while non-Git and unborn repositories\nretain an honestly unproven empty state.\n\n**a skipped run never clobbers an oracle's recorded verdict.** The record is the last\nknown truth, honestly dated. A fast tier that skips the executable claims every commit\nwould otherwise erase last week's real pass — or, worse, a real fail — with \"did not\nlook\", and history that can be overwritten by not looking is not history.\n\n**experiment outcomes require evidence for every criterion.** A\nplan is frozen before work with its predicted context, actions, criteria, and evidence\ncursors. Closure answers every action and criterion exactly once, preserves the assessor,\nand derives success, failure, or inconclusive from criterion statuses rather than accepting\nan outcome label. Otherwise the ledger would turn an incomplete story into a measured loop.\n\n**experiment telemetry preserves its weakest provable attribution.** Trace and activity\nwindows may be empty, prove an exact owner session, or only prove a parent-session aggregate\nthat can include descendants; older trace may carry no observation metadata at all. Those\nfour scopes remain distinct in the immutable close record. Damaged prefixes, unreadable\nrows, and unknown or inconsistent scope refuse. That keeps compatible history without\nturning absence or uncertainty into false precision.\n\n**surviving agent-assessed defect evidence is attributable and internally consistent.** A\nconjecture keeps uncertainty alive; a defect record says an agent crossed that epistemic\nboundary and must therefore carry the evidence for doing so, the repository subject it\njudged, and the caller-attributed writer labels attached to the assessment. Records append per session and\ndedupe exact retries, while the merged reader recomputes the ordinary content address and\nrefuses malformed, inconsistent, or displaced surviving rows. That detects partial damage;\nit does not prove that a valid row was never rewritten with a recomputed id. Committed Git\nhistory is this first recorder's external rewrite and deletion witness, and an independently\nanchored head is future work.\n\n**defect writes refuse pre-existing symlink redirection.** A path beneath the repository\nis not containment when its stable components redirect through a symlink. The reader\ntherefore refuses linked ledger directories and entries, while the writer validates both\ndirectory components and opens the session target without following its final link, then\ncompares the opened descriptor with the standing path before appending. This prevents the\nmeasured stable-state redirects; it is not an `openat`-grade promise against a privileged\nprocess racing parent-directory renames during the append.\n\n**defect provenance is data, never terminal control.** Repository identity is captured by\nthe machine, but the committed row is still untrusted input on its next read. A commit is\ntherefore null or has lowercase SHA-1/SHA-256 object-name shape, never merely a nonempty string; the\nhuman renderer also neutralizes its bytes. Without both the semantic constraint and the\noutput encoding, an edited but re-addressed row could turn provenance into a terminal\ninstruction while remaining structurally valid.\n\n**a streamed journal entry renders exactly once across appends and compaction.** The live\nstream exists for the one reader the settled render cannot serve — an orchestrator watching\nfive subagents mid-flight — and that reader has no way to audit the feed against the files.\nA dropped entry is a decision the orchestrator never saw, indistinguishable from one never\nmade; a duplicate teaches the opposite lie, that a question was decided twice. Both are\ncheap to produce, because the journal's files do not strictly grow: compaction moves lines\nbetween files and unlinks the originals, which a position-addressed reader replays in full.\nSo a record's identity in the stream comes from its content — the same triple the merged\ntimeline sorts by — and a moved line is one the feed already carried.\n\n**decision ratification follows explicit subject and authority, never prose similarity or\nrecency.** Independent agents can word the same question differently and can mention the\nsame noun while answering different questions. Conflict detection therefore compares only\nstanding decisions that share a machine-authored subject. Local alternatives remain\nproposals; one explicit orchestrator-accepted or user-directed choice can ratify them;\nincompatible choices tied at the highest authority stay contested.",
+      "why": "**immutable receipts preserve witnessed runs and refuse damaged dependencies.** A rolling\nstatus display can retain an old pass through a new skip, so it cannot identify one run.\nReceipt mode captures the current run before status merging, binds Git-visible working\nbytes and effective configuration, and publishes immutable start, manifest, terminal seal\nand result objects. One atomic seal selects one terminal digest. Missing or damaged\nrequired bytes refuse; a started run is never inferred successful. A work link needs the\nsame work definition and criteria, unchanged tested bytes, witnessed full execution and\nan explicit assessor. Local hashes detect altered addresses, not fabricated testimony;\nsemantic adequacy and executor trust remain assessed. Ignored dependencies, runtime\nservices and the named output/coordination exclusions are outside this input grade.\n\n**concurrent status writers preserve complete independent reports.** A successful report\nwrite is a promise that later readers can recover it. Independent instruments must not\nerase one another merely because their finish times overlap, and a reader must never\ninherit half of a report. Availability after a killed writer is less valuable than\ninventing ownership of a still-live writer's critical section.\n\n**verdict-bearing decision reads fail closed on surviving journal damage.** The journal's\ntolerant reader is useful for a human salvaging old history, but a regulator or waiver\ncannot turn its skipped lines into a smaller trusted population. The strict projection\nvalidates wire version, canonical shape and time, content identity, session/file\nattribution, containment, append framing, duplicate agreement, and terminal references\nas one relation. Domain-separated session hashes retain case-sensitive identity on\ncase-folding filesystems while an owned historical filename remains readable. Any damage\nmakes the verdict-bearing population unavailable while the historical render stays\nbackward-compatible.\n\n**a committed decision population cannot disappear into adoption from zero.** An absent\nledger is legitimate before first use, so filesystem absence alone proves nothing. Once\ncurrent Git `HEAD` owns decision files, however, their wholesale deletion is an external\nwitness that zero rows means lost evidence rather than adoption. The witness is consulted\nonly at zero: populated compaction remains legal, while non-Git and unborn repositories\nretain an honestly unproven empty state.\n\n**a skipped run never clobbers an oracle's recorded verdict.** The record is the last\nknown truth, honestly dated. A fast tier that skips the executable claims every commit\nwould otherwise erase last week's real pass — or, worse, a real fail — with \"did not\nlook\", and history that can be overwritten by not looking is not history.\n\n**experiment outcomes require evidence for every criterion.** A\nplan is frozen before work with its predicted context, actions, criteria, and evidence\ncursors. Closure answers every action and criterion exactly once, preserves the assessor,\nand derives success, failure, or inconclusive from criterion statuses rather than accepting\nan outcome label. Otherwise the ledger would turn an incomplete story into a measured loop.\n\n**experiment telemetry preserves its weakest provable attribution.** Trace and activity\nwindows may be empty, prove an exact owner session, or only prove a parent-session aggregate\nthat can include descendants; older trace may carry no observation metadata at all. Those\nfour scopes remain distinct in the immutable close record. Damaged prefixes, unreadable\nrows, and unknown or inconsistent scope refuse. That keeps compatible history without\nturning absence or uncertainty into false precision.\n\n**surviving agent-assessed defect evidence is attributable and internally consistent.** A\nconjecture keeps uncertainty alive; a defect record says an agent crossed that epistemic\nboundary and must therefore carry the evidence for doing so, the repository subject it\njudged, and the caller-attributed writer labels attached to the assessment. Records append per session and\ndedupe exact retries, while the merged reader recomputes the ordinary content address and\nrefuses malformed, inconsistent, or displaced surviving rows. That detects partial damage;\nit does not prove that a valid row was never rewritten with a recomputed id. Committed Git\nhistory is this first recorder's external rewrite and deletion witness, and an independently\nanchored head is future work.\n\n**defect writes refuse pre-existing symlink redirection.** A path beneath the repository\nis not containment when its stable components redirect through a symlink. The reader\ntherefore refuses linked ledger directories and entries, while the writer validates both\ndirectory components and opens the session target without following its final link, then\ncompares the opened descriptor with the standing path before appending. This prevents the\nmeasured stable-state redirects; it is not an `openat`-grade promise against a privileged\nprocess racing parent-directory renames during the append.\n\n**defect provenance is data, never terminal control.** Repository identity is captured by\nthe machine, but the committed row is still untrusted input on its next read. A commit is\ntherefore null or has lowercase SHA-1/SHA-256 object-name shape, never merely a nonempty string; the\nhuman renderer also neutralizes its bytes. Without both the semantic constraint and the\noutput encoding, an edited but re-addressed row could turn provenance into a terminal\ninstruction while remaining structurally valid.\n\n**a streamed journal entry renders exactly once across appends and compaction.** The live\nstream exists for the one reader the settled render cannot serve — an orchestrator watching\nfive subagents mid-flight — and that reader has no way to audit the feed against the files.\nA dropped entry is a decision the orchestrator never saw, indistinguishable from one never\nmade; a duplicate teaches the opposite lie, that a question was decided twice. Both are\ncheap to produce, because the journal's files do not strictly grow: compaction moves lines\nbetween files and unlinks the originals, which a position-addressed reader replays in full.\nSo a record's identity in the stream comes from its content — the same triple the merged\ntimeline sorts by — and a moved line is one the feed already carried.\n\n**an open escalation heads every human-facing journal read until a human acknowledges it.**\n`blocked` records what an agent could not do and is read by whoever opens the journal next;\nan escalation records what no agent may decide — a human decision, a secret, a policy\nquestion, an infeasible or harmful order — and a route that files it at the bottom of the\nrender is no route. METR (2026-08-26) measured agents that considered alerting a human and\ndid not, citing \"no route\" and \"not my task\"; this repo's own journal held four such rows\nparked under \"Could not\". So the record is agent-to-human: it heads the settled render, the\nstream snapshot and the orient heading, gates nothing mechanically, and stays open until a\nperson appends an acknowledgement carrying what they decided. `resolved` and `dismiss` are\nnot reused, because an acknowledgement is neither an answer nor a decision not to ask.\n\n**a hollow escalation is refused at the write and leaves no row.** The row is a claim on a\nperson's attention, and a hollow one spends that attention on nothing. An empty because, or\na because that only restates the what, carries no human decision, secret or policy question\nby construction and is refused before the ledger is touched. The measure is content words\nadded after function words are dropped and inflections folded; a vocabulary gate would\nrefuse the four real subjects in this repo's history, which share no words, and admit any\nrow that pastes the word \"policy\".\n\n**decision ratification follows explicit subject and authority, never prose similarity or\nrecency.** Independent agents can word the same question differently and can mention the\nsame noun while answering different questions. Conflict detection therefore compares only\nstanding decisions that share a machine-authored subject. Local alternatives remain\nproposals; one explicit orchestrator-accepted or user-directed choice can ratify them;\nincompatible choices tied at the highest authority stay contested.",
       "invariants": [
         "immutable receipts preserve witnessed runs and refuse damaged dependencies",
         "concurrent status writers preserve complete independent reports",
@@ -262,7 +267,9 @@
         "surviving agent-assessed defect evidence is attributable and internally consistent",
         "defect writes refuse pre-existing symlink redirection",
         "defect provenance is data, never terminal control",
-        "a streamed journal entry renders exactly once across appends and compaction"
+        "a streamed journal entry renders exactly once across appends and compaction",
+        "an open escalation heads every human-facing journal read until a human acknowledges it",
+        "a hollow escalation is refused at the write and leaves no row"
       ],
       "refutations": [
         "immutable receipts preserve witnessed runs and refuse damaged dependencies: a context-free reviewer made `test.skip` and failing `test.todo` clear work through public receipt mode; attempted lookup was wrongly labeled execution. Receipt mode now requires named non-skipped TAP or fully passed structured matches. The same review reused a report less than two seconds old after a runner exited without tests; private fresh report destinations and successful termination remove that reuse path. Renaming an incomplete start under `.pending-` also hid it; pending publication now refuses instead of shrinking inventory.",
@@ -274,6 +281,7 @@
         "defect writes refuse pre-existing symlink redirection: before release, replaced `.coherence/defects` with a symlink to an outside temporary directory and `recordDefect` created the session ledger there; replacing a session target with an outside-file symlink likewise appended through it. The focused containment guard now refuses both, and the writer opens the final component with `O_NOFOLLOW` plus descriptor/path identity checks. This is a stable-filesystem guarantee, not a claim to defeat a privileged concurrent parent-directory rename.",
         "defect provenance is data, never terminal control: before release, replaced a valid row's commit with `deadbeef` plus an ESC clear-screen sequence, recomputed its ordinary content id, and the strict reader accepted it; the human render contained the live control byte. The focused provenance guard now requires lowercase 40- or 64-hex Git object-name shape, and rendering still escapes it defensively.",
         "a skipped run never clobbers an oracle's recorded verdict: made the merge take the fresh skip unconditionally -> `claims: 26 · 25 green · 1 red`, this claim red by name. Restored, 26/26.",
+        "a hollow escalation is refused at the write and leaves no row: the first rule counted every word longer than one letter as content, so `--because \"the prod key is needed to deploy\"` passed against `\"deploy needs the prod key\"` on the strength of `is`, `to` and `needed` (observed in the first end-to-end smoke, 2026-09-17). Function words are now dropped and inflections folded before counting; that pair refuses at 0 new words, and the guard carries it as its negative control.",
         "a streamed journal entry renders exactly once across appends and compaction: deleted the `seen` dedupe from `tailJournal`'s parse loop — every parsed line pushed unconditionally, so a compaction fold replays its whole record set (2026-08-04) — full verify red BY NAME, `claims: 31 · 30 green · 1 red`, this claim failing through its guard (the fold fixture observed the replay). Restored, back to 31/31. This is the loosening direction and the quiet one: a feed that duplicates does not crash, it just teaches the orchestrator that a question was decided twice — the exact lie the content address exists to prevent."
       ],
       "guaranteeLinks": {
@@ -316,10 +324,12 @@
         "boundary \"supported lifecycle hosts share one control contract without sharing host syntax\" at setLifecycleHookForHost via guard \"Codex control — install is exact, idempotent, preserving, and runnable across nested paths\"",
         "boundary \"current-session activation requires exact installed-bundle evidence\" at currentObservation via guard \"hook status — exact current bundle activates; stale, direct, replayed, and damaged evidence does not\"",
         "boundary \"customized hook text composes declared overrides and appends, degrading to canon on damage\" at composeHookText via guard \"hook text — override replaces, append follows, and damage degrades to the canonical emission\"",
-        "boundary \"activity evidence is accepted only when identity, scope, time, and command agree\" at isActivityRow via guard \"activity — internally inconsistent scope, time, and command rows are damage, not evidence\""
+        "boundary \"activity evidence is accepted only when identity, scope, time, and command agree\" at isActivityRow via guard \"activity — internally inconsistent scope, time, and command rows are damage, not evidence\"",
+        "boundary \"session startup teaches the route to a human and lists the honest cancelled exit\" at agentInstructions via guard \"hook text — startup teaches escalate beside blocked and the owner menu lists the cancelled exit\"",
+        "boundary \"session startup teaches the route to a human and lists the honest cancelled exit\" at assignedWorkInstructions via guard \"SessionStart teaches the executable swarm loop and exact owned lifecycle\""
       ],
       "prose": "Installation, inspection and observed activation are distinct facts. Host-specific transports implement one lifecycle contract without promoting indirect activity into exact session evidence.",
-      "why": "**agent lifecycle preserves decisions and exposes the current change signal.** Decisions\nand risk are cheapest to surface while the agent still holds the context that produced\nthem; waiting for a later reviewer externalizes both reconstruction costs. The two stop\nsurfaces are not interchangeable: a subagent restates its report because its caller may\nsee nothing else, while the main agent has already shown its report to the user and is\nnever interrupted by shared-worktree state that may belong to another agent. Main Stop\nkeeps the calibration observation and emits no bytes; only SubagentStop carries the\njournal and patch signal forward.\n\n**high-frequency lifecycle hooks start without the analysis dependency stack.**\nPostToolUse is the hottest and most fragile control boundary. Its eager import closure is\nbuilt-ins plus local lifecycle modules; parser registries enter only through the main CLI\ncomposition root. The runtime canary copies the complete source tree into an isolated\nproject with no dependency installation and executes PostToolUse, so a future eager edge\nto a parser package recreates the measured startup failure.\n\n**hook telemetry loss never kills PostToolUse.** Read traces calibrate the context model,\nbut losing that observation is cheaper than breaking every tool call in an agent session.\nThe hook contains both dynamic-load and persistence failures, emits no canonical bytes,\nand leaves the damaged target untouched. A real file-bearing hostile-target canary ensures\nthis contract exercises the write path rather than vacuously recording zero events.\n\n**session startup injects only the exact session's current work order.** Assignment is\nuseful only if the receiving agent can distinguish its authority, success criteria,\ndependencies, write scope, and collisions from another worker's. SessionStart reads the\nwork graph dynamically and emits only records whose owner session exactly matches the\nhost session; failure degrades to a named unavailable reading rather than breaking agent\nstartup.\n\n**session startup teaches the executable swarm loop without manufacturing authority.**\nEvery agent gets the two inert readings that establish direction and fleet state, while\ncreation and handoff remain explicitly conditional on coordination authority. Only an\nexactly owned live order acquires mutation examples, and those examples are selected from\nits standing state and carry both the host session and predecessor token. After one write\nthe token expires and the hook says to inspect again; startup guidance therefore cannot\nturn a stale instruction or a general orientation heading into last-writer-wins authority.\n\n**session startup survives a damaged decision-journal path with named degradation.** The\njournal carries decisions but cannot be allowed to prevent the agent that might repair it\nfrom starting. SessionStart keeps the exact host identity in memory, emits the canonical\ninstructions plus a visible unavailable control, and skips the journal write when the\nstanding path cannot be read or opened. This is degradation, not silent adoption of an\nempty history.\n\n**lifecycle hook presence is one canonical runnable bit.** The control surface cannot\ncreate a field if every repository is free to carry a merely similar—or silently dead—\nhook. Printing, installation, and inspection therefore share one five-event value and\none stable launcher per host. Presence means exactly one shared project copy, no competing\nlocal, inline, or legacy path, an aligned host/launcher root, a correct declared root\nmapping, an enabled project-hook layer, and a runnable target. Unrelated hooks may coexist.\nHistorical journal activity is reported beside this bit but can neither redeem current\nabsence nor erase current presence.\n\n**supported lifecycle hosts share one control contract without sharing host syntax.**\nClaude and Codex expose the same five lifecycle meanings through different settings files,\nmatchers, launch commands, and response envelopes. Host parity therefore means deriving\neach complete bundle from one host-selected domain while retaining a distinct fingerprint;\ncopying Claude bytes into Codex would be resemblance, not parity.\n\n**current-session activation requires exact installed-bundle evidence.** Structural\npresence proves that the project control is runnable, not that this session loaded it. A\nsession becomes observed only when its activity names the selected host, launcher\ntransport, and current bundle fingerprint. Direct probes, stale bundles, other sessions,\nand a guessed newest session cannot establish activation; parent-session fallback stays a\nnamed attribution ceiling rather than being promoted to child evidence.\n\n**activity evidence is accepted only when identity, scope, time, and command agree.** A\nrow is useful precisely because later status and experiment readers stop re-deriving the\nhost event. That cached inference is safe only while its relational fields still agree:\nagent attribution names the row session, parent fallback names its parent domain, event\nidentity recomputes, time is canonical, and command kind/result agrees with name and exit\ncode. One strict reader grades that whole relation; malformed rows become counted damage,\nnever partially trusted evidence.\n\n**customized hook text composes declared overrides and appends, degrading to canon on\ndamage.** The canonical hook text is the harness's voice — identical across adopting\nprojects, and byte-testable because of it — but a project knows things the harness cannot:\nits own commands, its conventions, the one warning its history taught it. So a project\ngets a declared voice per event rather than a fork of the hook body, under one composition\nrule with no conflict state: the override answers what the base is, the append answers\nwhat follows it, and both may coexist; an empty override is a deliberate, visible silence,\nnot an error. Damage must degrade to the canonical emission at hook time, because the hook\nbody runs inside every agent session of every adopting project — a torn customization\nfile that broke sessions would make the journal's carrier the thing that kills the work it\nrecords — so a tear costs exactly the customization, never the session, and the loud\nsurface for it is `hooks review`, where a reader is actually looking. Events with no\ncanonical emission — main Stop, PostToolUse — speak only with a declared project voice;\nmain Stop's canonical byte-silence and the attribution reasoning behind it stand unchanged\nas the default.",
+      "why": "**agent lifecycle preserves decisions and exposes the current change signal.** Decisions\nand risk are cheapest to surface while the agent still holds the context that produced\nthem; waiting for a later reviewer externalizes both reconstruction costs. The two stop\nsurfaces are not interchangeable: a subagent restates its report because its caller may\nsee nothing else, while the main agent has already shown its report to the user and is\nnever interrupted by shared-worktree state that may belong to another agent. Main Stop\nkeeps the calibration observation and emits no bytes; only SubagentStop carries the\njournal and patch signal forward.\n\n**high-frequency lifecycle hooks start without the analysis dependency stack.**\nPostToolUse is the hottest and most fragile control boundary. Its eager import closure is\nbuilt-ins plus local lifecycle modules; parser registries enter only through the main CLI\ncomposition root. The runtime canary copies the complete source tree into an isolated\nproject with no dependency installation and executes PostToolUse, so a future eager edge\nto a parser package recreates the measured startup failure.\n\n**hook telemetry loss never kills PostToolUse.** Read traces calibrate the context model,\nbut losing that observation is cheaper than breaking every tool call in an agent session.\nThe hook contains both dynamic-load and persistence failures, emits no canonical bytes,\nand leaves the damaged target untouched. A real file-bearing hostile-target canary ensures\nthis contract exercises the write path rather than vacuously recording zero events.\n\n**session startup injects only the exact session's current work order.** Assignment is\nuseful only if the receiving agent can distinguish its authority, success criteria,\ndependencies, write scope, and collisions from another worker's. SessionStart reads the\nwork graph dynamically and emits only records whose owner session exactly matches the\nhost session; failure degrades to a named unavailable reading rather than breaking agent\nstartup.\n\n**session startup teaches the executable swarm loop without manufacturing authority.**\nEvery agent gets the two inert readings that establish direction and fleet state, while\ncreation and handoff remain explicitly conditional on coordination authority. Only an\nexactly owned live order acquires mutation examples, and those examples are selected from\nits standing state and carry both the host session and predecessor token. After one write\nthe token expires and the hook says to inspect again; startup guidance therefore cannot\nturn a stale instruction or a general orientation heading into last-writer-wins authority.\n\n**session startup survives a damaged decision-journal path with named degradation.** The\njournal carries decisions but cannot be allowed to prevent the agent that might repair it\nfrom starting. SessionStart keeps the exact host identity in memory, emits the canonical\ninstructions plus a visible unavailable control, and skips the journal write when the\nstanding path cannot be read or opened. This is degradation, not silent adoption of an\nempty history.\n\n**lifecycle hook presence is one canonical runnable bit.** The control surface cannot\ncreate a field if every repository is free to carry a merely similar—or silently dead—\nhook. Printing, installation, and inspection therefore share one five-event value and\none stable launcher per host. Presence means exactly one shared project copy, no competing\nlocal, inline, or legacy path, an aligned host/launcher root, a correct declared root\nmapping, an enabled project-hook layer, and a runnable target. Unrelated hooks may coexist.\nHistorical journal activity is reported beside this bit but can neither redeem current\nabsence nor erase current presence.\n\n**supported lifecycle hosts share one control contract without sharing host syntax.**\nClaude and Codex expose the same five lifecycle meanings through different settings files,\nmatchers, launch commands, and response envelopes. Host parity therefore means deriving\neach complete bundle from one host-selected domain while retaining a distinct fingerprint;\ncopying Claude bytes into Codex would be resemblance, not parity.\n\n**current-session activation requires exact installed-bundle evidence.** Structural\npresence proves that the project control is runnable, not that this session loaded it. A\nsession becomes observed only when its activity names the selected host, launcher\ntransport, and current bundle fingerprint. Direct probes, stale bundles, other sessions,\nand a guessed newest session cannot establish activation; parent-session fallback stays a\nnamed attribution ceiling rather than being promoted to child evidence.\n\n**activity evidence is accepted only when identity, scope, time, and command agree.** A\nrow is useful precisely because later status and experiment readers stop re-deriving the\nhost event. That cached inference is safe only while its relational fields still agree:\nagent attribution names the row session, parent fallback names its parent domain, event\nidentity recomputes, time is canonical, and command kind/result agrees with name and exit\ncode. One strict reader grades that whole relation; malformed rows become counted damage,\nnever partially trusted evidence.\n\n**session startup teaches the route to a human and lists the honest cancelled exit.** METR\n(2026-08-26) measured the incentive gradient this text must not reproduce: an impossible\ntask, no visible exit, and agents that considered alerting a human but did not because no\nroute was in front of them. So every agent is taught `escalate` beside `blocked`, with the\none distinction that matters — what you could not do versus what no agent may decide — and\nan exact owner sees `close cancelled` printed beside finish, block, yield and resume, with\none line saying when it is the honest exit. Both are protocol changes: the hook body's\nmeaning moved, so its version moved with it.\n\n**customized hook text composes declared overrides and appends, degrading to canon on\ndamage.** The canonical hook text is the harness's voice — identical across adopting\nprojects, and byte-testable because of it — but a project knows things the harness cannot:\nits own commands, its conventions, the one warning its history taught it. So a project\ngets a declared voice per event rather than a fork of the hook body, under one composition\nrule with no conflict state: the override answers what the base is, the append answers\nwhat follows it, and both may coexist; an empty override is a deliberate, visible silence,\nnot an error. Damage must degrade to the canonical emission at hook time, because the hook\nbody runs inside every agent session of every adopting project — a torn customization\nfile that broke sessions would make the journal's carrier the thing that kills the work it\nrecords — so a tear costs exactly the customization, never the session, and the loud\nsurface for it is `hooks review`, where a reader is actually looking. Events with no\ncanonical emission — main Stop, PostToolUse — speak only with a declared project voice;\nmain Stop's canonical byte-silence and the attribution reasoning behind it stand unchanged\nas the default.",
       "invariants": [
         "agent lifecycle preserves decisions and exposes the current change signal",
         "high-frequency lifecycle hooks start without the analysis dependency stack",
@@ -331,7 +341,8 @@
         "supported lifecycle hosts share one control contract without sharing host syntax",
         "current-session activation requires exact installed-bundle evidence",
         "customized hook text composes declared overrides and appends, degrading to canon on damage",
-        "activity evidence is accepted only when identity, scope, time, and command agree"
+        "activity evidence is accepted only when identity, scope, time, and command agree",
+        "session startup teaches the route to a human and lists the honest cancelled exit"
       ],
       "refutations": [
         "session startup survives a damaged decision-journal path with named degradation: with `.coherence/decisions` replaced by a regular file, SessionStart threw raw `ENOTDIR` before emitting any instructions. It now retains the exact host session, names `JOURNAL CONTROL unavailable`, performs no journal write, and exits zero.",
@@ -683,7 +694,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/cli.ts",
-      "line": 100
+      "line": 101
     },
     {
       "id": "f:src/commands.ts",
@@ -767,7 +778,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/commands.ts",
-      "line": 285,
+      "line": 294,
       "prose": "Every command name, in registry order. The `<a|b|c>` list — aliases excluded."
     },
     {
@@ -777,7 +788,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/commands.ts",
-      "line": 289,
+      "line": 298,
       "prose": "Every token the dispatch must accept: names AND aliases. The totality oracle compares\n THIS against the `cmd === \"…\"` literals it reads out of cli.ts."
     },
     {
@@ -787,7 +798,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/commands.ts",
-      "line": 302,
+      "line": 311,
       "prose": "The registry entry a typed token names — BY NAME OR BY ALIAS. The one lookup any guard\nkeyed on a flag (`writesArtifacts`, `writesBaseline`) may use.\n\nThe floor guarding the generators matched `c.name === cmd` and nothing else, which is a\nlatent bypass with no current victim: the only alias in the registry, `resolve`, writes\nnothing. But `aliases` exists precisely so a writing command can acquire a second\nspelling, and the day one does, the guard would silently exempt it — a gate that fails\nopen on a rename is the class of defect this whole file exists to end. Closed here\nrather than at the call site, because the call site is where it was forgotten once."
     },
     {
@@ -797,7 +808,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/commands.ts",
-      "line": 330,
+      "line": 339,
       "prose": "SPELLING ONE — the usage banner, printed to stderr when the verb is unknown or absent.\nDerived in full: there is no command-name string literal left in cli.ts's help text, so\nthe banner cannot be 29 while the dispatch is 30, and two branches editing different\ncommands can no longer conflict on one line."
     },
     {
@@ -807,7 +818,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/commands.ts",
-      "line": 363,
+      "line": 372,
       "prose": "SPELLING TWO — the README's command index, markers inclusive, ready for `spliceBlock`.\n\nA BULLET LIST, not a markdown table, and that is a real constraint rather than taste:\n`redundancy` reads the first column of every markdown table as an enumerated domain, so\na generated table would hand it a fresh README↔dispatch pair to report — trading the\nfinding this change exists to remove for an identical one. A generated block that the\nproject's own detector still flags has not fixed anything.\n\nThe block is an INDEX and nothing more: name, arg shape, one line. The authored\nper-command reasoning lives OUTSIDE the markers, below the block, and is not expected to\ncover every command — completeness is what the derivation owes, depth is what the prose\nowes, and confusing the two is how the reference got twelve commands behind."
     },
     {
@@ -817,7 +828,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/commands.ts",
-      "line": 404,
+      "line": 413,
       "prose": "The lightweight command catalog is imported by the lifecycle hook's due-work reader.\nKeep the executable claim registry on the docs side of this parameter boundary: a\nstatic import here makes every PostToolUse load parsers before it can record one path."
     },
     {
@@ -827,7 +838,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/commands.ts",
-      "line": 411
+      "line": 420
     },
     {
       "id": "f:src/config.ts",
@@ -1174,7 +1185,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/coordination/orient.ts",
-      "line": 31
+      "line": 32
     },
     {
       "id": "s:src/coordination/orient.ts#DanglingConsequenceRef",
@@ -1183,7 +1194,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/coordination/orient.ts",
-      "line": 37
+      "line": 38
     },
     {
       "id": "s:src/coordination/orient.ts#VerificationOrientation",
@@ -1192,7 +1203,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/coordination/orient.ts",
-      "line": 43
+      "line": 44
     },
     {
       "id": "s:src/coordination/orient.ts#Orientation",
@@ -1201,7 +1212,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/coordination/orient.ts",
-      "line": 51
+      "line": 52
     },
     {
       "id": "s:src/coordination/orient.ts#verifyOrientation",
@@ -1210,7 +1221,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/coordination/orient.ts",
-      "line": 103
+      "line": 107
     },
     {
       "id": "s:src/coordination/orient.ts#observeOrientation",
@@ -1219,7 +1230,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/coordination/orient.ts",
-      "line": 222,
+      "line": 226,
       "prose": "Read every ledger independently. A failed source is preserved as a source failure and\nmakes the heading REFUSE; it never turns into an empty population."
     },
     {
@@ -1229,7 +1240,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/coordination/orient.ts",
-      "line": 380
+      "line": 394
     },
     {
       "id": "f:src/coordination/regulate.ts",
@@ -4063,7 +4074,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/decisions.ts",
-      "line": 100,
+      "line": 102,
       "prose": "Machine-addressable scope for a decision. These are SETS, not a second prose field:\nwriters sort and deduplicate them before they enter the wire record and its identity."
     },
     {
@@ -4073,7 +4084,7 @@
       "kind": "symbol",
       "sub": "type",
       "path": "src/evidence/decisions.ts",
-      "line": 110,
+      "line": 112,
       "prose": "Whose authority the row claims. Identity is intentionally a small closed vocabulary;\nan actor/session belongs in `agent`, while this field answers whether that actor was\nproposing, ratifying for the swarm, or carrying an explicit user direction."
     },
     {
@@ -4083,7 +4094,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/decisions.ts",
-      "line": 112
+      "line": 114
     },
     {
       "id": "s:src/evidence/decisions.ts#DecisionRecord",
@@ -4092,7 +4103,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/decisions.ts",
-      "line": 119
+      "line": 121
     },
     {
       "id": "s:src/evidence/decisions.ts#LABEL_SOFT_MAX",
@@ -4101,7 +4112,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/decisions.ts",
-      "line": 181,
+      "line": 186,
       "prose": "LABELS ARE CAPPED; EVIDENCE IS NOT. Measured on this repo's own journal at 53\nentries: `chose` p50 149 / p90 241, `over` p50 94 / p90 175 — both already read as\nlabels, and the few that run long are the ones where an agent put its rationale in\nthe title. But `because` p50 609, and ALL 53 exceed 250: capping it there would have\nstripped 16 of 23 file:line citations and 22 of 33 measured numbers, because the\nevidence lives at the END of a rationale, after the claim. That converts a checkable\nentry into an assertable one, which is the failure this journal exists to prevent.\nSo the cap is a WARNING on the label fields only, and readability is solved where it\nbelongs — at the render, with `--brief`."
     },
     {
@@ -4111,7 +4122,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/decisions.ts",
-      "line": 189,
+      "line": 194,
       "prose": "── the candidate nobody writes down ────────────────────────────────────────────────\n\nIt names the MOVE, not the mood. \"the instrument is wrong\" alone is unactionable; the\nclause after the dash is what turns it into a next step, because the mistake is always\nthe same one — reading a number as a fact about the subject when it is a fact about\nthe thing that produced it."
     },
     {
@@ -4121,7 +4132,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/decisions.ts",
-      "line": 191
+      "line": 196
     },
     {
       "id": "s:src/evidence/decisions.ts#readsAsInstrumentDoubt",
@@ -4130,7 +4141,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 213,
+      "line": 218,
       "prose": "Does this candidate already doubt the apparatus rather than the world?"
     },
     {
@@ -4140,7 +4151,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 229,
+      "line": 234,
       "prose": "THE GUARANTEE: every conjecture leaves here with instrument-doubt among its\n candidates. Six for six of the findings that motivated this record were instrument\n failures, so the prior is not merely high — and a candidate list that omits it has\n already made the mistake, at WRITE time, before any reader can catch it.\n\n Nothing is reordered when the author explicitly marks their own wording: their\n specific candidate (`[instrument] the decoder had an off-by-one`) beats the generic\n canonical line. Lexical inference is deliberately insufficient here: redundancy is\n recoverable, while a false positive silently removes the candidate."
     },
     {
@@ -4150,7 +4161,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 233
+      "line": 238
     },
     {
       "id": "s:src/evidence/decisions.ts#slug",
@@ -4159,7 +4170,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 249,
+      "line": 254,
       "prose": "ONE FILENAME COMPONENT, filesystem-safe, AND STILL INJECTIVE — that last part is the\n requirement that rules out a plain `replace`. A branch may contain `/`, and if\n `feat/x` and `feat-x` both flatten to `feat-x` they share a journal file, which is\n exactly the two-branches-conflict failure the split layout exists to prevent. So\n whenever sanitising CHANGED anything — a substitution, a trim, the length cap — a\n digest of the RAW string is appended, and two distinct inputs can no longer land on\n one name. A string that was already safe is passed through untouched, so every session\n id ever written (`s-` + 12 hex) still maps to the file it has always mapped to.\n\n It is applied at `sessionPath`, which also closes a hole that predates it: `--session`\n is caller-supplied and went straight into a path, so `--session ../../etc/x` wrote\n outside the journal."
     },
     {
@@ -4169,7 +4180,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 263
+      "line": 268
     },
     {
       "id": "s:src/evidence/decisions.ts#newSessionId",
@@ -4178,7 +4189,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 350,
+      "line": 355,
       "prose": "A fresh fallback session id. Random rather than derived: two agents started in the same\n second on the same branch with the same name must not collide, and they can.\n\n A host-supplied unique id is preferred by the hook. Randomness is its fallback, never\n the fallback for a hookless `coherence decide` — see `derivedSessionId`."
     },
     {
@@ -4188,7 +4199,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 377,
+      "line": 382,
       "prose": "THE HOOKLESS FALLBACK: `<branch>-<agent>-<YYYY-MM-DD>`, derived rather than random, so\n a human typing `decide` five times gets ONE file instead of five.\n\n THE BRANCH IS IN THE NAME AND MUST STAY THERE. Distinct filenames are the entire reason\n two parallel branches never conflict on the journal; an id that dropped the branch would\n buy a tidier PR by reintroducing the conflict this layout was built to avoid.\n\n THE DATE COMES FROM THE RECORD'S OWN `at`, so the filename and the timestamps inside it\n are on ONE clock (UTC). The cost is that an evening's work can straddle UTC midnight\n into two files; month-grouped compaction absorbs that completely, and a local-clock\n filename would put two timezones in one layout for the same money.\n\n THE RESIDUAL COLLISION IS TWO AGENTS THAT BOTH DEFAULTED TO agent \"main\" ON ONE BRANCH,\n and it is safe on four independent grounds:\n   1. Same branch means same checkout. Git refuses to check one branch out in two\n      worktrees, so genuinely concurrent agents have DIFFERENT branches by construction —\n      and therefore different files.\n   2. Even interleaved, the write survives: `appendFileSync` is measured here at 8\n      concurrent writers x 300 lines, 2400/2400 intact, 0 torn, 0 missing (and the same\n      probe loses 1242 of 2400 with a seek-then-write writer, so it can see loss).\n   3. What is actually lost is attribution BETWEEN two agents that already declined to\n      pass `--agent` — they were indistinguishable before the filename was.\n   4. The supported concurrency path is the hook, and the hook still mints random ids."
     },
     {
@@ -4198,7 +4209,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 505,
+      "line": 510,
       "prose": "Recompute the released content address. Callers should normally use\n`readTrustedJournal`; this export exists for ledger migrations and focused audits."
     },
     {
@@ -4208,7 +4219,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/decisions.ts",
-      "line": 524
+      "line": 529
     },
     {
       "id": "s:src/evidence/decisions.ts#openSession",
@@ -4217,7 +4228,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 548,
+      "line": 553,
       "prose": "Open a session and write its header record. A lifecycle host may supply its stable,\n unique agent/session id so later tool hooks, calibration labels and journal writes all\n address the same file. Hookless callers still mint a collision-safe random id."
     },
     {
@@ -4227,7 +4238,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 566,
+      "line": 571,
       "prose": "Append one record to a session's file, creating the session on first write so an\n agent that never saw the hook still produces an attributable file.\n\n WITH NO ID FROM ANYWHERE THE ID IS DERIVED, NOT RANDOMISED — the one-line cause of\n twenty unreviewable files in a day. `null` is passed down rather than resolved here\n because the derivation needs the branch and the agent, and `write` is where those are\n worked out; computing them twice is how the two spellings drift."
     },
     {
@@ -4237,7 +4248,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/decisions.ts",
-      "line": 626
+      "line": 638
     },
     {
       "id": "s:src/evidence/decisions.ts#timelineOrder",
@@ -4246,7 +4257,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/decisions.ts",
-      "line": 634,
+      "line": 646,
       "prose": "THE TOTAL TIMELINE ORDER, exported because two readers depend on it agreeing with\n itself: `readJournal`'s merged render and the live stream (`journal.ts`), which\n receives records incrementally and must interleave them exactly where a cold read\n would have. Two hand-written copies of a three-key comparator is how \"compaction\n changes nothing\" stops being checkable. See `readJournal` for why the third key\n exists at all."
     },
     {
@@ -4256,7 +4267,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 649,
+      "line": 661,
       "prose": "A SESSION IS NAMED BY ITS WORK, NOT BY ITS HEADER. The header is written by the\n hook at agent start, BEFORE the agent knows what it is called — so it defaults to\n \"main\" and the branch. Taking identity from the first record therefore filed every\n agent's session under \"main\", which is exactly the attribution the split-file\n layout exists to guarantee. A real record's own claim always wins over the header's\n placeholder.\n\n Sorted INTERNALLY rather than trusting the caller's order, so the answer is a\n function of the record SET — the same property `readJournal`'s sort buys — and a\n caller holding an incrementally-grown array (the stream) gets the same sessions a\n cold read would."
     },
     {
@@ -4266,7 +4277,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/decisions.ts",
-      "line": 667,
+      "line": 679,
       "prose": "ONE SPELLING OF \"IN SCOPE\". `decisions` filters its render by job/agent/session/branch\n and the stream filters the same four ways; a second hand-written predicate is exactly\n the two-spellings drift `redundancy` exists to report, one file over from the module\n that hunts it."
     },
     {
@@ -4276,7 +4287,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/decisions.ts",
-      "line": 668
+      "line": 680
     },
     {
       "id": "s:src/evidence/decisions.ts#readJournal",
@@ -4285,7 +4296,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 679,
+      "line": 691,
       "prose": "THE COHERING READ. Every session file in the folder, merged into ONE timeline\n ordered by time — across agents, across jobs, across branches. This is the\n abstraction the whole split-file layout exists to make possible: writers are\n isolated so they never collide, and the reader sees a single history anyway.\n\n A malformed line is SKIPPED and COUNTED, never thrown on: a journal that refuses\n to render because one agent wrote garbage has failed at the one job it has."
     },
     {
@@ -4295,7 +4306,7 @@
       "kind": "symbol",
       "sub": "type",
       "path": "src/evidence/decisions.ts",
-      "line": 710
+      "line": 722
     },
     {
       "id": "s:src/evidence/decisions.ts#TrustedJournalDamage",
@@ -4304,7 +4315,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/decisions.ts",
-      "line": 720
+      "line": 732
     },
     {
       "id": "s:src/evidence/decisions.ts#TrustedJournalRead",
@@ -4313,7 +4324,7 @@
       "kind": "symbol",
       "sub": "type",
       "path": "src/evidence/decisions.ts",
-      "line": 732,
+      "line": 744,
       "prose": "A damaged strict read contains no admissible records. Keeping `records` empty in the\nrefusal arm makes it difficult for a verdict caller to accidentally trust the valid\nsubset while merely printing a warning about the rest. `readJournal` remains the\ntolerant recovery/rendering surface."
     },
     {
@@ -4323,7 +4334,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 931,
+      "line": 944,
       "prose": "Strict, version-aware evidence projection. Unlike `readJournal`, one damaged row,\nbroken pointer, conflicting content address, or provable session/file displacement\nrefuses the entire projection. This is the reader verdict-bearing consumers use."
     },
     {
@@ -4333,7 +4344,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/decisions.ts",
-      "line": 1174,
+      "line": 1195,
       "prose": "THE QUIET WINDOW: a file written more recently than this is never folded.\n\n TWO HOURS, and both bounds are argued rather than picked. It has to be LONGER than the\n gap between one agent's successive appends, or compaction lands mid-session — measured\n on this repo's own journal, the largest gap between consecutive entries in a single\n session is 14.1 min and the longest session spans 22.5 min, so two hours is ~8x the\n observed worst case. And it has to be SHORTER than a day, because the motivating case is\n twenty files accumulated in ONE day and compacted before the PR goes up; a 24-hour\n window would refuse exactly the work it was asked to tidy.\n\n It is a heuristic, so it is not the only guard: every source is re-stat'ed immediately\n before its group is written and the group is abandoned if anything moved, and a fold\n that raced an append anyway would duplicate lines rather than lose them — which\n `resolve`'s content-hash dedupe renders identically."
     },
     {
@@ -4343,7 +4354,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/decisions.ts",
-      "line": 1178
+      "line": 1199
     },
     {
       "id": "s:src/evidence/decisions.ts#planCompaction",
@@ -4352,7 +4363,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 1190,
+      "line": 1211,
       "prose": "What compaction WOULD do. Separated from doing it so the refusals can be tested without\n a filesystem mutation, and so the executor has no policy left in it."
     },
     {
@@ -4362,7 +4373,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 1269,
+      "line": 1290,
       "prose": "Execute the plan. Report lines out, exit code out; the CLI only prints."
     },
     {
@@ -4372,8 +4383,47 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 1347,
+      "line": 1368,
       "prose": "Retractions resolve ACROSS session files — one agent may withdraw another's\n decision, which in a fan-out is the single most valuable thing that can happen.\n Resolutions cross files the same way, and for the same reason: the agent that\n notices the surprising number is very often not the one with the instrument to\n settle it. Dismissals too — and a dismissal by a SECOND agent is the ordinary case,\n because the advisory that raised the question is not a person at all.\n\n OPEN AND RESOLVED ARE SEPARATE BUCKETS, not a flag on one list, because the render\n has to be able to lead with the open ones. A conjecture never lands in `standing`:\n it is not a choice, and counting it as one would report an unanswered question as a\n settled position — the precise confusion this record exists to end.\n\n THE PRECEDENCE IS retraction > resolution > dismissal, and each step is a claim about\n how much a reader learns:\n   · a RETRACTION says the observation was never real — there is nothing to answer, so\n     it outranks an answer.\n   · a RESOLUTION beats a DISMISSAL because an answer is strictly more informative than\n     a decision not to ask. Filing an answered question under \"we chose not to chase\n     this\" would HIDE the answer, which is the more expensive of the two mistakes."
+    },
+    {
+      "id": "s:src/evidence/decisions.ts#ESCALATION_MIN_NEW_WORDS",
+      "parent": "f:src/evidence/decisions.ts",
+      "label": "ESCALATION_MIN_NEW_WORDS",
+      "kind": "symbol",
+      "sub": "const",
+      "path": "src/evidence/decisions.ts",
+      "line": 1468,
+      "prose": "The write-time refusal for a hollow escalation. Nonempty `because`, and a `because` that\n is not merely the `what` again. \"Merely\" is measured as CONTENT WORDS ADDED: after\n lowercasing, stripping punctuation, dropping function words and folding inflections\n (`needed`/`needs` → `need`), the because must contribute at least three words the what\n does not already contain. A restated what carries no human decision, secret or policy\n question by construction — that is the refusal — while a rule keyed on VOCABULARY\n (\"secret\", \"policy\") would refuse the four real subjects in this repo's own journal,\n which share no words at all, and admit any row that pastes the word \"policy\".\n\n MEASURED BEFORE THE STOPWORDS: the first rule counted every word over one letter, and\n `--because \"the prod key is needed to deploy\"` passed against `\"deploy needs the prod\n key\"` on the strength of `is`, `to` and `needed`. Function words carry no decision."
+    },
+    {
+      "id": "s:src/evidence/decisions.ts#escalationProblems",
+      "parent": "f:src/evidence/decisions.ts",
+      "label": "escalationProblems",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/evidence/decisions.ts",
+      "line": 1493
+    },
+    {
+      "id": "s:src/evidence/decisions.ts#EscalationRefusal",
+      "parent": "f:src/evidence/decisions.ts",
+      "label": "EscalationRefusal",
+      "kind": "symbol",
+      "sub": "class",
+      "path": "src/evidence/decisions.ts",
+      "line": 1510,
+      "prose": "Thrown by the write when an escalation is hollow. A class rather than a bare Error so a\n caller can tell a refusal (exit 2, nothing written) from a storage failure."
+    },
+    {
+      "id": "s:src/evidence/decisions.ts#acknowledgeableEscalation",
+      "parent": "f:src/evidence/decisions.ts",
+      "label": "acknowledgeableEscalation",
+      "kind": "symbol",
+      "sub": "function",
+      "path": "src/evidence/decisions.ts",
+      "line": 1522,
+      "prose": "WHAT MAY BE ACKNOWLEDGED, and the exact refusal when it may not — the same shape as\n `resolvableConjecture`, for the same reason: an acknowledgement pointing at a decision\n would append a row no render reads, a command that exits 0 and clears nothing."
     },
     {
       "id": "s:src/evidence/decisions.ts#resolvableConjecture",
@@ -4382,7 +4432,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 1417,
+      "line": 1565,
       "prose": "WHAT MAY BE RESOLVED OR DISMISSED, and the exact refusal when it may not.\n\n Two DIFFERENT failures live here and they need different messages: an id nobody ever\n wrote, versus an id that names the wrong KIND of thing. Accepting the second would\n append a resolution pointing at a decision, which no render ever reads — a command\n that exits 0 and does nothing, which is the defect this harness exists to hunt.\n\n It sits in the journal rather than in the CLI so the rule is testable without\n spawning a process, and so a second caller cannot reimplement it differently.\n\n DISMISSAL SHARES THE RULE RATHER THAN COPYING IT, and that is the point of the `verb`\n parameter. `dismiss` has to be as cheap to reach for as `resolved` — if it is even\n slightly harder, a noisy question stays open and the whole `--open` list gets skipped\n — and \"as cheap\" includes failing the same way, with the same words, on the same\n mistakes. Two hand-written copies of this rule would have drifted by the second edit."
     },
     {
@@ -4392,7 +4442,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/decisions.ts",
-      "line": 1449
+      "line": 1597
     },
     {
       "id": "s:src/evidence/decisions.ts#BRIEF_BECAUSE",
@@ -4401,7 +4451,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/decisions.ts",
-      "line": 1456,
+      "line": 1604,
       "prose": "`--brief`'s budget for `because`. Truncation is ALWAYS announced with the withheld\n count — a shortened rationale that looks complete is worse than no rationale."
     },
     {
@@ -4411,7 +4461,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/decisions.ts",
-      "line": 1470,
+      "line": 1618,
       "prose": "The render IS the artifact, and its value is a COMPRESSION RATIO: a reader given\n this should be better equipped than one given the transcripts. So it leads with\n what is standing, states what was rejected inline, and gives retractions their own\n section — a retraction rendered as an absence is invisible, and it is the most\n valuable entry in the journal.\n\n OPEN CONJECTURES GO ABOVE EVERYTHING, INCLUDING `Standing`. That ordering is the\n feature, not decoration. A standing decision is settled and will still be there\n tomorrow; an open conjecture is a thing this project NOTICED AND DID NOT CHASE, and\n it decays — the agent that saw the surprising number is gone, and nobody else knows\n to look. Filed underneath the settled work it reads as an appendix, which is\n indistinguishable from never having recorded it."
     },
     {
@@ -4911,7 +4961,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/journal.ts",
-      "line": 131,
+      "line": 132,
       "prose": "The whole record on ONE line: when, what kind, who, what — and the full `because`,\n uncapped, because this is a pipe-facing render and the evidence lives at the end of\n a rationale (the LABEL_SOFT_MAX argument, applied to a different surface). Pointer\n kinds carry their target inline; a resolution that does not say WHAT it resolves is\n unactionable in a feed where the conjecture scrolled past an hour ago."
     },
     {
@@ -4921,7 +4971,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/journal.ts",
-      "line": 154,
+      "line": 157,
       "prose": "Stored timestamps are UTC ISO — right for the record, wrong for the eye. Every\n render below converts to the machine's wall clock; an unparseable stamp returns\n null and the caller falls back to showing the raw string, because a wrong-looking\n stamp a reader can question beats a silently invented one."
     },
     {
@@ -4931,7 +4981,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/journal.ts",
-      "line": 165
+      "line": 168
     },
     {
       "id": "s:src/evidence/journal.ts#entryDetail",
@@ -4940,7 +4990,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/journal.ts",
-      "line": 189,
+      "line": 192,
       "prose": "The drill-in: every field the record carries, wrapped to width. The stream's rows\n clip; this is where nothing does.\n\n Fields are COLLECTED before anything is formatted, because the layout is a single\n judgment over all of them: the widest label present in THIS record sets one colon\n column, labels right-align against it so every colon lands at the same x, and\n wrapped continuations indent to the value column — so the eye reads one flush\n column of colons and one flush column of content, instead of re-finding the start\n of the text on every line. The\n metadata that used to ride one `·`-joined line is the same shape (label → value),\n so it stacks under the same column: schema names from decisions.ts, absent fields\n omitted rather than printed as empty labels."
     },
     {
@@ -4950,7 +5000,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/journal.ts",
-      "line": 232
+      "line": 238
     },
     {
       "id": "s:src/evidence/journal.ts#StreamUI",
@@ -4959,7 +5009,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/journal.ts",
-      "line": 234
+      "line": 240
     },
     {
       "id": "s:src/evidence/journal.ts#initialStreamUI",
@@ -4968,7 +5018,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/journal.ts",
-      "line": 254
+      "line": 260
     },
     {
       "id": "s:src/evidence/journal.ts#shownEntry",
@@ -4977,7 +5027,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/journal.ts",
-      "line": 261,
+      "line": 267,
       "prose": "The record the drill-in is showing: the tip of the reference trail when one is being\n followed, otherwise the selection of the list that opened it. Null when a followed id\n resolves to nothing — the caller renders that as a dangling pointer, not a crash."
     },
     {
@@ -4987,7 +5037,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/journal.ts",
-      "line": 267
+      "line": 273
     },
     {
       "id": "s:src/evidence/journal.ts#displayRecords",
@@ -4996,7 +5046,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/journal.ts",
-      "line": 277,
+      "line": 283,
       "prose": "THE LIST ORDER — newest first. `visibleRecords` stays chronological (that is the\n order `timelineOrder` defines, and what the pipe modes print); the interactive list\n reverses it, because the reader this surface exists for is watching a live feed and\n the newest entry belongs where the eye rests — the top. `ui.cursor` indexes THIS\n order, so 0 is always the tip and \"follow\" is simply \"cursor pinned at 0\".\n Copied before reversing: `visibleRecords` hands back the model's own array when the\n scope is ALL, and reversing that in place would corrupt the timeline itself."
     },
     {
@@ -5006,7 +5056,7 @@
       "kind": "symbol",
       "sub": "const",
       "path": "src/evidence/journal.ts",
-      "line": 286,
+      "line": 292,
       "prose": "THE OPEN LIST — the records behind the masthead's \"N OPEN conjecture(s)\", newest\n first. Deliberately UNSCOPED (the whole model, never the surfed stream): the count\n in the header is unscoped, and a drill-in that shows fewer entries than the number\n that invited the reader in would read as a bug. `resolve` already owns the\n open/answered/dismissed judgment — reused here, never re-decided. Copied before\n reversing for the same reason `displayRecords` copies."
     },
     {
@@ -5016,7 +5066,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/journal.ts",
-      "line": 293,
+      "line": 299,
       "prose": "The PICKER's order: streams by most recent activity, newest first — the stream the\n operator is reaching for is almost always the one that just spoke. `deriveSessions`\n keeps its started-order (the settled render leans on it); the recency sort lives\n here, beside the one surface that wants it."
     },
     {
@@ -5026,7 +5076,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/journal.ts",
-      "line": 391,
+      "line": 399,
       "prose": "Assemble one full frame. Pure over its inputs — no IO, no clock of its own —\n EXCEPT that it reconciles `ui.scroll`/`ui.sScroll` in place: cells have variable\n height and height exists only at layout time (it depends on the wrap width), so the\n render is the one place \"slide the window only when the selection hits an edge\" can\n be decided. Same (model, ui, size) still produces the same frame and the same\n anchors — replayable, just not stateless about where the window sits."
     },
     {
@@ -5036,7 +5086,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/evidence/journal.ts",
-      "line": 490
+      "line": 501
     },
     {
       "id": "s:src/evidence/journal.ts#runJournal",
@@ -5045,7 +5095,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/evidence/journal.ts",
-      "line": 517,
+      "line": 536,
       "prose": "`coherence journal` — three modes, chosen by where stdout points:\n  · a TTY: the interactive surf (live timeline · streams picker · open-conjectures\n    list · entry drill-in).\n  · a pipe, or `--once`: a chronological snapshot, then exit — which is also what\n    keeps this command safe to run bare in any harness that executes every verb.\n  · `--follow`: line-mode tail for a pipe or a dumb terminal — print the scoped\n    history, then each new record as it lands, until SIGINT."
     },
     {
@@ -6181,7 +6231,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 166,
+      "line": 172,
       "prose": "The exact-session work order injected beside the durable journal instructions.\nLoaded dynamically so PostToolUse's startup closure does not acquire the coordination\nledger. Failure is rendered as unavailable evidence, never thrown through a host's\nlifecycle boundary."
     },
     {
@@ -6191,7 +6241,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 223,
+      "line": 237,
       "prose": "A Stop feedback turn stops again. Hosts mark that second pass so a non-blocking nudge\ncan be emitted exactly once instead of accidentally becoming an eight-turn gate."
     },
     {
@@ -6201,7 +6251,7 @@
       "kind": "symbol",
       "sub": "type",
       "path": "src/lifecycle/hooks.ts",
-      "line": 228
+      "line": 242
     },
     {
       "id": "s:src/lifecycle/hooks.ts#composeStopFeedback",
@@ -6210,7 +6260,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 238,
+      "line": 252,
       "prose": "Host semantics make this distinction consequential: any `additionalContext` continues\nthe conversation. A subagent's parent may genuinely need the final report restated;\nthe main user just read it. Main Stop therefore emits nothing. Shared-worktree state\ncannot be promoted into a task-local obligation merely because this agent stopped."
     },
     {
@@ -6220,7 +6270,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 260,
+      "line": 274,
       "prose": "`coherence hook <event>` — the hook body itself, so nothing has to be written to\n disk or kept in sync with a script file. Reads the event payload on stdin (unused\n today, but hooks are fed JSON and ignoring it silently would be rude to the next\n person who needs a field from it) and prints the documented output shape."
     },
     {
@@ -6230,7 +6280,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 421,
+      "line": 435,
       "prose": "What a subagent is told as it finishes. Split out of `runHook` so it is reachable\n without a stdin pipe — the hook body drains stdin, and a report you can only observe\n by feeding a process is a report nobody tests."
     },
     {
@@ -6240,7 +6290,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/lifecycle/hooks.ts",
-      "line": 496
+      "line": 516
     },
     {
       "id": "s:src/lifecycle/hooks.ts#CurrentHookObservation",
@@ -6249,7 +6299,7 @@
       "kind": "symbol",
       "sub": "interface",
       "path": "src/lifecycle/hooks.ts",
-      "line": 508
+      "line": 528
     },
     {
       "id": "s:src/lifecycle/hooks.ts#activeHookHost",
@@ -6258,7 +6308,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 533,
+      "line": 553,
       "prose": "Which host owns the current shell. Explicit selection always wins."
     },
     {
@@ -6268,7 +6318,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 539,
+      "line": 559,
       "prose": "Never pick the newest session: concurrency makes \"latest\" an attribution bug."
     },
     {
@@ -6278,7 +6328,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 567
+      "line": 587
     },
     {
       "id": "s:src/lifecycle/hooks.ts#hookStatus",
@@ -6287,7 +6337,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 643,
+      "line": 663,
       "prose": "Structural configuration, historical memory, and this exact session stay separate."
     },
     {
@@ -6297,7 +6347,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 724,
+      "line": 744,
       "prose": "`coherence hooks status` — report the switch and the observation beside it."
     },
     {
@@ -6307,7 +6357,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 731,
+      "line": 751,
       "prose": "`coherence hooks --check` — the binary current-control gate. Observation never redeems absence."
     },
     {
@@ -6317,7 +6367,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 741
+      "line": 761
     },
     {
       "id": "s:src/lifecycle/hooks.ts#uninstallHooks",
@@ -6326,7 +6376,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 758
+      "line": 778
     },
     {
       "id": "s:src/lifecycle/hooks.ts#reviewHooks",
@@ -6335,7 +6385,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 775,
+      "line": 795,
       "prose": "`coherence hooks review` — every event's EFFECTIVE emission, with its provenance.\n The hook body degrades an unreadable customization to canon silently, because a torn\n file must not break a session; THIS is the loud surface where that damage lands, and\n the exit code carries it."
     },
     {
@@ -6345,7 +6395,7 @@
       "kind": "symbol",
       "sub": "function",
       "path": "src/lifecycle/hooks.ts",
-      "line": 823,
+      "line": 843,
       "prose": "`coherence hooks` — print one host's canonical block, plus the\n instruction text so a reader can see what agents will actually be told."
     },
     {
@@ -9686,6 +9736,15 @@
       "sub": "test/economy.test.ts",
       "path": "test/economy.test.ts",
       "prose": "economy.test.ts — THE CONTEXT CLOSURE (src/diagnostics/economy.ts): what a reader must load to\nchange one thing safely. Two layers, the split decompose.ts's header sets out and\nevolution.ts's repeats, because injection is blind exactly where the git plumbing is:\n  1. the closure math — adjacency, closure, median/p90, the trend orientation, the hub\n     findings — driven through HAND-BUILT commit arrays and graphs. No git, exhaustive.\n  2. the glue the injection bypasses — the real log read, the SUBDIRECTORY rebase (the\n     v0.19.1 regression class), the status record and the raise dedupe — driven through\n     real throwaway repos.\n\nWhat is genuinely at risk here is not the arithmetic but three ways the advisory could\nLIE: a commit outside the graph read as a ZERO closure (it must be ABSENT), a one-way\nimport closure that reports a hub as cheap (the edges are UNDIRECTED), and a hub finding\nwhose journal key carries its count (which would mint a new question every run)."
+    },
+    {
+      "id": "f:test/escalation.test.ts",
+      "parent": "c:test",
+      "label": "escalation.test.ts",
+      "kind": "file",
+      "sub": "test/escalation.test.ts",
+      "path": "test/escalation.test.ts",
+      "prose": "escalation.test.ts — the route to a human.\n\nWhat these pin, in order of how badly it hurts when it breaks:\n  1. AN OPEN ESCALATION HEADS EVERY HUMAN-FACING READ — the settled render, the stream\n     snapshot, and the orient heading — until a person acknowledges it. The verb exists\n     because METR (2026-08-26) measured agents that considered alerting a human and\n     did not, citing \"no route\"; a route that files the row at the bottom is no route.\n  2. A HOLLOW ESCALATION IS REFUSED AT THE WRITE AND LEAVES NO ROW. Empty because, or a\n     because that only restates the what. The row is a claim on a person's attention.\n  3. THE ACKNOWLEDGEMENT IS A RECORD, points only at an escalation, and is the one thing\n     that clears the heading; retracting it reopens the escalation.\n  4. IT GATES NOTHING MECHANICALLY. `orient` exits 0 on `await-human`; nothing refuses.\n  5. THE STARTUP TEXT TEACHES IT beside `blocked`, and the owner menu lists the honest\n     cancelled exit beside finish."
     },
     {
       "id": "f:test/evolution.test.ts",
@@ -14332,6 +14391,78 @@
     {
       "id": "f:test/economy.test.ts->f:test/_helpers.ts:imports",
       "source": "f:test/economy.test.ts",
+      "target": "f:test/_helpers.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/escalation.test.ts->x:node:test:imports",
+      "source": "f:test/escalation.test.ts",
+      "target": "x:node:test",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/escalation.test.ts->x:node:assert/strict:imports",
+      "source": "f:test/escalation.test.ts",
+      "target": "x:node:assert/strict",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/escalation.test.ts->x:node:fs:imports",
+      "source": "f:test/escalation.test.ts",
+      "target": "x:node:fs",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/escalation.test.ts->x:node:child_process:imports",
+      "source": "f:test/escalation.test.ts",
+      "target": "x:node:child_process",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/escalation.test.ts->x:node:path:imports",
+      "source": "f:test/escalation.test.ts",
+      "target": "x:node:path",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/escalation.test.ts->x:node:url:imports",
+      "source": "f:test/escalation.test.ts",
+      "target": "x:node:url",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/escalation.test.ts->f:src/evidence/decisions.ts:imports",
+      "source": "f:test/escalation.test.ts",
+      "target": "f:src/evidence/decisions.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/escalation.test.ts->f:src/evidence/journal.ts:imports",
+      "source": "f:test/escalation.test.ts",
+      "target": "f:src/evidence/journal.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/escalation.test.ts->f:src/coordination/orient.ts:imports",
+      "source": "f:test/escalation.test.ts",
+      "target": "f:src/coordination/orient.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/escalation.test.ts->f:src/coordination/work.ts:imports",
+      "source": "f:test/escalation.test.ts",
+      "target": "f:src/coordination/work.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/escalation.test.ts->f:src/lifecycle/hooks.ts:imports",
+      "source": "f:test/escalation.test.ts",
+      "target": "f:src/lifecycle/hooks.ts",
+      "kind": "imports"
+    },
+    {
+      "id": "f:test/escalation.test.ts->f:test/_helpers.ts:imports",
+      "source": "f:test/escalation.test.ts",
       "target": "f:test/_helpers.ts",
       "kind": "imports"
     },

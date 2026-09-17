@@ -10,7 +10,7 @@ Coherence is a machine for spending less inference. It guides your agent toward 
 
 It gives a project durable, *checkable* spine of truth and design intention:
 
-**A decision journal** records what was chosen, what was rejected, and why, so settled questions stay settled instead of getting re-litigated by every fresh session. This also gives you, the human, a highlight reel to review.
+**A decision journal** records what was chosen, what was rejected, and why, so settled questions stay settled instead of getting re-litigated by every fresh session. This also gives you, the human, a highlight reel to review — and it gives agents a route to you: an *escalation* is what no agent may decide, and an open one heads that reel until you acknowledge it.
 
 **Machine-checkable specs** tie documentation to the code with oracles that re-grade it every build—when the docs rot, the build says so. An agent orients in seconds instead of spelunking.
 
@@ -1601,7 +1601,9 @@ own instead of falling back to a derived one. The canonical startup instruction 
 gyroscope executable without pretending it grants authority: every agent sees `orient`
 and the fleet-wide `work inspect`; explicitly authorized coordinators are pointed to work
 creation and handoff; and an exactly owned order receives only lifecycle commands valid
-for its standing state. Those commands carry the host session and current predecessor,
+for its standing state — `close cancelled` among them, printed beside finish as the honest
+exit when a criterion cannot be met, so the exit is as visible as completion. Those
+commands carry the host session and current predecessor,
 then require a fresh inspect after mutation so stale startup text refuses instead of
 becoming last-writer-wins. Startup names consequence navigation but does not auto-run the
 full orientation projection or infer causal links. This instruction contract is part of
@@ -1676,6 +1678,11 @@ coherence decide "species gas physics as its own commit" \
 
 coherence blocked "measure the converged CO2" --because "sub-cycling is unbuilt" --session s-abc
 coherence retract d-dfa936a6 --because "the sweep RAN: 5/8 on a re-roll" --session s-abc
+
+# ...and the route to a HUMAN: what no agent may decide. Open until a person acknowledges it.
+coherence escalate "deploy needs the production signing key" \
+  --because "only the maintainer holds it; no agent may mint or request one" --session s-abc
+coherence acknowledge d-3835192f --because "rotated it by hand; agents may proceed" --session s-danilo
 
 coherence conjecture "139,460 habitat violations across 84 cells" \
   --could-be "the sim really is that broken" \
@@ -1769,8 +1776,10 @@ consequence references.
 ### `coherence orient` — one heading, not another dashboard
 
 `orient` composes the strict ledgers without collapsing their epistemic boundaries. Its
-priority is fixed: damaged evidence or an invalid work graph refuses first; decision or
-write-scope conflict follows; then dangling navigation and live work blockers. An
+priority is fixed: damaged evidence or an invalid work graph refuses first; an open
+escalation — a human must see this before anyone proceeds — comes next, above every
+actionable heading, and gates nothing mechanically; decision or write-scope conflict
+follows; then dangling navigation and live work blockers. An
 unsynthesized child result comes next only when every direct child of that parent is terminal,
 making parent closure executable. Otherwise ready, active, or blocked sibling work keeps its
 own heading while the pending result remains visible. Ready work, active work, missing
@@ -1780,6 +1789,62 @@ verification, stale/failing verification, and finally steady state complete the 
 The heading does not authorize work and does not prove correctness. It is a gyroscope:
 one stable direction from the evidence agents deliberately left behind, with the
 instrument's limits printed beside it.
+
+### `coherence escalate` — a human must see this before anyone proceeds
+
+`blocked` records what an agent could not do, and it is read by whoever opens the journal
+next. An escalation records what **no agent may decide** — a human decision, a secret, a
+policy question, an infeasible or harmful order — and it is placed where a person sees it
+first.
+
+Why a verb, when `blocked` exists: METR's 2026-08-26 field study found 3 to 6 of ~1300
+agents that *considered* alerting a human, and zero that did — citing "no route" and "not
+my task" — and escalated to the peer board instead. Counted before building, this repo's
+own committed journal showed the same shape at smaller scale: of 28 `blocked` rows, four
+were a human's to settle (a maintainer's one-time password, a choice between two `main`
+lineages, authorization for independent reviewers, a CI pin policy), and every one was
+parked under "Could not" — the last section of the render — and routed to whoever read
+the journal next. The route must exist and be cheap at the moment of the work:
+
+```sh
+coherence escalate "deploy needs the production signing key" \
+  --because "only the maintainer holds it; no agent may mint or request one" \
+  --session "$CODEX_THREAD_ID" --agent worker
+```
+
+**What it means, exactly.** An escalation is agent-to-human, not agent-to-record. It is
+a *claim* that a human must decide, and it **gates nothing mechanically**: it fails no
+build, refuses no work transition, and `regulate` never reads it. What the harness does
+with the claim is put it where a human will see it first — the top of `coherence
+decisions` (its own section, above the open questions), the head of the `coherence
+journal --once` snapshot and the stream masthead, the SubagentStop report, and the
+`AWAIT-HUMAN` heading in `coherence orient`, which sits directly below refuse and above
+every actionable heading, conflicts included, because resolving a conflict is proceeding.
+`orient` still exits 0 on it.
+
+**It stays open until a human acknowledges it**, and the acknowledgement is itself a
+record — what the person decided — so the route out is as durable as the route in:
+
+```sh
+coherence acknowledge d-3835192f --because "rotated it by hand; agents may proceed" --session s-danilo
+```
+
+`acknowledge` is deliberately neither `resolved` nor `dismiss`, whose meanings are
+settled (an answer; a question nobody will answer); it points only at an escalation, and
+the strict reader refuses one that points anywhere else. Retracting an acknowledgement
+reopens the escalation.
+
+**A hollow escalation is refused at the write** and leaves no row: an empty `--because`,
+or a `--because` that only restates the `what`, carries no human decision, secret or
+policy question by construction. "Restates" is measured as content words added after
+function words are dropped and inflections folded — `--because "the prod key is needed
+to deploy"` against `"deploy needs the prod key"` adds nothing and is refused. A rule
+keyed on vocabulary ("secret", "policy") was rejected: the four real subjects above share
+no words, and such a rule admits any row that pastes the word "policy".
+
+Every agent is taught the verb at startup beside `blocked`, with the one distinction
+that matters: `blocked` is what *you* could not do; `escalate` is what no agent may
+decide.
 
 ### `coherence experiment` — freeze a planned inference loop, then close it with evidence
 
@@ -2655,7 +2720,7 @@ both is exactly what drifted.
      edit by hand — add the command to the registry and re-run. Everything OUTSIDE these
      markers is authored prose. -->
 
-_49 commands. This index is derived from the registry the dispatch is checked
+_51 commands. This index is derived from the registry the dispatch is checked
 against (`test/commands.test.ts` enumerates the live `cmd === …` chain and asserts the two
 sets are equal), so it cannot fall behind the CLI. The reasoning for the commands that have
 any is in **In detail** below — that half is authored, and does not cover all of them._
@@ -2690,6 +2755,8 @@ any is in **In detail** below — that half is authored, and does not cover all 
 
 - `coherence decide "<chose>" [--over "<alt>" ...] --because "<why>" [--work W] [--subject S] [--authority A] [--scope-component C] [--scope-file p] [--scope-symbol S] [--environment E] [--session S]` — log one choice, any rejected alternatives, and optional swarm-addressable authority
 - `coherence blocked "<what>" --because "<why>"` — log what you could NOT do — first-class, not a footnote
+- `coherence escalate "<what a human must see>" --because "<why a human, not a peer>" [--file p] [--session S] [--agent A]` — a human must see this before anyone proceeds — heads every read until a person acknowledges it; gates nothing mechanically
+- `coherence acknowledge <id> --because "<what the human decided>" [--session S]` — a human's record of having seen an escalation and what they decided — the only thing that clears one
 - `coherence defect "<what failed>" --evidence "<what proves it>" [--file p] [--session S] [--agent A] [--job J]` — record an agent-assessed defect with the evidence that made it a defect
 - `coherence defects [--session S] [--json]` — read the merged append-only defect record across agent sessions
 - `coherence conjecture "<observation>" [--could-be "<explanation>"] --discriminated-by "<the test>"` — log what surprised you; `the instrument is wrong` is added if you omit it
@@ -3058,7 +3125,7 @@ any is in **In detail** below — that half is authored, and does not cover all 
   the fix is to derive one spelling from the other (best), or to declare the `parity` claim
   that was missing. `--raise` opens the pairs above the **default** floor as conjectures —
   never the tail `--all` exposes, which is there to be judged, not recorded.
-- **The decision journal**, all eight verbs — the section "The decision journal" above has
+- **The decision journal**, all ten verbs — the section "The decision journal" above has
   the reasoning behind each. Every one of these appends to
   `.coherence/decisions/<session>.jsonl`, and **none of them gates anything**:
   - `coherence decide "<chose>" --over "<rejected>" --because "<why>"` — a choice made.
@@ -3067,6 +3134,13 @@ any is in **In detail** below — that half is authored, and does not cover all 
     most expensive inference in the repo — the search that no longer has to be run.
   - `coherence blocked "<what>" --because "<why>"` — what could NOT be determined.
     First-class, not a footnote; it is the section that gets dropped under length pressure.
+  - `coherence escalate "<what a human must see>" --because "<why a human, not a peer>"` —
+    what NO AGENT may decide: a human decision, a secret, a policy question, an infeasible or
+    harmful order. Heads every human-facing read and the `orient` heading until a person
+    acknowledges it; gates nothing mechanically. Hollow input is refused at the write.
+  - `coherence acknowledge <id> --because "<what the human decided>"` — the human's half, and
+    the only thing that clears an escalation. A record, not a click: the because carries the
+    decision. Neither `resolved` nor `dismiss`, whose meanings are settled.
   - `coherence conjecture "<observation>" --could-be "<explanation>" --discriminated-by "<test>"`
     — a suspicion. `[instrument] the instrument is wrong` is injected as a candidate
     whether or not you supply it.

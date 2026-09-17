@@ -121,6 +121,7 @@ export function tailJournal(cfg: Config, state: TailState): { fresh: DecisionRec
 export const KIND_GLYPH: Record<DecisionKind, string> = {
   session: "▷", decision: "●", blocked: "✗", conjecture: "?",
   resolution: "✓", dismissal: "∅", retraction: "↩",
+  escalation: "!", acknowledgement: "☑",
 };
 
 /** The whole record on ONE line: when, what kind, who, what — and the full `because`,
@@ -132,7 +133,9 @@ export function formatEntryLine(r: DecisionRecord): string {
   const lp = localParts(r.at);
   const t = lp ? `${lp.y}-${lp.md} ${lp.hms}` : r.at;
   const g = KIND_GLYPH[r.kind] ?? "•";
-  const who = `${r.agent} · ${r.session}`;
+  // An escalation carries its own id inline: the person reading this line is the one who
+  // has to type `acknowledge <id>`, and a feed that makes them hunt for it has failed.
+  const who = r.kind === "escalation" ? `${r.agent} · ${r.session} · ${r.id}` : `${r.agent} · ${r.session}`;
   const arrow = r.supersedes ? ` ⇒ ${r.supersedes}` : "";
   const why = r.because && r.kind !== "session" ? ` — ${r.because}` : "";
   return `${t}  ${g} ${r.kind.padEnd(10)} [${who}]${arrow}  ${r.chose}${why}`;
@@ -196,6 +199,9 @@ export function entryDetail(r: DecisionRecord, width: number): string[] {
     for (const c of r.couldBe ?? []) body.push(["could be", c]);
     body.push(["discriminated by", r.discriminatedBy ?? ""]);
     if (r.because) body.push(["because", r.because]);
+  } else if (r.kind === "escalation") {
+    // No `over`: an escalation rejects nothing, it hands the choice to a person.
+    body.push(["why a human", r.because]);
   } else if (r.kind !== "session") {
     // Same rule as the settled render: `over` prints even when empty, and says so —
     // forced and unexamined are different claims, and the reader should see which.
@@ -302,6 +308,8 @@ function glyph(kind: DecisionKind, S: Sty): string {
   switch (kind) {
     case "decision": return S.cyn(g);
     case "blocked": return S.red(g);
+    case "escalation": return S.bold(S.red(g));
+    case "acknowledgement": return S.grn(g);
     case "conjecture": return S.mag(g);
     case "resolution": return S.grn(g);
     case "retraction": return S.yel(g);
@@ -396,11 +404,14 @@ export function renderStreamFrame(
   const rows = Math.max(12, size.rows);
   const sessions = deriveSessions(m.records);
   const disp = displayRecords(m, ui);
-  const open = resolveJournal(m.records).open.length;
+  const settled = resolveJournal(m.records);
+  const open = settled.open.length;
+  const escalated = settled.escalations.length;
 
   const follow = ui.follow ? S.grn("following ▶") : S.yel("paused ⏸ (G resumes)");
   const l1 = ` ${S.bold("journal — the live stream")}  ${m.records.length} entr${m.records.length === 1 ? "y" : "ies"}`
     + ` · ${sessions.length} stream(s)`
+    + (escalated ? ` · ${S.bold(S.red(`${escalated} ESCALATION(S) awaiting a human`))}` : "")
     + (open ? ` · ${S.mag(`${open} OPEN conjecture(s)`)}` : "")
     + (m.unreadable ? ` · ${S.red(`${m.unreadable} unreadable line(s)`)}` : "")
     + `  ${S.dim("|")}  ${follow}`;
@@ -500,6 +511,14 @@ function snapshotLines(m: StreamModel, scope: JournalScope): string[] {
   const L = [`journal — ${m.records.length} entr${m.records.length === 1 ? "y" : "ies"} across ${sessions.length} stream(s)`
     + (filters ? ` (${filters})` : "")
     + (m.unreadable ? `  WARNING: ${m.unreadable} unreadable line(s) — skipped, not repaired` : ""), ""];
+  // OPEN ESCALATIONS HEAD THE SNAPSHOT, before the chronology. This is the read a human
+  // gets from a pipe or `--once`; a row that only a person can settle must not sit at
+  // whatever line its timestamp happened to land on.
+  const escalated = resolveJournal(m.records).escalations;
+  if (escalated.length) {
+    L.push(`ESCALATED — a human must see ${escalated.length === 1 ? "this" : "these"} before anyone proceeds (${escalated.length}):`);
+    L.push(...escalated.map(formatEntryLine), "");
+  }
   L.push(...m.records.map(formatEntryLine));
   if (!m.records.length) L.push("(nothing logged)");
   return L;

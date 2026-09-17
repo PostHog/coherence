@@ -21,6 +21,7 @@ Work orders remain inert records rather than an execution engine. Orientation an
 - verification currency follows material repository state without invalidating its own receipt
 - orientation selects synthesis only when parent closure can execute it
 - orientation derives live blockage only from closeable work state
+- an open escalation outranks every actionable heading until a human acknowledges it
 - completed work remains unverified until an explicit verification edge names it
 
 ## refutations
@@ -55,6 +56,7 @@ Work orders remain inert records rather than an execution engine. Orientation an
 - boundary "verification currency follows material repository state without invalidating its own receipt" at verifyOrientation via guard "verification currency ignores its own receipt but rejects tracked source and index changes"
 - boundary "orientation selects synthesis only when parent closure can execute it" at observeOrientation via guard "orientation dispatches a ready sibling before asking for parent synthesis"
 - boundary "orientation derives live blockage only from closeable work state" at observeOrientation via guard "orientation treats journal blockage as history, not a live work state"
+- boundary "an open escalation outranks every actionable heading until a human acknowledges it" at observeOrientation via guard "orientation — an open escalation outranks ready work until a human acknowledges it"
 - boundary "completed work remains unverified until an explicit verification edge names it" at observeRegulation via guard "regulate — completed work requires an explicit verification link before release"
 
 ## why
@@ -118,8 +120,9 @@ evidence contract, not merely to filesystem hygiene.
 **orientation refuses damaged evidence before selecting a swarm heading.** The gyroscope
 is a projection over independent instruments, not a new source of truth. It reads each
 strictly, preserves source availability and denominators, and selects one deterministic
-heading: refuse, resolve a collision, repair navigation, unblock, synthesize, dispatch,
-continue, verify, or steady. A damaged source outranks every actionable-looking empty list.
+heading: refuse, await a human, resolve a collision, repair navigation, unblock, synthesize,
+dispatch, continue, verify, or steady. A damaged source outranks every actionable-looking
+empty list.
 
 **orientation admits verification state only with valid shape and comparable provenance.**
 The status file is persisted JSON, not a TypeScript value at runtime. Orientation validates
@@ -140,6 +143,14 @@ is historical testimony and has no event that later marks it complete. Treating 
 as the live scheduler makes the heading demand an action the record cannot ever discharge.
 The work lifecycle owns current blocked state; journal incidents remain visible context
 without acquiring scheduler semantics.
+
+**an open escalation outranks every actionable heading until a human acknowledges it.** An
+escalation is a recorded claim that a person must see something before anyone proceeds, and
+resolving a conflict, repairing a link or dispatching ready work is proceeding. Only
+unreadable evidence outranks it, because a heading over damaged sources cannot be trusted.
+The heading gates nothing mechanically: `orient` exits zero on it, `regulate` never reads
+it, and the work lifecycle refuses nothing because of it. It clears only when a human
+appends an acknowledgement, which is itself durable evidence of what was decided.
 
 **completed work remains unverified until an explicit verification edge names it.** A
 passing command nearby in time cannot establish which work it assessed. V2 regulation

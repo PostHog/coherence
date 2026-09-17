@@ -17,6 +17,7 @@ Installation, inspection and observed activation are distinct facts. Host-specif
 - current-session activation requires exact installed-bundle evidence
 - customized hook text composes declared overrides and appends, degrading to canon on damage
 - activity evidence is accepted only when identity, scope, time, and command agree
+- session startup teaches the route to a human and lists the honest cancelled exit
 
 ## refutations
 
@@ -41,6 +42,8 @@ Installation, inspection and observed activation are distinct facts. Host-specif
 - boundary "current-session activation requires exact installed-bundle evidence" at currentObservation via guard "hook status — exact current bundle activates; stale, direct, replayed, and damaged evidence does not"
 - boundary "customized hook text composes declared overrides and appends, degrading to canon on damage" at composeHookText via guard "hook text — override replaces, append follows, and damage degrades to the canonical emission"
 - boundary "activity evidence is accepted only when identity, scope, time, and command agree" at isActivityRow via guard "activity — internally inconsistent scope, time, and command rows are damage, not evidence"
+- boundary "session startup teaches the route to a human and lists the honest cancelled exit" at agentInstructions via guard "hook text — startup teaches escalate beside blocked and the owner menu lists the cancelled exit"
+- boundary "session startup teaches the route to a human and lists the honest cancelled exit" at assignedWorkInstructions via guard "SessionStart teaches the executable swarm loop and exact owned lifecycle"
 
 ## relies on
 
@@ -121,6 +124,15 @@ agent attribution names the row session, parent fallback names its parent domain
 identity recomputes, time is canonical, and command kind/result agrees with name and exit
 code. One strict reader grades that whole relation; malformed rows become counted damage,
 never partially trusted evidence.
+
+**session startup teaches the route to a human and lists the honest cancelled exit.** METR
+(2026-08-26) measured the incentive gradient this text must not reproduce: an impossible
+task, no visible exit, and agents that considered alerting a human but did not because no
+route was in front of them. So every agent is taught `escalate` beside `blocked`, with the
+one distinction that matters — what you could not do versus what no agent may decide — and
+an exact owner sees `close cancelled` printed beside finish, block, yield and resume, with
+one line saying when it is the honest exit. Both are protocol changes: the hook body's
+meaning moved, so its version moved with it.
 
 **customized hook text composes declared overrides and appends, degrading to canon on
 damage.** The canonical hook text is the harness's voice — identical across adopting
