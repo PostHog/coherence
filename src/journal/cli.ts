@@ -12,13 +12,14 @@
  *   node src/cli.ts unable "<what you could not do>" --because "<the wall>"
  *   node src/cli.ts escalate "<what a human must see>" --because "<why a human>"
  *   node src/cli.ts acknowledge <id> --because "<what the human decided>"
- *   node src/cli.ts journal [--session <id>] [--agent <name>] [--kind <kind>] [--json]
+ *   node src/cli.ts journal [--session <id>] [--agent <name>] [--kind <kind>] [--since <cursorOrIso>] [--json]
  *   node src/cli.ts journal --subjects [--since <cursorOrIso>]
+ *   node src/cli.ts work create | move | close | owner | inspect   (see WORK_USAGE)
  *
- * Every writing verb takes --session and --agent (required) and --work <id>
- * (optional; binds the record to a work order, unset by default). The commands
- * take an `Io` so tests can run them in a temporary directory with a fixed
- * clock and capture what they print.
+ * Every writing verb takes --session and --agent (required). A write binds
+ * to the one active work order its session owns; --work <id> names another.
+ * The commands take an `Io` so tests can run them in a temporary directory
+ * with a fixed clock and capture what they print.
  */
 
 import { JournalError, parseFlags } from "./args.ts";
@@ -39,6 +40,7 @@ import {
   type Context,
   type Written,
 } from "./verbs.ts";
+import { WORK_USAGE, work } from "./workVerbs.ts";
 
 export interface Io {
   cwd: string;
@@ -93,22 +95,27 @@ const read: Command = guarded((argv, io) => {
   if (agent !== undefined) filters.agent = agent;
   if (kind !== undefined) filters.kind = parseKind(kind);
   const loaded = loadJournal(io.cwd);
-  const since = parsed.one.get("since");
+  const sinceText = parsed.one.get("since");
+  const since = sinceText === undefined ? null : parseCursor(sinceText);
   let lines: string[];
   if (parsed.switches.has("subjects")) {
-    lines = renderSubjects(loaded, since === undefined ? null : parseCursor(since), filters);
+    lines = renderSubjects(loaded, since, filters);
   } else if (parsed.switches.has("json")) {
-    if (since !== undefined) throw new JournalError("--since goes with --subjects");
+    if (since !== null) throw new JournalError("--since goes with the timeline or --subjects, not --json");
     lines = [renderJson(loaded, filters, gitBranch(io.cwd))];
   } else {
-    if (since !== undefined) throw new JournalError("--since goes with --subjects");
-    lines = renderTimeline(loaded, filters);
+    lines = renderTimeline(loaded, filters, since);
   }
   for (const line of lines) io.out(line);
   for (const line of renderDamaged(loaded.damaged)) io.err(line);
 });
 
+const workCommand: Command = guarded((argv, io) => {
+  for (const line of work(argv, context(io)).lines) io.out(line);
+});
+
 export const journalVerbs: Record<string, Command> = {
+  work: workCommand,
   decide: writing(decide),
   retract: writing(retract),
   conjecture: writing(conjecture),
@@ -123,7 +130,8 @@ export const journalVerbs: Record<string, Command> = {
 };
 
 export const JOURNAL_USAGE = [
-  "journal verbs (each needs --session <id> --agent <name>; --work <id> binds a work order):",
+  WORK_USAGE,
+  "journal verbs (each needs --session <id> --agent <name>; a write binds to the one active order its session owns, or to --work <id>):",
   '  decide "<chose>" [--over "<rejected>"]... --because "<why>"',
   '  retract <id> --because "<what refuted it>"',
   '  conjecture "<observation>" [--could-be "<candidate>"]... --discriminated-by "<test>"',
@@ -135,6 +143,6 @@ export const JOURNAL_USAGE = [
   '  unable "<what you could not do>" --because "<the wall>"',
   '  escalate "<what a human must see>" --because "<why a human>"',
   '  acknowledge <id> --because "<what the human decided>"',
-  `  journal [--session <id>] [--agent <name>] [--kind <${KIND_NAMES.join("|")}>] [--json]`,
+  `  journal [--session <id>] [--agent <name>] [--kind <${KIND_NAMES.join("|")}>] [--since <cursorOrIso>] [--json]`,
   "  journal --subjects [--since <cursorOrIso>]",
 ].join("\n");

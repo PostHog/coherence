@@ -137,9 +137,9 @@ function escalationHeading(records: readonly JournalRecord[], status: Map<string
   ];
 }
 
-export function renderTimeline(loaded: Loaded, filters: Filters): string[] {
+export function renderTimeline(loaded: Loaded, filters: Filters, since: Cursor | null = null): string[] {
   const status = statuses(loaded.records);
-  const shown = applyFilters(loaded.records, filters);
+  const shown = applyFilters(loaded.records, filters).filter((record) => since === null || after(record, since));
   const body = shown.length === 0 ? ["nothing recorded"] : shown.flatMap((record) => renderRecord(record, status.get(record.id)));
   return [...escalationHeading(loaded.records, status), ...body];
 }
@@ -195,8 +195,29 @@ export function truncateSubject(text: string): string {
   return flat.length <= SUBJECT_WIDTH ? flat : `${flat.slice(0, SUBJECT_WIDTH - 1)}…`;
 }
 
+/**
+ * The one line that stands for a record in the subjects feed: glyph, id,
+ * agent, the truncated subject; an escalation is marked, since it is the one
+ * record that exists for a human.
+ */
+export function subjectLine(record: JournalRecord): string {
+  const mark = record.kind === "escalation" ? "  [escalation: a human must answer]" : "";
+  return `${GLYPH[record.kind]} ${record.id} ${record.agent}: ${truncateSubject(subjectOf(record))}${mark}`;
+}
+
+/** The records after a cursor that pass the filters, oldest first. */
+export function recordsAfter(loaded: Loaded, since: Cursor | null, filters: Filters): JournalRecord[] {
+  return applyFilters(loaded.records, filters).filter((record) => since === null || after(record, since));
+}
+
+/** The cursor that stands for the last of these records, or the one given when there are none. */
+export function cursorAfter(records: readonly JournalRecord[], since: Cursor | null): Cursor | null {
+  const last = records.at(-1);
+  return last === undefined ? since : { at: last.at, id: last.id };
+}
+
 export function renderSubjects(loaded: Loaded, since: Cursor | null, filters: Filters): string[] {
-  const fresh = applyFilters(loaded.records, filters).filter((record) => since === null || after(record, since));
+  const fresh = recordsAfter(loaded, since, filters);
   const open = openEscalations(loaded.records);
   const heading =
     open.length === 0
@@ -206,11 +227,8 @@ export function renderSubjects(loaded: Loaded, since: Cursor | null, filters: Fi
           ...open.map((record) => `${GLYPH.escalation} ${record.id} ${record.agent}: ${truncateSubject(record.what)}`),
           "",
         ];
-  const lines = fresh.map(
-    (record) => `${GLYPH[record.kind]} ${record.id} ${record.agent}: ${truncateSubject(subjectOf(record))}`,
-  );
-  const last = fresh.at(-1);
-  const next = last === undefined ? since : { at: last.at, id: last.id };
+  const lines = fresh.map(subjectLine);
+  const next = cursorAfter(fresh, since);
   const cursorLine = next === null ? "cursor: (none; nothing recorded)" : `cursor: ${formatCursor(next)}`;
   return [...heading, ...(lines.length === 0 ? ["nothing new"] : lines), cursorLine];
 }
