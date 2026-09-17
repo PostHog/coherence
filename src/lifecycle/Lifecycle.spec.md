@@ -49,7 +49,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   via: orient lists open requirements and regulate reports them; only spec problems refuse a subagent stop
   because: a refusal holds a subagent in its loop, so it is spent only on what the tool can prove is owed: a rejected name in a changed file, a spec that will not parse, a chokepoint that no longer chokes; an open requirement can legitimately outlive a session, and refusing on it would train agents to fabricate enforcement lines
   crossing: harness -> reading
-  refuted: <not witnessed: a staged break that refused on any spec text stayed green, since the test it names checks the problem count and not the exit; recorded as a conjecture in the journal>
+  refuted: widened the refusal to any spec text, so an open requirement refused the subagent stop -> its totality oracle went red at "an open requirement never refuses a subagent stop", exit 2 where 0 was asserted (2026-09-17)
   kinds: none
 - escalation heads the start: An unacknowledged escalation heads the start injection, never shortened; an acknowledged one does not.
   over: every start event, SessionStart and SubagentStart, against every escalation in the journal

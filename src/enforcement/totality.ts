@@ -48,7 +48,7 @@ function shellQuote(value: string): string {
 }
 
 export async function runTotalityOracle(root: string, config: EnforcementConfig, filter: string, timeoutMs = TOTALITY_TIMEOUT_MS): Promise<TotalityResult> {
-  const spec = commandFor(config, filter);
+  const spec = commandFor(config, escapeRegExp(filter));
   if (spec === undefined) {
     return { verdict: "not run", reason: "no test command configured; set test in coherence.config.json (an argv array the filter is appended to, or a string with {filter})", command: undefined, tail: "" };
   }
@@ -105,7 +105,8 @@ interface JsonReport {
   testResults?: { assertionResults?: AssertionResult[] }[];
 }
 
-function escapeRegExp(value: string): string {
+/** A test title as a runner name filter: every regex metacharacter escaped, so a title with parentheses selects itself and nothing else. */
+export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 

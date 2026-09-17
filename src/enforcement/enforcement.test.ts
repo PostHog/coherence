@@ -353,3 +353,11 @@ test("PostToolUse on a file-writing tool re-checks the invariants that may invol
   assert.match(stop.text, /✕ \.\/digest-only egress — structural defect \(chokepoint, run 2026-09-17\): 1 reference to SECRET_COLUMNS outside seal: src\/api\/render\.ts:5 in render\.leaked/);
   assert.match(stop.text, /stands until the reference is routed through the chokepoint or a human acknowledges a retirement/);
 });
+
+test("the one-at-a-time totality path escapes the title before the runner reads it as a regex", async () => {
+  const { escapeRegExp, runTotalityOracle } = await import("./totality.ts");
+  assert.equal(escapeRegExp("returns 503 (R2 absent)"), "returns 503 \\(R2 absent\\)");
+  const config = { test: ["node", "-e", "console.log(process.argv[1])"], testMatch: /^returns 503 \\\(R2 absent\\\)$/m, testJson: undefined } as never;
+  const result = await runTotalityOracle(process.cwd(), config, "returns 503 (R2 absent)");
+  assert.equal(result.verdict, "pass", result.reason);
+});

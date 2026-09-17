@@ -173,6 +173,13 @@ test("orient lists open requirements and regulate reports them; only spec proble
   const mine = specStopText(root, ["Root.spec.md"]);
   assert.match(mine.text, /^○ \.\/secure access — still a requirement; lacks: enforcement, refutation, kinds\n1 requirement open in the project, 1 in specs this session changed/);
   writeFileSync(join(root, "Root.spec.md"), "# Root\n\nA fixture project.\n\n## works when\n- typechecks\n");
-  const broken = specStopText(root);
-  assert.ok(broken.problems > 0, "a retired section is a problem and refuses a subagent stop");
+  const brokenText = specStopText(root);
+  assert.ok(brokenText.problems > 0, "a retired section is a problem and refuses a subagent stop");
+  const { runHook: hook, REFUSE_EXIT: refuseExit } = await import("./hook.ts");
+  const refused = await hook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
+  assert.equal(refused.exit, refuseExit, "a spec problem refuses the subagent stop");
+  writeFileSync(join(root, "Root.spec.md"), "# Root\n\nA fixture project.\n\n## invariants\n- secure access: Only a member with permission reads a secured resource.\n  because: the resource is private to its member.\n");
+  const allowed = await hook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
+  assert.equal(allowed.exit, 0, "an open requirement never refuses a subagent stop");
+  assert.match(allowed.stdout, /1 requirement open in the project/, "the open requirement is still reported");
 });
