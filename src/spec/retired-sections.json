@@ -1,0 +1,33 @@
+{
+  "purpose": "The spec sections the reference implementation used and the rebuild retired (docs/retired.md). The parser refuses each by name and says what replaced it. Kept as data, like the glossary's rejected names, so the refused names appear nowhere in code or prose.",
+  "sections": [
+    {
+      "section": "works when",
+      "replacement": "## invariants: a claim with enforcement becomes one invariant bullet (protects/chokepoint or over/via); exists and imports claims are dropped"
+    },
+    {
+      "section": "why",
+      "replacement": "because: lines on the invariants the prose explains; rationale that restates a mechanism is dropped"
+    },
+    {
+      "section": "zones",
+      "replacement": "## trust levels in the entry spec: one bullet per level, name: meaning"
+    },
+    {
+      "section": "refutations",
+      "replacement": "refuted: <what was broken> -> <what was seen> (YYYY-MM-DD) on the invariant it witnessed"
+    },
+    {
+      "section": "addresses",
+      "replacement": "nothing: reliance is computed from references, never declared"
+    },
+    {
+      "section": "relies on",
+      "replacement": "nothing: reliance is computed from references, never declared"
+    },
+    {
+      "section": "architecture",
+      "replacement": "the one-line intent, and because: lines on the invariants that carry the design"
+    }
+  ]
+}
