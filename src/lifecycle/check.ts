@@ -64,7 +64,7 @@ const EXCLUDED_FOLDERS = new Set(["node_modules", "public", ".coherence", ".git"
 
 /** Identifiers the language itself owns; a rejected name that is also one of these is not a finding in code. */
 const LANGUAGE_GLOBALS = new Set([
-  "Promise", "Object", "Array", "Map", "Set", "WeakMap", "WeakSet", "Symbol", "Proxy", "Reflect",
+  "Promise", "HTMLElement", "HTMLAnchorElement", "HTMLInputElement", "HTMLDetailsElement", "Element", "Document", "Event", "Node", "Object", "Array", "Map", "Set", "WeakMap", "WeakSet", "Symbol", "Proxy", "Reflect",
   "Error", "Date", "JSON", "Math", "Intl", "Atomics", "Buffer", "URL", "Request", "Response", "Blob", "Event",
 ]);
 
@@ -98,9 +98,10 @@ async function walk(dir: string, out: string[]): Promise<void> {
   }
 }
 
-/** Every file the check reads, excluding the glossary files and docs/retired.md. */
+/** Every file the check reads, excluding the glossary files, docs/retired.md, and docs/reference/ (written in the reference vocabulary). */
 export async function collectFiles(options: CheckOptions): Promise<string[]> {
   const excluded = new Set<string>([resolve(options.coherence.path), resolve(options.root, "docs", "retired.md")]);
+  const referenceDocs = resolve(options.root, "docs", "reference");
   if (options.project !== undefined) excluded.add(resolve(options.project.path));
   const found: string[] = [];
   const roots = options.paths === undefined || options.paths.length === 0 ? [options.root] : options.paths;
@@ -117,6 +118,7 @@ export async function collectFiles(options: CheckOptions): Promise<string[]> {
   }
   return [...new Set(found)].filter((p) => {
     if (excluded.has(p)) return false;
+    if (p === referenceDocs || p.startsWith(referenceDocs + sep)) return false;
     const folders = dirname(relative(options.root, p)).split(sep);
     return !folders.some((part) => EXCLUDED_FOLDERS.has(part));
   });

@@ -239,12 +239,7 @@
         "enforcement",
         "totality oracle"
       ],
-      "rejected": [
-        {
-          "alternative": "grade",
-          "because": "a former name for this concept in the reference implementation; refused so it cannot return as a second spelling"
-        }
-      ],
+      "rejected": [],
       "detail": {
         "ladder": [
           {
@@ -417,10 +412,6 @@
         },
         {
           "alternative": "import edge",
-          "because": "a former name for this concept in the reference implementation; refused so it cannot return as a second spelling"
-        },
-        {
-          "alternative": "imports",
           "because": "a former name for this concept in the reference implementation; refused so it cannot return as a second spelling"
         }
       ],
@@ -721,10 +712,6 @@
         {
           "alternative": "status record",
           "because": "a former name for this concept in the reference implementation; refused so it cannot return as a second spelling"
-        },
-        {
-          "alternative": "verify",
-          "because": "a former name for this concept in the reference implementation; refused so it cannot return as a second spelling"
         }
       ],
       "related": [
@@ -764,10 +751,6 @@
         },
         {
           "alternative": "graph",
-          "because": "a former name for this concept in the reference implementation; refused so it cannot return as a second spelling"
-        },
-        {
-          "alternative": "index",
           "because": "a former name for this concept in the reference implementation; refused so it cannot return as a second spelling"
         },
         {
@@ -1004,10 +987,6 @@
         {
           "alternative": "job as a carried field",
           "because": "git already knows the branch"
-        },
-        {
-          "alternative": "job",
-          "because": "a former name for this concept in the reference implementation; refused so it cannot return as a second spelling"
         }
       ],
       "related": [
@@ -1072,10 +1051,6 @@
         {
           "alternative": "manual outcome labeling",
           "because": "never happened; the loop that makes economy an instrument must close on its own"
-        },
-        {
-          "alternative": "activity",
-          "because": "a former name for this concept in the reference implementation; refused so it cannot return as a second spelling"
         }
       ],
       "related": [
@@ -1119,6 +1094,24 @@
       "provenance": {
         "owner_words": "glossary.json. Injected into context same as AGENTS.md. no run can miss it. glossary must be anti-rot, anti-fragile.",
         "defined_by": "owner, 2026-09-17"
+      }
+    },
+    {
+      "name": "platform",
+      "definition": "The only supported platform is Apple Silicon, the M-series Macs. Metal is its GPU interface. This is what makes a local embedding service practical with no API key and no network.",
+      "status": "settled",
+      "aliases": [
+        "apple silicon",
+        "m-series",
+        "metal"
+      ],
+      "related": [
+        "glossary",
+        "language adapter"
+      ],
+      "provenance": {
+        "defined_by": "owner, 2026-09-17",
+        "owner_words": "supporting M-series processors only means we can easily run the embeddings service locally"
       }
     }
   ],

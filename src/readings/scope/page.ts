@@ -60,7 +60,7 @@ function boot(): void {
     }
 
     // A related link must land on its card even when the query has hidden it:
-    // clear the query and render before the browser follows the anchor.
+    // clear the query and render before the browser follows the link.
     const link = target.closest<HTMLAnchorElement>("a.related-link");
     if (link !== null && state.glossary.query !== "") {
       state.glossary.query = "";
