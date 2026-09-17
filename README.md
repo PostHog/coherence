@@ -23,7 +23,9 @@ regulate. Mnemion is the first adopter.
 ## Settled before code
 
 - Runtime and language are preserved from the reference: TypeScript on Node.
+- Supported platform is Apple Silicon (M-series) only. That makes a local embedding
+  service practical with no API key and no network.
 - The drift check matches exact strings first. A similarity seam stays open for a
-  later embedding pass (alias suggestion, overload detection); similarity improves
-  the question, never decides it.
+  local embedding pass (alias suggestion, overload detection); similarity improves
+  the question, never decides it. Backend options are under survey.
 - Mnemion is the first adopter; its domain glossary lives in its own repository.
