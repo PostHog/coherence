@@ -22,6 +22,20 @@ Guiding artifacts kept from the reference:
 First slice: the glossary, the hook that injects it, and the drift check at
 regulate. Mnemion is the first adopter.
 
+```sh
+node src/cli.ts glossary                  # the compact form the hook injects; token estimate on stderr
+node src/cli.ts glossary --check [paths]  # rejected names and unknown nouns; exit 1 with findings
+node src/cli.ts hook <event>              # answer one harness event (event JSON on stdin)
+node src/cli.ts hooks install --host claude|codex
+node src/cli.ts hooks status
+npm test
+```
+
+A project names its own glossary under `glossary` in `coherence.config.json`
+(default: `glossary.json` at the root). SessionStart and SubagentStart inject
+both layers with a short instruction; Stop reports the check over changed files;
+SubagentStop refuses the stop (exit 2, reason on stderr) while findings remain.
+
 ## Settled before code
 
 - Runtime and language are preserved from the reference: TypeScript on Node.
