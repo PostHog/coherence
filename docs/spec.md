@@ -76,6 +76,19 @@ still chokes, and so whether the invariant has become a structural defect, is
 the language server's verdict and arrives in slice three. A missing `because`
 is reported as a lack but does not change the state.
 
+## Coherence's own spec
+
+Coherence carries its own spec in this grammar. `Coherence.spec.md` at the root
+is the entry spec: it declares the five trust levels (project-source, harness,
+record, reading, instrument) and the project-wide invariants. One component
+spec sits in each real unit under `src/`: journal, lifecycle, spec, scaffold,
+enforcement, adapters, and readings/scope. Every bullet is a rule the tests
+already settle: its totality oracle is a real test title, and where the
+structure holds, its chokepoint names a real protected symbol and the one site
+that reaches it, so `run` grades it and refutes it. `npm test` runs the
+typecheck, the tests, the vocabulary check, and `spec --check`, so the tree
+cannot go green with a spec problem.
+
 ## The checklist rule
 
 `kinds` names what the requirement protects (read, credential, storage,

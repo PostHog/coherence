@@ -74,7 +74,9 @@ The totality oracle pass runs every test the bullets name in one invocation of t
 config's `testJson` command (a combined name pattern, a per-test JSON
 report) and maps results back by name; the record says so. One test per
 invocation of `test` is the fallback when a runner cannot report per test.
-Not configured is reported, never assumed passing.
+Not configured is reported, never assumed passing. node:test ships no JSON
+reporter, so `src/enforcement/node-test-reporter.ts` writes the jest-shaped
+report from its events; Coherence's own config names it.
 
 ## Revelation at the edit
 

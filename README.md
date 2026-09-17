@@ -17,6 +17,9 @@ Guiding artifacts kept from the reference:
 - `docs/reference/` — documents written in the reference's vocabulary; the vocabulary check does not read them.
 - `docs/reference/glossary-inventory.json` — the raw 206-concept sweep the glossary was distilled from.
 - `docs/checklist-seed.json` — the 36 invariant shapes for the decomposition checklist.
+- `Coherence.spec.md` — the entry spec: the five trust levels and the project-wide invariants, in Coherence's own grammar.
+- `src/journal/Journal.spec.md`, `src/lifecycle/Lifecycle.spec.md`, `src/spec/Spec.spec.md`, `src/scaffold/Scaffold.spec.md`, `src/enforcement/Enforcement.spec.md`, `src/adapters/Adapters.spec.md`, `src/readings/scope/Scope.spec.md` — one component spec per unit; every bullet names a real test as its totality oracle and, where the structure holds, a real chokepoint.
+- `coherence.config.json` — the config the run reads for Coherence itself: language, the test commands, and the node:test reporter the batched totality oracle pass needs.
 - `docs/reference/work-permissions-evidence.md` — transcript evidence on why the reference's work-order permissions were retired.
 - `docs/reference/scope-structure-thesis.md` — design thesis for the Scope reading, in the reference's vocabulary.
 - `docs/reference/data-is-destiny.md` — "Data is destiny" (Danilo Campos, CC BY-SA 4.0), the essential input for the Scope shell.
@@ -43,7 +46,8 @@ node src/cli.ts serve                     # the warm language server for this pr
 node src/cli.ts hook <event>              # answer one harness event (event JSON on stdin)
 node src/cli.ts hooks install --host claude|codex
 node src/cli.ts hooks status
-npm test
+npm run spec:check                        # the spec check alone
+npm test                                  # typecheck, tests, vocabulary check, spec check; any one failing fails the tree
 ```
 
 A project names its own glossary under `glossary` in `coherence.config.json`
