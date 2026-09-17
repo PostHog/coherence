@@ -153,6 +153,12 @@ export function agentInstructions(session: string, cli = "npx coherence", agent?
     `  ${cli} blocked "<what you could not do>" --because "<why>" ${scope}`,
     `  ${cli} retract <id> --because "<what refuted it>" ${scope}`,
     "",
+    "WHEN A HUMAN MUST DECIDE, ESCALATE — never to a peer, never parked in blocked:",
+    `  ${cli} escalate "<what a human must see>" --because "<why a human, not a peer>" ${scope}`,
+    "A human decision, a secret, a policy question, an infeasible or harmful order. `blocked` is",
+    "what YOU could not do; this is what no agent may decide. It gates nothing mechanically and",
+    "heads the journal and `orient` until a person runs `acknowledge <id> --because \"<decided>\"`.",
+    "",
     "This gates nothing. It cannot fail your build and it is not a checklist — log the",
     "handful of choices a reader who never saw your transcript would need, not every step.",
     "A job that logs three real decisions is worth more than one that logs thirty steps.",
@@ -207,6 +213,14 @@ export async function assignedWorkInstructions(
         && !item.conflictsWith.length) {
         lifecycle.push(mutate("resume", `work transition ${JSON.stringify(item.work)} active --because "BLOCKER_CLEARED"`));
       }
+      // THE HONEST EXIT IS IN THE MENU. `closeWork` accepts `cancelled` from every open
+      // state, so it prints beside finish, block, yield and resume rather than only in
+      // `work --help`. METR's incentive gradient — impossible task, no visible exit, cheat —
+      // is reproduced by any menu whose only terminal line is `completed`.
+      lifecycle.push(
+        mutate("cancel", `work close ${JSON.stringify(item.work)} cancelled --because "WHY_THE_CRITERION_CANNOT_BE_MET"`),
+        "    cancel is the honest exit when a criterion cannot be met: never fabricate evidence for finish, never park in blocked to avoid it.",
+      );
       lifecycle.push(mutate("handoff", `work handoff ${JSON.stringify(item.work)} --owner-session "NEXT_EXACT_SESSION" --owner-agent "AGENT" --because "WHY_OWNERSHIP_MOVES"`));
       lines.push(...lifecycle, `    after any lifecycle write: ${cli} work inspect ${JSON.stringify(item.work)}`);
     }
@@ -452,7 +466,7 @@ export function stopReport(cfg: Config, childSession: string | null = null): str
   // EXPENSIVE — the agent still holds the context that noticed it, and is one turn from
   // losing it. Repo-wide, and phrased as such: attributing another session's open
   // conjecture to this agent would be a lie the journal cannot afford.
-  const { open } = resolve(records);
+  const { open, escalations } = resolve(records);
   // AND THE LAST LINE, WHICH IS NOT ABOUT THE JOURNAL AT ALL. A subagent's caller sees
   // ONE message: the final reply. Everything else — the reasoning, the measurements, the
   // thing it found that contradicted its own brief — is in a transcript the caller is
@@ -463,7 +477,13 @@ export function stopReport(cfg: Config, childSession: string | null = null): str
   const restate = "\n\nYOUR REPLY MUST RESTATE YOUR FINAL REPORT — IT IS THE ONLY THING"
     + " YOUR CALLER SEES. A terse sign-off discards everything you learned that is not"
     + " already in the code.";
-  return msg + damage + restate + (open.length
+  // AN OPEN ESCALATION IS NAMED HERE TOO, because this report is the one line of the
+  // child's work its caller reads, and the caller may be the human who has to see it.
+  const escalated = escalations.length
+    ? `\n\n${escalations.length} ESCALATION(S) AWAITING A HUMAN in this repo — a person must see them before`
+      + ` anyone proceeds; name them in your reply. \`${cli} decisions\` lists them first.`
+    : "";
+  return msg + damage + restate + escalated + (open.length
     ? `\n\n${open.length} OPEN CONJECTURE(S) in this repo — noticed, not yet chased.`
       + ` If your work settled one, close it with \`${cli} resolved <id> --because ...\`;`
       + ` if one is not worth chasing, \`${cli} dismiss <id> --because ...\` retires it.`
@@ -845,7 +865,9 @@ folder; it is the record, not a cache. Read the merged timeline across every ses
 job and branch with \`coherence decisions [--job X] [--agent Y] [--branch B] [--sessions] [--md]\`.
 \`coherence decisions --open\` narrows it to the OPEN CONJECTURES — the standing list of
 things this project noticed and did not chase, which is the entry most likely to decay
-because the agent that saw it is gone.
+because the agent that saw it is gone. \`coherence escalate\` is agent-to-human: an open
+escalation heads \`decisions\`, \`journal\` and \`orient\` until a person acknowledges it,
+and it gates nothing mechanically.
 
 A project may put its own voice into these emissions — \`.coherence/hooks/<Event>.override.md\`
 replaces an event's canonical text, \`<Event>.append.md\` follows it — and \`coherence hooks

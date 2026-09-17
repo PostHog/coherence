@@ -19,6 +19,7 @@ import { gitStamp, readStatus } from "../evidence/status.ts";
 
 export type OrientationAction =
   | "refuse"
+  | "await-human"
   | "resolve-conflict"
   | "repair-navigation"
   | "unblock"
@@ -57,6 +58,9 @@ export interface Orientation {
     /** Historical incident reports; unlike work state, these have no close lifecycle. */
     historicalBlockedReports: number;
     openConjectures: number;
+    /** Escalations no human has acknowledged. A person must see each before anyone
+     * proceeds; the heading says so and gates nothing mechanically. */
+    openEscalations: Array<{ id: string; what: string; agent: string; at: string }>;
     positions: DecisionPosition[];
     contested: string[];
     needsRatification: string[];
@@ -239,6 +243,9 @@ export async function observeOrientation(cfg: Config): Promise<Orientation> {
         standing: resolved.standing.length,
         historicalBlockedReports: resolved.blocked.length,
         openConjectures: resolved.open.length,
+        openEscalations: resolved.escalations.map((record) => ({
+          id: record.id, what: record.chose, agent: record.agent, at: record.at,
+        })),
         positions,
         contested: positions.filter((item) => item.state === "contested").map((item) => item.subject),
         needsRatification: positions.filter((item) => item.state === "needs-ratification").map((item) => item.subject),
@@ -321,6 +328,12 @@ export async function observeOrientation(cfg: Config): Promise<Orientation> {
   } else if ((work?.stats.graphProblems ?? 0) > 0) {
     action = "refuse";
     reasons = [`work graph has ${work!.stats.graphProblems} structural problem(s)`];
+  } else if ((decisions?.openEscalations.length ?? 0) > 0) {
+    // Directly below refuse and above every actionable heading, conflicts included: the
+    // record's meaning is that a person must see this BEFORE ANYONE PROCEEDS, and
+    // resolving a conflict is proceeding. Only unreadable evidence outranks it.
+    action = "await-human";
+    reasons = decisions!.openEscalations.map((item) => `${item.id} awaits a human: ${item.what}`);
   } else if ((decisions?.contested.length ?? 0) > 0 || (decisions?.needsRatification.length ?? 0) > 0
     || (work?.conflicts.length ?? 0) > 0) {
     action = "resolve-conflict";
@@ -364,6 +377,7 @@ export async function observeOrientation(cfg: Config): Promise<Orientation> {
     verification,
     limitations: [
       "orientation selects one heading from recorded evidence; it neither executes work nor proves semantic correctness",
+      "an open escalation gates nothing mechanically; it is a recorded claim that a human must decide before anyone proceeds, and only an acknowledgement clears it",
       "historical journal blocked reports remain visible evidence but only closeable work state selects a live unblock heading",
       "pending child results select synthesis only after that parent's direct children are terminal",
       "legacy verification references remain unchecked; work verification requires intact current work-bound local receipts and explicit assessor links",
@@ -388,8 +402,12 @@ export function renderOrientation(reading: Orientation): string {
   if (reading.decisions) {
     lines.push(
       "",
-      `DECISIONS  ${reading.decisions.standing} standing · ${reading.decisions.openConjectures} open conjecture(s) · ${reading.decisions.historicalBlockedReports} historical blocked report(s)`,
+      `DECISIONS  ${reading.decisions.standing} standing · ${reading.decisions.openConjectures} open conjecture(s) · ${reading.decisions.historicalBlockedReports} historical blocked report(s)`
+        + (reading.decisions.openEscalations.length ? ` · ${reading.decisions.openEscalations.length} ESCALATION(S) AWAITING A HUMAN` : ""),
     );
+    for (const item of reading.decisions.openEscalations) {
+      lines.push(`  ! AWAITING A HUMAN ${visible(item.id)} — ${visible(item.what)} (${visible(item.agent)}, ${visible(item.at)})`);
+    }
     for (const position of reading.decisions.positions) {
       lines.push(`  ${position.state} ${visible(position.subject)} — ${visible(position.reason)}`);
     }

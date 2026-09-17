@@ -36,6 +36,7 @@ import { readSurface, vacuityRefusal, Unrunnable } from "./verification/floor.ts
 import { CLAIM_FORMS, loadDictionary } from "./verification/phrasebook.ts";
 import {
   appendDecision, renderJournal, readJournal, resolvableConjecture, compactJournal,
+  acknowledgeableEscalation, EscalationRefusal,
   type DecisionAuthority, type DecisionScope,
 } from "./evidence/decisions.ts";
 import { runJournal } from "./evidence/journal.ts";
@@ -509,6 +510,75 @@ if (cmd === "guarantees") {
     scope: hasScope ? scopeParts : undefined,
   });
   console.log(`${rec.id}  ${rec.kind}  [${rec.agent} · ${rec.commit ?? "no-commit"}${rec.dirty ? "+dirty" : ""}]`);
+  await exit(0);
+} else if (cmd === "escalate") {
+  // AGENT-TO-HUMAN, NOT AGENT-TO-RECORD. `blocked` records what an agent could not do and
+  // is read by whoever reads the journal next; this records what NO AGENT MAY DECIDE — a
+  // human decision, a secret, a policy question, an infeasible or harmful order — and is
+  // placed where a person sees it first. METR (2026-08-26) measured why the verb has to
+  // exist as a one-liner: 3 to 6 of ~1300 agents considered alerting a human, zero did,
+  // citing "no route" and "not my task", and escalated to the peer board instead. The
+  // route has to exist and be cheap at the moment of the work.
+  //
+  // IT GATES NOTHING MECHANICALLY — see decisions.ts. The one refusal is the hollow
+  // escalation, applied at the write so every path gets it: an empty because, or a because
+  // that only restates the what, spends a person's attention on nothing.
+  const what = positional[0];
+  const because = one("--because");
+  const usage = 'usage: coherence escalate "<what a human must see>" --because "<why a human, not a peer>" [--file p] [--session S] [--agent A] [--job J]';
+  const allowed = new Set(["--because", "--file", "--session", "--agent", "--job"]);
+  const badFlags = argv.filter((arg) => arg.startsWith("--") && !allowed.has(arg));
+  const repeated = repeatedSingletonFlags(argv, ["--because", "--session", "--agent", "--job"]);
+  if (badFlags.length || repeated.length || positional.length !== 1 || !what || because === null) {
+    if (badFlags.length) console.error(`unsupported flag(s) for escalate: ${badFlags.join(", ")}`);
+    else if (repeated.length) console.error(`repeated singleton flag(s): ${repeated.join(", ")}`);
+    console.error(usage);
+    console.error("");
+    console.error("  Not `blocked`. `blocked` is what YOU could not do; this is what NO AGENT may decide —");
+    console.error("  a human decision, a secret, a policy question, an infeasible or harmful order. It gates");
+    console.error("  nothing mechanically: it heads the journal and `orient` until a person acknowledges it with");
+    console.error('  `coherence acknowledge <id> --because "<what they decided>"`.');
+    await exit(2);
+  }
+  try {
+    const rec = appendDecision(cfg, {
+      kind: "escalation", chose: what!, because: because!,
+      agent: one("--agent") ?? undefined, job: one("--job") ?? undefined,
+      session: one("--session") ?? undefined, files: many("--file"),
+    });
+    console.log(`${rec.id}  escalation  [${rec.agent} · ${rec.commit ?? "no-commit"}${rec.dirty ? "+dirty" : ""}]`);
+    console.log("  a human must see this before anyone proceeds. It gates nothing mechanically; it heads");
+    console.log("  `coherence decisions`, `coherence journal` and `coherence orient` until a person runs:");
+    console.log(`  coherence acknowledge ${rec.id} --because "<what you decided>"`);
+    await exit(0);
+  } catch (error) {
+    if (!(error instanceof EscalationRefusal)) throw error;
+    for (const problem of error.problems) console.error(problem);
+    console.error(usage);
+    await exit(2);
+  }
+} else if (cmd === "acknowledge") {
+  // THE HUMAN'S HALF. An acknowledgement is an APPEND that points at the escalation, exactly
+  // as a resolution points at a conjecture — and it is deliberately neither `resolved` nor
+  // `dismiss`, whose meanings are settled. It records WHAT THE HUMAN DECIDED, and it is the
+  // only thing that takes an escalation off the top of the reads.
+  const id = positional[0];
+  const because = one("--because");
+  if (!id || !because) {
+    console.error('usage: coherence acknowledge <id> --because "<what the human decided>" [--session S] [--agent A] [--job J]');
+    console.error("");
+    console.error("  A person's record of having seen an escalation. `--because` carries the decision itself,");
+    console.error("  so the next reader learns what was decided and not merely that someone clicked through.");
+    await exit(2);
+  }
+  const target = acknowledgeableEscalation(readJournal(cfg).records, id!);
+  if ("error" in target) { for (const line of target.error) console.error(line); await exit(2); }
+  const rec = appendDecision(cfg, {
+    kind: "acknowledgement", chose: `(acknowledged: ${id})`, because: because!,
+    supersedes: id!, agent: one("--agent") ?? undefined, job: one("--job") ?? undefined,
+    session: one("--session") ?? undefined,
+  });
+  console.log(`${rec.id}  acknowledges ${id} — a human decided; it no longer heads the journal or orient`);
   await exit(0);
 } else if (cmd === "conjecture") {
   // ABDUCTION AS A FIRST-CLASS ENTRY. `decide` records a choice and `blocked` records an

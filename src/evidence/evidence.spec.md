@@ -19,6 +19,8 @@ Each ledger keeps its own evidence contract. Readers validate surviving records;
 - defect writes refuse pre-existing symlink redirection
 - defect provenance is data, never terminal control
 - a streamed journal entry renders exactly once across appends and compaction
+- an open escalation heads every human-facing journal read until a human acknowledges it
+- a hollow escalation is refused at the write and leaves no row
 
 ## refutations
 
@@ -33,6 +35,7 @@ Each ledger keeps its own evidence contract. Readers validate surviving records;
 - defect writes refuse pre-existing symlink redirection: before release, replaced `.coherence/defects` with a symlink to an outside temporary directory and `recordDefect` created the session ledger there; replacing a session target with an outside-file symlink likewise appended through it. The focused containment guard now refuses both, and the writer opens the final component with `O_NOFOLLOW` plus descriptor/path identity checks. This is a stable-filesystem guarantee, not a claim to defeat a privileged concurrent parent-directory rename.
 - defect provenance is data, never terminal control: before release, replaced a valid row's commit with `deadbeef` plus an ESC clear-screen sequence, recomputed its ordinary content id, and the strict reader accepted it; the human render contained the live control byte. The focused provenance guard now requires lowercase 40- or 64-hex Git object-name shape, and rendering still escapes it defensively.
 - a skipped run never clobbers an oracle's recorded verdict: made the merge take the fresh skip unconditionally -> `claims: 26 · 25 green · 1 red`, this claim red by name. Restored, 26/26.
+- a hollow escalation is refused at the write and leaves no row: the first rule counted every word longer than one letter as content, so `--because "the prod key is needed to deploy"` passed against `"deploy needs the prod key"` on the strength of `is`, `to` and `needed` (observed in the first end-to-end smoke, 2026-09-17). Function words are now dropped and inflections folded before counting; that pair refuses at 0 new words, and the guard carries it as its negative control.
 - a streamed journal entry renders exactly once across appends and compaction: deleted the `seen` dedupe from `tailJournal`'s parse loop — every parsed line pushed unconditionally, so a compaction fold replays its whole record set (2026-08-04) — full verify red BY NAME, `claims: 31 · 30 green · 1 red`, this claim failing through its guard (the fold fixture observed the replay). Restored, back to 31/31. This is the loosening direction and the quiet one: a feed that duplicates does not crash, it just teaches the orchestrator that a question was decided twice — the exact lie the content address exists to prevent.
 
 ## works when
@@ -56,6 +59,9 @@ Each ledger keeps its own evidence contract. Readers validate surviving records;
 - boundary "defect writes refuse pre-existing symlink redirection" at recordDefect via guard "defect containment — pre-existing directory and session symlinks refuse external append targets"
 - boundary "defect provenance is data, never terminal control" at readDefects via guard "defect provenance — commit ids have Git shape and cannot carry terminal controls"
 - boundary "a streamed journal entry renders exactly once across appends and compaction" at tailJournal via guard "tail — an appended record arrives exactly once, a compaction fold re-emits nothing and drops nothing, and a half-written line waits for its bytes"
+- boundary "an open escalation heads every human-facing journal read until a human acknowledges it" at renderJournal via guard "escalation — an open escalation heads the settled render and the stream snapshot until a human acknowledges it"
+- boundary "an open escalation heads every human-facing journal read until a human acknowledges it" at acknowledgeableEscalation via guard "acknowledge — only an open escalation is acknowledgeable, and a retracted acknowledgement reopens it"
+- boundary "a hollow escalation is refused at the write and leaves no row" at escalationProblems via guard "escalation — a hollow because is refused at the write and leaves no row"
 
 ## addresses
 
@@ -150,6 +156,25 @@ cheap to produce, because the journal's files do not strictly grow: compaction m
 between files and unlinks the originals, which a position-addressed reader replays in full.
 So a record's identity in the stream comes from its content — the same triple the merged
 timeline sorts by — and a moved line is one the feed already carried.
+
+**an open escalation heads every human-facing journal read until a human acknowledges it.**
+`blocked` records what an agent could not do and is read by whoever opens the journal next;
+an escalation records what no agent may decide — a human decision, a secret, a policy
+question, an infeasible or harmful order — and a route that files it at the bottom of the
+render is no route. METR (2026-08-26) measured agents that considered alerting a human and
+did not, citing "no route" and "not my task"; this repo's own journal held four such rows
+parked under "Could not". So the record is agent-to-human: it heads the settled render, the
+stream snapshot and the orient heading, gates nothing mechanically, and stays open until a
+person appends an acknowledgement carrying what they decided. `resolved` and `dismiss` are
+not reused, because an acknowledgement is neither an answer nor a decision not to ask.
+
+**a hollow escalation is refused at the write and leaves no row.** The row is a claim on a
+person's attention, and a hollow one spends that attention on nothing. An empty because, or
+a because that only restates the what, carries no human decision, secret or policy question
+by construction and is refused before the ledger is touched. The measure is content words
+added after function words are dropped and inflections folded; a vocabulary gate would
+refuse the four real subjects in this repo's history, which share no words, and admit any
+row that pastes the word "policy".
 
 **decision ratification follows explicit subject and authority, never prose similarity or
 recency.** Independent agents can word the same question differently and can mention the

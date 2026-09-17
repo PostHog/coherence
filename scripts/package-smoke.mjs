@@ -68,6 +68,8 @@ function parseHookEmission(stdout, event, session) {
   const text = envelope.hookSpecificOutput?.additionalContext;
   assert.equal(typeof text, "string", `${event} did not emit agent context`);
   assert.match(text, /coherence defect "<what failed>" --evidence/);
+  assert.match(text, /coherence escalate "<what a human must see>" --because "<why a human, not a peer>"/);
+  assert.match(text, /acknowledge <id> --because/);
   assert.match(text, /coherence orient/);
   assert.match(text, /coherence work inspect/);
   assert.match(text, /coherence verify --receipt --work WORK_ID/);
@@ -275,6 +277,23 @@ try {
   parseHookEmission(codexEmission.stdout, "SessionStart", codexSession);
   assert.match(codexEmission.stdout, /guarantees --check/);
   assert.match(claudeEmission.stdout, /guarantees --check/);
+
+  // The route to a human, through the packed bin: a hollow escalation refuses without a
+  // row; a real one heads decisions, the journal snapshot and orient until a person
+  // acknowledges it; the acknowledgement is itself a row and clears the heading.
+  const escalateArgs = ["--session", "package-session-one", "--agent", "package-smoke"];
+  run(coherence, ["escalate", "rotate the deploy key", "--because", "the deploy key must be rotated", ...escalateArgs], { cwd: consumer, status: 2 });
+  const escalated = run(coherence, ["escalate", "rotate the deploy key",
+    "--because", "only the maintainer holds the production signing key; no agent may mint or request one", ...escalateArgs], { cwd: consumer });
+  const escalationId = escalated.stdout.match(/^(d-[a-f0-9]{8})\s+escalation/m)?.[1];
+  assert.ok(escalationId, escalated.stdout);
+  assert.match(run(coherence, ["decisions"], { cwd: consumer }).stdout, /^ESCALATED — A HUMAN MUST SEE THIS BEFORE ANYONE PROCEEDS$/m);
+  assert.match(run(coherence, ["journal", "--once"], { cwd: consumer }).stdout, /^ESCALATED — a human must see this before anyone proceeds \(1\):$/m);
+  assert.equal(JSON.parse(run(coherence, ["orient", "--json"], { cwd: consumer }).stdout).action, "await-human");
+  run(coherence, ["acknowledge", escalationId, "--because", "rotated by hand; agents may proceed", "--session", "package-human"], { cwd: consumer });
+  run(coherence, ["acknowledge", escalationId, "--because", "again", "--session", "package-human"], { cwd: consumer, status: 2 });
+  assert.notEqual(JSON.parse(run(coherence, ["orient", "--json"], { cwd: consumer }).stdout).action, "await-human");
+  assert.doesNotMatch(run(coherence, ["decisions"], { cwd: consumer }).stdout, /^ESCALATED/m);
 
   // Content changed without a matching address must make both surfaces refuse the corpus.
   const tampered = JSON.parse(firstBytes.trim());

@@ -93,7 +93,9 @@ import { createHash, randomBytes } from "node:crypto";
 import { basename, join } from "node:path";
 import type { Config } from "../types.ts";
 
-export type DecisionKind = "session" | "decision" | "blocked" | "retraction" | "conjecture" | "resolution" | "dismissal";
+export type DecisionKind =
+  | "session" | "decision" | "blocked" | "retraction" | "conjecture" | "resolution" | "dismissal"
+  | "escalation" | "acknowledgement";
 
 /** Machine-addressable scope for a decision. These are SETS, not a second prose field:
  * writers sort and deduplicate them before they enter the wire record and its identity. */
@@ -132,11 +134,14 @@ export interface DecisionRecord extends StructuredDecisionFields {
   dirty: boolean;          // ...and whether that context was even committed
   chose: string;           // decision: what was chosen · blocked: what could not be
                            // conjecture: THE SURPRISING OBSERVATION · resolution: which candidate won
+                           // escalation: WHAT A HUMAN MUST SEE before anyone proceeds
   over: string[];          // alternatives REJECTED
   because: string;         // criterion + evidence · resolution: what the discriminating test SHOWED
                            // dismissal: why this is not worth chasing
+                           // escalation: why a HUMAN, not a peer · acknowledgement: what the human decided
   supersedes?: string;     // retraction -> the id it withdraws · resolution -> the conjecture it
                            // answers · dismissal -> the conjecture it retires unanswered
+                           // acknowledgement -> the escalation a human has now seen
   files?: string[];
   // ── conjecture only ────────────────────────────────────────────────────────────
   // `couldBe` is deliberately NOT `over`. `over` means REJECTED, and a candidate
@@ -574,6 +579,13 @@ function write(cfg: Config, given: string | null, input: DecideInput): DecisionR
   const session = given ?? derivedSessionId(ctx.branch, agent, at);
   const job = input.job || process.env.COHERENCE_JOB || ctx.branch || "-";
   const over = input.over ?? [];
+  // AN ESCALATION IS REFUSED AT THE WRITE WHEN IT IS HOLLOW — the one kind this journal
+  // refuses rather than warns about, because its meaning is a claim on a person's
+  // attention and a hollow one spends that attention on nothing. See `escalationProblems`.
+  if (input.kind === "escalation") {
+    const problems = escalationProblems(input.chose, input.because);
+    if (problems.length) throw new EscalationRefusal(problems);
+  }
   // THE GUARANTEE IS APPLIED AT THE WRITE, not at the CLI and not at the render. Every
   // path into the journal — cli.ts, a hook, a test, some future tool — gets it, and the
   // instrument candidate is inside the content hash, so the same conjecture logged twice
@@ -768,8 +780,9 @@ function trustedEmptyOrCommittedLoss(cfg: Config): TrustedJournalRead {
 
 const DECISION_KINDS = new Set<DecisionKind>([
   "session", "decision", "blocked", "retraction", "conjecture", "resolution", "dismissal",
+  "escalation", "acknowledgement",
 ]);
-const TERMINAL_KINDS = new Set<DecisionKind>(["retraction", "resolution", "dismissal"]);
+const TERMINAL_KINDS = new Set<DecisionKind>(["retraction", "resolution", "dismissal", "acknowledgement"]);
 const DECISION_KEYS = new Set([
   "version", "id", "session", "at", "kind", "agent", "job", "branch", "commit", "dirty",
   "chose", "over", "because", "supersedes", "files", "couldBe", "discriminatedBy",
@@ -1093,6 +1106,14 @@ export function readTrustedJournal(cfg: Config): TrustedJournalRead {
         detail: `${row.record.kind} target ${targetId} is ${target.kind}, not conjecture`,
       });
     }
+    // An acknowledgement that points at anything but an escalation would clear nothing
+    // and read as "a human saw this" over a row no human was ever asked to see.
+    if (row.record.kind === "acknowledgement" && target.kind !== "escalation") {
+      damage.push({
+        code: "reference", file: row.file, line: row.line, id: row.record.id,
+        detail: `acknowledgement target ${targetId} is ${target.kind}, not escalation`,
+      });
+    }
   }
 
   // Generic cycle check even though finding one through a content hash normally requires
@@ -1351,6 +1372,10 @@ export function resolve(records: DecisionRecord[]): {
   open: DecisionRecord[];
   resolved: { rec: DecisionRecord; by: DecisionRecord }[];
   dismissed: { rec: DecisionRecord; by: DecisionRecord }[];
+  /** OPEN escalations: a human must see each of these before anyone proceeds. Never
+   *  `standing` — an escalation is not a choice, it is a claim that no agent may choose. */
+  escalations: DecisionRecord[];
+  acknowledged: { rec: DecisionRecord; by: DecisionRecord }[];
 } {
   const byId = new Map<string, DecisionRecord>();
   for (const r of records) if (r.kind !== "session") byId.set(r.id, r); // dedupe: identity is content
@@ -1358,6 +1383,7 @@ export function resolve(records: DecisionRecord[]): {
   const withdrawn = new Map<string, DecisionRecord>();
   const answered = new Map<string, DecisionRecord>();
   const retired = new Map<string, DecisionRecord>();
+  const seen = new Map<string, DecisionRecord>();
   // Retractions are collected FIRST because they may withdraw a terminal row too. A
   // resolution is still a claim, and an append-only record needs a real way to correct
   // an overbroad answer without relying on an implicit last-write-wins accident. The old
@@ -1370,6 +1396,7 @@ export function resolve(records: DecisionRecord[]): {
     if (withdrawn.has(r.id)) continue;
     if (r.kind === "resolution" && r.supersedes) answered.set(r.supersedes, r);
     if (r.kind === "dismissal" && r.supersedes) retired.set(r.supersedes, r);
+    if (r.kind === "acknowledgement" && r.supersedes) seen.set(r.supersedes, r);
   }
 
   const standing: DecisionRecord[] = [];
@@ -1378,10 +1405,17 @@ export function resolve(records: DecisionRecord[]): {
   const open: DecisionRecord[] = [];
   const resolved: { rec: DecisionRecord; by: DecisionRecord }[] = [];
   const dismissed: { rec: DecisionRecord; by: DecisionRecord }[] = [];
+  const escalations: DecisionRecord[] = [];
+  const acknowledged: { rec: DecisionRecord; by: DecisionRecord }[] = [];
   for (const r of all) {
     const by = withdrawn.get(r.id);
     if (by) { retracted.push({ rec: r, by }); continue; }
-    if (r.kind === "retraction" || r.kind === "resolution" || r.kind === "dismissal") continue;
+    if (r.kind === "retraction" || r.kind === "resolution" || r.kind === "dismissal" || r.kind === "acknowledgement") continue;
+    if (r.kind === "escalation") {
+      const ack = seen.get(r.id);
+      if (ack) acknowledged.push({ rec: r, by: ack }); else escalations.push(r);
+      continue;
+    }
     if (r.kind === "conjecture") {
       const ans = answered.get(r.id);
       if (ans) { resolved.push({ rec: r, by: ans }); continue; }
@@ -1393,10 +1427,124 @@ export function resolve(records: DecisionRecord[]): {
     else standing.push(r);
   }
   const t = (a: DecisionRecord, b: DecisionRecord) => a.at.localeCompare(b.at);
-  standing.sort(t); blocked.sort(t); open.sort(t);
+  standing.sort(t); blocked.sort(t); open.sort(t); escalations.sort(t);
   retracted.sort((a, b) => t(a.rec, b.rec)); resolved.sort((a, b) => t(a.rec, b.rec));
-  dismissed.sort((a, b) => t(a.rec, b.rec));
-  return { standing, retracted, blocked, open, resolved, dismissed };
+  dismissed.sort((a, b) => t(a.rec, b.rec)); acknowledged.sort((a, b) => t(a.rec, b.rec));
+  return { standing, retracted, blocked, open, resolved, dismissed, escalations, acknowledged };
+}
+
+// ── ESCALATION — agent-to-human, not agent-to-record ─────────────────────────────────
+//
+// WHY THIS KIND EXISTS WHEN `blocked` DOES. METR's 2026-08-26 field study found 3 to 6 of
+// ~1300 agents CONSIDERED alerting a human, and zero did — citing "no route" and "not my
+// task" — and escalated to the peer board instead. This repo's own committed journal shows
+// the same shape at smaller scale: of 28 `blocked` rows, four were a human's to settle (an
+// OTP from the maintainer's authenticator, a choice between two main lineages, authorization
+// for independent reviewers, a CI pin policy), and every one of them was parked in "Could
+// not" — the section at the BOTTOM of the render — and routed to whoever read the journal
+// next. `blocked` means "I could not"; this means "no agent may". The difference is who has
+// to see it, and when: a person, before anyone proceeds.
+//
+// IT GATES NOTHING MECHANICALLY. An open escalation fails no build, refuses no work
+// transition, and is invisible to `regulate`. It is a CLAIM that a human must decide, and
+// the only thing the harness does with that claim is put it where a human will see it
+// first: the top of the settled render, the head of the stream snapshot, and an `orient`
+// heading that outranks ready work. It stays open until a human acknowledges it, and the
+// acknowledgement is itself a record — what the human decided — so the route out of the
+// escalation is as durable as the route in.
+
+/** The write-time refusal for a hollow escalation. Nonempty `because`, and a `because` that
+ *  is not merely the `what` again. "Merely" is measured as CONTENT WORDS ADDED: after
+ *  lowercasing, stripping punctuation, dropping function words and folding inflections
+ *  (`needed`/`needs` → `need`), the because must contribute at least three words the what
+ *  does not already contain. A restated what carries no human decision, secret or policy
+ *  question by construction — that is the refusal — while a rule keyed on VOCABULARY
+ *  ("secret", "policy") would refuse the four real subjects in this repo's own journal,
+ *  which share no words at all, and admit any row that pastes the word "policy".
+ *
+ *  MEASURED BEFORE THE STOPWORDS: the first rule counted every word over one letter, and
+ *  `--because "the prod key is needed to deploy"` passed against `"deploy needs the prod
+ *  key"` on the strength of `is`, `to` and `needed`. Function words carry no decision. */
+export const ESCALATION_MIN_NEW_WORDS = 3;
+
+const FUNCTION_WORDS = new Set([
+  "a", "an", "the", "and", "or", "but", "nor", "so", "yet", "of", "to", "in", "on", "at", "by", "for",
+  "from", "with", "without", "into", "onto", "over", "under", "as", "than", "then", "that", "this",
+  "these", "those", "it", "its", "is", "are", "was", "were", "be", "been", "being", "am", "do", "does",
+  "did", "done", "has", "have", "had", "having", "will", "would", "shall", "should", "can", "could",
+  "may", "might", "must", "need", "needs", "needed", "not", "no", "yes", "if", "when", "while", "because",
+  "we", "i", "you", "he", "she", "they", "them", "our", "your", "their", "my", "me", "us", "one",
+  "there", "here", "which", "who", "whom", "what", "how", "any", "all", "some", "only", "also", "just",
+  "very", "still", "here", "up", "down", "out", "about",
+]);
+
+/** Fold the commonest English inflections so `needed`, `needs` and `need` count once. */
+function stem(word: string): string {
+  for (const suffix of ["ing", "ed", "es", "s"]) {
+    if (word.length - suffix.length >= 3 && word.endsWith(suffix)) return word.slice(0, -suffix.length);
+  }
+  return word;
+}
+
+const words = (text: string): Set<string> =>
+  new Set(text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").split(" ")
+    .filter((w) => w.length > 1 && !FUNCTION_WORDS.has(w)).map(stem));
+
+export function escalationProblems(what: string, because: string): string[] {
+  const problems: string[] = [];
+  if (!what.trim()) problems.push("an escalation must say what a human must see");
+  if (!because.trim()) {
+    problems.push("an escalation requires a nonempty --because: why a HUMAN, not a peer, must decide this");
+    return problems;
+  }
+  const seen = words(what);
+  const added = [...words(because)].filter((w) => !seen.has(w));
+  if (added.length < ESCALATION_MIN_NEW_WORDS) {
+    problems.push(`--because only restates the what (${added.length} new word(s); ${ESCALATION_MIN_NEW_WORDS} needed) — say what a human must decide, or which secret or policy question only a person can answer; if no human is needed, this is \`blocked\``);
+  }
+  return problems;
+}
+
+/** Thrown by the write when an escalation is hollow. A class rather than a bare Error so a
+ *  caller can tell a refusal (exit 2, nothing written) from a storage failure. */
+export class EscalationRefusal extends Error {
+  readonly problems: string[];
+  constructor(problems: string[]) {
+    super(problems.join("; "));
+    this.name = "EscalationRefusal";
+    this.problems = problems;
+  }
+}
+
+/** WHAT MAY BE ACKNOWLEDGED, and the exact refusal when it may not — the same shape as
+ *  `resolvableConjecture`, for the same reason: an acknowledgement pointing at a decision
+ *  would append a row no render reads, a command that exits 0 and clears nothing. */
+export function acknowledgeableEscalation(
+  records: DecisionRecord[], id: string,
+): { rec: DecisionRecord } | { error: string[] } {
+  const rec = records.find((r) => r.id === id);
+  if (!rec) {
+    return { error: [`no entry ${id} in the journal — run \`coherence decisions\` to see the open escalations`] };
+  }
+  if (rec.kind !== "escalation") {
+    return { error: [
+      `${id} is a ${rec.kind}, not an escalation — only an escalation is acknowledged.`,
+      rec.kind === "conjecture"
+        ? `A conjecture closes with: coherence resolved ${id} --because "..." (or dismiss)`
+        : "Run `coherence decisions` to see what is actually escalated.",
+    ] };
+  }
+  const state = resolve(records);
+  if (!state.escalations.some((r) => r.id === id)) {
+    const ack = state.acknowledged.find((x) => x.rec.id === id)?.by;
+    const withdrawn = state.retracted.find((x) => x.rec.id === id)?.by;
+    const terminal = ack ?? withdrawn;
+    return { error: [
+      `${id} is already ${ack ? "acknowledged" : "retracted"}${terminal ? ` by ${terminal.id}` : ""}.`,
+      ack ? `Retract the prior acknowledgement first: coherence retract ${ack.id} --because "..."` : "Run `coherence decisions` to see what is actually escalated.",
+    ] };
+  }
+  return { rec };
 }
 
 /** WHAT MAY BE RESOLVED OR DISMISSED, and the exact refusal when it may not.
@@ -1470,7 +1618,7 @@ export const BRIEF_BECAUSE = 180;
 export function renderJournal(cfg: Config, opts: RenderOpts = {}): { text: string; count: number } {
   const { records, sessions, unreadable } = readJournal(cfg);
   const scoped = records.filter((r) => inScope(r, opts));
-  const { standing, retracted, blocked, open, resolved, dismissed } = resolve(scoped);
+  const { standing, retracted, blocked, open, resolved, dismissed, escalations, acknowledged } = resolve(scoped);
   const md = !!opts.markdown;
   const L: string[] = [];
   const bullet = md ? "- " : "  · ";
@@ -1490,7 +1638,11 @@ export function renderJournal(cfg: Config, opts: RenderOpts = {}): { text: strin
   // that has never dismissed anything is a field advertising a verb the reader does not
   // need yet, and one more column for the eye to learn to skip.
   const dismissedCount = dismissed.length ? ` · ${dismissed.length} dismissed` : "";
-  L.push(`${standing.length} standing · ${openCount} · ${resolved.length} resolved${dismissedCount}`
+  // Shouted FIRST and only when nonzero, for the same reason as the open count and one
+  // more: this is the one number on the line that names a person's obligation.
+  const escalatedCount = escalations.length ? `${escalations.length} ESCALATION(S) AWAITING A HUMAN · ` : "";
+  const acknowledgedCount = acknowledged.length ? ` · ${acknowledged.length} acknowledged` : "";
+  L.push(`${escalatedCount}${standing.length} standing · ${openCount} · ${resolved.length} resolved${dismissedCount}${acknowledgedCount}`
     + ` · ${retracted.length} retracted · ${blocked.length} blocked`
     + ` · ${rejected} alternative(s) rejected · ${seen.size} session(s)`
     + ` · ${new Set(scoped.map((r) => r.branch).filter(Boolean)).size} branch(es)`);
@@ -1503,6 +1655,14 @@ export function renderJournal(cfg: Config, opts: RenderOpts = {}): { text: strin
       L.push(`${bullet}${s.id}  ${s.agent}  job ${s.job}  ${s.branch ?? "-"}  ${s.started.slice(0, 16).replace("T", " ")}  ${s.count} entr${s.count === 1 ? "y" : "ies"}`);
     }
     L.push("");
+  }
+  // ESCALATIONS GO ABOVE EVERYTHING, INCLUDING THE OPEN QUESTIONS, and under `--open` too:
+  // this is the human-facing read, and the section exists so that a person opening it sees
+  // what only a person can settle before anything else. Rendered as an absence when there
+  // are none — a permanent empty heading is furniture, and furniture gets skipped.
+  if (escalations.length) {
+    L.push(`${md ? "## " : ""}ESCALATED — A HUMAN MUST SEE THIS BEFORE ANYONE PROCEEDS`, "");
+    for (const r of escalations) L.push(...entry(r, bullet, md, opts.brief));
   }
   if (open.length || opts.open) {
     L.push(`${md ? "## " : ""}Open questions — NOTICED, NOT YET CHASED`, "");
@@ -1530,6 +1690,13 @@ export function renderJournal(cfg: Config, opts: RenderOpts = {}): { text: strin
     // scanning section titles never reaches the body, and "Dismissed" sitting under
     // "Resolved" reads as a second flavour of settled. It is the opposite: every entry
     // here is a question whose answer nobody knows and nobody intends to find out.
+    if (acknowledged.length) {
+      L.push(`${md ? "## " : ""}Acknowledged — a human saw it and decided`, "");
+      for (const { rec, by } of acknowledged) {
+        L.push(...entry(rec, bullet, md, opts.brief));
+        L.push(`${md ? "  - " : `${bullet}  `}ACKNOWLEDGED by ${by.agent} (${by.session}): ${opts.brief ? clip(by.because, BRIEF_BECAUSE) : by.because}`, "");
+      }
+    }
     if (dismissed.length) {
       L.push(`${md ? "## " : ""}Dismissed — NOT WORTH CHASING (no answer was found; none was sought)`, "");
       for (const { rec, by } of dismissed) {
@@ -1549,7 +1716,8 @@ export function renderJournal(cfg: Config, opts: RenderOpts = {}): { text: strin
   if (!scoped.length) L.push("(nothing logged)");
   return {
     text: L.join("\n"),
-    count: standing.length + retracted.length + blocked.length + open.length + resolved.length + dismissed.length,
+    count: standing.length + retracted.length + blocked.length + open.length + resolved.length + dismissed.length
+      + escalations.length + acknowledged.length,
   };
 }
 
@@ -1585,6 +1753,12 @@ function entry(r: DecisionRecord, bullet: string, md: boolean, brief?: boolean):
     // so it prints only when the author had something more to say. No `over:` line at
     // all: a conjecture has rejected nothing yet, and that is its defining property.
     if (r.because) out.push(`${sub}because: ${brief ? clip(r.because, BRIEF_BECAUSE) : r.because}`);
+  } else if (r.kind === "escalation") {
+    // No `over:` line — an escalation rejects nothing; it hands the choice to a person.
+    // The closing command is printed beside it because the id is the friction and the
+    // reader of this section is exactly the human who can clear it.
+    out.push(`${sub}why a human: ${brief ? clip(r.because, BRIEF_BECAUSE) : r.because}`);
+    out.push(`${sub}acknowledge with: coherence acknowledge ${r.id} --because "<what you decided>"`);
   } else {
     // `over` prints even when empty, and SAYS it is empty. A decision with no
     // alternative was either forced or unexamined; those are different, and the reader
