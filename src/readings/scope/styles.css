@@ -372,11 +372,15 @@ a {
   margin-top: 0.75rem;
 }
 
-.distinctions {
+.distinctions,
+.properties,
+.open-questions {
   margin-top: 1.25rem;
 }
 
 .distinctions h4,
+.properties h4,
+.open-questions h4,
 .rejected h4 {
   margin: 0 0 0.375rem;
   font-family: var(--sans);
@@ -385,13 +389,28 @@ a {
   color: var(--ink-quiet);
 }
 
-.distinctions ul {
+.distinctions ul,
+.open-questions ul {
   margin: 0;
   padding-left: 1.25rem;
 }
 
-.distinctions li + li {
+.distinctions li + li,
+.open-questions li + li {
   margin-top: 0.25rem;
+}
+
+.properties .record-fields {
+  margin-top: 0;
+}
+
+.properties .record-field {
+  margin-top: 0.5rem;
+}
+
+.properties .record-field dt {
+  font-family: var(--sans);
+  font-size: 0.9375rem;
 }
 
 .rejected {
@@ -444,18 +463,16 @@ a {
   cursor: help;
 }
 
-.carry-over,
-.correction,
-.resolution {
-  margin-top: 0.75rem;
-}
-
-/* The rest of the record, one click away and named in full */
+/* Detail, provenance, and the rest of the record: one click away, each named in full */
 
 .record {
   margin-top: 1.25rem;
   font-family: var(--sans);
   font-size: 0.9375rem;
+}
+
+.record + .record {
+  margin-top: 0.5rem;
 }
 
 .record summary {

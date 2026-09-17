@@ -47,7 +47,7 @@ function renderViewBody(state: ShellState): Markup {
       return html`<div class="view-tools">
         <label class="search">
           <span class="label">Search</span>
-          <input type="search" data-search value="${state.glossary.query}" placeholder="name, former name, definition, or rejected name" autocomplete="off" spellcheck="false">
+          <input type="search" data-search value="${state.glossary.query}" placeholder="name, other name, definition, or rejected name" autocomplete="off" spellcheck="false">
         </label>
       </div>
       <div class="view-results" data-results>${renderGlossaryResults(state)}</div>`;

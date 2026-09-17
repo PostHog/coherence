@@ -8,6 +8,14 @@
  * show still belong here: a concept's record and a glossary's record keep
  * every key the file said, so nothing is lost between the file and the page.
  *
+ * A concept is split three ways. Its vocabulary is what a definition needs:
+ * name, definition, status, aliases, rejected alternatives with their because,
+ * distinctions, properties, related names, open questions. Its detail is
+ * definitional sub-structure. Its provenance is history: who defined it, the
+ * owner's words, the metaphor, the evidence. The page shows vocabulary on the
+ * card and keeps detail and provenance one click away, each under its own
+ * name, so history is never mistaken for definition.
+ *
  * State is a concrete value of this shape. The page holds exactly one
  * `ShellState` and derives everything it shows from it.
  */
@@ -16,30 +24,6 @@
 export interface RejectedAlternative {
   alternative: string;
   because: string;
-}
-
-/**
- * One concept. The fields named here are the ones the reading treats
- * specially; every other key on the JSON object is kept in `record`.
- * Coherence's glossary and a project domain glossary both parse into this.
- */
-export interface Concept {
-  name: string;
-  definition: string;
-  /** Absent when the glossary records no status for the concept. */
-  status?: string;
-  defined_by?: string;
-  /** Names the concept had in the reference implementation. */
-  reference_aliases: string[];
-  /** Names the concept also goes by now. */
-  aliases: string[];
-  not_to_be_confused_with: string[];
-  rejected: RejectedAlternative[];
-  related: string[];
-  metaphor?: string;
-  owner_words?: string;
-  /** Every other field of the entry, in file order, rendered as evidence. */
-  record: Record<string, RecordValue>;
 }
 
 /** A value inside a record: prose, a list, or a nested record. */
@@ -51,19 +35,46 @@ export type RecordValue =
   | RecordValue[]
   | { [key: string]: RecordValue };
 
-/** One mechanism retired at the top level of a glossary. */
-export interface Retirement {
-  concept: string;
-  because: string;
-  decided_by?: string;
-  carry_over?: string;
-  correction?: string;
+/** A record of named values, in file order. */
+export type Fields = Record<string, RecordValue>;
+
+/**
+ * One concept. The vocabulary keys are the ones the card renders in the open;
+ * `detail` and `provenance` are the file's own sub-objects, kept whole; every
+ * other key on the JSON object is kept in `record`. Coherence's glossary and
+ * a project domain glossary both parse into this: a project glossary in an
+ * older shape has no detail or provenance, and its extra keys land in record.
+ */
+export interface Concept {
+  name: string;
+  definition: string;
+  /** Absent when the glossary records no status for the concept. */
   status?: string;
-  resolution?: string;
+  /** Names the concept also goes by. */
+  aliases: string[];
+  rejected: RejectedAlternative[];
+  not_to_be_confused_with: string[];
+  /** Named properties the definition relies on, each a short statement. */
+  properties: Fields;
+  related: string[];
+  open_questions: string[];
+  /** Definitional sub-structure: nested prose, lists and objects. Empty when the file has none. */
+  detail: Fields;
+  /** History: owner_words, metaphor, evidence, defined_by and similar. Empty when the file has none. */
+  provenance: Fields;
+  /** Every other field of the entry, in file order. */
+  record: Fields;
 }
 
 /** Named metaphors that several concepts lean on, keyed by their short name. */
 export type Metaphors = Record<string, string>;
+
+/** One name a project glossary refuses at the top level, with why. Distinct from a concept's rejected alternatives. */
+export interface RejectedName {
+  concept: string;
+  because: string;
+  decided_by?: string;
+}
 
 /** One entry in the short list a project declares for crossings: an instance of Coherence's trust level. */
 export interface TrustLevel {
@@ -95,15 +106,17 @@ export interface Glossary {
   source?: string;
   completed?: string;
   concepts: Concept[];
-  retirements: Retirement[];
   metaphors: Metaphors;
+  /** The file's own account of how a concept is split. Kept, never rendered. */
+  shape?: Fields;
   /** Undefined when the file does not speak of them; empty when it says there are none. */
+  rejected_names?: RejectedName[];
   trust_levels?: TrustLevel[];
   rulings?: Ruling[];
   candidate_overloads?: Overload[];
   uncertain?: Ruling[];
   /** Every other top-level field of the file, in file order. */
-  record: Record<string, RecordValue>;
+  record: Fields;
 }
 
 /**
@@ -135,22 +148,22 @@ export interface ShellState {
   glossary: GlossaryViewState;
 }
 
-/** The keys a concept entry carries that the render treats specially. */
+/** The keys of a concept entry that are vocabulary, detail, or provenance. Everything else is record. */
 const CONCEPT_KEYS = new Set([
   "name",
-  "status",
   "definition",
-  "defined_by",
-  "reference_aliases",
+  "status",
   "aliases",
-  "not_to_be_confused_with",
   "rejected",
+  "not_to_be_confused_with",
+  "properties",
   "related",
-  "metaphor",
-  "owner_words",
+  "open_questions",
+  "detail",
+  "provenance",
 ]);
 
-/** The top-level keys of a glossary file that the render treats specially. */
+/** The top-level keys of a glossary file that the model has a place for. */
 const GLOSSARY_KEYS = new Set([
   "version",
   "project",
@@ -159,8 +172,9 @@ const GLOSSARY_KEYS = new Set([
   "source",
   "completed",
   "concepts",
-  "rejected",
   "metaphors",
+  "shape",
+  "rejected",
   "trust_levels",
   "rulings",
   "candidate_overloads",
@@ -230,13 +244,23 @@ function asRecordValue(value: unknown, where: string): RecordValue {
   throw new GlossaryShapeError(where, "unsupported value");
 }
 
+/** An object-valued key kept whole, in file order. Empty when the key is absent. */
+function fieldsAt(record: Record<string, unknown>, key: string, where: string): Fields {
+  const value = record[key];
+  if (value === undefined) return {};
+  if (!isRecord(value)) throw new GlossaryShapeError(where, `${key} must be an object`);
+  const fields: Fields = {};
+  for (const [k, v] of Object.entries(value)) fields[k] = asRecordValue(v, `${where}.${key}.${k}`);
+  return fields;
+}
+
 /** Every key not in `known`, kept in file order. */
 function restOf(
   value: Record<string, unknown>,
   known: Set<string>,
   where: string,
-): Record<string, RecordValue> {
-  const record: Record<string, RecordValue> = {};
+): Fields {
+  const record: Fields = {};
   for (const [key, v] of Object.entries(value)) {
     if (!known.has(key)) record[key] = asRecordValue(v, `${where}.${key}`);
   }
@@ -263,31 +287,30 @@ function parseConcept(value: unknown, where: string): Concept {
   const concept: Concept = {
     name,
     definition: stringAt(value, "definition", at),
-    reference_aliases: stringListAt(value, "reference_aliases", at),
     aliases: stringListAt(value, "aliases", at),
-    not_to_be_confused_with: stringListAt(value, "not_to_be_confused_with", at),
     rejected: parseRejected(value["rejected"], at),
+    not_to_be_confused_with: stringListAt(value, "not_to_be_confused_with", at),
+    properties: fieldsAt(value, "properties", at),
     related: stringListAt(value, "related", at),
+    open_questions: stringListAt(value, "open_questions", at),
+    detail: fieldsAt(value, "detail", at),
+    provenance: fieldsAt(value, "provenance", at),
     record: restOf(value, CONCEPT_KEYS, at),
   };
-  for (const key of ["status", "defined_by", "metaphor", "owner_words"] as const) {
-    const v = optionalStringAt(value, key, at);
-    if (v !== undefined) concept[key] = v;
-  }
+  const status = optionalStringAt(value, "status", at);
+  if (status !== undefined) concept.status = status;
   return concept;
 }
 
-function parseRetirement(value: unknown, where: string): Retirement {
+function parseRejectedName(value: unknown, where: string): RejectedName {
   if (!isRecord(value)) throw new GlossaryShapeError(where, "must be an object");
-  const retirement: Retirement = {
+  const rejected: RejectedName = {
     concept: stringAt(value, "concept", where),
     because: stringAt(value, "because", where),
   };
-  for (const key of ["decided_by", "carry_over", "correction", "status", "resolution"] as const) {
-    const v = optionalStringAt(value, key, where);
-    if (v !== undefined) retirement[key] = v;
-  }
-  return retirement;
+  const decidedBy = optionalStringAt(value, "decided_by", where);
+  if (decidedBy !== undefined) rejected.decided_by = decidedBy;
+  return rejected;
 }
 
 function parseTrustLevel(value: unknown, where: string): TrustLevel {
@@ -326,8 +349,6 @@ export function parseGlossary(input: unknown, where: string): Glossary {
   if (typeof version !== "number") throw new GlossaryShapeError(where, "version must be a number");
   const conceptsRaw = input["concepts"];
   if (!Array.isArray(conceptsRaw)) throw new GlossaryShapeError(where, "concepts must be a list");
-  const retirementsRaw = input["rejected"] ?? [];
-  if (!Array.isArray(retirementsRaw)) throw new GlossaryShapeError(where, "rejected must be a list");
   const metaphorsRaw = input["metaphors"] ?? {};
   if (!isRecord(metaphorsRaw)) throw new GlossaryShapeError(where, "metaphors must be an object");
   const metaphors: Metaphors = {};
@@ -338,7 +359,6 @@ export function parseGlossary(input: unknown, where: string): Glossary {
   const glossary: Glossary = {
     version,
     concepts: conceptsRaw.map((c, i) => parseConcept(c, `${where} concepts[${i}]`)),
-    retirements: retirementsRaw.map((r, i) => parseRetirement(r, `${where} rejected[${i}]`)),
     metaphors,
     record: restOf(input, GLOSSARY_KEYS, where),
   };
@@ -346,6 +366,9 @@ export function parseGlossary(input: unknown, where: string): Glossary {
     const v = optionalStringAt(input, key, where);
     if (v !== undefined) glossary[key] = v;
   }
+  if (input["shape"] !== undefined) glossary.shape = fieldsAt(input, "shape", where);
+  const rejectedNames = optionalListAt(input, "rejected", where, parseRejectedName);
+  if (rejectedNames !== undefined) glossary.rejected_names = rejectedNames;
   const trustLevels = optionalListAt(input, "trust_levels", where, parseTrustLevel);
   if (trustLevels !== undefined) glossary.trust_levels = trustLevels;
   const rulings = optionalListAt(input, "rulings", where, parseRuling);
