@@ -169,7 +169,9 @@ test("orient lists open requirements and regulate reports them; only spec proble
   assert.match(start, /○ \.\/secure access — lacks: enforcement, refutation, kinds/);
   const stop = specStopText(root);
   assert.equal(stop.problems, 0, "an open requirement is not a grammar problem");
-  assert.match(stop.text, /^1 requirement still short of invariant: \.\/secure access \(lacks enforcement, refutation, kinds\)/);
+  assert.match(stop.text, /^1 requirement open in the project; run: spec --check$/);
+  const mine = specStopText(root, ["Root.spec.md"]);
+  assert.match(mine.text, /^○ \.\/secure access — still a requirement; lacks: enforcement, refutation, kinds\n1 requirement open in the project, 1 in specs this session changed/);
   writeFileSync(join(root, "Root.spec.md"), "# Root\n\nA fixture project.\n\n## works when\n- typechecks\n");
   const broken = specStopText(root);
   assert.ok(broken.problems > 0, "a retired section is a problem and refuses a subagent stop");

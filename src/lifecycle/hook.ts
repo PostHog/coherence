@@ -16,6 +16,7 @@
  * print nothing yet; the peer feed is a later slice.
  */
 
+import { sep } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
@@ -141,14 +142,18 @@ export function specBlock(root: string): string {
 }
 
 /** What the spec owes at stop: problems refuse a subagent stop; open requirements are advisory. */
-export function specStopText(root: string): { text: string; problems: number } {
+export function specStopText(root: string, changed: readonly string[] = []): { text: string; problems: number } {
   const model = specModelOrNull(root);
   if ("error" in model) return { text: `Spec: not readable (${model.error})`, problems: 0 };
   if (model.components.length === 0) return { text: "", problems: 0 };
-  const open = model.components.flatMap((c) => c.invariants.filter((i) => i.state === "requirement").map((i) => `${c.folder}/${i.name} (lacks ${i.lacks.join(", ")})`));
+  const touched = new Set(changed.map((p) => p.split(sep).join("/")));
+  const open = model.components.flatMap((c) => c.invariants.filter((i) => i.state === "requirement").map((i) => ({ c, i })));
+  const mine = open.filter(({ c }) => touched.has(c.specPath));
   const lines: string[] = [];
   for (const p of model.problems) lines.push(`PROBLEM  ${p.file}:${p.line}  ${p.message}`);
-  if (open.length > 0) lines.push(`${open.length} requirement${open.length === 1 ? "" : "s"} still short of invariant: ${open.slice(0, OPEN_REQUIREMENT_LINES).join("; ")}${open.length > OPEN_REQUIREMENT_LINES ? "; ..." : ""}`);
+  for (const { c, i } of mine.slice(0, OPEN_REQUIREMENT_LINES)) lines.push(`○ ${c.folder}/${i.name} — still a requirement; lacks: ${i.lacks.join(", ")}`);
+  if (mine.length > OPEN_REQUIREMENT_LINES) lines.push(`  and ${mine.length - OPEN_REQUIREMENT_LINES} more in specs this session changed`);
+  if (open.length > 0) lines.push(`${open.length} requirement${open.length === 1 ? "" : "s"} open in the project${mine.length > 0 ? `, ${mine.length} in specs this session changed` : ""}; run: spec --check`);
   return { text: lines.join("\n"), problems: model.problems.length };
 }
 
@@ -183,7 +188,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     case "Stop":
     case "SubagentStop": {
       const report = await checkChanged(root);
-      const spec = specStopText(root);
+      const spec = specStopText(root, await changedFiles(root));
       const glossaryText = report !== undefined && hasFindings(report) ? formatReport(report) : "";
       if (glossaryText === "" && spec.text === "") return { stdout: "", stderr: "", exit: 0 };
       const parts: string[] = [];
