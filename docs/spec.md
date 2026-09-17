@@ -1,0 +1,87 @@
+# The spec
+
+A component is any folder with a spec file, `<Name>.spec.md`. Folders without
+one are transparent; a super folder becomes a component when a relationship
+invariant about its children needs a home. The spec holds a title, a one-line
+intent, `## trust levels` in the entry spec only, and `## invariants`. No other
+section: the parser refuses the reference's sections by name and says what
+replaced each.
+
+```sh
+node src/cli.ts spec --check [root]   # components, invariants with state, problems; exit 1 on problems
+node src/cli.ts spec --json [root]    # the model
+node src/cli.ts scaffold component <folder> "<intent>"
+node src/cli.ts scaffold invariant <folder> "<sentence>" --kinds a,b [--chokepoint|--totality-oracle] [--write]
+```
+
+## The bullet
+
+Every bullet is an invariant. Its first line is the name and the sentence,
+the abstract behavioral requirement; indented `key: value` lines carry the
+rest. A value still in `<angle brackets>` is a placeholder: it parses, counts
+as absent, and is listed as unfilled, so a scaffolded bullet can be written
+first and filled second.
+
+Enforcement takes one of two forms, and a bullet may carry both as separate
+evidence paths. The chokepoint form names the protected thing (a symbol or a
+module) and the chokepoint every reference passes through:
+
+```markdown
+## trust levels
+- storage: the rows beneath everything
+- public-egress: what leaves in the clear
+
+## invariants
+- digest-only egress: A secret leaves storage only as its digest.
+  protects: SECRET_COLUMNS
+  chokepoint: seal
+  because: a read of a leaked row must disclose no usable bearer
+  crossing: storage -> public-egress
+  refuted: removed the seal call from the row renderer -> the check went red naming the column (2026-09-17)
+  kinds: credential, output
+  checklist: redaction declared as digest-only egress
+  checklist: encrypted-storage dismissed: the digest is the stored form; nothing is decrypted
+```
+
+The totality oracle form, the compromise where structure is not practical,
+names the whole set the detector is total over and the test:
+
+```markdown
+- write-class totality: Every kernel pattern resolves to a declared write class.
+  over: every pattern in KERNEL_TABLES
+  via: write-policy totality
+  because: an unclassified pattern must fail closed rather than become writable
+  crossing: agent-mcp -> storage
+  refuted: unclassified _members -> write-policy totality failed by name (2026-08-20)
+  kinds: storage
+  checklist: scoped-reads dismissed: reads are the capability invariant's
+```
+
+`because` says why the invariant exists and what it protects against.
+`crossing` is the security marker: two trust levels the entry spec declares.
+`refuted` records the witnessed firing: what was broken, what was seen, the date.
+
+## Lifecycle states
+
+The check derives each bullet's state from what it carries:
+
+- **requirement**: enforcement is absent, or no refutation is recorded, or the
+  decomposition checklist has an applicable shape neither declared nor
+  dismissed. A missing `kinds` line means the checklist was never run.
+- **invariant**: enforcement is declared, its refutation is recorded, and every
+  applicable shape is answered.
+
+Every enforcement reports as declared, unverified: whether the chokepoint
+still chokes, and so whether the invariant has become a structural defect, is
+the language server's verdict and arrives in slice three. A missing `because`
+is reported as a lack but does not change the state.
+
+## The checklist rule
+
+`kinds` names what the requirement protects (read, credential, storage,
+message, output, state, queue, budget, deploy, identity, encoding, revision;
+or `none` for an examined empty set). Each shape in `docs/checklist-seed.json`
+carries its kinds; the shapes whose kinds intersect are applicable, and each
+needs one line: `<shape> declared as <invariant name>` (the bullet itself may
+be that invariant) or `<shape> dismissed: <reason>`. The scaffold prints one
+placeholder line per applicable shape with the shapes' sentences beside it.

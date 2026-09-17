@@ -21,11 +21,17 @@ Guiding artifacts kept from the reference:
 - `docs/reference/data-is-destiny.md` — "Data is destiny" (Danilo Campos, CC BY-SA 4.0), the essential input for the Scope shell.
 
 First slice: the glossary, the hook that injects it, and the drift check at
-regulate. Mnemion is the first adopter.
+regulate. Second slice: the spec grammar and the spine (`docs/spec.md`), with
+the scaffold that makes the complete shape the cheapest thing to produce.
+Mnemion is the first adopter.
 
 ```sh
 node src/cli.ts glossary                  # the compact form the hook injects; token estimate on stderr
 node src/cli.ts glossary --check [paths]  # rejected names and unknown nouns; exit 1 with findings
+node src/cli.ts spec --check [root]       # components, invariants with state, problems; exit 1 on problems
+node src/cli.ts spec --json [root]        # the spec model
+node src/cli.ts scaffold component <folder> "<intent>"
+node src/cli.ts scaffold invariant <folder> "<sentence>" --kinds a,b [--chokepoint|--totality-oracle] [--write]
 node src/cli.ts hook <event>              # answer one harness event (event JSON on stdin)
 node src/cli.ts hooks install --host claude|codex
 node src/cli.ts hooks status

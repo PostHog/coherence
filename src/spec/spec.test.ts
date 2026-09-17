@@ -300,7 +300,7 @@ test("the model: names are unique within a component, declared-as names must exi
       const messages = model.problems.map((p) => p.message);
       assert.ok(messages.some((m) => m === "invariant twin declared twice in this component"));
       assert.ok(messages.some((m) => m.includes('capability-authorization declared as "nobody", which names no invariant')));
-      assert.ok(messages.some((m) => m.includes("revalidated-permission declared as itself")));
+      assert.ok(!messages.some((m) => m.includes("revalidated-permission")), "a shape declared as the bullet itself is fine: the requirement often is the shape");
       assert.ok(messages.some((m) => m.includes("a folder holds one spec")));
     },
   );

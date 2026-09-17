@@ -185,11 +185,10 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
           problems.push({ file: specPath, line: invariant.crossing.line, message: `crossing on ${invariant.name} names trust level ${end}; ${declared}` });
         }
       }
+      // A shape may be declared as the bullet itself: the requirement often is the shape.
       for (const line of invariant.checklist) {
         if (line.outcome !== "declared") continue;
-        if (line.as === invariant.name) {
-          problems.push({ file: specPath, line: line.line, message: `checklist on ${invariant.name}: ${line.shape} declared as itself` });
-        } else if (!allNames.has(line.as)) {
+        if (!allNames.has(line.as)) {
           problems.push({ file: specPath, line: line.line, message: `checklist on ${invariant.name}: ${line.shape} declared as "${line.as}", which names no invariant` });
         }
       }
