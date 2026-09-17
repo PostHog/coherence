@@ -12,8 +12,11 @@
     "scope": "node --disable-warning=ExperimentalWarning src/readings/scope/build.ts",
     "scope:check": "node --disable-warning=ExperimentalWarning --test src/readings/scope/check.test.ts",
     "journal:check": "node --disable-warning=ExperimentalWarning --test src/journal/journal.test.ts",
+    "glossary:check": "node --disable-warning=ExperimentalWarning src/cli.ts glossary --check",
+    "spec:check": "node --disable-warning=ExperimentalWarning src/cli.ts spec --check",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 \"src/**/*.test.ts\""
+    "test:unit": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 \"src/**/*.test.ts\"",
+    "test": "npm run typecheck && npm run test:unit && npm run glossary:check && npm run spec:check"
   },
   "devDependencies": {
     "@types/node": "^22.20.3",
