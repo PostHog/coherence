@@ -121,7 +121,7 @@ test("a wrapped value continues the line above it", () => {
 test("the state derivation: the full bullet is an invariant, and each missing part keeps it a requirement", () => {
   const full = firstInvariant(`${ENTRY}${FULL_BULLET}${checklistFor(["credential", "output"], "door count")}${OTHER}`);
   const applicable = applicableShapes(seed, ["credential", "output"]).map((s) => s.shape);
-  assert.deepEqual(deriveState(full, applicable), { state: "invariant", lacks: [], missingShapes: [] });
+  assert.deepEqual(deriveState(full, applicable), { state: "invariant", lacks: [], missingShapes: [], verified: [], defects: [] });
 
   const without = (...keys: string[]): Invariant => {
     const lines = `${FULL_BULLET}${checklistFor(["credential", "output"], "door count")}`
@@ -258,6 +258,7 @@ test("the model: components nest by folder, transparent folders are skipped, and
         bullets: 3,
         invariants: 1,
         requirements: 2,
+        structuralDefects: 0,
         lacking: { enforcement: 1, refutation: 2, kinds: 1, checklist: 0, because: 0 },
         unfilled: 0,
         problems: 0,
