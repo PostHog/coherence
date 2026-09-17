@@ -13,6 +13,7 @@ dist/
 .coherence/*
 !.coherence/decisions/
 !.coherence/journal/
+!.coherence/runs/
 !.coherence/defects/
 !.coherence/status.json
 !.coherence/calibration/

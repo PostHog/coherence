@@ -23,6 +23,10 @@ Guiding artifacts kept from the reference:
 First slice: the glossary, the hook that injects it, and the drift check at
 regulate. Second slice: the spec grammar and the spine (`docs/spec.md`), with
 the scaffold that makes the complete shape the cheapest thing to produce.
+Third slice: enforcement (`docs/enforcement.md`): the language adapter seam
+over the language server protocol, the chokepoint check with its grade
+ladder and automatic refutation, the totality oracle pass, the run, and
+revelation at the edit through a warm per-project server.
 Mnemion is the first adopter.
 
 ```sh
@@ -32,6 +36,9 @@ node src/cli.ts spec --check [root]       # components, invariants with state, p
 node src/cli.ts spec --json [root]        # the spec model
 node src/cli.ts scaffold component <folder> "<intent>"
 node src/cli.ts scaffold invariant <folder> "<sentence>" --kinds a,b [--chokepoint|--totality-oracle] [--write]
+node src/cli.ts run [--session --agent]   # the chokepoint check and the totality oracle pass, one run appended; exit 1 on a structural defect
+node src/cli.ts run --status              # the latest verdict per enforcement, a view over every run
+node src/cli.ts serve                     # the warm language server for this project (spawned on demand otherwise)
 node src/cli.ts hook <event>              # answer one harness event (event JSON on stdin)
 node src/cli.ts hooks install --host claude|codex
 node src/cli.ts hooks status

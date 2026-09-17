@@ -7,15 +7,16 @@
  * config's entryDir, else the root) declares the trust levels crossings
  * name. Cross-spec facts are checked here: crossings against trust levels,
  * declared-as names against the invariants that exist, names unique within
- * a component. State is derived statically from what the bullet carries;
- * whether an enforcement actually detects is the language server's question
- * (slice three), so every enforcement reports as declared, unverified.
+ * a component. State is derived from what the bullet carries and, when runs
+ * exist under .coherence/runs, from the latest run that checked each
+ * enforcement; with no run every enforcement reports as declared, unverified.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { parseSpec, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
+import { latestByEnforcement, latestFor, loadRuns, type Latest } from "../enforcement/record.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
 
 export const SPEC_SUFFIX = ".spec.md";
@@ -33,6 +34,12 @@ export interface ModelInvariant extends Invariant {
   missingShapes: string[];
   state: State;
   lacks: Lack[];
+  /** The latest run entry per form that checked this bullet; empty when no run has. */
+  latest: Latest[];
+  /** Enforcements the latest run found passing. */
+  verified: Latest[];
+  /** Enforcements the latest run found failing: the structural defects. */
+  defects: Latest[];
 }
 
 export interface Component {
@@ -52,6 +59,7 @@ export interface Counts {
   bullets: number;
   invariants: number;
   requirements: number;
+  structuralDefects: number;
   lacking: Record<Lack, number>;
   unfilled: number;
   problems: number;
@@ -65,6 +73,8 @@ export interface SpecModel {
   components: Component[];
   problems: Problem[];
   counts: Counts;
+  /** When runs exist: the time of the latest, and how many run lines were unreadable. */
+  runs: { latest: string; count: number; damaged: number } | undefined;
 }
 
 interface Config {
@@ -129,6 +139,8 @@ function parentOf(folder: string, folders: ReadonlySet<string>): string | undefi
 
 export interface LoadOptions {
   seed?: Seed | undefined;
+  /** Read .coherence/runs and derive run-informed state (default true). */
+  runs?: boolean | undefined;
 }
 
 export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): SpecModel {
@@ -137,6 +149,12 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   const seed = options.seed ?? loadSeed();
   const config = readConfig(root);
   const problems: Problem[] = [];
+  const loadedRuns = options.runs === false ? { records: [], damaged: [] } : loadRuns(root);
+  const latest = latestByEnforcement(loadedRuns.records);
+  const runs =
+    loadedRuns.records.length === 0
+      ? undefined
+      : { latest: loadedRuns.records[loadedRuns.records.length - 1]!.at, count: loadedRuns.records.length, damaged: loadedRuns.damaged.length };
 
   const byFolder = new Map<string, { folder: string; specPath: string; parsed: ReturnType<typeof parseSpec> }>();
   for (const specPath of findSpecs(root, config.ignore)) {
@@ -193,8 +211,10 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
         }
       }
       const applicable = invariant.kinds === undefined || invariant.kinds === "none" ? [] : applicableShapes(seed, invariant.kinds).map((s) => s.shape);
-      const { state, lacks, missingShapes } = deriveState(invariant, applicable);
-      invariants.push({ ...invariant, component: folder, applicable, missingShapes, state, lacks });
+      const mine = latestFor(latest, folder, invariant.name);
+      const { state, lacks, missingShapes, verified, defects } = deriveState(invariant, applicable, mine);
+      const entries = [mine.chokepoint, mine.totality].filter((e): e is Latest => e !== undefined);
+      invariants.push({ ...invariant, component: folder, applicable, missingShapes, state, lacks, latest: entries, verified, defects });
     }
     components.push({
       folder,
@@ -215,21 +235,23 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   problems.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
 
   const counts = countModel(components, problems);
-  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts };
+  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs };
 }
 
 function countModel(components: Component[], problems: Problem[]): Counts {
   const lacking: Record<Lack, number> = { enforcement: 0, refutation: 0, kinds: 0, checklist: 0, because: 0 };
   let bullets = 0;
   let invariants = 0;
+  let structuralDefects = 0;
   let unfilled = 0;
   for (const component of components) {
     for (const invariant of component.invariants) {
       bullets += 1;
       if (invariant.state === "invariant") invariants += 1;
+      if (invariant.state === "structural defect") structuralDefects += 1;
       for (const lack of invariant.lacks) lacking[lack] += 1;
       unfilled += invariant.unfilled.length;
     }
   }
-  return { components: components.length, bullets, invariants, requirements: bullets - invariants, lacking, unfilled, problems: problems.length };
+  return { components: components.length, bullets, invariants, requirements: bullets - invariants - structuralDefects, structuralDefects, lacking, unfilled, problems: problems.length };
 }

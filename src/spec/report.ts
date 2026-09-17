@@ -3,18 +3,35 @@
  * state, every problem with its file and line, and the counts.
  */
 
+import type { Latest } from "../enforcement/record.ts";
 import type { Component, ModelInvariant, SpecModel } from "./model.ts";
 import { LACKS } from "./state.ts";
+
+/** How the latest run left one enforcement, or "declared, unverified" when no run has checked it. */
+export function verdictText(latest: Latest | undefined): string {
+  if (latest === undefined) return "declared, unverified";
+  const date = latest.at.slice(0, 10);
+  const grade = latest.grade === undefined ? "" : ` ${latest.grade}`;
+  switch (latest.verdict) {
+    case "pass":
+      return `verified ${date}${grade}`;
+    case "fail":
+      return `structural defect ${date}${grade}: ${latest.reason}`;
+    case "not run":
+      return `not run ${date}${grade}: ${latest.reason}`;
+  }
+}
 
 function invariantLines(invariant: ModelInvariant): string[] {
   const lines: string[] = [];
   const lacks = invariant.lacks.length === 0 ? "" : `  lacks ${invariant.lacks.join(", ")}`;
   lines.push(`  ${invariant.name}  ${invariant.state}${lacks}`);
   for (const enforcement of invariant.enforcements) {
+    const latest = invariant.latest.find((l) => l.form === enforcement.form);
     if (enforcement.form === "chokepoint") {
-      lines.push(`      chokepoint ${enforcement.chokepoint} protects ${enforcement.protects}: declared, unverified`);
+      lines.push(`      chokepoint ${enforcement.chokepoint} protects ${enforcement.protects}: ${verdictText(latest)}`);
     } else {
-      lines.push(`      totality oracle "${enforcement.via}" over ${enforcement.over}: declared, unverified`);
+      lines.push(`      totality oracle "${enforcement.via}" over ${enforcement.over}: ${verdictText(latest)}`);
     }
   }
   if (invariant.crossing !== undefined) lines.push(`      crossing ${invariant.crossing.from} -> ${invariant.crossing.to}`);
@@ -42,9 +59,14 @@ export function formatCounts(model: SpecModel): string {
   const c = model.counts;
   const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
   const lacking = LACKS.map((lack) => `${lack} ${c.lacking[lack]}`).join(", ");
+  const defects = c.structuralDefects === 0 ? "" : `, ${plural(c.structuralDefects, "structural defect")}`;
+  const runs =
+    model.runs === undefined
+      ? "no run yet: every enforcement is declared, unverified"
+      : `latest run ${model.runs.latest} (${plural(model.runs.count, "run")}${model.runs.damaged === 0 ? "" : `, ${model.runs.damaged} unreadable`})`;
   return [
-    `${plural(c.components, "component")}, ${plural(c.bullets, "bullet")}: ${plural(c.invariants, "invariant")}, ${plural(c.requirements, "requirement")}`,
-    `lacking: ${lacking}; unfilled placeholders ${c.unfilled}; ${plural(c.problems, "problem")}`,
+    `${plural(c.components, "component")}, ${plural(c.bullets, "bullet")}: ${plural(c.invariants, "invariant")}, ${plural(c.requirements, "requirement")}${defects}`,
+    `lacking: ${lacking}; unfilled placeholders ${c.unfilled}; ${plural(c.problems, "problem")}; ${runs}`,
   ].join("\n");
 }
 
