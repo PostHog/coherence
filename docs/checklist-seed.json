@@ -1,223 +1,377 @@
 {
-  "version": 1,
-  "purpose": "Seed for the decomposition checklist: known invariant shapes an agent must declare or dismiss when a requirement of the matching kind is declared. Prose only; no ids, links, or assessments.",
+  "version": 2,
+  "purpose": "Seed for the decomposition checklist: known invariant shapes an agent must declare or dismiss when a requirement of the matching kind is declared. Prose only; no ids, links, or assessments. Each shape carries kinds, the tags a requirement names to see only the shapes that apply.",
   "source": "reference guarantee catalog, 36 entries, extracted 2026-09-17",
   "shapes": [
     {
       "shape": "scoped-reads",
+      "kinds": [
+        "read",
+        "storage"
+      ],
       "sentence": "Ordinary reads through the named boundary return only records in the declared effective scope, and missing required context refuses.",
       "applies_when": "A read entry point promises to restrict a shared population using explicit scope context.",
       "excludes": "Raw queries, alternate managers, and explicit cross-scope operations outside the bound entry point; context correctness needs its own evidence."
     },
     {
       "shape": "capability-authorization",
+      "kinds": [
+        "credential",
+        "identity"
+      ],
       "sentence": "A credential authorizes only its declared resource, operation, audience and validity interval at the named acceptance boundary.",
       "applies_when": "A service accepts credentials carrying bounded authority.",
       "excludes": "Legacy shared-secret and intentionally unauthenticated branches; authenticity alone does not confer authority."
     },
     {
-      "shape": "current-authority",
+      "shape": "revalidated-permission",
+      "kinds": [
+        "credential",
+        "queue",
+        "state"
+      ],
       "sentence": "Deferred or resumed work revalidates the actor's current authority at the declared execution boundary rather than relying solely on queue-time authority.",
       "applies_when": "An authority-changing interval separates acceptance from execution or resumption.",
       "excludes": "Revocation of already-running work and remote invalidation of copied credentials; those require separate enforcement."
     },
     {
       "shape": "destination-confinement",
+      "kinds": [
+        "output",
+        "message"
+      ],
       "sentence": "Outbound payload delivery remains inside the declared destination policy through redirects and other followed hops.",
       "applies_when": "A sender accepts a destination or follows a response that can change it.",
       "excludes": "A URL allowlist alone does not prove DNS-rebinding resistance or confinement of uninspected transports."
     },
     {
       "shape": "message-authenticity",
+      "kinds": [
+        "message",
+        "credential"
+      ],
       "sentence": "A message is accepted only if its protected fields verify under the declared signing and trust policy.",
       "applies_when": "A receiver relies on a signed external message before applying effects.",
       "excludes": "Replay freshness, authorization and truthful content from an authorized signer are not established by signature verification."
     },
     {
       "shape": "encrypted-storage",
+      "kinds": [
+        "storage",
+        "credential"
+      ],
       "sentence": "The named persistence boundary encodes protected values as ciphertext under the configured key policy rather than persisting plaintext.",
       "applies_when": "A field or object is explicitly designated confidential at rest.",
       "excludes": "Logs, process memory, backups, access control and cryptographic algorithm strength outside the declared boundary."
     },
     {
       "shape": "key-rotation-compatibility",
+      "kinds": [
+        "storage",
+        "credential",
+        "encoding"
+      ],
       "sentence": "During the declared rotation stages, supported readers can decrypt retained data while new writes use the stage's designated key.",
       "applies_when": "Encrypted data must survive key changes and coexisting reader versions.",
       "excludes": "Readability after deliberate removal of the only decrypting key, key compromise recovery and remote credential revocation."
     },
     {
       "shape": "redaction",
+      "kinds": [
+        "output",
+        "read"
+      ],
       "sentence": "Output removes or replaces content designated sensitive by the declared recognition and allowlist policy across the bound representation paths.",
       "applies_when": "A representation is exported with an explicit scrubbing policy.",
       "excludes": "Universal PII detection, irreversible anonymization, image/OCR coverage or representations absent from the binding."
     },
     {
       "shape": "input-validation",
+      "kinds": [
+        "message",
+        "storage"
+      ],
       "sentence": "When the declared validation policy is enabled, invalid inputs do not enter the accepted processing path.",
       "applies_when": "A boundary has an explicit schema and reject or quarantine behavior.",
       "excludes": "Unenforced schemas, unknown types explicitly allowed by policy, optional properties not checked, and semantic authorization."
     },
     {
       "shape": "semantic-preservation",
+      "kinds": [
+        "encoding"
+      ],
       "sentence": "A transformation preserves the declared observable meaning of the reference computation on its supported input domain.",
       "applies_when": "An optimization or translation claims equivalence to a reference behavior.",
       "excludes": "Byte identity, performance improvement and equivalence of transformations or query forms outside the bound domain."
     },
     {
       "shape": "canonical-encoding",
+      "kinds": [
+        "encoding",
+        "identity"
+      ],
       "sentence": "Inputs equivalent under the declared normalization relation produce the same encoded identity regardless of irrelevant representation ordering.",
       "applies_when": "A key, digest input or serialized identity must ignore representation-only differences.",
       "excludes": "Cryptographic collision resistance, semantic correctness of the chosen identity and arbitrary input permutations that change meaning."
     },
     {
       "shape": "identity-continuity",
+      "kinds": [
+        "identity"
+      ],
       "sentence": "A declared identity transition preserves the bound assignment or association while the policy and relevant state remain fixed.",
       "applies_when": "A system promises continuity across anonymous/identified or other identity changes.",
       "excludes": "Flag revisions, eligibility changes, deliberately disabled continuity and unavailable identity state."
     },
     {
       "shape": "revision-preservation",
+      "kinds": [
+        "revision",
+        "storage"
+      ],
       "sentence": "Publishing a new revision preserves the previous revision's bound content and identity instead of rewriting its history.",
       "applies_when": "A publication path maintains version-addressed history.",
       "excludes": "Database-administrator edits, deliberate retention deletion, tamper-proof storage and workers executing historical snapshots."
     },
     {
       "shape": "separation-of-duties",
+      "kinds": [
+        "credential",
+        "state"
+      ],
       "sentence": "An actor cannot satisfy mutually exclusive roles in the same protected operation when the declared approval policy forbids it.",
       "applies_when": "A policy requires independent request and approval authority.",
       "excludes": "Policies allowing self-approval, proof that two accounts belong to different people, and enforcement outside the gated API."
     },
     {
-      "shape": "legal-state-transitions",
+      "shape": "legal-state-succession",
+      "kinds": [
+        "state"
+      ],
       "sentence": "A transition commits only from a currently allowed predecessor state, rechecked within the serialization boundary.",
       "applies_when": "Concurrent actors may make competing terminal decisions about one stateful subject.",
       "excludes": "External effects outside the transaction and proof of physical concurrency when an oracle only simulates the locked state."
     },
     {
       "shape": "supersession-safety",
+      "kinds": [
+        "state",
+        "queue"
+      ],
       "sentence": "Late work publishes only while its declared precondition still holds; it cannot displace a superseding accepted value or clean up that winner's resources.",
       "applies_when": "Asynchronous operations compete to publish state at one subject.",
       "excludes": "General linearizability and equal-value intermediate-write detection unless explicitly represented by the precondition."
     },
     {
       "shape": "retry-recognition",
+      "kinds": [
+        "message",
+        "queue"
+      ],
       "sentence": "Repeating an operation whose own effect already landed recognizes that success rather than classifying the retry as a conflicting operation.",
       "applies_when": "Replies can be lost and the caller retries a distinguishable operation.",
       "excludes": "Exactly-once execution, detection of every network failure, and retry identities reused by unrelated operations."
     },
     {
       "shape": "duplicate-suppression",
+      "kinds": [
+        "message",
+        "queue"
+      ],
       "sentence": "Within the declared horizon, competing claims for one deduplication identity receive the declared suppression outcome while permitted redelivery remains distinct.",
       "applies_when": "A boundary explicitly deduplicates logical events or requests.",
       "excludes": "Global exactly-once processing, repeats after expiry and suppression during an explicitly fail-open store outage."
     },
     {
       "shape": "keyed-ordering",
+      "kinds": [
+        "message",
+        "queue"
+      ],
       "sentence": "The named transport boundary retains the routing key required by the declared ordering domain and lane.",
       "applies_when": "Routing promises ordered handling for a specific identity, not global traffic.",
       "excludes": "Total global order and downstream order across producer failures, rebalances or storage unless separately bound."
     },
     {
       "shape": "worker-fencing",
+      "kinds": [
+        "queue",
+        "state"
+      ],
       "sentence": "After ownership changes, work carrying the former ownership generation cannot commit through the fenced boundary.",
       "applies_when": "Workers may complete after a lease, assignment or ownership handoff.",
       "excludes": "Side effects outside the offset/store fence and proof that every worker operation checks the generation."
     },
     {
       "shape": "acknowledgment-barrier",
+      "kinds": [
+        "message",
+        "queue"
+      ],
       "sentence": "Successful acknowledgment follows the named completion barrier rather than mere receipt or submission.",
       "applies_when": "A producer relies on an acknowledgment to retire responsibility for submitted work.",
       "excludes": "Durability, query visibility and downstream exactly-once behavior not promised by that barrier."
     },
     {
       "shape": "commit-ordered-effects",
+      "kinds": [
+        "storage",
+        "output",
+        "state"
+      ],
       "sentence": "An irreversible external effect is not issued before the transaction establishing its intent successfully commits.",
       "applies_when": "A transaction creates state whose existence authorizes external work.",
       "excludes": "Eventual delivery after commit and effects issued on other code paths."
     },
     {
       "shape": "durable-dispatch-intent",
+      "kinds": [
+        "storage",
+        "queue"
+      ],
       "sentence": "Committed work retains a discoverable dispatch intent until the declared dispatch acknowledgment retires it, including loss of the immediate callback.",
       "applies_when": "A database commit and external dispatch cannot be one atomic operation.",
       "excludes": "Unconditional eventual delivery, an operating dispatcher, permanent downstream availability and exactly-once execution."
     },
     {
       "shape": "resumption-coverage",
+      "kinds": [
+        "queue",
+        "state"
+      ],
       "sentence": "After interruption, planned remaining work covers the required range not already completed under the declared boundary and overlap rules.",
       "applies_when": "A batch operation resumes from completed ranges or checkpoints.",
       "excludes": "Exactly-once downstream effects and records arriving outside the bound source snapshot or interval policy."
     },
     {
       "shape": "retry-classification",
+      "kinds": [
+        "queue",
+        "message"
+      ],
       "sentence": "Failures are classified as retryable or terminal according to the declared error policy, without silently exchanging those outcomes.",
       "applies_when": "A worker chooses whether to retry after an external failure.",
       "excludes": "Backoff, attempt bounds, successful recovery and universal meanings for particular HTTP status codes."
     },
     {
       "shape": "graceful-drain",
+      "kinds": [
+        "queue",
+        "deploy"
+      ],
       "sentence": "Shutdown stops the declared admission path and gives already-accepted work its promised settlement/drain opportunity before closing, with an explicit deadline outcome.",
       "applies_when": "A service closes while work is in flight.",
       "excludes": "Unbounded waiting, guaranteed completion of stalled dependencies and work outside the captured drain population."
     },
     {
       "shape": "cancellation-release",
+      "kinds": [
+        "queue"
+      ],
       "sentence": "Canceled waiting work loses its queue claim and any subsequently granted capacity is returned rather than consumed by dead work.",
       "applies_when": "Cancelable work waits for a scarce slot.",
       "excludes": "Stopping already-running server computation and removing already-issued irreversible effects."
     },
     {
       "shape": "bounded-admission",
+      "kinds": [
+        "budget",
+        "queue"
+      ],
       "sentence": "The named admission boundary does not admit more simultaneously active work than its configured capacity.",
       "applies_when": "A scheduler or service imposes a concurrency ceiling.",
       "excludes": "Bounds on every buffer, memory allocation, per-tenant fairness and time-window rate limits."
     },
     {
       "shape": "fair-admission",
+      "kinds": [
+        "budget",
+        "queue"
+      ],
       "sentence": "When capacity becomes available, eligible contenders receive service according to the declared scheduling order rather than accidental races.",
       "applies_when": "Multiple eligible contenders share a scheduling resource with an explicit fairness policy.",
       "excludes": "Wall-clock latency bounds, equal throughput and progress while no slots become available."
     },
     {
       "shape": "rate-budget",
+      "kinds": [
+        "budget"
+      ],
       "sentence": "Admission accounts for weighted consumption against every declared time window of the correct budget owner.",
       "applies_when": "Requests share an external or internal quota over time.",
       "excludes": "Fleet-wide enforcement during per-process fallback and upstream limits omitted from the configured policy."
     },
     {
       "shape": "memory-budget",
+      "kinds": [
+        "budget"
+      ],
       "sentence": "The bound evaluator refuses further accounted allocation once its declared memory budget would be exceeded.",
       "applies_when": "Untrusted or variable-sized work runs under explicit allocation accounting.",
       "excludes": "Operating-system RSS, unaccounted host-library allocations and a claim that all memory is bounded."
     },
     {
       "shape": "execution-budget",
+      "kinds": [
+        "budget"
+      ],
       "sentence": "Execution refuses further counted steps once the declared operation budget is exhausted.",
       "applies_when": "An interpreter or workflow permits bounded repeated execution or external calls.",
       "excludes": "A wall-clock deadline, memory limits and operations the declared counter does not count."
     },
     {
       "shape": "circuit-breaker-policy",
+      "kinds": [
+        "budget",
+        "output"
+      ],
       "sentence": "Observed dependency failures produce the declared open/closed and bypass decision under the configured sample window and threshold policy.",
       "applies_when": "A caller uses failure history to divert or suppress calls to a struggling dependency.",
       "excludes": "Zero traffic to an open circuit when bypass is probabilistic, caller compliance and downstream recovery."
     },
     {
       "shape": "readiness-evidence",
+      "kinds": [
+        "deploy"
+      ],
       "sentence": "A readiness claim requires current positive observations of every declared serving prerequisite, not merely a live process.",
       "applies_when": "A deployment or router admits traffic based on a readiness surface.",
       "excludes": "Undeclared dependencies, all possible request success and liveness, which may intentionally remain true during dependency failure."
     },
     {
       "shape": "declared-target-coverage",
+      "kinds": [
+        "output",
+        "storage",
+        "deploy"
+      ],
       "sentence": "A fan-out operation accounts for every target in its declared live registry and refuses unsupported reachability instead of silently omitting a target.",
       "applies_when": "Work must reach a registry-defined set of stores, clusters or handlers.",
       "excludes": "Proof that the registry contains every physical copy, backup, external destination or future replay source."
     },
     {
       "shape": "completion-evidence",
+      "kinds": [
+        "queue",
+        "storage"
+      ],
       "sentence": "A work item enters completed only after the declared observer confirms the requested outcome across its bound target population.",
       "applies_when": "Submitting or queuing work can precede its actual effect.",
       "excludes": "Permanent no-resurrection, deletion of undeclared copies and exact predicate support where the observer uses a conservative superset."
     }
-  ]
+  ],
+  "kinds": {
+    "read": "a read path over a shared population",
+    "credential": "a token, key, passkey, or other bearer of permission",
+    "storage": "data at rest and the writes that land it",
+    "message": "a message, request, or event accepted from outside",
+    "output": "data leaving the system: responses, deliveries, exports",
+    "state": "a stateful subject moving between states",
+    "queue": "deferred, retried, or competing work",
+    "budget": "a bound on admission, memory, steps, or rate",
+    "deploy": "a process, shutdown, or readiness surface",
+    "identity": "how a thing is identified or its identity kept",
+    "encoding": "a transformation, normalization, or serialization",
+    "revision": "versioned or published history"
+  }
 }
