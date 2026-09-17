@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -9,7 +10,8 @@ import { Readable } from "node:stream";
 import { journalVerbs } from "../journal/cli.ts";
 import { openEscalations } from "../journal/read.ts";
 import { loadJournal } from "../journal/store.ts";
-import { CONTEXT_BUDGET, INSTRUCTION, REFUSE_EXIT, changedFiles, readStdinJson, runHook, sessionBlock } from "./hook.ts";
+import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
+import { BOUNDARY_RULE, CONTEXT_BUDGET, INSTRUCTION, REFUSE_EXIT, changedFiles, feedContext, readStdinJson, runHook, sessionBlock } from "./hook.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
@@ -182,4 +184,138 @@ test("orient lists open requirements and regulate reports them; only spec proble
   const allowed = await hook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
   assert.equal(allowed.exit, 0, "an open requirement never refuses a subagent stop");
   assert.match(allowed.stdout, /1 requirement open in the project/, "the open requirement is still reported");
+});
+
+/** A project of its own for the work and feed tests, so the shared root's journal stays as the earlier tests left it. */
+async function freshRoot(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "coherence-hook-work-"));
+  await writeFile(join(dir, "coherence.config.json"), JSON.stringify({ glossary: "glossary.json" }));
+  await writeFile(join(dir, "glossary.json"), JSON.stringify({ project: "widgetry", version: 0, concepts: [], rejected: [] }));
+  return dir;
+}
+
+function verb(cwd: string, name: string, ...argv: string[]): string[] {
+  const printed: string[] = [];
+  const io = { cwd, out: (line: string) => printed.push(line), err: (line: string) => printed.push(line) };
+  const code = journalVerbs[name]!(argv, io);
+  assert.equal(code, 0, printed.join("\n"));
+  return printed;
+}
+
+function idOf(printed: string[]): string {
+  return printed[0]!.split(/\s+/)[0]!;
+}
+
+function contextOf(result: { stdout: string }): string {
+  return (JSON.parse(result.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext;
+}
+
+test("orient prints the active order a session owns with the boundary rule, nudges an open one, and regulate reminds that work close ends it", async () => {
+  const dir = await freshRoot();
+  try {
+    const silent = await runHook("SubagentStart", { cwd: dir, session_id: "child", agent_type: "Plan" }, dir);
+    assert.doesNotMatch(contextOf(silent), /Work order/, "no order, no block");
+
+    const id = idOf(verb(dir, "work", "create", "ship the feed", "--success", "hook.test.ts covers the feed", "--boundary", "src/journal only", "--owner-session", "child", "--session", "main-1", "--agent", "main"));
+    const open = contextOf(await runHook("SubagentStart", { cwd: dir, session_id: "child", agent_type: "Plan" }, dir));
+    assert.match(open, new RegExp(`Work order ${id} is open, not active; nothing binds to it until: work move ${id} active --because "<taking it up>" --session child --agent Plan\n  objective: ship the feed`));
+    assert.doesNotMatch(open, /every journal write and run this session makes binds/);
+    assert.deepEqual(await runHook("Stop", { cwd: dir, session_id: "child" }, dir), { stdout: "", stderr: "", exit: 0 }, "an open order owes nothing at the stop");
+
+    verb(dir, "work", "move", id, "active", "--because", "taking it up", "--session", "child", "--agent", "Plan");
+    const active = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "child", agent_type: "Plan" }, dir));
+    const rule = BOUNDARY_RULE.replace(/[().:]/g, "\\$&");
+    assert.match(active, new RegExp(`^Work order ${id} \\(active; every journal write and run this session makes binds to it\\):\n  objective: ship the feed\n  success:   hook.test.ts covers the feed\n  boundary:  src/journal only\n  ${rule}\n\nCoherence vocabulary`));
+    assert.ok(active.length <= CONTEXT_BUDGET);
+    const other = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "main-1" }, dir));
+    assert.doesNotMatch(other, /Work order/, "the order is the owner's, not the creator's");
+
+    for (const event of ["Stop", "SubagentStop"] as const) {
+      const stop = await runHook(event, { cwd: dir, session_id: "child", agent_type: "Plan", stop_hook_active: false }, dir);
+      assert.equal(stop.exit, 0, "an active order is a reminder, never a refusal");
+      const message = (JSON.parse(stop.stdout) as { systemMessage: string }).systemMessage;
+      assert.match(message, new RegExp(`^Regulate \\(${event}\\):\nWork:\nWork order ${id} is still active \\(ship the feed\\)\\. When its success criterion holds, close it: work close ${id} --because "<what was done>" --session child --agent Plan$`));
+    }
+
+    const second = idOf(verb(dir, "work", "create", "another", "--success", "s", "--boundary", "b", "--session", "child", "--agent", "Plan"));
+    verb(dir, "work", "move", second, "active", "--because", "also", "--session", "child", "--agent", "Plan");
+    const several = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "child" }, dir));
+    assert.match(several, /^This session owns 2 active work orders, so nothing binds by inference; pass --work <id> on each write:\n/);
+
+    verb(dir, "work", "close", id, "--because", "done", "--session", "child", "--agent", "Plan");
+    verb(dir, "work", "close", second, "--because", "done", "--session", "child", "--agent", "Plan");
+    assert.deepEqual(await runHook("Stop", { cwd: dir, session_id: "child" }, dir), { stdout: "", stderr: "", exit: 0 }, "closed orders owe nothing");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("the peer feed injects subjects of other sessions' records since the cursor, capped, never full records", async () => {
+  const dir = await freshRoot();
+  try {
+    verb(dir, "decide", "before the child began", "--because", "old", "--session", "main-1", "--agent", "main");
+    const start = await runHook("SubagentStart", { cwd: dir, session_id: "child", agent_type: "Plan" }, dir);
+    assert.equal(start.exit, 0);
+    assert.notEqual(readCursor(dir, "child"), null, "the start sets the cursor at the latest record");
+    assert.deepEqual(await runHook("UserPromptSubmit", { cwd: dir, session_id: "child" }, dir), { stdout: "", stderr: "", exit: 0 }, "nothing new since the start");
+
+    const mine = idOf(verb(dir, "decide", "my own", "--because", "b", "--session", "child", "--agent", "Plan"));
+    const subject = "peer chose JSONL because it needs no dependencies and the reference proved a native module is a wall for a subagent in a fresh worktree";
+    assert.ok(subject.length > 120);
+    const peer = idOf(verb(dir, "decide", subject, "--over", "sqlite", "--because", "the long because that must never be injected", "--session", "peer-1", "--agent", "scope"));
+    const escalation = idOf(verb(dir, "escalate", "retire an invariant", "--because", "only a human", "--session", "peer-2", "--agent", "economy"));
+
+    const prompt = await runHook("UserPromptSubmit", { cwd: dir, session_id: "child" }, dir);
+    assert.equal(prompt.exit, 0);
+    const parsed = JSON.parse(prompt.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
+    assert.equal(parsed.hookSpecificOutput.hookEventName, "UserPromptSubmit");
+    const feed = parsed.hookSpecificOutput.additionalContext;
+    const lines = feed.trimEnd().split("\n");
+    assert.match(lines[0]!, /^Peers recorded 2 since your last look \(subjects only; whole records: journal --since \S+\):$/);
+    assert.equal(lines[1], `◆ ${peer} scope: ${subject.slice(0, 119)}…`, "the subject is truncated to 120 characters");
+    assert.equal(lines[2], `▲ ${escalation} economy: retire an invariant  [escalation: a human must answer]`);
+    assert.equal(lines.length, 3);
+    assert.doesNotMatch(feed, /the long because|over:|sqlite/, "subjects only, never a full record");
+    assert.doesNotMatch(feed, new RegExp(mine), "a session's own records are not its peers'");
+
+    assert.deepEqual(await runHook("PostToolUse", { cwd: dir, session_id: "child", tool_name: "Read", tool_input: { file_path: "x" } }, dir), { stdout: "", stderr: "", exit: 0 }, "the cursor advanced: the same records are not shown twice");
+
+    for (let n = 0; n < FEED_CAP + 3; n += 1) verb(dir, "decide", `peer decision ${n}`, "--because", "b", "--session", "peer-1", "--agent", "scope");
+    const tool = await runHook("PostToolUse", { cwd: dir, session_id: "child", tool_name: "Read", tool_input: { file_path: "x" } }, dir);
+    const capped = contextOf(tool).trimEnd().split("\n");
+    assert.match(capped[0]!, new RegExp(`^Peers recorded ${FEED_CAP + 3} since your last look`));
+    assert.equal(capped.length, FEED_CAP + 2, "a header, the cap, and the count of the rest");
+    assert.match(capped.at(-1)!, /^and 3 more; run: journal --since \S+$/);
+    const since = /journal --since (\S+)\)/.exec(capped[0]!)![1]!;
+    const whole: string[] = [];
+    journalVerbs["journal"]!(["--since", since], { cwd: dir, out: (l) => whole.push(l), err: () => {} });
+    assert.equal(whole.filter((l) => /peer decision/.test(l)).length, FEED_CAP + 3, "the named command shows every record the cap hid");
+    assert.deepEqual(await runHook("UserPromptSubmit", { cwd: dir, session_id: "child" }, dir), { stdout: "", stderr: "", exit: 0 });
+    assert.deepEqual(await runHook("UserPromptSubmit", { cwd: dir }, dir), { stdout: "", stderr: "", exit: 0 }, "no session, no cursor, no feed");
+    assert.ok(!existsSync(join(dir, ".coherence", "journal", "child.cursor")), "the cursor lives under the feed directory, not the journal");
+    assert.ok(existsSync(join(dir, FEED_DIR, "child.cursor")));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("the feed cursor advances only after the feed is printed", async () => {
+  const dir = await freshRoot();
+  try {
+    await runHook("SubagentStart", { cwd: dir, session_id: "child" }, dir);
+    verb(dir, "decide", "seed", "--because", "b", "--session", "main-1", "--agent", "main");
+    await runHook("UserPromptSubmit", { cwd: dir, session_id: "child" }, dir);
+    const before = readCursor(dir, "child");
+    verb(dir, "decide", "peer wrote", "--because", "b", "--session", "peer-1", "--agent", "scope");
+    const first = feedContext(dir, { session_id: "child" });
+    assert.match(first.text, /peer wrote/);
+    assert.deepEqual(readCursor(dir, "child"), before, "rendering the feed moves nothing");
+    const again = feedContext(dir, { session_id: "child" });
+    assert.equal(again.text, first.text, "an uncommitted feed is shown again");
+    first.commit();
+    assert.notDeepEqual(readCursor(dir, "child"), before, "the commit after the print moves the cursor");
+    assert.equal(feedContext(dir, { session_id: "child" }).text, "");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
