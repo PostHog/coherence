@@ -1,0 +1,1125 @@
+{
+  "version": 1,
+  "source": "reference implementation at /Users/daniloc/Documents/Dev/coherence, inventory concepts-raw.json (206 concepts)",
+  "concepts": [
+    {
+      "name": "invariant",
+      "definition": "The abstract behavioral requirement for a feature, system, or mechanism. No matter what additions or removals, the invariant must be preserved across implementations. If the invariant is removed or violated, this must be immediately revealed and evaluated by an agent and their human operator, or Coherence has failed as a system.",
+      "defined_by": "owner, 2026-09-17",
+      "status": "settled",
+      "reference_aliases": [
+        "gate (promise graph)",
+        "guarantee (Scope, guarantees command)",
+        "promise (Structure thesis)",
+        "contract (contract command)",
+        "anchor"
+      ],
+      "reference_note": "In the reference the authored form is one bullet under ## invariants; enforcement (boundary claim: chokepoint + oracle + crossing) and refutation history are separate records that the render layers fold back in under different names.",
+      "open_questions": [],
+      "revelation": {
+        "when": "At the moment of the edit, inside the agent's session. If the economics of that are not practical, at the next nearest practical moment (the fallback ladder is an implementation question, not part of the concept).",
+        "who": "The editing agent first. A violation that stands must be a conscious decision, made as the result of a refactor, move, or retirement of the larger class of facility the invariant protects.",
+        "owner_words": "if the invariant has been violated, this must be a conscious decision, as the result of a refactor, move or retirement of the larger class of facility the invariant is protecting. if the economics of this are not practical, then the alarm should come at the next nearest, practical moment."
+      },
+      "working_readings": [
+        "A surviving violation is a recorded decision with the rejected alternative being preservation.",
+        "Removing an invariant from the spec without an acknowledged retirement is itself a violation and is revealed the same way.",
+        "An invariant is a requirement satisfied by detection. Enforcement is a separate concept that points at it and is what makes a requirement an invariant."
+      ],
+      "metaphor": "Invariants are the spine of the system. Removing any vertebra may have significant consequences because it alters the fundamental shape of the system and its integrity. Most projects need a structure closer to an automobile than an octopus.",
+      "retirement": {
+        "rule": "Any retired invariant must be acknowledged by the human operator. The agent may propose retirement with a recorded decision; the invariant stays in force, and alarming, until a person acknowledges.",
+        "reference_verbs": "decide (with the rejected alternative being preservation) plus escalate and acknowledge; the reference has the verbs but no link from a decision to the invariant it retires.",
+        "owner_words": "the human should absolutely acknowledge any retired invariant.",
+        "reliance_listing": "At retirement the tool lists every component that relies on the invariant, computed from imports of its chokepoint; the human acknowledges with that list in view."
+      },
+      "authoring": {
+        "rule": "Asymmetric. An agent may propose new invariants as part of planning new work, decomposing requirements freely, and must announce each declaration. Only removal requires human acknowledgement.",
+        "origin": "Invariants fall out of requirements. A requirement like \"this is a session-secured resource that can only be accessed by a user with permissions\" implicitly contains invariant instances.",
+        "growth": "Growing more detailed is good. Most projects need a structure closer to an automobile than an octopus; detailed invariants make sure load-bearing members are not opaquely weakened to serve feature work or refactors.",
+        "owner_words": "an agent can propose new invariants as a process of planning new work ... the agent may decompose this stuff freely, but should also announce such invariant declaration."
+      },
+      "rejected": [
+        {
+          "alternative": "invariant includes its enforcement (the reference gate/guarantee bundle)",
+          "because": "the invariant is abstract; it must survive any implementation, so enforcement points at it rather than being part of it"
+        },
+        {
+          "alternative": "agent may retire an invariant with only a recorded decision",
+          "because": "removing a vertebra alters the shape and integrity of the system; a human must acknowledge"
+        },
+        {
+          "alternative": "symmetric human ratification for additions",
+          "because": "agents decompose requirements into invariants freely during planning; announcement suffices, and growth in detail protects load-bearing members"
+        },
+        {
+          "alternative": "revelation at verify or at read time as the primary channel",
+          "because": "the primary moment is the edit inside the agent session; later moments are fallbacks when the economics are impractical"
+        },
+        {
+          "alternative": "a facility concept above components that invariants belong to",
+          "because": "the folder tree already expresses containment; the nearest common ancestor folder is the home of a relationship invariant"
+        },
+        {
+          "alternative": "a flat project-level set of invariants",
+          "because": "coupling to the protected resource is what keeps the invariant legible next to the code it constrains"
+        }
+      ],
+      "lifecycle": "requirement (declared, not yet enforced) -> invariant (requirement satisfied by detection) -> structural defect (invariant whose satisfaction has been removed)",
+      "home": {
+        "rule": "An invariant couples as closely as possible to the resource whose behavior it protects. If it must describe two components in relationship, it belongs in the super folder containing both. The spec tree is the only home; no facility concept.",
+        "owner_words": "invariants couple as closely as possible to the resource whose behavior they protect. if an invariant must be able to describe two components in relationship, then the invariant belongs in the super folder containing both components. no new concept needed"
+      },
+      "security_marker": {
+        "rule": "Not a boolean. An expressive, machine-readable marker on the invariant, starting with a crossing: \"crossing A -> B\" where A and B are trust levels from a short list the entry spec declares. Tracing the security spine is a query over crossings; more expressive forms may be added later.",
+        "trust_levels": "Declared once in the entry spec as a short list with one-line meanings (Mnemion example: owner-trusted, storage, served-untrusted, public-egress, agent-mcp, federated). Spec, not config. They are trust levels of data or callers, never places in the code.",
+        "owner_words": "no boolean, make the marker more expressive, starting with crossing"
+      },
+      "because": {
+        "rule": "Each invariant carries its own because: why it exists, what it protects against. Replaces the ## why section. Rationale that restates the mechanism belongs nowhere.",
+        "owner_words": "retire why for because"
+      }
+    },
+    {
+      "name": "requirement",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The invariant state before enforcement. A declared behavioral requirement that nothing yet detects the violation of. Falls out of planning; an agent may declare one freely and must announce it. A requirement becomes an invariant only after enforcement is witnessed AND every applicable decomposition-checklist shape has been declared or dismissed.",
+      "reference_aliases": [
+        "unanchored invariant",
+        "proposed obligation"
+      ],
+      "related": [
+        "invariant",
+        "enforcement",
+        "decomposition checklist"
+      ]
+    },
+    {
+      "name": "structural defect",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "An invariant whose satisfaction has been removed. The enforcement that made the requirement an invariant no longer detects. Revealed at the edit in the agent session; stands until a human acknowledges a retirement or the enforcement is restored.",
+      "reference_aliases": [
+        "breach",
+        "gate verdict fail",
+        "unanchored invariant (coverage gate)",
+        "defect (journal verb, loosely)"
+      ],
+      "related": [
+        "invariant",
+        "enforcement",
+        "retirement"
+      ]
+    },
+    {
+      "name": "enforcement",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The category of things that satisfy a requirement by detection, turning it into an invariant. Two options: a chokepoint (ideal) or a totality oracle (the compromise). Enforcement counts as detection only once its refutation has been witnessed; chokepoints refute themselves through symbol resolution, totality oracles must be witnessed.",
+      "reference_aliases": [
+        "boundary claim",
+        "anchor",
+        "anchoring",
+        "gate",
+        "boundary anatomy (invariant + chokepoint + oracle + crossing)"
+      ],
+      "reference_note": "In the reference a boundary claim carries BOTH a chokepoint and an oracle; here they are alternatives under one category.",
+      "options": [
+        "chokepoint",
+        "totality oracle"
+      ],
+      "related": [
+        "invariant",
+        "chokepoint",
+        "totality oracle",
+        "refutation"
+      ],
+      "open_questions": [],
+      "working_readings": [
+        "Cardinality follows the reference decision d-6642c854: one invariant may have several enforcements as evidence paths, grouped under the one invariant rather than rendered as several. Adopted unless the owner objects."
+      ],
+      "cardinality": "One invariant may have several enforcements, grouped under it as evidence paths (reference decision d-6642c854). One enforcement serves one invariant; if a chokepoint protects two requirements, they are two invariants naming the same chokepoint."
+    },
+    {
+      "name": "chokepoint",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "A structural fact: the one site through which every reference to a protected thing passes. A chokepoint claim names two things, the protected thing (a symbol or a module, so the concept generalizes across kinds of systems) and the chokepoint symbol. It holds while every resolved reference to the protected thing is inside the chokepoint; the moment a second referencing site exists, it is no longer a chokepoint, and that edit is the moment to reveal it. The chokepoint itself may have any number of callers.",
+      "reference_aliases": [
+        "at <symbol>",
+        "anchor symbol",
+        "enforcement anchor",
+        "boundary symbol",
+        "transition symbol (atlas)"
+      ],
+      "related": [
+        "enforcement",
+        "invariant",
+        "chokepoint grade",
+        "totality oracle"
+      ],
+      "detection": "AST and symbol resolution, not a test run. Cheap enough to run at the edit.",
+      "protected_thing": {
+        "granularity": [
+          "symbol",
+          "module"
+        ],
+        "note": "module privacy is the natural unit when several members of one module legitimately touch the protected state"
+      },
+      "rejected": [
+        {
+          "alternative": "the chokepoint symbol itself has one and only one caller",
+          "because": "the chokepoint is what many paths cross; the single-caller constraint belongs to the protected thing behind it"
+        },
+        {
+          "alternative": "existence of the chokepoint symbol in the code graph is sufficient (the reference behavior)",
+          "because": "existence detects nothing; a bypass path is invisible to it, so under the lifecycle it is a requirement, not an invariant"
+        }
+      ]
+    },
+    {
+      "name": "totality oracle",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The compromise enforcement, used where structural encoding of the invariant is not practical: a detector that checks the invariant holds over the whole named set it is total over. Totality is the required form of the compromise; a spot check is not enforcement. Requires a witnessed refutation before it counts as enforcement.",
+      "reference_aliases": [
+        "oracle",
+        "via test/guard",
+        "named test",
+        "totality claim (over <enumeration>)",
+        "boundary oracle"
+      ],
+      "reference_note": "The reference recently required a totality claim to name the set it is total over (commit 05f3ea5); the reference also uses \"oracle\" for the machine that grades tests, which this concept does not cover.",
+      "related": [
+        "enforcement",
+        "invariant"
+      ]
+    },
+    {
+      "name": "chokepoint grade",
+      "status": "settled",
+      "defined_by": "owner with assistant proposal, 2026-09-17",
+      "definition": "A legible, generalizable grade for the structural quality of a chokepoint. It nudges the agent toward a better form and reflects chokepoint strength to the user.",
+      "ladder": [
+        {
+          "grade": "visibility-choked",
+          "meaning": "the protected thing is not exported from the chokepoint module; the compiler enforces the choke and the AST check only confirms non-export plus single reference. Nothing outside the module can bypass. The ideal."
+        },
+        {
+          "grade": "reference-choked",
+          "meaning": "the protected thing is exported, but every resolved reference in the repository is inside the chokepoint. A consumer outside the repository could still bypass, so this ranks below visibility-choked."
+        },
+        {
+          "grade": "not chokeable",
+          "meaning": "the protected thing is reached dynamically (string-keyed access, reflection, raw SQL strings, network, subprocess, another language). No AST can count callers; a totality oracle is the required compromise and the claim must say why structure was unavailable."
+        }
+      ],
+      "reference_aliases": [
+        "grade (A..U ordinal on a gate)",
+        "gate chip"
+      ],
+      "reference_note": "The reference has an ordinal A..U grade that is a total function of recorded signals on a gate; this replaces it with a ladder whose rungs name structural facts.",
+      "related": [
+        "chokepoint",
+        "enforcement",
+        "totality oracle"
+      ]
+    },
+    {
+      "name": "refutation",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The witnessed firing of an enforcement: the invariant was broken and the detector went red. Required. Enforcement does not count as detection, and a requirement does not become an invariant, until its refutation has been witnessed. The same hygiene as writing a test for a new feature.",
+      "by_option": {
+        "chokepoint": "Provided transparently by the tool. The language server or equivalent symbol resolution proves that a second reference to the protected thing would be reported, so no one stages the break by hand.",
+        "totality oracle": "Must be witnessed and recorded: what was broken and what was seen. Until then the oracle is a requirement, not enforcement."
+      },
+      "reference_aliases": [
+        "## refutations",
+        "negative control",
+        "observed negative control",
+        "Refuted? column",
+        "smoke pencil"
+      ],
+      "reference_note": "The reference records refutations as <invariant>: <what was broken> -> <what was seen> and reports coverage over them but never fails on a missing one. Here absence blocks the transition from requirement to invariant.",
+      "rejected": [
+        {
+          "alternative": "graded: a refutation raises the grade, absence is tolerated",
+          "because": "a detector never seen to fire is not evidence of detection; a green test that has never been red proves nothing"
+        }
+      ],
+      "related": [
+        "enforcement",
+        "chokepoint",
+        "totality oracle",
+        "invariant"
+      ]
+    },
+    {
+      "name": "component",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "Any folder with a spec file. A component is the aggregate of an implementation and its spec definition. Subcomponents are declared by specs in child folders; folders without a spec are transparent. A super folder becomes a component when a relationship invariant about its children needs a home there.",
+      "reference_aliases": [
+        "spec-tree node",
+        "node (graph)",
+        "stack (Structure)",
+        "card (Scope)",
+        "deploy unit (contracts)"
+      ],
+      "related": [
+        "invariant",
+        "zone",
+        "crossing"
+      ],
+      "open_questions": [],
+      "rejected": [
+        {
+          "alternative": "every folder is a component",
+          "because": "the spec is what declares the unit; a folder without one is transparent"
+        },
+        {
+          "alternative": "components declared in config",
+          "because": "the spec file in place is the declaration; config would be a second spelling"
+        }
+      ],
+      "contents": "See spec."
+    },
+    {
+      "name": "reliance",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "A computed fact, never declared: the components whose code references a chokepoint (or the protected thing behind it) rely on that invariant. Listed at retirement time so the human acknowledging a retired invariant sees who depends on it, and modeled and displayed in Scope.",
+      "computed_from": [
+        "resolved symbol references to the chokepoint (language server)"
+      ],
+      "reference_aliases": [
+        "relies on (guarantee consumer link)",
+        "reliance (promise graph double-entry)",
+        "reliant",
+        "architectural relationship / declared handoff",
+        "import edge"
+      ],
+      "reference_note": "The reference had four arrow kinds: 1,369 derived import edges, 12 declared handoffs in the entry spec, 3 relies-on and 3 addresses guarantee links naming claims by sha256 hash. Only the derived edges survive. Imports were the reference's cheapest derivable graph; they are a coarse shadow of references and carry no information of their own.",
+      "rejected": [
+        {
+          "alternative": "declared guarantee consumer links (relies on / addresses)",
+          "because": "3 instances each; their prose is a relationship invariant, which already has a home in the super folder under the home rule; the hash ids are unreadable"
+        },
+        {
+          "alternative": "declared handoffs as labeled import edges for the map",
+          "because": "the reliance listing computed from imports is the map; an authored label with no verification weight is a second spelling"
+        }
+      ],
+      "related": [
+        "invariant",
+        "chokepoint",
+        "retirement",
+        "scope"
+      ]
+    },
+    {
+      "name": "decomposition checklist",
+      "status": "settled",
+      "defined_by": "owner adopting assistant position, 2026-09-17",
+      "definition": "A prosthetic for systematic thinking that fires when an agent declares a requirement. The tool asks two closed questions: what set is this total over (the totality grammar), and, for the kind of thing being protected, which of the known invariant shapes apply. Each applicable shape must be declared as an invariant or dismissed with a reason before the requirement can become an invariant. Dismissals are recorded so a considered refusal never looks like an unexamined gap.",
+      "purpose": "Models struggle to behave with systematicity; given one requirement they write one invariant where a systematic thinker writes five. The checklist forces enumeration at the moment the agent has a specific subject in hand, and its output is a first-class thing (an invariant or a recorded dismissal), never a parallel record.",
+      "content": "The 36 guarantee-catalog sentences from the reference, re-keyed by what the requirement protects rather than by the role a file plays. Prose shapes only: no ids, no assessments, no links, no activation rules.",
+      "reference_aliases": [
+        "guarantee catalog",
+        "obligation",
+        "taxonomy suggestion",
+        "applies-when / demote-when"
+      ],
+      "reference_note": "The reference forced ontology at code-classification time (taxonomy roles activating obligations), producing 79 obligations and 3 links for one component and an unresolved vocabulary escalation; its portability assay found zero unchanged fits across 112 attempts.",
+      "rejected": [
+        {
+          "alternative": "taxonomy (roles, facets, obligations, caller-assessed classification records)",
+          "because": "systematicity about what exists rather than what must hold; a second ontology with its own records, ids, revisions, and staleness that competed with the spine for maintenance"
+        },
+        {
+          "alternative": "guarantee catalog as linked machinery with hash ids and assessments",
+          "because": "the sentences are good, the machinery around them is strata; zero unchanged fits in the reference assay"
+        },
+        {
+          "alternative": "retire both entirely",
+          "because": "the goal of forcing ontology is legitimate; only the moment and the output form were wrong"
+        }
+      ],
+      "related": [
+        "requirement",
+        "invariant",
+        "totality oracle",
+        "dismissal"
+      ]
+    },
+    {
+      "name": "reference",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "A resolved use of one symbol by another site, as the language server reports it. The only dependency fact the system reasons over. Chokepoint detection, the reliance listing, and any dependency picture are computed from references; a module-level import map is at most a view over them.",
+      "reference_aliases": [
+        "import edge",
+        "imports claim",
+        "reliance edge",
+        "import adjacency"
+      ],
+      "rejected": [
+        {
+          "alternative": "imports as a claim form or as the dependency graph",
+          "because": "an import says a module mentions a module, not which symbol or whether it is the protected one; low information, and references subsume it once a language server is the instrument"
+        }
+      ],
+      "related": [
+        "chokepoint",
+        "reliance",
+        "chokepoint grade"
+      ]
+    },
+    {
+      "name": "crossing",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The first form of the security marker on an invariant: crossing A -> B names the trust levels on either side of the invariant's chokepoint. Lets \"every chokepoint where agent input reaches storage\" be a query. Carries no topology and nothing renders from it but the spine.",
+      "reference_aliases": [
+        "crossing <zone> -> <zone> on a boundary claim",
+        "transition (atlas)",
+        "translates"
+      ],
+      "reference_note": "Mnemion: 12 of 16 boundary claims carry a crossing over 6 declared trust levels. Coherence itself never used the form and put the same information in 62 atlas transitions in config.",
+      "related": [
+        "invariant",
+        "trust level",
+        "chokepoint"
+      ]
+    },
+    {
+      "name": "trust level",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "One entry in the short list the entry spec declares for use in crossings: a name and a one-line meaning for a class of data or caller. Declared order carries no meaning. Not a place in the code and not a container of components.",
+      "reference_aliases": [
+        "zone",
+        "chart (atlas)",
+        "lives in <zone> (residence)"
+      ],
+      "rejected": [
+        {
+          "alternative": "zones as a topology with residence (lives in) and nesting (inside)",
+          "because": "components already nest; a trust level only needs to exist so a crossing can name it"
+        },
+        {
+          "alternative": "charts in config",
+          "because": "a second spelling of the same list, outside the spec"
+        }
+      ],
+      "related": [
+        "crossing",
+        "invariant"
+      ]
+    },
+    {
+      "name": "spec",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17 (assembled from settled decisions)",
+      "definition": "The file that makes a folder a component. Contains: a one-line intent; the invariants, each with its enforcement (chokepoint with protected thing, or totality oracle over a named set), its because, its crossing where security-relevant, and its refutation; and, in the entry spec only, the list of trust levels. One bullet grammar: every bullet is an invariant with enforcement.",
+      "reference_aliases": [
+        "*.spec.md",
+        "spec-tree node",
+        "## invariants + ## works when + ## refutations + ## why + ## zones"
+      ],
+      "reference_note": "The reference split one invariant across four sections (invariants, works when, refutations, why) and let works-when hold claims with no invariant behind them. Here the invariant is the unit and the sections collapse into it.",
+      "open_questions": [],
+      "related": [
+        "component",
+        "invariant",
+        "enforcement",
+        "refutation",
+        "crossing",
+        "trust level"
+      ]
+    },
+    {
+      "name": "journal",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "Compression. The journal compresses possibly millions of subagent session tokens into a handful of durable, comprehensible outcomes. It is also a signaling system so subagents can compare notes, and a means of escalation to humans. Getting a pile of code into RAM is expensive; the journal exists to maximize the value extracted while the cache is hot.",
+      "purposes": [
+        "compression of session work into durable outcomes",
+        "signaling between concurrent subagents",
+        "escalation to the human operator"
+      ],
+      "owner_words": "the journal exists as COMPRESSION, not just memory. it is compression of possibly millions of subagent session tokens into a handful of durable, comprehensible outcomes. it is a signaling system so that subagents can compare notes. and it is a means of escalation for humans.",
+      "caution": "Population comparisons across projects are unreliable here: the journal is newer than most adopters and Coherence received far more development attention than Mnemion during its life.",
+      "reference_aliases": [
+        "decision journal",
+        "durable agent record",
+        "the field",
+        "ledger"
+      ],
+      "related": [
+        "decision",
+        "conjecture",
+        "escalation",
+        "blocked",
+        "retraction"
+      ],
+      "open_questions": [],
+      "verbs_settled": [
+        "decide (with rejected alternatives and because)",
+        "retract",
+        "conjecture / resolved / dismissed",
+        "blocked",
+        "escalate / acknowledge",
+        "defect",
+        "experiment"
+      ]
+    },
+    {
+      "name": "conjecture",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "A side observation recorded while the cache is hot that would otherwise be lost: something that surprised the agent, what it could be, and the test that would separate the candidates. Not a decision; an open question a later agent may resolve or dismiss. The instrument-is-wrong candidate is always present.",
+      "purpose": "Side observations and other reporting from expensive sessions are the highest-value compression the journal performs; a conjecture is how they survive.",
+      "reference_aliases": [
+        "conjecture / resolved / dismissed",
+        "observed (metric outside its band)",
+        "open finding"
+      ],
+      "rejected": [
+        {
+          "alternative": "fold conjecture into decide",
+          "because": "a conjecture is an observation with no choice made; recording it as a decision would answer something nobody answered"
+        }
+      ],
+      "related": [
+        "journal",
+        "decision"
+      ]
+    },
+    {
+      "name": "defect",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "A recorded behavioral deviation with the evidence that made it a defect: a user report about a UI bug, a field observation, or any deviation fuzzier than an invariant can record. Distinct from a structural defect, which is a state the tool derives for an invariant. Not every part of the car is structural steel.",
+      "owner_words": "Defect can be a report from a user about a UI bug, or any other behavioral deviation which may be fuzzier than what an invariant can record. we cannot make the entire car out of structural steel.",
+      "reference_aliases": [
+        "defect (journal verb)",
+        "defects ledger"
+      ],
+      "rejected": [
+        {
+          "alternative": "fold into conjecture or into a requirement announcement",
+          "because": "a defect is an assessed conclusion with evidence, not an open question, and it may never map to an invariant"
+        }
+      ],
+      "related": [
+        "journal",
+        "structural defect",
+        "invariant"
+      ]
+    },
+    {
+      "name": "experiment",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "A plan made falsifiable before acting: predicted context, actions, and observable success criteria, closed by evidence for every criterion. The agent catches its own premature success instead of the human spending time detecting it. That is compression of the human's review, and a high success rate is evidence the mechanism works.",
+      "owner_words": "Experiment succeeding most of the time is evidence of the mechanism working correctly. it remains compression: instead of me spending time detecting premature success, the agent catches itself.",
+      "reference_aliases": [
+        "experiment create / inspect / close",
+        "plan hypothesis",
+        "criterion-total close"
+      ],
+      "rejected": [
+        {
+          "alternative": "fold into decide with the prediction as the because",
+          "because": "the value is the prediction being frozen before action and the close being derived from evidence per criterion; a decision records neither"
+        }
+      ],
+      "related": [
+        "journal",
+        "decision"
+      ]
+    },
+    {
+      "name": "work order",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17, on transcript evidence (authority-evidence.md)",
+      "definition": "A named unit of assigned work: an objective, an observable success criterion, a boundary and write scope, an owner session set at creation, and a state (open, active, blocked, completed, cancelled). Journal records and verification runs written by the owner session bind to it by inference. It grants no authority and gates nothing; its value is context, so a reader can see everything one assignment produced and why.",
+      "finding": "In the reference, 361 decisions came from sessions that owned an order and 6 were bound. Cause: the hook never printed --work in any decide template, and binding was a flag rather than a default. The graph the owner wants (decisions contextualized by work) never formed for want of a default.",
+      "reference_aliases": [
+        "work",
+        "assignment",
+        "work graph",
+        "wrk-… id"
+      ],
+      "related": [
+        "journal",
+        "decision",
+        "session"
+      ],
+      "open_questions": [],
+      "states": {
+        "list": [
+          "open",
+          "active",
+          "blocked",
+          "completed",
+          "cancelled"
+        ],
+        "rule": "Kept as given. Blocked is a valid state for a work order and a valid journal verb; naming under review.",
+        "owner_words": "states can stay, and blocked is a valid state for either object class."
+      },
+      "boundary_note": "A session bound to an order must not be nagged about maintenance outside the order's boundary; 14 of 33 reference blocked entries were that nag.",
+      "evidence": "~1,000 work commands across Claude, Codex, and bakeoff repos produced zero authority refusals because transition/handoff/close never compared writer to owner and nothing read granted-by. Boundary and write scope were read back by subagents; risk had no consumer; granted-by named the writer itself in 12 of 18 delegated orders. Handoffs were mostly the orchestrator repairing owner ids after spawn.",
+      "rejected": [
+        {
+          "alternative": "authority model (granted-by, authority level, owner token expiring on handoff, orchestrator-only creation)",
+          "because": "described in the hook, never enforced in code, routed around by every subagent; the substantive part of an order is its content"
+        },
+        {
+          "alternative": "risk field",
+          "because": "no consumer anywhere"
+        },
+        {
+          "alternative": "handoff as a verb",
+          "because": "17 of 17 handoffs were the orchestrator fixing the owner session after spawn or reclaiming a stalled owner; setting the owner at create removes the need"
+        },
+        {
+          "alternative": "consequences (typed links implements/repairs/verifies/authorizes)",
+          "because": "all 16 written in 31 minutes by the sessions that built the feature, restating their own close; ~55 in bakeoffs, always by the closing session; nobody read one back; inferred session-to-work binding carries the same fact"
+        }
+      ]
+    },
+    {
+      "name": "unable",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "A journal verb: this agent, in this session, could not get past a wall, and names the wall. A one-time password it does not hold, a runtime that ships no reporter, a history it cannot merge. It claims nothing about whether a human could; the reader decides that. Narrower than the reference verb it replaces.",
+      "reference_aliases": [
+        "blocked (journal verb)"
+      ],
+      "population_note": "Of 33 reference blocked entries: 10 were genuine inability (this verb); 14 were maintenance nags the session's assignment forbade, which dissolve once the hook knows the session's work boundary; 6 were deferrals, which are decisions (not X, because); 2 were standing down for a peer, which the work order's state carries.",
+      "rejected": [
+        {
+          "alternative": "keep blocked as the verb",
+          "because": "collides with the work state and covers three populations, two of which belong elsewhere"
+        },
+        {
+          "alternative": "omitted or declined",
+          "because": "impossible names the one population that survives and cannot collide with any order state"
+        },
+        {
+          "alternative": "impossible",
+          "because": "overclaims: at least half the reference cases were walls for the agent, not for the human (a one-time password, a force merge, CI permissions)"
+        }
+      ],
+      "related": [
+        "journal",
+        "work order",
+        "decision"
+      ]
+    },
+    {
+      "name": "run",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The primary record of one verification pass: which invariants were checked, the verdict for each enforcement, the session that ran it (and so the work order it binds to), and the commit. The chokepoint pass runs at the edit; the oracle pass runs at the next practical moment. The latest verdict per invariant is a view derived from runs, never stored as its own truth; a skipped enforcement keeps its prior dated verdict in the view.",
+      "reference_aliases": [
+        "verify",
+        "verification run",
+        "receipt",
+        "status record",
+        "tier (fast/full)"
+      ],
+      "rejected": [
+        {
+          "alternative": "tiers (fast skips oracles, full runs them)",
+          "because": "the two tiers are the two enforcement options; chokepoint pass and oracle pass are already named"
+        },
+        {
+          "alternative": "receipt as a separate immutable record",
+          "because": "it existed because the merged status could not identify one run; the run is the record, 4 receipts were ever written"
+        },
+        {
+          "alternative": "merged status file as the primary object",
+          "because": "a view; storing it as truth made skip-preserves-prior a merge step that could go wrong"
+        }
+      ],
+      "related": [
+        "enforcement",
+        "structural defect",
+        "work order",
+        "session"
+      ]
+    },
+    {
+      "name": "scope",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The reading. One surface projecting the model (components, invariants with enforcement, grade, crossing, refutation and because, references, reliance, runs, journal records, work orders) for a human, in views. Replaces every other render.",
+      "reference_aliases": [
+        "Scope",
+        "_scope.html / scope.json",
+        "graph / _graph.html (the outline)",
+        "overview",
+        "contract (promise graph render)",
+        "index (the returning human page)",
+        "panel (TUI)",
+        "structure blockout"
+      ],
+      "rejected": [
+        {
+          "alternative": "panel (live TUI)",
+          "because": "Scope is its replacement"
+        },
+        {
+          "alternative": "graph, overview, contract, index as separate surfaces",
+          "because": "views of one model; separate surfaces meant separate models that drifted"
+        },
+        {
+          "alternative": "structure blockout",
+          "because": "a prototyping artifact, not a concept"
+        }
+      ],
+      "related": [
+        "agent query",
+        "invariant",
+        "component",
+        "reliance",
+        "run",
+        "journal"
+      ]
+    },
+    {
+      "name": "agent query",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "CLI access for the agent to what Scope shows a human, as a small fixed set of questions with plain-text answers: which invariants touch these files, who relies on this chokepoint, what must be loaded to change this safely (the economy prediction), and what does my work order say. Fixed questions first; a query language only if the fixed set proves insufficient.",
+      "reference_aliases": [
+        "context packet",
+        "context command",
+        "work inspect",
+        "orient (partly)"
+      ],
+      "related": [
+        "scope",
+        "economy"
+      ],
+      "open_questions": [],
+      "rejected": [
+        {
+          "alternative": "a general query language over the model",
+          "because": "a second grammar to teach; fixed questions have known answer shapes an agent can act on"
+        }
+      ]
+    },
+    {
+      "name": "economy",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The context closure of a change: what a reader must load to modify one thing safely. The direct cost of a cold cache, predicted from the model (references, invariants, components).",
+      "reference_aliases": [
+        "economy",
+        "context closure"
+      ],
+      "related": [
+        "calibrate",
+        "agent query",
+        "reference"
+      ]
+    },
+    {
+      "name": "calibrate",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "Compares the economy prediction with what agents actually read in sessions, against labeled outcomes, so the prediction can be corrected. Read traces are its input.",
+      "reference_aliases": [
+        "calibrate",
+        "read-traces",
+        "activity (as input)"
+      ],
+      "related": [
+        "economy"
+      ],
+      "open_questions": []
+    },
+    {
+      "name": "mass",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17 (keep); definition pending",
+      "definition": "A diagnostic reporting two numbers side by side for each component and the project: total mass (lines, files, symbols) and unreached mass (code in no component, or in a component that no invariant's chokepoint or oracle references). A large object with no definition is an unbalanced, wobbly load the agent should instinctively be cautious with.",
+      "owner_words": "both. consider Coherence as a prosthetic for proprioception. a large object in the project with no definition is an unbalanced, wobbly load the agent should instinctively be cautious with",
+      "reference_aliases": [
+        "mass",
+        "mass-baseline.json"
+      ],
+      "related": [
+        "component",
+        "invariant"
+      ],
+      "open_questions": [],
+      "metaphor": "Coherence is a prosthetic for proprioception. Mass is the felt weight of a part of the project; unreached mass is weight with nothing holding it.",
+      "rejected": [
+        {
+          "alternative": "mass as a ratchet pinned to a baseline that fails on growth",
+          "because": "growth is not the danger; weight with no definition is. The way down is an invariant, not a deletion."
+        }
+      ]
+    },
+    {
+      "name": "gyroscope",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The lifecycle as a whole: the mechanism that provides proprioceptive balance to an agent session. Two readings of one model at two moments of the cycle: orient at the start, regulate at the end.",
+      "owner_words": "the goal here for lifecycle is the gyroscope that provides the proprioceptive balance. orient should be at the start of the cycle, regulate should supply the balance for the end of that cycle.",
+      "reference_aliases": [
+        "swarm gyroscope",
+        "lifecycle",
+        "hook bundle"
+      ],
+      "related": [
+        "orient",
+        "regulate",
+        "hook",
+        "session"
+      ]
+    },
+    {
+      "name": "orient",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The start-of-cycle reading. Before acting, the session sees where the project stands and what heading follows from it: escalations awaiting a human, structural defects, requirements stuck short of invariant, unreached mass, the session's own work order, and what peers recorded. One heading, derived from state.",
+      "reference_aliases": [
+        "orient",
+        "orientation heading",
+        "SessionStart instructions (the state half)"
+      ],
+      "rejected": [
+        {
+          "alternative": "orient and regulate as two competing machines over the same ledgers",
+          "because": "they are one model read at two moments"
+        }
+      ],
+      "related": [
+        "gyroscope",
+        "regulate",
+        "work order",
+        "journal"
+      ]
+    },
+    {
+      "name": "regulate",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17 (moment); force pending",
+      "definition": "The end-of-cycle reading. Before the session stops, it supplies the balance: what this session owes so that it leaves the project no less coherent than it found it. Candidates: an invariant touched without a run, a requirement declared without its checklist, a structural defect revealed and not acknowledged or repaired, a decision made and not recorded.",
+      "reference_aliases": [
+        "regulate",
+        "doctrine (its rules become the list of what is owed)",
+        "Stop hook (currently empty)"
+      ],
+      "related": [
+        "gyroscope",
+        "orient",
+        "run",
+        "journal"
+      ],
+      "open_questions": [],
+      "force": {
+        "main_thread": "advisory: the Stop hook prints what the session owes; the human is present and decides",
+        "subagent": "gate: SubagentStop is refused until the debt is paid or recorded as unable; no human is watching a subagent, so the harness holds the line"
+      },
+      "delivery": "The harness event (Stop, SubagentStop), not a command the agent remembers to run.",
+      "owner_words": "for the main thread stop is advisory, for subagents it is a gate.",
+      "rejected": [
+        {
+          "alternative": "a command the agent is told to run last",
+          "because": "the reference tried it and produced 14 blocked entries about maintenance not run"
+        },
+        {
+          "alternative": "uniform force for every session",
+          "because": "a main thread has a human present to decide; a subagent does not"
+        }
+      ]
+    },
+    {
+      "name": "config",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The list of project facts the tool cannot derive: name, entry dir, output dir, ignore patterns, language, platform, how to typecheck, how to run tests and match their names, where tests live. Every key that configures a mechanism leaves with the mechanism.",
+      "reference_aliases": [
+        "coherence.config.json"
+      ],
+      "rejected": [
+        {
+          "alternative": "mass, conventions, sinks, atlas keys",
+          "because": "configure retired mechanisms"
+        }
+      ],
+      "related": [
+        "component",
+        "language adapter"
+      ]
+    },
+    {
+      "name": "language adapter",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The seam that lets chokepoint detection and reference resolution generalize across languages: how to ask this language's server for references and symbols. The spec walker is language-neutral and sits outside it.",
+      "reference_aliases": [
+        "adapter",
+        "tree-sitter adapter",
+        "platform adapter (cloudflare)"
+      ],
+      "rejected": [
+        {
+          "alternative": "platform adapter",
+          "because": "existed for the contracts command, which is retired"
+        }
+      ],
+      "related": [
+        "reference",
+        "chokepoint",
+        "config"
+      ]
+    },
+    {
+      "name": "hook",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The delivery of the gyroscope through harness events and nothing else. SessionStart and SubagentStart carry orient; Stop and SubagentStop carry regulate; prompt and tool boundaries carry the peer feed. Its instruction text is a fixed document it points at rather than reprints. A protocol version keeps the packaged hook and the project hook in step for as long as both exist.",
+      "reference_aliases": [
+        "hook body",
+        "lifecycle control",
+        "hook bundle",
+        "agentInstructions",
+        "HOOK_BODY_PROTOCOL_VERSION"
+      ],
+      "rejected": [
+        {
+          "alternative": "reprinting the vocabulary at every session start (9.7 KB in the reference)",
+          "because": "the hook injects state, not doctrine"
+        }
+      ],
+      "related": [
+        "gyroscope",
+        "orient",
+        "regulate",
+        "journal"
+      ]
+    },
+    {
+      "name": "attribution",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "Every record carries a session (the key everything binds through) and an agent (the readable name). The branch is derived from git at write time, not carried as a field.",
+      "reference_aliases": [
+        "session / agent / job",
+        "--session --agent"
+      ],
+      "rejected": [
+        {
+          "alternative": "job as a carried field",
+          "because": "git already knows the branch"
+        }
+      ],
+      "related": [
+        "journal",
+        "work order",
+        "run"
+      ]
+    },
+    {
+      "name": "scaffold",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The command that makes the complete shape the cheapest thing to ship. Two shapes: a component (folder plus spec with intent and empty invariants) and an invariant (bullet with slots for enforcement, because, crossing, refutation, and the decomposition checklist printed beside it as declare-or-dismiss lines). The agent fills slots instead of recalling rules. Scope shows a visual preview of the proposed structure before it is written, so a human can see the new vertebra in place.",
+      "evidence": "In the reference, zero real invocations across Claude, Codex, and Mnemion transcripts (every hit is help text with the <name> placeholder or a test sample), against 20 spec files and 104 invariants written by hand. The hook described the command; nothing offered it at the moment of need.",
+      "reference_aliases": [
+        "scaffold",
+        "gradient-flip generator",
+        "paste-in kit"
+      ],
+      "rejected": [
+        {
+          "alternative": "four kinds (component, invariant, boundary, parity)",
+          "because": "one grammar leaves two shapes"
+        }
+      ],
+      "related": [
+        "component",
+        "invariant",
+        "decomposition checklist",
+        "scope"
+      ]
+    },
+    {
+      "name": "peer feed",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The simpler signaling channel for subagents: before each tool use, the hook injects the subjects of decisions peers have recorded since the last injection, not their full text. Delta-tracked per session. An agent that wants the full record reads the journal.",
+      "owner_words": "populating with decision subjects but not their full text before each tool use, tracking the delta since the last injection, seems sane.",
+      "reference_aliases": [
+        "journal feed",
+        "journalFeed",
+        "COHERENCE JOURNAL UPDATES",
+        "cursors, previews, pending fragments"
+      ],
+      "rejected": [
+        {
+          "alternative": "full records with previews, truncation, escaped fragments, and a pending queue at every boundary",
+          "because": "most of what the boundary hooks did; subjects carry the signal, the journal carries the text"
+        }
+      ],
+      "related": [
+        "journal",
+        "hook",
+        "decision"
+      ]
+    },
+    {
+      "name": "read trace",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "The files a session explicitly read, recorded at tool boundaries and snapshotted at Stop against the patch and the economy prediction. Exists only as calibrate's input, scoped to the session and so to its work order. The outcome label is automatic: a defect or structural defect later recorded against a file in the patch labels the sample defect; a passing run labels it clean.",
+      "evidence": "In the reference all 39 calibration samples carry outcome unknown because labeling was a manual command nobody ran.",
+      "reference_aliases": [
+        "read-traces",
+        "calibration sample"
+      ],
+      "rejected": [
+        {
+          "alternative": "manual outcome labeling",
+          "because": "never happened; the loop that makes economy an instrument must close on its own"
+        }
+      ],
+      "related": [
+        "calibrate",
+        "economy",
+        "run",
+        "defect"
+      ]
+    },
+    {
+      "name": "glossary",
+      "status": "settled",
+      "defined_by": "owner, 2026-09-17",
+      "definition": "A required component of every Coherence project: glossary.json, the settled vocabulary with, for each concept, its definition, its aliases, and the names rejected for it and why. Injected into context the same way AGENTS.md is; no run can miss it.",
+      "owner_words": "glossary.json. Injected into context same as AGENTS.md. no run can miss it. glossary must be anti-rot, anti-fragile.",
+      "reference_aliases": [
+        "(none; the reference had no glossary, which is how one invariant acquired four names)"
+      ],
+      "related": [
+        "hook",
+        "spec",
+        "invariant",
+        "decision"
+      ],
+      "open_questions": [],
+      "properties": {
+        "anti_rot": "The glossary names things and never points at where they live in code. No addresses, so a rename or move cannot stale it.",
+        "anti_fragile": "Every attempt to introduce a name makes the glossary stronger: a new noun in a spec, journal entry, or identifier is caught at regulate and must be declared as a new concept, mapped as an alias, or fixed if it is a rejected name. Rejected names accumulate as the record of what drift was refused.",
+        "two_layers": "Coherence's own glossary (the tool vocabulary) and each project's domain glossary share one shape and one mechanism; scaffold for a new project begins by asking for the domain glossary.",
+        "growth": "Asymmetric, like invariants: agents propose and announce new concepts; only a human retires or renames one. Each definition change is a decision with a rejected alternative.",
+        "injection": "Compact: name, one-line definition, rejected names. Full entries through agent query.",
+        "naming_check": "Identifiers are checked against rejected names and misused concept names by word, not by address."
+      },
+      "rejected": [
+        {
+          "alternative": "concept addressing (each concept lists where it is implemented in code)",
+          "because": "invites drift; an address is a claim about code that rots when the code moves"
+        }
+      ]
+    }
+  ],
+  "rejected": [
+    {
+      "concept": "atlas (charts, transitions, atlas gate)",
+      "because": "vestigial; components and subcomponents address the same problem concretely with zero config. In the reference: 6 charts and 62 transitions in config, all keyed by chokepoints that already exist as spec claims.",
+      "decided_by": "owner, 2026-09-17",
+      "carry_over": "a security-relevance marker on the invariant (48 of 62 transitions were flagged security); the translates prose folds into the invariant sentence"
+    },
+    {
+      "concept": "zone / region / crossing (trust-region topology)",
+      "because": "mechanism with zero subjects: 0 zones sections and 0 crossing claims anywhere in the reference, including assays. Component nesting is the topology.",
+      "decided_by": "owner, 2026-09-17",
+      "correction": "2026-09-17: the zero count was Coherence-only. Mnemion (121 source files) declares 6 zones, 7 lives-in claims, and 12 of its 16 boundary claims carry a crossing. Retirement reopened for the owner to reaffirm or revise.",
+      "status": "revised",
+      "resolution": "trust levels and crossings survive as the security marker on the invariant; zone topology (residence, nesting, placement) and the atlas retire"
+    },
+    {
+      "concept": "guarantee links (relies on, addresses), promise-graph reliance ledger, declared handoffs",
+      "because": "reliance is computed from the import graph, not declared",
+      "decided_by": "owner, 2026-09-17"
+    },
+    {
+      "concept": "taxonomy (roles, facets, obligations, assessments, taxonomy records)",
+      "because": "see decomposition checklist; the intent moves to requirement declaration",
+      "decided_by": "owner, 2026-09-17"
+    },
+    {
+      "concept": "guarantee catalog machinery (ids, assessments, addresses links, activation)",
+      "because": "the 36 sentences survive as the decomposition checklist; nothing else does",
+      "decided_by": "owner, 2026-09-17"
+    },
+    {
+      "concept": "imports claim form and the import edge as a concept",
+      "because": "references subsume imports; imports were only cheap to derive",
+      "decided_by": "owner, 2026-09-17"
+    },
+    {
+      "concept": "exists claim form",
+      "because": "overused; if nothing more concrete than existence can be pointed to, the claim is not needed. Mnemion had 46, Coherence 7, all inventory; the reference scaffold had already stopped seeding them.",
+      "decided_by": "owner, 2026-09-17"
+    },
+    {
+      "concept": "## why section (free rationale prose per spec)",
+      "because": "rationale attaches to the invariant it justifies as a because; a section of free prose invited restating mechanisms (the reference built why-lint to catch it). 7,666 words in Coherence, 4,392 in Mnemion.",
+      "decided_by": "owner, 2026-09-17"
+    },
+    {
+      "concept": "claim forms: responds, coverage, parity, conforms to, lives in, typechecks, passes test (bare), imports",
+      "because": "one grammar: every spec bullet is an invariant with enforcement. Zero-use forms retire on count; passes-test survives only as the oracle half of an invariant; typechecks becomes a tree-wide invariant whose enforcement is the compiler; responds (3 uses in hoist) is live evidence against a running service and does not carry a form.",
+      "decided_by": "owner, 2026-09-17"
+    },
+    {
+      "concept": "work authority, granted-by, risk, handoff tokens, consequences",
+      "because": "see work order evidence",
+      "decided_by": "owner, 2026-09-17"
+    },
+    {
+      "concept": "command classes: gate / ratchet / advisory",
+      "because": "one thing goes red (a structural defect or an unacknowledged retirement) and it belongs to the invariant, not to a class of command; everything else is a reading",
+      "decided_by": "owner, 2026-09-17"
+    },
+    {
+      "concept": "ratchets (lint-sinks, conventions, mass baselines with growth failure)",
+      "because": "each is an invariant never written as one (sink quoting and conventions are chokepoint claims) or a measurement (mass, a reading); a known residual becomes a totality oracle whose named set excludes a listed residual",
+      "decided_by": "owner, 2026-09-17"
+    },
+    {
+      "concept": "diagnostics: decompose, drift, redundancy, prose, why-lint, premise, signal, log, novelty",
+      "because": "questions the project asked of itself while growing; not questions an adopter asks. Economy, calibrate, and mass survive.",
+      "decided_by": "owner, 2026-09-17"
+    },
+    {
+      "concept": "doctrine (versioned rulebook the regulator applies)",
+      "because": "its rules are the ordered list of what a session owes at the end of its cycle, which regulate carries directly",
+      "decided_by": "owner, 2026-09-17"
+    },
+    {
+      "concept": "activity ledger (per-tool-use hook telemetry, 8,701 records)",
+      "because": "its consumers were hook self-verification (one row per session suffices), experiment attribution (the session id on every record carries it), and a Scope view over the ledger itself",
+      "decided_by": "owner, 2026-09-17",
+      "carry_over": "one row per session recording that the hook reached the body with which bundle"
+    }
+  ],
+  "metaphors": {
+    "spine": "Invariants are the spine; removing a vertebra changes the shape and integrity of the system.",
+    "automobile": "Most projects need a structure closer to an automobile than an octopus; detailed invariants keep load-bearing members from being opaquely weakened.",
+    "proprioception": "Coherence is a prosthetic for proprioception: the agent should feel the weight and balance of what it is moving. Unreached mass is a wobbly load.",
+    "structural_steel": "Not every part of the car is structural steel; defects can be fuzzier than an invariant records."
+  },
+  "completed": "first pass, 2026-09-17"
+}
