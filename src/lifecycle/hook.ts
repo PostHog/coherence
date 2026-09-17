@@ -20,6 +20,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
 import { openEscalations } from "../journal/read.ts";
+import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { renderCompactWithin } from "./glossary.ts";
 import { isCoherenceItself, loadProjectGlossaries } from "./project.ts";
@@ -113,9 +114,47 @@ export async function sessionBlock(root: string, input: HookInput): Promise<stri
   ].join("\n") + "\n";
 }
 
+const OPEN_REQUIREMENT_LINES = 12;
+
+function specModelOrNull(root: string): SpecModel | { error: string } {
+  try {
+    return loadSpecModel(root);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Requirements still short of invariant, and grammar problems, for orient. */
+export function specBlock(root: string): string {
+  const model = specModelOrNull(root);
+  if ("error" in model) return `Spec: not readable (${model.error})\n\n`;
+  if (model.components.length === 0) return "";
+  const open = model.components.flatMap((c) => c.invariants.filter((i) => i.state === "requirement").map((i) => ({ c, i })));
+  const lines: string[] = [];
+  if (model.problems.length > 0) lines.push(`Spec problems (${model.problems.length}); run: spec --check`);
+  if (open.length > 0) {
+    lines.push(`Open requirements (${open.length} of ${model.counts.bullets} bullets). A requirement becomes an invariant when it has enforcement, a witnessed refutation, and its checklist; scaffold prints the shape.`);
+    for (const { c, i } of open.slice(0, OPEN_REQUIREMENT_LINES)) lines.push(`○ ${c.folder}/${i.name} — lacks: ${i.lacks.join(", ")}`);
+    if (open.length > OPEN_REQUIREMENT_LINES) lines.push(`  and ${open.length - OPEN_REQUIREMENT_LINES} more; run: spec --check`);
+  }
+  return lines.length === 0 ? "" : lines.join("\n") + "\n\n";
+}
+
+/** What the spec owes at stop: problems refuse a subagent stop; open requirements are advisory. */
+export function specStopText(root: string): { text: string; problems: number } {
+  const model = specModelOrNull(root);
+  if ("error" in model) return { text: `Spec: not readable (${model.error})`, problems: 0 };
+  if (model.components.length === 0) return { text: "", problems: 0 };
+  const open = model.components.flatMap((c) => c.invariants.filter((i) => i.state === "requirement").map((i) => `${c.folder}/${i.name} (lacks ${i.lacks.join(", ")})`));
+  const lines: string[] = [];
+  for (const p of model.problems) lines.push(`PROBLEM  ${p.file}:${p.line}  ${p.message}`);
+  if (open.length > 0) lines.push(`${open.length} requirement${open.length === 1 ? "" : "s"} still short of invariant: ${open.slice(0, OPEN_REQUIREMENT_LINES).join("; ")}${open.length > OPEN_REQUIREMENT_LINES ? "; ..." : ""}`);
+  return { text: lines.join("\n"), problems: model.problems.length };
+}
+
 export async function startContext(root: string, input: HookInput = {}): Promise<string> {
   const { coherence, project } = await loadProjectGlossaries(root);
-  const head = escalationBlock(root);
+  const head = escalationBlock(root) + specBlock(root);
   const tail = `\n${await sessionBlock(root, input)}`;
   const { text } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length);
   return head + text + tail;
@@ -144,13 +183,18 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     case "Stop":
     case "SubagentStop": {
       const report = await checkChanged(root);
-      if (report === undefined || !hasFindings(report)) return { stdout: "", stderr: "", exit: 0 };
-      const text = formatReport(report);
-      const refuse = event === "SubagentStop" && input.stop_hook_active !== true;
+      const spec = specStopText(root);
+      const glossaryText = report !== undefined && hasFindings(report) ? formatReport(report) : "";
+      if (glossaryText === "" && spec.text === "") return { stdout: "", stderr: "", exit: 0 };
+      const parts: string[] = [];
+      if (glossaryText !== "") parts.push(`Glossary check:\n${glossaryText}`);
+      if (spec.text !== "") parts.push(`Spec:\n${spec.text}`);
+      const text = parts.join("\n");
+      const refuse = event === "SubagentStop" && input.stop_hook_active !== true && (glossaryText !== "" || spec.problems > 0);
       if (refuse) {
-        return { stdout: "", stderr: `Glossary check found defects in the files this session changed; fix them before stopping.\n${text}`, exit: REFUSE_EXIT };
+        return { stdout: "", stderr: `Regulate found what this session owes; settle it before stopping.\n${text}`, exit: REFUSE_EXIT };
       }
-      const message = `Glossary check (${event}):\n${text}`;
+      const message = `Regulate (${event}):\n${text}`;
       return { stdout: JSON.stringify({ systemMessage: message }) + "\n", stderr: "", exit: 0 };
     }
   }

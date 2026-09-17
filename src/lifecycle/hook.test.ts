@@ -105,7 +105,7 @@ test("with defects in changed files: Stop reports and exits 0; SubagentStop refu
   const subagent = await runHook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
   assert.equal(subagent.exit, REFUSE_EXIT);
   assert.equal(subagent.stdout, "");
-  assert.match(subagent.stderr, /^Glossary check found defects/);
+  assert.match(subagent.stderr, /^Regulate found what this session owes/);
   assert.match(subagent.stderr, /REJECTED NAME  clean\.md:1/);
 
   const again = await runHook("SubagentStop", { cwd: root, stop_hook_active: true }, root);
@@ -155,4 +155,22 @@ test("the CLI reads the event from stdin and uses its cwd", () => {
   const bad = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "NoSuchEvent"], { input: "{}", encoding: "utf8" });
   assert.equal(bad.status, 64);
   assert.match(bad.stderr, /expected one of/);
+});
+
+test("orient lists open requirements and regulate reports them; only spec problems refuse a subagent stop", async () => {
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { specBlock, specStopText } = await import("./hook.ts");
+  const root = mkdtempSync(join(tmpdir(), "coherence-spec-hook-"));
+  writeFileSync(join(root, "Root.spec.md"), "# Root\n\nA fixture project.\n\n## invariants\n- secure access: Only a member with permission reads a secured resource.\n  because: the resource is private to its member.\n");
+  const start = specBlock(root);
+  assert.match(start, /^Open requirements \(1 of 1 bullets\)/);
+  assert.match(start, /○ \.\/secure access — lacks: enforcement, refutation, kinds/);
+  const stop = specStopText(root);
+  assert.equal(stop.problems, 0, "an open requirement is not a grammar problem");
+  assert.match(stop.text, /^1 requirement still short of invariant: \.\/secure access \(lacks enforcement, refutation, kinds\)/);
+  writeFileSync(join(root, "Root.spec.md"), "# Root\n\nA fixture project.\n\n## works when\n- typechecks\n");
+  const broken = specStopText(root);
+  assert.ok(broken.problems > 0, "a retired section is a problem and refuses a subagent stop");
 });
