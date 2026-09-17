@@ -12,14 +12,23 @@
  * stderr, which both hosts read as "continue, and here is why" (Claude Code:
  * https://code.claude.com/docs/en/hooks; Codex: https://learn.chatgpt.com/docs/hooks).
  * A stop hook that is already active (`stop_hook_active`) never refuses again,
- * so a subagent cannot be held forever. UserPromptSubmit and PostToolUse
- * print nothing yet; the peer feed is a later slice.
+ * so a subagent cannot be held forever.
+ * PostToolUse for a file-writing tool is revelation at the edit: the
+ * chokepoint invariants that may involve the written file are re-checked
+ * through the warm server, and a bypass is printed as additionalContext so
+ * the agent sees the structural defect in the same turn, with the two
+ * honest options. Stop and SubagentStop also carry the structural defects
+ * the latest run left; one refuses a subagent stop. UserPromptSubmit prints
+ * nothing yet; the peer feed is a later slice.
  */
 
-import { sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
+import type { LanguageAdapter } from "../adapters/adapter.ts";
+import { mayTouch, performRun } from "../enforcement/run.ts";
 import { openEscalations } from "../journal/read.ts";
 import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
@@ -141,20 +150,78 @@ export function specBlock(root: string): string {
   return lines.length === 0 ? "" : lines.join("\n") + "\n\n";
 }
 
-/** What the spec owes at stop: problems refuse a subagent stop; open requirements are advisory. */
-export function specStopText(root: string, changed: readonly string[] = []): { text: string; problems: number } {
+/** What the spec owes at stop: problems and structural defects refuse a subagent stop; open requirements are shown and left to the human. */
+export function specStopText(root: string, changed: readonly string[] = []): { text: string; problems: number; defects: number } {
   const model = specModelOrNull(root);
-  if ("error" in model) return { text: `Spec: not readable (${model.error})`, problems: 0 };
-  if (model.components.length === 0) return { text: "", problems: 0 };
+  if ("error" in model) return { text: `Spec: not readable (${model.error})`, problems: 0, defects: 0 };
+  if (model.components.length === 0) return { text: "", problems: 0, defects: 0 };
   const touched = new Set(changed.map((p) => p.split(sep).join("/")));
   const open = model.components.flatMap((c) => c.invariants.filter((i) => i.state === "requirement").map((i) => ({ c, i })));
+  const broken = model.components.flatMap((c) => c.invariants.filter((i) => i.state === "structural defect").map((i) => ({ c, i })));
   const mine = open.filter(({ c }) => touched.has(c.specPath));
   const lines: string[] = [];
   for (const p of model.problems) lines.push(`PROBLEM  ${p.file}:${p.line}  ${p.message}`);
+  for (const { c, i } of broken) {
+    for (const d of i.defects) lines.push(`✕ ${c.folder}/${i.name} — structural defect (${d.form}, run ${d.at.slice(0, 10)}): ${d.reason}`);
+  }
+  if (broken.length > 0) lines.push(`A structural defect stands until the reference is routed through the chokepoint or a human acknowledges a retirement (escalate, then acknowledge).`);
   for (const { c, i } of mine.slice(0, OPEN_REQUIREMENT_LINES)) lines.push(`○ ${c.folder}/${i.name} — still a requirement; lacks: ${i.lacks.join(", ")}`);
   if (mine.length > OPEN_REQUIREMENT_LINES) lines.push(`  and ${mine.length - OPEN_REQUIREMENT_LINES} more in specs this session changed`);
   if (open.length > 0) lines.push(`${open.length} requirement${open.length === 1 ? "" : "s"} open in the project${mine.length > 0 ? `, ${mine.length} in specs this session changed` : ""}; run: spec --check`);
-  return { text: lines.join("\n"), problems: model.problems.length };
+  return { text: lines.join("\n"), problems: model.problems.length, defects: broken.length };
+}
+
+/** Tools that read a file and name it the same way a writing tool does. */
+const READING_TOOLS: ReadonlySet<string> = new Set(["Read", "Glob", "Grep", "LS", "NotebookRead", "read_file", "list_files", "search"]);
+
+/** The project-relative path a tool event wrote, or undefined when the event wrote no file under the root. */
+export function writtenFile(root: string, input: HookInput): string | undefined {
+  if (typeof input.tool_name === "string" && READING_TOOLS.has(input.tool_name)) return undefined;
+  const toolInput = input.tool_input;
+  if (typeof toolInput !== "object" || toolInput === null) return undefined;
+  const record = toolInput as Record<string, unknown>;
+  const path = [record["file_path"], record["notebook_path"], record["path"]].find((v): v is string => typeof v === "string" && v !== "");
+  if (path === undefined) return undefined;
+  const absolute = isAbsolute(path) ? path : resolve(root, path);
+  const rel = relative(resolve(root), absolute).split(sep).join("/");
+  if (rel === "" || rel.startsWith("../") || rel === "..") return undefined;
+  return rel;
+}
+
+/**
+ * Revelation at the edit: re-check the chokepoint invariants the written file
+ * may involve and describe any structural defect, or nothing.
+ */
+export async function editContext(root: string, input: HookInput, options: HookOptions = {}): Promise<string> {
+  const file = writtenFile(root, input);
+  if (file === undefined) return "";
+  const model = specModelOrNull(root);
+  if ("error" in model || model.components.length === 0) return "";
+  const absolute = resolve(root, file);
+  const text = existsSync(absolute) ? readFileSync(absolute, "utf8") : undefined;
+  const touched = model.components.flatMap((c) => c.invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint") && mayTouch(i, file, text)).map((i) => i.name));
+  if (touched.length === 0) return "";
+  const session = typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : "unknown-session";
+  const agent = typeof input.agent_type === "string" && input.agent_type !== "" ? input.agent_type : MAIN_AGENT;
+  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: touched, model, adapter: options.adapter });
+  if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
+  const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
+  if (failed.length === 0) return "";
+  const cli = (await isCoherenceItself(root)) ? "node src/cli.ts" : "node_modules/.bin/coherence";
+  const lines = [`Structural defect revealed at this edit (${file}); recorded in ${outcome.file ?? "the run"}:`];
+  for (const d of failed) {
+    const e = d.entry;
+    const here = e.bypasses.filter((b) => b.file === file);
+    const elsewhere = e.bypasses.length - here.length;
+    lines.push(`✕ ${e.component}/${e.name} — chokepoint ${d.chokepoint?.input.chokepoint ?? ""} protects ${d.chokepoint?.input.protects ?? ""}: ${e.grade ?? "broken"}`);
+    for (const b of here) lines.push(`    bypass ${b.file}:${b.line} in ${b.symbol} (this edit)`);
+    if (elsewhere > 0) lines.push(`    ${elsewhere} bypass${elsewhere === 1 ? "" : "es"} elsewhere: ${e.bypasses.filter((b) => b.file !== file).map((b) => `${b.file}:${b.line} in ${b.symbol}`).join(", ")}`);
+    if (e.bypasses.length === 0) lines.push(`    ${e.reason}`);
+  }
+  lines.push("Two honest options: route the reference through the chokepoint, or escalate a retirement for a human, who must acknowledge it:");
+  lines.push(`  ${cli} escalate "retire <invariant>" --because "<what changed and why the chokepoint no longer holds>" --session ${session} --agent ${agent}`);
+  lines.push("The invariant stays in force, and alarming, until a person acknowledges.");
+  return lines.join("\n") + "\n";
 }
 
 export async function startContext(root: string, input: HookInput = {}): Promise<string> {
@@ -172,8 +239,13 @@ async function checkChanged(root: string): Promise<CheckReport | undefined> {
   return runCheck({ root, paths, coherence, project });
 }
 
+export interface HookOptions {
+  /** An adapter to check with instead of the warm server (tests). */
+  adapter?: LanguageAdapter | undefined;
+}
+
 /** Run one event. `input` is the parsed stdin the host sent; `root` defaults to its cwd. */
-export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: string): Promise<HookResult> {
+export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: string, options: HookOptions = {}): Promise<HookResult> {
   const root = typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : fallbackRoot;
   switch (event) {
     case "SessionStart":
@@ -183,8 +255,13 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       return { stdout: stdout + "\n", stderr: "", exit: 0 };
     }
     case "UserPromptSubmit":
-    case "PostToolUse":
       return { stdout: "", stderr: "", exit: 0 };
+    case "PostToolUse": {
+      const context = await editContext(root, input, options);
+      if (context === "") return { stdout: "", stderr: "", exit: 0 };
+      const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
+      return { stdout: stdout + "\n", stderr: "", exit: 0 };
+    }
     case "Stop":
     case "SubagentStop": {
       const report = await checkChanged(root);
@@ -195,7 +272,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       if (glossaryText !== "") parts.push(`Glossary check:\n${glossaryText}`);
       if (spec.text !== "") parts.push(`Spec:\n${spec.text}`);
       const text = parts.join("\n");
-      const refuse = event === "SubagentStop" && input.stop_hook_active !== true && (glossaryText !== "" || spec.problems > 0);
+      const refuse = event === "SubagentStop" && input.stop_hook_active !== true && (glossaryText !== "" || spec.problems > 0 || spec.defects > 0);
       if (refuse) {
         return { stdout: "", stderr: `Regulate found what this session owes; settle it before stopping.\n${text}`, exit: REFUSE_EXIT };
       }
