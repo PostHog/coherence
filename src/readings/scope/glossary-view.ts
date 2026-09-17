@@ -136,7 +136,7 @@ function renderDisclosure(kind: "detail" | "provenance", label: string, fields: 
 /** Fields the reading has no place for, kept as the file said them. */
 function renderConceptRecord(concept: Concept): Markup {
   const entries = Object.entries(concept.record);
-  if (entries.length === 0) return html`<p class="quiet">Nothing further on record.</p>`;
+  if (entries.length === 0) return html``;
   return html`<details class="record" data-section="record">
     <summary>Also on record: ${entries.map(([k]) => humanize(k)).join(", ")} (${plural(entries.length, "field", "fields")})</summary>
     ${renderRecordFields(entries)}

@@ -172,7 +172,7 @@ test("provenance and detail are one click away; no provenance key or value appea
       }
       assert.ok(card.indexOf('data-section="detail"') < provenance, `${concept.name}: Detail comes before Provenance`);
     }
-    assert.ok(card.includes("Nothing further on record."), `${concept.name}: the record is empty`);
+    assert.ok(!card.includes("data-section=\"record\""), `${concept.name}: the record is empty, so no record section renders`);
   }
 });
 
