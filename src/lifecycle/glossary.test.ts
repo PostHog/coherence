@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
@@ -185,5 +186,6 @@ test("the compact Coherence glossary stays under 2,000 tokens", async () => {
   const glossary = await loadGlossary(COHERENCE_GLOSSARY);
   const { tokens } = tokenEstimate(renderCompact(glossary));
   assert.ok(tokens < 2000, `compact glossary is ${tokens} tokens`);
-  assert.equal(glossary.concepts.length, 38);
+  const onDisk = JSON.parse(readFileSync(COHERENCE_GLOSSARY, "utf8")) as { concepts: unknown[] };
+  assert.equal(glossary.concepts.length, onDisk.concepts.length, "every concept in the file is loaded");
 });

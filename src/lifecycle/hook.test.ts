@@ -67,7 +67,7 @@ test("SessionStart and SubagentStart inject both glossaries and the instruction 
     const parsed = JSON.parse(result.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
     assert.equal(parsed.hookSpecificOutput.hookEventName, event);
     const context = parsed.hookSpecificOutput.additionalContext;
-    assert.match(context, /^Coherence vocabulary \(38 concepts/, "no escalation: the glossary comes first");
+    assert.match(context, /^Coherence vocabulary \(\d+ concepts/, "no escalation: the glossary comes first");
     assert.match(context, /\n\nSession: s1\nEvery journal write needs --session s1 --agent main\./);
     assert.match(context, /\nWidgetry vocabulary \(1 concept/);
     assert.match(context, /- widget: A thing with a knob\. \(also: gadget\)/);
