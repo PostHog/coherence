@@ -856,7 +856,10 @@
       "provenance": {
         "owner_words": "the goal here for lifecycle is the gyroscope that provides the proprioceptive balance. orient should be at the start of the cycle, regulate should supply the balance for the end of that cycle.",
         "defined_by": "owner, 2026-09-17"
-      }
+      },
+      "aliases": [
+        "lifecycle"
+      ]
     },
     {
       "name": "orient",
@@ -949,7 +952,10 @@
       ],
       "provenance": {
         "defined_by": "owner, 2026-09-17"
-      }
+      },
+      "aliases": [
+        "adapter"
+      ]
     },
     {
       "name": "hook",
