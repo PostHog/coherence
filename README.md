@@ -19,3 +19,11 @@ Guiding artifacts kept from the reference:
 
 First slice: the glossary, the hook that injects it, and the drift check at
 regulate. Mnemion is the first adopter.
+
+## Settled before code
+
+- Runtime and language are preserved from the reference: TypeScript on Node.
+- The drift check matches exact strings first. A similarity seam stays open for a
+  later embedding pass (alias suggestion, overload detection); similarity improves
+  the question, never decides it.
+- Mnemion is the first adopter; its domain glossary lives in its own repository.

@@ -1030,7 +1030,8 @@
           "alternative": "concept addressing (each concept lists where it is implemented in code)",
           "because": "invites drift; an address is a claim about code that rots when the code moves"
         }
-      ]
+      ],
+      "similarity_seam": "The drift check matches exact strings first (new noun, rejected name). A similarity seam is left open so an embedding pass can later suggest candidate mappings for near-synonyms and flag overloads by clustering the contexts of a term across components. Similarity only improves the closed question (declare, map, or fix); it never decides. Deferred until the exact check shows its gaps on Mnemion; a local model adds mass and an API adds a secret."
     }
   ],
   "rejected": [
