@@ -12,6 +12,9 @@
  *   coherence spec --check [root]      every component, its invariants with state, every problem
  *   coherence spec --json [root]       the spec model
  *   coherence scaffold component | invariant   the complete shape, cheapest to produce
+ *   coherence run [--session --agent]  the chokepoint check and the totality oracle pass, appended as one run
+ *   coherence run --status             the latest verdict per enforcement, a view over every run
+ *   coherence serve                    the warm language server for this project
  *   coherence hook <event>             answer one harness event (event JSON on stdin)
  *   coherence hooks install --host <claude|codex>
  *   coherence hooks status
@@ -21,6 +24,7 @@
  * to refuse a stop, with the reason on stderr.
  */
 
+import { ENFORCEMENT_USAGE, runCommand, serveCommand } from "./enforcement/cli.ts";
 import { JOURNAL_USAGE, journalVerbs, type Command, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, runCheck } from "./lifecycle/check.ts";
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/glossary.ts";
@@ -37,6 +41,7 @@ const USAGE = `usage:
   coherence glossary --check [--json] [paths...]
 ${SPEC_USAGE}
 ${SCAFFOLD_USAGE}
+${ENFORCEMENT_USAGE}
   coherence hook <${HOOK_EVENTS.join("|")}>
   coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"]
   coherence hooks status
@@ -161,9 +166,18 @@ async function main(argv: string[]): Promise<number> {
     };
     return command(rest, io);
   }
+  const io: Io = {
+    cwd: root,
+    out: (line) => process.stdout.write(`${line}\n`),
+    err: (line) => process.stderr.write(`${line}\n`),
+  };
   switch (verb) {
     case "glossary":
       return glossaryCommand(rest, root);
+    case "run":
+      return runCommand(rest, io);
+    case "serve":
+      return serveCommand(rest, io);
     case "hook":
       return hookCommand(rest, root);
     case "hooks":
