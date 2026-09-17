@@ -1042,8 +1042,8 @@
       "carry_over": "a security-relevance marker on the invariant (48 of 62 transitions were flagged security); the translates prose folds into the invariant sentence"
     },
     {
-      "concept": "zone / region / crossing (trust-region topology)",
-      "because": "mechanism with zero subjects: 0 zones sections and 0 crossing claims anywhere in the reference, including assays. Component nesting is the topology.",
+      "concept": "zone topology (residence, nesting, placement) and the region as a container",
+      "because": "mechanism with zero subjects: 0 zones sections and 0 crossing claims anywhere in the reference, including assays. Component nesting is the topology. Trust levels and crossings survive as the security marker on the invariant.",
       "decided_by": "owner, 2026-09-17",
       "correction": "2026-09-17: the zero count was Coherence-only. Mnemion (121 source files) declares 6 zones, 7 lives-in claims, and 12 of its 16 boundary claims carry a crossing. Retirement reopened for the owner to reaffirm or revise.",
       "status": "revised",
