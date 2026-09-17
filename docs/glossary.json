@@ -254,7 +254,8 @@
             "grade": "not chokeable",
             "meaning": "the protected thing is reached dynamically (string-keyed access, reflection, raw SQL strings, network, subprocess, another language). No AST can count callers; a totality oracle is the required compromise and the claim must say why structure was unavailable."
           }
-        ]
+        ],
+        "adapter_defined": "The ladder is defined per language adapter and each rung names who enforces it. TypeScript: visibility-choked (the compiler), reference-choked (Coherence), not chokeable. Python: closure-choked (the interpreter, when the protected thing is never a module attribute), checker-choked (Pyright private-usage at error in the project configuration; an import-linter contract for a protected module), reference-choked (Coherence, at the edit and in CI), convention (nobody), not chokeable. A rung the project must configure is shown as such, never assumed."
       },
       "provenance": {
         "reference_note": "The reference has an ordinal A..U grade that is a total function of recorded signals on a gate; this replaces it with a ladder whose rungs name structural facts.",
