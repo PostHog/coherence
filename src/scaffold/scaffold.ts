@@ -17,9 +17,24 @@ import { applicableShapes, type Seed, type Shape } from "../spec/seed.ts";
 
 export class ScaffoldError extends Error {}
 
-/** The spec file name for a folder: <Name>.spec.md, the name being the folder's, capitalized. */
+/** The project's own name for the entry component: coherence.config.json's name, then package.json's, then the folder's. */
+function entryName(root: string): string {
+  for (const file of ["coherence.config.json", "package.json"]) {
+    try {
+      const parsed = JSON.parse(readFileSync(join(root, file), "utf8")) as { name?: unknown };
+      if (typeof parsed.name === "string" && /^[A-Za-z][A-Za-z0-9_-]*$/.test(parsed.name)) return parsed.name;
+    } catch {
+      // absent or unreadable: try the next source
+    }
+  }
+  return basename(root);
+}
+
+/** The spec file name for a folder: <Name>.spec.md. A component is named for its folder; the entry
+ *  component is named for the project, never for the checkout folder (a worktree is a hash). */
 export function specFileName(folder: string, root: string): string {
-  const name = basename(resolve(root, folder));
+  const absolute = resolve(root, folder);
+  const name = absolute === resolve(root) ? entryName(resolve(root)) : basename(absolute);
   return `${name.charAt(0).toUpperCase()}${name.slice(1)}${SPEC_SUFFIX}`;
 }
 

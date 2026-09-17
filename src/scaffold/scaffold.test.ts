@@ -129,3 +129,17 @@ test("scaffold invariant --write appends to the invariants section, and the resu
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("the entry component is named for the project, not the checkout folder", async () => {
+  const { mkdtempSync, writeFileSync: write } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join: j } = await import("node:path");
+  const { specFileName } = await import("./scaffold.ts");
+  const root = mkdtempSync(j(tmpdir(), "agent-0123abcd-"));
+  assert.match(specFileName(".", root), /^Agent-0123abcd.*\.spec\.md$/, "no project name: the folder's");
+  write(j(root, "package.json"), JSON.stringify({ name: "widgetry" }));
+  assert.equal(specFileName(".", root), "Widgetry.spec.md", "package.json names the project");
+  write(j(root, "coherence.config.json"), JSON.stringify({ name: "gadgetry" }));
+  assert.equal(specFileName(".", root), "Gadgetry.spec.md", "coherence.config.json wins");
+  assert.equal(specFileName("src/journal", root), "Journal.spec.md", "a component keeps its folder name");
+});
