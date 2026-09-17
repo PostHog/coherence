@@ -242,6 +242,8 @@ export function acceptedNames(glossary: Glossary): Set<string> {
   for (const concept of glossary.concepts) {
     out.add(concept.name.toLowerCase());
     for (const alias of concept.aliases) for (const name of aliasNames(alias)) out.add(name.toLowerCase());
+    // A property key names a part of the concept (a column, a field, a unit); it is vocabulary, not an unknown noun.
+    for (const key of Object.keys(concept.properties)) for (const name of aliasNames(key)) out.add(name.toLowerCase());
   }
   return out;
 }
