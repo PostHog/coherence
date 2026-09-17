@@ -104,8 +104,8 @@ test("rejectedNames carries the concept and because; top-level rejections carry 
   assert.deepEqual(rejectedNames(coherence).map((n) => n.name), ["zorp", "quux"]);
 });
 
-test("acceptedNames strips alias parentheticals, splits slashes, and includes trust levels and the project", () => {
-  assert.deepEqual([...acceptedNames(project)].sort(), ["gadget", "gizmo", "owner-trusted", "thingamajig", "widget", "widgetry"]);
+test("acceptedNames strips alias parentheticals, splits slashes, and includes property keys, trust levels and the project", () => {
+  assert.deepEqual([...acceptedNames(project)].sort(), ["anti_rot", "gadget", "gizmo", "owner-trusted", "thingamajig", "widget", "widgetry"]);
 });
 
 test("firstSentence takes one sentence, or two when the first is a bare label", () => {
