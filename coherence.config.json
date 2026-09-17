@@ -1,0 +1,20 @@
+{
+  "name": "coherence",
+  "entryDir": ".",
+  "ignore": ["docs", "node_modules"],
+  "language": "typescript",
+  "platform": "apple silicon",
+  "typecheck": ["npm", "run", "typecheck"],
+  "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 --test-name-pattern={filter} 'src/**/*.test.ts'",
+  "testMatch": "# pass [1-9][0-9]*",
+  "testJson": [
+    "node",
+    "--disable-warning=ExperimentalWarning",
+    "--test",
+    "--test-concurrency=1",
+    "--test-reporter=./src/enforcement/node-test-reporter.ts",
+    "--test-reporter-destination={out}",
+    "--test-name-pattern={filter}",
+    "src/**/*.test.ts"
+  ]
+}
