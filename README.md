@@ -11,7 +11,8 @@ replaces. Nothing in this tree may introduce a name the glossary rejected.
 
 Guiding artifacts kept from the reference:
 
-- `docs/glossary.json` — the settled vocabulary (38 concepts, 15 retirements).
+- `docs/glossary.json` — the settled vocabulary (38 concepts). Vocabulary fields are injected; `detail` and `provenance` are shown in Scope only.
+- `docs/retired.md` — the reference mechanisms retired during the glossary pass, with reasons.
 - `docs/glossary-inventory.json` — the raw 206-concept sweep the glossary was distilled from.
 - `docs/checklist-seed.json` — the 36 invariant shapes for the decomposition checklist.
 - `docs/authority-evidence.md` — transcript evidence on why work authority was retired.
