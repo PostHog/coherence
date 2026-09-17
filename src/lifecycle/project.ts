@@ -54,6 +54,16 @@ export async function projectGlossaryPath(root: string): Promise<string | undefi
   return (await exists(fallback)) ? fallback : undefined;
 }
 
+/** Whether the project at `root` is Coherence itself, whose CLI is its own source tree rather than an installed bin. */
+export async function isCoherenceItself(root: string): Promise<boolean> {
+  try {
+    const pkg: unknown = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+    return typeof pkg === "object" && pkg !== null && (pkg as Record<string, unknown>)["name"] === "coherence";
+  } catch {
+    return false;
+  }
+}
+
 /** Both layers for a project root. */
 export async function loadProjectGlossaries(root: string): Promise<ProjectGlossaries> {
   const coherence = await loadGlossary(COHERENCE_GLOSSARY);

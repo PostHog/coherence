@@ -1,8 +1,11 @@
 /**
  * The hook: what each harness event injects or answers.
  *
- * SessionStart and SubagentStart carry the compact glossary and a short fixed
- * instruction; both hosts read it from `hookSpecificOutput.additionalContext`.
+ * SessionStart and SubagentStart carry orient's first slice: any escalation
+ * awaiting a human first (an escalation heads every read), then the compact
+ * glossary, then the session id as the exact --session value every journal
+ * write must carry, a decide template, and a short fixed instruction. Both
+ * hosts read it from `hookSpecificOutput.additionalContext`.
  * Stop and SubagentStop run the glossary check over the files changed in the
  * working tree. On Stop the findings are shown to the human and the session
  * ends. On SubagentStop findings refuse the stop: exit 2 with the reason on
@@ -16,8 +19,10 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
+import { openEscalations } from "../journal/read.ts";
+import { loadJournal } from "../journal/store.ts";
 import { renderCompactWithin } from "./glossary.ts";
-import { loadProjectGlossaries } from "./project.ts";
+import { isCoherenceItself, loadProjectGlossaries } from "./project.ts";
 
 const run = promisify(execFile);
 
@@ -47,19 +52,22 @@ export const REFUSE_EXIT = 2;
  */
 export const CONTEXT_BUDGET = 9_500;
 
-/** Under 80 words; the vocabulary above it is the state, this is the rule. */
+/** The rule; with the session block above it the whole tail stays under 120 words. */
 export const INSTRUCTION = [
   "Use these names. A rejected name in prose, a spec, a journal record, or an",
-  "identifier is a defect: replace it. A new noun that names something the",
-  "glossary lacks must be declared there as a concept, or mapped as an alias of",
-  "an existing concept, before this session ends. Coherence's names describe",
-  "the tool; the project's names describe its domain, and inside the project",
-  "the project's sense wins.",
+  "identifier is a defect: replace it. A new noun the glossary lacks must be",
+  "declared there as a concept, or mapped as an alias of an existing concept,",
+  "before this session ends. Coherence's names describe the tool; the",
+  "project's names describe its domain, and inside the project its sense wins.",
 ].join(" ");
+
+/** The agent name a journal write carries when the harness names none: the main thread. */
+const MAIN_AGENT = "main";
 
 export interface HookInput {
   cwd?: string;
   session_id?: string;
+  agent_type?: string;
   stop_hook_active?: boolean;
   [key: string]: unknown;
 }
@@ -82,11 +90,35 @@ export async function changedFiles(root: string): Promise<string[]> {
   }
 }
 
-export async function startContext(root: string): Promise<string> {
+/** Escalations no human has acknowledged, under a heading, or nothing. Never shortened: a human must see them whole. */
+export function escalationBlock(root: string): string {
+  const open = openEscalations(loadJournal(root).records);
+  if (open.length === 0) return "";
+  const lines = [`Escalations awaiting a human (${open.length}); answer one with: acknowledge <id> --because "<what the human decided>"`];
+  for (const e of open) lines.push(`▲ ${e.id}  ${e.agent}  ${e.what} — ${e.because}`);
+  return lines.join("\n") + "\n\n";
+}
+
+/** The session id as the exact --session value, a decide template, and the rule. */
+export async function sessionBlock(root: string, input: HookInput): Promise<string> {
+  const session = typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
+  const agent = typeof input.agent_type === "string" && input.agent_type !== "" ? input.agent_type : MAIN_AGENT;
+  const cli = (await isCoherenceItself(root)) ? "node src/cli.ts" : "node_modules/.bin/coherence";
+  const id = session ?? "<the id your harness shows>";
+  return [
+    `Session: ${session ?? "unknown"}`,
+    `Every journal write needs --session ${id} --agent ${agent}. Record a choice as:`,
+    `  ${cli} decide "<chose>" --over "<rejected>" --because "<why>" --session ${id} --agent ${agent}`,
+    INSTRUCTION,
+  ].join("\n") + "\n";
+}
+
+export async function startContext(root: string, input: HookInput = {}): Promise<string> {
   const { coherence, project } = await loadProjectGlossaries(root);
-  const tail = `\n${INSTRUCTION}\n`;
-  const { text } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - tail.length);
-  return text + tail;
+  const head = escalationBlock(root);
+  const tail = `\n${await sessionBlock(root, input)}`;
+  const { text } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length);
+  return head + text + tail;
 }
 
 async function checkChanged(root: string): Promise<CheckReport | undefined> {
@@ -102,7 +134,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
   switch (event) {
     case "SessionStart":
     case "SubagentStart": {
-      const context = await startContext(root);
+      const context = await startContext(root, input);
       const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
       return { stdout: stdout + "\n", stderr: "", exit: 0 };
     }

@@ -6,7 +6,10 @@ import { dirname, join, resolve } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
-import { CONTEXT_BUDGET, INSTRUCTION, REFUSE_EXIT, changedFiles, readStdinJson, runHook } from "./hook.ts";
+import { journalVerbs } from "../journal/cli.ts";
+import { openEscalations } from "../journal/read.ts";
+import { loadJournal } from "../journal/store.ts";
+import { CONTEXT_BUDGET, INSTRUCTION, REFUSE_EXIT, changedFiles, readStdinJson, runHook, sessionBlock } from "./hook.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
@@ -39,12 +42,21 @@ after(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-test("the instruction block is under 80 words and says the three things", () => {
-  assert.ok(INSTRUCTION.split(/\s+/).length < 80);
+test("the block after the glossary is under 120 words: session, decide template, and the rule", async () => {
+  const block = await sessionBlock(root, { session_id: "abc123", agent_type: "Explore" });
+  assert.ok(block.split(/\s+/).filter((w) => w !== "").length < 120, block);
+  assert.match(block, /^Session: abc123\n/);
+  assert.match(block, /Every journal write needs --session abc123 --agent Explore\./);
+  assert.match(block, /\n  node_modules\/\.bin\/coherence decide "<chose>" --over "<rejected>" --because "<why>" --session abc123 --agent Explore\n/);
+  assert.ok(block.endsWith(`${INSTRUCTION}\n`));
   assert.match(INSTRUCTION, /rejected name .* defect/);
   assert.match(INSTRUCTION, /declared .* concept/);
   assert.match(INSTRUCTION, /alias of an existing concept/);
   assert.match(INSTRUCTION, /before this session ends/);
+
+  const main = await sessionBlock(root, {});
+  assert.match(main, /^Session: unknown\n/);
+  assert.match(main, /--session <the id your harness shows> --agent main/);
 });
 
 test("SessionStart and SubagentStart inject both glossaries and the instruction as additionalContext", async () => {
@@ -55,7 +67,8 @@ test("SessionStart and SubagentStart inject both glossaries and the instruction 
     const parsed = JSON.parse(result.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
     assert.equal(parsed.hookSpecificOutput.hookEventName, event);
     const context = parsed.hookSpecificOutput.additionalContext;
-    assert.match(context, /^Coherence vocabulary \(38 concepts/);
+    assert.match(context, /^Coherence vocabulary \(38 concepts/, "no escalation: the glossary comes first");
+    assert.match(context, /\n\nSession: s1\nEvery journal write needs --session s1 --agent main\./);
     assert.match(context, /\nWidgetry vocabulary \(1 concept/);
     assert.match(context, /- widget: A thing with a knob\. \(also: gadget\)/);
     assert.match(context, /- rejected names: doohickey/);
@@ -98,6 +111,30 @@ test("with defects in changed files: Stop reports and exits 0; SubagentStop refu
   const again = await runHook("SubagentStop", { cwd: root, stop_hook_active: true }, root);
   assert.equal(again.exit, 0, "a stop hook already active never refuses twice");
   assert.match(again.stdout, /systemMessage/);
+});
+
+test("an unacknowledged escalation heads the start output; an acknowledged one does not", async () => {
+  const printed: string[] = [];
+  const io = { cwd: root, out: (line: string) => printed.push(line), err: (line: string) => printed.push(line) };
+  const wrote = journalVerbs["escalate"]!(
+    ["the widget's name is contested", "--because", "only the owner can settle a name", "--session", "s1", "--agent", "main"],
+    io,
+  );
+  assert.equal(wrote, 0, printed.join("\n"));
+  const open = openEscalations(loadJournal(root).records);
+  assert.equal(open.length, 1);
+
+  const before = await runHook("SubagentStart", { cwd: root, session_id: "s1", agent_type: "Plan" }, root);
+  const context = (JSON.parse(before.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext;
+  assert.match(context, /^Escalations awaiting a human \(1\); answer one with: acknowledge <id> --because/);
+  assert.match(context, new RegExp(`^▲ ${open[0]!.id}  main  the widget's name is contested — only the owner can settle a name\n\nCoherence vocabulary`, "m"));
+  assert.match(context, /--session s1 --agent Plan/);
+  assert.ok(context.length <= CONTEXT_BUDGET);
+
+  const answered = journalVerbs["acknowledge"]!([open[0]!.id, "--because", "call it a widget", "--session", "s1", "--agent", "main"], io);
+  assert.equal(answered, 0, printed.join("\n"));
+  const after = await runHook("SessionStart", { cwd: root, session_id: "s1" }, root);
+  assert.match((JSON.parse(after.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext, /^Coherence vocabulary/);
 });
 
 test("readStdinJson tolerates empty and malformed input", async () => {
