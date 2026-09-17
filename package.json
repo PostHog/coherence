@@ -1,0 +1,20 @@
+{
+  "name": "coherence",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A prosthetic for proprioception: specs, invariants, and the readings that keep an agent balanced.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "scope": "node --disable-warning=ExperimentalWarning src/readings/scope/build.ts",
+    "scope:check": "node --disable-warning=ExperimentalWarning --test src/readings/scope/check.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "typescript": "^5.9.3"
+  }
+}
