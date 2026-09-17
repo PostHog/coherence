@@ -16,6 +16,7 @@ Guiding artifacts kept from the reference:
 - `docs/checklist-seed.json` — the 36 invariant shapes for the decomposition checklist.
 - `docs/authority-evidence.md` — transcript evidence on why work authority was retired.
 - `docs/scope-structure-thesis.md` — design thesis for the Scope reading.
+- `docs/data-is-destiny.md` — the data-model brief the Scope shell is built to.
 
 First slice: the glossary, the hook that injects it, and the drift check at
 regulate. Mnemion is the first adopter.
