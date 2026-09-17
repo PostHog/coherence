@@ -7,6 +7,12 @@
  *   testMatch  a regular expression the test output must match to pass
  *              (a runner that exits 0 when no test matched the filter
  *              needs it); absent means the exit code decides
+ *   testJson   one invocation for every test the bullets name at once: an argv array or
+ *              string template with {filter} (a combined name pattern) and
+ *              {out} (where the runner writes a jest-shaped JSON report:
+ *              testResults[].assertionResults[] with ancestorTitles, title,
+ *              status). Results map back to invariants by test name; when
+ *              absent the pass runs one test per invocation through `test`
  *   testDir    a folder name (or testDirs, a list) whose files are tests,
  *              beside the built-in __tests__, test, tests
  */
@@ -23,11 +29,19 @@ export interface EnforcementConfig {
   /** Undefined when no test command is configured. */
   test: string[] | string | undefined;
   testMatch: RegExp | undefined;
+  /** One invocation reporting every test the bullets name, or undefined to run them one at a time. */
+  testJson: string[] | string | undefined;
   testFolders: string[];
 }
 
+function commandValue(value: unknown): string[] | string | undefined {
+  if (Array.isArray(value) && value.every((v): v is string => typeof v === "string") && value.length > 0) return value;
+  if (typeof value === "string" && value.trim() !== "") return value;
+  return undefined;
+}
+
 export function readEnforcementConfig(root: string): EnforcementConfig {
-  const config: EnforcementConfig = { language: "typescript", test: undefined, testMatch: undefined, testFolders: [...DEFAULT_TEST_FOLDERS] };
+  const config: EnforcementConfig = { language: "typescript", test: undefined, testMatch: undefined, testJson: undefined, testFolders: [...DEFAULT_TEST_FOLDERS] };
   const path = resolve(root, CONFIG_FILE);
   if (!existsSync(path)) return config;
   let parsed: unknown;
@@ -40,9 +54,8 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   const record = parsed as Record<string, unknown>;
   const language = record["language"];
   if (typeof language === "string" && isLanguage(language)) config.language = language;
-  const test = record["test"];
-  if (Array.isArray(test) && test.every((v): v is string => typeof v === "string") && test.length > 0) config.test = test;
-  else if (typeof test === "string" && test.trim() !== "") config.test = test;
+  config.test = commandValue(record["test"]);
+  config.testJson = commandValue(record["testJson"]);
   const testMatch = record["testMatch"];
   if (typeof testMatch === "string" && testMatch !== "") {
     try {

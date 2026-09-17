@@ -23,17 +23,16 @@ A name resolves as a bare symbol (`writeClass`), a symbol in its file
 resolve, and the check says so.
 
 The first adapter drives `typescript-language-server` over the language
-server protocol on stdio, found in the adopter's `node_modules`, then
-Coherence's own, then `PATH`.
-Exportedness is not in the protocol, so the adapter reads the declaration
-text. The second adapter, for Pyright, is a stub that names its ladder.
+server protocol on stdio. Exportedness is not in the protocol, so the
+adapter reads the declaration text. The second adapter, for Pyright, is a
+stub that names its ladder.
 
 ## The ladder
 
 Every reference to the protected thing is classified: inside the chokepoint
-(within the chokepoint symbol's range, or its module when the chokepoint is
-a module), an import, a test reference (under a configured test folder;
-reported, never a bypass), or a bypass.
+(the chokepoint symbol's range, or its module when the chokepoint is a
+module), an import, a test reference (reported, never a bypass), or a
+bypass.
 
 - **visibility-choked**: not visible outside its module, no bypass.
 - **reference-choked**: visible, but every reference is inside the chokepoint.
@@ -53,9 +52,9 @@ A chokepoint refutes itself. The adapter opens an unsaved document beside
 the protected thing that imports and uses it (for a thing not exported, an
 unsaved edit of its own module), asks for references, and confirms the
 synthetic site appears; nothing touches disk. If the instrument cannot see
-the site, the check is vacuous: the run says so, the refutation is missing,
-and the bullet stays a requirement. A totality oracle must be witnessed by
-hand and written on the bullet as `refuted:`.
+the site, the check is vacuous: the run says so and the bullet stays a
+requirement. A totality oracle must be witnessed by hand and written on the
+bullet as `refuted:`.
 
 ## The run and its view
 
@@ -68,18 +67,20 @@ rewritten.
 one the latest run skipped keeps its prior dated verdict, and the line says
 so. `spec --check` reads the same view: an automatic refutation satisfies a
 chokepoint bullet's refutation requirement, a passing verdict shows as
-verified with its date, and a failing one makes the bullet a structural
-defect. With no run, every enforcement is declared, unverified.
+verified, and a failing one makes the bullet a structural defect. With no
+run, every enforcement is declared, unverified.
 
-The totality oracle pass runs the test `via` names through the config's
-`test` command; `testMatch` decides pass when a runner exits 0 on an empty
-selection. Not configured is reported, never assumed passing.
+The totality oracle pass runs every test the bullets name in one invocation of the
+config's `testJson` command (a combined name pattern, a per-test JSON
+report) and maps results back by name; the record says so. One test per
+invocation of `test` is the fallback when a runner cannot report per test.
+Not configured is reported, never assumed passing.
 
 ## Revelation at the edit
 
 The warm server holds the language server open across hook invocations:
 `serve` runs it in the foreground; a client connects over a unix socket
-under `.coherence/run/`, spawns it detached when none listens, and it shuts
+under `.coherence/run/` and spawns it detached when none listens; it shuts
 down after a few idle minutes.
 
 On PostToolUse for a file-writing tool, the hook re-checks only the

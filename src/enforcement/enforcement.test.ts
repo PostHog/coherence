@@ -215,6 +215,47 @@ test("the totality oracle pass: configured command with a filter and a match; no
   assert.match(argv.reason, /exited 3/);
 });
 
+test("the batched totality oracle pass: every test the bullets name in one invocation, mapped back by name; the record says which mode ran", async () => {
+  const { combinedFilter, runTotalityBatch, verdictsFromReport } = await import("./totality.ts");
+  assert.equal(combinedFilter(["a (b)", "c|d", "a (b)"]), "a \\(b\\)|c\\|d");
+  const report = {
+    testResults: [
+      { assertionResults: [
+        { ancestorTitles: ["egress totality"], title: "strips", status: "passed", fullName: "egress totality strips" },
+        { ancestorTitles: ["egress totality"], title: "hashes", status: "passed", fullName: "egress totality hashes" },
+        { ancestorTitles: ["door totality"], title: "closes", status: "failed", fullName: "door totality closes" },
+        { ancestorTitles: [], title: "lone test", status: "passed", fullName: "lone test" },
+      ] },
+    ],
+  };
+  const verdicts = verdictsFromReport(report, ["egress totality", "door totality", "lone test", "absent"], "runner");
+  assert.equal(verdicts.get("egress totality")!.verdict, "pass");
+  assert.match(verdicts.get("egress totality")!.reason, /2 tests under "egress totality" passed in one invocation/);
+  assert.equal(verdicts.get("door totality")!.verdict, "fail");
+  assert.equal(verdicts.get("lone test")!.verdict, "pass", "a test's own title matches too");
+  assert.equal(verdicts.get("absent")!.verdict, "fail");
+  assert.match(verdicts.get("absent")!.reason, /no test ran under the name "absent"/);
+
+  // A fake runner that writes the report it is asked for, recording the filter it received.
+  const script = `const [out, filter] = process.argv.slice(1); require("node:fs").writeFileSync(out, JSON.stringify({ testResults: [{ assertionResults: [{ ancestorTitles: ["egress totality"], title: "strips " + filter, status: "passed" }] }] }));`;
+  const config = { ...readEnforcementConfig(root), testJson: ["node", "-e", script, "{out}", "{filter}"] };
+  const batch = await runTotalityBatch(root, config, ["egress totality"]);
+  assert.ok(batch !== undefined);
+  assert.equal(batch.get("egress totality")!.verdict, "pass");
+  assert.equal(await runTotalityBatch(root, readEnforcementConfig(root), ["egress totality"]), undefined, "no testJson: the caller falls back to one at a time");
+
+  write("coherence.config.json", JSON.stringify({ language: "typescript", testDir: "__tests__", testJson: ["node", "-e", script, "{out}", "{filter}"] }));
+  const outcome = await performRun(root, { session: "batched", agent: "enforcement", adapter, form: "totality oracle" });
+  const entry = outcome.record.invariants[0]!;
+  assert.equal(entry.mode, "batched");
+  assert.equal(entry.verdict, "pass");
+  assert.match(formatRun(outcome), /totality oracle: pass \(.*one invocation for every test the bullets name\)/);
+  write("coherence.config.json", CONFIG);
+  const single = await performRun(root, { session: "batched", agent: "enforcement", adapter, form: "totality oracle" });
+  assert.equal(single.record.invariants[0]!.mode, "one-at-a-time");
+  rmSync(join(root, ".coherence", "runs"), { recursive: true, force: true });
+});
+
 test("the state derivation without a run: a chokepoint bullet lacks refutation; with a run: automatic refutation satisfies it, a fail is a structural defect", () => {
   const model = loadSpecModel(root, { runs: false });
   const bullet = model.components[0]!.invariants.find((i) => i.name === "hidden set")!;

@@ -177,6 +177,8 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private readonly lineCache = new Map<string, string[]>();
   /** The first source file, kept open so the project stays loaded. */
   private seed: string | undefined;
+  /** Files a definition or a reference site landed in since the last forget: the ones a forget re-reads from disk. */
+  private readonly touched = new Set<string>();
   readonly root: string;
 
   constructor(root: string) {
@@ -285,15 +287,27 @@ export class TypeScriptAdapter implements LanguageAdapter {
 
   /**
    * Cached facts about files are dropped when their text may have changed (the
-   * edit hook re-runs a check). Every document is closed and reopened from disk;
-   * the seed stays open throughout, since tsserver drops the project when no
-   * document is open.
+   * edit hook re-runs a check). tsserver reads a file it never opened from disk
+   * and refreshes it only when its watcher fires, so every file touched since
+   * the last forget, and every file the caller names, is opened and closed:
+   * closing makes tsserver reload it from disk at once. The seed stays open
+   * throughout, since tsserver drops the project when no document is open.
    */
-  forget(): void {
+  forget(files: readonly string[] = []): void {
     this.symbolCache.clear();
     this.lineCache.clear();
     if (this.client === undefined) return;
-    for (const file of [...this.opened]) if (file !== this.seed) this.closeDocument(file);
+    const refresh = new Set([...this.touched, ...files, ...this.opened]);
+    this.touched.clear();
+    for (const file of refresh) {
+      if (file === this.seed) continue;
+      if (!existsSync(join(this.root, file))) {
+        if (this.opened.has(file)) this.closeDocument(file);
+        continue;
+      }
+      if (!this.opened.has(file)) this.open(file);
+      this.closeDocument(file);
+    }
     if (this.seed !== undefined && this.opened.has(this.seed)) {
       this.client.notify("textDocument/didChange", { textDocument: { uri: this.uri(this.seed), version: Date.now() }, contentChanges: [{ text: readFileSync(join(this.root, this.seed), "utf8") }] });
     }
@@ -366,6 +380,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
   async references(definition: Definition): Promise<ReferenceSite[]> {
     const client = await this.live();
     this.open(definition.file);
+    this.touched.add(definition.file);
     const starts: Position[] = [];
     if (definition.kind === "module") {
       for (const symbol of await this.documentSymbols(definition.file)) {
@@ -390,6 +405,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
         const key = `${file}:${start.line}:${start.character}`;
         if (seen.has(key)) continue;
         seen.add(key);
+        this.touched.add(file);
         const lines = this.opened.has(file) && this.lineCache.has(file) ? this.lineCache.get(file)! : this.linesOf(file);
         sites.push({
           file,

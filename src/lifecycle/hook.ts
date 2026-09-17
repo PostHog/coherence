@@ -203,7 +203,7 @@ export async function editContext(root: string, input: HookInput, options: HookO
   if (touched.length === 0) return "";
   const session = typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : "unknown-session";
   const agent = typeof input.agent_type === "string" && input.agent_type !== "" ? input.agent_type : MAIN_AGENT;
-  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: touched, model, adapter: options.adapter });
+  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: touched, model, adapter: options.adapter, refresh: [file] });
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
   if (failed.length === 0) return "";

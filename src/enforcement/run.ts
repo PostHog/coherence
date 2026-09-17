@@ -13,7 +13,7 @@ import { checkChokepoint, type ChokepointResult } from "./check.ts";
 import { readEnforcementConfig, type EnforcementConfig } from "./config.ts";
 import { appendRun, type Form, type RunEntry, type RunRecord } from "./record.ts";
 import { connectAdapter, type RemoteAdapter } from "./server.ts";
-import { runTotalityOracle, type TotalityResult } from "./totality.ts";
+import { runTotalityBatch, runTotalityOracle, type TotalityResult } from "./totality.ts";
 
 export interface RunOptions {
   session: string;
@@ -22,8 +22,8 @@ export interface RunOptions {
   form?: Form | undefined;
   /** Only invariants with these names, when given. */
   invariants?: readonly string[] | undefined;
-  /** Only invariants whose chokepoint check touches one of these files (project-relative), or whose names appear in the file's text. */
-  touching?: readonly string[] | undefined;
+  /** Files (project-relative) whose text changed since the instrument last read them; the warm server re-reads them first. */
+  refresh?: readonly string[] | undefined;
   /** An adapter to use instead of the warm server (tests, and `--no-server`). */
   adapter?: LanguageAdapter | undefined;
   /** Whether to talk to the warm server (default true when no adapter is given). */
@@ -95,17 +95,28 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
       remote = connected.adapter;
       adapter = remote;
       instrument = { language: remote.language, server: connected.server };
-      await remote.forget();
+      await remote.forget(options.refresh ?? []);
     } catch (error) {
       instrumentReason = error instanceof Error ? error.message : String(error);
     }
   } else if (adapter !== undefined) {
     // An adapter handed in lives in this process: no server was warm before it.
     instrument = { language: adapter.language, server: "cold" };
+    if ("forget" in adapter && typeof adapter.forget === "function") (adapter as { forget: (files?: readonly string[]) => void }).forget(options.refresh ?? []);
   }
   if (adapter !== undefined && instrumentReason === undefined && needsAdapter) {
     const state = await adapter.ready();
     if (!state.ok) instrumentReason = state.reason;
+  }
+
+  // Every test a bullet names in one invocation, when the runner can report per test; else one at a time below.
+  let batched: Map<string, TotalityResult> | undefined;
+  let batchLatency = 0;
+  if (wantTotality) {
+    const filters = selected.flatMap(({ invariant }) => totalityEnforcements(invariant).map(({ via }) => adapter?.testFilter(via) ?? via));
+    const t0 = Date.now();
+    batched = await runTotalityBatch(root, config, filters);
+    batchLatency = Date.now() - t0;
   }
 
   for (const { component, invariant } of selected) {
@@ -164,18 +175,22 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
       for (const { via } of totalityEnforcements(invariant)) {
         const t0 = Date.now();
         const filter = adapter?.testFilter(via) ?? via;
-        const result = await runTotalityOracle(root, config, filter);
+        const fromBatch = batched?.get(filter);
+        const result = fromBatch ?? (await runTotalityOracle(root, config, filter));
         details.push({
-          entry: entryOf(component, invariant.name, "totality oracle", {
-            verdict: result.verdict,
-            grade: undefined,
-            refutation: invariant.refutations.length > 0 ? "witnessed" : "missing",
-            bypasses: [],
-            testReferences: 0,
-            files: [],
-            latency: Date.now() - t0,
-            reason: result.reason,
-          }),
+          entry: {
+            ...entryOf(component, invariant.name, "totality oracle", {
+              verdict: result.verdict,
+              grade: undefined,
+              refutation: invariant.refutations.length > 0 ? "witnessed" : "missing",
+              bypasses: [],
+              testReferences: 0,
+              files: [],
+              latency: fromBatch === undefined ? Date.now() - t0 : batchLatency,
+              reason: result.reason,
+            }),
+            mode: fromBatch === undefined ? "one-at-a-time" : "batched",
+          },
           totality: result,
         });
       }
