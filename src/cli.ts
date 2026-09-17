@@ -9,6 +9,9 @@
  *   coherence glossary                 print the compact glossary the hook injects
  *   coherence glossary --json          print the parsed glossary model
  *   coherence glossary --check [paths] run the glossary check (--json for the report as JSON)
+ *   coherence spec --check [root]      every component, its invariants with state, every problem
+ *   coherence spec --json [root]       the spec model
+ *   coherence scaffold component | invariant   the complete shape, cheapest to produce
  *   coherence hook <event>             answer one harness event (event JSON on stdin)
  *   coherence hooks install --host <claude|codex>
  *   coherence hooks status
@@ -24,12 +27,16 @@ import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/g
 import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook } from "./lifecycle/hook.ts";
 import { formatStatus, HOSTS, install, isHost, status } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectGlossaries } from "./lifecycle/project.ts";
+import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
+import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
 
-const commands: Record<string, Command> = { ...journalVerbs };
+const commands: Record<string, Command> = { ...journalVerbs, spec: specCommand, scaffold: scaffoldCommand };
 
 const USAGE = `usage:
   coherence glossary [--json]
   coherence glossary --check [--json] [paths...]
+${SPEC_USAGE}
+${SCAFFOLD_USAGE}
   coherence hook <${HOOK_EVENTS.join("|")}>
   coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"]
   coherence hooks status
