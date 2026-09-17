@@ -11,10 +11,14 @@
   "scripts": {
     "scope": "node --disable-warning=ExperimentalWarning src/readings/scope/build.ts",
     "scope:check": "node --disable-warning=ExperimentalWarning --test src/readings/scope/check.test.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\""
   },
   "devDependencies": {
     "@types/node": "^22.20.3",
     "typescript": "^5.9.3"
+  },
+  "bin": {
+    "coherence": "src/cli.ts"
   }
 }
