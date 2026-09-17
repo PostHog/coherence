@@ -11,19 +11,19 @@ vocabulary: 206 inventoried concepts, half of them another spelling of something
 that already had a name, reduced to 38. That pass exposed a defect class nothing
 else in the toolkit can see.
 
-The reference's boundary claims named a chokepoint and nothing else. When the
+The reference's enforcement claims named a chokepoint and nothing else. When the
 owner said what a chokepoint is, the one site every reference to a protected thing
 passes through, the mechanism was visibly not that: it checked that a symbol
 existed. Fourteen of Mnemion's sixteen chokepoint claims turned out to have prose
 where the protected thing belongs and had stood green for months. The two that
 named a symbol were broken as written, with seven references outside the
-chokepoint that a module-level import graph could never see.
+chokepoint that a module-level import map could never see.
 
 No test caught this, because tests check what code does and the defect was in
 what the claim meant. No review caught it, because reviewers share the
 vocabulary. No metric caught it, because metrics measure structure and never hold
-a referent. The journal recorded 778 decisions about gates without one definition
-of a gate. Only an exercise that forces a definition to be stated and then holds
+a referent. The journal recorded 778 decisions that used the reference's word for an
+invariant without once defining it. Only an exercise that forces a definition to be stated and then holds
 the mechanism against it can find a name that has drifted from what the code does.
 
 ## The three activities
