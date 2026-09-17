@@ -1089,10 +1089,11 @@
         }
       ],
       "detail": {
-        "similarity_seam": "The drift check matches exact strings first (new noun, rejected name). A similarity seam is left open so an embedding pass can later suggest candidate mappings for near-synonyms and flag overloads by clustering the contexts of a term across components. Similarity only improves the closed question (declare, map, or fix); it never decides. Planned as a local service: the supported platform is Apple Silicon only, so an on-device model needs no API key and no network. Backend under survey 2026-09-17."
+        "similarity_seam": "The drift check matches exact strings first (new noun, rejected name). A similarity seam is left open so an embedding pass can later suggest candidate mappings for near-synonyms and flag overloads by clustering the contexts of a term across components. Similarity only improves the closed question (declare, map, or fix); it never decides. Planned as a local service: the supported platform is Apple Silicon only, so an on-device model needs no API key and no network. Backend under survey 2026-09-17.",
+        "first_class": "Coherence needs first-class support for building, maintaining, and validating the glossary. Building: draft from specs, docs, component names, and tool surface; settle collisions by ruling. Maintaining: the vocabulary check at regulate; only a human retires or renames. Validating: sense, not names; a periodic per-concept review the tool makes cheap, approximated mechanically by the similarity seam. See docs/glossary.md."
       },
       "provenance": {
-        "owner_words": "glossary.json. Injected into context same as AGENTS.md. no run can miss it. glossary must be anti-rot, anti-fragile.",
+        "owner_words": "glossary.json. Injected into context same as AGENTS.md. no run can miss it. glossary must be anti-rot, anti-fragile. Coherence will need first class support for building, maintaining and validating the glossary.",
         "defined_by": "owner, 2026-09-17"
       }
     },
