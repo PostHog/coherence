@@ -12,6 +12,7 @@ dist/
 # own README tells consumers to commit.
 .coherence/*
 !.coherence/decisions/
+!.coherence/journal/
 !.coherence/defects/
 !.coherence/status.json
 !.coherence/calibration/
