@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 /**
- * The Coherence command line.
+ * The command line: `node src/cli.ts <verb> ...`.
+ *
+ * Each area of the tool exports its verbs; this file dispatches on the first
+ * word. The journal's verbs arrive as a record of synchronous commands over an
+ * `Io`; the lifecycle's verbs are dispatched below them.
  *
  *   coherence glossary                 print the compact glossary the hook injects
  *   coherence glossary --json          print the parsed glossary model
@@ -8,18 +12,20 @@
  *   coherence hook <event>             answer one harness event (event JSON on stdin)
  *   coherence hooks install --host <claude|codex>
  *   coherence hooks status
+ *   coherence decide | retract | conjecture | ... | journal   (see JOURNAL_USAGE)
  *
  * Exit codes: the check exits 1 with findings and 0 without; a hook exits 2
  * to refuse a stop, with the reason on stderr.
  */
 
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { JOURNAL_USAGE, journalVerbs, type Command, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, runCheck } from "./lifecycle/check.ts";
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/glossary.ts";
 import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook } from "./lifecycle/hook.ts";
 import { formatStatus, HOSTS, install, isHost, status } from "./lifecycle/install.ts";
-import { loadProjectGlossaries } from "./lifecycle/project.ts";
+import { isCoherenceItself, loadProjectGlossaries } from "./lifecycle/project.ts";
+
+const commands: Record<string, Command> = { ...journalVerbs };
 
 const USAGE = `usage:
   coherence glossary [--json]
@@ -27,6 +33,7 @@ const USAGE = `usage:
   coherence hook <${HOOK_EVENTS.join("|")}>
   coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"]
   coherence hooks status
+${JOURNAL_USAGE}
 `;
 
 function fail(message: string, code = 64): never {
@@ -73,15 +80,7 @@ function parse(args: string[], valued: Set<string>): Parsed {
  */
 async function defaultCommand(root: string): Promise<string> {
   const dir = "${CLAUDE_PROJECT_DIR:-.}";
-  try {
-    const pkg: unknown = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
-    if (typeof pkg === "object" && pkg !== null && (pkg as Record<string, unknown>)["name"] === "coherence") {
-      return `node "${dir}/src/cli.ts"`;
-    }
-  } catch {
-    /* no package.json: the bin is still where npm puts it */
-  }
-  return `"${dir}/node_modules/.bin/coherence"`;
+  return (await isCoherenceItself(root)) ? `node "${dir}/src/cli.ts"` : `"${dir}/node_modules/.bin/coherence"`;
 }
 
 async function glossaryCommand(args: string[], root: string): Promise<number> {
@@ -144,9 +143,18 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
 }
 
 async function main(argv: string[]): Promise<number> {
-  const [command, ...rest] = argv;
+  const [verb, ...rest] = argv;
   const root = process.cwd();
-  switch (command) {
+  const command = verb === undefined ? undefined : commands[verb];
+  if (command !== undefined) {
+    const io: Io = {
+      cwd: root,
+      out: (line) => process.stdout.write(`${line}\n`),
+      err: (line) => process.stderr.write(`${line}\n`),
+    };
+    return command(rest, io);
+  }
+  switch (verb) {
     case "glossary":
       return glossaryCommand(rest, root);
     case "hook":
@@ -154,7 +162,7 @@ async function main(argv: string[]): Promise<number> {
     case "hooks":
       return hooksCommand(rest, root);
     default:
-      fail(USAGE);
+      fail(verb === undefined ? USAGE : `unknown verb "${verb}"\n${USAGE}`);
   }
 }
 

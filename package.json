@@ -11,6 +11,7 @@
   "scripts": {
     "scope": "node --disable-warning=ExperimentalWarning src/readings/scope/build.ts",
     "scope:check": "node --disable-warning=ExperimentalWarning --test src/readings/scope/check.test.ts",
+    "journal:check": "node --disable-warning=ExperimentalWarning --test src/journal/journal.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\""
   },

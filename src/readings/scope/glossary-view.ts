@@ -9,12 +9,13 @@
 import { html, join, raw, slug, type Markup } from "./html.ts";
 import type {
   Concept,
+  Fields,
   Glossary,
   GlossaryViewState,
   Layer,
   Overload,
   RecordValue,
-  Retirement,
+  RejectedName,
   Ruling,
   TrustLevel,
 } from "./model.ts";
@@ -68,7 +69,6 @@ function conceptMatches(concept: Concept, query: string): boolean {
   return matches(
     query,
     concept.name,
-    concept.reference_aliases,
     concept.aliases,
     concept.definition,
     concept.rejected.map((r) => r.alternative),
@@ -85,11 +85,7 @@ function plural(count: number, one: string, many: string): string {
 
 /** The sentence that says how large a glossary is. Shared by the shell masthead. */
 export function glossaryCounts(glossary: Glossary): string {
-  return `${plural(glossary.concepts.length, "concept", "concepts")} and ${plural(
-    glossary.retirements.length,
-    "retired mechanism",
-    "retired mechanisms",
-  )}, glossary version ${glossary.version}.`;
+  return `${plural(glossary.concepts.length, "concept", "concepts")}, glossary version ${glossary.version}.`;
 }
 
 function renderQuotation(text: string, kind: "metaphor" | "owner-words"): Markup {
@@ -119,17 +115,49 @@ function renderRecordValue(key: string, value: RecordValue): Markup {
 
 function renderRecordFields(entries: [string, RecordValue][]): Markup {
   return html`<dl class="record-fields">${entries.map(
-    ([k, v]) => html`<div class="record-field"><dt>${humanize(k)}</dt><dd>${renderRecordValue(k, v)}</dd></div>`,
+    ([k, v]) => html`<div class="record-field" data-field="${k}"><dt>${humanize(k)}</dt><dd>${renderRecordValue(k, v)}</dd></div>`,
   )}</dl>`;
 }
 
+/**
+ * A named set of fields one click away: the disclosure's summary names the
+ * fields it holds, so the reader knows what opening it will show. Omitted
+ * when there are no fields.
+ */
+function renderDisclosure(kind: "detail" | "provenance", label: string, fields: Fields): Markup | null {
+  const entries = Object.entries(fields);
+  if (entries.length === 0) return null;
+  return html`<details class="record ${kind}" data-section="${kind}">
+    <summary>${label}: ${entries.map(([k]) => humanize(k)).join(", ")} (${plural(entries.length, "field", "fields")})</summary>
+    ${renderRecordFields(entries)}
+  </details>`;
+}
+
+/** Fields the reading has no place for, kept as the file said them. */
 function renderConceptRecord(concept: Concept): Markup {
   const entries = Object.entries(concept.record);
-  if (entries.length === 0) return html`<p class="quiet">Nothing further on record.</p>`;
-  return html`<details class="record">
+  if (entries.length === 0) return html``;
+  return html`<details class="record" data-section="record">
     <summary>Also on record: ${entries.map(([k]) => humanize(k)).join(", ")} (${plural(entries.length, "field", "fields")})</summary>
     ${renderRecordFields(entries)}
   </details>`;
+}
+
+function renderProperties(concept: Concept): Markup | null {
+  const entries = Object.entries(concept.properties);
+  if (entries.length === 0) return null;
+  return html`<section class="properties" data-field="properties">
+    <h4>Properties</h4>
+    ${renderRecordFields(entries)}
+  </section>`;
+}
+
+function renderOpenQuestions(concept: Concept): Markup | null {
+  if (concept.open_questions.length === 0) return null;
+  return html`<section class="open-questions" data-field="open_questions">
+    <h4>Open questions</h4>
+    <ul>${concept.open_questions.map((q) => html`<li>${q}</li>`)}</ul>
+  </section>`;
 }
 
 function renderRejected(concept: Concept): Markup {
@@ -160,21 +188,13 @@ function renderRelated(layer: Layer, concept: Concept, index: ConceptIndex): Mar
 }
 
 function renderNames(concept: Concept): Markup {
-  const formerly =
-    concept.reference_aliases.length > 0
-      ? html`<p class="formerly"><span class="label">formerly</span> ${concept.reference_aliases.join("; ")}</p>`
-      : null;
-  const alsoCalled =
-    concept.aliases.length > 0
-      ? html`<p class="formerly"><span class="label">also called</span> ${concept.aliases.join("; ")}</p>`
-      : null;
-  if (formerly === null && alsoCalled === null) return html`<p class="formerly quiet">No other names.</p>`;
-  return html`${formerly}${alsoCalled}`;
+  if (concept.aliases.length === 0) return html`<p class="formerly quiet">No other names.</p>`;
+  return html`<p class="formerly"><span class="label">also called</span> ${concept.aliases.join("; ")}</p>`;
 }
 
 function renderNotToBeConfusedWith(concept: Concept): Markup | null {
   if (concept.not_to_be_confused_with.length === 0) return null;
-  return html`<section class="distinctions">
+  return html`<section class="distinctions" data-field="not_to_be_confused_with">
     <h4>Not to be confused with</h4>
     <ul>${concept.not_to_be_confused_with.map((d) => html`<li>${d}</li>`)}</ul>
   </section>`;
@@ -189,33 +209,33 @@ function renderConcept(layer: Layer, concept: Concept, index: ConceptIndex): Mar
         ? html`<p class="status">${concept.status}</p>`
         : html`<p class="status quiet">status not recorded</p>`}
       ${renderNames(concept)}
-      ${concept.defined_by ? html`<p class="defined-by">defined by ${concept.defined_by}</p>` : null}
     </div>
     <div class="body">
-      <p class="definition">${concept.definition}</p>
-      ${concept.metaphor ? renderQuotation(concept.metaphor, "metaphor") : null}
-      ${concept.owner_words ? renderQuotation(concept.owner_words, "owner-words") : null}
-      ${renderNotToBeConfusedWith(concept)}
-      ${renderRejected(concept)}
-      ${renderRelated(layer, concept, index)}
+      <div class="vocabulary" data-section="vocabulary">
+        <p class="definition" data-field="definition">${concept.definition}</p>
+        ${renderProperties(concept)}
+        ${renderNotToBeConfusedWith(concept)}
+        ${renderRejected(concept)}
+        ${renderRelated(layer, concept, index)}
+        ${renderOpenQuestions(concept)}
+      </div>
+      ${renderDisclosure("detail", "Detail", concept.detail)}
+      ${renderDisclosure("provenance", "Provenance", concept.provenance)}
       ${renderConceptRecord(concept)}
     </div>
   </article>`;
 }
 
-function renderRetirement(layer: Layer, retirement: Retirement): Markup {
-  const id = `${layer.id}-retired-${slug(retirement.concept)}`;
-  return html`<article class="entry retirement" id="${id}">
+function renderRejectedName(layer: Layer, rejected: RejectedName): Markup {
+  const id = `${layer.id}-rejected-${slug(rejected.concept)}`;
+  return html`<article class="entry rejected-name" id="${id}">
     <div class="margin">
-      <h3 class="headword">${retirement.concept}</h3>
-      <p class="status">${retirement.status ?? "retired"}</p>
-      ${retirement.decided_by ? html`<p class="defined-by">decided by ${retirement.decided_by}</p>` : null}
+      <h3 class="headword">${rejected.concept}</h3>
+      <p class="status">rejected</p>
+      ${rejected.decided_by ? html`<p class="defined-by">decided by ${rejected.decided_by}</p>` : null}
     </div>
     <div class="body">
-      <p class="definition"><span class="because-word">because</span> ${retirement.because}</p>
-      ${retirement.carry_over ? html`<p class="carry-over"><span class="label">Carried over</span> ${retirement.carry_over}</p>` : null}
-      ${retirement.correction ? html`<p class="correction"><span class="label">Correction</span> ${retirement.correction}</p>` : null}
-      ${retirement.resolution ? html`<p class="resolution"><span class="label">Resolution</span> ${retirement.resolution}</p>` : null}
+      <p class="definition"><span class="because-word">because</span> ${rejected.because}</p>
     </div>
   </article>`;
 }
@@ -356,9 +376,10 @@ function renderPresentLayer(layer: PresentLayer, state: GlossaryViewState, index
       (r, i) => renderRuling(layer, "uncertain", r, i),
       html`<p class="section-lead">Questions the glossary raised about its own names, with the ruling where one was made.</p>`)}
 
-    ${renderListSection(layer, "retirements", "Retired mechanisms", ["retired mechanism", "retired mechanisms"], glossary.retirements, rawQuery,
+    ${renderListSection(layer, "rejected-names", "Rejected names", ["rejected name", "rejected names"], glossary.rejected_names, rawQuery,
       (r) => matches(query, r.concept, r.because),
-      (r) => renderRetirement(layer, r))}
+      (r) => renderRejectedName(layer, r),
+      html`<p class="section-lead">Names this glossary refuses at the top level, each with its because.</p>`)}
 
     ${renderListSection(layer, "metaphors", "Metaphors", ["metaphor", "metaphors"], Object.entries(glossary.metaphors), rawQuery,
       ([n, t]) => matches(query, n, t),

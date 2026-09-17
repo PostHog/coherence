@@ -80,13 +80,23 @@ test("the embedded state is the loaded glossary, unchanged", async () => {
   assert.deepEqual(embeddedState(html), state);
   const glossary = firstGlossary(state);
   const file = JSON.parse(await readFile(DEFAULTS.glossaryPath, "utf8")) as {
-    concepts: { name: string }[];
-    rejected: { concept: string }[];
+    concepts: { name: string; detail?: object; provenance?: object }[];
+    metaphors: Record<string, string>;
+    shape: object;
     version: number;
   };
   assert.equal(glossary.concepts.length, file.concepts.length);
-  assert.equal(glossary.retirements.length, file.rejected.length);
   assert.equal(glossary.version, file.version);
+  assert.deepEqual(Object.keys(glossary.metaphors), Object.keys(file.metaphors));
+  assert.deepEqual(glossary.shape, file.shape, "the file's shape key is kept in the model");
+  assert.equal(glossary.rejected_names, undefined, "Coherence's glossary has no top-level rejected names");
+  assert.deepEqual(glossary.record, {}, "every top-level key of the file has a place in the model");
+  for (const [i, concept] of glossary.concepts.entries()) {
+    const entry = file.concepts[i]!;
+    assert.deepEqual(concept.detail, entry.detail ?? {}, `${concept.name}: detail is kept whole`);
+    assert.deepEqual(concept.provenance, entry.provenance ?? {}, `${concept.name}: provenance is kept whole`);
+    assert.deepEqual(concept.record, {}, `${concept.name}: every key of the entry has a place in the model`);
+  }
 });
 
 test("the render shows every concept name and every rejected alternative's because", async () => {
@@ -102,16 +112,81 @@ test("the render shows every concept name and every rejected alternative's becau
       );
     }
   }
-  for (const retirement of glossary.retirements) {
-    assert.ok(rendered.includes(escapeHtml(retirement.concept)), `retired ${retirement.concept} is on the page`);
-    assert.ok(rendered.includes(escapeHtml(retirement.because)), `because for retired ${retirement.concept} is on the page`);
-  }
   for (const [name, text] of Object.entries(glossary.metaphors)) {
     assert.ok(rendered.includes(escapeHtml(text)), `metaphor ${name} is on the page`);
   }
+  for (const value of Object.values(glossary.shape ?? {})) {
+    if (typeof value === "string") assert.ok(!rendered.includes(escapeHtml(value)), "the shape key is rendered nowhere");
+  }
   assert.ok(rendered.includes(`${glossary.concepts.length} concepts`), "concept count is in the masthead");
   assert.ok(rendered.includes(`glossary version ${glossary.version}`), "version is in the masthead");
+  assert.ok(!rendered.includes(">Retired mechanisms</h2>"), "there is no retired-mechanisms section");
+  assert.ok(!rendered.includes('class="entry retirement"'), "there are no retired-mechanism cards");
 });
+
+/** The markup of one concept's card, and the vocabulary part of it: the body above the disclosures. */
+function conceptCard(rendered: string, id: string): { card: string; vocabulary: string } {
+  const start = rendered.indexOf(`id="${id}"`);
+  assert.ok(start !== -1, `card ${id} is on the page`);
+  const card = rendered.slice(start, rendered.indexOf("</article>", start));
+  const from = card.indexOf('data-section="vocabulary"');
+  assert.ok(from !== -1, `card ${id} has a vocabulary section`);
+  const to = card.indexOf("<details", from);
+  return { card, vocabulary: card.slice(from, to === -1 ? undefined : to) };
+}
+
+test("provenance and detail are one click away; no provenance key or value appears in the vocabulary", async () => {
+  const { state } = await buildScopePage(options);
+  const rendered = renderShell(state).text;
+  const glossary = firstGlossary(state);
+  for (const concept of glossary.concepts) {
+    const id = `coherence-${slug(concept.name)}`;
+    const { card, vocabulary } = conceptCard(rendered, id);
+    assert.ok(!vocabulary.includes("<details"), `${concept.name}: the vocabulary holds no disclosure`);
+    assert.ok(!vocabulary.includes('class="quotation'), `${concept.name}: no quotation in the vocabulary`);
+    for (const [key, value] of Object.entries(concept.provenance)) {
+      assert.ok(!vocabulary.includes(`data-field="${key}"`), `${concept.name}: provenance key ${key} is not a vocabulary field`);
+      assert.ok(!vocabulary.includes(`<dt>${escapeHtml(key.replace(/_/g, " "))}</dt>`), `${concept.name}: ${key} is not labeled in the vocabulary`);
+      for (const text of stringsIn(value)) {
+        assert.ok(!vocabulary.includes(escapeHtml(text)), `${concept.name}: provenance ${key} text is not in the vocabulary`);
+      }
+    }
+    const provenance = card.indexOf('data-section="provenance"');
+    assert.ok(provenance !== -1 && card.includes("<summary>Provenance:"), `${concept.name}: provenance is under its own disclosure`);
+    assert.ok(card.slice(provenance).includes('data-field="defined_by"'), `${concept.name}: defined_by is in provenance`);
+    for (const [key, value] of Object.entries(concept.provenance)) {
+      if (key === "owner_words" && typeof value === "string") {
+        assert.ok(card.includes(`<blockquote class="quotation owner-words"><p>${escapeHtml(value)}</p>`), `${concept.name}: owner's words are a quotation`);
+      }
+      if (key === "metaphor" && typeof value === "string") {
+        assert.ok(card.includes(`<blockquote class="quotation metaphor"><p>${escapeHtml(value)}</p>`), `${concept.name}: metaphor is a quotation`);
+      }
+    }
+    const detailKeys = Object.keys(concept.detail);
+    if (detailKeys.length === 0) {
+      assert.ok(!card.includes('data-section="detail"'), `${concept.name}: no detail, no Detail disclosure`);
+    } else {
+      assert.ok(card.includes("<summary>Detail:"), `${concept.name}: detail is under its own disclosure`);
+      for (const key of detailKeys) {
+        assert.ok(card.includes(`data-field="${key}"`), `${concept.name}: detail ${key} is on the card`);
+      }
+      assert.ok(card.indexOf('data-section="detail"') < provenance, `${concept.name}: Detail comes before Provenance`);
+    }
+    assert.ok(!card.includes("data-section=\"record\""), `${concept.name}: the record is empty, so no record section renders`);
+  }
+});
+
+function slug(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/** Every string inside a value, however nested. */
+function stringsIn(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(stringsIn);
+  if (typeof value === "object" && value !== null) return Object.values(value).flatMap(stringsIn);
+  return [];
+}
 
 test("the render has one view strip with a Glossary tab", async () => {
   const { state } = await buildScopePage(options);
@@ -196,10 +271,20 @@ test("the Mnemion domain glossary renders beneath Coherence's with every concept
   for (const overload of mnemion.candidate_overloads) {
     for (const sense of overload.senses) assert.ok(rendered.includes(escapeHtml(sense)));
   }
-  assert.ok(mnemion.retirements.length > 0, "Mnemion carries rejected names");
-  for (const retirement of mnemion.retirements) {
-    assert.ok(rendered.includes(escapeHtml(retirement.concept)), `rejected name ${retirement.concept} is on the page`);
-    assert.ok(rendered.includes(escapeHtml(retirement.because)));
+  assert.ok(mnemion.rejected_names !== undefined && mnemion.rejected_names.length > 0, "Mnemion carries rejected names");
+  for (const rejected of mnemion.rejected_names) {
+    assert.ok(rendered.includes(escapeHtml(rejected.concept)), `rejected name ${rejected.concept} is on the page`);
+    assert.ok(rendered.includes(escapeHtml(rejected.because)));
+    assert.ok(rejected.decided_by !== undefined && rendered.includes(`decided by ${escapeHtml(rejected.decided_by)}`));
+  }
+  assert.ok(rendered.includes(">Rejected names</h2>"), "rejected names have their own section");
+  for (const concept of mnemion.concepts) {
+    for (const text of stringsIn(concept.properties)) {
+      assert.ok(rendered.includes(escapeHtml(text)), `property of ${concept.name} is on the page`);
+    }
+    for (const text of stringsIn(concept.record)) {
+      assert.ok(rendered.includes(escapeHtml(text)), `record of ${concept.name} is on the page`);
+    }
   }
   assert.ok(mnemion.trust_levels !== undefined && mnemion.trust_levels.length > 0, "Mnemion declares trust levels");
   for (const level of mnemion.trust_levels) {
