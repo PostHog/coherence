@@ -29,6 +29,8 @@ export interface TotalityResult {
   command: string | undefined;
   /** The last lines of output, for a failure. */
   tail: string;
+  /** How many reported tests mapped to this via, when the runner reported per test: 0 says no test of that name ran. */
+  matched?: number;
 }
 
 export const TOTALITY_TIMEOUT_MS = 10 * 60 * 1000;
@@ -197,17 +199,17 @@ export function verdictsFromReport(report: JsonReport, filters: readonly string[
   for (const via of filters) {
     const mine = results.filter((r) => belongsTo(r, via));
     if (mine.length === 0) {
-      out.set(via, { verdict: "fail", reason: `no test ran under the name "${via}" in ${command}`, command, tail: "" });
+      out.set(via, { verdict: "fail", reason: `no test ran under the name "${via}" in ${command}`, command, tail: "", matched: 0 });
       continue;
     }
     const failed = mine.filter((r) => r.status === "failed");
     const passed = mine.filter((r) => r.status === "passed");
     if (failed.length > 0) {
-      out.set(via, { verdict: "fail", reason: `${failed.length} of ${mine.length} tests under "${via}" failed: ${failed.map((r) => r.fullName ?? r.title ?? "?").slice(0, 3).join("; ")}`, command, tail: "" });
+      out.set(via, { verdict: "fail", reason: `${failed.length} of ${mine.length} tests under "${via}" failed: ${failed.map((r) => r.fullName ?? r.title ?? "?").slice(0, 3).join("; ")}`, command, tail: "", matched: mine.length });
     } else if (passed.length === mine.length) {
-      out.set(via, { verdict: "pass", reason: `${passed.length} test${passed.length === 1 ? "" : "s"} under "${via}" passed in one invocation of ${command}`, command, tail: "" });
+      out.set(via, { verdict: "pass", reason: `${passed.length} test${passed.length === 1 ? "" : "s"} under "${via}" passed in one invocation of ${command}`, command, tail: "", matched: mine.length });
     } else {
-      out.set(via, { verdict: "not run", reason: `${mine.length - passed.length} of ${mine.length} tests under "${via}" were skipped or pending`, command, tail: "" });
+      out.set(via, { verdict: "not run", reason: `${mine.length - passed.length} of ${mine.length} tests under "${via}" were skipped or pending`, command, tail: "", matched: mine.length });
     }
   }
   return out;
@@ -232,7 +234,7 @@ export async function runTotalityBatch(root: string, config: EnforcementConfig, 
     .join(`<${filters.length} names>`)
     .split("{out}")
     .join("<report>");
-  const notRun = (reason: string, tail = ""): Map<string, TotalityResult> => new Map(filters.map((via) => [via, { verdict: "not run" as Verdict, reason, command: shown, tail }]));
+  const notRun = (reason: string, tail = ""): Map<string, TotalityResult> => new Map(filters.map((via) => [via, { verdict: "not run" as Verdict, reason, command: shown, tail, matched: 0 }]));
   try {
     const output = await new Promise<{ code: number | null; text: string }>((resolve, reject) => {
       let text = "";

@@ -28,6 +28,7 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   via: a totality oracle's refutation is a recorded event: the refuted line never satisfies it, a record with a later passing run does, and a bullet with both forms needs both
   because: both reviewers measured 32 of the 52 bullets reported as invariants resting on a parseable sentence with nothing linking it to a red result, and a chokepoint written entirely in prose with a self-asserted refuted line read as a full invariant with 0 problems from spec --check, the only check npm test runs; a refutation is the witnessed firing of an enforcement, so it must be an event the tool watched (the totality oracle red with the break staged, then green once restored), and the chokepoint's automatic refutation proves nothing about the totality oracle standing beside it
   crossing: record -> reading
+  refuted: let the bullet's own refuted: line satisfy a totality oracle's refutation again, with no record behind it -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
 - placeholders count as absent: A value still in angle brackets parses, counts as absent, and is listed as unfilled.
   over: every key of the grammar
@@ -41,6 +42,7 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   via: a long refuted value parses in linear time, and three digit groups that name no day are refused
   because: loadSpecModel runs on every hook event, and the old pattern put a lazy group before the arrow, another before the date, and \s* between them: 156 KB of a value that reaches an arrow and never reaches a date took 16.5 s, and one interior run of 8 KB of spaces took 161 s, so any agent-authored spec was a stall the session could not explain; and a date of three digit groups let 2026-13-45 stand as the day a refutation was witnessed
   crossing: project-source -> reading
+  refuted: made the date check accept any three digit groups again, so 2026-13-45 stood as a day -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
 - half a form is a problem: Half an enforcement form, an unknown key, a bad crossing, or a bad refutation is a problem reported with its file and line.
   over: every key on every bullet: the two enforcement pairs, the crossing, the refutation, and any key the grammar does not name

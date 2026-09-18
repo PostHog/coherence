@@ -40,7 +40,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   via: a project's own sense wins: an accepted project name silences a Coherence rejection, and an accepted phrase guards the words inside it
   because: Coherence's names describe the tool and a project's names describe its domain; a domain that legitimately uses a word the tool refuses must not be made to rename its own things
   crossing: project-source -> reading
-  refuted: <not witnessed: no staged break was attempted for the guard logic; the test has not been red in this repository>
+  refuted: dropped the project's own accepted phrases from the guard, so a Coherence rejection spoke over the project's sense -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
 - regulate refuses only what it can prove: A subagent stop is refused for glossary findings in changed files, spec problems, or structural defects, and never for an open requirement.
   protects: REFUSE_EXIT
@@ -79,7 +79,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   via: mergeHooks adds one Coherence entry per event, keeps everything else, and replaces its own entry on a second pass
   because: the host's settings file belongs to the adopter and may already carry other hooks; an install that clobbered them would cost the adopter its own automation, and a second install that duplicated its entry would run every hook twice
   crossing: project-source -> harness
-  refuted: <not witnessed: no staged break was attempted on the merge; the test has not been red in this repository>
+  refuted: made mergeHooks drop every other host's entry instead of keeping it -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: deploy
   checklist: graceful-drain dismissed: nothing is shut down by an install
   checklist: readiness-evidence dismissed: status reports what is written in the settings file and claims nothing about a running process

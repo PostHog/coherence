@@ -52,13 +52,14 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   via: the automatic refutation opens a synthetic reference and sees it; nothing is written to disk
   because: a check that would report nothing if the chokepoint were broken is vacuous; opening a synthetic reference and confirming the instrument sees it proves the instrument would report a real bypass, doing it in an unsaved document leaves the tree untouched, and every chokepoint verdict reaches the record through the one function that always attempts it
   crossing: instrument -> record
-  refuted: <not witnessed by hand: the run witnesses this one automatically; no staged break was attempted on the synthetic document>
+  refuted: stopped the refutation opening its synthetic document, so the instrument had nothing to see -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
 - refutation proves this check would fire: The synthetic site the adapter reports is classified by the same function every other site goes through, and only a site the check calls a bypass refutes; a synthetic site classified inside the chokepoint or as a test reference is vacuous and records not run.
   over: every chokepoint-form enforcement whose synthetic site the instrument reported
   via: the automatic refutation is vacuous unless the check's own classification calls the synthetic site a bypass
   because: the adapter decided outsideness itself and got it wrong in two ways the reviewers reproduced: a synthetic sibling document beside a protected thing under a test folder is a test reference, so nothing could ever be a bypass and the bullet read as a verified invariant; and a synthetic line appended to a module that is its own chokepoint fell past a range computed before the line was added, so the check called an inside site outside. Running the check's own classifier on the synthetic site is the only way the refutation proves the thing it claims: that this check, not the instrument, would go red
   crossing: instrument -> reading
+  refuted: let any site the instrument reported count as the refutation, without classifying it -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
 - not configured never passes: The totality oracle pass reports a missing test command as not run, never as passing, and a command whose output does not match is a fail.
   over: every totality oracle the run checks
@@ -81,12 +82,14 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   via: a report entry maps to a via by exact title, with the one stated fallback for a runner that truncates
   because: the batched pass selects by pattern and maps results back by name, so the mapping is the whole basis of a totality oracle's verdict; a substring mapping let a bullet's verdict come from a different test whose title merely contained its name, which means a neighbour's failure can fail this bullet and a neighbour's pass can carry it
   crossing: instrument -> record
+  refuted: mapped a report entry to a via by substring again -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
 - the instrument outlives the test pass: A run keeps the instrument alive across the totality pass and asks it again afterwards; a run whose instrument did not survive records the reason on every entry it could not check and exits non-zero, never 0 with not run.
   over: every run that needs the instrument and runs the totality pass first
   via: the run keeps the instrument alive across the test pass, and a run whose instrument died exits non-zero with the reason
   because: the totality pass runs the project's whole suite before the first question, and the warm server's idle timer only resets on a request line, so a suite longer than the idle killed the instrument mid-run, recorded not run for every chokepoint, and exited 0: a run that proved nothing read exactly like a clean one, which is the one thing a verification pass must never do
   crossing: harness -> instrument
+  refuted: removed the heartbeat that holds the warm server's idle timer open across the test pass -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
 - warm server the only path: From a hook or a reading, the language server is reached only through the warm server: one door connects over the socket, spawns the server detached when none listens, and hands the adapter to the run or to the reading that asked.
   protects: connectAdapter
@@ -95,5 +98,5 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   via: two clients ask the same questions; the second finds the server warm
   because: a hook is short-lived and a cold project load is too slow for a check at the edit; every run and every reading (the economy's closure) connects through one door that finds the warm server or spawns it detached, so no hook and no reading can start its own cold instrument and wait on it
   crossing: harness -> instrument
-  refuted: <not witnessed by hand: the run witnesses the chokepoint automatically; no staged break was attempted on the socket>
+  refuted: made the second client report a cold server whether or not one was warm -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none

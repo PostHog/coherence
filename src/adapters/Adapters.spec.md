@@ -37,7 +37,7 @@ The language adapter seam: how to ask a language's server for definitions, refer
   protects: TYPESCRIPT_LADDER
   chokepoint: TypeScriptAdapter
   over: every adapter
-  via: the grade ladder's top rung is adapter-defined
+  via: the grade ladder's top rung is adapter-defined: TypeScript enforces visibility, Python does not
   because: visibility-choked means the language itself refuses a reference from outside the module; a language that enforces no visibility cannot earn it, and a ladder with one top for every language would grade a convention as a structural fact; naming the enforcer on every rung is what lets a human read how much the structure is doing and who would stop a bypass
   crossing: instrument -> reading
   refuted: raised the second adapter's top rung to visibility-choked -> the adapter-defined ladder test went red in adapter.test.ts; restored, green (2026-09-17); left whenVacuous unset on the Python ladder -> the same test went red; restored, green (2026-09-17)
@@ -61,9 +61,8 @@ The language adapter seam: how to ask a language's server for definitions, refer
 - whole workspace indexed: The Python adapter waits for Pyright's enumeration of the whole workspace before answering, and never narrows the workspace to a component.
   over: every references query and every bare-name resolution the Python adapter answers
   via: Python classification: inside the chokepoint, a test reference, a bypass; an import or an __all__ entry outside the chokepoint is a bypass
-  because: a Python reference to anything can sit in any file, so an index that sees less than the whole workspace can only prove the absence of a bypass inside what it sees; a narrower root on PostHog was fast (0.4 s, 160 MB) and blind to three references outside the folder, and an answer before enumeration is silently partial (the fixture's references came back one file short until the "Found N source files" message)
+  because: a Python reference to anything can sit in any file, so an index that sees less than the whole workspace can only prove the absence of a bypass inside what it sees; a narrower root on PostHog was fast (0.4 s, 160 MB) and blind to three references outside the folder, and an answer before enumeration is silently partial (the fixture's references came back one file short until the "Found N source files" message). This stays a requirement: no break of the wait can be staged, because an answer that arrives before enumeration is a race the test cannot hold still, and the via borrows the Python classification test, which would stay green with the wait removed. It needs a detector of its own — one that asks before enumeration is done and expects a refusal — before it can become an invariant
   crossing: instrument -> reading
-  refuted: <not witnessed: a staged answer before enumeration is a race the test cannot hold still; the partial answer was observed by hand on the fixture and on PostHog before the wait was added (2026-09-17)>
   kinds: none
 - pytest report mapped by name: The batched totality pass reads pytest's JUnit XML or pytest-json-report's JSON as the one report shape, and writes pytest's name filter as a -k expression joined with or.
   protects: reportFromJunit
@@ -75,13 +74,12 @@ The language adapter seam: how to ask a language's server for definitions, refer
   refuted: joined pytest names as a regex -> "pytest's JUnit report reads as the jest shape, and -k names join with or" went red in python.test.ts; restored, green (2026-09-17)
   kinds: none
 - server located or a reason: The language server binary is found in the adopter's node_modules first, then Coherence's, then on PATH, and its absence is a reason, never a crash.
-  protects: SERVER_BIN
+  protects: SERVER_BIN in typescript.ts
   chokepoint: src/adapters/typescript.ts
   over: the adopter's node_modules, Coherence's, and every folder on PATH
   via: the language server binary is found (the adapter's precondition)
-  because: the language server is an optional dependency; an adopter without it must get a reason naming where the tool looked and how to install it, and a run must record not run rather than crash, since not run is a verdict the status view can show
+  because: the language server is an optional dependency; an adopter without it must get a reason naming where the tool looked and how to install it, and a run must record not run rather than crash, since not run is a verdict the status view can show. This stays a requirement: the binary is on PATH on this machine too, so a staged break of the node_modules lookup stays green, and the absence branch is the one that matters and cannot be staged without taking the binary off the machine
   crossing: instrument -> reading
-  refuted: <not witnessed: the binary is also on PATH on this machine, so a staged break of the node_modules lookup would stay green>
   kinds: deploy
   checklist: graceful-drain dismissed: nothing is shut down by locating the binary
   checklist: readiness-evidence declared as server located or a reason

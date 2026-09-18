@@ -42,7 +42,7 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   via: provenance and detail are one click away; no provenance key or value appears in the vocabulary
   because: history mistaken for definition is how a metaphor becomes a rule; provenance and detail stay whole under their disclosures, and the check asserts for every concept that nothing of provenance leaks into the vocabulary
   crossing: project-source -> reading
-  refuted: <not witnessed: no staged break was attempted on the concept renderer; the test has not been red in this repository>
+  refuted: moved the provenance disclosure inside the vocabulary, so its keys and words read as vocabulary -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: read
   checklist: scoped-reads dismissed: every concept is shown to every reader
   checklist: redaction dismissed: nothing is removed; history is separated from definition and shown on request
@@ -50,7 +50,7 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   over: every reader interaction the shell handles
   via: the search derives its matches from state and hides the rest
   because: the shell is a function of one state value; a render that read from the document instead would let the page drift from the state it claims to show
-  refuted: <not witnessed: no staged break was attempted on the search; the test has not been red in this repository>
+  refuted: made the search match every concept instead of deriving its matches from state -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
 - views render from state: Every view is a pure render over the one state value: every component, invariant, run record, and journal record in the state is on its view, and a filter or query narrows what is shown without storing anything.
   over: every component, invariant, run record, journal record, and work order of the fixture project, on each of the five model views
@@ -78,5 +78,5 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   via: the first adopter's tree builds as a second root: its glossary is the domain layer and its run records show its structural defects
   because: a reading that rendered only Coherence's own tree would never have shown the two broken chokepoints the first adopter's runs recorded
   crossing: record -> reading
-  refuted: <not witnessed: the test reads the first adopter's tree from this machine and is skipped where it is absent>
+  refuted: made the build ignore --root, so the first adopter's tree could not be a second root -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none

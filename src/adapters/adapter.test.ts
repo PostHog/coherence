@@ -29,6 +29,7 @@ test("a path is a test when a configured folder is a segment or the file is name
   assert.equal(isTestPath("src/__tests__/policy.test.ts", folders), true);
   assert.equal(isTestPath("src/policy.test.ts", folders), true);
   assert.equal(isTestPath("src/policy.spec.ts", folders), true);
+  assert.equal(isTestPath("src/tests/helper.ts", folders), true, "a configured folder marks a path whatever the file is called");
   assert.equal(isTestPath("src/policy.ts", folders), false);
   assert.equal(isTestPath("tests-helpers/policy.ts", folders), false, "a folder name matches whole, not as a prefix");
 });
