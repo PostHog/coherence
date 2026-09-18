@@ -1,32 +1,16 @@
 node_modules/
 dist/
 .DS_Store
-# .coherence/ holds two DIFFERENT kinds of thing, and they need opposite treatment.
-# verify-jobs.json is regenerated on every run and is genuinely a cache. decisions/,
-# defects/, experiments/, work/, consequences/, calibration/, and status.json are the RECORD —
-# durable choices, agent-assessed defects, planned loops and evidence, delegated work,
-# assessed navigation, calibration history, and sticky reds. All are cumulative and worthless
-# if a fresh clone starts empty. A blanket ignore was
-# defensible when this directory held only transient files; it stopped being defensible
-# the moment the journal landed here, and this repo was ignoring the very folder its
-# own README tells consumers to commit.
+
+# .coherence/ holds two different kinds of thing and they need opposite treatment.
+# The record folders below are durable and cumulative: the journal's records, the
+# verification runs, and the work orders. A fresh clone that started empty would
+# have lost them. Everything else under .coherence is transient (the warm server's
+# socket, feed cursors, read traces) and is regenerated on demand.
 .coherence/*
-!.coherence/decisions/
 !.coherence/journal/
 !.coherence/runs/
-!.coherence/defects/
-!.coherence/status.json
-!.coherence/calibration/
-!.coherence/experiments/
 !.coherence/work/
-!.coherence/consequences/
-!.coherence/hooks/
-!.coherence/taxonomy/
-
-# AGENTS.md and public/{graph.json,_graph.html,_overview.html} are committed, fully-owned
-# reading surfaces now that this repository has a real spec tree. `coherence docs --check`
-# gates their freshness; the other public artifacts are independently generated and already
-# tracked where their commands own them.
 
 # agent worktrees
 .claude/worktrees/

@@ -200,10 +200,12 @@ export interface SpecInvariant {
   missingShapes: string[];
   state: LifecycleState;
   lacks: Lack[];
-  /** The latest run entry per form that checked this bullet; empty when none has. */
-  latest: LatestEntry[];
-  verified: LatestEntry[];
-  defects: LatestEntry[];
+  /*
+   * No latest, verified, or defects here. Those are the run records read by
+   * enforcement and invariant name, and the run records are already in this
+   * state; a stored copy beside them is a second truth that can disagree.
+   * derive.ts computes them at render: latestOf, verifiedOf, defectsOf.
+   */
 }
 
 export interface SpecComponent {
@@ -316,14 +318,13 @@ export type JournalRecord =
   | (JournalHead & { kind: "acknowledgement"; of: string; because: string });
 
 /**
- * One work order, read tolerantly: the id and every field the file said.
- * The work orders' shape belongs to the journal; the page renders what it
- * finds and names the fields it recognizes (state, objective, owner).
+ * One work order as the journal folds it from its records: the order's
+ * content, its owner now, its current state, and the records that moved it.
+ * The shape is the journal's own; the page never re-derives an order from
+ * the raw store.
  */
-export interface WorkOrder {
-  id: string;
-  fields: Fields;
-}
+import type { WorkOrder } from "../../journal/work.ts";
+export type { WorkOrder };
 
 /** The work orders under .coherence/work, or their absence with the reason. */
 export type WorkData =

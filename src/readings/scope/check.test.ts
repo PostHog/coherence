@@ -9,15 +9,16 @@
  */
 
 import assert from "node:assert/strict";
+import { appendFileSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { loadSpecModel } from "../../spec/model.ts";
 import { DEFAULTS, buildScopePage, writeScopePage, type BuildOptions } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
-import { componentId, invariantId, journalId, relianceId, resolveHash, runId, workId } from "./derive.ts";
+import { allReliance, componentId, defectsOf, invariantId, journalId, latestOf, relianceId, resolveHash, runId, verifiedOf, workId } from "./derive.ts";
 import { escapeHtml } from "./html.ts";
 import type { Glossary, ShellState } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
@@ -270,10 +271,53 @@ test("related names that resolve become links; the rest are marked unresolved", 
   assert.ok(rendered.includes('class="unresolved"'), "some related names are not concepts and say so");
 });
 
-test("the build is deterministic: the same glossary in, byte-identical page out", async () => {
+test("the build is deterministic: the same glossaries, specs, runs, journal and work in, byte-identical page out", async () => {
   const first = await buildScopePage(options);
   const second = await buildScopePage(options);
   assert.equal(first.html, second.html);
+
+  // Union item 28: every input the page depends on, named. Adding a record to any of them
+  // changes the page, which is why the claim is about all of them and not the glossaries alone.
+  // Its own copy of the fixture: this test appends to every record store, and the shared one must not move.
+  const own = makeFixture();
+  const fixtureOptions: BuildOptions = { root: own.root, glossaryPath: DEFAULTS.glossaryPath, project: "Fixture" };
+  const before = (await buildScopePage(fixtureOptions)).html;
+  assert.equal((await buildScopePage(fixtureOptions)).html, before, "the fixture builds identically twice");
+  const inputs: { name: string; write: () => void }[] = [
+    { name: "the journal", write: () => appendFileSync(join(own.root, ".coherence", "journal", `${own.names.session}.jsonl`), JSON.stringify({ id: "d-00009999", kind: "decision", at: "2026-09-12T10:00:00.000Z", session: own.names.session, agent: "fixture", commit: "abc1234", dirty: false, chose: "one more door", over: ["two doors"], because: "a later record must reach the page" }) + "\n") },
+    { name: "the runs", write: () => appendFileSync(join(own.root, ".coherence", "runs", `${own.names.session}.jsonl`), JSON.stringify({ at: "2026-09-12T10:00:00.000Z", session: own.names.session, agent: "fixture", commit: "abc1234", dirty: false, instrument: { language: "typescript", server: "cold" }, latency: 1, invariants: [{ component: "src/store", name: "single writer", form: "chokepoint", grade: "reference-choked", verdict: "pass", refutation: "automatic", bypasses: [], testReferences: 0, files: ["src/store/write.ts"], latency: 1, reason: "clean again" }] }) + "\n") },
+    { name: "the work store", write: () => appendFileSync(join(own.root, ".coherence", "work", `${own.names.session}.jsonl`), JSON.stringify({ id: "wm-00009999", kind: "move", at: "2026-09-12T10:00:00.000Z", session: own.names.session, agent: "fixture", commit: "abc1234", dirty: false, of: own.names.workOrder, state: "waiting", because: "a later record must reach the page" }) + "\n") },
+    { name: "the specs", write: () => appendFileSync(join(own.root, "src", "api", "Api.spec.md"), "- one more: The api keeps one rule of its own.\n  because: a later bullet must reach the page\n") },
+  ];
+  let previous = before;
+  for (const input of inputs) {
+    input.write();
+    const after = (await buildScopePage(fixtureOptions)).html;
+    assert.notEqual(after, previous, `${input.name} is an input the page depends on`);
+    assert.equal((await buildScopePage(fixtureOptions)).html, after, `${input.name} changed, and the page is deterministic again`);
+    previous = after;
+  }
+  own.remove();
+});
+
+test("the state stores no copy of what it derives: the latest verdicts live in the run records and nowhere else", async () => {
+  const { state } = await buildScopePage({ root: fixture.root, glossaryPath: DEFAULTS.glossaryPath, project: "Fixture" });
+  for (const component of state.spec.components) {
+    for (const invariant of component.invariants) {
+      for (const key of ["latest", "verified", "defects"]) {
+        assert.ok(!(key in invariant), `${component.folder}/${invariant.name} carries no stored ${key}: it is derived from state.runs.records at render`);
+      }
+    }
+  }
+  // Derived at render, and the same answer the stored copy used to give.
+  const invariant = state.spec.components.find((c) => c.folder === "src/store")!.invariants.find((i) => i.name === "single writer")!;
+  const latest = latestOf(invariant, state.runs.records);
+  assert.deepEqual(latest.map((l) => [l.form, l.verdict, l.at]), [["chokepoint", "fail", fixture.names.runAts[1]]]);
+  assert.deepEqual(defectsOf(invariant, state.runs.records).map((d) => d.verdict), ["fail"]);
+  assert.deepEqual(verifiedOf(invariant, state.runs.records), []);
+  const kept = state.spec.components.find((c) => c.folder === "src/store")!.invariants.find((i) => i.name === fixture.names.keptName)!;
+  assert.deepEqual(latestOf(kept, state.runs.records).map((l) => [l.form, l.at]), [["totality oracle", fixture.names.runAts[0]]], "an enforcement a later run skipped keeps the verdict of the last run that checked it");
+  assert.deepEqual(verifiedOf(kept, state.runs.records).map((v) => v.verdict), ["pass"]);
 });
 
 test("every view renders from state: every component, invariant, run, and journal record in the fixture is on its view", () => {
@@ -319,8 +363,27 @@ test("every view renders from state: every component, invariant, run, and journa
   const relianceCard = card(reliance, relianceId("src/store", "single writer"));
   assert.ok(relianceCard.includes("owns the invariant") && relianceCard.includes("src/store/write.ts"), "the owning component comes first with its files");
   assert.ok(relianceCard.includes(`href="#${componentId("src/api")}"`) && relianceCard.includes("src/api/handler.ts"), "the relying component and its file are listed");
-  assert.ok(relianceCard.includes("1 component relies"));
   assert.ok(reliance.includes('data-field="record-limit"'), "what the run record lacks is said on the view");
+
+  // Union item 19: the record carries the files the check touched, not the sites it resolved.
+  // The only sites it locates are the bypasses; everything else is a file whose part is unknown.
+  const relied = allReliance(state.spec.components, state.runs.records).find((r) => r.invariant.name === "single writer");
+  assert.ok(relied !== undefined);
+  assert.equal(relied.recordCarries, "files", "a chokepoint run entry names files, never reference sites");
+  assert.deepEqual(relied.sites, [fixture.names.bypass], "the bypasses are the only sites the record locates");
+  assert.deepEqual(
+    relied.entries.flatMap((e) => e.files),
+    ["src/store/rows.ts", "src/store/write.ts", "src/api/handler.ts"],
+    "and the rest is the file list, owner first",
+  );
+  assert.doesNotMatch(relianceCard, /components? relies? on this chokepoint through/, "the file list is not a count of reliance");
+  assert.match(relianceCard, /1 file in 1 component outside <code>src\/store<\/code>/, "what the record says: files the check touched, in components");
+  assert.match(relianceCard, /1 of them is a reference site the record locates/, "and how much of that is actually a site");
+  assert.match(
+    reliance,
+    /the file list a check records does not separate a reference site from the definition of the protected thing/,
+    "the view says plainly what the record cannot tell it",
+  );
 
   const runs = renderView(state, "runs").text;
   const runIds = cardIds(runs).filter((id) => id.startsWith("run-"));
@@ -341,6 +404,11 @@ test("every view renders from state: every component, invariant, run, and journa
   assert.ok(journal.includes(n.decisionOver), "a decision's rejected alternative is shown");
   assert.ok(journal.includes(n.conjectureCandidate) && journal.includes("log the key at both sites"), "a conjecture's candidates and discriminating test");
   assert.ok(journal.includes(`id="${workId(n.workOrder)}"`) && journal.includes("make every write pass through one door"), "the work order renders");
+  const active = card(journal, workId(n.workOrder));
+  assert.ok(active.includes('data-state="active"') && active.includes("the chokepoint check passes") && active.includes("src/store"), "the order shows its current state, success, and boundary");
+  assert.ok(active.includes(`<code>${n.workMove}</code>`), "the move is history under the order");
+  assert.ok(!journal.includes(`id="${workId(n.workMove)}"`), "a state-change record is never a card of its own");
+  assert.ok(card(journal, workId(n.completedOrder)).includes('data-state="completed"'), "a closed order shows completed");
   state.journalView.kind = "decision";
   assert.deepEqual(cardIds(renderView(state, "journal").text).filter((id) => id.startsWith("journal-")), ["journal-d-00000001"], "the kind filter narrows");
   state.journalView.kind = "";
@@ -399,7 +467,7 @@ test("the first adopter's tree builds as a second root: its glossary is the doma
   for (const defect of defects) {
     const c = card(invariants, invariantId(defect.component, defect.name));
     assert.ok(c.includes('data-option="route"') && c.includes('data-option="retire"'), `${defect.name} shows both options`);
-    for (const site of defect.defects.flatMap((d) => d.bypasses)) {
+    for (const site of defectsOf(defect, state.runs.records).flatMap((d) => d.bypasses)) {
       assert.ok(c.includes(`<code>${escapeHtml(site.file)}:${site.line}</code>`), `${defect.name} shows bypass ${site.file}:${site.line}`);
     }
   }

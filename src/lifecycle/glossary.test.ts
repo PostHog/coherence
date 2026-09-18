@@ -140,7 +140,7 @@ test("renderCompact: the project glossary renders beneath with its own header, a
   assert.doesNotMatch(text, /anti_rot|never addressed/);
 });
 
-test("renderCompactWithin steps the project layer down until the text fits; Coherence's layer never shrinks", () => {
+test("renderCompactWithin steps the project layer down, then Coherence's layer to names, then to a one-line pointer, until the text fits", () => {
   const big = parseGlossary(
     {
       project: "biggish",
@@ -170,12 +170,20 @@ test("renderCompactWithin steps the project layer down until the text fits; Cohe
   const names = renderCompactWithin(coherence, big, definitions.text.length - 1);
   assert.equal(names.detail, "names");
   assert.match(names.text, /Biggish vocabulary \(40 concepts; names only here; full entries: coherence glossary\):\nthing0, thing1, /);
-  assert.match(names.text, /^- invariant: The abstract behavioral requirement\. \[rejected: zorp\]$/m, "Coherence's layer is untouched");
+  assert.match(names.text, /^- invariant: The abstract behavioral requirement\. \[rejected: zorp\]$/m, "Coherence's layer is untouched while the project layer can still step down");
   assert.ok(names.text.length < definitions.text.length);
 
+  const coherenceNames = renderCompactWithin(coherence, big, names.text.length - 1);
+  assert.equal(coherenceNames.detail, "coherence-names", "below the project's names, Coherence's own layer steps down to names");
+  assert.match(coherenceNames.text, /^Coherence vocabulary \(2 concepts; names only here, rejected names are defects; full entries: coherence glossary\):\ninvariant, journal\n/);
+  assert.doesNotMatch(coherenceNames.text, /rejected: zorp/);
+  assert.ok(coherenceNames.text.length < names.text.length);
+
   const tooSmall = renderCompactWithin(coherence, big, 10);
-  assert.equal(tooSmall.detail, "names", "the last level is returned even when it does not fit");
-  assert.equal(renderCompactWithin(coherence, undefined, 10).detail, "full", "without a project there is nothing to step down");
+  assert.equal(tooSmall.detail, "pointer", "when even the names do not fit, one line points at the glossary command");
+  assert.equal(tooSmall.text, "Vocabulary omitted to stay under the host budget; full entries: coherence glossary\n");
+  assert.equal(renderCompactWithin(coherence, undefined, 10, "node src/cli.ts").text, "Vocabulary omitted to stay under the host budget; full entries: node src/cli.ts glossary\n", "the pointer names the command the session has");
+  assert.equal(renderCompactWithin(coherence, undefined, 1_000_000).detail, "full", "without a project and with room, the full form");
 });
 
 test("tokenEstimate is bytes over four, rounded up", () => {

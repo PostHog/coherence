@@ -1,10 +1,15 @@
 /**
  * The Reliance view: computed, never declared. For each chokepoint
- * invariant, the components whose files the latest chokepoint check
- * touched: the definitions of the protected thing and the chokepoint, and
- * every reference site the instrument resolved. This is the listing a human
- * sees when acknowledging a retirement. A pure function from the shell
- * state to markup.
+ * invariant, what the latest check's record can say about who relies on it.
+ *
+ * The record carries the files the check touched, which hold the definition
+ * of the protected thing, the chokepoint's own module, the reference sites,
+ * their imports and their tests, undistinguished. The only sites it locates
+ * are the bypasses. So the view says both: the files, in their components,
+ * as an upper bound; and how many of them are reference sites the record
+ * actually places. This is the listing a human sees when acknowledging a
+ * retirement, and it must not read as more certain than it is. A pure
+ * function from the shell state to markup.
  */
 
 import { allReliance, componentId, invariantId, isTestFile, plural, relianceId, stamp, textMatches, type Reliance } from "./derive.ts";
@@ -22,9 +27,16 @@ function relianceMatches(reliance: Reliance, query: string): boolean {
   );
 }
 
-function renderRelianceEntry(entry: Reliance["entries"][number]): Markup {
+/** How many of the files outside the owning component the record places as reference sites. */
+function outsideSites(reliance: Reliance): number {
+  const owned = new Set(reliance.entries.filter((e) => e.owner).flatMap((e) => e.files));
+  return new Set(reliance.sites.filter((s) => !owned.has(s.file)).map((s) => `${s.file}:${s.line}`)).size;
+}
+
+function renderRelianceEntry(entry: Reliance["entries"][number], reliance: Reliance): Markup {
   const name = entry.component === undefined ? "in no component" : entry.component.name;
   const folder = entry.component?.folder;
+  const sitesIn = (file: string): Reliance["sites"] => reliance.sites.filter((s) => s.file === file);
   return html`<li class="reliance-entry" data-owner="${entry.owner ? "true" : "false"}">
     <p class="reliance-component">${entry.component === undefined
       ? html`<span class="unresolved" title="These files lie under no folder with a spec">${name}</span>`
@@ -32,7 +44,9 @@ function renderRelianceEntry(entry: Reliance["entries"][number]): Markup {
       ${folder !== undefined && folder !== "." ? html`<span class="quiet">${folder}</span>` : null}
       ${entry.owner ? html`<span class="owner-mark">owns the invariant</span>` : null}
     </p>
-    <ul class="files">${entry.files.map((f) => html`<li><code>${f}</code>${isTestFile(f) ? html` <span class="quiet">test</span>` : null}</li>`)}</ul>
+    <ul class="files">${entry.files.map((f) => html`<li><code>${f}</code>${isTestFile(f) ? html` <span class="quiet">test</span>` : null}${sitesIn(f).length === 0
+      ? html` <span class="quiet" title="The record says the check touched this file; it does not say what part the file played">part unknown</span>`
+      : html` <span class="quiet">${sitesIn(f).map((s) => `site ${s.line} in ${s.symbol}`).join(", ")}</span>`}</li>`)}</ul>
   </li>`;
 }
 
@@ -50,10 +64,10 @@ function renderReliance(reliance: Reliance): Markup {
       ${entry === undefined
         ? html`<p class="definition quiet">No run has checked this chokepoint, so no reference site is on record; run <code>run</code> to compute reliance.</p>`
         : html`<p class="definition">${others.length === 0
-            ? html`No component outside ${invariant.component === "." ? "the root" : html`<code>${invariant.component}</code>`} references the protected thing: the chokepoint is internal.`
-            : html`${plural(others.length, "component relies", "components rely")} on this chokepoint through ${plural(others.reduce((n, e) => n + e.files.length, 0), "file", "files")}.`}
+            ? html`The check touched no file outside ${invariant.component === "." ? "the root" : html`<code>${invariant.component}</code>`}: nothing on record relies on this chokepoint from elsewhere.`
+            : html`${plural(others.reduce((n, e) => n + e.files.length, 0), "file", "files")} in ${plural(others.length, "component", "components")} outside <code>${invariant.component}</code> ${others.reduce((n, e) => n + e.files.length, 0) === 1 ? "was" : "were"} touched by the check; ${outsideSites(reliance) === 0 ? "none of them is a reference site the record locates" : `${outsideSites(reliance)} of them ${outsideSites(reliance) === 1 ? "is a reference site the record locates" : "are reference sites the record locates"}`}.`}
             <span class="quiet">From the check at ${stamp(entry.at)}${entry.grade !== undefined ? `, graded ${entry.grade}` : ""}.</span></p>
-          ${reliance.entries.length > 0 ? html`<ul class="reliance-entries">${reliance.entries.map(renderRelianceEntry)}</ul>` : null}`}
+          ${reliance.entries.length > 0 ? html`<ul class="reliance-entries">${reliance.entries.map((e) => renderRelianceEntry(e, reliance))}</ul>` : null}`}
     </div>
   </article>`;
 }
@@ -69,12 +83,12 @@ export function renderRelianceTools(state: ShellState): Markup {
 
 export function renderRelianceResults(state: ShellState): Markup {
   const query = state.reliance.query.trim().toLowerCase();
-  const all = allReliance(state.spec.components);
+  const all = allReliance(state.spec.components, state.runs.records);
   const shown = all.filter((r) => relianceMatches(r, query));
   return html`<section class="reliance-listing" aria-labelledby="reliance-heading">
     <h2 class="section-heading" id="reliance-heading">Reliance</h2>
     <p class="section-lead">Computed from the latest run, never declared: the components whose files the chokepoint check touched when it resolved every reference to the protected thing. The owning component comes first.</p>
-    <p class="section-lead quiet" data-field="record-limit">What the run record carries is the file list of each check, so reliance resolves to components and files. It does not carry the line and symbol of each reference site outside the bypasses, nor references to the chokepoint symbol itself, only to the protected thing; a record with every classified site would let this listing name the referencing symbols too.</p>
+    <p class="section-lead quiet" data-field="record-limit">Read this as an upper bound, not as reliance: the file list a check records does not separate a reference site from the definition of the protected thing, the chokepoint's own module, an import, or a test. The only sites the record places are the bypasses, marked with their line and symbol; every other file is marked part unknown. A run entry carrying each resolved reference site, classified, would make this listing the reliance the glossary defines. Work order w-1a54ec05 covers that field; nothing here guesses at it.</p>
     ${all.length === 0
       ? html`<p class="absence">No bullet names a chokepoint, so there is nothing to rely on.</p>`
       : query === ""

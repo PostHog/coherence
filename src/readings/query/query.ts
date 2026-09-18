@@ -8,7 +8,10 @@
  *   relies-on <chokepoint> who references this chokepoint
  *   status                 structural defects, open requirements, escalations
  *   component <folder>     one component and its bullets
- *   order                  the session's active work order
+ *   order                  the session's active work order, as the journal folds it
+ *   economy <path...>      what must be loaded to change these files safely: the
+ *                          economy prediction, which the command line answers through
+ *                          the economy's own closure and the warm instrument
  *
  * Fixed questions first; no query language.
  */
@@ -18,14 +21,17 @@ import {
   chokepointNames,
   componentByFolder,
   componentOfFile,
+  defectsOf,
+  latestOf,
   openEscalations,
   relianceOf,
   shortSession,
   stamp,
 } from "../scope/derive.ts";
-import type { ShellState, SpecComponent, SpecInvariant, WorkOrder } from "../scope/model.ts";
+import { renderOrder } from "../../journal/workVerbs.ts";
+import type { RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
 
-export const QUESTIONS = ["invariants", "relies-on", "status", "component", "order"] as const;
+export const QUESTIONS = ["invariants", "relies-on", "status", "component", "order", "economy"] as const;
 export type Question = (typeof QUESTIONS)[number];
 
 export function isQuestion(value: string): value is Question {
@@ -37,7 +43,8 @@ export const QUERY_USAGE = [
   "  query relies-on <chokepoint>   who references this chokepoint, from the latest run",
   "  query status                   structural defects, open requirements, escalations awaiting a human",
   "  query component <folder>       one component: intent, counts, bullets",
-  "  query order [--session <id>]   the session's active work order, when the journal keeps work orders",
+  "  query order [--session <id>]   the active work order the session owns, folded from its records, with what binds to it",
+  "  query economy <path...>        what must be loaded to change these files safely: the economy prediction, through the instrument",
 ].join("\n");
 
 export interface Answer {
@@ -92,8 +99,8 @@ function namesPath(invariant: SpecInvariant, path: string): boolean {
 }
 
 /** Whether the latest chokepoint check of the invariant touched the path, as a file or as a folder. */
-function touchedPath(invariant: SpecInvariant, path: string): boolean {
-  return invariant.latest.some((l) => l.files.some((f) => f === path || f.startsWith(`${path}/`)) || l.bypasses.some((b) => b.file === path || b.file.startsWith(`${path}/`)));
+function touchedPath(invariant: SpecInvariant, path: string, runs: readonly RunRecord[]): boolean {
+  return latestOf(invariant, runs).some((l) => l.files.some((f) => f === path || f.startsWith(`${path}/`)) || l.bypasses.some((b) => b.file === path || b.file.startsWith(`${path}/`)));
 }
 
 function answerInvariants(state: ShellState, args: string[]): Answer {
@@ -111,10 +118,10 @@ function answerInvariants(state: ShellState, args: string[]): Answer {
       lines.push(`  by component ${component.folder === "." ? "(root)" : component.folder} (${component.name}): ${byComponent.length === 0 ? "no bullets" : ""}`);
       lines.push(...capped(byComponent, (i) => invariantLine(i)));
     }
-    const bySite = all.filter((i) => !seen.has(`${i.component}/${i.name}`) && (touchedPath(i, path) || namesPath(i, path)));
+    const bySite = all.filter((i) => !seen.has(`${i.component}/${i.name}`) && (touchedPath(i, path, state.runs.records) || namesPath(i, path)));
     if (bySite.length > 0) {
       lines.push("  by protected thing, chokepoint, or reference site:");
-      lines.push(...capped(bySite, (i) => invariantLine(i, touchedPath(i, path) ? "(a reference site in the latest run)" : "(named on the bullet)")));
+      lines.push(...capped(bySite, (i) => invariantLine(i, touchedPath(i, path, state.runs.records) ? "(a reference site in the latest run)" : "(named on the bullet)")));
     }
     const others = all.filter((i) => !seen.has(`${i.component}/${i.name}`) && !bySite.includes(i) && i.component !== "." && within(path, i.component) === false && path.startsWith(`${i.component}/`) === false && i.component.startsWith(`${path}/`));
     if (others.length > 0) {
@@ -135,19 +142,22 @@ function answerReliesOn(state: ShellState, args: string[]): Answer {
   if (matching.length === 0) return { text: `no bullet names chokepoint or protected thing "${name}"; run: query status`, code: 0 };
   const lines: string[] = [];
   for (const invariant of matching) {
-    for (const reliance of relianceOf(invariant, state.spec.components)) {
+    for (const reliance of relianceOf(invariant, state.spec.components, state.runs.records)) {
       lines.push(`${reliance.chokepoint} protects ${reliance.protects}  (${invariant.component}/${invariant.name}, ${invariant.state})`);
       if (reliance.entry === undefined) {
         lines.push("  no run has checked this chokepoint; run: run");
         continue;
       }
       const others = reliance.entries.filter((e) => !e.owner);
-      lines.push(`  from the check at ${stamp(reliance.entry.at)}${reliance.entry.grade === undefined ? "" : `, ${reliance.entry.grade}`}: ${others.length === 0 ? "no component outside the owner references the protected thing" : `${others.length} relying component${others.length === 1 ? "" : "s"}`}`);
+      const outside = others.reduce((n, e) => n + e.files.length, 0);
+      lines.push(`  from the check at ${stamp(reliance.entry.at)}${reliance.entry.grade === undefined ? "" : `, ${reliance.entry.grade}`}: ${outside === 0 ? "the check touched no file outside the owner" : `${outside} file${outside === 1 ? "" : "s"} in ${others.length} component${others.length === 1 ? "" : "s"} outside the owner`}`);
       for (const entry of reliance.entries) {
         const who = entry.component === undefined ? "in no component" : `${entry.component.folder === "." ? "(root)" : entry.component.folder} (${entry.component.name})`;
         lines.push(`  ${entry.owner ? "owner " : ""}${who}: ${entry.files.join(", ")}`);
       }
-      if (reliance.entry.bypasses.length > 0) lines.push(...capped(reliance.entry.bypasses, (b) => `  bypass ${b.file}:${b.line} in ${b.symbol}`));
+      if (reliance.sites.length > 0) lines.push(...capped(reliance.sites, (b) => `  reference site ${b.file}:${b.line} in ${b.symbol} (a bypass: outside the chokepoint)`));
+      // The record says which files a check touched, not what part each played; the reader must not read the list as reliance.
+      lines.push(`  the record carries ${reliance.recordCarries}: a file list holds the definition of the protected thing, the chokepoint's own module, imports and tests as well as the reference sites, and only a bypass is placed by line and symbol`);
     }
   }
   return { text: lines.join("\n"), code: 0 };
@@ -162,8 +172,9 @@ function answerStatus(state: ShellState): Answer {
   lines.push(`structural defects (${defects.length})${defects.length === 0 ? ": none" : ":"}`);
   lines.push(
     ...capped(defects, (i) => {
-      const sites = i.defects.flatMap((d) => d.bypasses).map((b) => `${b.file}:${b.line} in ${b.symbol}`);
-      const reason = i.defects.map((d) => d.reason).join("; ");
+      const failing = defectsOf(i, state.runs.records);
+      const sites = failing.flatMap((d) => d.bypasses).map((b) => `${b.file}:${b.line} in ${b.symbol}`);
+      const reason = failing.map((d) => d.reason).join("; ");
       return `  ✕ ${i.component}/${i.name}: ${sites.length > 0 ? `bypass ${sites.join(", ")}` : reason}`;
     }),
   );
@@ -206,30 +217,16 @@ function answerComponent(state: ShellState, args: string[]): Answer {
   return { text: lines.join("\n"), code: 0 };
 }
 
-function orderText(order: WorkOrder): string {
-  const f = order.fields;
-  const text = (key: string): string | undefined => (typeof f[key] === "string" ? (f[key] as string) : undefined);
-  const parts = [`${order.id}  ${text("state") ?? "state not recorded"}`];
-  const objective = text("objective");
-  if (objective !== undefined) parts.push(`  objective: ${objective}`);
-  for (const key of Object.keys(f)) {
-    if (key === "id" || key === "state" || key === "objective") continue;
-    const value = f[key];
-    parts.push(`  ${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`);
-  }
-  return parts.join("\n");
-}
-
 function answerOrder(state: ShellState, session: string | undefined): Answer {
   const work = state.journal.work;
   if (work.kind === "absent") return { text: `no work orders: ${work.because}`, code: 0 };
-  const active = work.orders.filter((o) => o.fields["state"] === "active");
-  const mine = session === undefined ? active : active.filter((o) => o.fields["owner"] === session || o.fields["session"] === session);
+  const active = work.orders.filter((o) => o.state === "active");
+  const mine = session === undefined ? active : active.filter((o) => o.owner === session);
   if (mine.length === 0) {
     const who = session === undefined ? "" : ` for session ${session}`;
     return { text: `no active work order${who} (${work.orders.length} on record${active.length > 0 ? `, ${active.length} active` : ""})`, code: 0 };
   }
-  return { text: mine.map(orderText).join("\n"), code: 0 };
+  return { text: mine.map((order) => renderOrder(order, state.journal.records, state.runs.records).join("\n")).join("\n"), code: 0 };
 }
 
 export interface QueryOptions {
@@ -249,6 +246,8 @@ export function answer(state: ShellState, question: string, args: string[], opti
       return answerComponent(state, args);
     case "order":
       return answerOrder(state, options.session);
+    case "economy":
+      return { text: `query economy is answered from the instrument, not from the page state; run it from the command line: query economy <path...>\n${QUERY_USAGE}`, code: 64 };
     default:
       return { text: `query: unknown question "${question}"\n${QUERY_USAGE}`, code: 64 };
   }

@@ -1,7 +1,7 @@
 {
   "version": 2,
   "purpose": "Seed for the decomposition checklist: known invariant shapes an agent must declare or dismiss when a requirement of the matching kind is declared. Prose only; no ids, links, or assessments. Each shape carries kinds, the tags a requirement names to see only the shapes that apply.",
-  "source": "reference guarantee catalog, 36 entries, extracted 2026-09-17",
+  "source": "the reference implementation's inventory of invariant shapes, 36 entries, extracted 2026-09-17",
   "shapes": [
     {
       "shape": "scoped-reads",
@@ -10,7 +10,7 @@
         "storage"
       ],
       "sentence": "Ordinary reads through the named boundary return only records in the declared effective scope, and missing required context refuses.",
-      "applies_when": "A read entry point promises to restrict a shared population using explicit scope context.",
+      "applies_when": "A read entry point undertakes to restrict a shared population using explicit scope context.",
       "excludes": "Raw queries, alternate managers, and explicit cross-scope operations outside the bound entry point; context correctness needs its own evidence."
     },
     {
@@ -20,8 +20,8 @@
         "identity"
       ],
       "sentence": "A credential authorizes only its declared resource, operation, audience and validity interval at the named acceptance boundary.",
-      "applies_when": "A service accepts credentials carrying bounded authority.",
-      "excludes": "Legacy shared-secret and intentionally unauthenticated branches; authenticity alone does not confer authority."
+      "applies_when": "A service accepts credentials carrying bounded permission.",
+      "excludes": "Legacy shared-secret and intentionally unauthenticated branches; authenticity alone does not confer permission."
     },
     {
       "shape": "revalidated-permission",
@@ -30,8 +30,8 @@
         "queue",
         "state"
       ],
-      "sentence": "Deferred or resumed work revalidates the actor's current authority at the declared execution boundary rather than relying solely on queue-time authority.",
-      "applies_when": "An authority-changing interval separates acceptance from execution or resumption.",
+      "sentence": "Deferred or resumed work revalidates the actor's current permission at the declared execution boundary rather than relying solely on the permission held when it was queued.",
+      "applies_when": "A permission-changing interval separates acceptance from execution or resumption.",
       "excludes": "Revocation of already-running work and remote invalidation of copied credentials; those require separate enforcement."
     },
     {
@@ -119,8 +119,8 @@
       "kinds": [
         "identity"
       ],
-      "sentence": "A declared identity transition preserves the bound assignment or association while the policy and relevant state remain fixed.",
-      "applies_when": "A system promises continuity across anonymous/identified or other identity changes.",
+      "sentence": "A declared identity succession preserves the bound assignment or association while the policy and relevant state remain fixed.",
+      "applies_when": "A system undertakes continuity across anonymous/identified or other identity changes.",
       "excludes": "Flag revisions, eligibility changes, deliberately disabled continuity and unavailable identity state."
     },
     {
@@ -140,7 +140,7 @@
         "state"
       ],
       "sentence": "An actor cannot satisfy mutually exclusive roles in the same protected operation when the declared approval policy forbids it.",
-      "applies_when": "A policy requires independent request and approval authority.",
+      "applies_when": "A policy requires the requester and the approver to hold their permission independently.",
       "excludes": "Policies allowing self-approval, proof that two accounts belong to different people, and enforcement outside the gated API."
     },
     {
@@ -148,9 +148,9 @@
       "kinds": [
         "state"
       ],
-      "sentence": "A transition commits only from a currently allowed predecessor state, rechecked within the serialization boundary.",
+      "sentence": "A state change commits only from a currently allowed predecessor state, rechecked within the serialization boundary.",
       "applies_when": "Concurrent actors may make competing terminal decisions about one stateful subject.",
-      "excludes": "External effects outside the transaction and proof of physical concurrency when an oracle only simulates the locked state."
+      "excludes": "External effects outside the transaction and proof of physical concurrency when a detector only simulates the locked state."
     },
     {
       "shape": "supersession-safety",
@@ -189,7 +189,7 @@
         "queue"
       ],
       "sentence": "The named transport boundary retains the routing key required by the declared ordering domain and lane.",
-      "applies_when": "Routing promises ordered handling for a specific identity, not global traffic.",
+      "applies_when": "Routing undertakes ordered handling for a specific identity, not global traffic.",
       "excludes": "Total global order and downstream order across producer failures, rebalances or storage unless separately bound."
     },
     {
@@ -199,7 +199,7 @@
         "state"
       ],
       "sentence": "After ownership changes, work carrying the former ownership generation cannot commit through the fenced boundary.",
-      "applies_when": "Workers may complete after a lease, assignment or ownership handoff.",
+      "applies_when": "Workers may complete after a lease, assignment or change of ownership.",
       "excludes": "Side effects outside the offset/store fence and proof that every worker operation checks the generation."
     },
     {
@@ -208,7 +208,7 @@
         "message",
         "queue"
       ],
-      "sentence": "Successful acknowledgment follows the named completion barrier rather than mere receipt or submission.",
+      "sentence": "Successful acknowledgment follows the named completion barrier rather than mere arrival or submission.",
       "applies_when": "A producer relies on an acknowledgment to retire responsibility for submitted work.",
       "excludes": "Durability, query visibility and downstream exactly-once behavior not promised by that barrier."
     },

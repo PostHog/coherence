@@ -17,7 +17,7 @@
  * its root) as the domain layer beneath Coherence's own.
  */
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { stripTypeScriptTypes } from "node:module";
 import { basename, dirname, join, resolve } from "node:path";
@@ -27,23 +27,11 @@ import { adapterFor } from "../../adapters/index.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
+import { WORK_DIR, foldOrders, loadWork as loadWorkRecords, workDir } from "../../journal/work.ts";
 import { COHERENCE_GLOSSARY, projectGlossaryPath } from "../../lifecycle/project.ts";
 import { loadSpecModel } from "../../spec/model.ts";
 import { escapeHtml } from "./html.ts";
-import {
-  parseGlossary,
-  type Damaged,
-  type Fields,
-  type Glossary,
-  type Ladder,
-  type LadderRung,
-  type Layer,
-  type RecordValue,
-  type ShellState,
-  type SpecData,
-  type WorkData,
-  type WorkOrder,
-} from "./model.ts";
+import { parseGlossary, type Glossary, type Ladder, type LadderRung, type Layer, type ShellState, type SpecData, type WorkData } from "./model.ts";
 import { VIEWS } from "./shell.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -66,9 +54,6 @@ const BROWSER_SOURCES = [
   "shell.ts",
   "page.ts",
 ];
-
-/** Where the work orders live when the journal keeps them. */
-export const WORK_DIR = join(".coherence", "work");
 
 export interface BuildOptions {
   /** The project root whose specs, runs, journal and work are read. The working directory when absent. */
@@ -155,7 +140,13 @@ export function loadSpec(root: string): SpecData {
   const data: SpecData = {
     entry: model.entry,
     trustLevels: model.trustLevels.map((level) => ({ name: level.name, meaning: level.meaning })),
-    components: model.components,
+    // The spec model carries each bullet's latest run entries; the page does not. They are the
+    // run records, which the page already holds, read by enforcement: derive.ts reads them back
+    // at render so no copy can disagree with the records it came from.
+    components: model.components.map((component) => ({
+      ...component,
+      invariants: component.invariants.map(({ latest: _latest, verified: _verified, defects: _defects, ...invariant }) => invariant),
+    })),
     problems: model.problems,
     counts: model.counts,
     ladder: ladderFor(root),
@@ -167,70 +158,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function asRecordValue(value: unknown): RecordValue {
-  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
-  if (Array.isArray(value)) return value.map(asRecordValue);
-  if (isRecord(value)) {
-    const out: { [key: string]: RecordValue } = {};
-    for (const [k, v] of Object.entries(value)) out[k] = asRecordValue(v);
-    return out;
-  }
-  return String(value);
-}
-
-/** One work order from one parsed value, or the reason it is not one. */
-function workOrderOf(value: unknown, fallbackId: string): WorkOrder | string {
-  if (!isRecord(value)) return "not an object";
-  const fields: Fields = {};
-  for (const [k, v] of Object.entries(value)) fields[k] = asRecordValue(v);
-  const id = typeof value["id"] === "string" && value["id"] !== "" ? value["id"] : fallbackId;
-  return { id, fields };
-}
-
 /**
- * The work orders, read tolerantly: every .jsonl line and every .json value
- * under .coherence/work is a work order when it is an object; anything else
- * is reported as damaged. Absent when the folder does not exist.
+ * The work orders as the journal folds them: every record under
+ * .coherence/work is read through the journal's own loader, and each order
+ * is the fold of its records (content, owner now, current state, history).
+ * Absent when the folder does not exist; a line that will not parse is
+ * reported. The page never re-derives an order from the raw store.
  */
 export function loadWork(root: string): WorkData {
-  const dir = join(root, WORK_DIR);
-  if (!existsSync(dir)) return { kind: "absent", because: `${WORK_DIR} does not exist under this project; the journal keeps no work orders yet.` };
-  const orders: WorkOrder[] = [];
-  const damaged: Damaged[] = [];
-  for (const name of readdirSync(dir).filter((n) => n.endsWith(".jsonl") || n.endsWith(".json")).sort()) {
-    const file = join(WORK_DIR, name);
-    const text = readFileSync(join(dir, name), "utf8");
-    if (name.endsWith(".json")) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(text);
-      } catch (error) {
-        damaged.push({ file, line: 1, reason: `not JSON (${error instanceof Error ? error.message : String(error)})` });
-        continue;
-      }
-      const values = Array.isArray(parsed) ? parsed : [parsed];
-      values.forEach((value, i) => {
-        const order = workOrderOf(value, `${basename(name, ".json")}${values.length > 1 ? `-${i + 1}` : ""}`);
-        if (typeof order === "string") damaged.push({ file, line: 1, reason: order });
-        else orders.push(order);
-      });
-      continue;
-    }
-    text.split("\n").forEach((line, index) => {
-      if (line.trim() === "") return;
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(line);
-      } catch (error) {
-        damaged.push({ file, line: index + 1, reason: `not JSON (${error instanceof Error ? error.message : String(error)})` });
-        return;
-      }
-      const order = workOrderOf(parsed, `${basename(name, ".jsonl")}-${index + 1}`);
-      if (typeof order === "string") damaged.push({ file, line: index + 1, reason: order });
-      else orders.push(order);
-    });
-  }
-  return { kind: "present", orders, damaged };
+  if (!existsSync(workDir(root))) return { kind: "absent", because: `${WORK_DIR} does not exist under this project; the journal keeps no work orders yet.` };
+  const loaded = loadWorkRecords(root);
+  return { kind: "present", orders: foldOrders(loaded), damaged: loaded.damaged };
 }
 
 /** The domain glossary path: as given, else the root's own when it is not Coherence's glossary itself. */

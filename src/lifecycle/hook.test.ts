@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -11,7 +11,10 @@ import { journalVerbs } from "../journal/cli.ts";
 import { openEscalations } from "../journal/read.ts";
 import { loadJournal } from "../journal/store.ts";
 import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
-import { BOUNDARY_RULE, CONTEXT_BUDGET, INSTRUCTION, REFUSE_EXIT, changedFiles, feedContext, readStdinJson, runHook, sessionBlock } from "./hook.ts";
+import { BOUNDARY_RULE, CONTEXT_BUDGET, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, feedContext, readStdinJson, runHook, sessionBlock, type WarmDoor } from "./hook.ts";
+import { withWarmAdapter } from "../enforcement/run.ts";
+import { TRACES_DIR, recordReadTrace } from "../economy/trace.ts";
+import { installedRoot } from "./project.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
@@ -63,7 +66,7 @@ test("the block after the glossary is under 120 words: session, decide template,
 
 test("SessionStart and SubagentStart inject both glossaries and the instruction as additionalContext", async () => {
   for (const event of ["SessionStart", "SubagentStart"] as const) {
-    const result = await runHook(event, { cwd: root, session_id: "s1" }, "/nowhere");
+    const result = await runHook(event, { cwd: root, session_id: "s1" }, tmpdir());
     assert.equal(result.exit, 0);
     assert.equal(result.stderr, "");
     const parsed = JSON.parse(result.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
@@ -86,7 +89,7 @@ test("UserPromptSubmit and PostToolUse print nothing", async () => {
 });
 
 test("Stop and SubagentStop with a clean working tree are silent", async () => {
-  assert.deepEqual(await changedFiles(root), []);
+  assert.deepEqual(await changedFiles(root), { files: [] });
   assert.deepEqual(await runHook("Stop", { cwd: root }, root), { stdout: "", stderr: "", exit: 0 });
   assert.deepEqual(await runHook("SubagentStop", { cwd: root }, root), { stdout: "", stderr: "", exit: 0 });
 });
@@ -94,7 +97,7 @@ test("Stop and SubagentStop with a clean working tree are silent", async () => {
 test("with defects in changed files: Stop reports and exits 0; SubagentStop refuses with exit 2 and the reason on stderr", async () => {
   await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
   await writeFile(join(root, "new.md"), "The Sprocket Wheel turns. It turns the Sprocket Wheel again.\n");
-  assert.deepEqual((await changedFiles(root)).sort(), ["clean.md", "new.md"]);
+  assert.deepEqual((await changedFiles(root)).files.sort(), ["clean.md", "new.md"]);
 
   const stop = await runHook("Stop", { cwd: root }, root);
   assert.equal(stop.exit, 0);
@@ -113,6 +116,70 @@ test("with defects in changed files: Stop reports and exits 0; SubagentStop refu
   const again = await runHook("SubagentStop", { cwd: root, stop_hook_active: true }, root);
   assert.equal(again.exit, 0, "a stop hook already active never refuses twice");
   assert.match(again.stdout, /systemMessage/);
+});
+
+test("an unknown noun in a changed file is advisory: Stop reports it and SubagentStop never refuses on it", async () => {
+  // Its own starting tree: a totality oracle must hold when its test runs alone.
+  await writeFile(join(root, "clean.md"), "The widget is fine.\n");
+  await writeFile(join(root, "new.md"), "The Sprocket Wheel turns. It turns the Sprocket Wheel again.\n");
+  assert.deepEqual((await changedFiles(root)).files, ["new.md"], "only the file with the unknown noun is changed");
+  const subagent = await runHook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
+  assert.equal(subagent.exit, 0, `an unknown noun is a nomination, not a proof: ${subagent.stderr}`);
+  const message = (JSON.parse(subagent.stdout) as { systemMessage: string }).systemMessage;
+  assert.match(message, /UNKNOWN NOUN   "sprocket wheel" \(2\)/, "it is still reported");
+  await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
+});
+
+test("an unable record from the session turns the debt it names advisory: SubagentStop reports it and exits 0, and another session is still refused", async () => {
+  const io = { cwd: root, out: () => {}, err: () => {} };
+  // Its own starting tree: a totality oracle must hold when its test runs alone.
+  await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
+  const refused = await runHook("SubagentStop", { cwd: root, session_id: "s-unable", stop_hook_active: false }, root);
+  assert.equal(refused.exit, REFUSE_EXIT, "the rejected name in clean.md refuses the stop");
+  assert.equal(journalVerbs["unable"]!(["cannot rename doohickey in clean.md", "--because", "the owner keeps that fixture text; the rename is theirs", "--session", "s-unable", "--agent", "Plan"], io), 0);
+  const excused = await runHook("SubagentStop", { cwd: root, session_id: "s-unable", stop_hook_active: false }, root);
+  assert.equal(excused.exit, 0, `the wall was recorded, so the debt is advisory: ${excused.stderr}`);
+  const message = (JSON.parse(excused.stdout) as { systemMessage: string }).systemMessage;
+  assert.match(message, /REJECTED NAME  clean\.md:1  "doohickey"/, "the finding is still shown");
+  assert.match(message, /advisory: recorded unable u-[0-9a-f]{8}/, "and says which record made it advisory");
+  const other = await runHook("SubagentStop", { cwd: root, session_id: "s-other", stop_hook_active: false }, root);
+  assert.equal(other.exit, REFUSE_EXIT, "an unable is this agent's, in this session; it clears nothing for another");
+
+  const specRoot = await mkdtemp(join(tmpdir(), "coherence-unable-spec-"));
+  try {
+    await writeFile(join(specRoot, "Root.spec.md"), "# Root\n\nA fixture project.\n\n## works when\n- typechecks\n");
+    const problem = await runHook("SubagentStop", { cwd: specRoot, session_id: "s-spec", stop_hook_active: false }, specRoot);
+    assert.equal(problem.exit, REFUSE_EXIT, "a spec problem refuses the subagent stop");
+    assert.equal(journalVerbs["unable"]!(["cannot repair Root.spec.md", "--because", "the retired section is the owner's to rewrite", "--session", "s-spec", "--agent", "Plan"], { ...io, cwd: specRoot }), 0);
+    const allowed = await runHook("SubagentStop", { cwd: specRoot, session_id: "s-spec", stop_hook_active: false }, specRoot);
+    assert.equal(allowed.exit, 0, `the recorded wall names the spec file: ${allowed.stderr}`);
+    assert.match((JSON.parse(allowed.stdout) as { systemMessage: string }).systemMessage, /PROBLEM  Root\.spec\.md:.*\n.*advisory: recorded unable/);
+  } finally {
+    await rm(specRoot, { recursive: true, force: true });
+  }
+});
+
+test("changedFiles reports a git failure instead of answering a clean tree; outside git the answer is no files", async () => {
+  const outside = await mkdtemp(join(tmpdir(), "coherence-nogit-"));
+  const broken = await mkdtemp(join(tmpdir(), "coherence-badgit-"));
+  try {
+    assert.deepEqual(await changedFiles(outside), { files: [] }, "no repository: nothing is changed and nothing failed");
+    await writeFile(join(broken, ".git"), "this is not a gitfile\n");
+    await writeFile(join(broken, "coherence.config.json"), JSON.stringify({ glossary: "glossary.json" }));
+    await writeFile(join(broken, "glossary.json"), JSON.stringify({ project: "widgetry", version: 0, concepts: [], rejected: [] }));
+    const failed = await changedFiles(broken);
+    assert.deepEqual(failed.files, []);
+    assert.match(failed.failure ?? "", /git diff --name-only HEAD failed: .*gitfile/, "the failure names the command and git's reason");
+    const stop = await runHook("Stop", { cwd: broken, session_id: "s-git" }, broken);
+    assert.equal(stop.exit, 0);
+    const message = (JSON.parse(stop.stdout) as { systemMessage: string }).systemMessage;
+    assert.match(message, /Changed files: not known \(git diff --name-only HEAD failed: .*\); the glossary check ran over nothing/);
+    const subagent = await runHook("SubagentStop", { cwd: broken, session_id: "s-git", stop_hook_active: false }, broken);
+    assert.equal(subagent.exit, 0, "what the tool cannot see it cannot prove owed, so it reports and never refuses");
+  } finally {
+    await rm(outside, { recursive: true, force: true });
+    await rm(broken, { recursive: true, force: true });
+  }
 });
 
 test("an unacknowledged escalation heads the start output; an acknowledged one does not", async () => {
@@ -139,6 +206,122 @@ test("an unacknowledged escalation heads the start output; an acknowledged one d
   assert.match((JSON.parse(after.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext, /^Coherence vocabulary/);
 });
 
+test("the start injection stays under the budget with escalations present: the vocabulary steps down to names and then to a pointer, and no escalation is shortened", async () => {
+  const dir = await freshRoot();
+  try {
+    const io = { cwd: dir, out: () => {}, err: () => {} };
+    const ids: string[] = [];
+    const what = (n: number): string => `retire invariant ${n}: ${"the chokepoint no longer reflects how the store is reached and a human must weigh the reliance listing ".repeat(4)}`;
+    for (let n = 0; n < 8; n += 1) {
+      const printed: string[] = [];
+      assert.equal(journalVerbs["escalate"]!([what(n), "--because", `only the owner can retire a vertebra, and this is the ${n}th`, "--session", `peer-${n}`, "--agent", "scope"], { ...io, out: (l) => printed.push(l) }), 0);
+      ids.push(printed[0]!.split(/\s+/)[0]!);
+    }
+    const context = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
+    assert.ok(context.length <= CONTEXT_BUDGET, `${context.length} characters against a budget of ${CONTEXT_BUDGET}`);
+    for (let n = 0; n < 8; n += 1) assert.ok(context.includes(`▲ ${ids[n]}  scope  ${what(n)} — only the owner can retire a vertebra, and this is the ${n}th`), `escalation ${n} is shown whole`);
+    assert.doesNotMatch(context, /^- invariant: /m, "the vocabulary stepped down: no full concept line");
+    assert.match(context, /^Coherence vocabulary \(\d+ concepts; names only here, rejected names are defects; full entries: coherence glossary\):\n/m, "Coherence's layer at names only");
+    assert.match(context, /\nSession: s-budget\n/, "the session block still rides along");
+
+    // More escalations, until even the names do not fit: the vocabulary gives way to one line that points at the glossary command.
+    let pointed = context;
+    for (let n = 8; n < 40 && /^Coherence vocabulary/m.test(pointed); n += 1) {
+      const printed: string[] = [];
+      assert.equal(journalVerbs["escalate"]!([what(n), "--because", `only the owner can retire a vertebra, and this is the ${n}th`, "--session", `peer-${n}`, "--agent", "scope"], { ...io, out: (l) => printed.push(l) }), 0);
+      ids.push(printed[0]!.split(/\s+/)[0]!);
+      pointed = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
+    }
+    assert.doesNotMatch(pointed, /^Coherence vocabulary/m, "the names no longer fit");
+    assert.match(pointed, /^Vocabulary omitted to stay under the host budget; full entries: node_modules\/\.bin\/coherence glossary$/m, "one line points at the glossary command instead");
+    assert.ok(pointed.length <= CONTEXT_BUDGET, `${pointed.length} characters against a budget of ${CONTEXT_BUDGET}`);
+    ids.forEach((id, n) => assert.ok(pointed.includes(`▲ ${id}  scope  ${what(n)} — only the owner`), `escalation ${n} is still shown whole`));
+
+    const one = await freshRoot();
+    try {
+      assert.equal(journalVerbs["escalate"]!(["one question", "--because", "a human decides", "--session", "peer", "--agent", "scope"], { ...io, cwd: one }), 0);
+      const light = contextOf(await runHook("SessionStart", { cwd: one, session_id: "s-light" }, one));
+      assert.ok(light.length <= CONTEXT_BUDGET);
+      assert.match(light, /^Escalations awaiting a human \(1\)/);
+      assert.match(light, /^- invariant: /m, "with room to spare the vocabulary is injected in full");
+    } finally {
+      await rm(one, { recursive: true, force: true });
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("the hook refuses a cwd from stdin that is not inside the project root it was installed for", async () => {
+  const installed = await freshRoot();
+  const stranger = await freshRoot();
+  try {
+    await mkdir(join(installed, ".claude"), { recursive: true });
+    await writeFile(join(installed, ".claude", "settings.json"), JSON.stringify({ hooks: {} }));
+    await writeFile(join(stranger, "notes.md"), "The stranger's tree.\n");
+    assert.equal(installedRoot(installed, {}), realpathSync(installed), "the settings file names the tree the hook was installed for");
+    assert.equal(installedRoot(stranger, {}), undefined, "no settings file anywhere above it: no installation to defend");
+
+    const inside = join(installed, "src", "deep");
+    await mkdir(inside, { recursive: true });
+    assert.equal(installedRoot(inside, { CLAUDE_PROJECT_DIR: installed }), realpathSync(installed), "the harness's own name for the project is honored");
+    assert.equal(installedRoot(inside, { CLAUDE_PROJECT_DIR: stranger }), realpathSync(installed), "a name that does not contain where the process runs was inherited from elsewhere");
+    for (const event of HOOK_EVENTS) {
+      const ok = await runHook(event, { cwd: inside, session_id: "child" }, installed);
+      assert.notEqual(ok.exit, OUTSIDE_ROOT_EXIT, `${event}: a cwd under the installed root is the project's own`);
+    }
+
+    for (const event of HOOK_EVENTS) {
+      const out = await runHook(event, { cwd: stranger, session_id: "child" }, installed);
+      assert.equal(out.exit, OUTSIDE_ROOT_EXIT, `${event}: a cwd outside the installed root is refused`);
+      assert.equal(out.stdout, "", `${event}: nothing is injected from a tree that is not ours`);
+      assert.match(out.stderr, /is not inside the project root this hook was installed for/);
+      assert.match(out.stderr, new RegExp(stranger.replace(/[/\\.]/g, "\\$&")), "the refusal names the cwd it was handed");
+    }
+    assert.equal(existsSync(join(stranger, ".coherence")), false, "the stranger's tree was never written to");
+  } finally {
+    await rm(installed, { recursive: true, force: true });
+    await rm(stranger, { recursive: true, force: true });
+  }
+});
+
+test("the Stop snapshot reaches the instrument through enforcement's one door, in production as in a test", async () => {
+  assert.equal(WARM_DOOR, withWarmAdapter, "the door the hook holds is enforcement's own; a production stop passes none of its own");
+  const dir = await freshRoot();
+  try {
+    const seed = (...args: string[]): void => void execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: dir });
+    seed("init", "-q");
+    seed("add", ".");
+    seed("commit", "-q", "-m", "seed");
+    // One untracked file is the patch the snapshot predicts a closure for.
+    await writeFile(join(dir, "note.md"), "A file this session changed.\n");
+    recordReadTrace(dir, "child", { tool_name: "Read", tool_input: { file_path: join(dir, "note.md") } });
+
+    // A door that hands back an adapter, as the warm server does when one answers.
+    let asked: string | undefined;
+    const door: WarmDoor = async (root, fn) => {
+      asked = root;
+      return fn({ language: "typescript" } as never, "warm", undefined);
+    };
+    const stop = await runHook("Stop", { cwd: dir, session_id: "child" }, dir, { door });
+    assert.equal(stop.exit, 0, stop.stderr);
+    assert.equal(asked, dir, "the stop asked the door for this project's instrument");
+    const lines = readFileSync(join(dir, TRACES_DIR, "child.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as { kind: string; instrument?: { language: string; server: string; reason?: string } });
+    const snapshot = lines.find((l) => l.kind === "snapshot");
+    assert.ok(snapshot !== undefined, "the stop wrote a snapshot");
+    assert.equal(snapshot.instrument?.server, "warm", "the snapshot records the instrument the door handed over, not a hop-less closure");
+    assert.equal(snapshot.instrument?.reason, undefined, "a door that answered leaves no reason");
+
+    // A door that cannot connect hands back its reason, and the snapshot says so rather than "no adapter".
+    const shut: WarmDoor = async (root, fn) => fn(undefined, undefined, "no server answered and none could be spawned");
+    await runHook("Stop", { cwd: dir, session_id: "child2" }, dir, { door: shut });
+    const second = readFileSync(join(dir, TRACES_DIR, "child2.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as { kind: string; instrument?: { reason?: string } });
+    assert.equal(second.find((l) => l.kind === "snapshot")?.instrument?.reason, "no server answered and none could be spawned");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("readStdinJson tolerates empty and malformed input", async () => {
   assert.deepEqual(await readStdinJson(Readable.from([""])), {});
   assert.deepEqual(await readStdinJson(Readable.from(["not json"])), {});
@@ -146,15 +329,17 @@ test("readStdinJson tolerates empty and malformed input", async () => {
 });
 
 test("the CLI reads the event from stdin and uses its cwd", () => {
+  // Started in the temp root's parent and told about the temp root on stdin: only the stdin cwd reaches Widgetry.
   const run = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "SessionStart"], {
     input: JSON.stringify({ hook_event_name: "SessionStart", cwd: root, source: "startup" }),
     encoding: "utf8",
+    cwd: tmpdir(),
   });
   assert.equal(run.status, 0, run.stderr);
   const parsed = JSON.parse(run.stdout) as { hookSpecificOutput: { additionalContext: string } };
   assert.match(parsed.hookSpecificOutput.additionalContext, /Widgetry vocabulary/);
 
-  const bad = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "NoSuchEvent"], { input: "{}", encoding: "utf8" });
+  const bad = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "NoSuchEvent"], { input: "{}", encoding: "utf8", cwd: tmpdir() });
   assert.equal(bad.status, 64);
   assert.match(bad.stderr, /expected one of/);
 });
@@ -250,6 +435,36 @@ test("orient prints the active order a session owns with the boundary rule, nudg
   }
 });
 
+test("the peer feed injects a peer's decisions and escalations and no other kind", async () => {
+  const dir = await freshRoot();
+  try {
+    verb(dir, "decide", "before the child began", "--because", "old", "--session", "main-1", "--agent", "main");
+    await runHook("SubagentStart", { cwd: dir, session_id: "child", agent_type: "Plan" }, dir);
+
+    // One record of every other kind a peer can write, between two the feed must carry.
+    const decision = idOf(verb(dir, "decide", "a peer chose the store", "--because", "b", "--session", "peer-1", "--agent", "scope"));
+    const conjecture = idOf(verb(dir, "conjecture", "a peer noticed something", "--could-be", "one", "--discriminated-by", "a test", "--session", "peer-1", "--agent", "scope"));
+    const defect = idOf(verb(dir, "defect", "a peer saw a deviation", "--evidence", "a report", "--session", "peer-1", "--agent", "scope"));
+    const wall = idOf(verb(dir, "unable", "a peer hit a wall", "--because", "no password", "--session", "peer-1", "--agent", "scope"));
+    const retraction = idOf(verb(dir, "retract", decision, "--because", "the test said otherwise", "--session", "peer-1", "--agent", "scope"));
+    const resolution = idOf(verb(dir, "resolved", conjecture, "--because", "the test showed one", "--session", "peer-1", "--agent", "scope"));
+    const escalation = idOf(verb(dir, "escalate", "a peer needs a human", "--because", "only a human decides", "--session", "peer-2", "--agent", "economy"));
+
+    const feed = contextOf(await runHook("UserPromptSubmit", { cwd: dir, session_id: "child" }, dir));
+    const lines = feed.trimEnd().split("\n");
+    assert.match(lines[0]!, /^Peers recorded 2 since your last look/, "two records of the two kinds the feed carries, not seven");
+    assert.deepEqual(lines.slice(1), [
+      `\u25c6 ${decision} scope: a peer chose the store`,
+      `\u25b2 ${escalation} economy: a peer needs a human  [escalation: a human must answer]`,
+    ]);
+    for (const [kind, id] of [["conjecture", conjecture], ["defect", defect], ["unable", wall], ["retraction", retraction], ["resolution", resolution]] as const) {
+      assert.doesNotMatch(feed, new RegExp(id), `a peer's ${kind} is the journal's, not the feed's`);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("the peer feed injects subjects of other sessions' records since the cursor, capped, never full records", async () => {
   const dir = await freshRoot();
   try {
@@ -267,6 +482,7 @@ test("the peer feed injects subjects of other sessions' records since the cursor
 
     const prompt = await runHook("UserPromptSubmit", { cwd: dir, session_id: "child" }, dir);
     assert.equal(prompt.exit, 0);
+    prompt.commit?.(); // the command line commits once its print succeeded; here the print is the assertion below
     const parsed = JSON.parse(prompt.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
     assert.equal(parsed.hookSpecificOutput.hookEventName, "UserPromptSubmit");
     const feed = parsed.hookSpecificOutput.additionalContext;
@@ -282,6 +498,7 @@ test("the peer feed injects subjects of other sessions' records since the cursor
 
     for (let n = 0; n < FEED_CAP + 3; n += 1) verb(dir, "decide", `peer decision ${n}`, "--because", "b", "--session", "peer-1", "--agent", "scope");
     const tool = await runHook("PostToolUse", { cwd: dir, session_id: "child", tool_name: "Read", tool_input: { file_path: "x" } }, dir);
+    tool.commit?.();
     const capped = contextOf(tool).trimEnd().split("\n");
     assert.match(capped[0]!, new RegExp(`^Peers recorded ${FEED_CAP + 3} since your last look`));
     assert.equal(capped.length, FEED_CAP + 2, "a header, the cap, and the count of the rest");
@@ -299,7 +516,26 @@ test("the peer feed injects subjects of other sessions' records since the cursor
   }
 });
 
-test("the feed cursor advances only after the feed is printed", async () => {
+/** Run the hook CLI on an event; with `closePipe` the host's end of stdout is closed before the hook can write, as a host that died would leave it. */
+function spawnHook(dir: string, event: string, input: object, closePipe: boolean): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", event], { cwd: dir, stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => (stderr += chunk));
+    if (closePipe) child.stdout.destroy();
+    else {
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (chunk: string) => (stdout += chunk));
+    }
+    child.on("error", reject);
+    child.on("close", (status) => resolve({ status, stdout, stderr }));
+    child.stdin.end(JSON.stringify(input));
+  });
+}
+
+test("the feed cursor advances only after the feed is printed: rendering moves nothing, and the CLI commits only once its stdout write succeeded", async () => {
   const dir = await freshRoot();
   try {
     await runHook("SubagentStart", { cwd: dir, session_id: "child" }, dir);
@@ -312,7 +548,19 @@ test("the feed cursor advances only after the feed is printed", async () => {
     assert.deepEqual(readCursor(dir, "child"), before, "rendering the feed moves nothing");
     const again = feedContext(dir, { session_id: "child" });
     assert.equal(again.text, first.text, "an uncommitted feed is shown again");
-    first.commit();
+    const rendered = await runHook("UserPromptSubmit", { cwd: dir, session_id: "child" }, dir);
+    assert.match(rendered.stdout, /peer wrote/);
+    assert.deepEqual(readCursor(dir, "child"), before, "runHook renders the feed and hands the advance back; it commits nothing itself");
+    assert.equal(typeof rendered.commit, "function", "the advance rides with the result for the caller that prints");
+
+    // The CLI boundary: the host's end of the pipe is gone, so the write fails and the cursor must stay.
+    const lost = await spawnHook(dir, "UserPromptSubmit", { session_id: "child", cwd: dir }, true);
+    assert.notEqual(lost.status, 0, `a hook whose output never reached the host does not exit 0: ${lost.stderr}`);
+    assert.deepEqual(readCursor(dir, "child"), before, "the cursor did not move: the feed the host never received is shown again");
+
+    const printed = await spawnHook(dir, "UserPromptSubmit", { session_id: "child", cwd: dir }, false);
+    assert.equal(printed.status, 0, printed.stderr);
+    assert.match(printed.stdout, /peer wrote/, "the unprinted feed is shown again");
     assert.notDeepEqual(readCursor(dir, "child"), before, "the commit after the print moves the cursor");
     assert.equal(feedContext(dir, { session_id: "child" }).text, "");
   } finally {

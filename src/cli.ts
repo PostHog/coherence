@@ -128,13 +128,33 @@ async function glossaryCommand(args: string[], root: string): Promise<number> {
   return 0;
 }
 
+/** Write to stdout and settle only once the bytes were accepted, so what follows records an effect that happened. */
+function writeStdout(text: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    process.stdout.once("error", reject);
+    process.stdout.write(text, (error) => (error ? reject(error) : resolve()));
+  });
+}
+
+/** The exit code for output the host never received (sysexits EX_IOERR). */
+const OUTPUT_LOST_EXIT = 74;
+
 async function hookCommand(args: string[], root: string): Promise<number> {
   const event = args[0];
   if (event === undefined || !isHookEvent(event)) fail(`hook: expected one of ${HOOK_EVENTS.join(", ")}\n${USAGE}`);
   const input = await readStdinJson(process.stdin);
   const result = await runHook(event, input, root);
-  if (result.stdout !== "") process.stdout.write(result.stdout);
   if (result.stderr !== "") process.stderr.write(result.stderr);
+  if (result.stdout !== "") {
+    try {
+      await writeStdout(result.stdout);
+    } catch (error) {
+      // The host has nothing, so nothing is committed: an unprinted feed is shown again next time.
+      process.stderr.write(`hook ${event}: the output never reached the host (${error instanceof Error ? error.message : String(error)}); nothing was committed\n`);
+      return OUTPUT_LOST_EXIT;
+    }
+  }
+  result.commit?.();
   return result.exit;
 }
 

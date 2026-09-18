@@ -1,9 +1,11 @@
 /**
- * The glossary check: two questions asked of a corpus of prose and code.
+ * The glossary check: two questions asked of a corpus of prose, code, data,
+ * and the journal's own records.
  *
  * REJECTED NAME: a name some concept refused, appearing as a whole word or
- * phrase in prose, or as a whole identifier token (camelCase and snake_case
- * split) in code. Each finding carries the concept and its because.
+ * phrase in prose, as a whole identifier token (camelCase and snake_case
+ * split) in code, or as a key or value in a data file. Each finding carries
+ * the concept and its because.
  *
  * UNKNOWN NOUN: a term prose uses as a name (backticked, Title Case away from
  * a sentence start, or the name of a component folder) that no glossary
@@ -11,16 +13,24 @@
  * recall: every finding is meant to be acted on with one of three answers,
  * declare it, map it, or fix it.
  *
- * Inside a project, the project's sense of a name wins: a Coherence rejected
- * name that the project accepts as a concept or alias is not a finding there,
- * a hit inside a longer accepted phrase (a project alias that happens to
- * contain a rejected word) is not a hit, and Coherence's names are held
- * against the project's prose only, never its identifiers, which belong to
- * the project's own domain.
+ * Inside a project, the project's SENSE of a name wins: a Coherence rejected
+ * name the project declares as its own concept or alias is not a finding
+ * there, and a hit inside a longer accepted phrase (a project alias that
+ * happens to contain a rejected word) is not a hit. Names, though, are held
+ * against everything the project writes: both layers' rejected names are
+ * matched in prose and in identifiers alike, because a rejected name in an
+ * identifier is the drift the glossary exists to catch.
+ *
+ * The corpus is every text file kind a project holds, the journal's records
+ * included, and never the files written in another vocabulary on purpose:
+ * the glossaries themselves, the retired inventories, docs/reference, and
+ * the adversarial reviews, which quote the names they report. A path the
+ * check cannot read is reported as unreadable and skipped; it never aborts
+ * the walk. Every path given is confined to the project root.
  */
 
 import { readdir, readFile, stat } from "node:fs/promises";
-import { basename, dirname, extname, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { acceptedNames, rejectedNames, type Glossary, type RejectedName } from "./glossary.ts";
 import { STOPLIST } from "./stoplist.ts";
 
@@ -43,6 +53,14 @@ export interface RejectedFinding extends Location {
   text: string;
   concept: string;
   because: string;
+  /**
+   * How this finding is repaired. "edit" for a file the project can rewrite;
+   * "record" for a line in the append-only store, where no edit is possible
+   * and the repair is a later record. Only an editable finding drives the
+   * exit code, because only an editable finding can be settled before the
+   * next command.
+   */
+  repair: "edit" | "record";
 }
 
 export interface UnknownFinding {
@@ -52,86 +70,201 @@ export interface UnknownFinding {
   options: { declare: string; map: string; fix: string };
 }
 
+/** A path the walk could not read, and why. Reported, never fatal: the check says what it did not see. */
+export interface UnreadablePath {
+  file: string;
+  reason: string;
+}
+
 export interface CheckReport {
   files: number;
   rejected: RejectedFinding[];
   unknown: UnknownFinding[];
+  /** Paths the walk could not read; the corpus is that much smaller and the report says so. */
+  unreadable: UnreadablePath[];
 }
 
-const PROSE_EXTENSIONS = new Set([".md"]);
-const CODE_EXTENSIONS = new Set([".ts"]);
-const EXCLUDED_FOLDERS = new Set(["node_modules", "public", ".coherence", ".git", "dist", ".claude", ".codex"]);
+const PROSE_EXTENSIONS = new Set([".md", ".markdown", ".mdx", ".rst", ".txt"]);
+const CODE_EXTENSIONS = new Set([
+  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts",
+  ".py", ".rb", ".go", ".rs", ".java", ".kt", ".kts", ".swift", ".m", ".mm",
+  ".c", ".h", ".cc", ".cpp", ".hpp", ".cs", ".php", ".scala", ".lua",
+  ".sh", ".bash", ".zsh", ".fish", ".sql", ".css", ".scss", ".less", ".vue", ".svelte",
+]);
+const DATA_EXTENSIONS = new Set([
+  ".json", ".jsonl", ".ndjson", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf",
+  ".env", ".properties", ".xml", ".csv", ".tsv", ".graphql", ".proto",
+]);
+const EXCLUDED_FOLDERS = new Set(["node_modules", "public", ".git", "dist", "build", ".claude", ".codex", ".venv", "__pycache__"]);
 
-/** Identifiers the language itself owns; a rejected name that is also one of these is not a finding in code. */
+/** Machine-written or foreign-vocabulary files no adopter can repair by renaming: a dependency lockfile is the author's, not the project's. */
+const EXCLUDED_NAMES = new Set(["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.lock", "poetry.lock", "uv.lock", "Gemfile.lock", "composer.lock", "go.sum"]);
+
+/** The record folders under .coherence the check reads; every other folder there is machine-written output (runs, traces, feed cursors). */
+const RECORD_FOLDERS = ["journal", "work"];
+const COHERENCE_DIR = ".coherence";
+
+/**
+ * Identifiers the language itself owns; a rejected name that is also one of
+ * these is not a finding in code, in any case and in the plural: `Promise`,
+ * `promise` and `promises` all name the language's thing, not the project's.
+ */
 const LANGUAGE_GLOBALS = new Set([
   "Promise", "HTMLElement", "HTMLAnchorElement", "HTMLInputElement", "HTMLDetailsElement", "Element", "Document", "Event", "Node", "Object", "Array", "Map", "Set", "WeakMap", "WeakSet", "Symbol", "Proxy", "Reflect",
   "Error", "Date", "JSON", "Math", "Intl", "Atomics", "Buffer", "URL", "Request", "Response", "Blob", "Event",
 ]);
 
+/** Whether a whole identifier is one of the language's own words, whatever its case or number. */
+function isLanguageWord(identifier: string): boolean {
+  const lower = identifier.toLowerCase();
+  return LANGUAGE_WORDS.has(lower) || LANGUAGE_WORDS.has(singular(lower));
+}
+
+const LANGUAGE_WORDS: ReadonlySet<string> = new Set([...LANGUAGE_GLOBALS].map((g) => g.toLowerCase()));
+
 /* --------------------------------------------------------------- corpus */
+
+type FileKind = "prose" | "code" | "data" | "record";
 
 interface CorpusFile {
   path: string;
   rel: string;
-  kind: "prose" | "code";
+  kind: FileKind;
   lines: string[];
 }
 
-function kindOf(path: string): "prose" | "code" | undefined {
-  const ext = extname(path);
+/** The project-relative path, in the one spelling findings and comparisons use. */
+function relPath(root: string, path: string): string {
+  return relative(root, path).split(sep).join("/");
+}
+
+/** A journal or work record file: one JSONL line per record, under .coherence. */
+function isRecordFile(rel: string): boolean {
+  const parts = rel.split("/");
+  return parts.length >= 3 && parts[0] === COHERENCE_DIR && RECORD_FOLDERS.includes(parts[1]!) && parts[parts.length - 1]!.endsWith(".jsonl");
+}
+
+/**
+ * What kind of text a file is, or nothing when the check does not read it.
+ * A dotfile with no extension (.gitignore, .npmrc) is data: its lines are
+ * the project's own words even though no extension says so.
+ */
+function kindOf(root: string, path: string): FileKind | undefined {
+  const rel = relPath(root, path);
+  if (isRecordFile(rel)) return "record";
+  const base = basename(path);
+  if (EXCLUDED_NAMES.has(base)) return undefined;
+  const ext = extname(base);
   if (PROSE_EXTENSIONS.has(ext)) return "prose";
   if (CODE_EXTENSIONS.has(ext)) return "code";
+  if (DATA_EXTENSIONS.has(ext)) return "data";
+  if (ext === "" && base.startsWith(".") && base.length > 1) return "data";
   return undefined;
 }
 
-async function walk(dir: string, out: string[]): Promise<void> {
-  const entries = await readdir(dir, { withFileTypes: true });
+interface Walk {
+  root: string;
+  found: string[];
+  unreadable: UnreadablePath[];
+}
+
+/** Why a path could not be read, in the operating system's own words, without the absolute path it already names. */
+function reasonOf(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/,?\s*'[^']*'\s*$/, "");
+}
+
+/**
+ * Descend one folder. A folder the process cannot read is recorded as
+ * unreadable and skipped, so one locked path never costs the whole check.
+ */
+async function walk(dir: string, walker: Walk): Promise<void> {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch (error) {
+    walker.unreadable.push({ file: relPath(walker.root, dir), reason: reasonOf(error) });
+    return;
+  }
   entries.sort((a, b) => a.name.localeCompare(b.name));
   for (const entry of entries) {
     const path = resolve(dir, entry.name);
     if (entry.isDirectory()) {
       if (EXCLUDED_FOLDERS.has(entry.name)) continue;
-      await walk(path, out);
-    } else if (entry.isFile() && kindOf(path) !== undefined) {
-      out.push(path);
+      await walk(path, walker);
+    } else if (entry.isFile() && kindOf(walker.root, path) !== undefined) {
+      walker.found.push(path);
     }
   }
 }
 
-/** Every file the check reads, excluding the glossary files, docs/retired.md, and docs/reference/ and docs/reviews/ (each quotes the reference vocabulary and the rejected names by name, as evidence). */
-export async function collectFiles(options: CheckOptions): Promise<string[]> {
-  const excluded = new Set<string>([resolve(options.coherence.path), resolve(options.root, "docs", "retired.md")]);
-  const quotingDocs = [resolve(options.root, "docs", "reference"), resolve(options.root, "docs", "reviews")];
+/** A path outside the project root is never read: an authored path must not reach above the tree it names. */
+function confine(root: string, given: string): string {
+  const path = resolve(root, given);
+  const rel = relative(resolve(root), path);
+  if (rel !== "" && (rel === ".." || rel.startsWith(".." + sep) || isAbsolute(rel))) {
+    throw new Error(`glossary check: "${given}" is outside the project root`);
+  }
+  return path;
+}
+
+/**
+ * Every file the check reads, with the paths it could not. Excluded: the
+ * glossary files themselves, the two retired inventories, docs/reference
+ * and docs/reviews (all written in another vocabulary on purpose),
+ * dependency lockfiles, and everything under .coherence that is not a record.
+ */
+export async function collectFiles(options: CheckOptions): Promise<{ files: string[]; unreadable: UnreadablePath[] }> {
+  const root = resolve(options.root);
+  // The inventories of what the project retired must name what they refuse, exactly as the glossary does; reading them would report the refusal as the drift.
+  const excluded = new Set<string>([resolve(options.coherence.path), resolve(root, "docs", "retired.md"), resolve(root, "src", "spec", "retired-sections.json")]);
+  const foreignDocs = [resolve(root, "docs", "reference"), resolve(root, "docs", "reviews")];
   if (options.project !== undefined) excluded.add(resolve(options.project.path));
-  const found: string[] = [];
-  const roots = options.paths === undefined || options.paths.length === 0 ? [options.root] : options.paths;
-  for (const given of roots) {
-    const path = resolve(options.root, given);
+  const walker: Walk = { root, found: [], unreadable: [] };
+  const roots = options.paths === undefined || options.paths.length === 0 ? [root] : options.paths.map((given) => confine(root, given));
+  for (const path of roots) {
     let info;
     try {
       info = await stat(path);
     } catch {
       continue;
     }
-    if (info.isDirectory()) await walk(path, found);
-    else if (info.isFile() && kindOf(path) !== undefined) found.push(path);
+    if (info.isDirectory()) await walk(path, walker);
+    else if (info.isFile() && kindOf(root, path) !== undefined) walker.found.push(path);
   }
-  return [...new Set(found)].filter((p) => {
+  const files = [...new Set(walker.found)].filter((p) => {
     if (excluded.has(p)) return false;
-    if (quotingDocs.some((dir) => p === dir || p.startsWith(dir + sep))) return false;
-    const folders = dirname(relative(options.root, p)).split(sep);
-    return !folders.some((part) => EXCLUDED_FOLDERS.has(part));
+    if (foreignDocs.some((d) => p === d || p.startsWith(d + sep))) return false;
+    const rel = relPath(root, p);
+    if (rel.split("/")[0] === COHERENCE_DIR && !isRecordFile(rel)) return false;
+    return !dirname(rel).split("/").some((part) => EXCLUDED_FOLDERS.has(part));
   });
+  return { files, unreadable: walker.unreadable };
 }
 
-async function readCorpus(options: CheckOptions): Promise<CorpusFile[]> {
-  const files = await collectFiles(options);
+/** A file whose first bytes carry a NUL byte is binary whatever its name says; the check reads text. */
+function isBinary(text: string): boolean {
+  return text.slice(0, 8000).includes(NUL);
+}
+
+const NUL = String.fromCharCode(0);
+
+async function readCorpus(options: CheckOptions): Promise<{ files: CorpusFile[]; unreadable: UnreadablePath[] }> {
+  const root = resolve(options.root);
+  const { files, unreadable } = await collectFiles(options);
   const out: CorpusFile[] = [];
   for (const path of files) {
-    const text = await readFile(path, "utf8");
-    out.push({ path, rel: relative(options.root, path), kind: kindOf(path)!, lines: text.split(/\r?\n/) });
+    let text;
+    try {
+      text = await readFile(path, "utf8");
+    } catch (error) {
+      unreadable.push({ file: relPath(root, path), reason: reasonOf(error) });
+      continue;
+    }
+    if (isBinary(text)) continue;
+    out.push({ path, rel: relPath(root, path), kind: kindOf(root, path)!, lines: text.split(/\r?\n/) });
   }
-  return out;
+  return { files: out, unreadable };
 }
 
 /* ---------------------------------------------------------------- words */
@@ -308,24 +441,85 @@ function matchWordLists<T>(
   return out;
 }
 
+/**
+ * Rejected names in one line of prose. A name declared for identifiers only
+ * counts where the prose names an identifier, which in a .md file means
+ * inside backticks; a data file or a record has no such convention, so
+ * `identifiersAnywhere` lets its keys and values count as written.
+ */
+function rejectedInLine(rel: string, line: string, lineNumber: number, names: NameTable, guard: Guard, identifiersAnywhere = false, repair: "edit" | "record" = "edit"): RejectedFinding[] {
+  const out: RejectedFinding[] = [];
+  const guarded = guard.regex === undefined ? [] : [...line.matchAll(guard.regex)].map((m) => ({ start: m.index, end: m.index + m[0].length }));
+  const code = backtickSpans(line);
+  const consider = (regex: RegExp | undefined, onlyInCode: boolean): void => {
+    if (regex === undefined) return;
+    for (const match of line.matchAll(regex)) {
+      const span = { start: match.index, end: match.index + match[0].length };
+      if (inside(span, guarded)) continue;
+      if (onlyInCode && !inside(span, code)) continue;
+      const entry = lookup(match[0], names.byPhrase);
+      if (entry === undefined) continue;
+      out.push({ file: rel, line: lineNumber, name: entry.name, text: match[0], concept: entry.concept, because: entry.because, repair });
+    }
+  };
+  consider(names.prose, false);
+  consider(names.identifierOnly, !identifiersAnywhere);
+  return out;
+}
+
 function rejectedInProse(file: CorpusFile, names: NameTable, guard: Guard): RejectedFinding[] {
+  return file.lines.flatMap((line, i) => rejectedInLine(file.rel, line, i + 1, names, guard));
+}
+
+/** A data file is read as the project's own words: keys and values alike, with no backtick convention to hide behind. */
+function rejectedInData(file: CorpusFile, names: NameTable, guard: Guard): RejectedFinding[] {
+  return file.lines.flatMap((line, i) => rejectedInLine(file.rel, line, i + 1, names, guard, true));
+}
+
+/**
+ * The fields of a record the writer authored as its own words. A decision's
+ * `over` is the name it refused, quoted so the reader can see what drift was
+ * turned away: naming it there is the record doing its job, not drift. The
+ * bookkeeping a record carries (its id, session, agent, commit, the paths it
+ * points at, the state it moved to) is the tool's spelling, not the agent's.
+ */
+const RECORD_METADATA: ReadonlySet<string> = new Set([
+  "id", "kind", "at", "session", "agent", "commit", "dirty", "binding", "of", "work",
+  "state", "owner", "to", "from", "file", "files", "path", "paths", "result", "results", "status",
+]);
+
+/** The name a record quotes as refused: `over` carries exactly what the decision turned away. */
+const RECORD_QUOTED: ReadonlySet<string> = new Set(["over"]);
+
+function recordStrings(value: unknown, out: string[]): void {
+  if (typeof value === "string") out.push(value);
+  else if (Array.isArray(value)) for (const v of value) recordStrings(v, out);
+  else if (typeof value === "object" && value !== null) {
+    for (const [k, v] of Object.entries(value)) {
+      if (RECORD_METADATA.has(k) || RECORD_QUOTED.has(k)) continue;
+      recordStrings(v, out);
+    }
+  }
+}
+
+/**
+ * Rejected names in the journal's own records: one JSONL line per record,
+ * checked in the words the writing agent chose. A line that will not parse
+ * is left to the journal's own reader to report.
+ */
+function rejectedInRecord(file: CorpusFile, names: NameTable, guard: Guard): RejectedFinding[] {
   const out: RejectedFinding[] = [];
   file.lines.forEach((line, i) => {
-    const guarded = guard.regex === undefined ? [] : [...line.matchAll(guard.regex)].map((m) => ({ start: m.index, end: m.index + m[0].length }));
-    const code = backtickSpans(line);
-    const consider = (regex: RegExp | undefined, onlyInCode: boolean): void => {
-      if (regex === undefined) return;
-      for (const match of line.matchAll(regex)) {
-        const span = { start: match.index, end: match.index + match[0].length };
-        if (inside(span, guarded)) continue;
-        if (onlyInCode && !inside(span, code)) continue;
-        const entry = lookup(match[0], names.byPhrase);
-        if (entry === undefined) continue;
-        out.push({ file: file.rel, line: i + 1, name: entry.name, text: match[0], concept: entry.concept, because: entry.because });
-      }
-    };
-    consider(names.prose, false);
-    consider(names.identifierOnly, true);
+    if (line.trim() === "") return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      return;
+    }
+    const texts: string[] = [];
+    recordStrings(parsed, texts);
+    for (const text of texts) out.push(...rejectedInLine(file.rel, text, i + 1, names, guard, true, "record"));
   });
   return out;
 }
@@ -339,8 +533,8 @@ function rejectedInCode(file: CorpusFile, names: NameTable, guard: Guard): Rejec
     const guarded = [...matchWordLists(line, tokens, guard.wordLists).map((m) => m.span), ...moduleSpecifierSpans(line)];
     for (const hit of matchWordLists(line, tokens, names.wordLists)) {
       if (inside(hit.span, guarded)) continue;
-      if (LANGUAGE_GLOBALS.has(hit.identifier) || hit.member) continue;
-      out.push({ file: file.rel, line: i + 1, name: hit.entry.name, text: hit.text, concept: hit.entry.concept, because: hit.entry.because });
+      if (isLanguageWord(hit.identifier) || hit.member) continue;
+      out.push({ file: file.rel, line: i + 1, name: hit.entry.name, text: hit.text, concept: hit.entry.concept, because: hit.entry.because, repair: "edit" });
     }
   });
   return out;
@@ -511,35 +705,51 @@ export function rejectedNamesInForce(coherence: Glossary, project: Glossary | un
 }
 
 export async function runCheck(options: CheckOptions): Promise<CheckReport> {
-  const files = await readCorpus(options);
+  const { files, unreadable } = await readCorpus(options);
   const inForce = rejectedNamesInForce(options.coherence, options.project);
-  const proseNames = nameTable([...inForce.coherence, ...inForce.project]);
-  const codeNames = options.project === undefined ? proseNames : nameTable(inForce.project);
+  // One table for every kind: a name the project did not take for its own is refused in its identifiers as much as in its prose.
+  const names = nameTable([...inForce.coherence, ...inForce.project]);
   const accepted = acceptedTerms(options);
   const guard = guardTable(accepted);
   const rejected: RejectedFinding[] = [];
   for (const file of files) {
-    rejected.push(...(file.kind === "prose" ? rejectedInProse(file, proseNames, guard) : rejectedInCode(file, codeNames, guard)));
+    if (file.kind === "prose") rejected.push(...rejectedInProse(file, names, guard));
+    else if (file.kind === "code") rejected.push(...rejectedInCode(file, names, guard));
+    else if (file.kind === "data") rejected.push(...rejectedInData(file, names, guard));
+    else rejected.push(...rejectedInRecord(file, names, guard));
   }
-  const unknown = unknownNouns(files, options, accepted, new Set(proseNames.byPhrase.keys()));
-  return { files: files.length, rejected, unknown };
+  const unknown = unknownNouns(files, options, accepted, new Set(names.byPhrase.keys()));
+  return { files: files.length, rejected, unknown, unreadable };
 }
 
 export function formatReport(report: CheckReport): string {
   const lines: string[] = [];
-  for (const f of report.rejected) {
+  for (const f of report.rejected.filter((f) => f.repair === "edit")) {
     lines.push(`REJECTED NAME  ${f.file}:${f.line}  "${f.text}"  rejected for ${f.concept}${f.because ? `: ${f.because}` : ""}`);
+  }
+  for (const f of report.rejected.filter((f) => f.repair === "record")) {
+    lines.push(`RECORDED NAME  ${f.file}:${f.line}  "${f.text}"  rejected for ${f.concept}; the store is append-only, so the repair is a later record, never an edit`);
   }
   for (const f of report.unknown) {
     const where = f.locations.map((l) => `${l.file}:${l.line}`).join(", ");
     lines.push(`UNKNOWN NOUN   "${f.term}" (${f.count})  ${where}`);
     lines.push(`               declare: ${f.options.declare} | map: ${f.options.map} | fix: ${f.options.fix}`);
   }
+  for (const u of report.unreadable) lines.push(`UNREADABLE     ${u.file}  ${u.reason}`);
   const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
-  lines.push(`${plural(report.rejected.length, "rejected name")}, ${plural(report.unknown.length, "unknown noun")} (${plural(report.files, "file")})`);
+  const missed = report.unreadable.length === 0 ? "" : `, ${plural(report.unreadable.length, "unreadable path")}`;
+  const inRecords = report.rejected.filter((f) => f.repair === "record").length;
+  const recorded = inRecords === 0 ? "" : `, ${inRecords} in records`;
+  lines.push(`${plural(report.rejected.filter((f) => f.repair === "edit").length, "rejected name")}, ${plural(report.unknown.length, "unknown noun")} (${plural(report.files, "file")})${recorded}${missed}`);
   return lines.join("\n") + "\n";
 }
 
+/**
+ * Whether the check found anything the project can still settle. A path it
+ * could not read counts: a corpus it did not see is a verdict it cannot
+ * honestly give. A name in the append-only store does not, because no edit
+ * can repair a record; it is printed, counted, and left to the reader.
+ */
 export function hasFindings(report: CheckReport): boolean {
-  return report.rejected.length > 0 || report.unknown.length > 0;
+  return report.rejected.some((f) => f.repair === "edit") || report.unknown.length > 0 || report.unreadable.length > 0;
 }

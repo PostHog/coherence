@@ -12,8 +12,8 @@
  *       unreached first
  *
  * Economy reaches the language server through the warm server, as the run
- * does; --no-server drives the adapter in this process. Calibrate and mass
- * need no instrument.
+ * does, and through the same door: enforcement's withWarmAdapter. There is no
+ * in-process mode on this command. Calibrate and mass need no instrument.
  */
 
 import { withWarmAdapter } from "../enforcement/run.ts";
