@@ -483,7 +483,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     return via;
   }
 
-  async refute(protectedThing: Definition, outsideOf: Definition | undefined): Promise<Refutation> {
+  async refute(protectedThing: Definition, _outsideOf: Definition | undefined): Promise<Refutation> {
     const client = await this.live();
     const symbols = await this.documentSymbols(protectedThing.file);
     let importName: string | undefined;
@@ -496,18 +496,18 @@ export class TypeScriptAdapter implements LanguageAdapter {
       const visibility = this.visibilityOf(protectedThing.file, importName, protectedThing.range.start.line);
       if (!visibility.visible) {
         // The language refuses the import; the synthetic reference stands in the protected file's own module instead.
-        return this.refuteInside(protectedThing, importName, outsideOf);
+        return this.refuteInside(protectedThing, importName);
       }
     }
     const dir = dirname(protectedThing.file);
     const base = protectedThing.file.slice(dir === "." ? 0 : dir.length + 1);
     const synthetic = `${dir === "." ? "" : dir + "/"}coherence-refutation-${randomBytes(4).toString("hex")}.ts`;
     const text = `import { ${importName} } from "./${base}";\nexport const coherenceRefutation = ${importName};\n`;
-    return this.probe(client, protectedThing, synthetic, text, { line: 1, character: text.split("\n")[1]!.indexOf(importName) }, outsideOf);
+    return this.probe(client, protectedThing, synthetic, text, { line: 1, character: text.split("\n")[1]!.indexOf(importName) });
   }
 
   /** A not-exported thing can only be referenced from its own module: the synthetic reference is the file with one line added at its end. */
-  private async refuteInside(protectedThing: Definition, importName: string, outsideOf: Definition | undefined): Promise<Refutation> {
+  private async refuteInside(protectedThing: Definition, importName: string): Promise<Refutation> {
     const original = readFileSync(join(this.root, protectedThing.file), "utf8");
     const lines = original.split(/\r?\n/);
     const added = `const coherenceRefutation = ${importName};`;
@@ -518,12 +518,12 @@ export class TypeScriptAdapter implements LanguageAdapter {
     this.symbolCache.delete(protectedThing.file);
     try {
       const sites = await this.references(protectedThing);
-      const seen = sites.some((s) => s.file === protectedThing.file && s.line === line + 1);
-      const outside = outsideOf === undefined || outsideOf.file !== protectedThing.file || !rangeContains(outsideOf.range, { line, character: added.indexOf(importName) });
+      const hit = sites.find((s) => s.file === protectedThing.file && s.line === line + 1);
       return {
-        seen: seen && outside,
-        account: seen
-          ? `an unsaved edit of ${protectedThing.file} adding a use of ${importName} at line ${line + 1}${outside ? " outside the chokepoint" : " (inside the chokepoint's range)"} was reported as a reference`
+        seen: hit !== undefined,
+        ...(hit === undefined ? {} : { site: hit }),
+        account: hit !== undefined
+          ? `an unsaved edit of ${protectedThing.file} adding a use of ${importName} at line ${line + 1} was reported as a reference`
           : `an unsaved edit of ${protectedThing.file} adding a use of ${importName} at line ${line + 1} was not reported; the check is vacuous`,
       };
     } finally {
@@ -532,16 +532,16 @@ export class TypeScriptAdapter implements LanguageAdapter {
     }
   }
 
-  private async probe(client: JsonRpcClient, protectedThing: Definition, synthetic: string, text: string, at: Position, outsideOf: Definition | undefined): Promise<Refutation> {
+  private async probe(client: JsonRpcClient, protectedThing: Definition, synthetic: string, text: string, at: Position): Promise<Refutation> {
     client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: "typescript", version: 1, text } });
     this.lineCache.set(synthetic, text.split("\n"));
     this.symbolCache.set(synthetic, []);
     try {
       const sites = await this.references(protectedThing);
       const hit = sites.find((s) => s.file === synthetic && s.line === at.line + 1);
-      const outside = outsideOf === undefined || outsideOf.file !== synthetic;
       return {
-        seen: hit !== undefined && outside,
+        seen: hit !== undefined,
+        ...(hit === undefined ? {} : { site: hit }),
         account: hit !== undefined
           ? `an unsaved document ${synthetic} importing and using the protected thing was reported as a reference at line ${hit.line}`
           : `an unsaved document ${synthetic} importing and using the protected thing was not reported among ${sites.length} references; the check is vacuous`,

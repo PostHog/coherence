@@ -16,9 +16,16 @@
  * its language can reach this rung); reference-choked when visible and
  * nothing bypasses; broken when a bypass exists or the chokepoint cannot be
  * resolved; not chokeable when the protected thing cannot be resolved as a
- * symbol or a module. The refutation is automatic: the adapter opens a
- * synthetic reference and the instrument must report it, or the check is
- * vacuous and says so.
+ * symbol or a module.
+ *
+ * The refutation is automatic, and it must prove that this check would fire:
+ * the adapter opens a synthetic reference and reports the site the instrument
+ * named, and the site is then classified by the same function every other
+ * site goes through. Only a synthetic site classified `bypass` refutes. A
+ * synthetic site the check would call `inside` (the chokepoint covers
+ * everywhere the language lets the thing be named) or `test` (the protected
+ * thing lives under a test folder, so nothing can ever be a bypass) proves
+ * only that the instrument answers, and the check says so and records not run.
  */
 
 import { isTestPath, rangeContains, type Definition, type LanguageAdapter, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
@@ -116,7 +123,15 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
 
   const visibility = await adapter.visibility(protectedThing, chokepoint);
   const refutation = await adapter.refute(protectedThing, chokepoint);
-  const refutationState: RefutationState = refutation.seen ? "automatic" : "missing";
+  const synthetic = refutation.site === undefined ? undefined : classifySite(refutation.site, protectedThing, chokepoint, input.testFolders);
+  // The refutation fires only when this check's own classification calls the synthetic site a bypass.
+  const fired = refutation.seen && synthetic === "bypass";
+  const refutationState: RefutationState = fired ? "automatic" : "missing";
+  const refutationAccount = !refutation.seen
+    ? refutation.account
+    : fired
+      ? `${refutation.account}, and the check classified it a bypass`
+      : `${refutation.account}, but the check classified it ${synthetic === "test" ? "a test reference" : "a reference inside the chokepoint"}, not a bypass; the refutation is vacuous`;
 
   if (bypasses.length > 0) {
     return {
@@ -124,7 +139,7 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
       verdict: "fail",
       grade: "broken",
       refutation: refutationState,
-      refutationAccount: refutation.account,
+      refutationAccount,
       protectedThing,
       chokepoint,
       sites,
@@ -137,17 +152,18 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
   }
   const earned = rungFor(adapter, visibility);
   // When the instrument could not see the synthetic site, Coherence's own check enforces nothing: a ladder may name the rung that is left.
+  // A site the instrument saw but the check would not call a bypass leaves the earned rung's fact standing; only the verdict drops.
   const vacuousRung = !refutation.seen && adapter.ladder.whenVacuous !== undefined ? rungsOf(adapter).find((r) => r.grade === adapter.ladder.whenVacuous) : undefined;
   const graded: Rung = vacuousRung === undefined ? earned : { ...vacuousRung, fact: `the instrument could not see the synthetic reference, so Coherence's check enforces nothing here and only the convention stands (${visibility.evidence})` };
   const tests = counts.test > 0 ? `; ${counts.test} test reference${counts.test === 1 ? "" : "s"}` : "";
-  const vacuous = refutation.seen ? "" : `; refutation missing: ${refutation.account}`;
+  const vacuous = fired ? "" : `; refutation missing: ${refutationAccount}`;
   return {
     input,
-    verdict: refutation.seen ? "pass" : "not run",
+    verdict: fired ? "pass" : "not run",
     grade: graded.grade,
     enforcer: graded.enforcer,
     refutation: refutationState,
-    refutationAccount: refutation.account,
+    refutationAccount,
     protectedThing,
     chokepoint,
     sites,

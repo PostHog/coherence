@@ -54,6 +54,12 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   crossing: instrument -> record
   refuted: <not witnessed by hand: the run witnesses this one automatically; no staged break was attempted on the synthetic document>
   kinds: none
+- refutation proves this check would fire: The synthetic site the adapter reports is classified by the same function every other site goes through, and only a site the check calls a bypass refutes; a synthetic site classified inside the chokepoint or as a test reference is vacuous and records not run.
+  over: every chokepoint-form enforcement whose synthetic site the instrument reported
+  via: the automatic refutation is vacuous unless the check's own classification calls the synthetic site a bypass
+  because: the adapter decided outsideness itself and got it wrong in two ways the reviewers reproduced: a synthetic sibling document beside a protected thing under a test folder is a test reference, so nothing could ever be a bypass and the bullet read as a verified invariant; and a synthetic line appended to a module that is its own chokepoint fell past a range computed before the line was added, so the check called an inside site outside. Running the check's own classifier on the synthetic site is the only way the refutation proves the thing it claims: that this check, not the instrument, would go red
+  crossing: instrument -> reading
+  kinds: none
 - not configured never passes: The totality oracle pass reports a missing test command as not run, never as passing, and a command whose output does not match is a fail.
   over: every totality oracle the run checks
   via: the totality oracle pass: configured command with a filter and a match; not configured is reported, never passing

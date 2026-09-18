@@ -423,3 +423,41 @@ test("the one-at-a-time totality path escapes the title before the runner reads 
   const result = await runTotalityOracle(process.cwd(), config, "returns 503 (R2 absent)");
   assert.equal(result.verdict, "pass", result.reason);
 });
+
+test("the automatic refutation is vacuous unless the check's own classification calls the synthetic site a bypass", async () => {
+  // Reviewer B: the protected thing under a test folder. Every site, the synthetic one included, is a test
+  // reference, so nothing can ever be a bypass and the bullet read as a verified invariant.
+  const other = mkdtempSync(join(tmpdir(), "coherence-vacuous-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(other, path)), { recursive: true });
+    writeFileSync(join(other, path), text, "utf8");
+  };
+  put("tsconfig.json", TSCONFIG);
+  put("src/__tests__/secrets.ts", 'export const SECRET_COLUMNS: Record<string, string[]> = { tokens: ["token"] };\nexport function seal(pattern: string): string[] {\n  return SECRET_COLUMNS[pattern] ?? [];\n}\n');
+  put("src/__tests__/render.ts", 'import { SECRET_COLUMNS } from "./secrets.ts";\nexport const leaked = SECRET_COLUMNS;\n');
+  // Reviewer A: a not-exported thing whose chokepoint is its own module. The synthetic line the adapter adds
+  // is inside that module, so no reference to it can be a bypass either.
+  put("src/store/hidden.ts", 'const HIDDEN = new Set(["x"]);\n\nexport function peek(pattern: string): number {\n  return HIDDEN.size + pattern.length;\n}\n');
+  const fresh = new TypeScriptAdapter(other);
+  try {
+    const inTests = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
+    assert.equal(inTests.counts.bypass, 0, "every site is under a test folder");
+    assert.equal(inTests.refutation, "missing", inTests.refutationAccount);
+    assert.equal(inTests.verdict, "not run", inTests.reason);
+    assert.match(inTests.refutationAccount, /classified it a test reference, not a bypass; the refutation is vacuous/);
+
+    const ownModule = await checkChokepoint(fresh, { protects: "HIDDEN", chokepoint: "src/store/hidden.ts", ...hint });
+    assert.equal(ownModule.refutation, "missing", ownModule.refutationAccount);
+    assert.equal(ownModule.verdict, "not run", ownModule.reason);
+    assert.match(ownModule.refutationAccount, /classified it a reference inside the chokepoint, not a bypass; the refutation is vacuous/);
+
+    // The same protected thing under a chokepoint that does not cover the whole module still refutes.
+    const symbolChokepoint = await checkChokepoint(fresh, { protects: "HIDDEN", chokepoint: "peek", ...hint });
+    assert.equal(symbolChokepoint.refutation, "automatic", symbolChokepoint.refutationAccount);
+    assert.equal(symbolChokepoint.verdict, "pass", symbolChokepoint.reason);
+    assert.match(symbolChokepoint.refutationAccount, /the check classified it a bypass/);
+  } finally {
+    await fresh.close();
+    rmSync(other, { recursive: true, force: true });
+  }
+});

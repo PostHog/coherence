@@ -94,6 +94,13 @@ export type ChokedGrade = "closure-choked" | "visibility-choked" | "checker-chok
 export interface Refutation {
   /** Whether the synthetic site appeared among the references. */
   seen: boolean;
+  /**
+   * The synthetic site as the instrument reported it, when it did. The adapter
+   * never decides whether it lies outside the chokepoint: the check classifies
+   * it with the same function it classifies every other site, and a synthetic
+   * site the check would not call a bypass makes the refutation vacuous.
+   */
+  site?: ReferenceSite;
   /** What was done and what was seen, in one line. */
   account: string;
 }
@@ -120,7 +127,7 @@ export interface LanguageAdapter {
   /** The chokepoint is passed so a ladder whose top rung depends on where the thing is defined can decide. */
   visibility(definition: Definition, chokepoint?: Definition): Promise<Visibility>;
   testFilter(via: string): string;
-  /** Open an unsaved document outside `outsideOf` that references `protected`, ask for references, confirm, close. */
+  /** Open an unsaved document outside `outsideOf` that references `protected`, ask for references, report the site the instrument named, close. */
   refute(protectedThing: Definition, outsideOf: Definition | undefined): Promise<Refutation>;
   /**
    * Drop what is cached about file contents and make the instrument see the current disk text of every

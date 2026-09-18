@@ -98,10 +98,10 @@ async function walk(dir: string, out: string[]): Promise<void> {
   }
 }
 
-/** Every file the check reads, excluding the glossary files, docs/retired.md, and docs/reference/ (written in the reference vocabulary). */
+/** Every file the check reads, excluding the glossary files, docs/retired.md, and docs/reference/ and docs/reviews/ (each quotes the reference vocabulary and the rejected names by name, as evidence). */
 export async function collectFiles(options: CheckOptions): Promise<string[]> {
   const excluded = new Set<string>([resolve(options.coherence.path), resolve(options.root, "docs", "retired.md")]);
-  const referenceDocs = resolve(options.root, "docs", "reference");
+  const quotingDocs = [resolve(options.root, "docs", "reference"), resolve(options.root, "docs", "reviews")];
   if (options.project !== undefined) excluded.add(resolve(options.project.path));
   const found: string[] = [];
   const roots = options.paths === undefined || options.paths.length === 0 ? [options.root] : options.paths;
@@ -118,7 +118,7 @@ export async function collectFiles(options: CheckOptions): Promise<string[]> {
   }
   return [...new Set(found)].filter((p) => {
     if (excluded.has(p)) return false;
-    if (p === referenceDocs || p.startsWith(referenceDocs + sep)) return false;
+    if (quotingDocs.some((dir) => p === dir || p.startsWith(dir + sep))) return false;
     const folders = dirname(relative(options.root, p)).split(sep);
     return !folders.some((part) => EXCLUDED_FOLDERS.has(part));
   });

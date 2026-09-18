@@ -208,8 +208,12 @@ test("Python grades: broken with a bypass; reference-choked when clean, with the
   const inner = await checkChokepoint(adapter, { protects: "INNER", chokepoint: "closure", ...hint });
   assert.equal(inner.grade, "closure-choked", inner.reason);
   assert.equal(inner.enforcer, "the interpreter");
-  assert.equal(inner.verdict, "pass");
   assert.match(inner.reason, /defined inside closure's body and is not a module attribute/);
+  // The interpreter is the enforcer here and Coherence's own check is not: a function-local can only be named
+  // inside the body that is the chokepoint, so the synthetic site classifies inside and refutes nothing.
+  assert.equal(inner.refutation, "missing", inner.refutationAccount);
+  assert.equal(inner.verdict, "not run");
+  assert.match(inner.refutationAccount, /classified it a reference inside the chokepoint, not a bypass; the refutation is vacuous/);
   const innerElsewhere = await checkChokepoint(adapter, { protects: "INNER", chokepoint: "seal", ...hint });
   assert.equal(innerElsewhere.grade, "broken", "a function-local named under another chokepoint is referenced inside its own function, outside that chokepoint");
   assert.deepEqual(innerElsewhere.bypasses, [{ file: "pkg/store.py", line: 31, symbol: "closure" }]);
@@ -272,7 +276,8 @@ test("the Python refutation opens an unsaved document that imports and uses the 
   const closure = definitionOf(await adapter.resolve("closure", hint));
   const inside = await adapter.refute(inner, closure);
   assert.equal(inside.seen, true, inside.account);
-  assert.match(inside.account, /unsaved edit of pkg\/store\.py adding a use of INNER at line 31 \(inside the chokepoint's body/);
+  assert.match(inside.account, /unsaved edit of pkg\/store\.py adding a use of INNER at line 31 was reported as a reference/);
+  assert.deepEqual({ file: inside.site?.file, line: inside.site?.line }, { file: "pkg/store.py", line: 31 }, "the adapter reports the site; the check classifies it");
   assert.equal(readFileSync(join(root, "pkg/store.py"), "utf8"), before);
 });
 
@@ -324,8 +329,8 @@ test("a run over the Python fixture records the grade, the enforcer, and the ref
   assert.equal(byName.get("hidden set")!.enforcer, "Coherence's check at the edit and in CI");
   assert.equal(byName.get("inner set")!.grade, "closure-choked");
   assert.equal(byName.get("inner set")!.enforcer, "the interpreter");
-  assert.equal(byName.get("inner set")!.refutation, "automatic");
-  assert.match(formatRun(outcome), /chokepoint closure protects INNER: closure-choked \(enforced by the interpreter\) — pass/);
+  assert.equal(byName.get("inner set")!.refutation, "missing", "the interpreter enforces the closure rung; Coherence's own check cannot be made to fire there");
+  assert.match(formatRun(outcome), /chokepoint closure protects INNER: closure-choked \(enforced by the interpreter\) — not run/);
   assert.equal(outcome.record.instrument.language, "python");
   rmSync(join(root, ".coherence"), { recursive: true, force: true });
 });

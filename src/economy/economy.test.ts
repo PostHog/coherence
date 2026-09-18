@@ -130,8 +130,8 @@ test("economy: one hop out, one hop in, the spec of each component, and the inva
 
   const inward = await predictClosure(root, ["src/store/secrets.ts"], { adapter });
   const inFiles = Object.fromEntries(inward.entries.map((e) => [e.file, e.why]));
-  assert.deepEqual(inFiles["src/api/render.ts"], ["references seal (src/store/secrets.ts) at line 5 in render"]);
-  assert.deepEqual(inFiles["src/__tests__/secrets.test.ts"], ["test references seal (src/store/secrets.ts) at line 2 in t"]);
+  assert.deepEqual(inFiles["src/api/render.ts"], ["references seal (src/store/secrets.ts) at line 1", "references seal (src/store/secrets.ts) at line 5 in render"]);
+  assert.deepEqual(inFiles["src/__tests__/secrets.test.ts"], ["test references seal (src/store/secrets.ts) at line 1", "test references seal (src/store/secrets.ts) at line 2 in t"]);
   assert.deepEqual(inFiles["src/store/secrets.ts"], ["chokepoint seal of src/store/sealed egress", "given", "protected thing SECRET_COLUMNS of src/store/sealed egress"]);
   assert.deepEqual(inFiles["src/store/Store.spec.md"], ["invariant src/store/sealed egress reaches a given file", "spec of src/store, which holds src/store/secrets.ts"]);
   assert.ok(!("src/store/extra.ts" in inFiles), "a sibling nothing references is not in the closure");

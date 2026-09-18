@@ -767,7 +767,7 @@ export class PythonAdapter implements LanguageAdapter {
     return via;
   }
 
-  async refute(protectedThing: Definition, outsideOf: Definition | undefined): Promise<Refutation> {
+  async refute(protectedThing: Definition, _outsideOf: Definition | undefined): Promise<Refutation> {
     const client = await this.indexed();
     const dir = dirname(protectedThing.file);
     const folder = dir === "." ? "" : dir + "/";
@@ -784,7 +784,7 @@ export class PythonAdapter implements LanguageAdapter {
     } else {
       const entry = await this.entryAt(protectedThing);
       if (entry === undefined) return { seen: false, account: `no declaration at ${protectedThing.file}:${protectedThing.selection.line + 1}` };
-      if (entry.parents.some((k) => k === KIND_FUNCTION || k === KIND_METHOD)) return this.refuteInside(protectedThing, entry, outsideOf);
+      if (entry.parents.some((k) => k === KIND_FUNCTION || k === KIND_METHOD)) return this.refuteInside(protectedThing, entry);
       // A class member is reached through its class; a module member directly.
       importName = entry.path[0]!;
       access = entry.path.join(".");
@@ -801,11 +801,11 @@ export class PythonAdapter implements LanguageAdapter {
     const synthetic = `${where}coherence_refutation_${randomBytes(4).toString("hex")}.py`;
     const text = `from ${from} import ${importName}\ncoherence_refutation = ${access}\n`;
     const at: Position = { line: 1, character: text.split("\n")[1]!.lastIndexOf(access.split(".").pop()!) };
-    return this.probe(client, protectedThing, synthetic, text, at, outsideOf);
+    return this.probe(client, protectedThing, synthetic, text, at);
   }
 
   /** A function-local can only be named inside its function: the synthetic reference is the file with one line added right after the definition, at its indentation. */
-  private async refuteInside(protectedThing: Definition, entry: Flat, outsideOf: Definition | undefined): Promise<Refutation> {
+  private async refuteInside(protectedThing: Definition, entry: Flat): Promise<Refutation> {
     const original = readFileSync(join(this.root, protectedThing.file), "utf8");
     const lines = original.split(/\r?\n/);
     const at = protectedThing.range.start.line;
@@ -818,12 +818,12 @@ export class PythonAdapter implements LanguageAdapter {
     this.lineCache.set(protectedThing.file, edited.split("\n"));
     try {
       const sites = await this.references(protectedThing);
-      const seen = sites.some((s) => s.file === protectedThing.file && s.line === at + 2);
-      const insideChokepoint = outsideOf !== undefined && outsideOf.file === protectedThing.file && rangeContains(outsideOf.range, { line: at + 1, character: added.length - entry.symbol.name.length });
+      const hit = sites.find((s) => s.file === protectedThing.file && s.line === at + 2);
       return {
-        seen,
-        account: seen
-          ? `an unsaved edit of ${protectedThing.file} adding a use of ${entry.symbol.name} at line ${at + 2}${insideChokepoint ? " (inside the chokepoint's body, the only place the interpreter lets a function-local be named)" : ""} was reported as a reference`
+        seen: hit !== undefined,
+        ...(hit === undefined ? {} : { site: hit }),
+        account: hit !== undefined
+          ? `an unsaved edit of ${protectedThing.file} adding a use of ${entry.symbol.name} at line ${at + 2} was reported as a reference`
           : `an unsaved edit of ${protectedThing.file} adding a use of ${entry.symbol.name} at line ${at + 2} was not reported; the check is vacuous`,
       };
     } finally {
@@ -833,16 +833,16 @@ export class PythonAdapter implements LanguageAdapter {
     }
   }
 
-  private async probe(client: JsonRpcClient, protectedThing: Definition, synthetic: string, text: string, at: Position, outsideOf: Definition | undefined): Promise<Refutation> {
+  private async probe(client: JsonRpcClient, protectedThing: Definition, synthetic: string, text: string, at: Position): Promise<Refutation> {
     client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: "python", version: 1, text } });
     this.lineCache.set(synthetic, text.split("\n"));
     this.symbolCache.set(synthetic, []);
     try {
       const sites = await this.references(protectedThing);
       const hit = sites.find((s) => s.file === synthetic && s.line === at.line + 1);
-      const outside = outsideOf === undefined || outsideOf.file !== synthetic;
       return {
-        seen: hit !== undefined && outside,
+        seen: hit !== undefined,
+        ...(hit === undefined ? {} : { site: hit }),
         account: hit !== undefined
           ? `an unsaved document ${synthetic} importing and using the protected thing was reported as a reference at line ${hit.line}`
           : `an unsaved document ${synthetic} importing and using the protected thing was not reported among ${sites.length} references; the check is vacuous`,
