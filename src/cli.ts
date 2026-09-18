@@ -15,6 +15,7 @@
  *   coherence run [--session --agent]  the chokepoint check and the totality oracle pass, appended as one run
  *   coherence run --status             the latest verdict per enforcement, a view over every run
  *   coherence serve                    the warm language server for this project
+ *   coherence query <question> ...     the agent query: what Scope shows a human, as plain text
  *   coherence hook <event>             answer one harness event (event JSON on stdin)
  *   coherence hooks install --host <claude|codex>
  *   coherence hooks status
@@ -31,6 +32,7 @@ import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/g
 import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook } from "./lifecycle/hook.ts";
 import { formatStatus, HOSTS, install, isHost, status } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectGlossaries } from "./lifecycle/project.ts";
+import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
 import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
 import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
 
@@ -42,6 +44,7 @@ const USAGE = `usage:
 ${SPEC_USAGE}
 ${SCAFFOLD_USAGE}
 ${ENFORCEMENT_USAGE}
+${QUERY_USAGE}
   coherence hook <${HOOK_EVENTS.join("|")}>
   coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"]
   coherence hooks status
@@ -178,6 +181,8 @@ async function main(argv: string[]): Promise<number> {
       return runCommand(rest, io);
     case "serve":
       return serveCommand(rest, io);
+    case "query":
+      return queryCommand(rest, io);
     case "hook":
       return hookCommand(rest, root);
     case "hooks":
