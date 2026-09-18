@@ -71,12 +71,16 @@ function renderEnforcement(state: ShellState, invariant: SpecInvariant, enforcem
 
 function renderRefutation(invariant: SpecInvariant, runs: readonly RunRecord[]): Markup {
   const automatic = latestOf(invariant, runs).find((l) => l.form === "chokepoint" && l.refutation === "automatic");
+  const refused = latestOf(invariant, runs).find((l) => l.form === "chokepoint" && l.refutation === "refused by the language");
   const parts: Markup[] = [];
   for (const refutation of invariant.refutations) {
     parts.push(html`<li class="refutation" data-refutation="witnessed"><span class="refutation-word">witnessed ${refutation.date}</span> <span class="broke">${refutation.broke}</span> <span class="arrow">→</span> <span class="saw">${refutation.saw}</span></li>`);
   }
   if (automatic !== undefined) {
     parts.push(html`<li class="refutation" data-refutation="automatic"><span class="refutation-word">automatic from the run ${automatic.at.slice(0, 10)}</span> <span class="quiet">the instrument reported a synthetic reference from outside the chokepoint, so it would report a real one</span></li>`);
+  }
+  if (refused !== undefined) {
+    parts.push(html`<li class="refutation" data-refutation="refused"><span class="refutation-word">refused by the language, run ${refused.at.slice(0, 10)}</span> <span class="quiet">the compiler or interpreter refused a synthetic reference from outside the chokepoint; the refusal is the proof</span> </li>`);
   }
   if (parts.length === 0) {
     parts.push(html`<li class="refutation" data-refutation="missing"><span class="refutation-word">missing</span> <span class="quiet">no witnessed firing is written on the bullet and no run has refuted it automatically</span></li>`);
