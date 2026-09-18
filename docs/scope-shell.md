@@ -69,8 +69,11 @@ decided.
 
 `node src/cli.ts query <question> [args]` answers a fixed set of questions
 from the same state through `buildScopePage`: `invariants <path...>`,
-`relies-on <chokepoint>`, `status`, `component <folder>`, `order`. Plain
-text, a few hundred tokens at most, no query language.
+`relies-on <chokepoint>`, `status`, `component <folder>`, `order`; and
+`economy <path...>`, the economy prediction (what must be loaded to change
+these files safely), which goes to the economy's own closure through the
+warm instrument rather than to the page state. Plain text, a few hundred
+tokens at most, no query language.
 
 ## Adding a view
 

@@ -5,16 +5,28 @@
  *
  * The state comes from the Scope builder through its one chokepoint,
  * `buildScopePage`, so the answer draws on exactly the state the page would
- * embed for the same project; the document it also renders is dropped.
+ * embed for the same project; the document it also renders is dropped. The
+ * economy question is the one that needs the instrument: it goes to the
+ * economy's own exported closure, which reaches the warm server as the run
+ * does, and never to the page state.
  */
 
 import { basename, resolve } from "node:path";
 import type { Io } from "../../journal/cli.ts";
+import { economyFor } from "../../economy/cli.ts";
+import { formatClosure, type Closure } from "../../economy/closure.ts";
 import { COHERENCE_GLOSSARY } from "../../lifecycle/project.ts";
 import { buildScopePage } from "../scope/build.ts";
 import { answer, QUERY_USAGE } from "./query.ts";
 
 export { QUERY_USAGE };
+
+/** What the command line reaches beyond the page state; a test hands in a closure that needs no instrument. */
+export interface QueryDependencies {
+  economy: (root: string, paths: readonly string[]) => Promise<Closure>;
+}
+
+export const QUERY_DEPENDENCIES: QueryDependencies = { economy: economyFor };
 
 interface Parsed {
   positionals: string[];
@@ -40,7 +52,7 @@ function parse(argv: string[]): Parsed {
   return parsed;
 }
 
-export async function queryCommand(argv: string[], io: Io): Promise<number> {
+export async function queryCommand(argv: string[], io: Io, deps: QueryDependencies = QUERY_DEPENDENCIES): Promise<number> {
   let parsed: Parsed;
   try {
     parsed = parse(argv);
@@ -54,6 +66,14 @@ export async function queryCommand(argv: string[], io: Io): Promise<number> {
     return 64;
   }
   const root = resolve(parsed.root ?? io.cwd);
+  if (question === "economy") {
+    if (args.length === 0) {
+      io.err(`query economy: give at least one path\n${QUERY_USAGE}`);
+      return 64;
+    }
+    io.out(formatClosure(await deps.economy(root, args)));
+    return 0;
+  }
   const { state } = await buildScopePage({ root, glossaryPath: COHERENCE_GLOSSARY, project: basename(root) });
   const result = answer(state, question, args, { session: parsed.session });
   if (result.code === 0) io.out(result.text);

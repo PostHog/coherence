@@ -9,6 +9,9 @@
  *   status                 structural defects, open requirements, escalations
  *   component <folder>     one component and its bullets
  *   order                  the session's active work order, as the journal folds it
+ *   economy <path...>      what must be loaded to change these files safely: the
+ *                          economy prediction, which the command line answers through
+ *                          the economy's own closure and the warm instrument
  *
  * Fixed questions first; no query language.
  */
@@ -26,7 +29,7 @@ import {
 import { renderOrder } from "../../journal/workVerbs.ts";
 import type { ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
 
-export const QUESTIONS = ["invariants", "relies-on", "status", "component", "order"] as const;
+export const QUESTIONS = ["invariants", "relies-on", "status", "component", "order", "economy"] as const;
 export type Question = (typeof QUESTIONS)[number];
 
 export function isQuestion(value: string): value is Question {
@@ -39,6 +42,7 @@ export const QUERY_USAGE = [
   "  query status                   structural defects, open requirements, escalations awaiting a human",
   "  query component <folder>       one component: intent, counts, bullets",
   "  query order [--session <id>]   the active work order the session owns, folded from its records, with what binds to it",
+  "  query economy <path...>        what must be loaded to change these files safely: the economy prediction, through the instrument",
 ].join("\n");
 
 export interface Answer {
@@ -236,6 +240,8 @@ export function answer(state: ShellState, question: string, args: string[], opti
       return answerComponent(state, args);
     case "order":
       return answerOrder(state, options.session);
+    case "economy":
+      return { text: `query economy is answered from the instrument, not from the page state; run it from the command line: query economy <path...>\n${QUERY_USAGE}`, code: 64 };
     default:
       return { text: `query: unknown question "${question}"\n${QUERY_USAGE}`, code: 64 };
   }
