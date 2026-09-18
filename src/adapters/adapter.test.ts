@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isTestPath, parseName, rangeContains } from "./adapter.ts";
-import { PYTHON_LADDER, PythonAdapter } from "./python.ts";
+import { PYTHON_LADDER, PythonAdapter, ruleCovers, rulesNaming, isPythonImportSite, type CheckerFacts } from "./python.ts";
 import { TYPESCRIPT_LADDER, isImportSite } from "./typescript.ts";
 
 test("a spec value reads as a bare symbol, a symbol in a file, a module path, or prose", () => {
@@ -49,14 +49,47 @@ test("rangeContains is inclusive at both ends", () => {
   assert.equal(rangeContains(range, { line: 1, character: 40 }), false);
 });
 
-test("the grade ladder's top rung is adapter-defined: TypeScript enforces visibility, Python does not", async () => {
+test("the grade ladder's top rung is adapter-defined: TypeScript enforces visibility, Python does not", () => {
   assert.equal(TYPESCRIPT_LADDER.top, "visibility-choked");
   assert.equal(PYTHON_LADDER.top, "reference-choked");
   assert.match(PYTHON_LADDER.because, /convention/);
-  const python = new PythonAdapter("/nowhere");
-  const ready = await python.ready();
-  assert.equal(ready.ok, false);
-  assert.match(ready.reason, /not yet/);
-  const visibility = await python.visibility({ name: "x", kind: "symbol", file: "x.py", range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }, selection: { line: 0, character: 0 } });
-  assert.equal(visibility.enforced, false);
+  assert.deepEqual(TYPESCRIPT_LADDER.rungs.map((r) => r.grade), ["visibility-choked", "reference-choked"]);
+  assert.deepEqual(PYTHON_LADDER.rungs.map((r) => r.grade), ["closure-choked", "checker-choked", "reference-choked", "convention"]);
+  assert.equal(PYTHON_LADDER.rungs.find((r) => r.grade === "closure-choked")!.enforcer, "the interpreter");
+  assert.equal(PYTHON_LADDER.rungs.find((r) => r.grade === "convention")!.enforcer, "nobody");
+  assert.equal(PYTHON_LADDER.whenVacuous, "convention", "a Python chokepoint whose refutation is vacuous stands on the convention alone");
+  assert.equal(TYPESCRIPT_LADDER.whenVacuous, undefined);
+  assert.ok(new PythonAdapter("/nowhere").ladder === PYTHON_LADDER);
+});
+
+test("a Python import statement is told from a use, across wrapped lines", () => {
+  const lines = ["from pkg.store import SECRET_COLUMNS, seal", "", "def render(pattern):", "    leaked = SECRET_COLUMNS[pattern]"];
+  assert.equal(isPythonImportSite(lines, 0, 22), true);
+  assert.equal(isPythonImportSite(lines, 3, 13), false);
+  const wrapped = ["from pkg.store import (", "    SECRET_COLUMNS,", "    seal,", ")", "x = SECRET_COLUMNS"];
+  assert.equal(isPythonImportSite(wrapped, 1, 4), true);
+  assert.equal(isPythonImportSite(wrapped, 4, 4), false);
+  const backslash = ["from pkg.store import SECRET_COLUMNS, \\", "    seal", "y = seal"];
+  assert.equal(isPythonImportSite(backslash, 1, 4), true);
+  assert.equal(isPythonImportSite(backslash, 2, 4), false);
+  assert.equal(isPythonImportSite(["import pkg.store", "z = pkg.store.SECRET_COLUMNS"], 1, 14), false, "a use on the line after an import is a use");
+});
+
+test("a spec value with a trailing slash reads as a package module, and pytest file names are test paths", () => {
+  assert.deepEqual(parseName("posthog/query_cache/"), { form: "module", path: "posthog/query_cache" });
+  assert.equal(parseName("../x/").form, "prose");
+  assert.equal(isTestPath("posthog/query_cache/test_storage.py", []), true);
+  assert.equal(isTestPath("posthog/query_cache/storage_test.py", []), true);
+  assert.equal(isTestPath("posthog/query_cache/storage.py", []), false);
+  assert.equal(isTestPath("posthog/query_cache/test/test_storage.py", ["test"]), true);
+});
+
+test("the project's checkers are read from its configuration: Pyright's private-usage rule, mypy's presence, import-linter rules", () => {
+  assert.equal(ruleCovers("products.*.backend", "products.alerts.backend.presentation.views"), true);
+  assert.equal(ruleCovers("products.**", "products.alerts.backend"), true);
+  assert.equal(ruleCovers("posthog.query_cache", "posthog.query_cache.storage"), true);
+  assert.equal(ruleCovers("posthog.query_cache", "posthog.caching.storage"), false);
+  const facts: CheckerFacts = { pyrightConfig: undefined, privateUsageIsError: false, mypyConfig: undefined, importLinterConfig: "pyproject.toml [tool.importlinter]", importRules: [{ name: "presentation must use facade", text: 'source_modules = ["products.*.backend.presentation"]\nforbidden_modules = [\n    "products.*.backend",\n]' }] };
+  assert.deepEqual(rulesNaming(facts, "products.alerts.backend.models"), ["presentation must use facade"]);
+  assert.deepEqual(rulesNaming(facts, "posthog.query_cache.storage"), []);
 });

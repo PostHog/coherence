@@ -26,6 +26,7 @@
     "coherence": "src/cli.ts"
   },
   "optionalDependencies": {
+    "pyright": "^1.1.414",
     "typescript": "^5.9.3",
     "typescript-language-server": "^5.3.0"
   }

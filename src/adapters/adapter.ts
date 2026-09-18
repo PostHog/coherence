@@ -13,8 +13,14 @@
  *   refute       prove the instrument sees a synthetic reference from
  *                outside the chokepoint, without touching disk
  *
- * The grade ladder's top rung is the adapter's to name: TypeScript enforces
- * visibility (not exported means unreachable), Python does not.
+ * The grade ladder is the adapter's to name, rung by rung, each rung a fact
+ * the adapter verifies and the name of who enforces it: TypeScript's compiler
+ * refuses a reference to a symbol not exported (visibility-choked); Python's
+ * interpreter refuses only a name that never becomes a module attribute
+ * (closure-choked), a checker the project runs may refuse private usage
+ * (checker-choked), and otherwise Coherence's own check is the enforcer
+ * (reference-choked), with the underscore prefix and the module export list
+ * as conventions enforced by nobody.
  */
 
 /** A position as the protocol counts it: zero-based line and character. */
@@ -65,7 +71,27 @@ export interface Visibility {
   visible: boolean;
   /** What the adapter read to decide, for the report. */
   evidence: string;
+  /**
+   * The rung a clean chokepoint earns on this evidence, with who enforces it,
+   * when the adapter's ladder decides by more than exportedness (Python).
+   * Absent, the check applies the two-rung rule: visibility-choked when the
+   * language enforces visibility and the thing is not visible, else
+   * reference-choked.
+   */
+  rung?: Rung;
 }
+
+/** One rung of a ladder: the grade, who enforces it, and the fact that earns it. */
+export interface Rung {
+  grade: ChokedGrade;
+  /** Who refuses a bypass at this rung: the compiler, the interpreter, a checker the project runs, Coherence's own check, or nobody. */
+  enforcer: string;
+  /** The fact the adapter verified, or the meaning of the rung when listed on a ladder. */
+  fact: string;
+}
+
+/** The grades a clean chokepoint can earn, strongest first. */
+export type ChokedGrade = "closure-choked" | "visibility-choked" | "checker-choked" | "reference-choked" | "convention";
 
 export interface Refutation {
   /** Whether the synthetic site appeared among the references. */
@@ -74,12 +100,16 @@ export interface Refutation {
   account: string;
 }
 
-/** The rung the adapter's language can reach, with the reason. */
+/** The rungs the adapter's language can reach, with the reason for the top. */
 export interface Ladder {
   /** The rung a clean chokepoint earns when the protected thing is not visible outside its module. */
   top: "visibility-choked" | "reference-choked";
   /** Why the top rung is what it is, in one sentence. */
   because: string;
+  /** Every rung the adapter can grade, strongest first, each naming its enforcer. */
+  rungs: readonly Rung[];
+  /** The rung a chokepoint stands on when the instrument could not see the synthetic reference, so Coherence's own check enforces nothing; absent keeps the earned grade with the verdict not run. */
+  whenVacuous?: ChokedGrade;
 }
 
 export interface LanguageAdapter {
@@ -89,7 +119,8 @@ export interface LanguageAdapter {
   ready(): Promise<{ ok: true } | { ok: false; reason: string }>;
   resolve(name: string, hint: ResolveHint): Promise<Resolved>;
   references(definition: Definition): Promise<ReferenceSite[]>;
-  visibility(definition: Definition): Promise<Visibility>;
+  /** The chokepoint is passed so a ladder whose top rung depends on where the thing is defined can decide. */
+  visibility(definition: Definition, chokepoint?: Definition): Promise<Visibility>;
   testFilter(via: string): string;
   /** Open an unsaved document outside `outsideOf` that references `protected`, ask for references, confirm, close. */
   refute(protectedThing: Definition, outsideOf: Definition | undefined): Promise<Refutation>;
@@ -110,6 +141,7 @@ export type Resolved =
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const IN_FILE = /^([A-Za-z_$][A-Za-z0-9_$]*)\s+in\s+(\S+)$/;
 const MODULE_PATH = /^[A-Za-z0-9_./@-]+\.[A-Za-z]+$/;
+const PACKAGE_PATH = /^[A-Za-z0-9_./@-]+\/$/;
 
 /** How a spec value reads before any instrument is asked. */
 export function parseName(value: string): NameForm {
@@ -118,6 +150,8 @@ export function parseName(value: string): NameForm {
   const inFile = IN_FILE.exec(text);
   if (inFile !== null) return { form: "symbol", name: inFile[1]!, fileHint: inFile[2]! };
   if (MODULE_PATH.test(text) && text.includes("/")) return { form: "module", path: text };
+  // A folder with a trailing slash is a package; the adapter decides which file is its module.
+  if (PACKAGE_PATH.test(text) && !text.includes("..")) return { form: "module", path: text.replace(/\/+$/, "") };
   return { form: "prose", text };
 }
 
@@ -129,10 +163,10 @@ export function rangeContains(range: Range, position: Position): boolean {
   return !positionBefore(position, range.start) && !positionBefore(range.end, position);
 }
 
-/** Whether a project-relative path lies in a test folder or is a test file by name. */
+/** Whether a project-relative path lies in a test folder or is a test file by name (`.test.ts`, `.spec.ts`, pytest's `test_*.py` and `*_test.py`). */
 export function isTestPath(file: string, testFolders: readonly string[]): boolean {
   const parts = file.split("/");
   if (parts.some((part) => testFolders.includes(part))) return true;
   const base = parts[parts.length - 1] ?? "";
-  return /\.(test|spec)\.[a-z]+$/.test(base);
+  return /\.(test|spec)\.[a-z]+$/.test(base) || /^test_.*\.py$/.test(base) || /_test\.py$/.test(base);
 }

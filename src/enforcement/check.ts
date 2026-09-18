@@ -20,7 +20,7 @@
  * vacuous and says so.
  */
 
-import { isTestPath, rangeContains, type Definition, type LanguageAdapter, type ReferenceSite } from "../adapters/adapter.ts";
+import { isTestPath, rangeContains, type Definition, type LanguageAdapter, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
 import type { Bypass, Grade, RefutationState, Verdict } from "./record.ts";
 
 export type SiteClass = "inside" | "import" | "test" | "bypass";
@@ -34,6 +34,8 @@ export interface ChokepointResult {
   input: ChokepointInput;
   verdict: Verdict;
   grade: Grade;
+  /** Who refuses a bypass at the graded rung, for a choked grade. */
+  enforcer?: string;
   refutation: RefutationState;
   /** What the refutation did and saw. */
   refutationAccount: string;
@@ -57,10 +59,17 @@ export interface ChokepointInput {
 export function classifySite(site: ReferenceSite, protectedThing: Definition, chokepoint: Definition, testFolders: readonly string[]): SiteClass {
   if (site.isImport) return "import";
   const position = { line: site.line - 1, character: site.character };
-  if (chokepoint.kind === "module" ? site.file === chokepoint.file : site.file === chokepoint.file && rangeContains(chokepoint.range, position)) return "inside";
-  if (protectedThing.kind === "module" && site.file === protectedThing.file) return "inside";
+  if (chokepoint.kind === "module" ? withinModule(site.file, chokepoint.file) : site.file === chokepoint.file && rangeContains(chokepoint.range, position)) return "inside";
+  if (protectedThing.kind === "module" && withinModule(site.file, protectedThing.file)) return "inside";
   if (isTestPath(site.file, testFolders)) return "test";
   return "bypass";
+}
+
+/** Whether a file is the module, or, when the module is a package's __init__, one of the package's own files. */
+function withinModule(file: string, moduleFile: string): boolean {
+  if (file === moduleFile) return true;
+  const init = /^(.*)\/__init__\.py$/.exec(moduleFile);
+  return init !== null && file.startsWith(init[1] + "/");
 }
 
 const NOT_CHOKEABLE_NOTE = "the totality oracle form (over + via) is the compromise where structure is unavailable";
@@ -105,7 +114,7 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
   const bypasses: Bypass[] = sites.filter((s) => s.class === "bypass").map((s) => ({ file: s.file, line: s.line, symbol: s.symbol ?? "module top level" }));
   const files = [...new Set([protectedThing.file, chokepoint.file, ...sites.map((s) => s.file)])].sort();
 
-  const visibility = await adapter.visibility(protectedThing);
+  const visibility = await adapter.visibility(protectedThing, chokepoint);
   const refutation = await adapter.refute(protectedThing, chokepoint);
   const refutationState: RefutationState = refutation.seen ? "automatic" : "missing";
 
@@ -126,13 +135,17 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
       reason: `${bypasses.length} reference${bypasses.length === 1 ? "" : "s"} to ${protectedThing.name} outside ${chokepoint.name}: ${bypasses.map((b) => `${b.file}:${b.line} in ${b.symbol}`).join(", ")}`,
     };
   }
-  const choked: Grade = visibility.enforced && !visibility.visible && adapter.ladder.top === "visibility-choked" ? "visibility-choked" : "reference-choked";
-  const rung = choked === "visibility-choked" ? "not visible outside its module and every reference inside the chokepoint" : `visible outside its module (${visibility.evidence}); every reference in the project is inside the chokepoint`;
+  const earned = rungFor(adapter, visibility);
+  // When the instrument could not see the synthetic site, Coherence's own check enforces nothing: a ladder may name the rung that is left.
+  const vacuousRung = !refutation.seen && adapter.ladder.whenVacuous !== undefined ? adapter.ladder.rungs.find((r) => r.grade === adapter.ladder.whenVacuous) : undefined;
+  const graded: Rung = vacuousRung === undefined ? earned : { ...vacuousRung, fact: `the instrument could not see the synthetic reference, so Coherence's check enforces nothing here and only the convention stands (${visibility.evidence})` };
+  const tests = counts.test > 0 ? `; ${counts.test} test reference${counts.test === 1 ? "" : "s"}` : "";
   const vacuous = refutation.seen ? "" : `; refutation missing: ${refutation.account}`;
   return {
     input,
     verdict: refutation.seen ? "pass" : "not run",
-    grade: choked,
+    grade: graded.grade,
+    enforcer: graded.enforcer,
     refutation: refutationState,
     refutationAccount: refutation.account,
     protectedThing,
@@ -142,6 +155,16 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
     counts,
     visibility: visibility.evidence,
     files,
-    reason: `${protectedThing.name} is ${rung}${counts.test > 0 ? `; ${counts.test} test reference${counts.test === 1 ? "" : "s"}` : ""}${vacuous}`,
+    reason: `${protectedThing.name} is ${graded.grade}, enforced by ${graded.enforcer}: ${graded.fact}${tests}${vacuous}`,
   };
+}
+
+/** The rung a clean chokepoint earns: the adapter's own verdict when its visibility carries one, else the two-rung rule over exportedness. */
+function rungFor(adapter: LanguageAdapter, visibility: Visibility): Rung {
+  if (visibility.rung !== undefined) return visibility.rung;
+  const listed = (grade: Grade): Rung | undefined => adapter.ladder.rungs.find((r) => r.grade === grade);
+  if (visibility.enforced && !visibility.visible && adapter.ladder.top === "visibility-choked") {
+    return { grade: "visibility-choked", enforcer: listed("visibility-choked")?.enforcer ?? "the compiler", fact: `not visible outside its module (${visibility.evidence}) and every reference inside the chokepoint` };
+  }
+  return { grade: "reference-choked", enforcer: listed("reference-choked")?.enforcer ?? "Coherence's check at the edit and in CI", fact: `visible outside its module (${visibility.evidence}); every reference in the project is inside the chokepoint` };
 }

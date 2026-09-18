@@ -44,6 +44,10 @@ const SKIPPED_FOLDERS = new Set(["node_modules", ".git", "dist", ".coherence", "
 export const TYPESCRIPT_LADDER: Ladder = {
   top: "visibility-choked",
   because: "a symbol not exported from its module cannot be referenced from another module; the compiler refuses it",
+  rungs: [
+    { grade: "visibility-choked", enforcer: "the compiler", fact: "the protected thing is not exported from its module, so no other module can reference it" },
+    { grade: "reference-choked", enforcer: "Coherence's check at the edit and in CI", fact: "the protected thing is exported, and every resolved reference in the project is inside the chokepoint" },
+  ],
 };
 
 /** Where the language server binary is, or undefined with the places looked. */
@@ -460,7 +464,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     return { enforced: true, visible: false, evidence: `${file}:${declarationLine + 1} declares ${name} without export and no export list names it` };
   }
 
-  async visibility(definition: Definition): Promise<Visibility> {
+  async visibility(definition: Definition, _chokepoint?: Definition): Promise<Visibility> {
     if (definition.kind === "module") {
       return { enforced: true, visible: true, evidence: `${definition.file} is a module; any file may import it` };
     }

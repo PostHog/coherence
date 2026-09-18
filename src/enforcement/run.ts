@@ -160,6 +160,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
           entry: entryOf(component, invariant.name, "chokepoint", {
             verdict: result.verdict,
             grade: result.grade,
+            ...(result.enforcer === undefined ? {} : { enforcer: result.enforcer }),
             refutation: result.refutation,
             bypasses: result.bypasses,
             testReferences: result.counts.test,
