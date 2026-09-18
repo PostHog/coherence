@@ -24,8 +24,9 @@ resolve, and the check says so.
 
 The first adapter drives `typescript-language-server` over the language
 server protocol on stdio. Exportedness is not in the protocol, so the
-adapter reads the declaration text. The second adapter, for Pyright, is a
-stub that names its ladder.
+adapter reads the declaration text. The second drives `pyright-langserver`
+the same way; a package folder (`posthog/query_cache/`) resolves as a
+module through its `__init__.py`.
 
 ## The ladder
 
@@ -41,10 +42,10 @@ bypass.
 - **not chokeable**: the protected thing is not a symbol or a module; the
   totality oracle form is the compromise.
 
-The top rung is adapter-defined. TypeScript enforces visibility, so its top
-is visibility-choked. The second adapter's language does not: an underscore
-prefix and a module's `__all__` list are conventions, so its chokepoints
-top out at reference-choked.
+The rungs are adapter-defined, each a fact the adapter verifies, and the
+grade names who enforces it. TypeScript enforces visibility, so its top is
+visibility-choked (the compiler). Python's ladder is in its own section
+below.
 
 ## Refutation
 
@@ -55,6 +56,38 @@ synthetic site appears; nothing touches disk. If the instrument cannot see
 the site, the check is vacuous: the run says so and the bullet stays a
 requirement. A totality oracle must be witnessed by hand and written on the
 bullet as `refuted:`.
+
+## Python
+
+Python enforces no visibility, so its ladder has four rungs, each a fact
+the adapter verifies, and the grade names the enforcer:
+
+- **closure-choked** (the interpreter): the protected thing is a
+  function-local inside the chokepoint's body, never a module attribute,
+  so nothing outside can import or name it.
+- **checker-choked** (a checker the project runs): the name is
+  underscore-prefixed and `pyrightconfig.json` or pyproject
+  `[tool.pyright]` makes `reportPrivateUsage` an error; or, for a
+  protected module, an import-linter rule in `.importlinter` or
+  `[tool.importlinter]` names it. A project on mypy has no such rule, and
+  the evidence says so.
+- **reference-choked** (Coherence's check at the edit and in CI): the top
+  rung when neither holds.
+- **convention** (nobody): the underscore prefix or `__all__` exclusion
+  alone; evidence, and the rung a vacuous refutation drops to.
+
+Pyright indexes the whole workspace and the adapter never narrows it: a
+Python reference can sit in any file, so a narrower root or include list
+only proves the absence of a bypass inside what it sees, and Pyright
+ignores a settings-level include under a project config anyway. On
+PostHog (19,693 files) enumeration takes 2 s and 350 MB, the first
+references query 3 s, later ones 0.5 s. `workspace/symbol` is never used
+(30 s, 3.5 GB there); a bare name resolves by a text scan, then
+`documentSymbol`.
+
+The totality oracle pass runs pytest with `--junitxml={out}` and
+`testFilterForm: "pytest"`: names go to `-k` joined with `or`, and the
+JUnit report (or pytest-json-report's JSON) maps back by test name.
 
 ## The run and its view
 

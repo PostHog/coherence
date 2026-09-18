@@ -955,6 +955,10 @@
       },
       "aliases": [
         "adapter"
+      ],
+      "not_to_be_confused_with": [
+        "Pyright: the Python language server the second adapter drives over the protocol; the instrument on the far side of the seam, not the adapter",
+        "Python: the second language an adapter serves; its ladder is the adapter's, since the language itself enforces no visibility"
       ]
     },
     {
