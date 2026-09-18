@@ -3,18 +3,32 @@
 The reading: one surface projecting the model for a human, in six views: Glossary, Components, Invariants, Reliance, Runs, Journal; and the agent query, the same state as plain text.
 
 ## invariants
-- deterministic build: The same glossary in produces a byte-identical page out.
+- deterministic build: The same inputs in produce a byte-identical page out, and the inputs are all of them: both glossaries, the spec tree, the run records, the journal, and the work store.
   protects: loadState
   chokepoint: buildScopePage
-  over: every byte of the page for a given pair of glossaries
-  via: the build is deterministic: the same glossary in, byte-identical page out
-  because: the page is derived from the glossary and never stored as truth; a build that differed for the same input would make the derived page look like it carried something of its own, and the state is loaded once by the one function that renders the document
+  over: every byte of the page, against every input it reads: both glossaries, every spec file, every run record, every journal record, and every work record
+  via: the build is deterministic: the same glossaries, specs, runs, journal and work in, byte-identical page out
+  because: the page is derived and never stored as truth; a build that differed for the same input would make the derived page look like it carried something of its own. Naming only the glossaries was false in the direction that matters: appending one journal record changes the page, so a reader who trusted the sentence would have read a stale page as a fresh one. Its totality oracle appends to each store in turn and asserts both halves, that the page moved and that it is identical again
   crossing: project-source -> reading
-  refuted: appended the clock to the page title in buildScopePage -> "the build is deterministic: the same glossary in, byte-identical page out" went red in check.test.ts; restored, green (2026-09-17)
+  refuted: appended the clock to the page title in buildScopePage -> "the build is deterministic: the same glossaries, specs, runs, journal and work in, byte-identical page out" went red in check.test.ts; restored, green (2026-09-17). The narrower sentence naming the glossaries alone was falsified by appending one journal record to the fixture and seeing the page change (2026-09-18)
   kinds: encoding
   checklist: semantic-preservation declared as embedded state unchanged
   checklist: canonical-encoding declared as deterministic build
   checklist: key-rotation-compatibility dismissed: nothing is encrypted
+- no stored derivation: The state stores nothing it derives from records it already holds: the latest verdict per enforcement, what passed, and what failed are read from the run records at render.
+  over: every bullet of every component in the state, against the run records in the same state
+  via: the state stores no copy of what it derives: the latest verdicts live in the run records and nowhere else
+  because: data is destiny, which this component's own reading cites: two stored copies of one fact are an invitation to disagreement, and the page must never show a verdict its records do not carry. The copies were about a fifth of the embedded state, so removing them is cheaper to ship as well as truer; determinism is unaffected because a derivation over a sorted record list is a function
+  crossing: record -> reading
+  refuted: embedded each bullet's latest, verified and defects beside the run records they came from -> "the state stores no copy of what it derives: the latest verdicts live in the run records and nowhere else" went red in check.test.ts, the stored keys present on every bullet; restored, green (2026-09-18)
+  kinds: none
+- reliance is not the file list: The Reliance view and the agent query say what the run record carries, files the check touched, and how many of them are reference sites the record actually places; neither presents the file list as reliance.
+  over: every chokepoint invariant with a latest check, on the view and in the agent query
+  via: every view renders from state: every component, invariant, run, and journal record in the fixture is on its view
+  because: the glossary defines reliance as the components whose code references the chokepoint, and a check's file list holds the definition of the protected thing, the chokepoint's own module, imports and tests as well; reading it as reliance overstates who depends on an invariant, which is exactly the number a human weighs when acknowledging a retirement. Only the bypasses are placed by line and symbol, so only they are named as sites, and the view says a run entry carrying every classified site is what would close the gap
+  crossing: record -> reading
+  refuted: counted the whole file list as relying components and files -> "every view renders from state: every component, invariant, run, and journal record in the fixture is on its view" went red in check.test.ts at the reliance card, which claimed reliance where the record carries files; restored, green (2026-09-18)
+  kinds: none
 - self-contained page: The page loads nothing from outside: no external src, href, url() or @import.
   over: every src, href, url() and @import in the page
   via: the page is self-contained: no external src, href, url() or @import

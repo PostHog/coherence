@@ -5,10 +5,14 @@
 
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import { predictClosure } from "../../economy/closure.ts";
+import { economyFor } from "../../economy/cli.ts";
+import type { Io } from "../../journal/cli.ts";
 import { COHERENCE_GLOSSARY } from "../../lifecycle/project.ts";
 import { buildScopePage } from "../scope/build.ts";
 import { makeFixture, type Fixture } from "../scope/check-fixture.ts";
 import type { ShellState } from "../scope/model.ts";
+import { QUERY_DEPENDENCIES, queryCommand } from "./cli.ts";
 import { answer, QUESTIONS } from "./query.ts";
 
 let fixture: Fixture;
@@ -44,7 +48,11 @@ test("query relies-on lists the components whose files reference the chokepoint'
   assert.ok(result.text.startsWith(`${fixture.names.chokepoint} protects ${fixture.names.protects}`));
   assert.ok(result.text.includes("owner src/store (Store)"), "the owning component is marked");
   assert.ok(result.text.includes("src/api (Api): src/api/handler.ts"), "the relying component and its file are named");
-  assert.ok(result.text.includes(`bypass ${fixture.names.bypass.file}:${fixture.names.bypass.line} in ${fixture.names.bypass.symbol}`));
+  assert.ok(
+    result.text.includes(`reference site ${fixture.names.bypass.file}:${fixture.names.bypass.line} in ${fixture.names.bypass.symbol} (a bypass: outside the chokepoint)`),
+    "a bypass is the one reference site the record places",
+  );
+  assert.match(result.text, /the record carries files: a file list holds the definition of the protected thing/, "and the answer says what the file list is not");
   assert.ok(answer(state, "relies-on", ["nothing"]).text.startsWith("no bullet names"));
   assert.ok(result.text.length < FEW_HUNDRED_TOKENS);
 });
@@ -74,15 +82,42 @@ test("query component answers with intent, counts, bullets, and an unmeasured ma
   assert.ok(result.text.length < FEW_HUNDRED_TOKENS);
 });
 
-test("query order answers the session's active work order, and says when there are none", () => {
-  const mine = answer(state, "order", [], { session: fixture.names.session });
+test("query order answers with the order the journal folds from the store: its content and current state, never a state-change record; a completed order is not active", () => {
+  const n = fixture.names;
+  const mine = answer(state, "order", [], { session: n.session });
   assert.equal(mine.code, 0);
-  assert.ok(mine.text.startsWith(`${fixture.names.workOrder}  active`));
-  assert.ok(mine.text.includes("objective: make every write pass through one door"));
+  assert.ok(mine.text.startsWith(`${n.workOrder}  active  owner ${n.session}\n`), mine.text);
+  assert.ok(mine.text.includes("  objective: make every write pass through one door\n  success:   the chokepoint check passes\n  boundary:  src/store\n"), "the four things an order is");
+  assert.ok(mine.text.includes(`${n.workMove}  -> active  fixture: taking it up`), "the move is history under the order");
+  assert.ok(!mine.text.startsWith(n.workMove), "a move record is never answered as an order");
+  assert.ok(!mine.text.includes(`${n.completedOrder}  active`) && !mine.text.includes("retire the cache"), "a completed order is not active");
+  assert.ok(mine.text.includes("journal records bound: 0") && mine.text.includes("runs bound: 0"), "what binds to the order is said");
   const other = answer(state, "order", [], { session: "someone-else" });
-  assert.ok(other.text.startsWith("no active work order for session someone-else"));
+  assert.equal(other.text, "no active work order for session someone-else (2 on record, 1 active)");
   const absent = answer({ ...state, journal: { ...state.journal, work: { kind: "absent", because: "no folder" } } }, "order", []);
   assert.equal(absent.text, "no work orders: no folder");
+});
+
+test("query economy answers what must be loaded to change the given files safely, through the economy's exported closure", async () => {
+  assert.ok((QUESTIONS as readonly string[]).includes("economy"), "the fixed set names the economy prediction");
+  assert.equal(QUERY_DEPENDENCIES.economy, economyFor, "the command line reaches the closure through the economy's one exported door");
+  const printed: string[] = [];
+  const io: Io = { cwd: fixture.root, out: (line) => printed.push(line), err: (line) => printed.push(line) };
+  const none = await queryCommand(["economy"], io);
+  assert.equal(none, 64, "no path is refused");
+  assert.match(printed.join("\n"), /query economy: give at least one path/);
+  printed.length = 0;
+  // The instrument is not spawned under test: the closure is the economy's own, reached with no adapter, and says so.
+  const code = await queryCommand(["economy", "src/store/write.ts"], io, { economy: (root, paths) => predictClosure(root, paths) });
+  assert.equal(code, 0, printed.join("\n"));
+  const text = printed.join("\n");
+  assert.match(text, /^economy of a change to src\/store\/write\.ts: \d+ files?, ~\d+ tokens/);
+  assert.ok(text.includes("src/store/Store.spec.md"), "the spec of the component holding the file is in the closure");
+  assert.match(text, /hops skipped: instrument unavailable/);
+  assert.ok(text.length < FEW_HUNDRED_TOKENS * 2);
+  const hint = answer(state, "economy", ["src/store/write.ts"]);
+  assert.equal(hint.code, 64, "the page state cannot answer it; the command line does, through the instrument");
+  assert.match(hint.text, /query economy/);
 });
 
 test("an unknown question is refused with the fixed set", () => {

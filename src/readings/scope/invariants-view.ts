@@ -6,13 +6,13 @@
  * searched by text. A pure function from the shell state to markup.
  */
 
-import { allInvariants, componentId, invariantId, isKept, latestRun, plural, relianceId, stamp, textMatches } from "./derive.ts";
+import { allInvariants, componentId, defectsOf, invariantId, isKept, latestOf, latestRun, plural, relianceId, stamp, textMatches } from "./derive.ts";
 import { html, type Markup } from "./html.ts";
-import type { LatestEntry, LifecycleState, ShellState, SpecEnforcement, SpecInvariant, TrustLevel } from "./model.ts";
+import type { LatestEntry, LifecycleState, RunRecord, ShellState, SpecEnforcement, SpecInvariant, TrustLevel } from "./model.ts";
 
 const STATES: readonly LifecycleState[] = ["requirement", "invariant", "structural defect"];
 
-function invariantMatches(invariant: SpecInvariant, query: string): boolean {
+function invariantMatches(invariant: SpecInvariant, query: string, runs: readonly RunRecord[]): boolean {
   return textMatches(
     query,
     invariant.name,
@@ -22,7 +22,7 @@ function invariantMatches(invariant: SpecInvariant, query: string): boolean {
     invariant.state,
     invariant.enforcements.map((e) => (e.form === "chokepoint" ? `${e.chokepoint} ${e.protects}` : `${e.via} ${e.over}`)),
     invariant.crossing === undefined ? undefined : `${invariant.crossing.from} ${invariant.crossing.to}`,
-    invariant.latest.flatMap((l) => l.bypasses.map((b) => `${b.file} ${b.symbol}`)),
+    latestOf(invariant, runs).flatMap((l) => l.bypasses.map((b) => `${b.file} ${b.symbol}`)),
   );
 }
 
@@ -55,7 +55,7 @@ function renderVerdict(state: ShellState, entry: LatestEntry | undefined): Marku
 }
 
 function renderEnforcement(state: ShellState, invariant: SpecInvariant, enforcement: SpecEnforcement): Markup {
-  const entry = invariant.latest.find((l) => l.form === enforcement.form);
+  const entry = latestOf(invariant, state.runs.records).find((l) => l.form === enforcement.form);
   if (enforcement.form === "chokepoint") {
     return html`<li class="enforcement" data-form="chokepoint">
       <p><span class="label">chokepoint</span> <code>${enforcement.chokepoint}</code> <span class="label">protects</span> <code>${enforcement.protects}</code></p>
@@ -69,8 +69,8 @@ function renderEnforcement(state: ShellState, invariant: SpecInvariant, enforcem
   </li>`;
 }
 
-function renderRefutation(invariant: SpecInvariant): Markup {
-  const automatic = invariant.latest.find((l) => l.form === "chokepoint" && l.refutation === "automatic");
+function renderRefutation(invariant: SpecInvariant, runs: readonly RunRecord[]): Markup {
+  const automatic = latestOf(invariant, runs).find((l) => l.form === "chokepoint" && l.refutation === "automatic");
   const parts: Markup[] = [];
   for (const refutation of invariant.refutations) {
     parts.push(html`<li class="refutation" data-refutation="witnessed"><span class="refutation-word">witnessed ${refutation.date}</span> <span class="broke">${refutation.broke}</span> <span class="arrow">→</span> <span class="saw">${refutation.saw}</span></li>`);
@@ -109,11 +109,11 @@ function renderLacks(invariant: SpecInvariant): Markup | null {
 }
 
 /** A structural defect's evidence and the two honest options. */
-function renderDefect(invariant: SpecInvariant): Markup | null {
+function renderDefect(invariant: SpecInvariant, runs: readonly RunRecord[]): Markup | null {
   if (invariant.state !== "structural defect") return null;
   const chokepoints = invariant.enforcements.flatMap((e) => (e.form === "chokepoint" ? [e.chokepoint] : []));
-  const sites = invariant.defects.flatMap((d) => d.bypasses);
-  const failing = invariant.defects;
+  const failing = defectsOf(invariant, runs);
+  const sites = failing.flatMap((d) => d.bypasses);
   return html`<section class="defect" data-field="defect">
     <h4>Structural defect</h4>
     ${failing.map((d) => html`<p class="reason">${d.form === "chokepoint" ? "chokepoint" : "totality oracle"} failed ${stamp(d.at)}: ${d.reason}</p>`)}
@@ -151,8 +151,8 @@ function renderInvariant(state: ShellState, invariant: SpecInvariant): Markup {
           ? html`<p class="quiet">None: the bullet names no chokepoint and no totality oracle, so nothing detects a break.</p>`
           : html`<ul>${invariant.enforcements.map((e) => renderEnforcement(state, invariant, e))}</ul>`}
       </section>
-      ${renderDefect(invariant)}
-      ${renderRefutation(invariant)}
+      ${renderDefect(invariant, state.runs.records)}
+      ${renderRefutation(invariant, state.runs.records)}
       ${renderChecklist(invariant)}
       ${renderLacks(invariant)}
       ${invariant.enforcements.some((e) => e.form === "chokepoint")
@@ -198,7 +198,7 @@ export function renderInvariantsResults(state: ShellState): Markup {
   const query = view.query.trim().toLowerCase();
   const all = allInvariants(state.spec.components);
   const shown = all.filter(
-    (i) => (view.state === "" || i.state === view.state) && (view.component === "" || i.component === view.component) && invariantMatches(i, query),
+    (i) => (view.state === "" || i.state === view.state) && (view.component === "" || i.component === view.component) && invariantMatches(i, query, state.runs.records),
   );
   const filtered = view.state !== "" || view.component !== "" || query !== "";
   const counts = state.spec.counts;

@@ -12,8 +12,9 @@ names, trust levels, rulings, candidate overloads, uncertain terms), a layer
 (a glossary present, or an absence with its reason), the spec model as
 `loadSpecModel` returns it (components, invariants with their lifecycle
 state, latest verdicts, counts, and the adapter's grade ladder), the run
-records, the journal records with the work orders when `.coherence/work`
-exists, and per view the reader's query and filters.
+records, the journal records with the work orders (folded by the journal's
+own loader from their records, so each carries its current state) when
+`.coherence/work` exists, and per view the reader's query and filters.
 
 `build.ts` loads those truths once and embeds the state as JSON in
 `public/_scope.html` with the styles and one inline script. Same files in,
@@ -52,7 +53,9 @@ view keeps from earlier runs.
 
 **Journal** is the merged timeline with kind glyphs, escalations awaiting a
 human pinned at the top, a decision's rejected alternatives in the open, and
-work orders when present. Filters by kind, agent, and session.
+work orders when present, each the fold of its records (content, owner,
+current state, history), never a state-change record shown as an order.
+Filters by kind, agent, and session.
 
 ## Deep links
 
@@ -66,8 +69,11 @@ decided.
 
 `node src/cli.ts query <question> [args]` answers a fixed set of questions
 from the same state through `buildScopePage`: `invariants <path...>`,
-`relies-on <chokepoint>`, `status`, `component <folder>`, `order`. Plain
-text, a few hundred tokens at most, no query language.
+`relies-on <chokepoint>`, `status`, `component <folder>`, `order`; and
+`economy <path...>`, the economy prediction (what must be loaded to change
+these files safely), which goes to the economy's own closure through the
+warm instrument rather than to the page state. Plain text, a few hundred
+tokens at most, no query language.
 
 ## Adding a view
 

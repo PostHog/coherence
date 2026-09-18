@@ -74,6 +74,19 @@ function byId(cwd: string, id: string): JournalRecord {
 
 const WHO = ["--session", "s1", "--agent", "alpha"];
 
+test("the work states are the five the glossary declares for the work order, and none is a rejected name", async () => {
+  const { WORK_STATES } = await import("./record.ts");
+  const { loadGlossary, rejectedNames } = await import("../lifecycle/glossary.ts");
+  const { COHERENCE_GLOSSARY } = await import("../lifecycle/project.ts");
+  const raw = JSON.parse(readFileSync(COHERENCE_GLOSSARY, "utf8")) as { concepts: { name: string; definition: string; detail?: { states?: { list?: string[] } } }[] };
+  const order = raw.concepts.find((c) => c.name === "work order");
+  assert.ok(order !== undefined, "the glossary declares the work order");
+  assert.deepEqual([...WORK_STATES], order.detail?.states?.list, "the code's states are the glossary's, in order");
+  for (const state of WORK_STATES) assert.ok(order.definition.includes(state), `the definition names ${state}`);
+  const rejected = new Set(rejectedNames(await loadGlossary(COHERENCE_GLOSSARY)).map((n) => n.name.toLowerCase()));
+  for (const state of WORK_STATES) assert.ok(!rejected.has(state), `${state} is not a rejected name`);
+});
+
 test("each verb writes the record its kind needs", () => {
   const cwd = scratch();
   try {

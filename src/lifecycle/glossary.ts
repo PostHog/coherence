@@ -277,10 +277,23 @@ function leadOf(entry: string): string {
 /**
  * How much of each project concept the compact form carries. The hook steps
  * down this list until the injection fits the host's budget; Coherence's own
- * layer always renders in full.
+ * layer renders in full at every one of these levels.
  */
 export const DETAIL_LEVELS = ["full", "no-confusions", "definitions", "names"] as const;
 export type DetailLevel = (typeof DETAIL_LEVELS)[number];
+
+/**
+ * Below the project levels, two more the injection as a whole can fall to
+ * when what must be shown whole (escalations are never shortened) leaves no
+ * room: Coherence's own layer at names only, and then a one-line pointer to
+ * the glossary command in place of any vocabulary.
+ */
+export type InjectionLevel = DetailLevel | "coherence-names" | "pointer";
+
+/** The one line that stands in for the vocabulary when nothing else fits. */
+export function renderPointer(cli = "coherence"): string {
+  return `Vocabulary omitted to stay under the host budget; full entries: ${cli} glossary\n`;
+}
 
 function renderConcept(concept: Concept, detail: DetailLevel = "full"): string {
   if (detail === "names") return concept.name;
@@ -307,10 +320,15 @@ function capitalize(text: string): string {
  * it the project glossary under its own header. Detail, provenance and
  * metaphors never appear.
  */
-export function renderCompact(coherence: Glossary, project?: Glossary, detail: DetailLevel = "full"): string {
+export function renderCompact(coherence: Glossary, project?: Glossary, detail: DetailLevel = "full", coherenceDetail: "full" | "names" = "full"): string {
   const lines: string[] = [];
-  lines.push(`Coherence vocabulary (${coherence.concepts.length} concepts; rejected names are defects):`);
-  for (const concept of coherence.concepts) lines.push(renderConcept(concept));
+  if (coherenceDetail === "names") {
+    lines.push(`Coherence vocabulary (${coherence.concepts.length} concepts; names only here, rejected names are defects; full entries: coherence glossary):`);
+    lines.push(coherence.concepts.map((c) => renderConcept(c, "names")).join(", "));
+  } else {
+    lines.push(`Coherence vocabulary (${coherence.concepts.length} concepts; rejected names are defects):`);
+    for (const concept of coherence.concepts) lines.push(renderConcept(concept));
+  }
   if (project !== undefined) {
     const title = capitalize(project.project ?? "Project");
     lines.push("");
@@ -328,22 +346,26 @@ export function renderCompact(coherence: Glossary, project?: Glossary, detail: D
 }
 
 /**
- * The compact form at the richest detail level that fits `maxChars`, with the
- * level chosen. The last level is returned even when it does not fit, so the
- * caller always has something to inject.
+ * The compact form at the richest level that fits `maxChars`, with the level
+ * chosen: the project layer steps down first, then Coherence's layer to
+ * names, then the vocabulary gives way to a one-line pointer at the glossary
+ * command (`cli` names it). The pointer is returned even when it does not
+ * fit, so the caller always has something to inject.
  */
 export function renderCompactWithin(
   coherence: Glossary,
   project: Glossary | undefined,
   maxChars: number,
-): { text: string; detail: DetailLevel } {
-  let last = { text: renderCompact(coherence, project, "full"), detail: DETAIL_LEVELS[0] as DetailLevel };
-  for (const detail of DETAIL_LEVELS) {
-    last = { text: renderCompact(coherence, project, detail), detail };
-    if (last.text.length <= maxChars) return last;
-    if (project === undefined) return last;
+  cli = "coherence",
+): { text: string; detail: InjectionLevel } {
+  const fits = (text: string): boolean => text.length <= maxChars;
+  for (const detail of project === undefined ? ([DETAIL_LEVELS[0]] as const) : DETAIL_LEVELS) {
+    const text = renderCompact(coherence, project, detail);
+    if (fits(text)) return { text, detail };
   }
-  return last;
+  const names = renderCompact(coherence, project, "names", "names");
+  if (fits(names)) return { text: names, detail: "coherence-names" };
+  return { text: renderPointer(cli), detail: "pointer" };
 }
 
 /** The token estimate used throughout: bytes divided by four. */

@@ -15,12 +15,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: commit-ordered-effects dismissed: nothing is committed before the injection and it has no external effect
   checklist: circuit-breaker-policy dismissed: no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
-- injection within budget: The start injection stays under the host budget: the project layer steps down in detail until the text fits, and Coherence's layer never shrinks.
-  over: both glossary layers at every detail level
-  via: renderCompactWithin steps the project layer down until the text fits; Coherence's layer never shrinks
-  because: a host replaces an over-long injection with a file preview or spills it, so an injection that overran the budget would be read by nobody; the project layer is the one that can shrink because its full entries are one command away
+- injection within budget: The start injection stays under the host budget: the project layer steps down in detail until the whole fits; when what must be shown whole (escalations are never shortened) leaves no room, Coherence's layer steps down to names and then to one line that points at the glossary command.
+  over: every start injection, with both glossary layers at every level and any number of open escalations ahead of them
+  via: the start injection stays under the budget with escalations present: the vocabulary steps down to names and then to a pointer, and no escalation is shortened
+  because: a host replaces an over-long injection with a file preview or spills it, so an injection that overran the budget would be read by nobody, and the one record that exists for a human would be the thing that hid itself; the vocabulary can shrink because its full entries are one command away, the escalations cannot
   crossing: project-source -> reading
-  refuted: made renderCompactWithin return the full form without checking the length -> "renderCompactWithin steps the project layer down until the text fits; Coherence's layer never shrinks" went red in glossary.test.ts; restored, green (2026-09-17)
+  refuted: returned the full vocabulary unchecked whenever no project layer could step down, so eight open escalations put the start injection at 11,614 characters against 9,500 -> "the start injection stays under the budget with escalations present: the vocabulary steps down to names and then to a pointer, and no escalation is shortened" went red in hook.test.ts; restored, green (2026-09-17)
   kinds: budget
   checklist: bounded-admission dismissed: no concurrent work is admitted; the bound is a character count on one document
   checklist: fair-admission dismissed: there are no contenders for the budget
@@ -35,6 +35,36 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: removed the prose pass from rejectedInProse -> "rejected names are found as whole words in prose, with concept and because" went red in check.test.ts; restored, green (2026-09-17)
   kinds: none
+- both layers reach identifiers: Both glossary layers' rejected names are matched in identifiers as well as in prose; only a name the project declares as its own concept or alias is silent there.
+  over: every rejected name of both layers against every identifier token in the corpus, in a project with its own glossary and in one without
+  via: in code, both layers' rejected names match identifier tokens, Coherence's too in an adopter, unless the project declares the name as its own; language globals and module specifiers never match
+  because: the cross-glossary rule is about sense, not about where a word sits: a project that means something of its own by a word declares it and is left alone, and a project that has not declared it is drifting whether the word is in a sentence or in a symbol. Holding Coherence's names against prose only let an adopter's code carry them untouched, which is where naming drift actually lives
+  crossing: project-source -> reading
+  refuted: held Coherence's rejected names against an adopter's prose only, so the name in an adopter identifier went unreported -> "in code, both layers' rejected names match identifier tokens, Coherence's too in an adopter, unless the project declares the name as its own; language globals and module specifiers never match" went red in check.test.ts, the identifier hit missing from the expected list; restored, green (2026-09-18)
+  kinds: none
+- the corpus is every text kind: The check reads every text file kind the project holds, the journal's and work's own records included, and leaves out what is written in another vocabulary on purpose, what no rename can repair, and what is not text.
+  over: every file under the project root, by kind: prose, code, data, dotfiles, records, lockfiles, binaries, the retired inventories, the reference docs and the reviews
+  via: the corpus reads every text kind the project holds, the journal's records included, and leaves out lockfiles, binaries, runs, and the reviews
+  because: a check that reads two extensions reports zero over a project whose drift is in its configuration, its scripts and its records, and a zero that means "not looked at" is worse than no check; the exclusions are the files that must name what they refuse (the glossaries and the retired inventories), the files a rename cannot reach (a dependency lockfile), and the files that are not the project's own words (the reference docs and the adversarial reviews, which quote the names they report)
+  crossing: project-source -> reading
+  refuted: read only .md and .ts, so eleven files of nine other kinds went unread and only the review the check should skip was read -> "the corpus reads every text kind the project holds, the journal's records included, and leaves out lockfiles, binaries, runs, and the reviews" went red in check.test.ts with every expected file missing; restored, green (2026-09-18)
+  kinds: read
+  checklist: scoped-reads declared as the corpus is every text kind
+  checklist: redaction dismissed: every finding is shown with its file, line, and the text as written
+- the corpus stays inside the root: Every path the check is given is confined to the project root; a path that reaches above it is refused rather than read.
+  over: every path given to the check: relative, absolute, and reaching upward
+  via: collectFiles confines every given path to the project root
+  because: the paths reach the check from a spec, a hook's stdin, and a command line, none of which is trusted to stay inside the tree it names; a walk that followed one upward would read, and report, a neighbouring project's files
+  crossing: project-source -> reading
+  refuted: resolved each given path and walked it, so ".." and "/etc" were read -> "collectFiles confines every given path to the project root" went red in check.test.ts, the walk failing above the root instead of refusing; restored, green (2026-09-18)
+  kinds: none
+- an unreadable path never aborts the check: A path the process cannot read is reported as unreadable and skipped; the rest of the corpus is still checked, and the report says what it did not see.
+  over: every folder and file the walk reaches, readable and not
+  via: an unreadable folder is reported and skipped; the check never aborts on it
+  because: one locked folder cost the whole check, so a project with a single unreadable path got no verdict at all; and a check that quietly skipped it would report a clean corpus it never read, which is the same lie a failed listing read as an empty one would be
+  crossing: project-source -> reading
+  refuted: let the walk's readdir throw -> "an unreadable folder is reported and skipped; the check never aborts on it" went red in check.test.ts with EACCES out of scandir aborting the run; restored, green (2026-09-18)
+  kinds: none
 - project sense wins: Inside a project, an accepted project name silences a Coherence rejection, and an accepted phrase guards the words inside it.
   over: every accepted project name and alias against every Coherence rejected name
   via: a project's own sense wins: an accepted project name silences a Coherence rejection, and an accepted phrase guards the words inside it
@@ -42,7 +72,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: <not witnessed: no staged break was attempted for the guard logic; the test has not been red in this repository>
   kinds: none
-- regulate refuses only what it can prove: A subagent stop is refused for glossary findings in changed files, spec problems, or structural defects, and never for an open requirement.
+- regulate refuses only what it can prove: A subagent stop is refused for a rejected name in a changed file, a spec problem, or a structural defect, and never for an open requirement.
   protects: REFUSE_EXIT
   chokepoint: runHook
   over: every stop event a host sends
@@ -50,6 +80,43 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: a refusal holds a subagent in its loop, so it is spent only on what the tool can prove is owed: a rejected name in a changed file, a spec that will not parse, a chokepoint that no longer chokes; an open requirement can legitimately outlive a session, and refusing on it would train agents to fabricate enforcement lines
   crossing: harness -> reading
   refuted: widened the refusal to any spec text, so an open requirement refused the subagent stop -> its totality oracle went red at "an open requirement never refuses a subagent stop", exit 2 where 0 was asserted (2026-09-17)
+  kinds: none
+- an unknown noun never refuses: An unknown noun in a changed file is reported at the stop with its three answers and never refuses a subagent stop.
+  over: every stop event whose changed files carry an unknown noun and no rejected name
+  via: an unknown noun in a changed file is advisory: Stop reports it and SubagentStop never refuses on it
+  because: the nomination is a heuristic, precision over recall, and the glossary allows a refusal only for what the tool can prove: a rejected name, a spec problem, a structural defect; holding a subagent on a guess would teach it to strip capitalized phrases rather than declare names
+  crossing: harness -> reading
+  refuted: refused the subagent stop on any glossary finding, unknown nouns included -> "an unknown noun in a changed file is advisory: Stop reports it and SubagentStop never refuses on it" went red in hook.test.ts, exit 2 where 0 was asserted; restored, green (2026-09-17)
+  kinds: none
+- a recorded wall makes the debt advisory: A debt the session has recorded as unable, naming the file, the rejected name, or the invariant, is reported with that record's id and does not refuse the subagent stop; another session's unable clears nothing.
+  over: every rejected name, spec problem, and structural defect a subagent stop would refuse on, against every unable record of the stopping session
+  via: an unable record from the session turns the debt it names advisory: SubagentStop reports it and exits 0, and another session is still refused
+  because: the subagent stop is refused until the debt is paid or recorded as unable; a wall the agent cannot pass must not hold it in its loop forever, and the record names the wall for the reader who decides, which is why it counts only for the session that wrote it
+  crossing: record -> reading
+  refuted: refused the subagent stop with the unable record on file, reading no wall -> "an unable record from the session turns the debt it names advisory: SubagentStop reports it and exits 0, and another session is still refused" went red in hook.test.ts, exit 2 where 0 was asserted; restored, green (2026-09-17)
+  kinds: none
+- a git failure is not a clean tree: When git cannot list the changed files, the stop says so and that the glossary check ran over nothing; outside a repository the answer is no files, and a failure never refuses.
+  over: every stop event, in a repository git can read, one it cannot, and no repository at all
+  via: changedFiles reports a git failure instead of answering a clean tree; outside git the answer is no files
+  because: a listing that failed reads exactly like a tree with nothing changed unless the failure is carried; regulate would then report clean over files it never saw, which is the one lie the stop exists to prevent
+  crossing: harness -> reading
+  refuted: caught every git failure and answered no files -> "changedFiles reports a git failure instead of answering a clean tree; outside git the answer is no files" went red in hook.test.ts on the unreadable repository; restored, green (2026-09-17)
+  kinds: none
+- the hook answers one project: Every event is answered for the project root the hook was installed for; a cwd from the harness that is not inside that root is refused, and nothing is read or written.
+  protects: OUTSIDE_ROOT_EXIT
+  chokepoint: runHook
+  over: every event, with a cwd inside the installed root, one outside it, and no installation to point at
+  via: the hook refuses a cwd from stdin that is not inside the project root it was installed for
+  because: the working directory arrives on stdin from the harness, which is the one input the tool does not author; a hook that answered any cwd would read a neighbouring project's journal and append its own records there, and the tree it was installed for is the one it can point at, by the settings file that carries it or by the name the harness gives
+  crossing: harness -> project-source
+  refuted: took the cwd from stdin as given, so a stranger's tree was answered for -> "the hook refuses a cwd from stdin that is not inside the project root it was installed for" went red in hook.test.ts, exit 0 where 78 was asserted; restored, green (2026-09-18)
+  kinds: none
+- the stop snapshot has an instrument: The read-trace snapshot at a stop reaches the language server through enforcement's one door, in production as in a test, and records the instrument it was handed.
+  over: every stop event that snapshots a trace, with a door that answers and a door that cannot
+  via: the Stop snapshot reaches the instrument through enforcement's one door, in production as in a test
+  because: the snapshot exists to be calibrate's input, and a closure predicted with no adapter skips the hops, so every production sample was measuring a prediction the tool would never make at the command line; the door is enforcement's because a second way to the warm server is a second lifecycle to get wrong
+  crossing: harness -> reading
+  refuted: passed only the adapter a test hands in, so a production stop recorded server "none" and reason "no adapter" -> "the Stop snapshot reaches the instrument through enforcement's one door, in production as in a test" went red in hook.test.ts, "none" where "warm" was asserted; restored, green (2026-09-18)
   kinds: none
 - escalation heads the start: An unacknowledged escalation heads the start injection, never shortened; an acknowledged one does not.
   over: every start event, SessionStart and SubagentStart, against every escalation in the journal
@@ -72,14 +139,14 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: commit-ordered-effects dismissed: the run is appended before the text is printed, and printing is not irreversible
   checklist: circuit-breaker-policy dismissed: an unavailable instrument is reported as such, never routed around
   checklist: declared-target-coverage dismissed: one file per event, not a registry of targets
-- install keeps other hooks: Installing the hook merges one Coherence entry per event into the host's settings, keeps every other hook, and replaces its own entry on a second pass.
-  protects: SETTINGS_FILE
-  chokepoint: src/lifecycle/install.ts
-  over: every host and every event Coherence installs
+- install keeps other hooks: Installing the hook merges one Coherence entry per event into the host's settings, keeps every hook that is not ours, owns only a command that names this tool's binary or its own cli path, and replaces that command on a second pass.
+  protects: mergeHooks
+  chokepoint: install
+  over: every host and every event Coherence installs, against every hook command another tool could have written there
   via: mergeHooks adds one Coherence entry per event, keeps everything else, and replaces its own entry on a second pass
-  because: the host's settings file belongs to the adopter and may already carry other hooks; an install that clobbered them would cost the adopter its own automation, and a second install that duplicated its entry would run every hook twice
+  because: the host's settings file belongs to the adopter and may already carry other hooks; an install that clobbered them would cost the adopter its own automation, a second install that duplicated its entry would run every hook twice, and ownership decided by a loose match would delete a stranger's hook that merely ends the way ours does. What must be choked is the object that gets written: only the merge produces it, and only install reaches the merge. It was written as the settings path inside this module, which stopped being true the moment the hook needed to know which tree it was installed for and read the same two paths to find it; the path is a fact about a host, the merge is the thing that must have one door
   crossing: project-source -> harness
-  refuted: <not witnessed: no staged break was attempted on the merge; the test has not been red in this repository>
+  refuted: claimed any command ending in "cli.ts hook <Event>" as Coherence's, so a stranger's cli.ts hook was deleted on install -> "mergeHooks adds one Coherence entry per event, keeps everything else, and replaces its own entry on a second pass" went red in install.test.ts naming the three foreign hooks that vanished; restored, green (2026-09-17)
   kinds: deploy
   checklist: graceful-drain dismissed: nothing is shut down by an install
   checklist: readiness-evidence dismissed: status reports what is written in the settings file and claims nothing about a running process
@@ -96,12 +163,24 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: commit-ordered-effects declared as cursor advances after the print
   checklist: circuit-breaker-policy dismissed: the feed reads local files; no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
-- cursor advances after the print: The feed cursor moves past the records a feed covered only after that feed was handed to the host; rendering alone moves nothing, and an unprinted feed is shown again.
-  over: every feed rendered for a session, at every boundary event
-  via: the feed cursor advances only after the feed is printed
-  because: a cursor moved before the print would let a hook that failed between render and output swallow what peers recorded; the advance is the commit, and it follows the effect it records
+- feed carries two kinds: The feed injects a peer's decisions and a peer's escalations, and no other verb.
+  over: every record kind a peer can write, at every boundary event
+  via: the peer feed injects a peer's decisions and escalations and no other kind
+  because: the glossary names decision subjects, and an escalation heads every read: a question standing before a human changes what a peer should do next, so a session that met one only at its own start would act past it for a whole cycle. Every other verb is the journal, one command away, and injecting all eleven at every tool use spends the session's budget on what nobody asked for
+  crossing: record -> reading
+  refuted: injected the subject of every record kind, so a peer's conjecture, defect, unable, retraction and resolution rode into the context too -> "the peer feed injects a peer's decisions and escalations and no other kind" went red in hook.test.ts, seven records where two were asserted; restored, green (2026-09-18)
+  kinds: output
+  checklist: destination-confinement dismissed: one destination, the host's additionalContext, and no redirect
+  checklist: redaction declared as feed injects subjects only
+  checklist: commit-ordered-effects declared as cursor advances after the print
+  checklist: circuit-breaker-policy dismissed: the feed reads local files; no dependency is sampled
+  checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
+- cursor advances after the print: The feed cursor moves past the records a feed covered only after that feed was handed to the host: rendering alone moves nothing, the hook hands the advance back to the command line, which commits it only once its stdout write succeeded, and an unprinted feed is shown again.
+  over: every feed rendered for a session, at every boundary event, through the library and through the command line that prints it
+  via: the feed cursor advances only after the feed is printed: rendering moves nothing, and the CLI commits only once its stdout write succeeded
+  because: a cursor moved before the print would let a hook that failed between render and output swallow what peers recorded; the advance is the commit, and it follows the effect it records, so it belongs to the one place that knows the write succeeded
   crossing: harness -> record
-  refuted: wrote the cursor inside the render, before the host had the text -> "the feed cursor advances only after the feed is printed" went red in hook.test.ts; restored, green (2026-09-17)
+  refuted: committed the cursor inside runHook, before the command line had written stdout -> "the feed cursor advances only after the feed is printed: rendering moves nothing, and the CLI commits only once its stdout write succeeded" went red in hook.test.ts: with the host's end of the pipe closed the cursor had moved and the host had nothing; restored, green (2026-09-17)
   kinds: state
   checklist: revalidated-permission dismissed: no permission is involved in moving a cursor
   checklist: separation-of-duties dismissed: one session moves its own cursor and nobody else's

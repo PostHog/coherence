@@ -1,6 +1,10 @@
 /**
  * Scaffold: the complete shape as the cheapest thing to produce.
  *
+ * A folder named for a component is confined to the project root: it comes
+ * from a command line or from spec text an agent wrote, and neither may reach
+ * above the tree it names.
+ *
  * Two shapes. A component is a folder plus a spec with its intent and an
  * empty invariants section. An invariant is one bullet with every slot
  * present as a placeholder, and beside it the decomposition checklist for
@@ -10,7 +14,7 @@
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { INVARIANTS_SECTION, KEYS, type Key } from "../spec/grammar.ts";
 import { SPEC_SUFFIX } from "../spec/model.ts";
 import { applicableShapes, type Seed, type Shape } from "../spec/seed.ts";
@@ -52,10 +56,35 @@ export function renderComponent(name: string, intent: string): string {
   return `# ${name}\n\n${intent.trim()}\n\n## ${INVARIANTS_SECTION}\n`;
 }
 
-/** Create the folder if needed and its spec; refused when the folder already holds one. */
+/**
+ * The absolute path of a folder named relative to the project root, refused
+ * when it reaches outside that root. The folder arrives from a command line
+ * or from spec text an agent wrote, neither of which is trusted to stay
+ * inside the tree it names. Internal: componentDir is the one door, so the
+ * confinement cannot be skipped by a caller that resolves a path itself.
+ */
+function confineToRoot(root: string, folder: string): string {
+  const dir = resolve(root, folder);
+  const rel = relative(resolve(root), dir);
+  if (rel === ".." || rel.startsWith(".." + "/") || rel.startsWith(".." + "\\") || isAbsolute(rel)) {
+    throw new ScaffoldError(`"${folder}" is outside the project root; a component lives under the project it belongs to`);
+  }
+  return dir;
+}
+
+/**
+ * Where a component named relative to the project root lives on disk. Every
+ * path the scaffold builds from a folder a caller named comes from here, so
+ * the confinement above has one site and no caller can route around it.
+ */
+export function componentDir(root: string, folder: string): string {
+  return confineToRoot(root, folder);
+}
+
+/** Create the folder if needed and its spec; refused when the folder already holds one, or when it is not under the project root. */
 export function scaffoldComponent(root: string, folder: string, intent: string): ComponentScaffold {
   if (intent.trim() === "") throw new ScaffoldError("a component needs its intent: one line saying what it is for");
-  const dir = resolve(root, folder);
+  const dir = componentDir(root, folder);
   const existing = specsIn(dir);
   if (existing.length > 0) throw new ScaffoldError(`${folder} already holds a spec: ${existing.join(", ")}`);
   const file = specFileName(folder, root);

@@ -2,8 +2,8 @@
  * The Journal view: the merged timeline across every session, latest first,
  * with a glyph per kind; escalations awaiting a human pinned at the top; a
  * decision's rejected alternatives shown, never hidden; a conjecture's
- * candidates and discriminating test; and the work orders when the work
- * orders folder exists. Filtered by kind, agent, and session; searched by text. A
+ * candidates and discriminating test; and the work orders, folded by the
+ * journal from their records, when the work orders folder exists. Filtered by kind, agent, and session; searched by text. A
  * pure function from the shell state to markup.
  */
 
@@ -23,7 +23,7 @@ import {
   workId,
 } from "./derive.ts";
 import { html, type Markup } from "./html.ts";
-import type { Fields, JournalRecord, RecordValue, ShellState, WorkOrder } from "./model.ts";
+import type { JournalRecord, ShellState, WorkOrder } from "./model.ts";
 
 function renderBecause(text: string): Markup {
   return html`<p class="because" data-field="because"><span class="because-word">because</span> ${text}</p>`;
@@ -89,34 +89,30 @@ function renderRecord(record: JournalRecord, status: string | undefined, pinned 
   </article>`;
 }
 
-function fieldText(value: RecordValue | undefined): string | undefined {
-  return typeof value === "string" ? value : typeof value === "number" || typeof value === "boolean" ? String(value) : undefined;
+/** One record that moved an order: a move, an owner change, or the close. */
+function renderWorkEvent(event: WorkOrder["history"][number]): Markup {
+  const what = event.kind === "owner" ? html`owner → <span title="${event.owner}">${shortSession(event.owner)}</span>` : html`→ ${event.state}`;
+  return html`<li class="work-event" data-kind="${event.kind}"><code>${event.id}</code> ${stamp(event.at)} ${what} <span class="quiet">${event.agent}: ${event.because}</span></li>`;
 }
 
-function renderWorkField(key: string, value: RecordValue): Markup {
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return html`<p>${String(value)}</p>`;
-  if (value === null) return html`<p class="quiet">none</p>`;
-  if (Array.isArray(value)) return value.length === 0 ? html`<p class="quiet">none</p>` : html`<ul class="record-list">${value.map((v) => html`<li>${renderWorkField(key, v)}</li>`)}</ul>`;
-  const entries = Object.entries(value);
-  return entries.length === 0 ? html`<p class="quiet">none</p>` : html`<dl class="record-fields">${entries.map(([k, v]) => html`<div class="record-field" data-field="${k}"><dt>${k.replace(/_/g, " ")}</dt><dd>${renderWorkField(k, v)}</dd></div>`)}</dl>`;
-}
-
-/** A work order as the file said it: the fields the view recognizes in the margin, the rest in the body. */
+/** A work order as the journal folds it: content in the body, owner and state in the margin, its history beneath. */
 function renderWorkOrder(order: WorkOrder): Markup {
-  const fields: Fields = order.fields;
-  const state = fieldText(fields["state"]);
-  const objective = fieldText(fields["objective"]);
-  const owner = fieldText(fields["owner"]) ?? fieldText(fields["session"]);
-  const rest = Object.entries(fields).filter(([k]) => k !== "state" && k !== "objective" && k !== "id");
-  return html`<article class="entry work-order" id="${workId(order.id)}" data-state="${state ?? ""}">
+  return html`<article class="entry work-order" id="${workId(order.id)}" data-state="${order.state}">
     <div class="margin">
       <h3 class="headword"><a href="#${workId(order.id)}">${order.id}</a></h3>
-      <p class="status">${state ?? "state not recorded"}</p>
-      ${owner !== undefined ? html`<p class="defined-by">owner <span title="${owner}">${shortSession(owner)}</span></p>` : null}
+      <p class="status"><span class="state-mark" data-state="${order.state}">${order.state}</span></p>
+      <p class="defined-by">owner <span title="${order.owner}">${shortSession(order.owner)}</span></p>
+      <p class="defined-by">created ${stamp(order.at)} by ${order.agent} · <span title="${order.session}">${shortSession(order.session)}</span></p>
     </div>
     <div class="body">
-      ${objective !== undefined ? html`<p class="definition">${objective}</p>` : html`<p class="definition quiet">No objective field.</p>`}
-      ${rest.length > 0 ? html`<dl class="record-fields">${rest.map(([k, v]) => html`<div class="record-field" data-field="${k}"><dt>${k.replace(/_/g, " ")}</dt><dd>${renderWorkField(k, v)}</dd></div>`)}</dl>` : null}
+      <p class="definition" data-field="objective">${order.objective}</p>
+      <dl class="record-fields">
+        <div class="record-field" data-field="success"><dt>success</dt><dd>${order.success}</dd></div>
+        <div class="record-field" data-field="boundary"><dt>boundary</dt><dd>${order.boundary}</dd></div>
+      </dl>
+      ${order.history.length > 0
+        ? html`<section class="work-history" data-field="history"><h4>History</h4><ul>${order.history.map(renderWorkEvent)}</ul></section>`
+        : html`<p class="quiet" data-field="history">No record has moved it since it was created.</p>`}
     </div>
   </article>`;
 }

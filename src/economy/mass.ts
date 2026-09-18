@@ -4,14 +4,18 @@
  *   total      lines, files, and symbols (top-level declarations by a plain
  *              scan; the seam offers no declaration listing)
  *   unreached  code in no component (no spec file above it), and code inside
- *              a component that no invariant's chokepoint or protected thing
+ *              a component that no invariant's chokepoint or totality oracle
  *              reaches
  *
- * Reach is at file level. An invariant reaches the files the latest run's
- * chokepoint check touched (its definitions and every reference site) when
- * a run exists; without one, the files that declare the spec's named
- * symbols or are the named modules. Test files are the detectors and not
- * the load: excluded and counted aside. Unreached prints first: a large
+ * Reach is at file level, and by either form of enforcement, as the glossary
+ * says. An invariant reaches the files the latest run says its check touched
+ * (a chokepoint's definitions and reference sites, a totality oracle's test coverage)
+ * when a run exists; without one, the files that declare the spec's named
+ * symbols or are the named modules, which only a chokepoint has. Where a
+ * totality oracle's run record does not say which files its test touched, the
+ * report names it rather than quietly counting it as reaching nothing: what
+ * the tool cannot decide it says it cannot decide. Test files are the detectors and
+ * not the load: excluded and counted aside. Unreached prints first: a large
  * object with no definition is a wobbly load. Never a threshold, never a
  * baseline, never a failure on growth.
  */
@@ -53,6 +57,12 @@ export interface MassReport {
   files: FileMass[];
   /** How reach was decided: the latest run's files, the spec's names, or both across invariants. */
   reachFrom: ("run" | "spec")[];
+  /**
+   * Invariants enforced only by a totality oracle whose latest run record does
+   * not say which files its test touched, as component/name. Their reach is
+   * unknown, not zero, and the report says so.
+   */
+  silentTotalityOracles: string[];
   testsExcluded: number;
 }
 
@@ -74,12 +84,19 @@ function chokepointNames(invariant: ModelInvariant): string[] {
   return invariant.enforcements.flatMap((e) => (e.form === "chokepoint" ? [e.protects, e.chokepoint] : []));
 }
 
-/** The files one invariant reaches, and where the answer came from. */
-function reachOf(invariant: ModelInvariant, files: readonly { file: string; names: Set<string> }[]): { files: string[]; from: "run" | "spec" | undefined } {
-  const latest = invariant.latest.find((l) => l.form === "chokepoint");
-  if (latest !== undefined && latest.files.length > 0) return { files: latest.files, from: "run" };
+/**
+ * The files one invariant reaches, and where the answer came from. Every
+ * latest run entry counts, whichever form wrote it: a chokepoint's files are
+ * its definitions and reference sites, a totality oracle's are the files its test
+ * covered. `silent` says a totality oracle ran and named no file, so its reach is
+ * unknown rather than empty.
+ */
+function reachOf(invariant: ModelInvariant, files: readonly { file: string; names: Set<string> }[]): { files: string[]; from: "run" | "spec" | undefined; silent: boolean } {
+  const ran = invariant.latest.filter((l) => l.files.length > 0);
+  if (ran.length > 0) return { files: [...new Set(ran.flatMap((l) => l.files))], from: "run", silent: false };
+  const silent = invariant.latest.some((l) => l.form === "totality oracle");
   const names = chokepointNames(invariant);
-  if (names.length === 0) return { files: [], from: undefined };
+  if (names.length === 0) return { files: [], from: undefined, silent };
   const reached = new Set<string>();
   for (const value of names) {
     const parsed = parseName(value);
@@ -94,7 +111,7 @@ function reachOf(invariant: ModelInvariant, files: readonly { file: string; name
       }
     }
   }
-  return { files: [...reached], from: "spec" };
+  return { files: [...reached], from: "spec", silent };
 }
 
 export function computeMass(rootGiven: string, options: MassOptions = {}): MassReport {
@@ -116,12 +133,14 @@ export function computeMass(rootGiven: string, options: MassOptions = {}): MassR
 
   const reachedBy = new Map<string, Set<string>>();
   const reachFrom = new Set<"run" | "spec">();
+  const silentTotalityOracles: string[] = [];
   for (const component of model.components) {
     for (const invariant of component.invariants) {
       const scoped = scanned.filter((f) => component.folder === "." || f.file.startsWith(component.folder + "/"));
       let reach = reachOf(invariant, scoped);
       if (reach.from === "spec" && reach.files.length === 0) reach = reachOf(invariant, scanned);
       if (reach.from !== undefined && reach.files.length > 0) reachFrom.add(reach.from);
+      if (reach.silent && reach.files.length === 0) silentTotalityOracles.push(`${component.folder}/${invariant.name}`);
       for (const file of reach.files) {
         const set = reachedBy.get(file) ?? new Set<string>();
         set.add(`${component.folder}/${invariant.name}`);
@@ -129,6 +148,7 @@ export function computeMass(rootGiven: string, options: MassOptions = {}): MassR
       }
     }
   }
+  silentTotalityOracles.sort();
 
   const files: FileMass[] = scanned.map((f) => ({ file: f.file, lines: f.lines, files: 1, symbols: f.symbols, reachedBy: [...(reachedBy.get(f.file) ?? [])].sort() }));
   const outsideFiles = files.filter((f) => componentOf(model, f.file) === undefined);
@@ -149,6 +169,7 @@ export function computeMass(rootGiven: string, options: MassOptions = {}): MassR
     components,
     files,
     reachFrom: [...reachFrom].sort(),
+    silentTotalityOracles,
     testsExcluded: tests.length,
   };
 }
@@ -184,5 +205,9 @@ export function formatMass(report: MassReport): string {
   for (const c of report.components) lines.push(`  ${c.folder}: ${numbers(c.total)}; unreached ${numbers(c.unreached)}`);
   const from = report.reachFrom.length === 0 ? "no invariant reaches any file" : `reach from ${report.reachFrom.map((f) => (f === "run" ? "the latest run's files" : "the spec's named symbols")).join(" and ")}`;
   lines.push(`${from}; symbols are top-level declarations by a plain scan; ${report.testsExcluded} test file${report.testsExcluded === 1 ? "" : "s"} excluded`);
+  if (report.silentTotalityOracles.length > 0) {
+    const n = report.silentTotalityOracles.length;
+    lines.push(`${n} totality oracle${n === 1 ? "'s" : "s'"} run record does not say which files its test touched, so nothing is counted reached through it: ${report.silentTotalityOracles.join(", ")}`);
+  }
   return lines.join("\n");
 }

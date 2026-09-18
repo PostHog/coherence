@@ -4,7 +4,7 @@
  */
 
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -13,6 +13,7 @@ import { KEYS } from "../spec/grammar.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { applicableShapes, loadSeed } from "../spec/seed.ts";
 import { scaffoldCommand } from "./cli.ts";
+import { componentDir, scaffoldComponent } from "./scaffold.ts";
 import { renderInvariant } from "./scaffold.ts";
 
 const seed = loadSeed();
@@ -127,6 +128,82 @@ test("scaffold invariant --write appends to the invariants section, and the resu
     assert.match(rootText, /## invariants\n- third: Third\.\n(  .*\n)+\n## trust levels\n- a: one\n$/);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/*
+ * Union item 26. The fix is one line in src/spec/grammar.ts, which another agent owns, so this
+ * test stands red and marked todo until that line lands:
+ *   const PLACEHOLDER = /(?:^|\s)<[a-z][^<>]*>(?:$|[\s)|])/;
+ * An angle-bracket group must stand as its own token, which is how the scaffold prints every
+ * slot and how a generic type never appears. Verified here: with that line the whole scaffold
+ * and spec suites are green and spec --check keeps 0 problems and the same 9 unfilled slots.
+ */
+test("an unfilled slot is one of the forms the scaffold prints, not any prose in angle brackets", { todo: "waiting on the one-line PLACEHOLDER fix in src/spec/grammar.ts" }, () => {
+  const root = scratch();
+  try {
+    // Every form the scaffold prints, as the scaffold prints it.
+    const printed = renderInvariant(seed, { sentence: "Every reference reaches the store through one door.", kinds: undefined, form: "chokepoint" }).bullet;
+    writeFileSync(join(root, "Root.spec.md"), `# Root\n\nThe root.\n\n## invariants\n${printed}`, "utf8");
+    const scaffolded = loadSpecModel(root, { seed }).components[0]!.invariants[0]!;
+    assert.deepEqual(
+      scaffolded.unfilled.sort(),
+      ["because", "chokepoint", "crossing", "kinds", "name", "protects", "refuted"].sort(),
+      "the scaffold's own forms are unfilled, every one of them",
+    );
+
+    // A filled bullet whose values merely name a generic type, a comparison, or a shell redirect.
+    const filled = [
+      "# Root",
+      "",
+      "The root.",
+      "",
+      "## trust levels",
+      "- reading: what a reader sees",
+      "- project-source: the tree on disk",
+      "",
+      "## invariants",
+      "- latest wins: The cache keeps one entry per key and the later write wins.",
+      "  protects: Map<string, Latest>",
+      "  chokepoint: putLatest",
+      "  because: two writers racing on one key would otherwise disagree, and the reader would see whichever landed last",
+      "  crossing: project-source -> reading",
+      "  refuted: dropped the compare-and-set -> the totality oracle went red (2026-09-17)",
+      "  kinds: none",
+      "",
+    ].join("\n");
+    writeFileSync(join(root, "Root.spec.md"), filled, "utf8");
+    const real = loadSpecModel(root, { seed }).components[0]!.invariants[0]!;
+    assert.deepEqual(real.unfilled, [], `a value naming Map<string, Latest> is written, not awaited: ${real.unfilled.join(", ")}`);
+    assert.equal(real.enforcements.length, 1, "the chokepoint is read, so the bullet can become an invariant");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("scaffold confines a component folder to the project root", async () => {
+  const outer = mkdtempSync(join(tmpdir(), "coherence-scaffold-outer-"));
+  const root = join(outer, "project");
+  mkdirSync(root);
+  try {
+    for (const folder of ["..", "../sibling", "../../elsewhere", join(outer, "sibling"), "/etc/coherence", "src/../../up"]) {
+      assert.throws(
+        () => scaffoldComponent(root, folder, "an intent"),
+        /is outside the project root/,
+        `${folder} reaches above the project root`,
+      );
+    }
+    assert.equal(existsSync(join(outer, "sibling")), false, "nothing was created beside the project");
+    assert.equal(existsSync(join(outer, "Project.spec.md")), false, "and nothing above it");
+
+    for (const folder of ["..", join(outer, "sibling")]) {
+      assert.throws(() => componentDir(root, folder), /is outside the project root/, `componentDir is the one door and it refuses ${folder}`);
+    }
+    const inside = scaffoldComponent(root, "src/deep", "a component under the root");
+    assert.equal(inside.path, join(root, "src", "deep", "Deep.spec.md"), "a folder under the root is made as asked");
+    assert.equal(scaffoldComponent(root, ".", "the entry component").path, join(root, "Project.spec.md"), "the root itself is inside itself");
+  } finally {
+    rmSync(outer, { recursive: true, force: true });
   }
 });
 

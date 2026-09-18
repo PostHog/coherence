@@ -1,6 +1,11 @@
 /**
  * The peer feed: what other sessions recorded since this session last looked.
  *
+ * Two kinds only: a peer's decisions, which is what the glossary names, and a
+ * peer's escalations, because an escalation heads every read and a question
+ * standing before a human changes what this session should do next. Every
+ * other verb is the journal, one command away.
+ *
  * Subjects only, never full records: the glyph, the id, the agent, and the
  * subject truncated to 120 characters, capped at twelve lines with a count of
  * the rest and the one command that shows them whole. The cursor is per
@@ -25,6 +30,9 @@ export const FEED_DIR = join(".coherence", "feed");
 
 /** The most subject lines one injection carries. */
 export const FEED_CAP = 12;
+
+/** The record kinds a boundary injects: the glossary's decisions, and the escalations that head every read. */
+export const FEED_KINDS: ReadonlySet<string> = new Set(["decision", "escalation"]);
 
 export function cursorFile(root: string, session: string): string | undefined {
   return SESSION_TOKEN.test(session) ? join(root, FEED_DIR, `${session}.cursor`) : undefined;
@@ -84,7 +92,7 @@ export function peerFeed(root: string, session: string): Feed {
     return none;
   }
   const all = recordsAfter(loaded, since, {});
-  const fresh = all.filter((record) => record.session !== session);
+  const fresh = all.filter((record) => record.session !== session && FEED_KINDS.has(record.kind));
   const next = cursorAfter(all, since);
   if (fresh.length === 0 || next === null) return none;
   const shown = fresh.slice(0, FEED_CAP);

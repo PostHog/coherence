@@ -3,6 +3,13 @@
 The context closure of a change, the read traces that record what sessions actually loaded, calibrate over the two with an automatic outcome label, and mass: total and unreached, unreached first.
 
 ## invariants
+- reach by either enforcement: Unreached mass counts a file reached when an invariant's chokepoint or its totality oracle reaches it, and says plainly which totality oracles could not be asked.
+  over: every file of every component, against every latest run entry of either form
+  via: mass counts reach by chokepoint or totality oracle, and says plainly when a totality oracle's run record does not name the files its test touched
+  because: the glossary says unreached mass is code that no invariant's chokepoint, and no invariant's totality oracle, references, and counting only chokepoints called a file unreached that a totality oracle covers, which is the diagnostic lying about the load it is there to weigh. A totality oracle entry whose run record names no file cannot be counted either way, so it is named rather than silently counted as reaching nothing: 33 of this project's own bullets are in that state today
+  crossing: record -> reading
+  refuted: counted reach from the chokepoint entry alone, so a file the totality oracle's run record named stood unreached -> "mass counts reach by chokepoint or totality oracle, and says plainly when a totality oracle's run record does not name the files its test touched" went red in economy.test.ts, the covered file listed as unreached; restored, green (2026-09-18)
+  kinds: none
 - economy is deterministic: The closure of the same files over the same tree is the same closure: the same entries in path order, the same why lines in order, the same token estimate; nothing about it is stored.
   over: every closure predicted for a set of files over one tree
   via: economy: one hop out, one hop in, the spec of each component, and the invariants whose protected thing or chokepoint lives in the given files; deterministic

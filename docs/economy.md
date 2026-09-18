@@ -29,8 +29,15 @@ Each entry says why it is there. The token estimate is bytes divided by
 four. With no instrument the hops are skipped, invariants come from the
 files the latest run touched, and the closure says so. The same tree yields
 the same closure: entries sort by path, why lines within an entry. No
-address lives in a glossary or a spec. The command drives the adapter in
-process; the warm server is reached only through the run today.
+address lives in a glossary or a spec.
+
+`economyFor` reaches the language server through enforcement's one door,
+`withWarmAdapter`: the same warm per-project server the run uses, spawned
+detached when none is listening and left running for the next question.
+There is no in-process mode and no `--no-server` flag on this command. The
+hook's read-trace snapshot at Stop goes through the same door, so the
+prediction a session is measured against is the prediction the command line
+gives.
 
 ## Read traces
 
@@ -56,19 +63,27 @@ is automatic, and only automatic:
   the patch and every such entry passed;
 - `unknown`: neither has happened yet.
 
-A defect always wins. A totality oracle entry carries no files, so today only
-chokepoint checks label clean. The aggregate says how often the prediction
-covered everything read, by outcome. No command sets a label.
+A defect always wins. A totality oracle entry records no files today, so only
+chokepoint checks label clean; when a totality oracle entry names the files
+its test covered, it will label too, with no change here. The aggregate says
+how often the prediction covered everything read, by outcome. No command sets
+a label.
 
 ## Mass
 
 Two numbers side by side for each component and the project: total mass
 (lines, files, symbols) and unreached mass: code in no component (no spec
-file above it) and code in a component that no invariant's chokepoint or
-protected thing reaches. Reach is at file level, from the latest run's
-chokepoint entry files, else from the files declaring the spec's named
-symbols. Symbols are top-level declarations by a plain scan. Test files are
-the detectors, not the load: counted aside.
+file above it) and code in a component that no invariant reaches through
+either form of enforcement. Reach is at file level, from the files the latest
+run says each check touched, whichever form wrote the entry, else from the
+files declaring the spec's named symbols, which only a chokepoint names.
+Symbols are top-level declarations by a plain scan. Test files are the
+detectors, not the load: counted aside.
+
+A totality oracle entry that names no file cannot be counted either way, so
+the report names those invariants in a line of their own rather than counting
+them as reaching nothing. Thirty-three of this project's own bullets are in
+that state: their reach is unknown, not zero.
 
 Unreached prints first. A large object with no definition is a wobbly load,
 and the way down is an invariant, not a deletion: never a threshold, never a
