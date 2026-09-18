@@ -18,8 +18,14 @@
  * through the warm server, and a bypass is printed as additionalContext so
  * the agent sees the structural defect in the same turn, with the two
  * honest options. Stop and SubagentStop also carry the structural defects
- * the latest run left; one refuses a subagent stop. UserPromptSubmit prints
- * nothing yet; the peer feed is a later slice.
+ * the latest run left; one refuses a subagent stop.
+ * The session's work order rides with orient and regulate: the start prints
+ * the active order the session owns (objective, success, boundary) and the
+ * rule that maintenance outside the boundary is not this session's to do;
+ * the stop says the order is still active and how it is closed.
+ * UserPromptSubmit and PostToolUse carry the peer feed: the subjects of what
+ * other sessions recorded since this session's cursor, never full records,
+ * and the cursor advances only after the feed was handed to the host.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -29,9 +35,11 @@ import { promisify } from "node:util";
 import { formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun } from "../enforcement/run.ts";
+import { openFeed, peerFeed } from "../journal/feed.ts";
 import { openEscalations } from "../journal/read.ts";
 import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
+import { loadOrders, ownedIn, type WorkOrder } from "../journal/work.ts";
 import { renderCompactWithin } from "./glossary.ts";
 import { isCoherenceItself, loadProjectGlossaries } from "./project.ts";
 
@@ -110,10 +118,61 @@ export function escalationBlock(root: string): string {
   return lines.join("\n") + "\n\n";
 }
 
+function sessionOf(input: HookInput): string | undefined {
+  return typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
+}
+
+function agentOf(input: HookInput): string {
+  return typeof input.agent_type === "string" && input.agent_type !== "" ? input.agent_type : MAIN_AGENT;
+}
+
+/** The rule an owning session reads at orient. */
+export const BOUNDARY_RULE = "Maintenance outside the boundary is not this session's to do: record it (unable, defect, conjecture) and leave it.";
+
+function orderLines(order: WorkOrder): string[] {
+  return [`  objective: ${order.objective}`, `  success:   ${order.success}`, `  boundary:  ${order.boundary}`];
+}
+
+/** The work orders the session owns, for orient: the active one it binds to, or why nothing binds, and an open one it has not taken up. */
+export function workBlock(root: string, input: HookInput): string {
+  const session = sessionOf(input);
+  if (session === undefined) return "";
+  const orders = loadOrders(root);
+  const active = ownedIn(orders, session, "active");
+  const open = ownedIn(orders, session, "open");
+  if (active.length === 0 && open.length === 0) return "";
+  const agent = agentOf(input);
+  const lines: string[] = [];
+  if (active.length === 1) {
+    const order = active[0]!;
+    lines.push(`Work order ${order.id} (active; every journal write and run this session makes binds to it):`, ...orderLines(order), `  ${BOUNDARY_RULE}`);
+  } else if (active.length > 1) {
+    lines.push(`This session owns ${active.length} active work orders, so nothing binds by inference; pass --work <id> on each write:`);
+    for (const order of active) lines.push(`  ${order.id}  ${order.objective}`);
+    lines.push(`  ${BOUNDARY_RULE}`);
+  }
+  for (const order of open) {
+    lines.push(`Work order ${order.id} is open, not active; nothing binds to it until: work move ${order.id} active --because "<taking it up>" --session ${session} --agent ${agent}`, ...orderLines(order));
+  }
+  return lines.join("\n") + "\n\n";
+}
+
+/** What regulate says about an order still active at the stop: it is closed with work close, and nothing else closes it. */
+export function workStopText(root: string, input: HookInput): string {
+  const session = sessionOf(input);
+  if (session === undefined) return "";
+  const active = ownedIn(loadOrders(root), session, "active");
+  if (active.length === 0) return "";
+  const agent = agentOf(input);
+  return active
+    .map((order) => `Work order ${order.id} is still active (${order.objective}). When its success criterion holds, close it: work close ${order.id} --because "<what was done>" --session ${session} --agent ${agent}`)
+    .join("\n");
+}
+
 /** The session id as the exact --session value, a decide template, and the rule. */
 export async function sessionBlock(root: string, input: HookInput): Promise<string> {
-  const session = typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
-  const agent = typeof input.agent_type === "string" && input.agent_type !== "" ? input.agent_type : MAIN_AGENT;
+  const session = sessionOf(input);
+  const agent = agentOf(input);
   const cli = (await isCoherenceItself(root)) ? "node src/cli.ts" : "node_modules/.bin/coherence";
   const id = session ?? "<the id your harness shows>";
   return [
@@ -201,8 +260,8 @@ export async function editContext(root: string, input: HookInput, options: HookO
   const text = existsSync(absolute) ? readFileSync(absolute, "utf8") : undefined;
   const touched = model.components.flatMap((c) => c.invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint") && mayTouch(i, file, text)).map((i) => i.name));
   if (touched.length === 0) return "";
-  const session = typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : "unknown-session";
-  const agent = typeof input.agent_type === "string" && input.agent_type !== "" ? input.agent_type : MAIN_AGENT;
+  const session = sessionOf(input) ?? "unknown-session";
+  const agent = agentOf(input);
   const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: touched, model, adapter: options.adapter, refresh: [file] });
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
@@ -226,10 +285,17 @@ export async function editContext(root: string, input: HookInput, options: HookO
 
 export async function startContext(root: string, input: HookInput = {}): Promise<string> {
   const { coherence, project } = await loadProjectGlossaries(root);
-  const head = escalationBlock(root) + specBlock(root);
+  const head = escalationBlock(root) + specBlock(root) + workBlock(root, input);
   const tail = `\n${await sessionBlock(root, input)}`;
   const { text } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length);
   return head + text + tail;
+}
+
+/** The feed for a boundary event: the text to inject and the advance to commit once it is in the host's hands. */
+export function feedContext(root: string, input: HookInput): { text: string; commit: () => void } {
+  const session = sessionOf(input);
+  if (session === undefined) return { text: "", commit: () => {} };
+  return peerFeed(root, session);
 }
 
 async function checkChanged(root: string): Promise<CheckReport | undefined> {
@@ -251,15 +317,19 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     case "SessionStart":
     case "SubagentStart": {
       const context = await startContext(root, input);
+      const session = sessionOf(input);
+      if (session !== undefined) openFeed(root, session);
       const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
       return { stdout: stdout + "\n", stderr: "", exit: 0 };
     }
     case "UserPromptSubmit":
-      return { stdout: "", stderr: "", exit: 0 };
     case "PostToolUse": {
-      const context = await editContext(root, input, options);
+      const feed = feedContext(root, input);
+      const edit = event === "PostToolUse" ? await editContext(root, input, options) : "";
+      const context = feed.text + (feed.text !== "" && edit !== "" ? "\n" : "") + edit;
       if (context === "") return { stdout: "", stderr: "", exit: 0 };
       const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
+      feed.commit();
       return { stdout: stdout + "\n", stderr: "", exit: 0 };
     }
     case "Stop":
@@ -267,10 +337,12 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const report = await checkChanged(root);
       const spec = specStopText(root, await changedFiles(root));
       const glossaryText = report !== undefined && hasFindings(report) ? formatReport(report) : "";
-      if (glossaryText === "" && spec.text === "") return { stdout: "", stderr: "", exit: 0 };
+      const workText = workStopText(root, input);
+      if (glossaryText === "" && spec.text === "" && workText === "") return { stdout: "", stderr: "", exit: 0 };
       const parts: string[] = [];
       if (glossaryText !== "") parts.push(`Glossary check:\n${glossaryText}`);
       if (spec.text !== "") parts.push(`Spec:\n${spec.text}`);
+      if (workText !== "") parts.push(`Work:\n${workText}`);
       const text = parts.join("\n");
       const refuse = event === "SubagentStop" && input.stop_hook_active !== true && (glossaryText !== "" || spec.problems > 0 || spec.defects > 0);
       if (refuse) {

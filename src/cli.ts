@@ -19,11 +19,13 @@
  *   coherence hooks install --host <claude|codex>
  *   coherence hooks status
  *   coherence decide | retract | conjecture | ... | journal   (see JOURNAL_USAGE)
+ *   coherence work create | move | close | owner | inspect   (see WORK_USAGE)
  *
  * Exit codes: the check exits 1 with findings and 0 without; a hook exits 2
  * to refuse a stop, with the reason on stderr.
  */
 
+import { ECONOMY_USAGE, calibrateCommand, economyCommand, massCommand } from "./economy/cli.ts";
 import { ENFORCEMENT_USAGE, runCommand, serveCommand } from "./enforcement/cli.ts";
 import { JOURNAL_USAGE, journalVerbs, type Command, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, runCheck } from "./lifecycle/check.ts";
@@ -42,6 +44,7 @@ const USAGE = `usage:
 ${SPEC_USAGE}
 ${SCAFFOLD_USAGE}
 ${ENFORCEMENT_USAGE}
+${ECONOMY_USAGE}
   coherence hook <${HOOK_EVENTS.join("|")}>
   coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"]
   coherence hooks status
@@ -178,6 +181,12 @@ async function main(argv: string[]): Promise<number> {
       return runCommand(rest, io);
     case "serve":
       return serveCommand(rest, io);
+    case "economy":
+      return economyCommand(rest, io);
+    case "calibrate":
+      return calibrateCommand(rest, io);
+    case "mass":
+      return massCommand(rest, io);
     case "hook":
       return hookCommand(rest, root);
     case "hooks":
