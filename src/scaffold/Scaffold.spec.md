@@ -21,7 +21,7 @@ The command that makes the complete shape the cheapest thing to produce: a compo
   kinds: none
 - a component lives under its project: The folder a component is scaffolded into is confined to the project root; one that reaches above it is refused and nothing is created.
   protects: confineToRoot
-  chokepoint: confineToRoot
+  chokepoint: src/scaffold/scaffold.ts
   over: every folder given to scaffold component and scaffold invariant, relative, absolute, and reaching upward
   via: scaffold confines a component folder to the project root
   because: the folder comes from a command line or from spec text an agent wrote, neither of which is trusted to stay inside the tree it names; a scaffold that followed one upward would write a spec into a neighbouring project, and the invariant verb would then read and append to it

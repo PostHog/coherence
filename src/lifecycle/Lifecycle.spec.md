@@ -140,11 +140,11 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: circuit-breaker-policy dismissed: an unavailable instrument is reported as such, never routed around
   checklist: declared-target-coverage dismissed: one file per event, not a registry of targets
 - install keeps other hooks: Installing the hook merges one Coherence entry per event into the host's settings, keeps every hook that is not ours, owns only a command that names this tool's binary or its own cli path, and replaces that command on a second pass.
-  protects: SETTINGS_FILE
-  chokepoint: src/lifecycle/install.ts
+  protects: mergeHooks
+  chokepoint: install
   over: every host and every event Coherence installs, against every hook command another tool could have written there
   via: mergeHooks adds one Coherence entry per event, keeps everything else, and replaces its own entry on a second pass
-  because: the host's settings file belongs to the adopter and may already carry other hooks; an install that clobbered them would cost the adopter its own automation, a second install that duplicated its entry would run every hook twice, and ownership decided by a loose match would delete a stranger's hook that merely ends the way ours does
+  because: the host's settings file belongs to the adopter and may already carry other hooks; an install that clobbered them would cost the adopter its own automation, a second install that duplicated its entry would run every hook twice, and ownership decided by a loose match would delete a stranger's hook that merely ends the way ours does. What must be choked is the object that gets written: only the merge produces it, and only install reaches the merge. It was written as the settings path inside this module, which stopped being true the moment the hook needed to know which tree it was installed for and read the same two paths to find it; the path is a fact about a host, the merge is the thing that must have one door
   crossing: project-source -> harness
   refuted: claimed any command ending in "cli.ts hook <Event>" as Coherence's, so a stranger's cli.ts hook was deleted on install -> "mergeHooks adds one Coherence entry per event, keeps everything else, and replaces its own entry on a second pass" went red in install.test.ts naming the three foreign hooks that vanished; restored, green (2026-09-17)
   kinds: deploy

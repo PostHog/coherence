@@ -13,7 +13,7 @@ import { KEYS } from "../spec/grammar.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { applicableShapes, loadSeed } from "../spec/seed.ts";
 import { scaffoldCommand } from "./cli.ts";
-import { scaffoldComponent } from "./scaffold.ts";
+import { componentDir, scaffoldComponent } from "./scaffold.ts";
 import { renderInvariant } from "./scaffold.ts";
 
 const seed = loadSeed();
@@ -196,6 +196,9 @@ test("scaffold confines a component folder to the project root", async () => {
     assert.equal(existsSync(join(outer, "sibling")), false, "nothing was created beside the project");
     assert.equal(existsSync(join(outer, "Project.spec.md")), false, "and nothing above it");
 
+    for (const folder of ["..", join(outer, "sibling")]) {
+      assert.throws(() => componentDir(root, folder), /is outside the project root/, `componentDir is the one door and it refuses ${folder}`);
+    }
     const inside = scaffoldComponent(root, "src/deep", "a component under the root");
     assert.equal(inside.path, join(root, "src", "deep", "Deep.spec.md"), "a folder under the root is made as asked");
     assert.equal(scaffoldComponent(root, ".", "the entry component").path, join(root, "Project.spec.md"), "the root itself is inside itself");

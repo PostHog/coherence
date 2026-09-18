@@ -119,7 +119,9 @@ test("with defects in changed files: Stop reports and exits 0; SubagentStop refu
 });
 
 test("an unknown noun in a changed file is advisory: Stop reports it and SubagentStop never refuses on it", async () => {
+  // Its own starting tree: a totality oracle must hold when its test runs alone.
   await writeFile(join(root, "clean.md"), "The widget is fine.\n");
+  await writeFile(join(root, "new.md"), "The Sprocket Wheel turns. It turns the Sprocket Wheel again.\n");
   assert.deepEqual((await changedFiles(root)).files, ["new.md"], "only the file with the unknown noun is changed");
   const subagent = await runHook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
   assert.equal(subagent.exit, 0, `an unknown noun is a nomination, not a proof: ${subagent.stderr}`);
@@ -130,6 +132,8 @@ test("an unknown noun in a changed file is advisory: Stop reports it and Subagen
 
 test("an unable record from the session turns the debt it names advisory: SubagentStop reports it and exits 0, and another session is still refused", async () => {
   const io = { cwd: root, out: () => {}, err: () => {} };
+  // Its own starting tree: a totality oracle must hold when its test runs alone.
+  await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
   const refused = await runHook("SubagentStop", { cwd: root, session_id: "s-unable", stop_hook_active: false }, root);
   assert.equal(refused.exit, REFUSE_EXIT, "the rejected name in clean.md refuses the stop");
   assert.equal(journalVerbs["unable"]!(["cannot rename doohickey in clean.md", "--because", "the owner keeps that fixture text; the rename is theirs", "--session", "s-unable", "--agent", "Plan"], io), 0);
