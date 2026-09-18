@@ -13,11 +13,9 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from
 import { join } from "node:path";
 import { JournalError } from "./args.ts";
 import { isKind, type JournalRecord } from "./record.ts";
+import { SESSION_TOKEN, workBinding } from "./work.ts";
 
 export const JOURNAL_DIR = join(".coherence", "journal");
-
-/** A session names its file, so it must be a plain file-safe token. */
-const SESSION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 export function journalDir(cwd: string): string {
   return join(cwd, JOURNAL_DIR);
@@ -32,12 +30,19 @@ export function sessionFile(cwd: string, session: string): string {
   return join(journalDir(cwd), `${session}.jsonl`);
 }
 
-/** Append one record as one line. The file and directory are created on first write. */
-export function appendRecord(cwd: string, record: JournalRecord): string {
+/**
+ * Append one record as one line, and settle its work order binding here,
+ * where every write passes: a --work flag names the order, otherwise the one
+ * active order the session owns binds, otherwise the record says why nothing
+ * does. The file and directory are created on first write. Returns the
+ * record as written.
+ */
+export function appendRecord(cwd: string, record: JournalRecord): JournalRecord {
   const file = sessionFile(cwd, record.session);
+  const bound: JournalRecord = { ...record, ...workBinding(cwd, record.session, record.work) };
   mkdirSync(journalDir(cwd), { recursive: true });
-  appendFileSync(file, `${JSON.stringify(record)}\n`, "utf8");
-  return file;
+  appendFileSync(file, `${JSON.stringify(bound)}\n`, "utf8");
+  return bound;
 }
 
 export interface Damaged {

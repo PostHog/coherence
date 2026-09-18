@@ -23,17 +23,19 @@ import {
   type Defect,
   type Escalation,
   type Experiment,
-  type Head,
   type JournalRecord,
   type Kind,
   type Resolution,
   type Retraction,
+  type Stamp,
   type Step,
   type StepResult,
   type Unable,
   type Dismissal,
+  type WorkKind,
 } from "./record.ts";
 import { JOURNAL_DIR, appendRecord, gitState, loadJournal, type Loaded } from "./store.ts";
+import { describeBinding } from "./work.ts";
 
 export interface Context {
   cwd: string;
@@ -46,32 +48,40 @@ export interface Written {
   lines: string[];
 }
 
-/** Every verb takes attribution; --work binds the record to a work order when given. */
+/** Every verb takes attribution; --work names the work order when the inferred binding is not wanted. */
 const COMMON: Record<string, FlagShape> = { session: "one", agent: "one", work: "one" };
 
-function withCommon(spec: Record<string, FlagShape>): Record<string, FlagShape> {
+export function withCommon(spec: Record<string, FlagShape>): Record<string, FlagShape> {
   return { ...COMMON, ...spec };
 }
 
-function attribution(parsed: Parsed): Attribution {
+export function attribution(parsed: Parsed): Attribution {
   const session = required(parsed, "session", "every record binds through its session");
   const agent = required(parsed, "agent", "every record names the agent that wrote it");
   const work = parsed.one.get("work");
   return work === undefined ? { session, agent } : { session, agent, work };
 }
 
-/** The head every record shares. The id hashes session, time, and the record's text. */
-function head<K extends Kind>(kind: K, who: Attribution, ctx: Context, text: string): Head & { kind: K } {
+/**
+ * The head every record shares, in the journal and in the work store. The id
+ * hashes session, time, and the record's text; this is the one site that
+ * mints one.
+ */
+export function head<K extends Kind | WorkKind>(kind: K, who: Attribution, ctx: Context, text: string): Stamp<K> & { work?: string } {
   const at = ctx.now().toISOString();
   const { commit, dirty } = gitState(ctx.cwd);
   return { id: recordId(kind, who.session, at, text), kind, at, ...who, commit, dirty };
 }
 
 function write(ctx: Context, record: JournalRecord, extra: string[] = []): Written {
-  appendRecord(ctx.cwd, record);
+  const written = appendRecord(ctx.cwd, record);
   return {
-    record,
-    lines: [`${record.id}  ${record.kind} recorded in ${JOURNAL_DIR}/${record.session}.jsonl`, ...extra],
+    record: written,
+    lines: [
+      `${written.id}  ${written.kind} recorded in ${JOURNAL_DIR}/${written.session}.jsonl`,
+      `  ${describeBinding({ binding: written.binding ?? "none: unsettled", ...(written.work === undefined ? {} : { work: written.work }) })}`,
+      ...extra,
+    ],
   };
 }
 

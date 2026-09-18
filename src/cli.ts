@@ -19,6 +19,7 @@
  *   coherence hooks install --host <claude|codex>
  *   coherence hooks status
  *   coherence decide | retract | conjecture | ... | journal   (see JOURNAL_USAGE)
+ *   coherence work create | move | close | owner | inspect   (see WORK_USAGE)
  *
  * Exit codes: the check exits 1 with findings and 0 without; a hook exits 2
  * to refuse a stop, with the reason on stderr.
