@@ -35,6 +35,36 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: removed the prose pass from rejectedInProse -> "rejected names are found as whole words in prose, with concept and because" went red in check.test.ts; restored, green (2026-09-17)
   kinds: none
+- both layers reach identifiers: Both glossary layers' rejected names are matched in identifiers as well as in prose; only a name the project declares as its own concept or alias is silent there.
+  over: every rejected name of both layers against every identifier token in the corpus, in a project with its own glossary and in one without
+  via: in code, both layers' rejected names match identifier tokens, Coherence's too in an adopter, unless the project declares the name as its own; language globals and module specifiers never match
+  because: the cross-glossary rule is about sense, not about where a word sits: a project that means something of its own by a word declares it and is left alone, and a project that has not declared it is drifting whether the word is in a sentence or in a symbol. Holding Coherence's names against prose only let an adopter's code carry them untouched, which is where naming drift actually lives
+  crossing: project-source -> reading
+  refuted: held Coherence's rejected names against an adopter's prose only, so the name in an adopter identifier went unreported -> "in code, both layers' rejected names match identifier tokens, Coherence's too in an adopter, unless the project declares the name as its own; language globals and module specifiers never match" went red in check.test.ts, the identifier hit missing from the expected list; restored, green (2026-09-18)
+  kinds: none
+- the corpus is every text kind: The check reads every text file kind the project holds, the journal's and work's own records included, and leaves out what is written in another vocabulary on purpose, what no rename can repair, and what is not text.
+  over: every file under the project root, by kind: prose, code, data, dotfiles, records, lockfiles, binaries, the retired inventories, the reference docs and the reviews
+  via: the corpus reads every text kind the project holds, the journal's records included, and leaves out lockfiles, binaries, runs, and the reviews
+  because: a check that reads two extensions reports zero over a project whose drift is in its configuration, its scripts and its records, and a zero that means "not looked at" is worse than no check; the exclusions are the files that must name what they refuse (the glossaries and the retired inventories), the files a rename cannot reach (a dependency lockfile), and the files that are not the project's own words (the reference docs and the adversarial reviews, which quote the names they report)
+  crossing: project-source -> reading
+  refuted: read only .md and .ts, so eleven files of nine other kinds went unread and only the review the check should skip was read -> "the corpus reads every text kind the project holds, the journal's records included, and leaves out lockfiles, binaries, runs, and the reviews" went red in check.test.ts with every expected file missing; restored, green (2026-09-18)
+  kinds: read
+  checklist: scoped-reads declared as the corpus is every text kind
+  checklist: redaction dismissed: every finding is shown with its file, line, and the text as written
+- the corpus stays inside the root: Every path the check is given is confined to the project root; a path that reaches above it is refused rather than read.
+  over: every path given to the check: relative, absolute, and reaching upward
+  via: collectFiles confines every given path to the project root
+  because: the paths reach the check from a spec, a hook's stdin, and a command line, none of which is trusted to stay inside the tree it names; a walk that followed one upward would read, and report, a neighbouring project's files
+  crossing: project-source -> reading
+  refuted: resolved each given path and walked it, so ".." and "/etc" were read -> "collectFiles confines every given path to the project root" went red in check.test.ts, the walk failing above the root instead of refusing; restored, green (2026-09-18)
+  kinds: none
+- an unreadable path never aborts the check: A path the process cannot read is reported as unreadable and skipped; the rest of the corpus is still checked, and the report says what it did not see.
+  over: every folder and file the walk reaches, readable and not
+  via: an unreadable folder is reported and skipped; the check never aborts on it
+  because: one locked folder cost the whole check, so a project with a single unreadable path got no verdict at all; and a check that quietly skipped it would report a clean corpus it never read, which is the same lie a failed listing read as an empty one would be
+  crossing: project-source -> reading
+  refuted: let the walk's readdir throw -> "an unreadable folder is reported and skipped; the check never aborts on it" went red in check.test.ts with EACCES out of scandir aborting the run; restored, green (2026-09-18)
+  kinds: none
 - project sense wins: Inside a project, an accepted project name silences a Coherence rejection, and an accepted phrase guards the words inside it.
   over: every accepted project name and alias against every Coherence rejected name
   via: a project's own sense wins: an accepted project name silences a Coherence rejection, and an accepted phrase guards the words inside it

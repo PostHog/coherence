@@ -158,7 +158,7 @@ test("the corpus reads every text kind the project holds, the journal's records 
     await put("docs/reviews/2026-09-18-review.md", `The reviewer wrote ${REJ} on purpose.\n`);
     await put("docs/reference/old.md", `The ${REJ} was the old name.\n`);
     const out = await runCheck({ root: dir, coherence });
-    const hits = out.rejected.map((f) => f.file).sort();
+    const hits = [...new Set(out.rejected.map((f) => f.file))].sort(); // which kinds were read, not how many times each one said it
     assert.deepEqual(hits, [
       ".coherence/journal/s1.jsonl",
       ".coherence/work/s1.jsonl",
@@ -237,7 +237,7 @@ test("the report ends with counts, and hasFindings drives the exit code", () => 
 test("paths restrict the corpus", async () => {
   const only = await runCheck({ root, coherence, project, paths: ["src/a.ts"] });
   assert.equal(only.files, 1);
-  assert.equal(only.rejected.length, 2);
+  assert.equal(only.rejected.length, 3, "both layers' names reach identifiers: the project's two, and Coherence's one the project did not take for its own");
   assert.equal(only.unknown.length, 0);
 });
 
