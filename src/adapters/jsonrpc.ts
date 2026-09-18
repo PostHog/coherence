@@ -2,8 +2,11 @@
  * A JSON-RPC 2.0 client over a child process's stdio, framed the way the
  * language server protocol frames it: `Content-Length: N\r\n\r\n` then N
  * bytes of JSON. Requests carry an id and await a response; notifications
- * carry none. Server-to-client requests are answered with null so the
- * server never waits on us; notifications from the server are ignored.
+ * carry none. Server-to-client requests are answered by `onRequest` when an
+ * adapter sets one (Pyright asks workspace/configuration) and with null
+ * otherwise, so the server never waits on us; notifications from the
+ * server reach `onNotification` (Pyright logs when its enumeration is done)
+ * and are otherwise ignored.
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
@@ -30,6 +33,10 @@ export class JsonRpcClient {
   private buffer = Buffer.alloc(0);
   private exited: Error | undefined;
   private readonly child: ChildProcess;
+  /** Called for every notification the server sends (a progress report, a log line); nothing is awaited. */
+  onNotification: ((method: string, params: unknown) => void) | undefined;
+  /** Answers a request from the server by method, at once or later; undefined (or no handler) answers null so the server never waits. */
+  onRequest: ((method: string, params: unknown) => unknown | Promise<unknown>) | undefined;
 
   constructor(child: ChildProcess) {
     this.child = child;
@@ -123,8 +130,27 @@ export class JsonRpcClient {
     const id = message["id"];
     const hasMethod = typeof message["method"] === "string";
     if (hasMethod) {
-      // A request from the server (window/workDoneProgress/create, client/registerCapability, ...): answer so it never waits.
-      if (id !== undefined && id !== null) this.send({ jsonrpc: "2.0", id, result: null });
+      const method = message["method"] as string;
+      // A request from the server (workspace/configuration, window/workDoneProgress/create, ...): answer so it never waits.
+      if (id !== undefined && id !== null) {
+        let answer: unknown;
+        try {
+          answer = this.onRequest?.(method, message["params"]);
+        } catch {
+          answer = null;
+        }
+        Promise.resolve(answer)
+          .catch(() => null)
+          .then((result) => {
+            if (this.exited === undefined) this.send({ jsonrpc: "2.0", id, result: result ?? null });
+          });
+        return;
+      }
+      try {
+        this.onNotification?.(method, message["params"]);
+      } catch {
+        // A listener's failure must not break the framing loop.
+      }
       return;
     }
     if (typeof id !== "number") return;

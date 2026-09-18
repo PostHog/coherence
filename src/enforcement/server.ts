@@ -88,6 +88,14 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   void adapter.ready().then((state) => {
     warm = state.ok;
     log(state.ok ? `${config.language} adapter ready` : `${config.language} adapter not ready: ${state.reason}`);
+    // An adapter whose instrument enumerates the workspace (Pyright) reports when that is done, for the measurement.
+    const enumerating = (adapter as { indexed?: () => Promise<unknown>; enumeration?: { sourceFiles: number; latency: number } }).indexed;
+    if (state.ok && typeof enumerating === "function") {
+      void enumerating.call(adapter).then(() => {
+        const e = (adapter as { enumeration?: { sourceFiles: number; latency: number } }).enumeration;
+        if (e !== undefined) log(`${config.language} instrument enumerated ${e.sourceFiles} source files in ${e.latency} ms`);
+      }, () => {});
+    }
   });
 
   mkdirSync(paths.dir, { recursive: true });
@@ -131,7 +139,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
     const params = sent.map((p) => (p === null ? undefined : p));
     switch (method) {
       case "status":
-        return { language: adapter.language, ladder: adapter.ladder, warm, pid: process.pid, startedAt };
+        return { language: adapter.language, ladder: adapter.ladder, warm, pid: process.pid, startedAt, enumeration: (adapter as { enumeration?: { sourceFiles: number; latency: number } }).enumeration ?? null };
       case "ready":
         return adapter.ready();
       case "resolve":
@@ -139,7 +147,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
       case "references":
         return adapter.references(params[0] as Definition);
       case "visibility":
-        return adapter.visibility(params[0] as Definition);
+        return adapter.visibility(params[0] as Definition, params[1] as Definition | undefined);
       case "testFilter":
         return adapter.testFilter(params[0] as string);
       case "refute":
@@ -261,8 +269,8 @@ export class RemoteAdapter implements LanguageAdapter {
   references(definition: Definition): Promise<ReferenceSite[]> {
     return this.client.request("references", [definition]);
   }
-  visibility(definition: Definition): Promise<Visibility> {
-    return this.client.request("visibility", [definition]);
+  visibility(definition: Definition, chokepoint?: Definition): Promise<Visibility> {
+    return this.client.request("visibility", [definition, chokepoint]);
   }
   testFilter(via: string): string {
     return via;

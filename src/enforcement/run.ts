@@ -8,6 +8,7 @@
 
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { gitState } from "../journal/store.ts";
+import { workBinding } from "../journal/work.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
 import { checkChokepoint, type ChokepointResult } from "./check.ts";
 import { readEnforcementConfig, type EnforcementConfig } from "./config.ts";
@@ -83,27 +84,11 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   );
 
   const details: EntryDetail[] = [];
-  let instrument: RunRecord["instrument"] = { language: config.language, server: "none" };
-  let instrumentReason: string | undefined;
-  let adapter: LanguageAdapter | undefined = options.adapter;
-  let remote: RemoteAdapter | undefined;
-
   const needsAdapter = wantChokepoints && selected.some(({ invariant }) => chokepointEnforcements(invariant).length > 0);
-  if (needsAdapter && adapter === undefined && options.server !== false) {
-    try {
-      const connected = await connectAdapter(root);
-      remote = connected.adapter;
-      adapter = remote;
-      instrument = { language: remote.language, server: connected.server };
-      await remote.forget(options.refresh ?? []);
-    } catch (error) {
-      instrumentReason = error instanceof Error ? error.message : String(error);
-    }
-  } else if (adapter !== undefined) {
-    // An adapter handed in lives in this process: no server was warm before it.
-    instrument = { language: adapter.language, server: "cold" };
-    if ("forget" in adapter && typeof adapter.forget === "function") (adapter as { forget: (files?: readonly string[]) => void }).forget(options.refresh ?? []);
-  }
+
+  // The pass itself, once the instrument question is settled: an adapter, where it came from, or why there is none.
+  const pass = async (adapter: LanguageAdapter | undefined, instrument: RunRecord["instrument"], unavailable: string | undefined): Promise<RunOutcome> => {
+  let instrumentReason = unavailable;
   if (adapter !== undefined && instrumentReason === undefined && needsAdapter) {
     const state = await adapter.ready();
     if (!state.ok) instrumentReason = state.reason;
@@ -160,6 +145,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
           entry: entryOf(component, invariant.name, "chokepoint", {
             verdict: result.verdict,
             grade: result.grade,
+            ...(result.enforcer === undefined ? {} : { enforcer: result.enforcer }),
             refutation: result.refutation,
             bypasses: result.bypasses,
             testReferences: result.counts.test,
@@ -197,13 +183,12 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     }
   }
 
-  if (remote !== undefined) await remote.close();
-
   const { commit, dirty } = gitState(root);
   const record: RunRecord = {
     at: now().toISOString(),
     session: options.session,
     agent: options.agent,
+    ...workBinding(root, options.session),
     commit,
     dirty,
     instrument,
@@ -212,6 +197,49 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   };
   const file = appendRun(root, record);
   return { record, file, details, instrumentReason };
+  };
+
+  if (needsAdapter && options.adapter === undefined && options.server !== false) {
+    return withWarmAdapter(root, (remote, server, reason) => pass(remote, { language: remote?.language ?? config.language, server: server ?? "none" }, reason), { refresh: options.refresh ?? [] });
+  }
+  const given = options.adapter;
+  if (given !== undefined) {
+    // An adapter handed in lives in this process: no server was warm before it.
+    if ("forget" in given && typeof given.forget === "function") (given as { forget: (files?: readonly string[]) => void }).forget(options.refresh ?? []);
+    return pass(given, { language: given.language, server: "cold" }, undefined);
+  }
+  return pass(undefined, { language: config.language, server: "none" }, undefined);
+}
+
+/**
+ * The one door to the warm instrument, for the run and for a reading that
+ * needs the adapter itself (the economy's closure): connects over the
+ * socket, spawning the server detached when none listens, re-reads the
+ * named files, hands the adapter to `fn` with whether the server was warm,
+ * and ends the connection after. When no server answers, `fn` gets no
+ * adapter and the reason, so a caller records not run rather than crashing.
+ */
+export async function withWarmAdapter<T>(
+  root: string,
+  fn: (adapter: RemoteAdapter | undefined, server: "cold" | "warm" | undefined, reason: string | undefined) => Promise<T>,
+  options: { refresh?: readonly string[] | undefined; idleMs?: number | undefined } = {},
+): Promise<T> {
+  let remote: RemoteAdapter | undefined;
+  let server: "cold" | "warm" | undefined;
+  let reason: string | undefined;
+  try {
+    const connected = await connectAdapter(root, options.idleMs === undefined ? {} : { idleMs: options.idleMs });
+    remote = connected.adapter;
+    server = connected.server;
+    await remote.forget(options.refresh ?? []);
+  } catch (error) {
+    reason = error instanceof Error ? error.message : String(error);
+  }
+  try {
+    return await fn(remote, server, reason);
+  } finally {
+    if (remote !== undefined) await remote.close();
+  }
 }
 
 function entryOf(component: string, name: string, form: Form, rest: Omit<RunEntry, "component" | "name" | "form" | "grade"> & { grade: RunEntry["grade"] | undefined }): RunEntry {

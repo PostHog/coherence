@@ -70,12 +70,12 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   crossing: instrument -> record
   refuted: made every totality entry record the one-at-a-time mode whatever ran -> "the batched totality oracle pass: every test the bullets name in one invocation, mapped back by name; the record says which mode ran" went red in enforcement.test.ts; restored, green (2026-09-17)
   kinds: none
-- warm server the only path: From a hook, the language server is reached only through the warm server: the run connects over the socket and spawns the server detached when none listens.
+- warm server the only path: From a hook or a reading, the language server is reached only through the warm server: one door connects over the socket, spawns the server detached when none listens, and hands the adapter to the run or to the reading that asked.
   protects: connectAdapter
-  chokepoint: performRun
-  over: every hook event that re-checks a chokepoint
+  chokepoint: withWarmAdapter
+  over: every hook event that re-checks a chokepoint and every reading that needs the instrument itself
   via: two clients ask the same questions; the second finds the server warm
-  because: a hook is short-lived and a cold project load is too slow for a check at the edit; every run connects through one function that finds the warm server or spawns it detached, so no hook can start its own cold instrument and wait on it
+  because: a hook is short-lived and a cold project load is too slow for a check at the edit; every run and every reading (the economy's closure) connects through one door that finds the warm server or spawns it detached, so no hook and no reading can start its own cold instrument and wait on it
   crossing: harness -> instrument
   refuted: <not witnessed by hand: the run witnesses the chokepoint automatically; no staged break was attempted on the socket>
   kinds: none

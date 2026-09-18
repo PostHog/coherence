@@ -16,9 +16,7 @@
  * need no instrument.
  */
 
-import { adapterFor } from "../adapters/index.ts";
-import type { LanguageAdapter } from "../adapters/adapter.ts";
-import { readEnforcementConfig } from "../enforcement/config.ts";
+import { withWarmAdapter } from "../enforcement/run.ts";
 import { JournalError, parseFlags } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
 import { calibrate, formatCalibration } from "./calibrate.ts";
@@ -31,38 +29,13 @@ export const ECONOMY_USAGE = [
   "  mass [--json]   total and unreached mass per component and for the project, unreached first",
 ].join("\n");
 
-interface Instrument {
-  adapter: LanguageAdapter | undefined;
-  server: "cold" | "warm" | undefined;
-  reason: string | undefined;
-  close: () => Promise<void>;
-}
-
 /**
- * The adapter a command reads references through. The warm server is reached
- * only through performRun (the enforcement component's chokepoint over
- * connectAdapter), which economy cannot use, so economy drives the adapter in
- * this process until enforcement opens a door for readings beside the run;
- * the hook's snapshot passes the adapter it already holds.
+ * The closure for a root and paths, through the warm instrument: enforcement's
+ * one door (withWarmAdapter) hands the adapter over, or the reason there is
+ * none; the hook's snapshot passes the adapter it already holds.
  */
-async function instrumentFor(root: string): Promise<Instrument> {
-  const direct = adapterFor(readEnforcementConfig(root).language, root);
-  const state = await direct.ready();
-  if (!state.ok) {
-    await direct.close();
-    return { adapter: undefined, server: undefined, reason: state.reason, close: async () => {} };
-  }
-  return { adapter: direct, server: "cold", reason: undefined, close: () => direct.close() };
-}
-
-/** The closure for a root and paths, through whichever instrument answers. */
 export async function economyFor(root: string, paths: readonly string[]): Promise<Closure> {
-  const instrument = await instrumentFor(root);
-  try {
-    return await predictClosure(root, paths, { adapter: instrument.adapter, server: instrument.server, instrumentReason: instrument.reason });
-  } finally {
-    await instrument.close();
-  }
+  return withWarmAdapter(root, (adapter, server, reason) => predictClosure(root, paths, { adapter, server, instrumentReason: reason }));
 }
 
 export async function economyCommand(argv: string[], io: Io): Promise<number> {

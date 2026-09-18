@@ -28,14 +28,48 @@ The language adapter seam: how to ask a language's server for definitions, refer
   crossing: project-source -> reading
   refuted: made a configured test folder no longer mark a path as a test -> "a path is a test when a configured folder is a segment or the file is named .test or .spec" went red in adapter.test.ts; restored, green (2026-09-17)
   kinds: none
-- ladder is adapter-defined: The top rung of the grade ladder is the adapter's to name: TypeScript enforces visibility and reaches visibility-choked; a language that does not tops out at reference-choked.
+- ladder is adapter-defined: The grade ladder is the adapter's to name, rung by rung, each rung a fact the adapter verifies and the name of who enforces it: TypeScript's compiler reaches visibility-choked; Python's interpreter reaches closure-choked, a checker the project runs checker-choked, Coherence's own check reference-choked, and a convention alone is enforced by nobody.
   protects: TYPESCRIPT_LADDER
   chokepoint: TypeScriptAdapter
   over: every adapter
   via: the grade ladder's top rung is adapter-defined
-  because: visibility-choked means the language itself refuses a reference from outside the module; a language that enforces no visibility cannot earn it, and a ladder with one top for every language would grade a convention as a structural fact
+  because: visibility-choked means the language itself refuses a reference from outside the module; a language that enforces no visibility cannot earn it, and a ladder with one top for every language would grade a convention as a structural fact; naming the enforcer on every rung is what lets a human read how much the structure is doing and who would stop a bypass
   crossing: instrument -> reading
-  refuted: raised the second adapter's top rung to visibility-choked -> the adapter-defined ladder test went red in adapter.test.ts; restored, green (2026-09-17)
+  refuted: raised the second adapter's top rung to visibility-choked -> the adapter-defined ladder test went red in adapter.test.ts; restored, green (2026-09-17); left whenVacuous unset on the Python ladder -> the same test went red; restored, green (2026-09-17)
+  kinds: none
+- Python rungs verified: A Python chokepoint is graded closure-choked only when the protected thing is a function-local inside the chokepoint's body and no module attribute exposes it, checker-choked only when the name is underscore-prefixed and the project's Pyright configuration makes reportPrivateUsage an error (or an import-linter rule names the protected module), and reference-choked otherwise, with the underscore prefix and the __all__ list reported as evidence.
+  protects: PYTHON_LADDER
+  chokepoint: PythonAdapter
+  over: every rung of the Python ladder and every combination of definition scope, name prefix, __all__ membership, and checker configuration
+  via: Python grades: broken with a bypass; reference-choked when clean, with the convention as evidence; closure-choked for a function-local; checker-choked once Pyright's private-usage rule is an error; broken without a chokepoint; not chokeable for prose
+  because: each rung names an enforcer, so a rung granted without its fact would credit the interpreter or a checker with a refusal that does not happen; the adapter reads the definition's scope from Pyright's symbols and the checker's rule from the project's own configuration, never from the spec
+  crossing: instrument -> reading
+  refuted: made the closure rung never verified -> "Python grades: broken with a bypass; reference-choked when clean, with the convention as evidence; closure-choked for a function-local; checker-choked once Pyright's private-usage rule is an error; broken without a chokepoint; not chokeable for prose" went red in python.test.ts; restored, green (2026-09-17)
+  kinds: none
+- Python import told from use: A site on an import statement or in an __all__ list, wrapped or not, is an import and never a bypass, and a site in one of a protected package's own files is inside the package.
+  protects: IMPORT_LINE in python.ts
+  chokepoint: isPythonImportSite
+  over: every reference site Pyright reports, across wrapped import lines, backslash chains, and __all__ lists
+  via: Python classification: inside the chokepoint, an import, a test reference, a bypass; an __all__ entry is a re-export, never a use
+  because: Pyright reports the string entries of __all__ and every import line as references; counted as uses, a package re-exporting its members would grade broken at module top level and every importer of a protected name would be a bypass
+  crossing: instrument -> reading
+  refuted: made an import line or __all__ entry count as a use -> "Python classification: inside the chokepoint, an import, a test reference, a bypass; an __all__ entry is a re-export, never a use" went red in python.test.ts; restored, green (2026-09-17); made a package's own files no longer inside the protected package -> "a Python module or package resolves, its members are the references' start, and the package's own files are inside it" went red in python.test.ts; restored, green (2026-09-17)
+  kinds: none
+- whole workspace indexed: The Python adapter waits for Pyright's enumeration of the whole workspace before answering, and never narrows the workspace to a component.
+  over: every references query and every bare-name resolution the Python adapter answers
+  via: Python classification: inside the chokepoint, an import, a test reference, a bypass; an __all__ entry is a re-export, never a use
+  because: a Python reference to anything can sit in any file, so an index that sees less than the whole workspace can only prove the absence of a bypass inside what it sees; a narrower root on PostHog was fast (0.4 s, 160 MB) and blind to three references outside the folder, and an answer before enumeration is silently partial (the fixture's references came back one file short until the "Found N source files" message)
+  crossing: instrument -> reading
+  refuted: <not witnessed: a staged answer before enumeration is a race the test cannot hold still; the partial answer was observed by hand on the fixture and on PostHog before the wait was added (2026-09-17)>
+  kinds: none
+- pytest report mapped by name: The batched totality pass reads pytest's JUnit XML or pytest-json-report's JSON as the one report shape, and writes pytest's name filter as a -k expression joined with or.
+  protects: reportFromJunit
+  chokepoint: parseReport
+  over: every report the configured testJson command writes and every via a Python bullet names
+  via: pytest's JUnit report reads as the jest shape, and -k names join with or
+  because: pytest ships no jest-shaped reporter but writes JUnit XML itself; a name joined as a regex would be one -k expression pytest cannot parse, so no test would run and every Python totality oracle would fail for the wrong reason
+  crossing: instrument -> record
+  refuted: joined pytest names as a regex -> "pytest's JUnit report reads as the jest shape, and -k names join with or" went red in python.test.ts; restored, green (2026-09-17)
   kinds: none
 - server located or a reason: The language server binary is found in the adopter's node_modules first, then Coherence's, then on PATH, and its absence is a reason, never a crash.
   protects: SERVER_BIN
