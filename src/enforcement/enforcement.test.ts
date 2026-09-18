@@ -158,7 +158,7 @@ test("grades: broken with a bypass, reference-choked when clean and exported, vi
   assert.equal(broken.refutation, "automatic");
 
   write("src/api/render.ts", RENDER_CLEAN);
-  adapter.forget();
+  await adapter.forget();
   const clean = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
   assert.equal(clean.grade, "reference-choked", clean.reason);
   assert.equal(clean.verdict, "pass");
@@ -180,7 +180,7 @@ test("grades: broken with a bypass, reference-choked when clean and exported, vi
   assert.match(prose.reason, /totality oracle form .* is the compromise/);
 
   write("src/api/render.ts", RENDER_BYPASS);
-  adapter.forget();
+  await adapter.forget();
 });
 
 test("the automatic refutation opens a synthetic reference and sees it; nothing is written to disk", async () => {
@@ -352,6 +352,37 @@ test("PostToolUse on a file-writing tool re-checks the invariants that may invol
   assert.equal(stop.defects, 2);
   assert.match(stop.text, /✕ \.\/digest-only egress — structural defect \(chokepoint, run \d{4}-\d{2}-\d{2}\): 1 reference to SECRET_COLUMNS outside seal: src\/api\/render\.ts:5 in render\.leaked/);
   assert.match(stop.text, /stands until the reference is routed through the chokepoint or a human acknowledges a retirement/);
+});
+
+test("the check reads the current disk text after a forget, with the instrument's watcher blind to the file: a loop of edit-then-check yields zero wrong verdicts", async () => {
+  // tsserver reloads a closed document from disk only when it does not own the text; a didOpen with the text it
+  // already loaded leaves it owning the text, and then only its file watcher notices an edit. Excluding the file
+  // from the watcher (a setting an adopter may carry) makes the stale answer deterministic instead of a race.
+  const other = mkdtempSync(join(tmpdir(), "coherence-stale-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(other, path)), { recursive: true });
+    writeFileSync(join(other, path), text, "utf8");
+  };
+  put("tsconfig.json", TSCONFIG.replace('"include": ["src/**/*.ts"]', '"include": ["src/**/*.ts"], "watchOptions": { "excludeFiles": ["src/api/render.ts"] }'));
+  put("src/store/secrets.ts", SECRETS);
+  put("src/__tests__/secrets.test.ts", TEST_FILE);
+  put("src/api/render.ts", RENDER_CLEAN);
+  const fresh = new TypeScriptAdapter(other);
+  const wrong: string[] = [];
+  try {
+    for (let i = 0; i < 6; i++) {
+      const bypass = i % 2 === 1;
+      put("src/api/render.ts", bypass ? RENDER_BYPASS : RENDER_CLEAN);
+      await fresh.forget(["src/api/render.ts"]);
+      const result = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
+      const expected = bypass ? "fail" : "pass";
+      if (result.verdict !== expected) wrong.push(`cycle ${i}: disk ${bypass ? "bypass" : "clean"}, verdict ${result.verdict} (${result.reason})`);
+    }
+  } finally {
+    await fresh.close();
+    rmSync(other, { recursive: true, force: true });
+  }
+  assert.deepEqual(wrong, [], "every verdict answers from the text on disk");
 });
 
 test("the one-at-a-time totality path escapes the title before the runner reads it as a regex", async () => {

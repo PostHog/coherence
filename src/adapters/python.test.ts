@@ -191,7 +191,7 @@ test("Python grades: broken with a bypass; reference-choked when clean, with the
   assert.equal(broken.refutation, "automatic");
 
   write("pkg/render.py", RENDER_CLEAN);
-  adapter.forget();
+  await adapter.forget();
   const clean = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
   assert.equal(clean.grade, "reference-choked", clean.reason);
   assert.equal(clean.verdict, "pass");
@@ -217,7 +217,7 @@ test("Python grades: broken with a bypass; reference-choked when clean, with the
   assert.match(member.reason, /member of Tracker, reachable through the class/);
 
   write("pyrightconfig.json", JSON.stringify({ reportPrivateUsage: "error" }));
-  adapter.forget();
+  await adapter.forget();
   const checked = await checkChokepoint(adapter, { protects: "_HIDDEN", chokepoint: "peek", ...hint });
   assert.equal(checked.grade, "checker-choked", checked.reason);
   assert.match(checked.enforcer ?? "", /^Pyright \(reportPrivateUsage: error in pyrightconfig\.json\)/);
@@ -225,7 +225,7 @@ test("Python grades: broken with a bypass; reference-choked when clean, with the
   assert.equal(stillPublic.grade, "reference-choked", "a name without the prefix gains nothing from the rule");
   assert.match(stillPublic.reason, /reportPrivateUsage is an error in pyrightconfig\.json/);
   rmSync(join(root, "pyrightconfig.json"));
-  adapter.forget();
+  await adapter.forget();
 
   const missing = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "no_such_function", ...hint });
   assert.equal(missing.grade, "broken");
@@ -236,7 +236,7 @@ test("Python grades: broken with a bypass; reference-choked when clean, with the
   assert.match(prose.reason, /totality oracle form .* is the compromise/);
 
   write("pkg/render.py", RENDER_BYPASS);
-  adapter.forget();
+  await adapter.forget();
 });
 
 test("a Python module or package resolves, its members are the references' start, and the package's own files are inside it", async () => {

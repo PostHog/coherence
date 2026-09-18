@@ -179,6 +179,8 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private readonly opened = new Set<string>();
   private readonly symbolCache = new Map<string, DocumentSymbol[]>();
   private readonly lineCache = new Map<string, string[]>();
+  /** The document version last sent per open file; a change carries the next one. */
+  private readonly versions = new Map<string, number>();
   /** The first source file, kept open so the project stays loaded. */
   private seed: string | undefined;
   /** Files a definition or a reference site landed in since the last forget: the ones a forget re-reads from disk. */
@@ -240,6 +242,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     if (this.client === undefined || !this.client.alive) {
       this.starting = undefined;
       this.opened.clear();
+      this.versions.clear();
       const again = await this.ready();
       if (!again.ok) throw new Error(again.reason);
     }
@@ -268,6 +271,14 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const content = text ?? readFileSync(join(this.root, file), "utf8");
     this.client!.notify("textDocument/didOpen", { textDocument: { uri: this.uri(file), languageId: "typescript", version: 1, text: content } });
     this.opened.add(file);
+    this.versions.set(file, 1);
+  }
+
+  /** Replace an open document's whole text; the version only ever climbs, so the server never discards a change as old. */
+  private change(file: string, text: string): void {
+    const version = (this.versions.get(file) ?? 1) + 1;
+    this.versions.set(file, version);
+    this.client!.notify("textDocument/didChange", { textDocument: { uri: this.uri(file), version }, contentChanges: [{ text }] });
   }
 
   private closeDocument(file: string): void {
@@ -291,30 +302,39 @@ export class TypeScriptAdapter implements LanguageAdapter {
 
   /**
    * Cached facts about files are dropped when their text may have changed (the
-   * edit hook re-runs a check). tsserver reads a file it never opened from disk
-   * and refreshes it only when its watcher fires, so every file touched since
-   * the last forget, and every file the caller names, is opened and closed:
-   * closing makes tsserver reload it from disk at once. The seed stays open
-   * throughout, since tsserver drops the project when no document is open.
+   * edit hook re-runs a check), and the server is made to see the current disk
+   * text of every document this adapter may have open before any question is
+   * asked. Closing a document is not enough: tsserver reloads a closed file
+   * from disk only when it does not own the text, and a didOpen carrying the
+   * text it already loaded leaves it owning the text, so a close after that
+   * leaves the edit to its file watcher, which is late under load and blind to
+   * an excluded file. So every open document, every file touched since the
+   * last forget, and every file the caller names gets its whole current text
+   * (didChange for an open document, didOpen for one not yet open, and it
+   * stays open), and the forget waits for a documentSymbol answer per file,
+   * which the server cannot give before the change is applied. A file that
+   * no longer exists is closed.
    */
-  forget(files: readonly string[] = []): void {
+  async forget(files: readonly string[] = []): Promise<void> {
     this.symbolCache.clear();
     this.lineCache.clear();
     if (this.client === undefined) return;
     const refresh = new Set([...this.touched, ...files, ...this.opened]);
     this.touched.clear();
+    const synced: string[] = [];
     for (const file of refresh) {
-      if (file === this.seed) continue;
-      if (!existsSync(join(this.root, file))) {
-        if (this.opened.has(file)) this.closeDocument(file);
+      const path = join(this.root, file);
+      if (!existsSync(path) || !statSync(path).isFile()) {
+        this.closeDocument(file);
         continue;
       }
-      if (!this.opened.has(file)) this.open(file);
-      this.closeDocument(file);
+      const text = readFileSync(path, "utf8");
+      if (this.opened.has(file)) this.change(file, text);
+      else this.open(file, text);
+      synced.push(file);
     }
-    if (this.seed !== undefined && this.opened.has(this.seed)) {
-      this.client.notify("textDocument/didChange", { textDocument: { uri: this.uri(this.seed), version: Date.now() }, contentChanges: [{ text: readFileSync(join(this.root, this.seed), "utf8") }] });
-    }
+    // The acknowledgment: one answer per changed document, each ordered after its change.
+    for (const file of synced) await this.documentSymbols(file);
   }
 
   async resolve(name: string, hint: ResolveHint): Promise<Resolved> {
@@ -496,7 +516,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
       const visibility = this.visibilityOf(protectedThing.file, importName, protectedThing.range.start.line);
       if (!visibility.visible) {
         // The language refuses the import; the synthetic reference stands in the protected file's own module instead.
-        return this.refuteInside(client, protectedThing, importName, outsideOf);
+        return this.refuteInside(protectedThing, importName, outsideOf);
       }
     }
     const dir = dirname(protectedThing.file);
@@ -507,15 +527,14 @@ export class TypeScriptAdapter implements LanguageAdapter {
   }
 
   /** A not-exported thing can only be referenced from its own module: the synthetic reference is the file with one line added at its end. */
-  private async refuteInside(client: JsonRpcClient, protectedThing: Definition, importName: string, outsideOf: Definition | undefined): Promise<Refutation> {
+  private async refuteInside(protectedThing: Definition, importName: string, outsideOf: Definition | undefined): Promise<Refutation> {
     const original = readFileSync(join(this.root, protectedThing.file), "utf8");
     const lines = original.split(/\r?\n/);
     const added = `const coherenceRefutation = ${importName};`;
     const text = original.endsWith("\n") ? `${original}${added}\n` : `${original}\n${added}\n`;
     const line = original.endsWith("\n") ? lines.length - 1 : lines.length;
-    const uri = this.uri(protectedThing.file);
     this.open(protectedThing.file);
-    client.notify("textDocument/didChange", { textDocument: { uri, version: 2 }, contentChanges: [{ text }] });
+    this.change(protectedThing.file, text);
     this.symbolCache.delete(protectedThing.file);
     try {
       const sites = await this.references(protectedThing);
@@ -528,7 +547,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
           : `an unsaved edit of ${protectedThing.file} adding a use of ${importName} at line ${line + 1} was not reported; the check is vacuous`,
       };
     } finally {
-      client.notify("textDocument/didChange", { textDocument: { uri, version: 3 }, contentChanges: [{ text: original }] });
+      this.change(protectedThing.file, original);
       this.symbolCache.delete(protectedThing.file);
     }
   }

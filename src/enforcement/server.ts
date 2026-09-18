@@ -153,7 +153,8 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
       case "refute":
         return adapter.refute(params[0] as Definition, params[1] as Definition | undefined);
       case "forget":
-        if ("forget" in adapter && typeof adapter.forget === "function") (adapter as { forget: (files?: readonly string[]) => void }).forget((params[0] as string[] | undefined) ?? []);
+        // Answered only once the instrument has acknowledged the current text, so the client's next question cannot be stale.
+        await adapter.forget((params[0] as string[] | undefined) ?? []);
         return null;
       case "stop":
         setTimeout(() => void stop(), 10);
@@ -279,8 +280,8 @@ export class RemoteAdapter implements LanguageAdapter {
     return this.client.request("refute", [protectedThing, outsideOf]);
   }
   /** Drop what the server cached about file contents and re-read the named files; the edit hook calls it before re-checking. */
-  forget(files: readonly string[] = []): Promise<null> {
-    return this.client.request("forget", [files]);
+  async forget(files: readonly string[] = []): Promise<void> {
+    await this.client.request("forget", [files]);
   }
   status(): Promise<{ language: string; ladder: Ladder; warm: boolean; pid: number; startedAt: string }> {
     return this.client.request("status");

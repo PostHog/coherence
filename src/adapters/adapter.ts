@@ -124,6 +124,12 @@ export interface LanguageAdapter {
   testFilter(via: string): string;
   /** Open an unsaved document outside `outsideOf` that references `protected`, ask for references, confirm, close. */
   refute(protectedThing: Definition, outsideOf: Definition | undefined): Promise<Refutation>;
+  /**
+   * Drop what is cached about file contents and make the instrument see the current disk text of every
+   * document it may have open and of the named files, resolving only once the instrument has acknowledged
+   * the text; the edit hook calls it before re-checking.
+   */
+  forget(files?: readonly string[]): Promise<void>;
   close(): Promise<void>;
 }
 

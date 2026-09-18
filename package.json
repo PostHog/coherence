@@ -15,7 +15,7 @@
     "glossary:check": "node --disable-warning=ExperimentalWarning src/cli.ts glossary --check",
     "spec:check": "node --disable-warning=ExperimentalWarning src/cli.ts spec --check",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test:unit": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 \"src/**/*.test.ts\"",
+    "test:unit": "node --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\"",
     "test": "npm run typecheck && npm run test:unit && npm run glossary:check && npm run spec:check"
   },
   "devDependencies": {

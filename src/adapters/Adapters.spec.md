@@ -12,6 +12,13 @@ The language adapter seam: how to ask a language's server for definitions, refer
   crossing: project-source -> instrument
   refuted: made parseName read prose as a bare symbol -> "a spec value reads as a bare symbol, a symbol in a file, a module path, or prose" went red in adapter.test.ts; restored, green (2026-09-17)
   kinds: none
+- current text before any question: Before any references query, the adapter makes the language server see the current disk text of every document it may have open and of every file the caller names, and waits for the server to acknowledge it.
+  over: every document either adapter has open and every file a forget names
+  via: the check reads the current disk text after a forget, with the instrument's watcher blind to the file: a loop of edit-then-check yields zero wrong verdicts
+  because: tsserver reloads a closed document from disk only when it does not own the text, and a didOpen carrying the text it already loaded leaves it owning that text, so closing the document leaves the edit to a file watcher that is late under load and blind to an excluded file; both reviewers saw the check answer from pre-edit text and a pass recorded with a bypass on disk, the one answer revelation at the edit must never give
+  crossing: project-source -> instrument
+  refuted: left an open document to the file watcher on forget, as the adapter did before -> "the check reads the current disk text after a forget, with the instrument's watcher blind to the file: a loop of edit-then-check yields zero wrong verdicts" went red in enforcement.test.ts with two of six verdicts answered from pre-edit text; restored, green (2026-09-18)
+  kinds: none
 - import told from use: An import or export specifier is told from a use, across wrapped lines, so bringing a name into scope is never a bypass.
   protects: IMPORT_START
   chokepoint: isImportSite

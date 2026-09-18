@@ -319,6 +319,8 @@ export class PythonAdapter implements LanguageAdapter {
   private readonly opened = new Set<string>();
   private readonly symbolCache = new Map<string, DocumentSymbol[]>();
   private readonly lineCache = new Map<string, string[]>();
+  /** The document version last sent per open file; a change carries the next one. */
+  private readonly versions = new Map<string, number>();
   private readonly touched = new Set<string>();
   private checkerFacts: CheckerFacts | undefined;
   /** When the workspace was last reported to Pyright as possibly changed. */
@@ -384,6 +386,7 @@ export class PythonAdapter implements LanguageAdapter {
     if (this.client === undefined || !this.client.alive) {
       this.starting = undefined;
       this.opened.clear();
+      this.versions.clear();
       const again = await this.ready();
       if (!again.ok) throw new Error(again.reason);
     }
@@ -428,6 +431,14 @@ export class PythonAdapter implements LanguageAdapter {
     const content = text ?? readFileSync(join(this.root, file), "utf8");
     this.client!.notify("textDocument/didOpen", { textDocument: { uri: this.uri(file), languageId: "python", version: 1, text: content } });
     this.opened.add(file);
+    this.versions.set(file, 1);
+  }
+
+  /** Replace an open document's whole text; the version only ever climbs, so the server never discards a change as old. */
+  private change(file: string, text: string): void {
+    const version = (this.versions.get(file) ?? 1) + 1;
+    this.versions.set(file, version);
+    this.client!.notify("textDocument/didChange", { textDocument: { uri: this.uri(file), version }, contentChanges: [{ text }] });
   }
 
   private closeDocument(file: string): void {
@@ -449,37 +460,51 @@ export class PythonAdapter implements LanguageAdapter {
 
   /**
    * Cached facts about files are dropped when their text may have changed (the
-   * edit hook re-runs a check). Pyright keeps the text of every file it has
-   * scanned, opened or not, until told the file changed, and this client
-   * registers no watcher, so a forget reports as changed every file the caller
-   * names, every file a site landed in, every open document (closed first, so
-   * its next read comes from disk), and every Python file whose modification
-   * time moved since the last forget: Pyright may have scanned a file this
-   * adapter never touched.
+   * edit hook re-runs a check), and Pyright is made to see the current disk
+   * text before any question is asked. Every open document and every file the
+   * caller names gets its whole current text (didChange for an open document,
+   * didOpen for one not yet open, and it stays open), and the forget waits for
+   * a documentSymbol answer per file, which Pyright cannot give before the
+   * change is applied. Pyright also keeps the text of every file it has
+   * scanned without opening, until told the file changed, and this client
+   * registers no watcher, so every file a site landed in and every Python file
+   * whose modification time moved since the last forget is reported as
+   * changed: Pyright may have scanned a file this adapter never touched.
    */
-  forget(files: readonly string[] = []): void {
+  async forget(files: readonly string[] = []): Promise<void> {
     this.symbolCache.clear();
     this.lineCache.clear();
     this.checkerFacts = undefined;
     const since = this.lastForget - 1000;
     this.lastForget = Date.now();
     if (this.client === undefined) return;
-    const refresh = new Set([...this.touched, ...files, ...this.opened]);
+    const sync = new Set([...files, ...this.opened]);
+    const report = new Set(this.touched);
     this.touched.clear();
     for (const file of pythonFiles(this.root)) {
       try {
-        if (statSync(join(this.root, file)).mtimeMs >= since) refresh.add(file);
+        if (statSync(join(this.root, file)).mtimeMs >= since) report.add(file);
       } catch {
         // Gone between the walk and the stat: reported below as deleted if it was known.
       }
     }
-    const changes: { uri: string; type: number }[] = [];
-    for (const file of refresh) {
-      const exists = existsSync(join(this.root, file));
-      if (this.opened.has(file)) this.closeDocument(file);
-      changes.push({ uri: this.uri(file), type: exists ? 2 : 3 });
+    const synced: string[] = [];
+    for (const file of sync) {
+      const path = join(this.root, file);
+      if (!existsSync(path) || !statSync(path).isFile()) {
+        this.closeDocument(file);
+        report.add(file);
+        continue;
+      }
+      const text = readFileSync(path, "utf8");
+      if (this.opened.has(file)) this.change(file, text);
+      else this.open(file, text);
+      synced.push(file);
     }
+    const changes = [...report].filter((file) => !sync.has(file)).map((file) => ({ uri: this.uri(file), type: existsSync(join(this.root, file)) ? 2 : 3 }));
     if (changes.length > 0) this.client.notify("workspace/didChangeWatchedFiles", { changes });
+    // The acknowledgment: one answer per changed document, each ordered after its change.
+    for (const file of synced) await this.documentSymbols(file);
   }
 
   async resolve(name: string, hint: ResolveHint): Promise<Resolved> {
@@ -768,7 +793,7 @@ export class PythonAdapter implements LanguageAdapter {
     } else {
       const entry = await this.entryAt(protectedThing);
       if (entry === undefined) return { seen: false, account: `no declaration at ${protectedThing.file}:${protectedThing.selection.line + 1}` };
-      if (entry.parents.some((k) => k === KIND_FUNCTION || k === KIND_METHOD)) return this.refuteInside(client, protectedThing, entry, outsideOf);
+      if (entry.parents.some((k) => k === KIND_FUNCTION || k === KIND_METHOD)) return this.refuteInside(protectedThing, entry, outsideOf);
       // A class member is reached through its class; a module member directly.
       importName = entry.path[0]!;
       access = entry.path.join(".");
@@ -789,16 +814,15 @@ export class PythonAdapter implements LanguageAdapter {
   }
 
   /** A function-local can only be named inside its function: the synthetic reference is the file with one line added right after the definition, at its indentation. */
-  private async refuteInside(client: JsonRpcClient, protectedThing: Definition, entry: Flat, outsideOf: Definition | undefined): Promise<Refutation> {
+  private async refuteInside(protectedThing: Definition, entry: Flat, outsideOf: Definition | undefined): Promise<Refutation> {
     const original = readFileSync(join(this.root, protectedThing.file), "utf8");
     const lines = original.split(/\r?\n/);
     const at = protectedThing.range.start.line;
     const indent = /^\s*/.exec(lines[at] ?? "")![0];
     const added = `${indent}coherence_refutation = ${entry.symbol.name}`;
     const edited = [...lines.slice(0, at + 1), added, ...lines.slice(at + 1)].join("\n");
-    const uri = this.uri(protectedThing.file);
     this.open(protectedThing.file);
-    client.notify("textDocument/didChange", { textDocument: { uri, version: 2 }, contentChanges: [{ text: edited }] });
+    this.change(protectedThing.file, edited);
     this.symbolCache.delete(protectedThing.file);
     this.lineCache.set(protectedThing.file, edited.split("\n"));
     try {
@@ -812,7 +836,7 @@ export class PythonAdapter implements LanguageAdapter {
           : `an unsaved edit of ${protectedThing.file} adding a use of ${entry.symbol.name} at line ${at + 2} was not reported; the check is vacuous`,
       };
     } finally {
-      client.notify("textDocument/didChange", { textDocument: { uri, version: 3 }, contentChanges: [{ text: original }] });
+      this.change(protectedThing.file, original);
       this.symbolCache.delete(protectedThing.file);
       this.lineCache.delete(protectedThing.file);
     }

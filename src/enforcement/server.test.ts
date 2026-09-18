@@ -11,33 +11,40 @@ import { after, before, test } from "node:test";
 import { connectAdapter, serve, serverPaths, type Serving } from "./server.ts";
 
 let root: string;
-let serving: Serving;
+let started: Promise<Serving> | undefined;
 
 function write(path: string, text: string): void {
   mkdirSync(dirname(join(root, path)), { recursive: true });
   writeFileSync(join(root, path), text, "utf8");
 }
 
-before(async () => {
+/** The server, started by the first test that needs it: a filtered run that selects no test here starts nothing and waits on nothing. */
+function warm(): Promise<Serving> {
+  started ??= serve(root, { idleMs: 60_000 });
+  return started;
+}
+
+before(() => {
   root = mkdtempSync(join(tmpdir(), "coherence-server-"));
   write("tsconfig.json", `{ "compilerOptions": { "strict": true, "noEmit": true, "module": "NodeNext", "moduleResolution": "NodeNext", "allowImportingTsExtensions": true }, "include": ["src/**/*.ts"] }\n`);
   write("src/door.ts", "const KEY = 1;\nexport function open(): number {\n  return KEY;\n}\n");
   write("src/hall.ts", 'import { open } from "./door.ts";\nexport const hall = open();\n');
-  serving = await serve(root, { idleMs: 60_000 });
 });
 
 after(async () => {
-  await serving.stop();
+  if (started !== undefined) await (await started).stop();
   rmSync(root, { recursive: true, force: true });
 });
 
-test("the server listens on the project's socket and records a pointer", () => {
+test("the server listens on the project's socket and records a pointer", async () => {
+  const serving = await warm();
   const paths = serverPaths(root);
   assert.ok(existsSync(paths.pointer), "server.json is written");
   assert.ok(existsSync(serving.paths.socket), "the socket exists");
 });
 
 test("two clients ask the same questions; the second finds the server warm", async () => {
+  await warm();
   const first = await connectAdapter(root, { spawn: false });
   const ready = await first.adapter.ready();
   assert.equal(ready.ok, true, JSON.stringify(ready));

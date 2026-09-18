@@ -205,7 +205,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   const given = options.adapter;
   if (given !== undefined) {
     // An adapter handed in lives in this process: no server was warm before it.
-    if ("forget" in given && typeof given.forget === "function") (given as { forget: (files?: readonly string[]) => void }).forget(options.refresh ?? []);
+    await given.forget(options.refresh ?? []);
     return pass(given, { language: given.language, server: "cold" }, undefined);
   }
   return pass(undefined, { language: config.language, server: "none" }, undefined);
