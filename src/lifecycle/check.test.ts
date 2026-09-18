@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
@@ -117,15 +117,93 @@ test("a project's own sense wins: an accepted project name silences a Coherence 
   assert.equal(report.rejected.filter((f) => f.file === "notes.md" && f.line === 2 && f.text === REJ).length, 1, "the guarded phrase is not a second hit");
 });
 
-test("in code, the project's rejected names match identifier tokens; Coherence's do not in an adopter, nor do language globals or module specifiers", () => {
+test("in code, both layers' rejected names match identifier tokens, Coherence's too in an adopter, unless the project declares the name as its own; language globals and module specifiers never match", () => {
   const code = report.rejected.filter((f) => f.file === "src/a.ts");
   assert.deepEqual(
     code.map((f) => [f.line, f.text, f.name]),
     [
       [2, "doohickey", "doohickey"],
+      [4, REJ, REJ],
       [6, "conventions", "convention"],
     ],
   );
+  assert.equal(code[1]!.concept, "invariant", "Coherence's name, in an adopter's identifier");
+  assert.ok(!report.rejected.some((f) => f.file === "src/a.ts" && f.line === 3), `sprocket${Rej} is guarded by the project's own phrase`);
+});
+
+test("the corpus reads every text kind the project holds, the journal's records included, and leaves out lockfiles, binaries, runs, and the reviews", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "coherence-corpus-"));
+  const put = async (rel: string, text: string | Buffer): Promise<void> => {
+    await mkdir(join(dir, rel, ".."), { recursive: true });
+    await writeFile(join(dir, rel), text);
+  };
+  try {
+    await put(".gitignore", `# keep the ${REJ}\n${REJ}/\n`);
+    await put("config.yaml", `${REJ}: true\n`);
+    await put("settings.toml", `[${REJ}]\nname = "x"\n`);
+    await put("tool.py", `${REJ}_keeper = 1\n`);
+    await put("web/app.tsx", `export const ${REJ}Box = 1;\n`);
+    await put("scripts/run.mjs", `const ${REJ} = 1;\n`);
+    await put("scripts/run.sh", `echo ${REJ}\n`);
+    await put("data/rows.jsonl", JSON.stringify({ label: REJ }) + "\n");
+    await put("data/shape.json", JSON.stringify({ [REJ]: 1 }) + "\n");
+    await put(".coherence/journal/s1.jsonl", [
+      JSON.stringify({ id: "d-1", kind: "decision", at: "2026-09-17T00:00:00.000Z", session: "s1", agent: "a", commit: null, dirty: false, chose: `the ${REJ}`, over: [`the ${ALT}`], because: "b" }),
+      JSON.stringify({ id: "d-2", kind: "decision", at: "2026-09-17T00:00:01.000Z", session: "s1", agent: "a", commit: null, dirty: false, chose: "fine", over: [`a ${REJ} by another name`], because: "an alternative is what was refused, so its name is not drift" }),
+    ].join("\n") + "\n");
+    await put(".coherence/work/s1.jsonl", JSON.stringify({ id: "w-1", kind: "order", at: "2026-09-17T00:00:00.000Z", session: "s1", agent: "a", commit: null, dirty: false, objective: `ship the ${REJ}`, success: "s", boundary: "b", owner: "s1" }) + "\n");
+    await put(".coherence/runs/s1.jsonl", JSON.stringify({ reason: `the ${REJ} passed` }) + "\n");
+    await put("package-lock.json", JSON.stringify({ name: REJ }) + "\n");
+    await put("bin.dat", Buffer.from([0x00, 0x01, 0x02, 0x67, 0x61, 0x74, 0x65]));
+    await put("docs/reviews/2026-09-18-review.md", `The reviewer wrote ${REJ} on purpose.\n`);
+    await put("docs/reference/old.md", `The ${REJ} was the old name.\n`);
+    const out = await runCheck({ root: dir, coherence });
+    const hits = out.rejected.map((f) => f.file).sort();
+    assert.deepEqual(hits, [
+      ".coherence/journal/s1.jsonl",
+      ".coherence/work/s1.jsonl",
+      ".gitignore",
+      "config.yaml",
+      "data/rows.jsonl",
+      "data/shape.json",
+      "scripts/run.mjs",
+      "scripts/run.sh",
+      "settings.toml",
+      "tool.py",
+      "web/app.tsx",
+    ]);
+    assert.deepEqual(out.rejected.filter((f) => f.file === ".coherence/journal/s1.jsonl").map((f) => f.line), [1], "a decision's chose is checked; what it rejected (over) is not drift");
+    assert.equal(out.files, 11, "every readable text file of a kind the project holds, minus the lockfile, the binary, the run, the review, and the reference doc");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("collectFiles confines every given path to the project root", async () => {
+  await assert.rejects(runCheck({ root, coherence, project, paths: [".."] }), /outside the project root/);
+  await assert.rejects(runCheck({ root, coherence, project, paths: [join(root, "..", "elsewhere")] }), /outside the project root/);
+  await assert.rejects(runCheck({ root, coherence, project, paths: ["/etc"] }), /outside the project root/);
+  const inside = await runCheck({ root, coherence, project, paths: [join(root, "src")] });
+  assert.equal(inside.files, 1, "an absolute path under the root is fine");
+});
+
+test("an unreadable folder is reported and skipped; the check never aborts on it", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "coherence-eacces-"));
+  try {
+    await writeFile(join(dir, "open.md"), `The ${REJ} is here.\n`);
+    await mkdir(join(dir, "locked"));
+    await writeFile(join(dir, "locked", "hidden.md"), `The ${REJ} is hidden.\n`);
+    await chmod(join(dir, "locked"), 0o000);
+    const out = await runCheck({ root: dir, coherence });
+    assert.equal(out.rejected.length, 1, "the readable file is checked");
+    if (process.getuid?.() === 0) return; // root reads everything; the skip cannot be witnessed
+    assert.deepEqual(out.unreadable.map((u) => u.file), ["locked"]);
+    assert.match(out.unreadable[0]!.reason, /EACCES|permission/i);
+    assert.match(formatReport(out), /^UNREADABLE     locked  .*permission/m);
+  } finally {
+    await chmod(join(dir, "locked"), 0o755).catch(() => {});
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("unknown nouns: Title Case away from a sentence start and component names, at least twice, with three closed options", () => {
@@ -153,7 +231,7 @@ test("the report ends with counts, and hasFindings drives the exit code", () => 
   assert.match(text, /^UNKNOWN NOUN   "durable object" \(3\)  flux\/flux\.spec\.md:1, notes\.md:3, notes\.md:3\n {15}declare: /m);
   assert.match(text, /\n\d+ rejected names, \d+ unknown nouns \(3 files\)\n$/);
   assert.equal(hasFindings(report), true);
-  assert.equal(hasFindings({ files: 1, rejected: [], unknown: [] }), false);
+  assert.equal(hasFindings({ files: 1, rejected: [], unknown: [], unreadable: [] }), false);
 });
 
 test("paths restrict the corpus", async () => {
@@ -163,7 +241,7 @@ test("paths restrict the corpus", async () => {
   assert.equal(only.unknown.length, 0);
 });
 
-test("without a project glossary, Coherence's names apply to code identifiers too", async () => {
+test("without a project glossary, nothing guards the project's phrases, so Coherence's names hit every identifier they are in", async () => {
   const alone = await runCheck({ root, coherence, paths: ["src/a.ts"] });
   assert.deepEqual(alone.rejected.map((f) => f.text.toLowerCase()), [REJ, REJ]);
   assert.deepEqual(alone.rejected.map((f) => f.line), [3, 4]);
