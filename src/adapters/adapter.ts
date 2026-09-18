@@ -52,6 +52,21 @@ export interface Definition {
   selection: Position;
 }
 
+/**
+ * The syntactic form of a reference site, where the language gives the site a
+ * form the check must read (ruling d-7abd1ba8):
+ *
+ *   import      a plain import specifier, type-only and namespace imports
+ *               included: how a module reaches the thing, not a place the
+ *               thing is used. Inside, but only in the chokepoint's own module.
+ *   re-export   an export-from specifier or a wildcard re-export: it widens
+ *               the thing's reach with no call at all, so it is a bypass
+ *               wherever it stands, the chokepoint's own module included.
+ *
+ * Every other site has no form and is classified by range alone.
+ */
+export type SiteForm = "import" | "re-export";
+
 export interface ReferenceSite {
   file: string;
   /** One-based, as an editor shows it. */
@@ -60,6 +75,23 @@ export interface ReferenceSite {
   character: number;
   /** The innermost named symbol enclosing the site, as `outer.inner`, or undefined at module top level. */
   symbol: string | undefined;
+  /** The syntactic form the adapter read at the site, when the site has one. */
+  form?: SiteForm;
+}
+
+/**
+ * The line a top-level statement starts on, for a site inside it: the nearest
+ * line at or above the site whose first character is not whitespace. An
+ * import, an export-from and a wildcard re-export are all top-level
+ * statements, so their continuation lines are indented and this reads forward
+ * from a start it can see, never backward for a terminator it has to guess.
+ */
+export function statementStartLine(lines: readonly string[], line: number): number {
+  for (let i = Math.min(line, lines.length - 1); i >= 0; i--) {
+    const text = lines[i] ?? "";
+    if (text !== "" && !/^\s/.test(text)) return i;
+  }
+  return 0;
 }
 
 export interface Visibility {
@@ -91,16 +123,32 @@ export interface Rung {
 /** The grades a clean chokepoint can earn, strongest first. */
 export type ChokedGrade = "closure-choked" | "visibility-choked" | "checker-choked" | "reference-choked" | "convention";
 
+/** One synthetic site the refutation staged, and the site the instrument reported for it. */
+export interface StagedSite {
+  /** What was staged, in one phrase: "a use of X in <file> outside <chokepoint>". */
+  what: string;
+  /** The site as the instrument reported it, absent when the instrument did not report it. */
+  site?: ReferenceSite;
+}
+
 export interface Refutation {
-  /** Whether the synthetic site appeared among the references. */
+  /** Whether every staged site appeared among the references. */
   seen: boolean;
   /**
-   * The synthetic site as the instrument reported it, when it did. The adapter
-   * never decides whether it lies outside the chokepoint: the check classifies
-   * it with the same function it classifies every other site, and a synthetic
-   * site the check would not call a bypass makes the refutation vacuous.
+   * The synthetic sites the adapter staged, in the order it staged them. The
+   * adapter never decides whether one lies outside the chokepoint: the check
+   * classifies each with the same function it classifies every other site, and
+   * a staged site the check would not call a bypass makes the refutation
+   * vacuous (ruling d-7abd1ba8: a use in the chokepoint's own module outside
+   * its range, and a re-export, must both be bypasses).
    */
-  site?: ReferenceSite;
+  staged: StagedSite[];
+  /**
+   * Ruling rs-e93ecdd6: the language itself refused the synthetic outside
+   * reference, and this is the diagnostic it gave. For the rung whose enforcer
+   * is the compiler or the interpreter, that refusal is the refutation.
+   */
+  refused?: string;
   /** What was done and what was seen, in one line. */
   account: string;
 }

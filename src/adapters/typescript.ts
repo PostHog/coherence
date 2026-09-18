@@ -25,6 +25,7 @@ import {
   isTestPath,
   parseName,
   rangeContains,
+  statementStartLine,
   type Definition,
   type Ladder,
   type LanguageAdapter,
@@ -34,6 +35,8 @@ import {
   type Refutation,
   type ResolveHint,
   type Resolved,
+  type SiteForm,
+  type StagedSite,
   type Visibility,
 } from "./adapter.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
@@ -93,6 +96,26 @@ interface Location {
   range: Range;
 }
 
+interface Diagnostic {
+  message: string;
+  severity?: number;
+  code?: number | string;
+  source?: string;
+}
+
+/**
+ * Whether a diagnostic is the compiler refusing a reference because the name
+ * is not exported or not accessible — the refusal that stands as the
+ * refutation for the rung the compiler enforces (ruling rs-e93ecdd6). TS2459
+ * is "declares it locally, but it is not exported"; TS2305 "has no exported
+ * member"; TS2341 and TS2445 are private and protected access.
+ */
+export function refusesReference(diagnostic: Diagnostic): boolean {
+  if (diagnostic.severity !== undefined && diagnostic.severity !== 1) return false;
+  if ([2459, 2305, 2341, 2445, 2694, 2724].includes(Number(diagnostic.code))) return true;
+  return /not exported|no exported member|is private|is protected|not accessible/.test(diagnostic.message);
+}
+
 /** The first source file under the root: opening it makes the language server load the project. */
 function firstSourceFile(root: string): string | undefined {
   const walk = (dir: string): string | undefined => {
@@ -148,6 +171,74 @@ export function filesEndingWith(root: string, hint: string): string[] {
   return found;
 }
 
+/** A wildcard re-export of a whole module: `export * from "./x.ts"`, `export * as ns from …`, `export type * from …`. */
+const WILDCARD_REEXPORT = /^export\s+(?:type\s+)?\*(?:\s+as\s+[A-Za-z_$][A-Za-z0-9_$]*)?\s+from\s*["']([^"']+)["']/;
+
+/**
+ * The syntactic form of a reference site, read forward from the top-level
+ * statement it sits in (ruling d-7abd1ba8). `import` in any shape — plain,
+ * `import type`, `import * as` — is an import; `export * from`, `export * as
+ * … from` and an `export { … } from` list are re-exports; a plain
+ * `export { … }` with no module specifier is neither, and no other statement
+ * has a form. Reading forward from a statement start is what the dissolved
+ * heuristic could not do: it scanned backward for a terminator, and a
+ * semicolon-less bare import gave it none.
+ */
+export function siteForm(lines: readonly string[], line: number): SiteForm | undefined {
+  const start = statementStartLine(lines, line);
+  const head = lines[start] ?? "";
+  if (/^import\b(?![(.])/.test(head)) return "import";
+  if (/^export\s+(?:type\s+)?\*/.test(head)) return "re-export";
+  if (!/^export\s+(?:type\s+)?\{/.test(head)) return undefined;
+  let joined = "";
+  for (let i = start; i < Math.min(lines.length, start + 200); i++) {
+    const text = lines[i] ?? "";
+    joined += (i === start ? "" : "\n") + text;
+    if (!text.includes("}")) continue;
+    return /\}\s*from\s*["']/.test(joined) ? "re-export" : undefined;
+  }
+  return undefined;
+}
+
+/** Every source file under the root, project-relative, skipping the folders no adopter's code lives in. */
+export function sourceFilesUnder(root: string): string[] {
+  const found: string[] = [];
+  const walk = (dir: string): void => {
+    let entries: string[];
+    try {
+      entries = readdirSync(dir).sort();
+    } catch {
+      return;
+    }
+    for (const name of entries) {
+      if (name.startsWith(".") || SKIPPED_FOLDERS.has(name)) continue;
+      const path = join(dir, name);
+      let stats;
+      try {
+        stats = statSync(path);
+      } catch {
+        continue;
+      }
+      if (stats.isDirectory()) walk(path);
+      else if (stats.isFile() && SOURCE_EXTENSIONS.has(extensionOf(name))) found.push(relative(root, path).split(sep).join("/"));
+    }
+  };
+  walk(root);
+  return found;
+}
+
+/** The file a relative module specifier names, project-relative, or undefined when it is a package or points outside. */
+export function resolveSpecifier(from: string, specifier: string): string | undefined {
+  if (!specifier.startsWith(".")) return undefined;
+  const dir = dirname(from);
+  const base = join(dir, specifier).split(sep).join("/");
+  if (base.startsWith("..")) return undefined;
+  const stripped = base.replace(/\.(js|mjs|cjs|ts|mts|cts|tsx)$/, "");
+  return [base, `${stripped}.ts`, `${stripped}.tsx`, `${stripped}.mts`, `${stripped}.cts`, `${stripped}/index.ts`, `${base}/index.ts`].find(
+    (candidate) => SOURCE_EXTENSIONS.has(extensionOf(candidate)),
+  );
+}
+
 function flatten(symbols: DocumentSymbol[], prefix: string[] = []): { path: string[]; symbol: DocumentSymbol }[] {
   const out: { path: string[]; symbol: DocumentSymbol }[] = [];
   for (const symbol of symbols) {
@@ -172,6 +263,10 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private seed: string | undefined;
   /** Files a definition or a reference site landed in since the last forget: the ones a forget re-reads from disk. */
   private readonly touched = new Set<string>();
+  /** Wildcard re-export sites by the file they re-export; the reference query never reports them. Scanned once per forget. */
+  private wildcards: Map<string, ReferenceSite[]> | undefined;
+  /** The last diagnostics the server published, by project-relative file. */
+  private readonly diagnostics = new Map<string, Diagnostic[]>();
   readonly root: string;
 
   constructor(root: string) {
@@ -191,13 +286,19 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const tsserver = locateTsserver(this.root);
     const client = JsonRpcClient.spawn(server.path, ["--stdio"], this.root);
     this.client = client;
+    client.onNotification = (method, params) => {
+      if (method !== "textDocument/publishDiagnostics") return;
+      const published = params as { uri?: string; diagnostics?: Diagnostic[] };
+      if (published.uri === undefined) return;
+      this.diagnostics.set(this.relative(published.uri), published.diagnostics ?? []);
+    };
     try {
       await client.request("initialize", {
         processId: process.pid,
         rootUri: pathToFileURL(this.root).href,
         workspaceFolders: [{ uri: pathToFileURL(this.root).href, name: "project" }],
         capabilities: {
-          textDocument: { documentSymbol: { hierarchicalDocumentSymbolSupport: true } },
+          textDocument: { documentSymbol: { hierarchicalDocumentSymbolSupport: true }, publishDiagnostics: {} },
           workspace: { symbol: {}, workspaceFolders: true },
         },
         initializationOptions: {
@@ -311,6 +412,8 @@ export class TypeScriptAdapter implements LanguageAdapter {
   async forget(files: readonly string[] = []): Promise<void> {
     this.symbolCache.clear();
     this.lineCache.clear();
+    this.wildcards = undefined;
+    this.diagnostics.clear();
     if (this.client === undefined) return;
     const refresh = new Set([...this.touched, ...files, ...this.opened]);
     this.touched.clear();
@@ -423,11 +526,48 @@ export class TypeScriptAdapter implements LanguageAdapter {
         if (seen.has(key)) continue;
         seen.add(key);
         this.touched.add(file);
-        sites.push({ file, line: start.line + 1, character: start.character, symbol: await this.enclosingSymbol(file, start) });
+        const form = siteForm(this.linesOf(file), start.line);
+        sites.push({ file, line: start.line + 1, character: start.character, symbol: await this.enclosingSymbol(file, start), ...(form === undefined ? {} : { form }) });
+      }
+    }
+    // A wildcard re-export names nothing, so the server reports no site for it; it still widens the thing's reach.
+    if (definition.kind === "module" || (await this.visibility(definition)).visible) {
+      for (const site of this.wildcardReExports(definition.file)) {
+        const key = `${site.file}:${site.line - 1}:${site.character}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        this.touched.add(site.file);
+        sites.push(site);
       }
     }
     sites.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.character - b.character);
     return sites;
+  }
+
+  /** The sites where another module re-exports this file wholesale, scanned once per forget because the reference query never reports them. */
+  private wildcardReExports(file: string): ReferenceSite[] {
+    if (this.wildcards === undefined) {
+      const found = new Map<string, ReferenceSite[]>();
+      for (const source of sourceFilesUnder(this.root)) {
+        let lines: string[];
+        try {
+          lines = readFileSync(join(this.root, source), "utf8").split(/\r?\n/);
+        } catch {
+          continue;
+        }
+        for (let i = 0; i < lines.length; i++) {
+          const match = WILDCARD_REEXPORT.exec(lines[i] ?? "");
+          if (match === null) continue;
+          const target = resolveSpecifier(source, match[1]!);
+          if (target === undefined) continue;
+          const list = found.get(target) ?? [];
+          list.push({ file: source, line: i + 1, character: (lines[i] ?? "").indexOf("*"), symbol: undefined, form: "re-export" });
+          found.set(target, list);
+        }
+      }
+      this.wildcards = found;
+    }
+    return this.wildcards.get(file) ?? [];
   }
 
   private linesOf(file: string): string[] {
@@ -489,74 +629,145 @@ export class TypeScriptAdapter implements LanguageAdapter {
     return via;
   }
 
-  async refute(protectedThing: Definition, _outsideOf: Definition | undefined): Promise<Refutation> {
+  /**
+   * Two rulings meet here. For a thing the compiler will not let any other
+   * module name, the compiler's own refusal of a synthetic outside import is
+   * the refutation (rs-e93ecdd6). For everything else, the refutation stages
+   * the two sites the import ruling could otherwise swallow (d-7abd1ba8): a
+   * use of the thing in the chokepoint's own module outside the chokepoint's
+   * range, and a re-export of it from a document beside it. The adapter only
+   * reports what the instrument said about each; the check classifies them.
+   */
+  async refute(protectedThing: Definition, outsideOf: Definition | undefined): Promise<Refutation> {
     const client = await this.live();
     const symbols = await this.documentSymbols(protectedThing.file);
-    let importName: string | undefined;
+    let name: string | undefined;
     if (protectedThing.kind === "module") {
-      importName = symbols.find((s) => this.exportedIn(protectedThing.file, s))?.name;
-      if (importName === undefined) return { seen: false, account: `${protectedThing.file} exports nothing, so no document can reference it` };
+      name = symbols.find((s) => this.exportedIn(protectedThing.file, s))?.name;
+      if (name === undefined) return { seen: false, staged: [], account: `${protectedThing.file} exports nothing, so no document can reference it` };
     } else {
-      importName = await this.declaredName(protectedThing);
-      if (importName === undefined) return { seen: false, account: `no declaration at ${protectedThing.file}:${protectedThing.selection.line + 1}` };
-      const visibility = this.visibilityOf(protectedThing.file, importName, protectedThing.range.start.line);
-      if (!visibility.visible) {
-        // The language refuses the import; the synthetic reference stands in the protected file's own module instead.
-        return this.refuteInside(protectedThing, importName);
-      }
+      name = await this.declaredName(protectedThing);
+      if (name === undefined) return { seen: false, staged: [], account: `no declaration at ${protectedThing.file}:${protectedThing.selection.line + 1}` };
+      if (!this.visibilityOf(protectedThing.file, name, protectedThing.range.start.line).visible) return this.refusedByCompiler(client, protectedThing, name);
     }
+    return this.stage(client, protectedThing, outsideOf, name);
+  }
+
+  /** The compiler refuses an import of a thing its module does not export: open the synthetic outside document and read the diagnostic back. */
+  private async refusedByCompiler(client: JsonRpcClient, protectedThing: Definition, name: string): Promise<Refutation> {
     const dir = dirname(protectedThing.file);
     const base = protectedThing.file.slice(dir === "." ? 0 : dir.length + 1);
     const synthetic = `${dir === "." ? "" : dir + "/"}coherence-refutation-${randomBytes(4).toString("hex")}.ts`;
-    const text = `import { ${importName} } from "./${base}";\nexport const coherenceRefutation = ${importName};\n`;
-    return this.probe(client, protectedThing, synthetic, text, { line: 1, character: text.split("\n")[1]!.indexOf(importName) });
-  }
-
-  /** A not-exported thing can only be referenced from its own module: the synthetic reference is the file with one line added at its end. */
-  private async refuteInside(protectedThing: Definition, importName: string): Promise<Refutation> {
-    const original = readFileSync(join(this.root, protectedThing.file), "utf8");
-    const lines = original.split(/\r?\n/);
-    const added = `const coherenceRefutation = ${importName};`;
-    const text = original.endsWith("\n") ? `${original}${added}\n` : `${original}\n${added}\n`;
-    const line = original.endsWith("\n") ? lines.length - 1 : lines.length;
-    this.open(protectedThing.file);
-    this.change(protectedThing.file, text);
-    this.symbolCache.delete(protectedThing.file);
-    try {
-      const sites = await this.references(protectedThing);
-      const hit = sites.find((s) => s.file === protectedThing.file && s.line === line + 1);
-      return {
-        seen: hit !== undefined,
-        ...(hit === undefined ? {} : { site: hit }),
-        account: hit !== undefined
-          ? `an unsaved edit of ${protectedThing.file} adding a use of ${importName} at line ${line + 1} was reported as a reference`
-          : `an unsaved edit of ${protectedThing.file} adding a use of ${importName} at line ${line + 1} was not reported; the check is vacuous`,
-      };
-    } finally {
-      this.change(protectedThing.file, original);
-      this.symbolCache.delete(protectedThing.file);
-    }
-  }
-
-  private async probe(client: JsonRpcClient, protectedThing: Definition, synthetic: string, text: string, at: Position): Promise<Refutation> {
+    const text = `import { ${name} } from "./${base}";\nexport const coherenceRefutation = ${name};\n`;
+    this.diagnostics.delete(synthetic);
     client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: "typescript", version: 1, text } });
     this.lineCache.set(synthetic, text.split("\n"));
     this.symbolCache.set(synthetic, []);
     try {
-      const sites = await this.references(protectedThing);
-      const hit = sites.find((s) => s.file === synthetic && s.line === at.line + 1);
-      return {
-        seen: hit !== undefined,
-        ...(hit === undefined ? {} : { site: hit }),
-        account: hit !== undefined
-          ? `an unsaved document ${synthetic} importing and using the protected thing was reported as a reference at line ${hit.line}`
-          : `an unsaved document ${synthetic} importing and using the protected thing was not reported among ${sites.length} references; the check is vacuous`,
-      };
+      const refusal = await this.awaitRefusal(synthetic);
+      if (refusal !== undefined) {
+        return {
+          seen: true,
+          staged: [],
+          refused: refusal,
+          account: `an unsaved document ${synthetic} importing ${name} was refused by the compiler: ${refusal}`,
+        };
+      }
+      return { seen: false, staged: [], account: `an unsaved document ${synthetic} importing ${name} drew no diagnostic from the compiler, so nothing proves the import is refused` };
     } finally {
       client.notify("textDocument/didClose", { textDocument: { uri: this.uri(synthetic) } });
       this.lineCache.delete(synthetic);
       this.symbolCache.delete(synthetic);
+      this.diagnostics.delete(synthetic);
     }
+  }
+
+  /** The first published diagnostic on a file that refuses the reference, within the window; the server publishes an empty set first. */
+  private async awaitRefusal(file: string, timeoutMs = 15_000): Promise<string | undefined> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const refusal = (this.diagnostics.get(file) ?? []).find((d) => refusesReference(d));
+      if (refusal !== undefined) return refusal.message;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return undefined;
+  }
+
+  /** Stage the two synthetic sites the import ruling could otherwise swallow, in one references query, and restore. */
+  private async stage(client: JsonRpcClient, protectedThing: Definition, chokepoint: Definition | undefined, name: string): Promise<Refutation> {
+    const dir = dirname(protectedThing.file);
+    const base = protectedThing.file.slice(dir === "." ? 0 : dir.length + 1);
+    const synthetic = `${dir === "." ? "" : dir + "/"}coherence-refutation-${randomBytes(4).toString("hex")}.ts`;
+    const reExport = `export { ${name} } from "./${base}";\n`;
+    client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: "typescript", version: 1, text: reExport } });
+    this.lineCache.set(synthetic, reExport.split("\n"));
+    this.symbolCache.set(synthetic, []);
+
+    // A module chokepoint has no inside that is outside its own range, so there is no same-module site to stage.
+    const sameModule = chokepoint !== undefined && chokepoint.kind === "symbol" ? this.editChokepointModule(chokepoint, protectedThing, name) : undefined;
+    const expected: { what: string; file: string; line: number }[] = [];
+    if (sameModule !== undefined) expected.push({ what: `a use of ${name} in ${chokepoint!.file} outside ${chokepoint!.name}`, file: chokepoint!.file, line: sameModule.line });
+    expected.push({ what: `a re-export of ${name} from the unsaved document ${synthetic}`, file: synthetic, line: 1 });
+
+    try {
+      const sites = await this.references(protectedThing);
+      const staged: StagedSite[] = expected.map((want) => {
+        const hit = sites.find((s) => s.file === want.file && s.line === want.line);
+        return { what: want.what, ...(hit === undefined ? {} : { site: hit }) };
+      });
+      const unseen = staged.filter((s) => s.site === undefined);
+      return {
+        seen: unseen.length === 0,
+        staged,
+        account:
+          unseen.length === 0
+            ? `the instrument reported ${staged.map((s) => s.what).join(" and ")}`
+            : `the instrument did not report ${unseen.map((s) => s.what).join(" or ")} among ${sites.length} references; the check is vacuous`,
+      };
+    } finally {
+      sameModule?.restore();
+      client.notify("textDocument/didClose", { textDocument: { uri: this.uri(synthetic) } });
+      this.lineCache.delete(synthetic);
+      this.symbolCache.delete(synthetic);
+    }
+  }
+
+  /**
+   * Append a use of the protected thing to the chokepoint's own module, past
+   * the chokepoint's range, as an unsaved edit: the one place the import
+   * ruling makes an import inside, so the one place a use must still be a
+   * bypass. When the module reaches the thing through an import, the added
+   * lines bring their own aliased import, so the use never collides with a
+   * binding already there.
+   */
+  private editChokepointModule(chokepoint: Definition, protectedThing: Definition, name: string): { line: number; restore: () => void } | undefined {
+    let original: string;
+    try {
+      original = readFileSync(join(this.root, chokepoint.file), "utf8");
+    } catch {
+      return undefined;
+    }
+    const body = original.endsWith("\n") ? original : `${original}\n`;
+    const start = body.split("\n").length - 1;
+    const here = dirname(chokepoint.file);
+    const specifier = `./${relative(here, protectedThing.file).split(sep).join("/")}`.replace(/^\.\/\.\.\//, "../");
+    const added =
+      chokepoint.file === protectedThing.file
+        ? `const coherenceRefutationUse = ${name};\n`
+        : `import { ${name} as coherenceRefutationName } from "${specifier}";\nconst coherenceRefutationUse = coherenceRefutationName;\n`;
+    const line = start + (chokepoint.file === protectedThing.file ? 1 : 2);
+    this.open(chokepoint.file);
+    this.change(chokepoint.file, body + added);
+    this.symbolCache.delete(chokepoint.file);
+    this.lineCache.set(chokepoint.file, (body + added).split("\n"));
+    return {
+      line,
+      restore: () => {
+        this.change(chokepoint.file, original);
+        this.symbolCache.delete(chokepoint.file);
+        this.lineCache.delete(chokepoint.file);
+      },
+    };
   }
 
   async close(): Promise<void> {

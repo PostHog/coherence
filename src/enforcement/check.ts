@@ -66,7 +66,12 @@ export interface ChokepointInput {
 
 export function classifySite(site: ReferenceSite, protectedThing: Definition, chokepoint: Definition, testFolders: readonly string[]): SiteClass {
   const position = { line: site.line - 1, character: site.character };
-  if (chokepoint.kind === "module" ? withinModule(site.file, chokepoint.file) : site.file === chokepoint.file && rangeContains(chokepoint.range, position)) return "inside";
+  // A re-export widens the thing's reach with no call at all, so it is a bypass wherever it stands.
+  if (site.form === "re-export") return "bypass";
+  // A plain import specifier is how the chokepoint's own module reaches the thing, not a place the thing is used.
+  const inChokepointModule = chokepoint.kind === "module" ? withinModule(site.file, chokepoint.file) : site.file === chokepoint.file;
+  if (site.form === "import" && inChokepointModule) return "inside";
+  if (chokepoint.kind === "module" ? inChokepointModule : site.file === chokepoint.file && rangeContains(chokepoint.range, position)) return "inside";
   if (protectedThing.kind === "module" && withinModule(site.file, protectedThing.file)) return "inside";
   if (isTestPath(site.file, testFolders)) return "test";
   return "bypass";
@@ -80,6 +85,13 @@ function withinModule(file: string, moduleFile: string): boolean {
 }
 
 const NOT_CHOKEABLE_NOTE = "the totality oracle form (over + via) is the compromise where structure is unavailable";
+
+/** The rungs whose enforcer is the language itself, where a refusal is the refutation (ruling rs-e93ecdd6). */
+const LANGUAGE_ENFORCED = new Set<Grade>(["visibility-choked", "closure-choked"]);
+
+function nameOf(site: SiteClass | undefined): string {
+  return site === undefined ? "as unreported" : site === "test" ? "a test reference" : "a reference inside the chokepoint";
+}
 
 export async function checkChokepoint(adapter: LanguageAdapter, input: ChokepointInput): Promise<ChokepointResult> {
   const hint = { component: input.component, testFolders: input.testFolders };
@@ -122,16 +134,26 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
   const files = [...new Set([protectedThing.file, chokepoint.file, ...sites.map((s) => s.file)])].sort();
 
   const visibility = await adapter.visibility(protectedThing, chokepoint);
+  const earned = rungFor(adapter, visibility);
   const refutation = await adapter.refute(protectedThing, chokepoint);
-  const synthetic = refutation.site === undefined ? undefined : classifySite(refutation.site, protectedThing, chokepoint, input.testFolders);
-  // The refutation fires only when this check's own classification calls the synthetic site a bypass.
-  const fired = refutation.seen && synthetic === "bypass";
-  const refutationState: RefutationState = fired ? "automatic" : "missing";
-  const refutationAccount = !refutation.seen
-    ? refutation.account
-    : fired
-      ? `${refutation.account}, and the check classified it a bypass`
-      : `${refutation.account}, but the check classified it ${synthetic === "test" ? "a test reference" : "a reference inside the chokepoint"}, not a bypass; the refutation is vacuous`;
+  const classified = refutation.staged.map((staged) => ({
+    what: staged.what,
+    class: staged.site === undefined ? undefined : classifySite(staged.site, protectedThing, chokepoint, input.testFolders),
+  }));
+  // The rung whose enforcer is the language refutes itself: a synthetic reference the compiler or the interpreter
+  // refuses is the proof, and Coherence's own check never has to be made to fire (ruling rs-e93ecdd6).
+  const languageRefused = refutation.refused !== undefined && LANGUAGE_ENFORCED.has(earned.grade);
+  // Otherwise every staged site must be one this check's own classification calls a bypass (ruling d-7abd1ba8).
+  const short = classified.filter((site) => site.class !== "bypass");
+  const fired = classified.length > 0 && refutation.seen && short.length === 0;
+  const refutationState: RefutationState = languageRefused ? "refused by the language" : fired ? "automatic" : "missing";
+  const refutationAccount = languageRefused
+    ? `${refutation.account}; the ${earned.grade} rung is enforced by ${earned.enforcer}, and its refusal is the refutation`
+    : !refutation.seen || classified.length === 0
+      ? refutation.account
+      : fired
+        ? `${refutation.account}, and the check classified each one a bypass`
+        : `${refutation.account}, but the check classified ${short.map((s) => `${s.what} ${nameOf(s.class)}`).join(" and ")}, not a bypass; the refutation is vacuous`;
 
   if (bypasses.length > 0) {
     return {
@@ -150,16 +172,16 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
       reason: `${bypasses.length} reference${bypasses.length === 1 ? "" : "s"} to ${protectedThing.name} outside ${chokepoint.name}: ${bypasses.map((b) => `${b.file}:${b.line} in ${b.symbol}`).join(", ")}`,
     };
   }
-  const earned = rungFor(adapter, visibility);
   // When the instrument could not see the synthetic site, Coherence's own check enforces nothing: a ladder may name the rung that is left.
   // A site the instrument saw but the check would not call a bypass leaves the earned rung's fact standing; only the verdict drops.
-  const vacuousRung = !refutation.seen && adapter.ladder.whenVacuous !== undefined ? rungsOf(adapter).find((r) => r.grade === adapter.ladder.whenVacuous) : undefined;
+  const vacuousRung = !languageRefused && !refutation.seen && adapter.ladder.whenVacuous !== undefined ? rungsOf(adapter).find((r) => r.grade === adapter.ladder.whenVacuous) : undefined;
   const graded: Rung = vacuousRung === undefined ? earned : { ...vacuousRung, fact: `the instrument could not see the synthetic reference, so Coherence's check enforces nothing here and only the convention stands (${visibility.evidence})` };
   const tests = counts.test > 0 ? `; ${counts.test} test reference${counts.test === 1 ? "" : "s"}` : "";
-  const vacuous = fired ? "" : `; refutation missing: ${refutationAccount}`;
+  const proved = languageRefused || fired;
+  const vacuous = proved ? "" : `; refutation missing: ${refutationAccount}`;
   return {
     input,
-    verdict: fired ? "pass" : "not run",
+    verdict: proved ? "pass" : "not run",
     grade: graded.grade,
     enforcer: graded.enforcer,
     refutation: refutationState,

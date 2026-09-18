@@ -39,6 +39,7 @@ import {
   isTestPath,
   parseName,
   rangeContains,
+  statementStartLine,
   type Definition,
   type Ladder,
   type LanguageAdapter,
@@ -49,6 +50,8 @@ import {
   type ResolveHint,
   type Resolved,
   type Rung,
+  type SiteForm,
+  type StagedSite,
   type Visibility,
 } from "./adapter.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
@@ -156,6 +159,55 @@ function importStatementLines(lines: readonly string[]): Set<number> {
     chained = /\\\s*$/.test(text);
   }
   return found;
+}
+
+/** A bare star import: `from pkg.store import *`, which re-exports whatever the module holds. */
+const STAR_IMPORT = /^from\s+(\.*)([A-Za-z0-9_.]*)\s+import\s+\*/;
+
+/**
+ * Whether a Pyright diagnostic is the interpreter's own refusal: the name is
+ * not a module attribute, so no import can reach it. That refusal is the
+ * refutation for the rung the interpreter enforces (ruling rs-e93ecdd6).
+ */
+export function refusesImport(diagnostic: { message: string; severity?: number }): boolean {
+  if (diagnostic.severity !== undefined && diagnostic.severity !== 1) return false;
+  return /unknown import symbol|is not a known attribute of module|could not be resolved|is unknown/.test(diagnostic.message);
+}
+
+/** The identifier the character sits in, or undefined. */
+export function identifierAt(line: string, character: number): string | undefined {
+  if (!/[A-Za-z0-9_]/.test(line[character] ?? "")) return undefined;
+  let start = character;
+  while (start > 0 && /[A-Za-z0-9_]/.test(line[start - 1] ?? "")) start--;
+  let end = character;
+  while (end < line.length && /[A-Za-z0-9_]/.test(line[end] ?? "")) end++;
+  return line.slice(start, end);
+}
+
+/**
+ * The syntactic form of a Python reference site, read forward from the
+ * top-level statement it sits in (ruling d-7abd1ba8). `from x import y` and
+ * `import x` are imports; a bare `from x import *` is a re-export, and so is
+ * an import whose name the module's `__all__` lists, because `__all__` is how
+ * a Python module hands a name it imported on to everyone else.
+ */
+export function pythonSiteForm(lines: readonly string[], line: number, character: number, exported: readonly string[] | undefined): SiteForm | undefined {
+  const head = lines[statementStartLine(lines, line)] ?? "";
+  if (STAR_IMPORT.test(head)) return "re-export";
+  if (!/^(from\s+[A-Za-z0-9_.]+\s+import\b|import\s)/.test(head)) return undefined;
+  const name = identifierAt(lines[line] ?? "", character);
+  return name !== undefined && (exported ?? []).includes(name) ? "re-export" : "import";
+}
+
+/** The module path a dotted name points at, project-relative and without an extension; a relative name resolves against `from`. */
+export function resolveDotted(from: string, dots: string, dotted: string): string | undefined {
+  let base: string[] = [];
+  if (dots !== "") {
+    base = dirname(from).split("/").filter((segment) => segment !== ".");
+    for (let i = 1; i < dots.length; i++) base.pop();
+  }
+  const parts = [...base, ...dotted.split(".").filter((segment) => segment !== "")];
+  return parts.length === 0 ? undefined : parts.join("/");
 }
 
 /** Whether a folder is a virtual environment (never source). */
@@ -320,6 +372,10 @@ export class PythonAdapter implements LanguageAdapter {
   private readonly versions = new Map<string, number>();
   private readonly touched = new Set<string>();
   private checkerFacts: CheckerFacts | undefined;
+  /** Star-import sites by the module path they re-export; Pyright reports no site for a name the statement never spells. Scanned once per forget. */
+  private wildcards: Map<string, ReferenceSite[]> | undefined;
+  /** The last diagnostics Pyright published, by project-relative file. */
+  private readonly diagnostics = new Map<string, { message: string; severity?: number }[]>();
   /** When the workspace was last reported to Pyright as possibly changed. */
   private lastForget = Date.now();
 
@@ -343,6 +399,11 @@ export class PythonAdapter implements LanguageAdapter {
     let found: (count: number) => void = () => {};
     this.enumerated = new Promise<number>((r) => (found = r));
     client.onNotification = (method, params) => {
+      if (method === "textDocument/publishDiagnostics") {
+        const published = params as { uri?: string; diagnostics?: { message: string; severity?: number }[] };
+        if (published.uri !== undefined) this.diagnostics.set(this.relative(published.uri), published.diagnostics ?? []);
+        return;
+      }
       if (method !== "window/logMessage") return;
       const message = (params as { message?: string }).message ?? "";
       const match = /Found (\d+) source files?/.exec(message);
@@ -363,7 +424,7 @@ export class PythonAdapter implements LanguageAdapter {
         rootUri: pathToFileURL(this.root).href,
         workspaceFolders: [{ uri: pathToFileURL(this.root).href, name: "project" }],
         capabilities: {
-          textDocument: { documentSymbol: { hierarchicalDocumentSymbolSupport: true } },
+          textDocument: { documentSymbol: { hierarchicalDocumentSymbolSupport: true }, publishDiagnostics: {} },
           workspace: { workspaceFolders: true, configuration: true },
         },
         initializationOptions: {},
@@ -472,6 +533,8 @@ export class PythonAdapter implements LanguageAdapter {
     this.symbolCache.clear();
     this.lineCache.clear();
     this.checkerFacts = undefined;
+    this.wildcards = undefined;
+    this.diagnostics.clear();
     const since = this.lastForget - 1000;
     this.lastForget = Date.now();
     if (this.client === undefined) return;
@@ -613,11 +676,48 @@ export class PythonAdapter implements LanguageAdapter {
         if (seen.has(key)) continue;
         seen.add(key);
         this.touched.add(file);
-        sites.push({ file, line: start.line + 1, character: start.character, symbol: await this.enclosingSymbol(file, start) });
+        const form = pythonSiteForm(this.linesOf(file), start.line, start.character, this.exportList(file));
+        sites.push({ file, line: start.line + 1, character: start.character, symbol: await this.enclosingSymbol(file, start), ...(form === undefined ? {} : { form }) });
       }
+    }
+    // A bare star import spells no name, so Pyright reports no site for it; it still hands the module's names on.
+    for (const site of this.starImports(definition.file)) {
+      const key = `${site.file}:${site.line - 1}:${site.character}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      this.touched.add(site.file);
+      sites.push(site);
     }
     sites.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.character - b.character);
     return sites;
+  }
+
+  /** The sites where another module star-imports this file, scanned once per forget because Pyright reports none of them. */
+  private starImports(file: string): ReferenceSite[] {
+    if (this.wildcards === undefined) {
+      const found = new Map<string, ReferenceSite[]>();
+      for (const source of pythonFiles(this.root)) {
+        let lines: string[];
+        try {
+          lines = readFileSync(join(this.root, source), "utf8").split(/\r?\n/);
+        } catch {
+          continue;
+        }
+        for (let i = 0; i < lines.length; i++) {
+          const match = STAR_IMPORT.exec(lines[i] ?? "");
+          if (match === null) continue;
+          const target = resolveDotted(source, match[1]!, match[2]!);
+          if (target === undefined) continue;
+          for (const candidate of [`${target}.py`, `${target}/__init__.py`]) {
+            const list = found.get(candidate) ?? [];
+            list.push({ file: source, line: i + 1, character: (lines[i] ?? "").lastIndexOf("*"), symbol: undefined, form: "re-export" });
+            found.set(candidate, list);
+          }
+        }
+      }
+      this.wildcards = found;
+    }
+    return this.wildcards.get(file) ?? [];
   }
 
   private async enclosingSymbol(file: string, position: Position): Promise<string | undefined> {
@@ -767,91 +867,148 @@ export class PythonAdapter implements LanguageAdapter {
     return via;
   }
 
-  async refute(protectedThing: Definition, _outsideOf: Definition | undefined): Promise<Refutation> {
+  /**
+   * A function-local is never a module attribute, so the interpreter refuses
+   * every import of it and that refusal is the refutation for the closure rung
+   * (ruling rs-e93ecdd6). Everything else stages the two sites the import
+   * ruling could otherwise swallow (d-7abd1ba8): a use in the chokepoint's own
+   * module past the chokepoint's body, and a re-export through `__all__`.
+   */
+  async refute(protectedThing: Definition, outsideOf: Definition | undefined): Promise<Refutation> {
     const client = await this.indexed();
-    const dir = dirname(protectedThing.file);
-    const folder = dir === "." ? "" : dir + "/";
-    const isInit = basename(protectedThing.file) === "__init__.py";
     let importName: string;
     let access: string;
-    let where = folder;
-    let from: string;
     if (protectedThing.kind === "module") {
       const first = (await this.moduleMembers(protectedThing.file))[0];
-      if (first === undefined) return { seen: false, account: `${protectedThing.file} declares and re-exports nothing, so no document can reference it` };
+      if (first === undefined) return { seen: false, staged: [], account: `${protectedThing.file} declares and re-exports nothing, so no document can reference it` };
       importName = first.name;
       access = importName;
     } else {
       const entry = await this.entryAt(protectedThing);
-      if (entry === undefined) return { seen: false, account: `no declaration at ${protectedThing.file}:${protectedThing.selection.line + 1}` };
-      if (entry.parents.some((k) => k === KIND_FUNCTION || k === KIND_METHOD)) return this.refuteInside(protectedThing, entry);
-      // A class member is reached through its class; a module member directly.
+      if (entry === undefined) return { seen: false, staged: [], account: `no declaration at ${protectedThing.file}:${protectedThing.selection.line + 1}` };
       importName = entry.path[0]!;
       access = entry.path.join(".");
+      if (entry.parents.some((k) => k === KIND_FUNCTION || k === KIND_METHOD)) return this.refusedByInterpreter(client, protectedThing, entry.symbol.name);
     }
-    if (isInit) {
-      // The package itself: the synthetic document stands beside the package and imports from it.
+    return this.stage(client, protectedThing, outsideOf, importName, access);
+  }
+
+  /** Where a synthetic document beside the protected thing stands, and how it names the module to import from. */
+  private syntheticFrom(protectedThing: Definition): { where: string; from: string } {
+    const dir = dirname(protectedThing.file);
+    if (basename(protectedThing.file) === "__init__.py") {
       const parent = dirname(dir);
-      where = parent === "." ? "" : parent + "/";
-      from = basename(dir);
-    } else {
-      const stem = basename(protectedThing.file, ".py");
-      from = existsSync(join(this.root, dir, "__init__.py")) ? `.${stem}` : stem;
+      return { where: parent === "." ? "" : parent + "/", from: basename(dir) };
     }
+    const stem = basename(protectedThing.file, ".py");
+    return { where: dir === "." ? "" : dir + "/", from: existsSync(join(this.root, dir, "__init__.py")) ? `.${stem}` : stem };
+  }
+
+  /** Open a synthetic document that imports the name and read Pyright's refusal back. */
+  private async refusedByInterpreter(client: JsonRpcClient, protectedThing: Definition, name: string): Promise<Refutation> {
+    const { where, from } = this.syntheticFrom(protectedThing);
     const synthetic = `${where}coherence_refutation_${randomBytes(4).toString("hex")}.py`;
-    const text = `from ${from} import ${importName}\ncoherence_refutation = ${access}\n`;
-    const at: Position = { line: 1, character: text.split("\n")[1]!.lastIndexOf(access.split(".").pop()!) };
-    return this.probe(client, protectedThing, synthetic, text, at);
-  }
-
-  /** A function-local can only be named inside its function: the synthetic reference is the file with one line added right after the definition, at its indentation. */
-  private async refuteInside(protectedThing: Definition, entry: Flat): Promise<Refutation> {
-    const original = readFileSync(join(this.root, protectedThing.file), "utf8");
-    const lines = original.split(/\r?\n/);
-    const at = protectedThing.range.start.line;
-    const indent = /^\s*/.exec(lines[at] ?? "")![0];
-    const added = `${indent}coherence_refutation = ${entry.symbol.name}`;
-    const edited = [...lines.slice(0, at + 1), added, ...lines.slice(at + 1)].join("\n");
-    this.open(protectedThing.file);
-    this.change(protectedThing.file, edited);
-    this.symbolCache.delete(protectedThing.file);
-    this.lineCache.set(protectedThing.file, edited.split("\n"));
-    try {
-      const sites = await this.references(protectedThing);
-      const hit = sites.find((s) => s.file === protectedThing.file && s.line === at + 2);
-      return {
-        seen: hit !== undefined,
-        ...(hit === undefined ? {} : { site: hit }),
-        account: hit !== undefined
-          ? `an unsaved edit of ${protectedThing.file} adding a use of ${entry.symbol.name} at line ${at + 2} was reported as a reference`
-          : `an unsaved edit of ${protectedThing.file} adding a use of ${entry.symbol.name} at line ${at + 2} was not reported; the check is vacuous`,
-      };
-    } finally {
-      this.change(protectedThing.file, original);
-      this.symbolCache.delete(protectedThing.file);
-      this.lineCache.delete(protectedThing.file);
-    }
-  }
-
-  private async probe(client: JsonRpcClient, protectedThing: Definition, synthetic: string, text: string, at: Position): Promise<Refutation> {
+    const text = `from ${from} import ${name}\ncoherence_refutation = ${name}\n`;
+    this.diagnostics.delete(synthetic);
     client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: "python", version: 1, text } });
     this.lineCache.set(synthetic, text.split("\n"));
     this.symbolCache.set(synthetic, []);
     try {
-      const sites = await this.references(protectedThing);
-      const hit = sites.find((s) => s.file === synthetic && s.line === at.line + 1);
-      return {
-        seen: hit !== undefined,
-        ...(hit === undefined ? {} : { site: hit }),
-        account: hit !== undefined
-          ? `an unsaved document ${synthetic} importing and using the protected thing was reported as a reference at line ${hit.line}`
-          : `an unsaved document ${synthetic} importing and using the protected thing was not reported among ${sites.length} references; the check is vacuous`,
-      };
+      const refusal = await this.awaitRefusal(synthetic);
+      if (refusal !== undefined) {
+        return { seen: true, staged: [], refused: refusal, account: `an unsaved document ${synthetic} importing ${name} was refused by the interpreter's own rule: ${refusal}` };
+      }
+      return { seen: false, staged: [], account: `an unsaved document ${synthetic} importing ${name} drew no diagnostic, so nothing proves the import is refused` };
     } finally {
       client.notify("textDocument/didClose", { textDocument: { uri: this.uri(synthetic) } });
       this.lineCache.delete(synthetic);
       this.symbolCache.delete(synthetic);
+      this.diagnostics.delete(synthetic);
     }
+  }
+
+  /** The first published diagnostic on a file that refuses the import, within the window; Pyright publishes an empty set first. */
+  private async awaitRefusal(file: string, timeoutMs = 20_000): Promise<string | undefined> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const refusal = (this.diagnostics.get(file) ?? []).find((d) => refusesImport(d));
+      if (refusal !== undefined) return refusal.message;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return undefined;
+  }
+
+  /** Stage the two synthetic sites in one references query, and restore. */
+  private async stage(client: JsonRpcClient, protectedThing: Definition, chokepoint: Definition | undefined, importName: string, access: string): Promise<Refutation> {
+    const { where, from } = this.syntheticFrom(protectedThing);
+    const synthetic = `${where}coherence_refutation_${randomBytes(4).toString("hex")}.py`;
+    // A class member is reached through its class, and `__all__` cannot name it: there the outside document uses it instead.
+    const direct = access === importName;
+    const text = direct ? `from ${from} import ${importName}\n__all__ = ["${importName}"]\n` : `from ${from} import ${importName}\ncoherence_refutation = ${access}\n`;
+    const outside = {
+      what: direct ? `a re-export of ${importName} through __all__ in the unsaved document ${synthetic}` : `a use of ${access} in the unsaved document ${synthetic}`,
+      file: synthetic,
+      line: direct ? 1 : 2,
+    };
+    client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: "python", version: 1, text } });
+    this.lineCache.set(synthetic, text.split("\n"));
+    this.symbolCache.set(synthetic, []);
+
+    // A module chokepoint has no inside that is outside its own range, so there is no same-module site to stage.
+    const sameModule = chokepoint !== undefined && chokepoint.kind === "symbol" ? this.editChokepointModule(chokepoint, protectedThing, importName, access) : undefined;
+    const expected: { what: string; file: string; line: number }[] = [];
+    if (sameModule !== undefined) expected.push({ what: `a use of ${access} in ${chokepoint!.file} outside ${chokepoint!.name}`, file: chokepoint!.file, line: sameModule.line });
+    expected.push(outside);
+
+    try {
+      const sites = await this.references(protectedThing);
+      const staged: StagedSite[] = expected.map((want) => {
+        const hit = sites.find((s) => s.file === want.file && s.line === want.line);
+        return { what: want.what, ...(hit === undefined ? {} : { site: hit }) };
+      });
+      const unseen = staged.filter((s) => s.site === undefined);
+      return {
+        seen: unseen.length === 0,
+        staged,
+        account:
+          unseen.length === 0
+            ? `the instrument reported ${staged.map((s) => s.what).join(" and ")}`
+            : `the instrument did not report ${unseen.map((s) => s.what).join(" or ")} among ${sites.length} references; the check is vacuous`,
+      };
+    } finally {
+      sameModule?.restore();
+      client.notify("textDocument/didClose", { textDocument: { uri: this.uri(synthetic) } });
+      this.lineCache.delete(synthetic);
+      this.symbolCache.delete(synthetic);
+    }
+  }
+
+  /** Append a use of the protected thing to the chokepoint's own module, past the chokepoint's body: the one place the import ruling makes an import inside. */
+  private editChokepointModule(chokepoint: Definition, protectedThing: Definition, importName: string, access: string): { line: number; restore: () => void } | undefined {
+    let original: string;
+    try {
+      original = readFileSync(join(this.root, chokepoint.file), "utf8");
+    } catch {
+      return undefined;
+    }
+    const body = original.endsWith("\n") ? original : `${original}\n`;
+    const start = body.split("\n").length - 1;
+    const sameFile = chokepoint.file === protectedThing.file;
+    // Re-importing a name Python already bound is harmless, so the added lines need no alias.
+    const added = sameFile ? `coherence_refutation_use = ${access}\n` : `from ${this.dottedModule(protectedThing.file)} import ${importName}\ncoherence_refutation_use = ${access}\n`;
+    const line = start + (sameFile ? 1 : 2);
+    this.open(chokepoint.file);
+    this.change(chokepoint.file, body + added);
+    this.symbolCache.delete(chokepoint.file);
+    this.lineCache.set(chokepoint.file, (body + added).split("\n"));
+    return {
+      line,
+      restore: () => {
+        this.change(chokepoint.file, original);
+        this.symbolCache.delete(chokepoint.file);
+        this.lineCache.delete(chokepoint.file);
+      },
+    };
   }
 
   async close(): Promise<void> {

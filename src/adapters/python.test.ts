@@ -210,10 +210,11 @@ test("Python grades: broken with a bypass; reference-choked when clean, with the
   assert.equal(inner.enforcer, "the interpreter");
   assert.match(inner.reason, /defined inside closure's body and is not a module attribute/);
   // The interpreter is the enforcer here and Coherence's own check is not: a function-local can only be named
-  // inside the body that is the chokepoint, so the synthetic site classifies inside and refutes nothing.
-  assert.equal(inner.refutation, "missing", inner.refutationAccount);
-  assert.equal(inner.verdict, "not run");
-  assert.match(inner.refutationAccount, /classified it a reference inside the chokepoint, not a bypass; the refutation is vacuous/);
+  // inside the body that is the chokepoint, so the interpreter's refusal of a synthetic import is the refutation (rs-e93ecdd6).
+  assert.equal(inner.refutation, "refused by the language", inner.refutationAccount);
+  assert.equal(inner.verdict, "pass", inner.reason);
+  assert.match(inner.refutationAccount, /refused by the interpreter's own rule: .*unknown import symbol/);
+  assert.match(inner.refutationAccount, /the closure-choked rung is enforced by the interpreter, and its refusal is the refutation/);
   const innerElsewhere = await checkChokepoint(adapter, { protects: "INNER", chokepoint: "seal", ...hint });
   assert.equal(innerElsewhere.grade, "broken", "a function-local named under another chokepoint is referenced inside its own function, outside that chokepoint");
   assert.deepEqual(innerElsewhere.bypasses, [{ file: "pkg/store.py", line: 31, symbol: "closure" }]);
@@ -260,12 +261,12 @@ test("a Python module or package resolves, its members are the references' start
   assert.match(visibility.evidence, /declares __all__ with 2 names/);
 });
 
-test("the Python refutation opens an unsaved document that imports and uses the protected thing, and nothing is written to disk", async () => {
+test("the Python refutation stages a re-export in an unsaved document, and a function-local is refused by the interpreter; nothing is written to disk", async () => {
   const before = readFileSync(join(root, "pkg/store.py"), "utf8");
   const protectedThing = definitionOf(await adapter.resolve("SECRET_COLUMNS", hint));
   const refutation = await adapter.refute(protectedThing, undefined);
   assert.equal(refutation.seen, true, refutation.account);
-  assert.match(refutation.account, /unsaved document pkg\/coherence_refutation_[0-9a-f]+\.py importing and using the protected thing was reported as a reference/);
+  assert.match(refutation.account, /a re-export of SECRET_COLUMNS through __all__ in the unsaved document pkg\/coherence_refutation_[0-9a-f]+\.py/);
   assert.ok(readdirSync(join(root, "pkg")).every((n) => !n.includes("refutation")), "no synthetic file lands on disk");
 
   const member = definitionOf(await adapter.resolve("_script in store.py", hint));
@@ -276,8 +277,8 @@ test("the Python refutation opens an unsaved document that imports and uses the 
   const closure = definitionOf(await adapter.resolve("closure", hint));
   const inside = await adapter.refute(inner, closure);
   assert.equal(inside.seen, true, inside.account);
-  assert.match(inside.account, /unsaved edit of pkg\/store\.py adding a use of INNER at line 31 was reported as a reference/);
-  assert.deepEqual({ file: inside.site?.file, line: inside.site?.line }, { file: "pkg/store.py", line: 31 }, "the adapter reports the site; the check classifies it");
+  assert.match(inside.account, /refused by the interpreter's own rule: .*unknown import symbol/, inside.account);
+  assert.deepEqual(inside.staged, [], "nothing is staged for a name no import can reach");
   assert.equal(readFileSync(join(root, "pkg/store.py"), "utf8"), before);
 });
 
@@ -321,6 +322,56 @@ test("the totality oracle pass through pytest: every test the bullets name in on
   write("coherence.config.json", JSON.stringify({ language: "python", testDir: "tests" }));
 });
 
+test("Python, ruling d-7abd1ba8: an import at the top of the chokepoint's module is inside; the same import elsewhere, an __all__ re-export, a bare star import, and a use outside the chokepoint's body are bypasses", async () => {
+  const other = mkdtempSync(join(tmpdir(), "coherence-python-ruling-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(other, path)), { recursive: true });
+    writeFileSync(join(other, path), text, "utf8");
+  };
+  put("pkg/__init__.py", "");
+  put("pkg/secrets.py", `SECRET_COLUMNS = {"tokens": ["token"]}\n`);
+  put(
+    "pkg/door.py",
+    `from pkg.secrets import SECRET_COLUMNS
+
+
+def seal(pattern: str, row: dict) -> dict:
+    out = dict(row)
+    for column in SECRET_COLUMNS.get(pattern, []):
+        out.pop(column, None)
+    return out
+
+
+SNEAK = SECRET_COLUMNS
+`,
+  );
+  put("pkg/render.py", `from pkg.secrets import SECRET_COLUMNS\n`);
+  put("pkg/reexport.py", `from pkg.secrets import SECRET_COLUMNS\n\n__all__ = ["SECRET_COLUMNS"]\n`);
+  put("pkg/star.py", `from pkg.secrets import *\n`);
+  const fresh = new PythonAdapter(other);
+  try {
+    const protectedThing = definitionOf(await fresh.resolve("SECRET_COLUMNS in secrets.py", hint));
+    const chokepoint = definitionOf(await fresh.resolve("seal", hint));
+    const sites = await fresh.references(protectedThing);
+    const classes = sites.map((s) => `${s.file}:${s.line} ${classifySite(s, protectedThing, chokepoint, hint.testFolders)}`);
+    assert.deepEqual(classes, [
+      "pkg/door.py:1 inside",
+      "pkg/door.py:6 inside",
+      "pkg/door.py:11 bypass",
+      "pkg/reexport.py:1 bypass",
+      "pkg/reexport.py:3 bypass",
+      "pkg/render.py:1 bypass",
+      "pkg/star.py:1 bypass",
+    ]);
+    assert.equal(sites.find((s) => s.file === "pkg/door.py" && s.line === 1)!.form, "import");
+    assert.equal(sites.find((s) => s.file === "pkg/reexport.py" && s.line === 1)!.form, "re-export", "__all__ turns the import into a re-export");
+    assert.equal(sites.find((s) => s.file === "pkg/star.py")!.form, "re-export", "a bare star import re-exports whatever the module holds");
+  } finally {
+    await fresh.close();
+    rmSync(other, { recursive: true, force: true });
+  }
+});
+
 test("a run over the Python fixture records the grade, the enforcer, and the refutation per chokepoint", async () => {
   const outcome = await performRun(root, { session: "python-run", agent: "python", adapter, form: "chokepoint" });
   const byName = new Map(outcome.record.invariants.map((e) => [e.name, e]));
@@ -329,8 +380,8 @@ test("a run over the Python fixture records the grade, the enforcer, and the ref
   assert.equal(byName.get("hidden set")!.enforcer, "Coherence's check at the edit and in CI");
   assert.equal(byName.get("inner set")!.grade, "closure-choked");
   assert.equal(byName.get("inner set")!.enforcer, "the interpreter");
-  assert.equal(byName.get("inner set")!.refutation, "missing", "the interpreter enforces the closure rung; Coherence's own check cannot be made to fire there");
-  assert.match(formatRun(outcome), /chokepoint closure protects INNER: closure-choked \(enforced by the interpreter\) — not run/);
+  assert.equal(byName.get("inner set")!.refutation, "refused by the language", "the interpreter refuses the import, and that refusal is the refutation");
+  assert.match(formatRun(outcome), /chokepoint closure protects INNER: closure-choked \(enforced by the interpreter\) — pass/);
   assert.equal(outcome.record.instrument.language, "python");
   rmSync(join(root, ".coherence"), { recursive: true, force: true });
 });

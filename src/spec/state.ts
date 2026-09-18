@@ -26,7 +26,7 @@
  * reported as a lack, since every invariant carries its own.
  */
 
-import type { Latest, LatestFor } from "../enforcement/record.ts";
+import type { Latest, LatestFor, RefutationState } from "../enforcement/record.ts";
 import type { Invariant } from "./grammar.ts";
 
 export type State = "requirement" | "invariant" | "structural defect";
@@ -51,6 +51,15 @@ export interface Derived {
 const NONE: LatestFor = { chokepoint: undefined, totality: undefined };
 
 /**
+ * The refutation states that witness a chokepoint form: the check's own
+ * classification called every staged synthetic site a bypass, or the rung's
+ * enforcer is the language itself and it refused the synthetic outside
+ * reference (ruling rs-e93ecdd6). A refusal is the firing of the enforcement
+ * the rung names, so it satisfies the requirement the same way.
+ */
+const CHOKEPOINT_WITNESSED: ReadonlySet<RefutationState> = new Set<RefutationState>(["automatic", "refused by the language"]);
+
+/**
  * `totalityWitnessed` is the run store's answer for this bullet's totality oracle:
  * a refutation record exists for it and a run at or after that record found it
  * passing. The model computes it; nothing derives it from the spec text.
@@ -59,7 +68,7 @@ export function deriveState(invariant: Invariant, applicable: readonly string[],
   const lacks: Lack[] = [];
   const forms = new Set(invariant.enforcements.map((e) => e.form));
   const unrefuted: string[] = [];
-  if (forms.has("chokepoint") && latest.chokepoint?.refutation !== "automatic") unrefuted.push("chokepoint");
+  if (forms.has("chokepoint") && !CHOKEPOINT_WITNESSED.has(latest.chokepoint?.refutation ?? "missing")) unrefuted.push("chokepoint");
   if (forms.has("totality oracle") && !totalityWitnessed) unrefuted.push("totality oracle");
   if (invariant.enforcements.length === 0) {
     lacks.push("enforcement");

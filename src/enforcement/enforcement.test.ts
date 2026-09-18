@@ -186,20 +186,21 @@ test("grades: broken with a bypass, reference-choked when clean and exported, vi
   await adapter.forget();
 });
 
-test("the automatic refutation opens a synthetic reference and sees it; nothing is written to disk", async () => {
+test("the automatic refutation stages a re-export in an unsaved document; a thing the module does not export is refused by the compiler; nothing is written to disk", async () => {
   const protectedThing = (await adapter.resolve("SECRET_COLUMNS", hint)) as { ok: true; definition: import("../adapters/adapter.ts").Definition };
   const before = readFileSync(join(root, "src/store/secrets.ts"), "utf8");
   const refutation = await adapter.refute(protectedThing.definition, undefined);
   assert.equal(refutation.seen, true, refutation.account);
-  assert.match(refutation.account, /unsaved document .*coherence-refutation-.*reported as a reference/);
+  assert.match(refutation.account, /a re-export of SECRET_COLUMNS from the unsaved document .*coherence-refutation-/);
   assert.equal(readFileSync(join(root, "src/store/secrets.ts"), "utf8"), before);
   const { readdirSync } = await import("node:fs");
   assert.ok(readdirSync(join(root, "src/store")).every((n) => !n.includes("refutation")), "no synthetic file lands on disk");
 
   const hidden = (await adapter.resolve("HIDDEN", hint)) as { ok: true; definition: import("../adapters/adapter.ts").Definition };
-  const inside = await adapter.refute(hidden.definition, undefined);
-  assert.equal(inside.seen, true, inside.account);
-  assert.match(inside.account, /unsaved edit of src\/store\/secrets\.ts/);
+  const refused = await adapter.refute(hidden.definition, undefined);
+  assert.equal(refused.seen, true, refused.account);
+  assert.match(refused.refused ?? "", /not exported/, refused.account);
+  assert.deepEqual(refused.staged, [], "nothing is staged for a name the compiler will not let another module import");
   assert.equal(readFileSync(join(root, "src/store/secrets.ts"), "utf8"), before);
 });
 
@@ -416,6 +417,83 @@ test("every site the language server reports is a reference: a bypass beneath a 
   }
 });
 
+/** Ruling d-7abd1ba8's tree: the chokepoint's module imports the protected thing, uses it inside and outside the chokepoint, and re-exports it; another module imports it and a third re-exports it with a wildcard. */
+const RULING_SEAL = `import { SECRET_COLUMNS } from "../store/secrets.ts";
+
+export function seal(pattern: string): string[] {
+  return SECRET_COLUMNS[pattern] ?? [];
+}
+
+export const sneak = SECRET_COLUMNS;
+
+export { SECRET_COLUMNS } from "../store/secrets.ts";
+`;
+
+async function ruledTree(seal: string): Promise<{ dir: string; adapter: TypeScriptAdapter }> {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-ruling-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text, "utf8");
+  };
+  put("tsconfig.json", TSCONFIG);
+  put("src/store/secrets.ts", 'export const SECRET_COLUMNS: Record<string, string[]> = { tokens: ["token"] };\n');
+  put("src/door/seal.ts", seal);
+  put("src/api/leak.ts", 'import { SECRET_COLUMNS } from "../store/secrets.ts";\nexport const held = SECRET_COLUMNS;\n');
+  put("src/api/star.ts", 'export * from "../store/secrets.ts";\n');
+  return { dir, adapter: new TypeScriptAdapter(dir) };
+}
+
+test("a plain import specifier in the chokepoint's own module is inside; the same import elsewhere, a re-export anywhere, a wildcard re-export, and a use outside the chokepoint's range are bypasses", async () => {
+  const { dir, adapter: fresh } = await ruledTree(RULING_SEAL);
+  try {
+    const protectedThing = (await fresh.resolve("SECRET_COLUMNS in secrets.ts", hint)) as { ok: true; definition: import("../adapters/adapter.ts").Definition };
+    const chokepoint = (await fresh.resolve("seal", hint)) as { ok: true; definition: import("../adapters/adapter.ts").Definition };
+    assert.ok(protectedThing.ok && chokepoint.ok);
+    const sites = await fresh.references(protectedThing.definition);
+    const classes = sites.map((s) => `${s.file}:${s.line} ${classifySite(s, protectedThing.definition, chokepoint.definition, hint.testFolders)}`);
+    assert.deepEqual(classes, [
+      "src/api/leak.ts:1 bypass",
+      "src/api/leak.ts:2 bypass",
+      "src/api/star.ts:1 bypass",
+      "src/door/seal.ts:1 inside",
+      "src/door/seal.ts:4 inside",
+      "src/door/seal.ts:7 bypass",
+      "src/door/seal.ts:9 bypass",
+    ]);
+    assert.equal(sites.find((s) => s.file === "src/door/seal.ts" && s.line === 1)!.form, "import");
+    assert.equal(sites.find((s) => s.file === "src/door/seal.ts" && s.line === 9)!.form, "re-export");
+    assert.equal(sites.find((s) => s.file === "src/api/star.ts" && s.line === 1)!.form, "re-export");
+  } finally {
+    await fresh.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the automatic refutation stages both synthetic sites — a use in the chokepoint's own module outside its range and a re-export — and is vacuous unless the check calls each one a bypass", async () => {
+  // The clean tree: the chokepoint's module imports the protected thing and uses it only inside seal.
+  const clean = `import { SECRET_COLUMNS } from "../store/secrets.ts";
+
+export function seal(pattern: string): string[] {
+  return SECRET_COLUMNS[pattern] ?? [];
+}
+`;
+  const { dir, adapter: fresh } = await ruledTree(clean);
+  try {
+    rmSync(join(dir, "src/api/leak.ts"));
+    rmSync(join(dir, "src/api/star.ts"));
+    const result = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS in secrets.ts", chokepoint: "seal", ...hint });
+    assert.equal(result.grade, "reference-choked", result.reason);
+    assert.equal(result.refutation, "automatic", result.refutationAccount);
+    assert.equal(result.verdict, "pass", result.reason);
+    assert.match(result.refutationAccount, /a use of SECRET_COLUMNS in src\/door\/seal\.ts outside seal/, result.refutationAccount);
+    assert.match(result.refutationAccount, /a re-export of SECRET_COLUMNS/, result.refutationAccount);
+    assert.match(result.refutationAccount, /the check classified each one a bypass/, result.refutationAccount);
+  } finally {
+    await fresh.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("the one-at-a-time totality path escapes the title before the runner reads it as a regex", async () => {
   const { escapeRegExp, runTotalityOracle } = await import("./totality.ts");
   assert.equal(escapeRegExp("returns 503 (R2 absent)"), "returns 503 \\(R2 absent\\)");
@@ -444,18 +522,20 @@ test("the automatic refutation is vacuous unless the check's own classification 
     assert.equal(inTests.counts.bypass, 0, "every site is under a test folder");
     assert.equal(inTests.refutation, "missing", inTests.refutationAccount);
     assert.equal(inTests.verdict, "not run", inTests.reason);
-    assert.match(inTests.refutationAccount, /classified it a test reference, not a bypass; the refutation is vacuous/);
+    assert.match(inTests.refutationAccount, /a test reference, not a bypass; the refutation is vacuous/);
 
+    // Ruling rs-e93ecdd6: HIDDEN is not exported, so the compiler refuses every outside reference and
+    // Coherence's own check can never be made to fire; the refusal is the refutation for that rung.
     const ownModule = await checkChokepoint(fresh, { protects: "HIDDEN", chokepoint: "src/store/hidden.ts", ...hint });
-    assert.equal(ownModule.refutation, "missing", ownModule.refutationAccount);
-    assert.equal(ownModule.verdict, "not run", ownModule.reason);
-    assert.match(ownModule.refutationAccount, /classified it a reference inside the chokepoint, not a bypass; the refutation is vacuous/);
+    assert.equal(ownModule.refutation, "refused by the language", ownModule.refutationAccount);
+    assert.equal(ownModule.verdict, "pass", ownModule.reason);
+    assert.equal(ownModule.grade, "visibility-choked", ownModule.reason);
+    assert.match(ownModule.refutationAccount, /refused by the compiler: .*not exported/);
+    assert.match(ownModule.refutationAccount, /the visibility-choked rung is enforced by the compiler, and its refusal is the refutation/);
 
-    // The same protected thing under a chokepoint that does not cover the whole module still refutes.
     const symbolChokepoint = await checkChokepoint(fresh, { protects: "HIDDEN", chokepoint: "peek", ...hint });
-    assert.equal(symbolChokepoint.refutation, "automatic", symbolChokepoint.refutationAccount);
+    assert.equal(symbolChokepoint.refutation, "refused by the language", symbolChokepoint.refutationAccount);
     assert.equal(symbolChokepoint.verdict, "pass", symbolChokepoint.reason);
-    assert.match(symbolChokepoint.refutationAccount, /the check classified it a bypass/);
   } finally {
     await fresh.close();
     rmSync(other, { recursive: true, force: true });
