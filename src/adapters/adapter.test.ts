@@ -1,13 +1,13 @@
 /**
  * The parts of the seam that need no instrument: how a spec value reads,
- * how an import site is told from a use, and which paths are tests.
+ * and which paths are tests.
  */
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isTestPath, parseName, rangeContains } from "./adapter.ts";
-import { PYTHON_LADDER, PythonAdapter, ruleCovers, rulesNaming, isPythonImportSite, type CheckerFacts } from "./python.ts";
-import { TYPESCRIPT_LADDER, isImportSite } from "./typescript.ts";
+import { PYTHON_LADDER, PythonAdapter, ruleCovers, rulesNaming, type CheckerFacts } from "./python.ts";
+import { TYPESCRIPT_LADDER } from "./typescript.ts";
 
 test("a spec value reads as a bare symbol, a symbol in a file, a module path, or prose", () => {
   assert.deepEqual(parseName("writeClass"), { form: "symbol", name: "writeClass", fileHint: undefined });
@@ -16,20 +16,6 @@ test("a spec value reads as a bare symbol, a symbol in a file, a module path, or
   assert.deepEqual(parseName("entities/Hive/policy.ts"), { form: "module", path: "entities/Hive/policy.ts" });
   assert.equal(parseName("the kernel tables (KERNEL_TABLES) reached through data.ts").form, "prose");
   assert.equal(parseName("IMMUTABLE and IMMUTABLE_AFTER_CREATE in kernel.ts").form, "prose");
-});
-
-test("an import or export specifier is told from a use, across wrapped lines", () => {
-  const lines = ['import { SECRET_COLUMNS, seal } from "../store/secrets.ts";', "", "export function render() {", "  const leaked = SECRET_COLUMNS;", "}"];
-  assert.equal(isImportSite(lines, 0, 9), true);
-  assert.equal(isImportSite(lines, 3, 17), false);
-  const wrapped = ["import {", "  SECRET_COLUMNS,", "  seal,", '} from "./secrets.ts";', "const x = SECRET_COLUMNS;"];
-  assert.equal(isImportSite(wrapped, 1, 2), true);
-  assert.equal(isImportSite(wrapped, 4, 10), false);
-  const reexport = ['export { SECRET_COLUMNS } from "./secrets.ts";', "export type { Row } from './row.ts';"];
-  assert.equal(isImportSite(reexport, 0, 9), true);
-  assert.equal(isImportSite(reexport, 1, 14), true);
-  const afterImport = ['import { a } from "./a.ts";', "const b = a(SECRET_COLUMNS);"];
-  assert.equal(isImportSite(afterImport, 1, 12), false, "a use on the line after an import is a use");
 });
 
 test("a path is a test when a configured folder is a segment or the file is named .test or .spec", () => {
@@ -60,19 +46,6 @@ test("the grade ladder's top rung is adapter-defined: TypeScript enforces visibi
   assert.equal(PYTHON_LADDER.whenVacuous, "convention", "a Python chokepoint whose refutation is vacuous stands on the convention alone");
   assert.equal(TYPESCRIPT_LADDER.whenVacuous, undefined);
   assert.ok(new PythonAdapter("/nowhere").ladder === PYTHON_LADDER);
-});
-
-test("a Python import statement is told from a use, across wrapped lines", () => {
-  const lines = ["from pkg.store import SECRET_COLUMNS, seal", "", "def render(pattern):", "    leaked = SECRET_COLUMNS[pattern]"];
-  assert.equal(isPythonImportSite(lines, 0, 22), true);
-  assert.equal(isPythonImportSite(lines, 3, 13), false);
-  const wrapped = ["from pkg.store import (", "    SECRET_COLUMNS,", "    seal,", ")", "x = SECRET_COLUMNS"];
-  assert.equal(isPythonImportSite(wrapped, 1, 4), true);
-  assert.equal(isPythonImportSite(wrapped, 4, 4), false);
-  const backslash = ["from pkg.store import SECRET_COLUMNS, \\", "    seal", "y = seal"];
-  assert.equal(isPythonImportSite(backslash, 1, 4), true);
-  assert.equal(isPythonImportSite(backslash, 2, 4), false);
-  assert.equal(isPythonImportSite(["import pkg.store", "z = pkg.store.SECRET_COLUMNS"], 1, 14), false, "a use on the line after an import is a use");
 });
 
 test("a spec value with a trailing slash reads as a package module, and pytest file names are test paths", () => {

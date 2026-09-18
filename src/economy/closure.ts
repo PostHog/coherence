@@ -139,14 +139,14 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
         const resolved = await adapter.resolve(`${declaration.name} in ${file}`, hint(file));
         if (!resolved.ok) continue;
         for (const site of await adapter.references(resolved.definition)) {
-          if (site.isImport || givenSet.has(site.file)) continue;
+          if (givenSet.has(site.file)) continue;
           const kind = isTest(site.file, config.testFolders) ? "test references" : "references";
           out.add(site.file, `${kind} ${declaration.name} (${file}) at line ${site.line}${site.symbol === undefined ? "" : ` in ${site.symbol}`}`);
         }
       }
     }
 
-    // Hop out: what the given files reference, confirmed by a site outside an import specifier.
+    // Hop out: what the given files reference, confirmed by a reference site in the given file (an import specifier is one).
     for (const file of given) {
       for (const imported of importsOf(root, file, texts.get(file)!, language)) {
         if (givenSet.has(imported.module)) continue;
@@ -154,7 +154,7 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
         const resolved = await adapter.resolve(name, hint(imported.module));
         if (!resolved.ok) continue;
         const sites = await adapter.references(resolved.definition);
-        const used = sites.filter((s) => s.file === file && !s.isImport);
+        const used = sites.filter((s) => s.file === file);
         if (used.length === 0) continue;
         const label = imported.name === undefined ? "the module" : imported.name;
         out.add(imported.module, `defines ${label}, referenced by ${file} at line${used.length === 1 ? "" : "s"} ${used.map((s) => s.line).join(", ")}`);

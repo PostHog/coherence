@@ -135,30 +135,27 @@ function isParameter(entry: Flat, lines: readonly string[]): boolean {
   return entry.symbol.range.start.line <= headerEnd;
 }
 
-/** A statement that brings a name into scope or re-exports it: an import, or the module's `__all__` list. */
-const IMPORT_LINE = /^\s*(from\s+\S+\s+import\b|import\s|__all__\s*(\+?=|:))/;
-
 /**
- * Whether the site sits on an import statement or in an `__all__` list,
- * including one wrapped in brackets or by backslashes: it brings the name
- * into scope or re-exports it, and is no use of it.
+ * The line indexes that belong to an import statement: its first line and,
+ * while a bracket it opened stays open or a line ends with a backslash, the
+ * lines that continue it. Used to find where a re-exported name enters a
+ * package's __init__, never to exempt a site: every site Pyright reports is
+ * a reference.
  */
-export function isPythonImportSite(lines: readonly string[], line: number, _character: number): boolean {
-  if (IMPORT_LINE.test(lines[line] ?? "")) return true;
-  // Walk back to the statement that opened the bracket or backslash chain this line continues, if any.
+function importStatementLines(lines: readonly string[]): Set<number> {
+  const found = new Set<number>();
   let open = 0;
-  let chain = true;
-  for (let k = line - 1; k >= Math.max(0, line - 60); k--) {
-    const text = lines[k] ?? "";
+  let chained = false;
+  for (let i = 0; i < lines.length; i++) {
+    const text = lines[i]!;
+    const starts = open === 0 && !chained && /^\s*(from\s+\S+\s+import\b|import\s)/.test(text);
+    if (!starts && open === 0 && !chained) continue;
+    found.add(i);
     open += (text.match(/[([]/g) ?? []).length - (text.match(/[)\]]/g) ?? []).length;
-    // A backslash chain reaches the site only when every line between ends with one.
-    chain = chain && /\\\s*$/.test(text);
-    if (IMPORT_LINE.test(text)) return open > 0 || chain;
-    // A line that could only be a list item, an opener, a comment, or blank may sit inside brackets opened above; anything else ends the search.
-    const couldContinue = open > 0 || chain || text.trim() === "" || /^\s*#/.test(text) || /[,([]\s*(#.*)?$/.test(text) || /^\s*[A-Za-z_][A-Za-z0-9_.]*\s*(#.*)?$/.test(text);
-    if (!couldContinue) return false;
+    if (open < 0) open = 0;
+    chained = /\\\s*$/.test(text);
   }
-  return false;
+  return found;
 }
 
 /** Whether a folder is a virtual environment (never source). */
@@ -616,14 +613,7 @@ export class PythonAdapter implements LanguageAdapter {
         if (seen.has(key)) continue;
         seen.add(key);
         this.touched.add(file);
-        const lines = this.opened.has(file) && this.lineCache.has(file) ? this.lineCache.get(file)! : this.linesOf(file);
-        sites.push({
-          file,
-          line: start.line + 1,
-          character: start.character,
-          symbol: await this.enclosingSymbol(file, start),
-          isImport: isPythonImportSite(lines, start.line, start.character),
-        });
+        sites.push({ file, line: start.line + 1, character: start.character, symbol: await this.enclosingSymbol(file, start) });
       }
     }
     sites.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.character - b.character);
@@ -681,10 +671,11 @@ export class PythonAdapter implements LanguageAdapter {
     const members = (await this.documentSymbols(file)).filter((s) => !s.name.startsWith("__")).map((s) => ({ name: s.name, position: s.selectionRange.start }));
     const declared = new Set(members.map((m) => m.name));
     const lines = this.linesOf(file);
+    const importLines = importStatementLines(lines);
     for (const name of this.exportList(file) ?? []) {
       if (declared.has(name)) continue;
       for (let i = 0; i < lines.length; i++) {
-        if (!isPythonImportSite(lines, i, 0) || /^\s*__all__/.test(lines[i]!)) continue;
+        if (!importLines.has(i)) continue;
         const at = new RegExp(`(?:^|[\\s,(])(?:\\S+\\s+as\\s+)?(${name})(?=[\\s,)]|$)`).exec(lines[i]!);
         if (at === null) continue;
         members.push({ name, position: { line: i, character: at.index + at[0].length - name.length } });

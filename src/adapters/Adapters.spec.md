@@ -19,14 +19,12 @@ The language adapter seam: how to ask a language's server for definitions, refer
   crossing: project-source -> instrument
   refuted: left an open document to the file watcher on forget, as the adapter did before -> "the check reads the current disk text after a forget, with the instrument's watcher blind to the file: a loop of edit-then-check yields zero wrong verdicts" went red in enforcement.test.ts with two of six verdicts answered from pre-edit text; restored, green (2026-09-18)
   kinds: none
-- import told from use: An import or export specifier is told from a use, across wrapped lines, so bringing a name into scope is never a bypass.
-  protects: IMPORT_START
-  chokepoint: isImportSite
-  over: every reference site the language server reports, across wrapped import and export lines
-  via: an import or export specifier is told from a use, across wrapped lines
-  because: an import brings a name into scope and uses nothing; counted as a bypass, every module that routes through the chokepoint would be graded broken for importing the thing it protects
+- every site is a reference: Every site the language server reports for the protected thing is a reference, an import or re-export specifier included; whether it is inside the chokepoint is the check's only question besides test paths.
+  over: every reference site either adapter reports, import and export specifiers included
+  via: every site the language server reports is a reference: a bypass beneath a semicolon-less bare import is a bypass, and an import outside the chokepoint is one too
+  because: an import of the protected thing outside the chokepoint reaches it and a re-export widens its reach with no call at all, so neither is exempt; the heuristic that told an import from a use called every site beneath a semicolon-less bare import an import, and a real bypass graded clean (decision d-0da89a08 dissolved the exemption rather than patch the parser)
   crossing: instrument -> reading
-  refuted: made isImportSite answer false for every site -> "an import or export specifier is told from a use, across wrapped lines" went red in adapter.test.ts; restored, green (2026-09-17)
+  refuted: exempted import specifiers from the classification, as the adapter did before -> "every site the language server reports is a reference: a bypass beneath a semicolon-less bare import is a bypass, and an import outside the chokepoint is one too" went red in enforcement.test.ts with the bypass graded pass; restored, green (2026-09-18)
   kinds: none
 - test paths: A path is a test when a configured folder is one of its segments or the file is named .test or .spec.
   over: every configured test folder and every file named .test or .spec
@@ -53,18 +51,16 @@ The language adapter seam: how to ask a language's server for definitions, refer
   crossing: instrument -> reading
   refuted: made the closure rung never verified -> "Python grades: broken with a bypass; reference-choked when clean, with the convention as evidence; closure-choked for a function-local; checker-choked once Pyright's private-usage rule is an error; broken without a chokepoint; not chokeable for prose" went red in python.test.ts; restored, green (2026-09-17)
   kinds: none
-- Python import told from use: A site on an import statement or in an __all__ list, wrapped or not, is an import and never a bypass, and a site in one of a protected package's own files is inside the package.
-  protects: IMPORT_LINE in python.ts
-  chokepoint: isPythonImportSite
-  over: every reference site Pyright reports, across wrapped import lines, backslash chains, and __all__ lists
-  via: Python classification: inside the chokepoint, an import, a test reference, a bypass; an __all__ entry is a re-export, never a use
-  because: Pyright reports the string entries of __all__ and every import line as references; counted as uses, a package re-exporting its members would grade broken at module top level and every importer of a protected name would be a bypass
+- package files are inside the package: A site in one of a protected package's own files is inside the package, and every other site Pyright reports, an import line or an __all__ entry included, is a reference classified by where it sits.
+  over: every reference site Pyright reports for a protected module or package
+  via: a Python module or package resolves, its members are the references' start, and the package's own files are inside it
+  because: a package re-exporting its own members from __init__ is the package reaching itself, so its own files are inside; an importer of a protected name outside the chokepoint reaches the thing and is a bypass, which is what the check exists to reveal
   crossing: instrument -> reading
-  refuted: made an import line or __all__ entry count as a use -> "Python classification: inside the chokepoint, an import, a test reference, a bypass; an __all__ entry is a re-export, never a use" went red in python.test.ts; restored, green (2026-09-17); made a package's own files no longer inside the protected package -> "a Python module or package resolves, its members are the references' start, and the package's own files are inside it" went red in python.test.ts; restored, green (2026-09-17)
+  refuted: made a package's own files no longer inside the protected package -> "a Python module or package resolves, its members are the references' start, and the package's own files are inside it" went red in python.test.ts; restored, green (2026-09-17)
   kinds: none
 - whole workspace indexed: The Python adapter waits for Pyright's enumeration of the whole workspace before answering, and never narrows the workspace to a component.
   over: every references query and every bare-name resolution the Python adapter answers
-  via: Python classification: inside the chokepoint, an import, a test reference, a bypass; an __all__ entry is a re-export, never a use
+  via: Python classification: inside the chokepoint, a test reference, a bypass; an import or an __all__ entry outside the chokepoint is a bypass
   because: a Python reference to anything can sit in any file, so an index that sees less than the whole workspace can only prove the absence of a bypass inside what it sees; a narrower root on PostHog was fast (0.4 s, 160 MB) and blind to three references outside the folder, and an answer before enumeration is silently partial (the fixture's references came back one file short until the "Found N source files" message)
   crossing: instrument -> reading
   refuted: <not witnessed: a staged answer before enumeration is a race the test cannot hold still; the partial answer was observed by hand on the fixture and on PostHog before the wait was added (2026-09-17)>

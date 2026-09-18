@@ -120,7 +120,7 @@ test("economy: one hop out, one hop in, the spec of each component, and the inva
   assert.deepEqual(out.given, ["src/api/render.ts"]);
   const outFiles = Object.fromEntries(out.entries.map((e) => [e.file, e.why]));
   assert.deepEqual(outFiles["src/api/render.ts"], ["given"]);
-  assert.deepEqual(outFiles["src/store/secrets.ts"], ["defines seal, referenced by src/api/render.ts at line 5"]);
+  assert.deepEqual(outFiles["src/store/secrets.ts"], ["defines seal, referenced by src/api/render.ts at lines 1, 5"]);
   assert.deepEqual(outFiles["src/util/format.ts"], ["defines pad, referenced by src/api/render.ts at line 5"]);
   assert.deepEqual(outFiles["src/store/Store.spec.md"], ["spec of src/store, which holds src/store/secrets.ts"]);
   assert.equal(out.entries.length, 4, Object.keys(outFiles).join(", "));

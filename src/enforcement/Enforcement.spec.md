@@ -31,12 +31,12 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   checklist: capability-authorization dismissed: the session token names a file and grants nothing
   checklist: canonical-encoding declared as session names the run file
   checklist: identity-continuity dismissed: a session's id never changes
-- sites classified: Every reference to the protected thing is inside the chokepoint, an import, a test reference, or a bypass, and a test reference is never a bypass.
+- sites classified: Every reference to the protected thing is inside the chokepoint, a test reference, or a bypass; an import or re-export outside the chokepoint is a bypass, and a test reference is never one.
   over: every reference the language server reports for a protected thing
-  via: classification: inside the chokepoint, an import, a test reference, a bypass
-  because: a chokepoint holds while every reference is inside it, so the classes must partition every site: an import brings a name into scope and uses nothing, a test may reference the protected thing to check it and is reported rather than counted, and everything else is a bypass; a test counted as a bypass would alarm on every test, and a bypass counted as anything else would hide a structural defect
+  via: classification: inside the chokepoint, a test reference, a bypass; an import outside the chokepoint is a bypass
+  because: a chokepoint holds while every reference is inside it, so the classes must partition every site: a test may reference the protected thing to check it and is reported rather than counted, and everything else outside the chokepoint is a bypass, an import that reaches the thing included; a test counted as a bypass would alarm on every test, and a bypass counted as anything else would hide a structural defect
   crossing: instrument -> reading
-  refuted: made a test reference classify as a bypass -> "classification: inside the chokepoint, an import, a test reference, a bypass" went red in enforcement.test.ts; restored, green (2026-09-17)
+  refuted: made a test reference classify as a bypass -> "classification: inside the chokepoint, a test reference, a bypass; an import outside the chokepoint is a bypass" went red in enforcement.test.ts; restored, green (2026-09-17)
   kinds: none
 - grade ladder: A chokepoint grades broken with a bypass or a missing chokepoint, reference-choked when clean and visible, visibility-choked when clean and not visible, and not chokeable when the protected thing is prose.
   over: every combination of bypass count, chokepoint resolution, visibility, and name form

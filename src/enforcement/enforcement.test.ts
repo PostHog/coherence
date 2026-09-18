@@ -132,16 +132,16 @@ test("the language server binary is found (the adapter's precondition)", () => {
   assert.ok(serverPresent, "typescript-language-server must be installed: npm install");
 });
 
-test("classification: inside the chokepoint, an import, a test reference, a bypass", async () => {
+test("classification: inside the chokepoint, a test reference, a bypass; an import outside the chokepoint is a bypass", async () => {
   const protectedThing = (await adapter.resolve("SECRET_COLUMNS", hint)) as { ok: true; definition: import("../adapters/adapter.ts").Definition };
   const chokepoint = (await adapter.resolve("seal", hint)) as { ok: true; definition: import("../adapters/adapter.ts").Definition };
   assert.ok(protectedThing.ok && chokepoint.ok);
   const sites = await adapter.references(protectedThing.definition);
   const classes = sites.map((s) => `${s.file}:${s.line} ${classifySite(s, protectedThing.definition, chokepoint.definition, hint.testFolders)}`);
   assert.deepEqual(classes, [
-    "src/__tests__/secrets.test.ts:1 import",
+    "src/__tests__/secrets.test.ts:1 test",
     "src/__tests__/secrets.test.ts:2 test",
-    "src/api/render.ts:1 import",
+    "src/api/render.ts:1 bypass",
     "src/api/render.ts:5 bypass",
     "src/store/secrets.ts:8 inside",
   ]);
@@ -153,8 +153,11 @@ test("grades: broken with a bypass, reference-choked when clean and exported, vi
   const broken = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
   assert.equal(broken.grade, "broken");
   assert.equal(broken.verdict, "fail");
-  assert.deepEqual(broken.bypasses, [{ file: "src/api/render.ts", line: 5, symbol: "render.leaked" }]);
-  assert.equal(broken.counts.test, 1, "a test reference is reported, never a bypass");
+  assert.deepEqual(broken.bypasses, [
+    { file: "src/api/render.ts", line: 1, symbol: "module top level" },
+    { file: "src/api/render.ts", line: 5, symbol: "render.leaked" },
+  ]);
+  assert.equal(broken.counts.test, 2, "a test reference is reported, never a bypass");
   assert.equal(broken.refutation, "automatic");
 
   write("src/api/render.ts", RENDER_CLEAN);
@@ -163,7 +166,7 @@ test("grades: broken with a bypass, reference-choked when clean and exported, vi
   assert.equal(clean.grade, "reference-choked", clean.reason);
   assert.equal(clean.verdict, "pass");
   assert.match(clean.reason, /visible outside its module/);
-  assert.match(clean.reason, /1 test reference/);
+  assert.match(clean.reason, /2 test references/);
 
   const hidden = await checkChokepoint(adapter, { protects: "HIDDEN", chokepoint: "peek", ...hint });
   assert.equal(hidden.grade, "visibility-choked", hidden.reason);
@@ -304,7 +307,7 @@ test("a run appends one record, never rewrites; spec --check reads the run; the 
 
   const status = formatStatus(root, model);
   assert.match(status, /✓ \.\/hidden set  chokepoint peek: verified 2026-09-17 visibility-choked\n/);
-  assert.match(status, /✕ \.\/digest-only egress  chokepoint seal: structural defect 2026-09-17 broken: 1 reference .* — kept from the run at 2026-09-17T10:00:00\.000Z; the latest run skipped it/);
+  assert.match(status, /✕ \.\/digest-only egress  chokepoint seal: structural defect 2026-09-17 broken: 2 references .* — kept from the run at 2026-09-17T10:00:00\.000Z; the latest run skipped it/);
   assert.match(status, /✓ \.\/egress totality  totality oracle "egress totality": verified 2026-09-17 — kept from/);
   assert.match(status, /2 runs; 2 structural defects$/);
   const latest = latestFor(latestByEnforcement(loadRuns(root).records), ".", "hidden set");
@@ -336,7 +339,7 @@ test("PostToolUse on a file-writing tool re-checks the invariants that may invol
   const context = (JSON.parse(result.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } }).hookSpecificOutput;
   assert.equal(context.hookEventName, "PostToolUse");
   assert.match(context.additionalContext, /^Structural defect revealed at this edit \(src\/api\/render\.ts\)/);
-  assert.match(context.additionalContext, /✕ \.\/digest-only egress — chokepoint seal protects SECRET_COLUMNS: broken\n    bypass src\/api\/render\.ts:5 in render\.leaked \(this edit\)/);
+  assert.match(context.additionalContext, /✕ \.\/digest-only egress — chokepoint seal protects SECRET_COLUMNS: broken\n    bypass src\/api\/render\.ts:1 in module top level \(this edit\)\n    bypass src\/api\/render\.ts:5 in render\.leaked \(this edit\)/);
   assert.match(context.additionalContext, /✕ \.\/missing door/);
   assert.doesNotMatch(context.additionalContext, /hidden set/, "an invariant the file cannot involve is not re-checked");
   assert.match(context.additionalContext, /route the reference through the chokepoint, or escalate a retirement for a human/);
@@ -350,7 +353,7 @@ test("PostToolUse on a file-writing tool re-checks the invariants that may invol
 
   const stop = specStopText(root);
   assert.equal(stop.defects, 2);
-  assert.match(stop.text, /✕ \.\/digest-only egress — structural defect \(chokepoint, run \d{4}-\d{2}-\d{2}\): 1 reference to SECRET_COLUMNS outside seal: src\/api\/render\.ts:5 in render\.leaked/);
+  assert.match(stop.text, /✕ \.\/digest-only egress — structural defect \(chokepoint, run \d{4}-\d{2}-\d{2}\): 2 references to SECRET_COLUMNS outside seal: src\/api\/render\.ts:1 in module top level, src\/api\/render\.ts:5 in render\.leaked/);
   assert.match(stop.text, /stands until the reference is routed through the chokepoint or a human acknowledges a retirement/);
 });
 
@@ -383,6 +386,34 @@ test("the check reads the current disk text after a forget, with the instrument'
     rmSync(other, { recursive: true, force: true });
   }
   assert.deepEqual(wrong, [], "every verdict answers from the text on disk");
+});
+
+test("every site the language server reports is a reference: a bypass beneath a semicolon-less bare import is a bypass, and an import outside the chokepoint is one too", async () => {
+  const other = mkdtempSync(join(tmpdir(), "coherence-imports-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(other, path)), { recursive: true });
+    writeFileSync(join(other, path), text, "utf8");
+  };
+  put("tsconfig.json", TSCONFIG);
+  put("src/store/secrets.ts", SECRETS);
+  put("src/api/polyfill.ts", "export const polyfilled = true;\n");
+  // Reviewer B's case: no semicolon after the bare import, then a real use of the protected thing.
+  put("src/api/leak.ts", 'import { SECRET_COLUMNS } from "../store/secrets.ts";\nimport "./polyfill.ts"\n\nexport const leaked = SECRET_COLUMNS\n');
+  put("src/api/reexport.ts", 'export { SECRET_COLUMNS } from "../store/secrets.ts";\n');
+  const fresh = new TypeScriptAdapter(other);
+  try {
+    const result = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
+    assert.equal(result.verdict, "fail", result.reason);
+    assert.equal(result.grade, "broken");
+    assert.deepEqual(
+      result.bypasses.map((b) => `${b.file}:${b.line} in ${b.symbol}`),
+      ["src/api/leak.ts:1 in module top level", "src/api/leak.ts:4 in leaked", "src/api/reexport.ts:1 in module top level"],
+      "the use beneath the bare import, the import specifier, and the re-export are all references outside the chokepoint",
+    );
+  } finally {
+    await fresh.close();
+    rmSync(other, { recursive: true, force: true });
+  }
 });
 
 test("the one-at-a-time totality path escapes the title before the runner reads it as a regex", async () => {

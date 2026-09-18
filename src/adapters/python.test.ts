@@ -166,28 +166,30 @@ test("the Python language server binary is found (the adapter's precondition)", 
   assert.ok(serverPresent, "pyright must be installed: npm install");
 });
 
-test("Python classification: inside the chokepoint, an import, a test reference, a bypass; an __all__ entry is a re-export, never a use", async () => {
+test("Python classification: inside the chokepoint, a test reference, a bypass; an import or an __all__ entry outside the chokepoint is a bypass", async () => {
   const protectedThing = definitionOf(await adapter.resolve("SECRET_COLUMNS", hint));
   const chokepoint = definitionOf(await adapter.resolve("seal", hint));
   assert.equal(protectedThing.file, "pkg/store.py");
   const sites = await adapter.references(protectedThing);
   const classes = sites.map((s) => `${s.file}:${s.line} ${classifySite(s, protectedThing, chokepoint, hint.testFolders)}`);
-  assert.deepEqual(classes, ["pkg/render.py:1 import", "pkg/render.py:6 bypass", "pkg/store.py:12 inside", "tests/test_store.py:1 import", "tests/test_store.py:9 test"]);
+  assert.deepEqual(classes, ["pkg/render.py:1 bypass", "pkg/render.py:6 bypass", "pkg/store.py:12 inside", "tests/test_store.py:1 test", "tests/test_store.py:9 test"]);
   assert.equal(sites.find((s) => s.line === 6 && s.file === "pkg/render.py")!.symbol, "render", "a bypass names its referencing symbol");
 
+  // Every site Pyright reports is a reference: the "seal" entry of __all__ and the package's import line included.
   const seal = await adapter.references(chokepoint);
-  const exportEntries = seal.filter((s) => s.file === "pkg/store.py" && s.line === 7);
-  assert.equal(exportEntries.length, 1);
-  assert.equal(exportEntries[0]!.isImport, true, 'the "seal" entry of __all__ is a re-export');
-  assert.ok(seal.some((s) => s.file === "pkg/__init__.py" && s.line === 1 && s.isImport), "the package's import line brings the name into scope");
+  assert.ok(seal.some((s) => s.file === "pkg/store.py" && s.line === 7), 'the "seal" entry of __all__ is a reference');
+  assert.ok(seal.some((s) => s.file === "pkg/__init__.py" && s.line === 1), "the package's import line is a reference");
 });
 
 test("Python grades: broken with a bypass; reference-choked when clean, with the convention as evidence; closure-choked for a function-local; checker-choked once Pyright's private-usage rule is an error; broken without a chokepoint; not chokeable for prose", async () => {
   const broken = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
   assert.equal(broken.grade, "broken");
   assert.equal(broken.verdict, "fail");
-  assert.deepEqual(broken.bypasses, [{ file: "pkg/render.py", line: 6, symbol: "render" }]);
-  assert.equal(broken.counts.test, 1, "a test reference is reported, never a bypass");
+  assert.deepEqual(broken.bypasses, [
+    { file: "pkg/render.py", line: 1, symbol: "module top level" },
+    { file: "pkg/render.py", line: 6, symbol: "render" },
+  ]);
+  assert.equal(broken.counts.test, 2, "a test reference is reported, never a bypass");
   assert.equal(broken.refutation, "automatic");
 
   write("pkg/render.py", RENDER_CLEAN);
@@ -197,7 +199,7 @@ test("Python grades: broken with a bypass; reference-choked when clean, with the
   assert.equal(clean.verdict, "pass");
   assert.equal(clean.enforcer, "Coherence's check at the edit and in CI");
   assert.match(clean.reason, /carries no underscore prefix; __all__ in pkg\/store\.py excludes it; no Pyright configuration/);
-  assert.match(clean.reason, /1 test reference/);
+  assert.match(clean.reason, /2 test references/);
 
   const hidden = await checkChokepoint(adapter, { protects: "_HIDDEN", chokepoint: "peek", ...hint });
   assert.equal(hidden.grade, "reference-choked", "the underscore prefix alone is a convention: the top rung without a checker is Coherence's own");

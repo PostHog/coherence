@@ -60,8 +60,6 @@ export interface ReferenceSite {
   character: number;
   /** The innermost named symbol enclosing the site, as `outer.inner`, or undefined at module top level. */
   symbol: string | undefined;
-  /** True when the site is an import or re-export specifier: it brings the name into scope and is no use of it. */
-  isImport: boolean;
 }
 
 export interface Visibility {

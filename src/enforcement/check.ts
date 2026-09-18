@@ -6,9 +6,10 @@
  *   inside   within the chokepoint symbol's range, or within its module when
  *            the chokepoint is a module; for a protected module, within the
  *            module itself
- *   import   an import or export specifier: brings the name into scope, no use
  *   test     under a test folder or a test file by name; reported, never a bypass
- *   bypass   any other site
+ *   bypass   any other site, an import or re-export specifier included: an
+ *            import of the protected thing outside the chokepoint reaches it,
+ *            and a re-export widens its reach with no call at all
  *
  * The grade follows: visibility-choked when the protected thing is not
  * visible outside its module and nothing bypasses (the adapter says whether
@@ -23,7 +24,7 @@
 import { isTestPath, rangeContains, type Definition, type LanguageAdapter, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
 import type { Bypass, Grade, RefutationState, Verdict } from "./record.ts";
 
-export type SiteClass = "inside" | "import" | "test" | "bypass";
+export type SiteClass = "inside" | "test" | "bypass";
 
 export interface ClassifiedSite extends ReferenceSite {
   class: SiteClass;
@@ -57,7 +58,6 @@ export interface ChokepointInput {
 }
 
 export function classifySite(site: ReferenceSite, protectedThing: Definition, chokepoint: Definition, testFolders: readonly string[]): SiteClass {
-  if (site.isImport) return "import";
   const position = { line: site.line - 1, character: site.character };
   if (chokepoint.kind === "module" ? withinModule(site.file, chokepoint.file) : site.file === chokepoint.file && rangeContains(chokepoint.range, position)) return "inside";
   if (protectedThing.kind === "module" && withinModule(site.file, protectedThing.file)) return "inside";
@@ -76,7 +76,7 @@ const NOT_CHOKEABLE_NOTE = "the totality oracle form (over + via) is the comprom
 
 export async function checkChokepoint(adapter: LanguageAdapter, input: ChokepointInput): Promise<ChokepointResult> {
   const hint = { component: input.component, testFolders: input.testFolders };
-  const empty: Record<SiteClass, number> = { inside: 0, import: 0, test: 0, bypass: 0 };
+  const empty: Record<SiteClass, number> = { inside: 0, test: 0, bypass: 0 };
   const base = { input, sites: [], bypasses: [], counts: empty, visibility: undefined, files: [] as string[], refutation: "missing" as RefutationState, refutationAccount: "not attempted" };
 
   const protectedResolved = await adapter.resolve(input.protects, hint);
@@ -109,7 +109,7 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
 
   const references = await adapter.references(protectedThing);
   const sites: ClassifiedSite[] = references.map((site) => ({ ...site, class: classifySite(site, protectedThing, chokepoint, input.testFolders) }));
-  const counts: Record<SiteClass, number> = { inside: 0, import: 0, test: 0, bypass: 0 };
+  const counts: Record<SiteClass, number> = { inside: 0, test: 0, bypass: 0 };
   for (const site of sites) counts[site.class] += 1;
   const bypasses: Bypass[] = sites.filter((s) => s.class === "bypass").map((s) => ({ file: s.file, line: s.line, symbol: s.symbol ?? "module top level" }));
   const files = [...new Set([protectedThing.file, chokepoint.file, ...sites.map((s) => s.file)])].sort();

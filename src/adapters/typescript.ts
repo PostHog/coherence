@@ -5,10 +5,13 @@
  *
  * Symbols resolve through workspace/symbol (a bare name) or the hinted
  * file's textDocument/documentSymbol (`name in file.ts`); a module is its
- * file. References come from textDocument/references. Exportedness is not
- * in the protocol, so the adapter reads the declaration text. The
- * refutation opens an unsaved sibling document that imports and uses the
- * protected thing and asks whether the instrument reports it.
+ * file. References come from textDocument/references, and every site the
+ * server reports is a reference, an import or re-export specifier
+ * included: whether it is inside the chokepoint is the check's question,
+ * not the adapter's. Exportedness is not in the protocol, so the adapter
+ * reads the declaration text. The refutation opens an unsaved sibling
+ * document that imports and uses the protected thing and asks whether the
+ * instrument reports it.
  *
  * TypeScript enforces visibility: a symbol not exported from its module is
  * unreachable from any other module, so the top rung is visibility-choked.
@@ -153,22 +156,6 @@ function flatten(symbols: DocumentSymbol[], prefix: string[] = []): { path: stri
     if (symbol.children !== undefined) out.push(...flatten(symbol.children, path));
   }
   return out;
-}
-
-const IMPORT_START = /^\s*(import\s|import\{|export\s*\{|export\s*\*|export\s+type\s*\{)/;
-
-/** Whether the site sits inside an import or export specifier list: it brings the name into scope and is no use of it. */
-export function isImportSite(lines: readonly string[], line: number, character: number): boolean {
-  for (let k = line; k >= Math.max(0, line - 40); k--) {
-    const text = lines[k] ?? "";
-    if (IMPORT_START.test(text)) {
-      const upTo = k === line ? text.slice(0, character) : [text, ...lines.slice(k + 1, line), (lines[line] ?? "").slice(0, character)].join("\n");
-      const afterKeyword = upTo.replace(/^\s*(import|export)\s*(type\s*)?/, "");
-      return !afterKeyword.includes(";") && !/\bfrom\s*["']/.test(afterKeyword);
-    }
-    if (k !== line && /;\s*(\/\/.*)?$/.test(text)) return false;
-  }
-  return false;
 }
 
 export class TypeScriptAdapter implements LanguageAdapter {
@@ -430,14 +417,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
         if (seen.has(key)) continue;
         seen.add(key);
         this.touched.add(file);
-        const lines = this.opened.has(file) && this.lineCache.has(file) ? this.lineCache.get(file)! : this.linesOf(file);
-        sites.push({
-          file,
-          line: start.line + 1,
-          character: start.character,
-          symbol: await this.enclosingSymbol(file, start),
-          isImport: isImportSite(lines, start.line, start.character),
-        });
+        sites.push({ file, line: start.line + 1, character: start.character, symbol: await this.enclosingSymbol(file, start) });
       }
     }
     sites.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.character - b.character);
