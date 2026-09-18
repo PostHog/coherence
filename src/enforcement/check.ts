@@ -137,7 +137,7 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
   }
   const earned = rungFor(adapter, visibility);
   // When the instrument could not see the synthetic site, Coherence's own check enforces nothing: a ladder may name the rung that is left.
-  const vacuousRung = !refutation.seen && adapter.ladder.whenVacuous !== undefined ? adapter.ladder.rungs.find((r) => r.grade === adapter.ladder.whenVacuous) : undefined;
+  const vacuousRung = !refutation.seen && adapter.ladder.whenVacuous !== undefined ? rungsOf(adapter).find((r) => r.grade === adapter.ladder.whenVacuous) : undefined;
   const graded: Rung = vacuousRung === undefined ? earned : { ...vacuousRung, fact: `the instrument could not see the synthetic reference, so Coherence's check enforces nothing here and only the convention stands (${visibility.evidence})` };
   const tests = counts.test > 0 ? `; ${counts.test} test reference${counts.test === 1 ? "" : "s"}` : "";
   const vacuous = refutation.seen ? "" : `; refutation missing: ${refutation.account}`;
@@ -159,10 +159,15 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
   };
 }
 
+/** The ladder's rungs; a warm server started before ladders carried rungs answers with none, and the check must not crash on it. */
+function rungsOf(adapter: LanguageAdapter): readonly Rung[] {
+  return adapter.ladder.rungs ?? [];
+}
+
 /** The rung a clean chokepoint earns: the adapter's own verdict when its visibility carries one, else the two-rung rule over exportedness. */
 function rungFor(adapter: LanguageAdapter, visibility: Visibility): Rung {
   if (visibility.rung !== undefined) return visibility.rung;
-  const listed = (grade: Grade): Rung | undefined => adapter.ladder.rungs.find((r) => r.grade === grade);
+  const listed = (grade: Grade): Rung | undefined => rungsOf(adapter).find((r) => r.grade === grade);
   if (visibility.enforced && !visibility.visible && adapter.ladder.top === "visibility-choked") {
     return { grade: "visibility-choked", enforcer: listed("visibility-choked")?.enforcer ?? "the compiler", fact: `not visible outside its module (${visibility.evidence}) and every reference inside the chokepoint` };
   }
