@@ -215,7 +215,10 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       const applicable = invariant.kinds === undefined || invariant.kinds === "none" ? [] : applicableShapes(seed, invariant.kinds).map((s) => s.shape);
       const mine = latestFor(latest, folder, invariant.name);
       const { state, lacks, missingShapes, verified, defects } = deriveState(invariant, applicable, mine, witnessed.has(entryKey(folder, invariant.name, "totality oracle")));
-      const entries = [mine.chokepoint, mine.totality].filter((e): e is Latest => e !== undefined);
+      const forms = new Set(invariant.enforcements.map((e) => e.form));
+      const entries = [forms.has("chokepoint") ? mine.chokepoint : undefined, forms.has("totality oracle") ? mine.totality : undefined].filter(
+        (e): e is Latest => e !== undefined,
+      );
       invariants.push({ ...invariant, component: folder, applicable, missingShapes, state, lacks, latest: entries, verified, defects });
     }
     components.push({

@@ -73,7 +73,11 @@ export function deriveState(invariant: Invariant, applicable: readonly string[],
   else if (missingShapes.length > 0) lacks.push("checklist");
   if (invariant.because === undefined) lacks.push("because");
 
-  const entries = [latest.chokepoint, latest.totality].filter((e): e is Latest => e !== undefined);
+  // Only the forms the bullet carries now: an entry for a form it no longer declares is history, not a verdict
+  // on what it claims today, and reading it would leave a retired chokepoint failing the bullet forever.
+  const entries = [forms.has("chokepoint") ? latest.chokepoint : undefined, forms.has("totality oracle") ? latest.totality : undefined].filter(
+    (e): e is Latest => e !== undefined,
+  );
   const verified = entries.filter((e) => e.verdict === "pass");
   const defects = entries.filter((e) => e.verdict === "fail");
   // A structural defect is an invariant whose satisfaction has been removed; a bullet that never got there

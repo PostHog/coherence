@@ -528,6 +528,13 @@ test("a structural defect is an invariant whose satisfaction has been removed; a
   // A vacuous refutation is the same story: the bullet never became an invariant, so a failure leaves it a requirement.
   const vacuous = latestEntry("chokepoint", { verdict: "fail", grade: "broken", refutation: "missing", reason: "1 reference outside seal" });
   assert.equal(deriveState(complete, [], { chokepoint: vacuous, totality: undefined }).state, "requirement");
+
+  // A run entry for a form the bullet no longer carries is history, not a verdict on what it claims now.
+  const totalityOnly = bullet({ enforcements: [TOTALITY_FORM] });
+  const stale = deriveState(totalityOnly, [], { chokepoint: failing, totality: latestEntry("totality oracle") }, true);
+  assert.equal(stale.state, "invariant", "the chokepoint entry is from when the bullet carried a chokepoint form");
+  assert.deepEqual(stale.defects, []);
+  assert.deepEqual(stale.verified.map((v) => v.form), ["totality oracle"]);
 });
 
 test("refute runs the bullet's totality oracle with the break staged, requires it to fail, and appends the refutation record", async () => {
