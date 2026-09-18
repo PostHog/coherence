@@ -277,6 +277,12 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private async documentSymbols(file: string): Promise<DocumentSymbol[]> {
     const cached = this.symbolCache.get(file);
     if (cached !== undefined) return cached;
+    // A file the instrument still has in its project but that is no longer on disk has no symbols;
+    // reading it would throw and take the whole run down with an ENOENT.
+    if (!existsSync(join(this.root, file))) {
+      this.symbolCache.set(file, []);
+      return [];
+    }
     const client = await this.live();
     this.open(file);
     const result = await client.request<DocumentSymbol[] | SymbolInformation[] | null>("textDocument/documentSymbol", { textDocument: { uri: this.uri(file) } });

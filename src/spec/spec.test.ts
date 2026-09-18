@@ -16,6 +16,27 @@ import { loadSpecModel, type SpecModel } from "./model.ts";
 import { formatReport } from "./report.ts";
 import { applicableShapes, loadSeed } from "./seed.ts";
 import { deriveState } from "./state.ts";
+import type { Latest } from "../enforcement/record.ts";
+
+/** A latest chokepoint entry whose automatic refutation fired: the run's own witness. */
+function automatic(): Latest {
+  return {
+    component: ".",
+    name: "digest-only egress",
+    form: "chokepoint",
+    verdict: "pass",
+    grade: "reference-choked",
+    refutation: "automatic",
+    bypasses: [],
+    testReferences: 0,
+    files: [],
+    latency: 1,
+    reason: "",
+    at: "2026-09-18T10:00:00.000Z",
+    commit: null,
+    session: "s",
+  };
+}
 
 const seed = loadSeed();
 
@@ -121,7 +142,18 @@ test("a wrapped value continues the line above it", () => {
 test("the state derivation: the full bullet is an invariant, and each missing part keeps it a requirement", () => {
   const full = firstInvariant(`${ENTRY}${FULL_BULLET}${checklistFor(["credential", "output"], "door count")}${OTHER}`);
   const applicable = applicableShapes(seed, ["credential", "output"]).map((s) => s.shape);
-  assert.deepEqual(deriveState(full, applicable), { state: "invariant", lacks: [], missingShapes: [], verified: [], defects: [] });
+  // The bullet carries a refuted: line and both forms; with no run and no refutation record it refutes nothing.
+  assert.deepEqual(deriveState(full, applicable), {
+    state: "requirement",
+    lacks: ["refutation"],
+    missingShapes: [],
+    verified: [],
+    defects: [],
+    unrefuted: ["chokepoint", "totality oracle"],
+  });
+  const witnessedBoth = { chokepoint: automatic(), totality: undefined };
+  assert.deepEqual(deriveState(full, applicable, witnessedBoth, true).lacks, [], "the automatic refutation and the record together");
+  assert.equal(deriveState(full, applicable, witnessedBoth, true).state, "invariant");
 
   const without = (...keys: string[]): Invariant => {
     const lines = `${FULL_BULLET}${checklistFor(["credential", "output"], "door count")}`
@@ -131,25 +163,26 @@ test("the state derivation: the full bullet is an invariant, and each missing pa
   };
   const oneForm = without("protects", "chokepoint");
   assert.equal(oneForm.enforcements.length, 1, "the totality oracle form alone still enforces");
-  assert.equal(deriveState(oneForm, applicable).state, "invariant");
+  assert.equal(deriveState(oneForm, applicable, undefined, true).state, "invariant");
+  assert.equal(deriveState(oneForm, applicable).state, "requirement", "and it still needs its own refutation record");
   const noEnforcement = without("protects", "chokepoint", "over", "via");
-  assert.deepEqual(deriveState(noEnforcement, applicable).lacks, ["enforcement"]);
+  assert.deepEqual(deriveState(noEnforcement, applicable).lacks, ["enforcement", "refutation"]);
   assert.equal(deriveState(noEnforcement, applicable).state, "requirement");
 
   const noRefutation = without("refuted");
   assert.deepEqual(deriveState(noRefutation, applicable).lacks, ["refutation"]);
-  assert.equal(deriveState(noRefutation, applicable).state, "requirement");
+  assert.deepEqual(deriveState(noRefutation, applicable, witnessedBoth, true).lacks, [], "the refuted: line is the human account, not the evidence");
 
   const noBecause = without("because");
-  assert.deepEqual(deriveState(noBecause, applicable).lacks, ["because"]);
-  assert.equal(deriveState(noBecause, applicable).state, "invariant", "because is reported but does not change the state");
+  assert.deepEqual(deriveState(noBecause, applicable, witnessedBoth, true).lacks, ["because"]);
+  assert.equal(deriveState(noBecause, applicable, witnessedBoth, true).state, "invariant", "because is reported but does not change the state");
 
   const noKinds = without("kinds");
-  assert.deepEqual(deriveState(noKinds, []).lacks, ["kinds"]);
-  assert.equal(deriveState(noKinds, []).state, "requirement");
+  assert.deepEqual(deriveState(noKinds, [], witnessedBoth, true).lacks, ["kinds"]);
+  assert.equal(deriveState(noKinds, [], witnessedBoth, true).state, "requirement");
 
   const noChecklist = without("checklist");
-  const derived = deriveState(noChecklist, applicable);
+  const derived = deriveState(noChecklist, applicable, witnessedBoth, true);
   assert.deepEqual(derived.lacks, ["checklist"]);
   assert.deepEqual(derived.missingShapes, applicable);
   assert.equal(derived.state, "requirement");
@@ -249,26 +282,27 @@ test("the model: components nest by folder, transparent folders are skipped, and
       assert.deepEqual(
         model.components[0]?.invariants.map((i) => [i.name, i.state]),
         [
-          ["digest-only egress", "invariant"],
+          ["digest-only egress", "requirement"],
           ["door count", "requirement"],
         ],
       );
+      // No run and no refutation record: nothing in this tree has been seen to fire.
       assert.deepEqual(model.counts, {
         components: 3,
         bullets: 3,
-        invariants: 1,
-        requirements: 2,
+        invariants: 0,
+        requirements: 3,
         structuralDefects: 0,
-        lacking: { enforcement: 1, refutation: 2, kinds: 1, checklist: 0, because: 0 },
+        lacking: { enforcement: 1, refutation: 3, kinds: 1, checklist: 0, because: 0 },
         unfilled: 0,
         problems: 0,
       });
       const report = formatReport(model);
-      assert.match(report, /digest-only egress {2}invariant\n/);
+      assert.match(report, /digest-only egress {2}requirement {2}lacks refutation\n/);
       assert.match(report, /chokepoint seal protects SECRET_COLUMNS: declared, unverified/);
       assert.match(report, /totality oracle "egress digest totality" over every column declared secret in SECRET_COLUMNS: declared, unverified/);
       assert.match(report, /door count {2}requirement {2}lacks refutation/);
-      assert.match(report, /3 components, 3 bullets: 1 invariant, 2 requirements/);
+      assert.match(report, /3 components, 3 bullets: 0 invariants, 3 requirements/);
     },
   );
 });

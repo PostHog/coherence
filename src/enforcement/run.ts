@@ -12,7 +12,7 @@ import { workBinding } from "../journal/work.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
 import { checkChokepoint, type ChokepointResult } from "./check.ts";
 import { readEnforcementConfig, type EnforcementConfig } from "./config.ts";
-import { appendRun, type Form, type RunEntry, type RunRecord } from "./record.ts";
+import { appendRun, entryKey, loadRuns, type Form, type RunEntry, type RunRecord } from "./record.ts";
 import { connectAdapter, type RemoteAdapter } from "./server.ts";
 import { runTotalityBatch, runTotalityOracle, type TotalityResult } from "./totality.ts";
 
@@ -85,6 +85,8 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
 
   const details: EntryDetail[] = [];
   const needsAdapter = wantChokepoints && selected.some(({ invariant }) => chokepointEnforcements(invariant).length > 0);
+  // A totality oracle's refutation is the record `refute` wrote, never the bullet's own refuted: line.
+  const recorded = new Set(loadRuns(root).refutations.map((r) => entryKey(r.component, r.name, r.form)));
 
   // The pass itself, once the instrument question is settled: an adapter, where it came from, or why there is none.
   const pass = async (adapter: LanguageAdapter | undefined, instrument: RunRecord["instrument"], unavailable: string | undefined): Promise<RunOutcome> => {
@@ -168,7 +170,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
             ...entryOf(component, invariant.name, "totality oracle", {
               verdict: result.verdict,
               grade: undefined,
-              refutation: invariant.refutations.length > 0 ? "witnessed" : "missing",
+              refutation: recorded.has(entryKey(component, invariant.name, "totality oracle")) ? "witnessed" : "missing",
               bypasses: [],
               testReferences: 0,
               files: [],

@@ -18,9 +18,9 @@ import { runHook, specStopText } from "../lifecycle/hook.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { deriveState } from "../spec/state.ts";
 import { checkChokepoint, classifySite } from "./check.ts";
-import { formatRun, formatStatus } from "./cli.ts";
+import { formatRun, formatStatus, refuteCommand } from "./cli.ts";
 import { readEnforcementConfig } from "./config.ts";
-import { appendRun, latestByEnforcement, latestFor, loadRuns, type RunRecord } from "./record.ts";
+import { appendRun, entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type RunRecord } from "./record.ts";
 import { mayTouch, performRun } from "./run.ts";
 import { runTotalityOracle } from "./totality.ts";
 
@@ -286,7 +286,7 @@ test("a run appends one record, never rewrites; spec --check reads the run; the 
   assert.equal(byName.get("prose thing/chokepoint")!.grade, "not chokeable");
   assert.equal(byName.get("missing door/chokepoint")!.verdict, "fail");
   assert.equal(byName.get("egress totality/totality oracle")!.verdict, "pass");
-  assert.equal(byName.get("egress totality/totality oracle")!.refutation, "witnessed");
+  assert.equal(byName.get("egress totality/totality oracle")!.refutation, "missing", "the bullet's refuted: line is prose; only a refutation record witnesses a totality oracle");
   assert.ok(byName.get("digest-only egress/chokepoint")!.files.includes("src/api/render.ts"), "the entry lists the files it touched");
   const printed = formatRun(first);
   assert.match(printed, /digest-only egress\n  chokepoint seal protects SECRET_COLUMNS: broken — fail/);
@@ -302,8 +302,8 @@ test("a run appends one record, never rewrites; spec --check reads the run; the 
   const model = loadSpecModel(root);
   assert.equal(model.runs?.count, 2);
   const states = Object.fromEntries(model.components[0]!.invariants.map((i) => [i.name, i.state]));
-  assert.deepEqual(states, { "digest-only egress": "structural defect", "hidden set": "invariant", "prose thing": "requirement", "missing door": "structural defect", "egress totality": "invariant" });
-  assert.equal(model.counts.structuralDefects, 2);
+  assert.deepEqual(states, { "digest-only egress": "structural defect", "hidden set": "invariant", "prose thing": "requirement", "missing door": "requirement", "egress totality": "requirement" });
+  assert.equal(model.counts.structuralDefects, 1, "the broken chokepoint was an invariant; the bullet whose chokepoint never resolved was never one");
 
   const status = formatStatus(root, model);
   assert.match(status, /✓ \.\/hidden set  chokepoint peek: verified 2026-09-17 visibility-choked\n/);
@@ -352,7 +352,7 @@ test("PostToolUse on a file-writing tool re-checks the invariants that may invol
   assert.deepEqual(unrelated, { stdout: "", stderr: "", exit: 0 }, "a file no invariant can involve is not checked");
 
   const stop = specStopText(root);
-  assert.equal(stop.defects, 2);
+  assert.equal(stop.defects, 1, "only the bullet that was an invariant is a structural defect; the one whose chokepoint never resolved stays a requirement");
   assert.match(stop.text, /✕ \.\/digest-only egress — structural defect \(chokepoint, run \d{4}-\d{2}-\d{2}\): 2 references to SECRET_COLUMNS outside seal: src\/api\/render\.ts:1 in module top level, src\/api\/render\.ts:5 in render\.leaked/);
   assert.match(stop.text, /stands until the reference is routed through the chokepoint or a human acknowledges a retirement/);
 });
@@ -460,4 +460,115 @@ test("the automatic refutation is vacuous unless the check's own classification 
     await fresh.close();
     rmSync(other, { recursive: true, force: true });
   }
+});
+
+/** A bullet as the grammar parses one, for the state derivation alone. */
+function bullet(over: Partial<import("../spec/grammar.ts").Invariant>): import("../spec/grammar.ts").Invariant {
+  return { name: "b", sentence: "s", line: 1, enforcements: [], because: "why", crossing: undefined, refutations: [], kinds: "none", checklist: [], unfilled: [], ...over };
+}
+
+const CHOKEPOINT_FORM = { form: "chokepoint" as const, protects: "SECRET_COLUMNS", chokepoint: "seal", line: 2 };
+const TOTALITY_FORM = { form: "totality oracle" as const, over: "every column", via: "egress totality", line: 3 };
+
+function latestEntry(form: "chokepoint" | "totality oracle", over: Partial<import("./record.ts").Latest> = {}): import("./record.ts").Latest {
+  return {
+    component: ".", name: "b", form, verdict: "pass", refutation: form === "chokepoint" ? "automatic" : "witnessed",
+    bypasses: [], testReferences: 0, files: [], latency: 1, reason: "", at: "2026-09-18T10:00:00.000Z", commit: null, session: "s", ...over,
+  };
+}
+
+test("a totality oracle's refutation is a recorded event: the refuted line never satisfies it, a record with a later passing run does, and a bullet with both forms needs both", () => {
+  const totality = bullet({ enforcements: [TOTALITY_FORM], refutations: [{ broke: "removed the seal call", saw: "egress totality went red", date: "2026-09-17", line: 4 }] });
+  const passing = { chokepoint: undefined, totality: latestEntry("totality oracle") };
+  assert.deepEqual(deriveState(totality, []).lacks, ["refutation"], "the refuted: line alone is prose");
+  assert.deepEqual(deriveState(totality, [], passing).lacks, ["refutation"], "a passing run is not a refutation either");
+  assert.deepEqual(deriveState(totality, [], passing, true).lacks, [], "the record plus a later passing run is");
+  assert.equal(deriveState(totality, [], passing, true).state, "invariant");
+
+  // Per enforcement (union item 20): a chokepoint's automatic refutation never covers the totality oracle beside it.
+  const both = bullet({ enforcements: [CHOKEPOINT_FORM, TOTALITY_FORM] });
+  const chokepointOnly = { chokepoint: latestEntry("chokepoint"), totality: latestEntry("totality oracle") };
+  assert.deepEqual(deriveState(both, [], chokepointOnly).unrefuted, ["totality oracle"]);
+  assert.deepEqual(deriveState(both, [], chokepointOnly).lacks, ["refutation"]);
+  assert.deepEqual(deriveState(both, [], chokepointOnly, true).lacks, []);
+  const totalityOnly = { chokepoint: latestEntry("chokepoint", { refutation: "missing", verdict: "not run" }), totality: latestEntry("totality oracle") };
+  assert.deepEqual(deriveState(both, [], totalityOnly, true).unrefuted, ["chokepoint"]);
+  assert.deepEqual(deriveState(both, [], totalityOnly, true).lacks, ["refutation"]);
+});
+
+test("witnessed only with a later passing run: the refutation record alone is a red detector, not a restored one", () => {
+  const record = {
+    kind: "refutation" as const, at: "2026-09-18T10:00:00.000Z", session: "s", agent: "a", component: ".", name: "b",
+    form: "totality oracle" as const, broke: "removed the seal call", verdict: "fail" as const, reason: "exited 1", commit: null, dirty: true,
+  };
+  const run = (at: string, verdict: "pass" | "fail"): RunRecord => ({
+    at, session: "s", agent: "a", commit: null, dirty: false, instrument: { language: "typescript", server: "none" }, latency: 1,
+    invariants: [{ component: ".", name: "b", form: "totality oracle", verdict, refutation: "witnessed", bypasses: [], testReferences: 0, files: [], latency: 1, reason: "" }],
+  });
+  assert.equal(witnessedRefutations([], [record]).size, 0, "no run after the record");
+  assert.equal(witnessedRefutations([run("2026-09-18T09:00:00.000Z", "pass")], [record]).size, 0, "a run before the record proves nothing");
+  assert.equal(witnessedRefutations([run("2026-09-18T11:00:00.000Z", "fail")], [record]).size, 0, "the code was never restored");
+  assert.deepEqual([...witnessedRefutations([run("2026-09-18T11:00:00.000Z", "pass")], [record])], [entryKey(".", "b", "totality oracle")]);
+});
+
+test("a structural defect is an invariant whose satisfaction has been removed; a requirement with a failing check stays a requirement", () => {
+  const failing = latestEntry("chokepoint", { verdict: "fail", grade: "broken", reason: "1 reference outside seal" });
+  const complete = bullet({ enforcements: [CHOKEPOINT_FORM] });
+  const wasInvariant = deriveState(complete, [], { chokepoint: failing, totality: undefined });
+  assert.equal(wasInvariant.state, "structural defect");
+  assert.equal(wasInvariant.defects.length, 1);
+
+  // The same failing check on a bullet that never reached invariant: the checklist was never run.
+  const neverInvariant = bullet({ enforcements: [CHOKEPOINT_FORM], kinds: undefined });
+  const stillRequirement = deriveState(neverInvariant, [], { chokepoint: failing, totality: undefined });
+  assert.equal(stillRequirement.state, "requirement", "a requirement is never promoted to a structural defect by failing");
+  assert.deepEqual(stillRequirement.lacks, ["kinds"]);
+  assert.deepEqual(stillRequirement.defects.map((d) => d.reason), ["1 reference outside seal"], "and it is reported with its failing check");
+
+  // A vacuous refutation is the same story: the bullet never became an invariant, so a failure leaves it a requirement.
+  const vacuous = latestEntry("chokepoint", { verdict: "fail", grade: "broken", refutation: "missing", reason: "1 reference outside seal" });
+  assert.equal(deriveState(complete, [], { chokepoint: vacuous, totality: undefined }).state, "requirement");
+});
+
+test("refute runs the bullet's totality oracle with the break staged, requires it to fail, and appends the refutation record", async () => {
+  rmSync(join(root, ".coherence", "runs"), { recursive: true, force: true });
+  const lines: string[] = [];
+  const errors: string[] = [];
+  const io = { cwd: root, out: (line: string) => lines.push(line), err: (line: string) => errors.push(line) };
+
+  // Nothing is staged, so the totality oracle passes: no record, and the command says so.
+  const passing = await refuteCommand(["./egress totality", "--broke", "removed the seal call", "--session", "r1", "--agent", "enforcement"], io);
+  assert.equal(passing, 1);
+  assert.match(errors.join("\n"), /still passed with the break staged, so nothing was refuted and nothing was recorded/);
+  assert.equal(loadRuns(root).refutations.length, 0);
+
+  // The break staged: the configured command goes red.
+  write("coherence.config.json", JSON.stringify({ language: "typescript", testDir: "__tests__", test: "sh -c 'exit 1'" }));
+  const refuted = await refuteCommand(["./egress totality", "--broke", "removed the seal call from the row renderer", "--session", "r1", "--agent", "enforcement"], io);
+  assert.equal(refuted, 0, errors.join("\n"));
+  const recorded = loadRuns(root).refutations;
+  assert.equal(recorded.length, 1);
+  assert.deepEqual(
+    { component: recorded[0]!.component, name: recorded[0]!.name, form: recorded[0]!.form, verdict: recorded[0]!.verdict, broke: recorded[0]!.broke },
+    { component: ".", name: "egress totality", form: "totality oracle", verdict: "fail", broke: "removed the seal call from the row renderer" },
+  );
+  assert.match(recorded[0]!.reason, /exited 1/);
+  assert.equal(recorded[0]!.dirty, typeof recorded[0]!.dirty === "boolean" ? recorded[0]!.dirty : true);
+  assert.match(lines.join("\n"), /now restore the code and run/);
+
+  // The break restored: the bullet is an invariant only once a later run finds the totality oracle passing again.
+  write("coherence.config.json", CONFIG);
+  const before = loadSpecModel(root);
+  assert.equal(before.components[0]!.invariants.find((i) => i.name === "egress totality")!.state, "requirement", "the record alone is a red detector");
+  await performRun(root, { session: "r1", agent: "enforcement", adapter, form: "totality oracle" });
+  const after = loadSpecModel(root);
+  const bulletAfter = after.components[0]!.invariants.find((i) => i.name === "egress totality")!;
+  assert.equal(bulletAfter.state, "invariant");
+  assert.deepEqual(bulletAfter.lacks, []);
+
+  // A bullet with no totality oracle form is refused rather than recorded.
+  const chokepointOnly = await refuteCommand(["./digest-only egress", "--broke", "x", "--session", "r1", "--agent", "enforcement"], io);
+  assert.equal(chokepointOnly, 64);
+  assert.match(errors.join("\n"), /carries no totality oracle form/);
+  rmSync(join(root, ".coherence", "runs"), { recursive: true, force: true });
 });

@@ -16,7 +16,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { parseSpec, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
-import { latestByEnforcement, latestFor, loadRuns, type Latest } from "../enforcement/record.ts";
+import { entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type Latest } from "../enforcement/record.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
 
 export const SPEC_SUFFIX = ".spec.md";
@@ -149,8 +149,10 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   const seed = options.seed ?? loadSeed();
   const config = readConfig(root);
   const problems: Problem[] = [];
-  const loadedRuns = options.runs === false ? { records: [], damaged: [] } : loadRuns(root);
+  const loadedRuns = options.runs === false ? { records: [], refutations: [], damaged: [] } : loadRuns(root);
   const latest = latestByEnforcement(loadedRuns.records);
+  // A totality oracle's refutation is witnessed by the record, never by the bullet's own refuted: line.
+  const witnessed = witnessedRefutations(loadedRuns.records, loadedRuns.refutations);
   const runs =
     loadedRuns.records.length === 0
       ? undefined
@@ -212,7 +214,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       }
       const applicable = invariant.kinds === undefined || invariant.kinds === "none" ? [] : applicableShapes(seed, invariant.kinds).map((s) => s.shape);
       const mine = latestFor(latest, folder, invariant.name);
-      const { state, lacks, missingShapes, verified, defects } = deriveState(invariant, applicable, mine);
+      const { state, lacks, missingShapes, verified, defects } = deriveState(invariant, applicable, mine, witnessed.has(entryKey(folder, invariant.name, "totality oracle")));
       const entries = [mine.chokepoint, mine.totality].filter((e): e is Latest => e !== undefined);
       invariants.push({ ...invariant, component: folder, applicable, missingShapes, state, lacks, latest: entries, verified, defects });
     }

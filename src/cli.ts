@@ -14,6 +14,7 @@
  *   coherence scaffold component | invariant   the complete shape, cheapest to produce
  *   coherence run [--session --agent]  the chokepoint check and the totality oracle pass, appended as one run
  *   coherence run --status             the latest verdict per enforcement, a view over every run
+ *   coherence refute <component>/<name> --broke "<what you changed>"   the totality oracle with the break staged; it must fail
  *   coherence serve                    the warm language server for this project
  *   coherence query <question> ...     the agent query: what Scope shows a human, as plain text
  *   coherence hook <event>             answer one harness event (event JSON on stdin)
@@ -27,7 +28,7 @@
  */
 
 import { ECONOMY_USAGE, calibrateCommand, economyCommand, massCommand } from "./economy/cli.ts";
-import { ENFORCEMENT_USAGE, runCommand, serveCommand } from "./enforcement/cli.ts";
+import { ENFORCEMENT_USAGE, refuteCommand, runCommand, serveCommand } from "./enforcement/cli.ts";
 import { JOURNAL_USAGE, journalVerbs, type Command, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, runCheck } from "./lifecycle/check.ts";
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/glossary.ts";
@@ -182,6 +183,8 @@ async function main(argv: string[]): Promise<number> {
       return glossaryCommand(rest, root);
     case "run":
       return runCommand(rest, io);
+    case "refute":
+      return refuteCommand(rest, io);
     case "serve":
       return serveCommand(rest, io);
     case "economy":

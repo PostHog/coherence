@@ -17,10 +17,9 @@ A prosthetic for proprioception: specs, invariants, and the readings that keep a
   crossing: project-source -> reading
   refuted: <not witnessed: no staged break was found for a rule over three data files; the test has not been red in this repository>
   kinds: none
-- structural defect overrides the state: A failing verdict in the latest run makes a bullet a structural defect whatever else it carries, and an automatic refutation satisfies a chokepoint bullet's refutation.
+- a structural defect was an invariant: A failing verdict in the latest run makes a bullet a structural defect only when the bullet was otherwise complete; a requirement with a failing check stays a requirement and is reported with its failing check, never promoted, and an automatic refutation satisfies a chokepoint enforcement's refutation.
   over: every bullet with an entry in the latest run that checked it
-  via: the state derivation without a run: a chokepoint bullet lacks refutation; with a run: automatic refutation satisfies it, a fail is a structural defect
-  because: when the enforcement no longer detects, the bullet's other lines are history; a bullet still shown as an invariant after its chokepoint broke is the failure Coherence exists to reveal, and an automatic refutation counts because the instrument proved it would see the break
+  via: a structural defect is an invariant whose satisfaction has been removed; a requirement with a failing check stays a requirement
+  because: the glossary defines a structural defect as an invariant whose satisfaction has been removed, and a bullet that never reached invariant has no satisfaction to remove; calling it one both overstates what the tree had and hides the ordinary case, a requirement whose detector is red because the work is not done. A bullet still shown as an invariant after its chokepoint broke is the other half of the same failure, and an automatic refutation counts because the check itself proved it would report the break
   crossing: record -> reading
-  refuted: made a failing run entry no longer force the structural defect state -> "the state derivation without a run: a chokepoint bullet lacks refutation; with a run: automatic refutation satisfies it, a fail is a structural defect" went red in enforcement.test.ts; restored, green (2026-09-17)
   kinds: none

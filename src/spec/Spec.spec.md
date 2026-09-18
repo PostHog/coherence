@@ -21,6 +21,14 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: stopped deriveState from recording a missing enforcement as a lack -> "the state derivation: the full bullet is an invariant, and each missing part keeps it a requirement" went red in spec.test.ts; restored, green (2026-09-17)
   kinds: none
+- refutation is a recorded event: A totality oracle's refutation is witnessed only by a refutation record in the run store together with a later run that found the same totality oracle passing; the bullet's refuted: line is the human account and satisfies nothing on its own, and refutation is required per enforcement, so a bullet carrying both forms needs both.
+  protects: witnessedRefutations
+  chokepoint: loadSpecModel
+  over: every bullet with a totality oracle form, and every refutation record in the run store
+  via: a totality oracle's refutation is a recorded event: the refuted line never satisfies it, a record with a later passing run does, and a bullet with both forms needs both
+  because: both reviewers measured 32 of the 52 bullets reported as invariants resting on a parseable sentence with nothing linking it to a red result, and a chokepoint written entirely in prose with a self-asserted refuted line read as a full invariant with 0 problems from spec --check, the only check npm test runs; a refutation is the witnessed firing of an enforcement, so it must be an event the tool watched (the totality oracle red with the break staged, then green once restored), and the chokepoint's automatic refutation proves nothing about the totality oracle standing beside it
+  crossing: record -> reading
+  kinds: none
 - placeholders count as absent: A value still in angle brackets parses, counts as absent, and is listed as unfilled.
   over: every key of the grammar
   via: a placeholder value parses but counts as absent

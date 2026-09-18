@@ -134,7 +134,12 @@ export function makeFixture(): Fixture {
       ],
     },
   ];
-  write(root, `.coherence/runs/${SESSION}.jsonl`, runs.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  // The read shape totality oracle was refuted by hand before the first run: the record, then a run that found it passing again.
+  const refutation = {
+    kind: "refutation", at: "2026-09-10T09:00:00.000Z", session: SESSION, agent: "fixture", component: "src/store", name: "read shape",
+    form: "totality oracle", broke: "returned a bare value from the read path", verdict: "fail", reason: "read shape holds exited 1", commit: "abc1234", dirty: true,
+  };
+  write(root, `.coherence/runs/${SESSION}.jsonl`, [refutation, ...runs].map((r) => JSON.stringify(r)).join("\n") + "\n");
 
   const head = (id: string, kind: string, at: string): { id: string; kind: string; at: string; session: string; agent: string; commit: string; dirty: boolean } => ({ id, kind, at, session: SESSION, agent: "fixture", commit: "abc1234", dirty: false });
   const journal: { id: string; [key: string]: unknown }[] = [
