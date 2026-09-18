@@ -19,6 +19,15 @@ The command that makes the complete shape the cheapest thing to produce: a compo
   crossing: reading -> project-source
   refuted: made appendInvariant write the spec back without the bullet -> "scaffold invariant --write appends to the invariants section, and the result parses as a requirement with unfilled slots" went red in scaffold.test.ts; restored, green (2026-09-17)
   kinds: none
+- a component lives under its project: The folder a component is scaffolded into is confined to the project root; one that reaches above it is refused and nothing is created.
+  protects: confineToRoot
+  chokepoint: confineToRoot
+  over: every folder given to scaffold component and scaffold invariant, relative, absolute, and reaching upward
+  via: scaffold confines a component folder to the project root
+  because: the folder comes from a command line or from spec text an agent wrote, neither of which is trusted to stay inside the tree it names; a scaffold that followed one upward would write a spec into a neighbouring project, and the invariant verb would then read and append to it
+  crossing: reading -> project-source
+  refuted: resolved the folder against the root and made it, so "..", an absolute path and "src/../../up" each created a component above the project -> "scaffold confines a component folder to the project root" went red in scaffold.test.ts, no exception where one was expected; restored, green (2026-09-18)
+  kinds: none
 - no overwrite: Scaffolding a component creates the folder and its spec with the intent and an empty invariants section, and refuses to overwrite a spec that exists.
   over: every folder the scaffold is asked to make a component
   via: scaffold component creates the folder and a spec with the intent and an empty invariants section, and refuses to overwrite

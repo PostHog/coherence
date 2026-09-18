@@ -13,7 +13,7 @@ import { join, resolve } from "node:path";
 import { JournalError, parseFlags } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
 import { loadSeed } from "../spec/seed.ts";
-import { appendInvariant, renderGuidance, renderInvariant, scaffoldComponent, ScaffoldError, specsIn, type Form } from "./scaffold.ts";
+import { appendInvariant, confineToRoot, renderGuidance, renderInvariant, scaffoldComponent, ScaffoldError, specsIn, type Form } from "./scaffold.ts";
 
 export const SCAFFOLD_USAGE = [
   '  scaffold component <folder> "<intent>"',
@@ -43,7 +43,7 @@ function invariantVerb(argv: string[], io: Io): void {
   if (rest.length > 0) usage(`unexpected argument "${rest[0]}"; quote the sentence`);
   if (parsed.switches.has("chokepoint") && parsed.switches.has("totality-oracle")) usage("--chokepoint or --totality-oracle, not both");
   const form: Form = parsed.switches.has("totality-oracle") ? "totality oracle" : "chokepoint";
-  const dir = resolve(io.cwd, folder);
+  const dir = confineToRoot(io.cwd, folder);
   const specs = specsIn(dir);
   if (specs.length === 0) throw new ScaffoldError(`${folder} holds no spec; scaffold component ${folder} "<intent>" first`);
   const kindsText = parsed.one.get("kinds");
