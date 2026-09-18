@@ -42,7 +42,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: <not witnessed: no staged break was attempted for the guard logic; the test has not been red in this repository>
   kinds: none
-- regulate refuses only what it can prove: A subagent stop is refused for glossary findings in changed files, spec problems, or structural defects, and never for an open requirement.
+- regulate refuses only what it can prove: A subagent stop is refused for a rejected name in a changed file, a spec problem, or a structural defect, and never for an open requirement.
   protects: REFUSE_EXIT
   chokepoint: runHook
   over: every stop event a host sends
@@ -50,6 +50,27 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: a refusal holds a subagent in its loop, so it is spent only on what the tool can prove is owed: a rejected name in a changed file, a spec that will not parse, a chokepoint that no longer chokes; an open requirement can legitimately outlive a session, and refusing on it would train agents to fabricate enforcement lines
   crossing: harness -> reading
   refuted: widened the refusal to any spec text, so an open requirement refused the subagent stop -> its totality oracle went red at "an open requirement never refuses a subagent stop", exit 2 where 0 was asserted (2026-09-17)
+  kinds: none
+- an unknown noun never refuses: An unknown noun in a changed file is reported at the stop with its three answers and never refuses a subagent stop.
+  over: every stop event whose changed files carry an unknown noun and no rejected name
+  via: an unknown noun in a changed file is advisory: Stop reports it and SubagentStop never refuses on it
+  because: the nomination is a heuristic, precision over recall, and the glossary allows a refusal only for what the tool can prove: a rejected name, a spec problem, a structural defect; holding a subagent on a guess would teach it to strip capitalized phrases rather than declare names
+  crossing: harness -> reading
+  refuted: refused the subagent stop on any glossary finding, unknown nouns included -> "an unknown noun in a changed file is advisory: Stop reports it and SubagentStop never refuses on it" went red in hook.test.ts, exit 2 where 0 was asserted; restored, green (2026-09-17)
+  kinds: none
+- a recorded wall makes the debt advisory: A debt the session has recorded as unable, naming the file, the rejected name, or the invariant, is reported with that record's id and does not refuse the subagent stop; another session's unable clears nothing.
+  over: every rejected name, spec problem, and structural defect a subagent stop would refuse on, against every unable record of the stopping session
+  via: an unable record from the session turns the debt it names advisory: SubagentStop reports it and exits 0, and another session is still refused
+  because: the subagent stop is refused until the debt is paid or recorded as unable; a wall the agent cannot pass must not hold it in its loop forever, and the record names the wall for the reader who decides, which is why it counts only for the session that wrote it
+  crossing: record -> reading
+  refuted: refused the subagent stop with the unable record on file, reading no wall -> "an unable record from the session turns the debt it names advisory: SubagentStop reports it and exits 0, and another session is still refused" went red in hook.test.ts, exit 2 where 0 was asserted; restored, green (2026-09-17)
+  kinds: none
+- a git failure is not a clean tree: When git cannot list the changed files, the stop says so and that the glossary check ran over nothing; outside a repository the answer is no files, and a failure never refuses.
+  over: every stop event, in a repository git can read, one it cannot, and no repository at all
+  via: changedFiles reports a git failure instead of answering a clean tree; outside git the answer is no files
+  because: a listing that failed reads exactly like a tree with nothing changed unless the failure is carried; regulate would then report clean over files it never saw, which is the one lie the stop exists to prevent
+  crossing: harness -> reading
+  refuted: caught every git failure and answered no files -> "changedFiles reports a git failure instead of answering a clean tree; outside git the answer is no files" went red in hook.test.ts on the unreadable repository; restored, green (2026-09-17)
   kinds: none
 - escalation heads the start: An unacknowledged escalation heads the start injection, never shortened; an acknowledged one does not.
   over: every start event, SessionStart and SubagentStart, against every escalation in the journal

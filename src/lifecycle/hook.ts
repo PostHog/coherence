@@ -8,9 +8,13 @@
  * hosts read it from `hookSpecificOutput.additionalContext`.
  * Stop and SubagentStop run the glossary check over the files changed in the
  * working tree. On Stop the findings are shown to the human and the session
- * ends. On SubagentStop findings refuse the stop: exit 2 with the reason on
- * stderr, which both hosts read as "continue, and here is why" (Claude Code:
+ * ends. On SubagentStop a rejected name in a changed file, a spec problem, or
+ * a structural defect refuses the stop: exit 2 with the reason on stderr,
+ * which both hosts read as "continue, and here is why" (Claude Code:
  * https://code.claude.com/docs/en/hooks; Codex: https://learn.chatgpt.com/docs/hooks).
+ * An unknown noun is a nomination, reported and never refused. A debt the
+ * session has recorded as unable, naming the file, the name, or the
+ * invariant, is advisory: the wall is on record and the reader decides.
  * A stop hook that is already active (`stop_hook_active`) never refuses again,
  * so a subagent cannot be held forever.
  * PostToolUse for a file-writing tool is revelation at the edit: the
@@ -42,6 +46,7 @@ import { openEscalations } from "../journal/read.ts";
 import { recordReadTrace, snapshotTrace } from "../economy/trace.ts";
 import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
+import type { Unable } from "../journal/record.ts";
 import { loadOrders, ownedIn, type WorkOrder } from "../journal/work.ts";
 import { renderCompactWithin } from "./glossary.ts";
 import { isCoherenceItself, loadProjectGlossaries } from "./project.ts";
@@ -106,16 +111,36 @@ export interface HookResult {
   commit?: () => void;
 }
 
-/** Files changed in the working tree at `root`: modified against HEAD plus untracked. Empty outside git. */
-export async function changedFiles(root: string): Promise<string[]> {
-  try {
-    const diff = await run("git", ["diff", "--name-only", "HEAD"], { cwd: root });
-    const untracked = await run("git", ["ls-files", "--others", "--exclude-standard"], { cwd: root });
-    const all = `${diff.stdout}\n${untracked.stdout}`.split("\n").map((l) => l.trim()).filter((l) => l !== "");
-    return [...new Set(all)];
-  } catch {
-    return [];
+export interface ChangedFiles {
+  /** Modified against HEAD plus untracked; empty when git could not answer. */
+  files: string[];
+  /** Why git could not answer, when it could not: the command and git's own reason. Absent when it answered. */
+  failure?: string;
+}
+
+/** The most bytes one git listing may carry before it is a failure worth reporting rather than a truncated answer. */
+const GIT_LISTING_LIMIT = 64 * 1024 * 1024;
+
+/**
+ * Files changed in the working tree at `root`: modified against HEAD plus
+ * untracked. Outside a repository the answer is no files, since there is no
+ * tree to be clean or dirty; any other failure is reported, never read as a
+ * clean tree.
+ */
+export async function changedFiles(root: string): Promise<ChangedFiles> {
+  const listings: string[] = [];
+  for (const args of [["diff", "--name-only", "HEAD"], ["ls-files", "--others", "--exclude-standard"]]) {
+    try {
+      listings.push((await run("git", args, { cwd: root, maxBuffer: GIT_LISTING_LIMIT })).stdout);
+    } catch (error) {
+      const raw = error instanceof Error ? error.message : String(error);
+      if (/not a git repository/i.test(raw)) return { files: [] };
+      const reason = raw.split("\n").map((l) => l.trim()).find((l) => l !== "" && !l.startsWith("Command failed")) ?? raw;
+      return { files: [], failure: `git ${args.join(" ")} failed: ${reason}` };
+    }
   }
+  const all = listings.join("\n").split("\n").map((l) => l.trim()).filter((l) => l !== "");
+  return { files: [...new Set(all)] };
 }
 
 /** Escalations no human has acknowledged, under a heading, or nothing. Never shortened: a human must see them whole. */
@@ -134,6 +159,24 @@ function sessionOf(input: HookInput): string | undefined {
 function agentOf(input: HookInput): string {
   return typeof input.agent_type === "string" && input.agent_type !== "" ? input.agent_type : MAIN_AGENT;
 }
+
+/** The walls this session recorded as unable: a debt one of them names is advisory at the stop, never refused. */
+function unableWalls(root: string, input: HookInput): Unable[] {
+  const session = sessionOf(input);
+  if (session === undefined) return [];
+  return loadJournal(root).records.filter((r): r is Unable => r.kind === "unable" && r.session === session);
+}
+
+/** The unable record whose text names one of the keys, when one does: the wall that stands between the session and this debt. */
+function excusedBy(walls: readonly Unable[], keys: readonly string[]): Unable | undefined {
+  const wanted = keys.map((k) => k.toLowerCase()).filter((k) => k !== "");
+  return walls.find((wall) => {
+    const text = `${wall.what}\n${wall.because}`.toLowerCase();
+    return wanted.some((k) => text.includes(k));
+  });
+}
+
+const ADVISORY = (wall: Unable): string => `advisory: recorded unable ${wall.id} (${wall.what})`;
 
 /** The rule an owning session reads at orient. */
 export const BOUNDARY_RULE = "Maintenance outside the boundary is not this session's to do: record it (unable, defect, conjecture) and leave it.";
@@ -218,25 +261,70 @@ export function specBlock(root: string): string {
   return lines.length === 0 ? "" : lines.join("\n") + "\n\n";
 }
 
-/** What the spec owes at stop: problems and structural defects refuse a subagent stop; open requirements are shown and left to the human. */
-export function specStopText(root: string, changed: readonly string[] = []): { text: string; problems: number; defects: number } {
+export interface SpecDebt {
+  text: string;
+  problems: number;
+  defects: number;
+  /** Problems and structural defects no unable record of the session names: what a subagent stop is refused for. */
+  owed: number;
+}
+
+/**
+ * What the spec owes at stop: problems and structural defects refuse a
+ * subagent stop, unless the session recorded unable naming the spec file or
+ * the invariant, which makes that item advisory; open requirements are shown
+ * and left to the human.
+ */
+export function specStopText(root: string, changed: readonly string[] = [], walls: readonly Unable[] = []): SpecDebt {
   const model = specModelOrNull(root);
-  if ("error" in model) return { text: `Spec: not readable (${model.error})`, problems: 0, defects: 0 };
-  if (model.components.length === 0) return { text: "", problems: 0, defects: 0 };
+  if ("error" in model) return { text: `Spec: not readable (${model.error})`, problems: 0, defects: 0, owed: 0 };
+  if (model.components.length === 0) return { text: "", problems: 0, defects: 0, owed: 0 };
   const touched = new Set(changed.map((p) => p.split(sep).join("/")));
   const open = model.components.flatMap((c) => c.invariants.filter((i) => i.state === "requirement").map((i) => ({ c, i })));
   const broken = model.components.flatMap((c) => c.invariants.filter((i) => i.state === "structural defect").map((i) => ({ c, i })));
   const mine = open.filter(({ c }) => touched.has(c.specPath));
   const lines: string[] = [];
-  for (const p of model.problems) lines.push(`PROBLEM  ${p.file}:${p.line}  ${p.message}`);
+  let owed = 0;
+  for (const p of model.problems) {
+    const wall = excusedBy(walls, [p.file]);
+    if (wall === undefined) owed += 1;
+    lines.push(`PROBLEM  ${p.file}:${p.line}  ${p.message}${wall === undefined ? "" : `\n         ${ADVISORY(wall)}`}`);
+  }
   for (const { c, i } of broken) {
-    for (const d of i.defects) lines.push(`✕ ${c.folder}/${i.name} — structural defect (${d.form}, run ${d.at.slice(0, 10)}): ${d.reason}`);
+    const wall = excusedBy(walls, [`${c.folder}/${i.name}`, i.name]);
+    if (wall === undefined) owed += 1;
+    for (const d of i.defects) lines.push(`✕ ${c.folder}/${i.name} — structural defect (${d.form}, run ${d.at.slice(0, 10)}): ${d.reason}${wall === undefined ? "" : `\n  ${ADVISORY(wall)}`}`);
   }
   if (broken.length > 0) lines.push(`A structural defect stands until the reference is routed through the chokepoint or a human acknowledges a retirement (escalate, then acknowledge).`);
   for (const { c, i } of mine.slice(0, OPEN_REQUIREMENT_LINES)) lines.push(`○ ${c.folder}/${i.name} — still a requirement; lacks: ${i.lacks.join(", ")}`);
   if (mine.length > OPEN_REQUIREMENT_LINES) lines.push(`  and ${mine.length - OPEN_REQUIREMENT_LINES} more in specs this session changed`);
   if (open.length > 0) lines.push(`${open.length} requirement${open.length === 1 ? "" : "s"} open in the project${mine.length > 0 ? `, ${mine.length} in specs this session changed` : ""}; run: spec --check`);
-  return { text: lines.join("\n"), problems: model.problems.length, defects: broken.length };
+  return { text: lines.join("\n"), problems: model.problems.length, defects: broken.length, owed };
+}
+
+/**
+ * The glossary check over the changed files at stop, as text, and what of it
+ * is owed: a rejected name refuses a subagent stop unless the session
+ * recorded unable naming the file or the name; an unknown noun is a
+ * nomination the tool cannot prove, so it is reported and never refused.
+ */
+export function glossaryStopText(report: CheckReport | undefined, walls: readonly Unable[] = []): { text: string; owed: number } {
+  if (report === undefined || !hasFindings(report)) return { text: "", owed: 0 };
+  const lines = formatReport(report).trimEnd().split("\n");
+  let owed = 0;
+  const out: string[] = [];
+  let next = 0;
+  for (const line of lines) {
+    out.push(line);
+    if (!line.startsWith("REJECTED NAME")) continue;
+    const finding = report.rejected[next];
+    next += 1;
+    if (finding === undefined) continue;
+    const wall = excusedBy(walls, [finding.file, finding.name]);
+    if (wall === undefined) owed += 1;
+    else out.push(`               ${ADVISORY(wall)}`);
+  }
+  return { text: out.join("\n") + "\n", owed };
 }
 
 /** Tools that read a file and name it the same way a writing tool does. */
@@ -307,11 +395,10 @@ export function feedContext(root: string, input: HookInput): { text: string; com
   return peerFeed(root, session);
 }
 
-async function checkChanged(root: string): Promise<CheckReport | undefined> {
-  const paths = await changedFiles(root);
+async function checkChanged(root: string, paths: readonly string[]): Promise<CheckReport | undefined> {
   if (paths.length === 0) return undefined;
   const { coherence, project } = await loadProjectGlossaries(root);
-  return runCheck({ root, paths, coherence, project });
+  return runCheck({ root, paths: [...paths], coherence, project });
 }
 
 export interface HookOptions {
@@ -343,19 +430,23 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     }
     case "Stop":
     case "SubagentStop": {
-      const report = await checkChanged(root);
-      const changedNow = await changedFiles(root);
-      if (typeof input.session_id === "string" && input.session_id !== "") await snapshotTrace(root, input.session_id, { adapter: options.adapter, changed: changedNow });
-      const spec = specStopText(root, changedNow);
-      const glossaryText = report !== undefined && hasFindings(report) ? formatReport(report) : "";
+      const changed = await changedFiles(root);
+      const report = await checkChanged(root, changed.files);
+      if (typeof input.session_id === "string" && input.session_id !== "") await snapshotTrace(root, input.session_id, { adapter: options.adapter, changed: changed.files });
+      const walls = unableWalls(root, input);
+      const spec = specStopText(root, changed.files, walls);
+      const glossary = glossaryStopText(report, walls);
       const workText = workStopText(root, input);
-      if (glossaryText === "" && spec.text === "" && workText === "") return { stdout: "", stderr: "", exit: 0 };
+      const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the glossary check ran over nothing`;
+      if (glossary.text === "" && spec.text === "" && workText === "" && changedText === "") return { stdout: "", stderr: "", exit: 0 };
       const parts: string[] = [];
-      if (glossaryText !== "") parts.push(`Glossary check:\n${glossaryText}`);
+      if (changedText !== "") parts.push(changedText);
+      if (glossary.text !== "") parts.push(`Glossary check:\n${glossary.text}`);
       if (spec.text !== "") parts.push(`Spec:\n${spec.text}`);
       if (workText !== "") parts.push(`Work:\n${workText}`);
       const text = parts.join("\n");
-      const refuse = event === "SubagentStop" && input.stop_hook_active !== true && (glossaryText !== "" || spec.problems > 0 || spec.defects > 0);
+      // A refusal is spent only on what the tool can prove is owed and no recorded wall excuses: a rejected name in a changed file, a spec problem, a structural defect.
+      const refuse = event === "SubagentStop" && input.stop_hook_active !== true && glossary.owed + spec.owed > 0;
       if (refuse) {
         return { stdout: "", stderr: `Regulate found what this session owes; settle it before stopping.\n${text}`, exit: REFUSE_EXIT };
       }

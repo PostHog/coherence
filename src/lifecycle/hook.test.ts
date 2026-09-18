@@ -86,7 +86,7 @@ test("UserPromptSubmit and PostToolUse print nothing", async () => {
 });
 
 test("Stop and SubagentStop with a clean working tree are silent", async () => {
-  assert.deepEqual(await changedFiles(root), []);
+  assert.deepEqual(await changedFiles(root), { files: [] });
   assert.deepEqual(await runHook("Stop", { cwd: root }, root), { stdout: "", stderr: "", exit: 0 });
   assert.deepEqual(await runHook("SubagentStop", { cwd: root }, root), { stdout: "", stderr: "", exit: 0 });
 });
@@ -94,7 +94,7 @@ test("Stop and SubagentStop with a clean working tree are silent", async () => {
 test("with defects in changed files: Stop reports and exits 0; SubagentStop refuses with exit 2 and the reason on stderr", async () => {
   await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
   await writeFile(join(root, "new.md"), "The Sprocket Wheel turns. It turns the Sprocket Wheel again.\n");
-  assert.deepEqual((await changedFiles(root)).sort(), ["clean.md", "new.md"]);
+  assert.deepEqual((await changedFiles(root)).files.sort(), ["clean.md", "new.md"]);
 
   const stop = await runHook("Stop", { cwd: root }, root);
   assert.equal(stop.exit, 0);
@@ -113,6 +113,66 @@ test("with defects in changed files: Stop reports and exits 0; SubagentStop refu
   const again = await runHook("SubagentStop", { cwd: root, stop_hook_active: true }, root);
   assert.equal(again.exit, 0, "a stop hook already active never refuses twice");
   assert.match(again.stdout, /systemMessage/);
+});
+
+test("an unknown noun in a changed file is advisory: Stop reports it and SubagentStop never refuses on it", async () => {
+  await writeFile(join(root, "clean.md"), "The widget is fine.\n");
+  assert.deepEqual((await changedFiles(root)).files, ["new.md"], "only the file with the unknown noun is changed");
+  const subagent = await runHook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
+  assert.equal(subagent.exit, 0, `an unknown noun is a nomination, not a proof: ${subagent.stderr}`);
+  const message = (JSON.parse(subagent.stdout) as { systemMessage: string }).systemMessage;
+  assert.match(message, /UNKNOWN NOUN   "sprocket wheel" \(2\)/, "it is still reported");
+  await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
+});
+
+test("an unable record from the session turns the debt it names advisory: SubagentStop reports it and exits 0, and another session is still refused", async () => {
+  const io = { cwd: root, out: () => {}, err: () => {} };
+  const refused = await runHook("SubagentStop", { cwd: root, session_id: "s-unable", stop_hook_active: false }, root);
+  assert.equal(refused.exit, REFUSE_EXIT, "the rejected name in clean.md refuses the stop");
+  assert.equal(journalVerbs["unable"]!(["cannot rename doohickey in clean.md", "--because", "the owner keeps that fixture text; the rename is theirs", "--session", "s-unable", "--agent", "Plan"], io), 0);
+  const excused = await runHook("SubagentStop", { cwd: root, session_id: "s-unable", stop_hook_active: false }, root);
+  assert.equal(excused.exit, 0, `the wall was recorded, so the debt is advisory: ${excused.stderr}`);
+  const message = (JSON.parse(excused.stdout) as { systemMessage: string }).systemMessage;
+  assert.match(message, /REJECTED NAME  clean\.md:1  "doohickey"/, "the finding is still shown");
+  assert.match(message, /advisory: recorded unable u-[0-9a-f]{8}/, "and says which record made it advisory");
+  const other = await runHook("SubagentStop", { cwd: root, session_id: "s-other", stop_hook_active: false }, root);
+  assert.equal(other.exit, REFUSE_EXIT, "an unable is this agent's, in this session; it clears nothing for another");
+
+  const specRoot = await mkdtemp(join(tmpdir(), "coherence-unable-spec-"));
+  try {
+    await writeFile(join(specRoot, "Root.spec.md"), "# Root\n\nA fixture project.\n\n## works when\n- typechecks\n");
+    const problem = await runHook("SubagentStop", { cwd: specRoot, session_id: "s-spec", stop_hook_active: false }, specRoot);
+    assert.equal(problem.exit, REFUSE_EXIT, "a spec problem refuses the subagent stop");
+    assert.equal(journalVerbs["unable"]!(["cannot repair Root.spec.md", "--because", "the retired section is the owner's to rewrite", "--session", "s-spec", "--agent", "Plan"], { ...io, cwd: specRoot }), 0);
+    const allowed = await runHook("SubagentStop", { cwd: specRoot, session_id: "s-spec", stop_hook_active: false }, specRoot);
+    assert.equal(allowed.exit, 0, `the recorded wall names the spec file: ${allowed.stderr}`);
+    assert.match((JSON.parse(allowed.stdout) as { systemMessage: string }).systemMessage, /PROBLEM  Root\.spec\.md:.*\n.*advisory: recorded unable/);
+  } finally {
+    await rm(specRoot, { recursive: true, force: true });
+  }
+});
+
+test("changedFiles reports a git failure instead of answering a clean tree; outside git the answer is no files", async () => {
+  const outside = await mkdtemp(join(tmpdir(), "coherence-nogit-"));
+  const broken = await mkdtemp(join(tmpdir(), "coherence-badgit-"));
+  try {
+    assert.deepEqual(await changedFiles(outside), { files: [] }, "no repository: nothing is changed and nothing failed");
+    await writeFile(join(broken, ".git"), "this is not a gitfile\n");
+    await writeFile(join(broken, "coherence.config.json"), JSON.stringify({ glossary: "glossary.json" }));
+    await writeFile(join(broken, "glossary.json"), JSON.stringify({ project: "widgetry", version: 0, concepts: [], rejected: [] }));
+    const failed = await changedFiles(broken);
+    assert.deepEqual(failed.files, []);
+    assert.match(failed.failure ?? "", /git diff --name-only HEAD failed: .*gitfile/, "the failure names the command and git's reason");
+    const stop = await runHook("Stop", { cwd: broken, session_id: "s-git" }, broken);
+    assert.equal(stop.exit, 0);
+    const message = (JSON.parse(stop.stdout) as { systemMessage: string }).systemMessage;
+    assert.match(message, /Changed files: not known \(git diff --name-only HEAD failed: .*\); the glossary check ran over nothing/);
+    const subagent = await runHook("SubagentStop", { cwd: broken, session_id: "s-git", stop_hook_active: false }, broken);
+    assert.equal(subagent.exit, 0, "what the tool cannot see it cannot prove owed, so it reports and never refuses");
+  } finally {
+    await rm(outside, { recursive: true, force: true });
+    await rm(broken, { recursive: true, force: true });
+  }
 });
 
 test("an unacknowledged escalation heads the start output; an acknowledged one does not", async () => {
