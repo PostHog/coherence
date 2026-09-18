@@ -59,22 +59,34 @@ names the whole set the detector is total over and the test:
 
 `because` says why the invariant exists and what it protects against.
 `crossing` is the security marker: two trust levels the entry spec declares.
-`refuted` records the witnessed firing: what was broken, what was seen, the date.
+`refuted` is the human account of a witnessed firing: what was broken, what
+was seen, the date. It is an account, not the evidence. A chokepoint form is
+refuted by the run itself; a totality oracle form is refuted by running
+`refute <component>/<name> --broke "…"` while the break is staged, which
+requires the totality oracle to fail and appends a refutation record to the
+run store, and the refutation counts only once a later run finds that same
+totality oracle passing again. Refutation is required per enforcement, so a bullet carrying both
+forms needs both.
 
 ## Lifecycle states
 
 The check derives each bullet's state from what it carries:
 
-- **requirement**: enforcement is absent, or no refutation is recorded, or the
-  decomposition checklist has an applicable shape neither declared nor
-  dismissed. A missing `kinds` line means the checklist was never run.
-- **invariant**: enforcement is declared, its refutation is recorded, and every
-  applicable shape is answered.
+- **requirement**: enforcement is absent, or an enforcement's refutation has
+  not been witnessed, or the decomposition checklist has an applicable shape
+  neither declared nor dismissed. A missing `kinds` line means the checklist
+  was never run. A requirement whose check is failing stays a requirement and
+  is reported with its failing check, never promoted.
+- **invariant**: enforcement is declared, every enforcement's refutation is
+  witnessed, and every applicable shape is answered.
+- **structural defect**: an invariant whose satisfaction has been removed —
+  the bullet is otherwise complete and the latest run found a bypass, an
+  unresolvable chokepoint, or a failing totality oracle.
 
-Every enforcement reports as declared, unverified: whether the chokepoint
-still chokes, and so whether the invariant has become a structural defect, is
-the language server's verdict and arrives in slice three. A missing `because`
-is reported as a lack but does not change the state.
+With no run and no refutation record, every enforcement reports as declared,
+unverified and every bullet is a requirement: nothing in the tree has been
+seen to fire. A missing `because` is reported as a lack but does not change
+the state.
 
 ## Coherence's own spec
 

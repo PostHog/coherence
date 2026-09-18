@@ -7,6 +7,7 @@ totality oracle (`over:` and `via:`).
 ```sh
 node src/cli.ts run [--session <id> --agent <name>]   # both passes, one run appended
 node src/cli.ts run --status                           # the latest verdict per enforcement
+node src/cli.ts refute <component>/<name> --broke "…"  # the totality oracle with the break staged; it must fail
 node src/cli.ts serve                                  # the warm language server, foreground
 ```
 
@@ -32,8 +33,11 @@ module through its `__init__.py`.
 
 Every reference to the protected thing is classified: inside the chokepoint
 (the chokepoint symbol's range, or its module when the chokepoint is a
-module), an import, a test reference (reported, never a bypass), or a
-bypass.
+module), a test reference (reported, never a bypass), or a bypass. There is
+no fourth class: every site the language server reports is a reference, an
+import or re-export specifier included, because an import outside the
+chokepoint reaches the thing and a re-export widens its reach with no call
+at all.
 
 - **visibility-choked**: not visible outside its module, no bypass.
 - **reference-choked**: visible, but every reference is inside the chokepoint.
@@ -49,13 +53,37 @@ below.
 
 ## Refutation
 
+Refutation is required **per enforcement**: a bullet carrying both forms
+needs both.
+
 A chokepoint refutes itself. The adapter opens an unsaved document beside
 the protected thing that imports and uses it (for a thing not exported, an
-unsaved edit of its own module), asks for references, and confirms the
-synthetic site appears; nothing touches disk. If the instrument cannot see
-the site, the check is vacuous: the run says so and the bullet stays a
-requirement. A totality oracle must be witnessed by hand and written on the
-bullet as `refuted:`.
+unsaved edit of its own module), asks for references, and reports the site
+the instrument named; nothing touches disk. The check then classifies that
+site with the same function every other site goes through, and only a site
+it calls a **bypass** refutes. A site the instrument could not see at all,
+or one the check would call `inside` (the chokepoint covers everywhere the
+language lets the thing be named) or `test` (the protected thing lives under
+a test folder, so nothing can ever be a bypass), makes the check vacuous: the
+run says which, records not run, and the bullet stays a requirement.
+
+A totality oracle is refuted by hand, and the refutation is a recorded
+event, never a sentence. While the break is staged:
+
+```sh
+node src/cli.ts refute src/enforcement/"run appended never rewritten" \
+  --broke "replaced the append in appendRun with a whole-file write" \
+  [--session <id> --agent <name>]
+```
+
+It runs that bullet's totality oracle, **requires it to fail**, and appends a
+refutation record beside the runs (kind `refutation`: the bullet, what was
+broken, the failing verdict and its reason, at, session, commit, dirty). A
+passing totality oracle appends nothing and exits non-zero. Then restore the
+code and run `run`: the refutation counts as witnessed only once a run at or
+after the record finds the same totality oracle passing again — red with the break, green
+without it. The bullet's `refuted:` line stays as the human account and may
+name the record; the account alone never satisfies the requirement.
 
 ## Python
 
@@ -94,14 +122,24 @@ JUnit report (or pytest-json-report's JSON) maps back by test name.
 A run appends one line to `.coherence/runs/<session>.jsonl`: time, session,
 agent, commit, and one entry per enforcement: form, verdict, grade,
 refutation, bypasses, test references, files, latency, reason. Nothing is
-rewritten.
+rewritten. `refute` appends its refutation records to the same files, marked
+with `kind: "refutation"`.
+
+A run exits non-zero when an enforcement failed and also when the instrument
+was needed and could not answer: the totality pass runs the whole suite
+before the first question, so the run holds the warm server's idle timer open
+with a heartbeat and asks the instrument again afterwards. A run that proved
+nothing must never read like a clean one.
 
 `run --status` is a view: the latest entry per enforcement across every run;
 one the latest run skipped keeps its prior dated verdict, and the line says
 so. `spec --check` reads the same view: an automatic refutation satisfies a
-chokepoint bullet's refutation requirement, a passing verdict shows as
-verified, and a failing one makes the bullet a structural defect. With no
-run, every enforcement is declared, unverified.
+chokepoint enforcement's refutation requirement, a refutation record with a
+later passing run satisfies a totality oracle's, a passing verdict shows as
+verified, and a failing one on a bullet that was otherwise complete makes it
+a structural defect — an invariant whose satisfaction has been removed. A
+requirement whose check is failing stays a requirement, reported with its
+failing check. With no run, every enforcement is declared, unverified.
 
 The totality oracle pass runs every test the bullets name in one invocation of the
 config's `testJson` command (a combined name pattern, a per-test JSON
