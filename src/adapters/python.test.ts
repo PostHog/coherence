@@ -14,6 +14,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
 import { checkChokepoint, classifySite } from "../enforcement/check.ts";
 import { formatRun } from "../enforcement/cli.ts";
@@ -21,7 +22,7 @@ import { readEnforcementConfig } from "../enforcement/config.ts";
 import { performRun } from "../enforcement/run.ts";
 import { combinedFilter, reportFromJunit, verdictsFromReport } from "../enforcement/totality.ts";
 import type { Definition } from "./adapter.ts";
-import { PythonAdapter, locateServer } from "./python.ts";
+import { PythonAdapter, locateServer, type PythonLanguageClient } from "./python.ts";
 
 const INIT = `from pkg.store import seal, peek
 
@@ -146,6 +147,65 @@ function definitionOf(resolved: Awaited<ReturnType<PythonAdapter["resolve"]>>): 
   return resolved.definition;
 }
 
+class ControlledPythonClient implements PythonLanguageClient {
+  onNotification: PythonLanguageClient["onNotification"];
+  onRequest: PythonLanguageClient["onRequest"];
+  alive = true;
+  initializeParams: unknown;
+  configurationReply: unknown;
+  private enumerated = false;
+  private readonly root: string;
+
+  constructor(root: string) {
+    this.root = root;
+  }
+
+  async request<T>(method: string, params: unknown): Promise<T> {
+    if (method === "initialize") {
+      this.initializeParams = params;
+      this.configurationReply = await this.onRequest?.("workspace/configuration", { items: [{ section: "python" }] });
+      return {} as T;
+    }
+    if (method === "textDocument/documentSymbol") {
+      const file = String((params as { textDocument: { uri: string } }).textDocument.uri);
+      if (this.enumerated && file.endsWith("/component/store.py")) {
+        return [{ name: "TARGET", kind: 13, range: { start: { line: 0, character: 0 }, end: { line: 0, character: 10 } }, selectionRange: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } } }] as T;
+      }
+      return [] as T;
+    }
+    if (method === "textDocument/references") {
+      if (!this.enumerated) return [] as T;
+      return [{ uri: pathToFileURL(join(this.root, "outside/use.py")).href, range: { start: { line: 2, character: 9 }, end: { line: 2, character: 15 } } }] as T;
+    }
+    throw new Error(`unexpected request ${method}`);
+  }
+
+  notify(): void {}
+
+  kill(): void {
+    this.alive = false;
+  }
+
+  finishEnumeration(): void {
+    if (this.enumerated) return;
+    this.enumerated = true;
+    this.onNotification?.("window/logMessage", { message: "Found 2 source files" });
+  }
+}
+
+/** Fail promptly if a controlled operation settles before the test releases its barrier. */
+async function assertStillPending(promise: Promise<unknown>, message: string): Promise<void> {
+  const pending = Symbol("pending");
+  const result = await Promise.race([
+    promise.then(
+      () => "resolved",
+      () => "rejected",
+    ),
+    new Promise<typeof pending>((resolvePending) => setImmediate(() => resolvePending(pending))),
+  ]);
+  assert.equal(result, pending, message);
+}
+
 before(async () => {
   root = mkdtempSync(join(tmpdir(), "coherence-python-"));
   write("coherence.config.json", JSON.stringify({ language: "python", testDir: "tests" }));
@@ -164,6 +224,50 @@ after(async () => {
 
 test("the Python language server binary is found (the adapter's precondition)", () => {
   assert.ok(serverPresent, "pyright must be installed: npm install");
+});
+
+test("Python waits for whole-workspace enumeration before bare-name resolution and references, and finds references outside the component", { timeout: 1_000 }, async () => {
+  const controlledRoot = mkdtempSync(join(tmpdir(), "coherence-python-enumeration-"));
+  mkdirSync(join(controlledRoot, "component"), { recursive: true });
+  mkdirSync(join(controlledRoot, "outside"), { recursive: true });
+  writeFileSync(join(controlledRoot, "component/store.py"), "TARGET = 1\n", "utf8");
+  writeFileSync(join(controlledRoot, "outside/use.py"), "from component.store import TARGET\n\nRESULT = TARGET\n", "utf8");
+  const client = new ControlledPythonClient(controlledRoot);
+  const controlled = new PythonAdapter(controlledRoot, () => client);
+  const definition: Definition = {
+    name: "TARGET",
+    kind: "symbol",
+    file: "component/store.py",
+    range: { start: { line: 0, character: 0 }, end: { line: 0, character: 10 } },
+    selection: { line: 0, character: 0 },
+  };
+  try {
+    const resolution = controlled.resolve("TARGET", { ...hint, component: "component" });
+    const references = controlled.references(definition);
+    await assertStillPending(resolution, "bare-name resolution answered before workspace enumeration");
+    await assertStillPending(references, "references answered before workspace enumeration");
+    assert.deepEqual(client.initializeParams, {
+      processId: process.pid,
+      rootUri: pathToFileURL(controlledRoot).href,
+      workspaceFolders: [{ uri: pathToFileURL(controlledRoot).href, name: "project" }],
+      capabilities: {
+        textDocument: { documentSymbol: { hierarchicalDocumentSymbolSupport: true }, publishDiagnostics: {} },
+        workspace: { workspaceFolders: true, configuration: true },
+      },
+      initializationOptions: {},
+    });
+    assert.deepEqual(client.configurationReply, [{ analysis: { diagnosticMode: "openFilesOnly" } }], "the configuration adds no include or component filter");
+
+    client.finishEnumeration();
+    const resolved = definitionOf(await resolution);
+    assert.equal(resolved.file, "component/store.py");
+    const sites = await references;
+    assert.deepEqual(sites.map((site) => `${site.file}:${site.line}`), ["outside/use.py:3"]);
+  } finally {
+    client.finishEnumeration();
+    await controlled.close();
+    rmSync(controlledRoot, { recursive: true, force: true });
+  }
 });
 
 test("Python classification: inside the chokepoint, a test reference, a bypass; an import or an __all__ entry outside the chokepoint is a bypass", async () => {

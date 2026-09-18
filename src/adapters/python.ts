@@ -67,6 +67,18 @@ import {
 } from "./adapter.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
 
+/** The small JSON-RPC surface the adapter needs, exposed so a test can control server ordering. */
+export interface PythonLanguageClient {
+  onNotification: ((method: string, params: unknown) => void) | undefined;
+  onRequest: ((method: string, params: unknown) => unknown | Promise<unknown>) | undefined;
+  readonly alive: boolean;
+  request<T>(method: string, params: unknown, timeoutMs?: number): Promise<T>;
+  notify(method: string, params: unknown): void;
+  kill(): void;
+}
+
+export type PythonClientFactory = (command: string, args: string[], cwd: string) => PythonLanguageClient;
+
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..");
 const SERVER_BIN = "pyright-langserver";
@@ -370,7 +382,8 @@ export class PythonAdapter implements LanguageAdapter {
   readonly language = "python";
   readonly ladder = PYTHON_LADDER;
   readonly root: string;
-  private client: JsonRpcClient | undefined;
+  private client: PythonLanguageClient | undefined;
+  private readonly clientFactory: PythonClientFactory;
   private starting: Promise<{ ok: true } | { ok: false; reason: string }> | undefined;
   /** Resolves with the source file count when Pyright reports its enumeration done. */
   private enumerated: Promise<number> | undefined;
@@ -390,8 +403,9 @@ export class PythonAdapter implements LanguageAdapter {
   /** When the workspace was last reported to Pyright as possibly changed. */
   private lastForget = Date.now();
 
-  constructor(root: string) {
+  constructor(root: string, clientFactory: PythonClientFactory = JsonRpcClient.spawn) {
     this.root = resolve(root);
+    this.clientFactory = clientFactory;
   }
 
   ready(): Promise<{ ok: true } | { ok: false; reason: string }> {
@@ -404,7 +418,7 @@ export class PythonAdapter implements LanguageAdapter {
     if (server === undefined) {
       return { ok: false, reason: `${SERVER_BIN} not found; looked in the project's node_modules, Coherence's, and PATH. Install it: npm install --save-dev pyright (or pip install pyright)` };
     }
-    const client = JsonRpcClient.spawn(server.path, ["--stdio"], this.root);
+    const client = this.clientFactory(server.path, ["--stdio"], this.root);
     this.client = client;
     const started = Date.now();
     let found: (count: number) => void = () => {};
@@ -449,7 +463,7 @@ export class PythonAdapter implements LanguageAdapter {
     }
   }
 
-  private async live(): Promise<JsonRpcClient> {
+  private async live(): Promise<PythonLanguageClient> {
     const state = await this.ready();
     if (!state.ok) throw new Error(state.reason);
     if (this.client === undefined || !this.client.alive) {
@@ -463,7 +477,7 @@ export class PythonAdapter implements LanguageAdapter {
   }
 
   /** The live client once Pyright has enumerated the workspace; an answer before that is silently partial. */
-  private async indexed(): Promise<JsonRpcClient> {
+  private async indexed(): Promise<PythonLanguageClient> {
     const client = await this.live();
     const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${SERVER_BIN} did not finish enumerating the workspace in ${ENUMERATION_TIMEOUT_MS / 60000} minutes`)), ENUMERATION_TIMEOUT_MS).unref());
     await Promise.race([this.enumerated!, timeout]);
@@ -599,6 +613,7 @@ export class PythonAdapter implements LanguageAdapter {
         },
       };
     }
+    await this.indexed();
     const candidates = parsed.fileHint === undefined ? await this.searchByText(parsed.name, hint) : await this.searchFiles(parsed.name, parsed.fileHint);
     if (candidates.length === 0) {
       return { ok: false, reason: parsed.fileHint === undefined ? `no symbol named ${parsed.name} in the project` : `no symbol named ${parsed.name} in a file ending with ${parsed.fileHint}` };
@@ -916,7 +931,7 @@ export class PythonAdapter implements LanguageAdapter {
   }
 
   /** Open a synthetic document that imports the name and read Pyright's refusal back. */
-  private async refusedByInterpreter(client: JsonRpcClient, protectedThing: Definition, name: string): Promise<Refutation> {
+  private async refusedByInterpreter(client: PythonLanguageClient, protectedThing: Definition, name: string): Promise<Refutation> {
     const { where, from } = this.syntheticFrom(protectedThing);
     const synthetic = `${where}coherence_refutation_${randomBytes(4).toString("hex")}.py`;
     const text = `from ${from} import ${name}\ncoherence_refutation = ${name}\n`;
@@ -950,7 +965,7 @@ export class PythonAdapter implements LanguageAdapter {
   }
 
   /** Stage the two synthetic sites in one references query, and restore. */
-  private async stage(client: JsonRpcClient, protectedThing: Definition, chokepoint: Definition | undefined, importName: string, access: string): Promise<Refutation> {
+  private async stage(client: PythonLanguageClient, protectedThing: Definition, chokepoint: Definition | undefined, importName: string, access: string): Promise<Refutation> {
     const { where, from } = this.syntheticFrom(protectedThing);
     const synthetic = `${where}coherence_refutation_${randomBytes(4).toString("hex")}.py`;
     // A class member is reached through its class, and `__all__` cannot name it: there the outside document uses it instead.

@@ -60,9 +60,10 @@ The language adapter seam: how to ask a language's server for definitions, refer
   kinds: none
 - whole workspace indexed: The Python adapter waits for Pyright's enumeration of the whole workspace before answering, and never narrows the workspace to a component.
   over: every references query and every bare-name resolution the Python adapter answers
-  via: Python classification: inside the chokepoint, a test reference, a bypass; an import or an __all__ entry outside the chokepoint is a bypass
-  because: a Python reference to anything can sit in any file, so an index that sees less than the whole workspace can only prove the absence of a bypass inside what it sees; a narrower root on PostHog was fast (0.4 s, 160 MB) and blind to three references outside the folder, and an answer before enumeration is silently partial (the fixture's references came back one file short until the "Found N source files" message). This stays a requirement: no break of the wait can be staged, because an answer that arrives before enumeration is a race the test cannot hold still, and the via borrows the Python classification test, which would stay green with the wait removed. It needs a detector of its own — one that asks before enumeration is done and expects a refusal — before it can become an invariant
+  via: Python waits for whole-workspace enumeration before bare-name resolution and references, and finds references outside the component
+  because: a Python reference can sit in any project file, so a partial index cannot prove that no bypass exists; both references queries and bare-name resolutions wait for Pyright's source-file enumeration, and Pyright receives the project root as its root and workspace folder, so a component hint orders the text scan without narrowing the workspace
   crossing: instrument -> reading
+  refuted: bypassed the enumeration barrier before every indexed query -> "Python waits for whole-workspace enumeration before bare-name resolution and references, and finds references outside the component" went red; restored, green (2026-09-18); narrowed Pyright initialization from the project root to one component -> the same test went red; restored, green (2026-09-18)
   kinds: none
 - pytest report mapped by name: The batched totality pass reads pytest's JUnit XML or pytest-json-report's JSON as the one report shape, and writes pytest's name filter as a -k expression joined with or.
   protects: reportFromJunit
