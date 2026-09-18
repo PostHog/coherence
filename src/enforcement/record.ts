@@ -51,6 +51,34 @@ export interface Bypass {
   symbol: string;
 }
 
+/** What a persisted reference site points at. */
+export type ReferenceTarget = "protected" | "chokepoint";
+
+/**
+ * The check's classification of a persisted site. `chokepoint-reference` makes only the
+ * fact the adapter established: an outside reference to the chokepoint. It
+ * does not claim the site is a runtime call; `form` separately retains an
+ * import or re-export form when the adapter supplied one.
+ */
+export type SiteClass = "inside" | "chokepoint-reference" | "test" | "bypass";
+
+/** The syntactic forms the adapter can establish at a reference site. */
+export type ReferenceForm = "import" | "re-export";
+
+/** The durable, editor-facing part of one classified reference. */
+export interface RecordedSite {
+  file: string;
+  line: number;
+  /** The referencing symbol, or "module top level". */
+  symbol: string;
+  class: SiteClass;
+  of: ReferenceTarget;
+  /** Orthogonal to class: whether this site is under a configured test path. */
+  test: boolean;
+  /** Orthogonal syntax evidence, when the adapter can establish it. */
+  form?: ReferenceForm;
+}
+
 export interface RunEntry {
   component: string;
   name: string;
@@ -64,6 +92,11 @@ export interface RunEntry {
   mode?: "batched" | "one-at-a-time";
   refutation: RefutationState;
   bypasses: Bypass[];
+  /**
+   * Chokepoint form only. Present only when both reference queries completed.
+   * Absence is unavailable or legacy evidence, never a confirmed empty set.
+   */
+  sites?: RecordedSite[];
   testReferences: number;
   /** Files the check touched: definitions and every reference site; the edit hook reads them. */
   files: string[];

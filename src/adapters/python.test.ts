@@ -5,8 +5,9 @@
  * that excludes the protected name, an underscore-prefixed name, a class
  * member, and a function-local. The classification, the four-rung ladder,
  * the refutation through an unsaved document, and the totality oracle pass
- * through pytest's JUnit report (skipped visibly when no interpreter with
- * pytest is found: COHERENCE_PYTHON names one, else python3).
+ * through pytest's JUnit report. npm run test:setup prepares the local Python
+ * environment; COHERENCE_PYTHON explicitly overrides it. Missing pytest is
+ * a test failure, never a skipped integration check.
  */
 
 import assert from "node:assert/strict";
@@ -14,10 +15,10 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { after, before, test } from "node:test";
 import { checkChokepoint, classifySite } from "../enforcement/check.ts";
-import { formatRun } from "../enforcement/cli.ts";
+import { formatRun, refuteCommand } from "../enforcement/cli.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { performRun } from "../enforcement/run.ts";
 import { combinedFilter, reportFromJunit, verdictsFromReport } from "../enforcement/totality.ts";
@@ -127,14 +128,22 @@ let adapter: PythonAdapter;
 const hint = { component: ".", testFolders: readEnforcementConfig("/nowhere").testFolders };
 const serverPresent = locateServer(process.cwd()) !== undefined;
 
-/** An interpreter that can run pytest, or undefined with the reason the test is skipped. */
-function pythonWithPytest(): { python: string } | { skip: string } {
-  const candidates = [process.env["COHERENCE_PYTHON"], "python3"].filter((c): c is string => c !== undefined && c !== "");
-  for (const python of candidates) {
-    const probe = spawnSync(python, ["-m", "pytest", "--version"], { encoding: "utf8" });
-    if (probe.status === 0) return { python };
-  }
-  return { skip: `no interpreter with pytest among ${candidates.join(", ")}; set COHERENCE_PYTHON to one to run the pytest pass` };
+const TEST_PYTHON = fileURLToPath(new URL("../../.venv/bin/python", import.meta.url));
+
+function pythonForTests(env: NodeJS.ProcessEnv = process.env): string {
+  return env["COHERENCE_PYTHON"] || TEST_PYTHON;
+}
+
+/** The local test interpreter, or an explicit override; a missing runner fails rather than hiding coverage. */
+function pythonWithPytest(env: NodeJS.ProcessEnv = process.env): string {
+  const python = pythonForTests(env);
+  const probe = spawnSync(python, ["-m", "pytest", "--version"], { encoding: "utf8" });
+  assert.equal(
+    probe.status,
+    0,
+    `pytest is unavailable in ${python}: ${probe.error?.message ?? probe.stderr.trim()}. Run npm run test:setup, or set COHERENCE_PYTHON to an interpreter with pytest.`,
+  );
+  return python;
 }
 
 function write(path: string, text: string): void {
@@ -401,29 +410,57 @@ test("pytest's JUnit report reads as the jest shape, and -k names join with or",
   assert.equal(combinedFilter(["a (b)"], "regex"), "a \\(b\\)");
 });
 
-test("the totality oracle pass through pytest: every test the bullets name in one invocation, mapped back from the JUnit report", async (t) => {
-  const found = pythonWithPytest();
-  if ("skip" in found) {
-    t.skip(found.skip);
-    return;
+test("Python test setup uses the local environment and refuses a missing runner or a broken explicit override", () => {
+  assert.equal(pythonForTests({}), TEST_PYTHON);
+  assert.equal(pythonForTests({ COHERENCE_PYTHON: "/custom/python" }), "/custom/python");
+  const dir = mkdtempSync(join(tmpdir(), "coherence-pytest-setup-"));
+  try {
+    const missing = join(dir, "missing-python");
+    assert.throws(() => pythonWithPytest({ COHERENCE_PYTHON: missing }), /pytest is unavailable.*Run npm run test:setup/);
+    const withoutPytest = join(dir, "python-without-pytest");
+    writeFileSync(withoutPytest, '#!/bin/sh\nprintf "%s\\n" "No module named pytest" >&2\nexit 1\n', { mode: 0o755 });
+    assert.throws(() => pythonWithPytest({ COHERENCE_PYTHON: withoutPytest }), /No module named pytest.*Run npm run test:setup/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
-  write("coherence.config.json", JSON.stringify({ language: "python", testDir: "tests", testFilterForm: "pytest", testJson: [found.python, "-m", "pytest", "-q", "-p", "no:cacheprovider", "-k", "{filter}", "--junitxml={out}", "tests"] }));
-  const outcome = await performRun(root, { session: "pytest", agent: "python", adapter, form: "totality oracle" });
-  const entry = outcome.record.invariants.find((e) => e.name === "egress totality")!;
-  assert.equal(entry.verdict, "pass", entry.reason);
-  assert.equal(entry.mode, "batched");
-  assert.equal(entry.refutation, "witnessed");
-  assert.match(entry.reason, /1 test under "test_seal_strips" passed in one invocation/);
-  assert.match(formatRun(outcome), /totality oracle: pass \(.*one invocation for every test the bullets name\)/);
+});
 
-  write("Fixture.spec.md", SPEC.replace("via: test_seal_strips", "via: test_no_such_name"));
-  const missing = await performRun(root, { session: "pytest", agent: "python", adapter, form: "totality oracle" });
-  assert.equal(missing.record.invariants[0]!.verdict, "fail");
-  assert.match(missing.record.invariants[0]!.reason, /no test ran under the name "test_no_such_name"/);
-  write("Fixture.spec.md", SPEC);
-  rmSync(join(root, ".coherence"), { recursive: true, force: true });
-  rmSync(join(root, ".pytest_cache"), { recursive: true, force: true });
-  write("coherence.config.json", JSON.stringify({ language: "python", testDir: "tests" }));
+test("the totality oracle pass through pytest: every test the bullets name in one invocation, mapped back from the JUnit report", async () => {
+  const python = pythonWithPytest();
+  const messages: string[] = [];
+  const io = { cwd: root, out: (line: string) => messages.push(line), err: (line: string) => messages.push(line) };
+  write("coherence.config.json", JSON.stringify({ language: "python", testDir: "tests", testFilterForm: "pytest", testJson: [python, "-m", "pytest", "-q", "-p", "no:cacheprovider", "-k", "{filter}", "--junitxml={out}", "tests"] }));
+  try {
+    const before = await performRun(root, { session: "pytest", agent: "python", adapter, form: "totality oracle" });
+    const unrefuted = before.record.invariants.find((e) => e.name === "egress totality")!;
+    assert.equal(unrefuted.verdict, "pass", unrefuted.reason);
+    assert.equal(unrefuted.refutation, "missing", "the spec's refuted line alone is not a witnessed refutation");
+
+    // Run the real Python detector against a staged break, then restore it.
+    write("pkg/store.py", STORE.replace("out.pop(column, None)", "pass"));
+    const refuted = await refuteCommand(["./egress totality", "--broke", "removed the pop from seal", "--session", "pytest", "--agent", "python"], io);
+    assert.equal(refuted, 0, messages.join("\n"));
+    write("pkg/store.py", STORE);
+
+    const outcome = await performRun(root, { session: "pytest", agent: "python", adapter, form: "totality oracle" });
+    const entry = outcome.record.invariants.find((e) => e.name === "egress totality")!;
+    assert.equal(entry.verdict, "pass", entry.reason);
+    assert.equal(entry.mode, "batched");
+    assert.equal(entry.refutation, "witnessed");
+    assert.match(entry.reason, /1 test under "test_seal_strips" passed in one invocation/);
+    assert.match(formatRun(outcome), /totality oracle: pass \(.*one invocation for every test the bullets name\)/);
+
+    write("Fixture.spec.md", SPEC.replace("via: test_seal_strips", "via: test_no_such_name"));
+    const missing = await performRun(root, { session: "pytest", agent: "python", adapter, form: "totality oracle" });
+    assert.equal(missing.record.invariants[0]!.verdict, "fail");
+    assert.match(missing.record.invariants[0]!.reason, /no test ran under the name "test_no_such_name"/);
+  } finally {
+    write("pkg/store.py", STORE);
+    write("Fixture.spec.md", SPEC);
+    rmSync(join(root, ".coherence"), { recursive: true, force: true });
+    rmSync(join(root, ".pytest_cache"), { recursive: true, force: true });
+    write("coherence.config.json", JSON.stringify({ language: "python", testDir: "tests" }));
+  }
 });
 
 test("Python, ruling d-7abd1ba8: an import at the top of the chokepoint's module is inside; the same import elsewhere, an __all__ re-export, a bare star import, and a use outside the chokepoint's body are bypasses", async () => {

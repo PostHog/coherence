@@ -22,6 +22,8 @@ export interface Concept {
   name: string;
   definition: string;
   aliases: string[];
+  /** Named examples of a concept, not alternate names for the category. */
+  instances?: string[];
   rejected: RejectedAlternative[];
   notToBeConfusedWith: string[];
   properties: Record<string, string>;
@@ -98,6 +100,7 @@ function parseConcept(value: unknown, where: string): Concept {
     name,
     definition,
     aliases: stringList(value["aliases"]),
+    instances: stringList(value["instances"]),
     rejected: parseRejected(value["rejected"]),
     notToBeConfusedWith: stringList(value["not_to_be_confused_with"]),
     properties: stringMap(value["properties"]),
@@ -241,6 +244,7 @@ export function acceptedNames(glossary: Glossary): Set<string> {
   for (const level of glossary.trustLevels) out.add(level.toLowerCase());
   for (const concept of glossary.concepts) {
     out.add(concept.name.toLowerCase());
+    for (const instance of concept.instances ?? []) out.add(instance.toLowerCase());
     for (const alias of concept.aliases) for (const name of aliasNames(alias)) out.add(name.toLowerCase());
     // A property key names a part of the concept (a column, a field, a unit); it is vocabulary, not an unknown noun.
     for (const key of Object.keys(concept.properties)) for (const name of aliasNames(key)) out.add(name.toLowerCase());
@@ -301,6 +305,7 @@ function renderConcept(concept: Concept, detail: DetailLevel = "full"): string {
   if (detail === "definitions") return line;
   const aliases = concept.aliases.flatMap(aliasNames);
   if (aliases.length > 0) line += ` (also: ${aliases.join(", ")})`;
+  if (concept.instances?.length) line += ` (instances: ${concept.instances.join(", ")})`;
   const rejected = concept.rejected.flatMap((r) => namesOfAlternative(r.alternative).map((n) => n.name));
   if (rejected.length > 0) line += ` [rejected: ${rejected.join(", ")}]`;
   if (detail === "full" && concept.notToBeConfusedWith.length > 0) {

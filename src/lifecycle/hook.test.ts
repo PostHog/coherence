@@ -44,7 +44,7 @@ before(async () => {
 });
 
 after(async () => {
-  await rm(root, { recursive: true, force: true });
+  if (root !== undefined) await rm(root, { recursive: true, force: true });
 });
 
 test("the block after the glossary is under 120 words: session, decide template, and the rule", async () => {
@@ -53,6 +53,7 @@ test("the block after the glossary is under 120 words: session, decide template,
   assert.match(block, /^Session: abc123\n/);
   assert.match(block, /Every journal write needs --session abc123 --agent Explore\./);
   assert.match(block, /\n  node_modules\/\.bin\/coherence decide "<chose>" --over "<rejected>" --because "<why>" --session abc123 --agent Explore\n/);
+  assert.match(block, /Read the project journal from the project root:\n  node_modules\/\.bin\/coherence journal\n/);
   assert.ok(block.endsWith(`${INSTRUCTION}\n`));
   assert.match(INSTRUCTION, /rejected name .* defect/);
   assert.match(INSTRUCTION, /declared .* concept/);
@@ -77,8 +78,28 @@ test("SessionStart and SubagentStart inject both glossaries and the instruction 
     assert.match(context, /\nWidgetry vocabulary \(1 concept/);
     assert.match(context, /- widget: A thing with a knob\. \(also: gadget\)/);
     assert.match(context, /- rejected names: doohickey/);
+    assert.match(context, /Read the project journal from the project root:\n  node_modules\/\.bin\/coherence journal\n/);
     assert.ok(context.endsWith(`${INSTRUCTION}\n`));
     assert.ok(context.length <= CONTEXT_BUDGET);
+  }
+});
+
+test("Coherence's own start hooks name its source-tree journal command", async () => {
+  const dir = await freshRoot();
+  try {
+    await writeFile(join(dir, "package.json"), JSON.stringify({ name: "coherence" }));
+    for (const event of ["SessionStart", "SubagentStart"] as const) {
+      const result = await runHook(event, { cwd: dir, session_id: "s-journal" }, dir);
+      assert.equal(result.exit, 0);
+      const context = contextOf(result);
+      assert.match(context, /Read the project journal from the project root:\n  node src\/cli\.ts journal\n/);
+      assert.doesNotMatch(context, /node_modules\/\.bin\/coherence/);
+      assert.ok(context.length <= CONTEXT_BUDGET);
+    }
+    const block = await sessionBlock(dir, { session_id: "s-journal" });
+    assert.ok(block.split(/\s+/).filter((w) => w !== "").length < 120, block);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
 
@@ -233,6 +254,7 @@ test("the start injection stays under the budget with escalations present: the v
       pointed = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
     }
     assert.doesNotMatch(pointed, /^Coherence vocabulary/m, "the names no longer fit");
+    assert.match(pointed, /\n  node_modules\/\.bin\/coherence journal\n/, "the journal command survives the reduced vocabulary");
     assert.match(pointed, /^Vocabulary omitted to stay under the host budget; full entries: node_modules\/\.bin\/coherence glossary$/m, "one line points at the glossary command instead");
     assert.ok(pointed.length <= CONTEXT_BUDGET, `${pointed.length} characters against a budget of ${CONTEXT_BUDGET}`);
     ids.forEach((id, n) => assert.ok(pointed.includes(`▲ ${id}  scope  ${what(n)} — only the owner`), `escalation ${n} is still shown whole`));

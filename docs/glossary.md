@@ -65,3 +65,18 @@ half, and they rank ahead of any spine work that would reintroduce the class the
 catch.
 
 Anti-rot holds throughout: the glossary names things and never points at code.
+
+## Coverage-first work orders
+
+The maintenance loop, transcript evidence, implementation orders, and readiness
+checkpoint for the next feature-parity slice are recorded in
+[Glossary coverage before feature-parity work](glossary-work.md). A green name
+check alone does not establish vocabulary coverage or correct sense.
+
+## Implemented command loop
+
+The command workflow and its limitations are documented in
+[Glossary operations](glossary-operations.md). The earlier owed list records the
+requirements that motivated it; tests, measurements, and work-order closure must
+show which parts now hold. Human sense rulings and live host delivery are not
+implied by the existence of commands.

@@ -15,11 +15,13 @@ import { renderJournalResults, renderJournalTools } from "./journal-view.ts";
 import type { ShellState } from "./model.ts";
 import { renderRelianceResults, renderRelianceTools } from "./reliance-view.ts";
 import { renderRunsResults, renderRunsTools } from "./runs-view.ts";
+import { renderStructureResults, renderStructureTools } from "./structure-view.ts";
 
 /** The views in strip order. The builder embeds this list; the page reads it from state. */
 export const VIEWS = [
   { id: "glossary", label: "Glossary" },
   { id: "components", label: "Components" },
+  { id: "structure", label: "Structure" },
   { id: "invariants", label: "Invariants" },
   { id: "reliance", label: "Reliance" },
   { id: "runs", label: "Runs" },
@@ -81,6 +83,8 @@ export function renderViewResults(state: ShellState): Markup {
       return renderGlossaryResults(state);
     case "components":
       return renderComponentsResults(state);
+    case "structure":
+      return renderStructureResults(state);
     case "invariants":
       return renderInvariantsResults(state);
     case "reliance":
@@ -105,6 +109,8 @@ function renderViewTools(state: ShellState): Markup | null {
       </div>`;
     case "components":
       return renderComponentsTools(state);
+    case "structure":
+      return renderStructureTools(state);
     case "invariants":
       return renderInvariantsTools(state);
     case "reliance":

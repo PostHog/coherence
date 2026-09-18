@@ -126,7 +126,7 @@ const LANGUAGE_WORDS: ReadonlySet<string> = new Set([...LANGUAGE_GLOBALS].map((g
 
 type FileKind = "prose" | "code" | "data" | "record";
 
-interface CorpusFile {
+export interface CorpusFile {
   path: string;
   rel: string;
   kind: FileKind;
@@ -166,6 +166,7 @@ interface Walk {
   root: string;
   found: string[];
   unreadable: UnreadablePath[];
+  excluded: UnreadablePath[];
 }
 
 /** Why a path could not be read, in the operating system's own words, without the absolute path it already names. */
@@ -190,10 +191,12 @@ async function walk(dir: string, walker: Walk): Promise<void> {
   for (const entry of entries) {
     const path = resolve(dir, entry.name);
     if (entry.isDirectory()) {
-      if (EXCLUDED_FOLDERS.has(entry.name)) continue;
+      if (EXCLUDED_FOLDERS.has(entry.name)) { walker.excluded.push({ file: relPath(walker.root, path), reason: "dependency, generated, host, or environment folder" }); continue; }
       await walk(path, walker);
     } else if (entry.isFile() && kindOf(walker.root, path) !== undefined) {
       walker.found.push(path);
+    } else {
+      walker.excluded.push({ file: relPath(walker.root, path), reason: entry.isSymbolicLink() ? "symbolic link not followed" : "unsupported file kind or dependency lockfile" });
     }
   }
 }
@@ -214,19 +217,20 @@ function confine(root: string, given: string): string {
  * and docs/reviews (all written in another vocabulary on purpose),
  * dependency lockfiles, and everything under .coherence that is not a record.
  */
-export async function collectFiles(options: CheckOptions): Promise<{ files: string[]; unreadable: UnreadablePath[] }> {
+export async function collectFiles(options: CheckOptions): Promise<{ files: string[]; unreadable: UnreadablePath[]; excluded: UnreadablePath[] }> {
   const root = resolve(options.root);
   // The inventories of what the project retired must name what they refuse, exactly as the glossary does; reading them would report the refusal as the drift.
   const excluded = new Set<string>([resolve(options.coherence.path), resolve(root, "docs", "retired.md"), resolve(root, "src", "spec", "retired-sections.json")]);
   const foreignDocs = [resolve(root, "docs", "reference"), resolve(root, "docs", "reviews")];
   if (options.project !== undefined) excluded.add(resolve(options.project.path));
-  const walker: Walk = { root, found: [], unreadable: [] };
+  const walker: Walk = { root, found: [], unreadable: [], excluded: [] };
   const roots = options.paths === undefined || options.paths.length === 0 ? [root] : options.paths.map((given) => confine(root, given));
   for (const path of roots) {
     let info;
     try {
       info = await stat(path);
-    } catch {
+    } catch (error) {
+      walker.unreadable.push({ file: relPath(root, path), reason: reasonOf(error) });
       continue;
     }
     if (info.isDirectory()) await walk(path, walker);
@@ -239,7 +243,8 @@ export async function collectFiles(options: CheckOptions): Promise<{ files: stri
     if (rel.split("/")[0] === COHERENCE_DIR && !isRecordFile(rel)) return false;
     return !dirname(rel).split("/").some((part) => EXCLUDED_FOLDERS.has(part));
   });
-  return { files, unreadable: walker.unreadable };
+  for (const path of walker.found) if (!files.includes(path)) walker.excluded.push({ file: relPath(root, path), reason: "glossary, reference vocabulary, generated state, or excluded folder" });
+  return { files, unreadable: walker.unreadable, excluded: walker.excluded };
 }
 
 /** A file whose first bytes carry a NUL byte is binary whatever its name says; the check reads text. */
@@ -249,9 +254,9 @@ function isBinary(text: string): boolean {
 
 const NUL = String.fromCharCode(0);
 
-async function readCorpus(options: CheckOptions): Promise<{ files: CorpusFile[]; unreadable: UnreadablePath[] }> {
+export async function readCorpus(options: CheckOptions): Promise<{ files: CorpusFile[]; unreadable: UnreadablePath[]; excluded: UnreadablePath[] }> {
   const root = resolve(options.root);
-  const { files, unreadable } = await collectFiles(options);
+  const { files, unreadable, excluded } = await collectFiles(options);
   const out: CorpusFile[] = [];
   for (const path of files) {
     let text;
@@ -261,10 +266,10 @@ async function readCorpus(options: CheckOptions): Promise<{ files: CorpusFile[];
       unreadable.push({ file: relPath(root, path), reason: reasonOf(error) });
       continue;
     }
-    if (isBinary(text)) continue;
+    if (isBinary(text)) { excluded.push({ file: relPath(root, path), reason: "binary content" }); continue; }
     out.push({ path, rel: relPath(root, path), kind: kindOf(root, path)!, lines: text.split(/\r?\n/) });
   }
-  return { files: out, unreadable };
+  return { files: out, unreadable, excluded };
 }
 
 /* ---------------------------------------------------------------- words */

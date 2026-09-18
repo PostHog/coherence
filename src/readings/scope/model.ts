@@ -1,3 +1,4 @@
+import type { Coverage, VocabularyTerm } from "../../lifecycle/glossary-coverage.ts";
 /**
  * The model for the Scope reading: the shape of everything the page handles.
  *
@@ -52,6 +53,7 @@ export interface Concept {
   status?: string;
   /** Names the concept also goes by. */
   aliases: string[];
+  instances?: string[];
   rejected: RejectedAlternative[];
   not_to_be_confused_with: string[];
   /** Named properties the definition relies on, each a short statement. */
@@ -128,8 +130,32 @@ export type Layer =
   | { kind: "present"; id: string; title: string; glossary: Glossary }
   | { kind: "absent"; id: string; title: string; because: string };
 
+/** A term's evidence may be sampled, but these counts always describe its full reading. */
+export interface GlossaryEvidenceTerm extends VocabularyTerm {
+  contextCount?: number;
+  unreviewedContextCount?: number;
+}
+
+/** A page projection keeps the authoritative totals and fingerprint, never recasts a sample as a corpus. */
+export interface GlossaryCoverage extends Coverage {
+  terms: GlossaryEvidenceTerm[];
+  /** Absent only on a full, unprojected reading. */
+  projection?: {
+    byteLimit: number;
+    selection: string;
+    contexts: number;
+    population: { files: number; excluded: number; unreadable: number };
+  };
+}
+
+/** A copyable full-reading command; quoting keeps corpus text from becoming shell syntax. */
+export function glossaryReviewCommand(term: string): string {
+  return `coherence glossary review '${term.replace(/'/g, "'\\''")}' --json`;
+}
+
 /** The state of the Glossary view: the layers it reads and the reader's query. */
 export interface GlossaryViewState {
+  coverage?: GlossaryCoverage;
   layers: Layer[];
   query: string;
 }
@@ -173,7 +199,7 @@ export type LifecycleState = "requirement" | "invariant" | "structural defect";
 
 export type Lack = "enforcement" | "refutation" | "kinds" | "checklist" | "because";
 
-export type { Form, Verdict, Grade, RefutationState, Bypass, RunEntry, RunRecord } from "../../enforcement/record.ts";
+export type { Form, Verdict, Grade, RefutationState, Bypass, RecordedSite, ReferenceForm, ReferenceTarget, RunEntry, RunRecord, SiteClass } from "../../enforcement/record.ts";
 import type { Bypass, Form, Grade, RefutationState, RunEntry, RunRecord, Verdict } from "../../enforcement/record.ts";
 
 /** A run entry with the run it came from: the latest verdict for one enforcement. */
@@ -358,6 +384,19 @@ export interface RelianceViewState {
   query: string;
 }
 
+/** One proposed crossing added to an ephemeral Structure page, never to the spec model. */
+export interface StructurePreview {
+  component: string;
+  name: string;
+  crossing: { from: string; to: string };
+  chokepoints?: { chokepoint: string; protects: string }[];
+}
+
+/** Structure has no filters; only an optional generated-page preview. */
+export interface StructureViewState {
+  preview: StructurePreview[];
+}
+
 export interface RunsViewState {
   query: string;
 }
@@ -379,6 +418,7 @@ export interface ShellState {
   runs: RunsData;
   journal: JournalData;
   components: ComponentsViewState;
+  structure: StructureViewState;
   invariants: InvariantsViewState;
   reliance: RelianceViewState;
   runsView: RunsViewState;
@@ -391,6 +431,7 @@ const CONCEPT_KEYS = new Set([
   "definition",
   "status",
   "aliases",
+  "instances",
   "rejected",
   "not_to_be_confused_with",
   "properties",
@@ -525,6 +566,7 @@ function parseConcept(value: unknown, where: string): Concept {
     name,
     definition: stringAt(value, "definition", at),
     aliases: stringListAt(value, "aliases", at),
+    instances: stringListAt(value, "instances", at),
     rejected: parseRejected(value["rejected"], at),
     not_to_be_confused_with: stringListAt(value, "not_to_be_confused_with", at),
     properties: fieldsAt(value, "properties", at),

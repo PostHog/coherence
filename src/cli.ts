@@ -27,9 +27,10 @@
  * to refuse a stop, with the reason on stderr.
  */
 
+import { GLOSSARY_WORK_USAGE, glossaryWorkCommand } from "./lifecycle/glossary-cli.ts";
 import { ECONOMY_USAGE, calibrateCommand, economyCommand, massCommand } from "./economy/cli.ts";
 import { ENFORCEMENT_USAGE, refuteCommand, runCommand, serveCommand } from "./enforcement/cli.ts";
-import { JOURNAL_USAGE, journalVerbs, type Command, type Io } from "./journal/cli.ts";
+import { JOURNAL_USAGE, journalVerbs, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, runCheck } from "./lifecycle/check.ts";
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/glossary.ts";
 import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook } from "./lifecycle/hook.ts";
@@ -39,9 +40,13 @@ import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
 import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
 import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
 
-const commands: Record<string, Command> = { ...journalVerbs, spec: specCommand, scaffold: scaffoldCommand };
+type CommandResult = number | Promise<number>;
+type RootCommand = (argv: string[], io: Io) => CommandResult;
+
+const commands: Record<string, RootCommand> = { ...journalVerbs, spec: specCommand, scaffold: scaffoldCommand };
 
 const USAGE = `usage:
+${GLOSSARY_WORK_USAGE}
   coherence glossary [--json]
   coherence glossary --check [--json] [paths...]
 ${SPEC_USAGE}
@@ -98,12 +103,24 @@ function parse(args: string[], valued: Set<string>): Parsed {
  * package of the same name when the dependency is missing.
  */
 async function defaultCommand(root: string): Promise<string> {
-  const dir = "${CLAUDE_PROJECT_DIR:-.}";
+  const dir = '$(dir="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$dir" != "/" ] && [ ! -f "$dir/.claude/settings.json" ] && [ ! -f "$dir/.codex/hooks.json" ]; do dir=$(dirname "$dir"); done; printf "%s" "$dir")';
   return (await isCoherenceItself(root)) ? `node "${dir}/src/cli.ts"` : `"${dir}/node_modules/.bin/coherence"`;
 }
 
 async function glossaryCommand(args: string[], root: string): Promise<number> {
+  const io: Io = {
+    cwd: root,
+    out: (line) => process.stdout.write(line + "\n"),
+    err: (line) => process.stderr.write(line + "\n"),
+  };
+  if (args[0] === "--help") return glossaryWorkCommand(["help"], io);
+  if (args[0] && !args[0].startsWith("--")) return glossaryWorkCommand(args, io);
   const { flags, positionals } = parse(args, new Set());
+  const unknown = [...flags.keys()].find((flag) => flag !== "check" && flag !== "json");
+  if (unknown !== undefined) {
+    process.stderr.write(`glossary: unknown flag --${unknown}\n`);
+    return 1;
+  }
   const { coherence, project } = await loadProjectGlossaries(root);
   if (flags.has("check")) {
     const report = await runCheck({ root, paths: positionals, coherence, project });

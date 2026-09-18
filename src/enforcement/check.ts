@@ -1,7 +1,7 @@
 /**
  * The chokepoint check: for one chokepoint-form enforcement, resolve the
  * protected thing and the chokepoint, collect every reference to the
- * protected thing, and classify each site.
+ * protected thing and the chokepoint, and classify each site.
  *
  * Two sites carry a form the language gives them, and the form is read
  * before the range (ruling d-7abd1ba8):
@@ -11,8 +11,12 @@
  *            thing — or any site within the chokepoint symbol's range, or
  *            within its module when the chokepoint is a module; for a
  *            protected module, within the module itself
- *   test     under a test folder or a test file by name; reported, never a bypass
- *   bypass   an export-from specifier or a wildcard re-export, wherever it
+ *   reference an adapter-reported reference to the chokepoint outside its own
+ *             definition; it may be an import, re-export, type use, or call,
+ *             and makes no stronger semantic claim
+ *   test      under a test folder or a test file by name; retained separately
+ *             on every site and used as the protected-site class
+ *   bypass   an export-from specifier or a wildcard re-export of the protected thing, wherever it
  *            stands, because it widens the thing's reach with no call at
  *            all; an import of the protected thing in any other module; and
  *            every other site outside the chokepoint
@@ -41,12 +45,13 @@
  */
 
 import { isTestPath, rangeContains, type Definition, type LanguageAdapter, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
-import type { Bypass, Grade, RefutationState, Verdict } from "./record.ts";
-
-export type SiteClass = "inside" | "test" | "bypass";
+import type { Bypass, Grade, ReferenceTarget, RefutationState, SiteClass, Verdict } from "./record.ts";
 
 export interface ClassifiedSite extends ReferenceSite {
   class: SiteClass;
+  of: ReferenceTarget;
+  /** Test location is an orthogonal fact, not a claim about how the chokepoint is used. */
+  test: boolean;
 }
 
 export interface ChokepointResult {
@@ -62,8 +67,11 @@ export interface ChokepointResult {
   protectedThing: Definition | undefined;
   chokepoint: Definition | undefined;
   sites: ClassifiedSite[];
+  /** Whether `sites` is complete; unavailable results keep an empty transient array but are never persisted as evidence. */
+  siteEvidence: "complete" | "unavailable";
   bypasses: Bypass[];
-  counts: Record<SiteClass, number>;
+  /** Protected-reference counts retained for grading and compatibility; chokepoint callers live in `sites`. */
+  counts: Record<Exclude<SiteClass, "chokepoint-reference">, number>;
   visibility: string | undefined;
   files: string[];
   reason: string;
@@ -76,7 +84,7 @@ export interface ChokepointInput {
   testFolders: readonly string[];
 }
 
-export function classifySite(site: ReferenceSite, protectedThing: Definition, chokepoint: Definition, testFolders: readonly string[]): SiteClass {
+export function classifySite(site: ReferenceSite, protectedThing: Definition, chokepoint: Definition, testFolders: readonly string[]): Exclude<SiteClass, "chokepoint-reference"> {
   const position = { line: site.line - 1, character: site.character };
   // A re-export widens the thing's reach with no call at all, so it is a bypass wherever it stands.
   if (site.form === "re-export") return "bypass";
@@ -87,6 +95,21 @@ export function classifySite(site: ReferenceSite, protectedThing: Definition, ch
   if (protectedThing.kind === "module" && withinModule(site.file, protectedThing.file)) return "inside";
   if (isTestPath(site.file, testFolders)) return "test";
   return "bypass";
+}
+
+
+/**
+ * A reference to the door itself is reliance, not a bypass. Recursion within
+ * the door is inside; every outside site is only `chokepoint-reference`, because the
+ * adapter may be reporting an import, re-export, type use, or runtime call.
+ * Test location and syntactic form remain separate fields on the site.
+ */
+export function classifyChokepointSite(site: ReferenceSite, chokepoint: Definition): "inside" | "chokepoint-reference" {
+  const position = { line: site.line - 1, character: site.character };
+  const inChokepoint = chokepoint.kind === "module"
+    ? withinModule(site.file, chokepoint.file)
+    : site.file === chokepoint.file && rangeContains(chokepoint.range, position);
+  return inChokepoint ? "inside" : "chokepoint-reference";
 }
 
 /** Whether a file is the module, or, when the module is a package's __init__, one of the package's own files. */
@@ -102,13 +125,13 @@ const NOT_CHOKEABLE_NOTE = "the totality oracle form (over + via) is the comprom
 const LANGUAGE_ENFORCED = new Set<Grade>(["visibility-choked", "closure-choked"]);
 
 function nameOf(site: SiteClass | undefined): string {
-  return site === undefined ? "as unreported" : site === "test" ? "a test reference" : "a reference inside the chokepoint";
+  return site === undefined ? "as unreported" : site === "test" ? "a test reference" : site === "chokepoint-reference" ? "an outside chokepoint reference" : "a reference inside the chokepoint";
 }
 
 export async function checkChokepoint(adapter: LanguageAdapter, input: ChokepointInput): Promise<ChokepointResult> {
   const hint = { component: input.component, testFolders: input.testFolders };
-  const empty: Record<SiteClass, number> = { inside: 0, test: 0, bypass: 0 };
-  const base = { input, sites: [], bypasses: [], counts: empty, visibility: undefined, files: [] as string[], refutation: "missing" as RefutationState, refutationAccount: "not attempted" };
+  const empty: Record<Exclude<SiteClass, "chokepoint-reference">, number> = { inside: 0, test: 0, bypass: 0 };
+  const base = { input, sites: [] as ClassifiedSite[], siteEvidence: "unavailable" as const, bypasses: [], counts: empty, visibility: undefined, files: [] as string[], refutation: "missing" as RefutationState, refutationAccount: "not attempted" };
 
   const protectedResolved = await adapter.resolve(input.protects, hint);
   if (!protectedResolved.ok) {
@@ -138,11 +161,19 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
   }
   const chokepoint = chokepointResolved.definition;
 
-  const references = await adapter.references(protectedThing);
-  const sites: ClassifiedSite[] = references.map((site) => ({ ...site, class: classifySite(site, protectedThing, chokepoint, input.testFolders) }));
-  const counts: Record<SiteClass, number> = { inside: 0, test: 0, bypass: 0 };
-  for (const site of sites) counts[site.class] += 1;
-  const bypasses: Bypass[] = sites.filter((s) => s.class === "bypass").map((s) => ({ file: s.file, line: s.line, symbol: s.symbol ?? "module top level" }));
+  // These are two distinct questions. Protected references decide the grade;
+  // chokepoint references describe legal reliance on the door. A run records
+  // sites only after both queries complete, so a failed second query cannot
+  // turn partial evidence into a confirmed empty set.
+  const protectedReferences = await adapter.references(protectedThing);
+  const chokepointReferences = await adapter.references(chokepoint);
+  const sites: ClassifiedSite[] = [
+    ...protectedReferences.map((site) => ({ ...site, of: "protected" as const, test: isTestPath(site.file, input.testFolders), class: classifySite(site, protectedThing, chokepoint, input.testFolders) })),
+    ...chokepointReferences.map((site) => ({ ...site, of: "chokepoint" as const, test: isTestPath(site.file, input.testFolders), class: classifyChokepointSite(site, chokepoint) })),
+  ].sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.character - b.character || a.of.localeCompare(b.of));
+  const counts: Record<Exclude<SiteClass, "chokepoint-reference">, number> = { inside: 0, test: 0, bypass: 0 };
+  for (const site of sites) if (site.of === "protected" && site.class !== "chokepoint-reference") counts[site.class] += 1;
+  const bypasses: Bypass[] = sites.filter((s) => s.of === "protected" && s.class === "bypass").map((s) => ({ file: s.file, line: s.line, symbol: s.symbol ?? "module top level" }));
   const files = [...new Set([protectedThing.file, chokepoint.file, ...sites.map((s) => s.file)])].sort();
 
   const visibility = await adapter.visibility(protectedThing, chokepoint);
@@ -177,6 +208,7 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
       protectedThing,
       chokepoint,
       sites,
+      siteEvidence: "complete",
       bypasses,
       counts,
       visibility: visibility.evidence,
@@ -201,6 +233,7 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
     protectedThing,
     chokepoint,
     sites,
+    siteEvidence: "complete",
     bypasses,
     counts,
     visibility: visibility.evidence,

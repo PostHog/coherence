@@ -20,7 +20,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { stripTypeScriptTypes } from "node:module";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 import { adapterFor } from "../../adapters/index.ts";
@@ -28,10 +28,12 @@ import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { WORK_DIR, foldOrders, loadWork as loadWorkRecords, workDir } from "../../journal/work.ts";
+import { glossaryCoverage } from "../../lifecycle/glossary-coverage.ts";
 import { COHERENCE_GLOSSARY, projectGlossaryPath } from "../../lifecycle/project.ts";
 import { loadSpecModel } from "../../spec/model.ts";
+import { projectGlossaryCoverage } from "./glossary-projection.ts";
 import { escapeHtml } from "./html.ts";
-import { parseGlossary, type Glossary, type Ladder, type LadderRung, type Layer, type ShellState, type SpecData, type WorkData } from "./model.ts";
+import { parseGlossary, type Glossary, type Ladder, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
 import { VIEWS } from "./shell.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -47,6 +49,7 @@ const BROWSER_SOURCES = [
   "derive.ts",
   "glossary-view.ts",
   "components-view.ts",
+  "structure-view.ts",
   "invariants-view.ts",
   "reliance-view.ts",
   "runs-view.ts",
@@ -66,6 +69,8 @@ export interface BuildOptions {
   domainTitle?: string;
   /** Project name shown in the masthead. */
   project: string;
+  /** Ephemeral proposed crossings embedded only in this generated page. */
+  structurePreview?: readonly StructurePreview[];
 }
 
 export const DEFAULTS = {
@@ -208,15 +213,30 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
         };
   const runs = loadRuns(root);
   const journal = loadJournal(root);
+  const spec = loadSpec(root);
+  if (options.structurePreview !== undefined) {
+    const levels = new Set(spec.trustLevels.map((level) => level.name));
+    for (const preview of options.structurePreview) {
+      if (!spec.components.some((component) => component.folder === preview.component)) throw new Error(`Structure preview: no component at ${preview.component}`);
+      if (preview.name.trim() === "") throw new Error("Structure preview: invariant name is empty");
+      if (spec.components.some((component) => component.folder === preview.component && component.invariants.some((invariant) => invariant.name === preview.name))) {
+        throw new Error(`Structure preview: invariant ${preview.name} already exists in ${preview.component}`);
+      }
+      for (const end of [preview.crossing.from, preview.crossing.to]) {
+        if (!levels.has(end)) throw new Error(`Structure preview: crossing names trust level ${end}; declared: ${[...levels].join(", ") || "none"}`);
+      }
+    }
+  }
   return {
     project: options.project,
     views: VIEWS.map((v) => ({ id: v.id, label: v.label })),
-    activeView: "glossary",
-    glossary: { layers: [coherence, domain], query: "" },
-    spec: loadSpec(root),
+    activeView: options.structurePreview === undefined || options.structurePreview.length === 0 ? "glossary" : "structure",
+    glossary: { layers: [coherence, domain], query: "", coverage: projectGlossaryCoverage(await glossaryCoverage(root)) },
+    spec,
     runs: { records: runs.records, damaged: runs.damaged },
     journal: { records: journal.records, damaged: journal.damaged, work: loadWork(root) },
     components: { query: "" },
+    structure: { preview: options.structurePreview === undefined ? [] : options.structurePreview.map((proposal) => ({ ...proposal, crossing: { ...proposal.crossing }, ...(proposal.chokepoints === undefined ? {} : { chokepoints: proposal.chokepoints.map((entry) => ({ ...entry })) }) })) },
     invariants: { query: "", state: "", component: "" },
     reliance: { query: "" },
     runsView: { query: "" },
@@ -296,6 +316,23 @@ export async function writeScopePage(options: BuildOptions, outPath: string): Pr
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, html, "utf8");
   return { bytes: Buffer.byteLength(html, "utf8"), state };
+}
+
+/**
+ * Build a read-only project state with one ephemeral proposed crossing, select
+ * Structure initially, and write only the requested generated page.
+ */
+export async function writeStructurePreview(root: string, preview: StructurePreview, outPath: string): Promise<{ bytes: number; state: ShellState }> {
+  const projectRoot = resolve(root);
+  const output = resolve(outPath);
+  const withinRoot = relative(projectRoot, output);
+  if (withinRoot === "" || (!withinRoot.startsWith(`..${sep}`) && withinRoot !== "..")) {
+    throw new Error("Structure preview: write the generated page outside the project root so it cannot perturb the project's inputs");
+  }
+  return writeScopePage(
+    { root: projectRoot, glossaryPath: COHERENCE_GLOSSARY, project: projectNameOf(projectRoot), structurePreview: [preview] },
+    output,
+  );
 }
 
 /** The project's name from its config, capitalized, else its folder name. */

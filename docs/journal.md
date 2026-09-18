@@ -64,6 +64,10 @@ Peers recorded 2 since your last look (subjects only; whole records: journal --s
 
 ## Reading
 
+From this checkout's root, run `node src/cli.ts journal`. In an adopter, run
+`node_modules/.bin/coherence journal`. SessionStart and SubagentStart supply
+the command for their project alongside the decision write template.
+
 `journal` prints the merged timeline across every session, oldest first: date,
 glyph, id, agent, text; a decision shows its rejected alternatives indented.
 Filters: `--session`, `--agent`, `--kind`, `--since <cursorOrIso>`; `--json`

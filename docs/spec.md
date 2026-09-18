@@ -11,7 +11,7 @@ replaced each.
 node src/cli.ts spec --check [root]   # components, invariants with state, problems; exit 1 on problems
 node src/cli.ts spec --json [root]    # the model
 node src/cli.ts scaffold component <folder> "<intent>"
-node src/cli.ts scaffold invariant <folder> "<sentence>" --kinds a,b [--chokepoint|--totality-oracle] [--write]
+node src/cli.ts scaffold invariant <folder> "<sentence>" --kinds a,b [--chokepoint|--totality-oracle] [--crossing "a -> b"] [--preview] [--write]
 ```
 
 ## The bullet
@@ -21,6 +21,17 @@ the abstract behavioral requirement; indented `key: value` lines carry the
 rest. A value still in `<angle brackets>` is a placeholder: it parses, counts
 as absent, and is listed as unfilled, so a scaffolded bullet can be written
 first and filled second.
+
+`--preview` requires a declared `--crossing "<level> -> <level>"`. It builds a
+self-contained Scope page in a private system temporary directory, opens on
+Structure, and adds the proposed crossing as a dashed, unverified edge. The
+command prints the generated page path. The proposal is not run evidence: it
+has no grade, lifecycle state, verdict, or reliance sites, and it does not
+change the component spec. Add `--write` explicitly to append the same
+scaffolded bullet, including the crossing, after preview validation succeeds.
+`--kinds` and `--chokepoint` or `--totality-oracle` keep their ordinary
+scaffold meanings; when omitted, the existing placeholder/default behavior
+is unchanged.
 
 Enforcement takes one of two forms, and a bullet may carry both as separate
 evidence paths. The chokepoint form names the protected thing (a symbol or a

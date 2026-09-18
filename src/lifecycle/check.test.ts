@@ -89,7 +89,7 @@ before(async () => {
 });
 
 after(async () => {
-  await rm(root, { recursive: true, force: true });
+  if (root !== undefined) await rm(root, { recursive: true, force: true });
 });
 
 test("the corpus excludes the glossary files and docs/retired.md", () => {

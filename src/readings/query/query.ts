@@ -1,8 +1,8 @@
 /**
  * The agent query: CLI access for the agent to what Scope shows a human, as
  * a small fixed set of questions with plain-text answers. Every answer is a
- * pure function of the same `ShellState` the page renders; nothing here
- * reads a file.
+ * pure function of the shared readings; nothing here reads a file. The
+ * glossary CLI supplies full coverage, while a page supplies bounded evidence.
  *
  *   invariants <path...>   which invariants touch these files
  *   relies-on <chokepoint> who references this chokepoint
@@ -27,11 +27,14 @@ import {
   relianceOf,
   shortSession,
   stamp,
+  structureOf,
+  type RelianceSite,
 } from "../scope/derive.ts";
 import { renderOrder } from "../../journal/workVerbs.ts";
-import type { RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
+import { glossaryReviewCommand } from "../scope/model.ts";
+import type { GlossaryCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
 
-export const QUESTIONS = ["invariants", "relies-on", "status", "component", "order", "economy"] as const;
+export const QUESTIONS = ["invariants", "relies-on", "spine", "status", "component", "order", "economy", "glossary"] as const;
 export type Question = (typeof QUESTIONS)[number];
 
 export function isQuestion(value: string): value is Question {
@@ -39,8 +42,10 @@ export function isQuestion(value: string): value is Question {
 }
 
 export const QUERY_USAGE = [
+  "  query glossary <term>         full live definition, all contexts and uses behind Scope's evidence summary",
   "  query invariants <path...>     which invariants touch these files, by component and by reference site",
   "  query relies-on <chokepoint>   who references this chokepoint, from the latest run",
+  "  query spine                    trust levels and every crossing-bearing invariant, in Structure order",
   "  query status                   structural defects, open requirements, escalations awaiting a human",
   "  query component <folder>       one component: intent, counts, bullets",
   "  query order [--session <id>]   the active work order the session owns, folded from its records, with what binds to it",
@@ -145,21 +150,50 @@ function answerReliesOn(state: ShellState, args: string[]): Answer {
     for (const reliance of relianceOf(invariant, state.spec.components, state.runs.records)) {
       lines.push(`${reliance.chokepoint} protects ${reliance.protects}  (${invariant.component}/${invariant.name}, ${invariant.state})`);
       if (reliance.entry === undefined) {
-        lines.push("  no run has checked this chokepoint; run: run");
+        lines.push(`  ${reliance.evidence.status === "unknown" ? reliance.evidence.reason : "reliance unknown"}; run: run`);
         continue;
       }
-      const others = reliance.entries.filter((e) => !e.owner);
-      const outside = others.reduce((n, e) => n + e.files.length, 0);
-      lines.push(`  from the check at ${stamp(reliance.entry.at)}${reliance.entry.grade === undefined ? "" : `, ${reliance.entry.grade}`}: ${outside === 0 ? "the check touched no file outside the owner" : `${outside} file${outside === 1 ? "" : "s"} in ${others.length} component${others.length === 1 ? "" : "s"} outside the owner`}`);
+      if (reliance.evidence.status === "unknown") {
+        lines.push(`  ${reliance.evidence.reason}`);
+        continue;
+      }
+      lines.push(`  from the check at ${stamp(reliance.entry.at)}${reliance.entry.grade === undefined ? "" : `, ${reliance.entry.grade}`}: complete evidence, ${reliance.evidence.sites.length} reference${reliance.evidence.sites.length === 1 ? "" : "s"} to either endpoint`);
+      if (reliance.evidence.sites.length === 0) lines.push("  both endpoint queries completed and returned zero references");
       for (const entry of reliance.entries) {
         const who = entry.component === undefined ? "in no component" : `${entry.component.folder === "." ? "(root)" : entry.component.folder} (${entry.component.name})`;
-        lines.push(`  ${entry.owner ? "owner " : ""}${who}: ${entry.files.join(", ")}`);
+        lines.push(`  ${entry.owner ? "owner " : ""}${who}`);
+        lines.push(...capped(entry.sites, (site) => `    ${site.file}:${site.line} in ${site.symbol} — ${relianceSiteText(site)}`));
       }
-      if (reliance.sites.length > 0) lines.push(...capped(reliance.sites, (b) => `  reference site ${b.file}:${b.line} in ${b.symbol} (a bypass: outside the chokepoint)`));
-      // The record says which files a check touched, not what part each played; the reader must not read the list as reliance.
-      lines.push(`  the record carries ${reliance.recordCarries}: a file list holds the definition of the protected thing, the chokepoint's own module, imports and tests as well as the reference sites, and only a bypass is placed by line and symbol`);
     }
   }
+  return { text: lines.join("\n"), code: 0 };
+}
+
+function relianceSiteText(site: RelianceSite): string {
+  const target = site.target === "protected" ? "protected thing" : "chokepoint";
+  const classification = site.target === "protected" && site.siteClass === "bypass"
+    ? "bypass, not a legal chokepoint reference"
+    : site.target === "chokepoint" && site.siteClass === "chokepoint-reference"
+      ? "reference; runtime call not established"
+      : site.siteClass;
+  return `${target}; ${classification}${site.form === undefined ? "" : `; ${site.form}`}${site.test ? "; test" : ""}`;
+}
+
+/** The text form of the exact ordered model the Structure view draws. */
+export function answerSpine(state: ShellState): Answer {
+  const model = structureOf(state);
+  const lines = [`trust levels (${model.levels.length}):`];
+  lines.push(...model.levels.map((level) => `  ${level.name} — ${level.meaning}`));
+  lines.push(`crossings (${model.edges.length}):`);
+  for (const edge of model.edges) {
+    const chokepoints = edge.chokepoints.length === 0
+      ? "chokepoint not declared"
+      : edge.chokepoints.map((entry) => `${entry.chokepoint} protects ${entry.protects}`).join("; ");
+    const grade = edge.grade === undefined ? "grade unknown, enforcer unknown" : `${edge.grade}, enforced by ${edge.enforcer ?? "unknown"}`;
+    const bypasses = edge.state === "structural defect" ? `, ${edge.bypassCount} bypass${edge.bypassCount === 1 ? "" : "es"}` : "";
+    lines.push(`  ${edge.component}/${edge.name}  ${edge.from} -> ${edge.to}  ${chokepoints}  ${grade}  ${edge.state}${bypasses}${edge.proposed ? "  proposed preview" : ""}`);
+  }
+  lines.push(`${model.invariantsWithoutCrossing} invariant${model.invariantsWithoutCrossing === 1 ? " has" : "s have"} no crossing`);
   return { text: lines.join("\n"), code: 0 };
 }
 
@@ -233,13 +267,53 @@ export interface QueryOptions {
   session?: string | undefined;
 }
 
+/** Render either the full authoritative reading or an explicitly labelled page selection. */
+export function answerGlossary(report: GlossaryCoverage | undefined, args: string[]): Answer {
+  if (args.length !== 1 || args[0]!.trim() === "") return { text: "query glossary needs one term", code: 64 };
+  if (!report) return { text: "No vocabulary usage reading is available in this page state.", code: 64 };
+  const term = args[0]!.trim().toLowerCase();
+  const terms = report.terms.filter((t) =>
+    t.term === term || t.concept?.toLowerCase() === term || t.meaningAlternatives?.some((meaning) => meaning.concept.toLowerCase() === term));
+  const fullReading = glossaryReviewCommand(args[0]!.trim());
+  const lines = report.projection ? [
+    `Bounded page evidence: ${report.terms.length} of ${report.totals.terms} terms embedded; ${report.totals.terms - report.terms.length} terms omitted. Matching terms, contexts or uses may be omitted.`,
+    `Full reading from the project's root: ${fullReading}`,
+  ] : ["Full observed candidate reading (not exhaustive semantic coverage)."];
+  if (terms.length === 0) {
+    lines.push(report.projection
+      ? "No matching term in the page selection; this does not establish absence from the full corpus."
+      : "No observed uses matched in the full candidate reading; absence is not a semantic coverage claim.");
+  }
+  for (const t of terms) {
+    const contexts = t.contextCount ?? t.contexts.length;
+    const meaning = t.meaningAlternatives !== undefined && t.meaningAlternatives.length > 0
+      ? [`${t.term} [${t.state}] — ${t.meaningAlternatives.length} applicable property meanings; spelling alone does not select an owner`,
+          ...t.meaningAlternatives.map((item) => `  applicable property meaning: ${item.concept} (${item.layer}) — ${item.definition}; properties ${JSON.stringify(item.properties)}; confusables ${item.confusables.join("; ") || "none declared"}`)]
+      : [`${t.term} [${t.state}] — ${t.definition ?? "No settled definition"}`,
+          `Properties: ${JSON.stringify(t.properties)}; confusables: ${t.confusables.join("; ") || "none declared"}`];
+    lines.push(
+      ...meaning,
+      `${t.contexts.length} of ${contexts} contexts shown; ${contexts - t.contexts.length} contexts omitted.`,
+      ...t.contexts.map((c) => `  ${c.component}: ${c.disposition}${c.because ? " — " + c.because : ""} (${c.fingerprint})`),
+      ...t.uses.map((u) => `  ${u.file}:${u.line} ${u.text}`),
+      `${t.uses.length} of ${t.count} uses shown; ${t.count - t.uses.length} uses omitted.`,
+      `Full JSON reading: ${glossaryReviewCommand(t.term)}`,
+    );
+  }
+  return { text: lines.join("\n"), code: 0 };
+}
+
 /** Answer one question from the state. */
 export function answer(state: ShellState, question: string, args: string[], options: QueryOptions = {}): Answer {
   switch (question) {
+    case "glossary":
+      return answerGlossary(state.glossary.coverage, args);
     case "invariants":
       return answerInvariants(state, args);
     case "relies-on":
       return answerReliesOn(state, args);
+    case "spine":
+      return args.length === 0 ? answerSpine(state) : { text: `query spine takes no arguments\n${QUERY_USAGE}`, code: 64 };
     case "status":
       return answerStatus(state);
     case "component":

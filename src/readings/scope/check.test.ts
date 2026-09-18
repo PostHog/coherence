@@ -10,18 +10,20 @@
 
 import assert from "node:assert/strict";
 import { appendFileSync } from "node:fs";
-import { access, readFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { loadSpecModel } from "../../spec/model.ts";
-import { DEFAULTS, buildScopePage, writeScopePage, type BuildOptions } from "./build.ts";
+import { DEFAULTS, buildScopePage, writeScopePage, writeStructurePreview, type BuildOptions } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
-import { allReliance, componentId, defectsOf, invariantId, journalId, latestOf, relianceId, resolveHash, runId, verifiedOf, workId } from "./derive.ts";
+import { allReliance, componentId, defectsOf, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, structureOf, verifiedOf, workId } from "./derive.ts";
 import { escapeHtml } from "./html.ts";
-import type { Glossary, ShellState } from "./model.ts";
+import type { Glossary, GlossaryCoverage, RecordedSite, ShellState, StructurePreview } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
+import { renderStructureSvg } from "./structure-view.ts";
 
 const options: BuildOptions = {
   glossaryPath: DEFAULTS.glossaryPath,
@@ -229,12 +231,12 @@ function stringsIn(value: unknown): string[] {
   return [];
 }
 
-test("the render has one view strip with the six views in order", async () => {
+test("the render has one view strip with the seven views in order", async () => {
   const { state } = await buildScopePage(options);
   const rendered = renderShell(state).text;
   const tabs = [...rendered.matchAll(/role="tab"[^>]*data-view="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs, ["glossary", "components", "invariants", "reliance", "runs", "journal"]);
-  for (const label of ["Glossary", "Components", "Invariants", "Reliance", "Runs", "Journal"]) {
+  assert.deepEqual(tabs, ["glossary", "components", "structure", "invariants", "reliance", "runs", "journal"]);
+  for (const label of ["Glossary", "Components", "Structure", "Invariants", "Reliance", "Runs", "Journal"]) {
     assert.ok(rendered.includes(`>${label}</button>`), `${label} tab`);
   }
 });
@@ -249,6 +251,42 @@ test("the search derives its matches from state and hides the rest", async () =>
   assert.ok(rendered.includes(`${shown} of ${total} concepts match “chokepoint”.`));
   state.glossary.query = "no concept says this sentence";
   assert.ok(renderShell(state).text.includes("No concept matches"));
+});
+
+test("the Scope glossary reading displays every applicable property meaning without choosing an owner", () => {
+  const state = fresh();
+  const coverage: GlossaryCoverage = {
+    version: 1,
+    projectGlossary: "glossary.json",
+    fingerprint: "ambiguous-meaning",
+    population: { files: [], excluded: [], unreadable: [], extraction: "fixture", limits: [] },
+    totals: { terms: 1, uses: 1, known: 1, rejected: 0, unresolved: 0, unreviewedContexts: 1 },
+    terms: [{
+      term: "unit basis",
+      state: "declared",
+      concept: null,
+      layer: null,
+      definition: null,
+      properties: {},
+      confusables: [],
+      meaningAlternatives: [
+        { concept: "exposure", layer: "project", definition: "The amount subject to loss.", properties: { unit_basis: "percentage" }, confusables: ["allocation"] },
+        { concept: "allocation", layer: "project", definition: "The amount assigned to a strategy.", properties: { unit_basis: "percentage" }, confusables: ["exposure"] },
+      ],
+      fingerprint: "unit-basis",
+      count: 1,
+      contexts: [{ component: "money", fingerprint: "money-unit-basis", disposition: "unreviewed", because: null }],
+      uses: [{ file: "src/money.ts", line: 4, component: "money", text: "unit_basis", kind: "code", fingerprint: "unit-basis-use" }],
+    }],
+  };
+  state.glossary.coverage = coverage;
+  state.glossary.query = "unit basis";
+  const rendered = renderView(state, "glossary").text;
+  assert.match(rendered, /2 applicable property meanings; this spelling alone does not select an owner/);
+  assert.match(rendered, /exposure[\s\S]*The amount subject to loss/);
+  assert.match(rendered, /allocation[\s\S]*The amount assigned to a strategy/);
+  assert.match(rendered, /unit_basis/);
+  assert.doesNotMatch(rendered, /No settled definition/);
 });
 
 test("an absent domain glossary is rendered as a placeholder, a present one as a second layer", async () => {
@@ -361,29 +399,13 @@ test("every view renders from state: every component, invariant, run, and journa
 
   const reliance = renderView(state, "reliance").text;
   const relianceCard = card(reliance, relianceId("src/store", "single writer"));
-  assert.ok(relianceCard.includes("owns the invariant") && relianceCard.includes("src/store/write.ts"), "the owning component comes first with its files");
-  assert.ok(relianceCard.includes(`href="#${componentId("src/api")}"`) && relianceCard.includes("src/api/handler.ts"), "the relying component and its file are listed");
-  assert.ok(reliance.includes('data-field="record-limit"'), "what the run record lacks is said on the view");
+  assert.ok(relianceCard.includes("reliance unknown: run carries no sites"), "a legacy run is explicitly incomplete");
+  assert.ok(reliance.includes('data-field="record-limit"'), "the evidence boundary is said on the view");
 
-  // Union item 19: the record carries the files the check touched, not the sites it resolved.
-  // The only sites it locates are the bypasses; everything else is a file whose part is unknown.
-  const relied = allReliance(state.spec.components, state.runs.records).find((r) => r.invariant.name === "single writer");
-  assert.ok(relied !== undefined);
-  assert.equal(relied.recordCarries, "files", "a chokepoint run entry names files, never reference sites");
-  assert.deepEqual(relied.sites, [fixture.names.bypass], "the bypasses are the only sites the record locates");
-  assert.deepEqual(
-    relied.entries.flatMap((e) => e.files),
-    ["src/store/rows.ts", "src/store/write.ts", "src/api/handler.ts"],
-    "and the rest is the file list, owner first",
-  );
-  assert.doesNotMatch(relianceCard, /components? relies? on this chokepoint through/, "the file list is not a count of reliance");
-  assert.match(relianceCard, /1 file in 1 component outside <code>src\/store<\/code>/, "what the record says: files the check touched, in components");
-  assert.match(relianceCard, /1 of them is a reference site the record locates/, "and how much of that is actually a site");
-  assert.match(
-    reliance,
-    /the file list a check records does not separate a reference site from the definition of the protected thing/,
-    "the view says plainly what the record cannot tell it",
-  );
+  const relied = allReliance(state.spec.components, state.runs.records).find((reading) => reading.invariant.name === "single writer");
+  assert.ok(relied !== undefined && relied.evidence.status === "unknown");
+  assert.match(relied.evidence.reason, /run carries no sites/);
+
 
   const runs = renderView(state, "runs").text;
   const runIds = cardIds(runs).filter((id) => id.startsWith("run-"));
@@ -436,11 +458,108 @@ test("a structural defect renders its bypass sites and both honest options", () 
   }
 });
 
+function setSingleWriterSites(state: ShellState, sites: RecordedSite[] | undefined): void {
+  const entry = state.runs.records.at(-1)?.invariants.find((candidate) => candidate.name === "single writer" && candidate.form === "chokepoint");
+  assert.ok(entry !== undefined);
+  if (sites === undefined) delete entry.sites;
+  else entry.sites = sites;
+}
+
+test("Structure derives every edge in stable order, counts no-crossing invariants, and renders defects and previews deterministically", () => {
+  const state = fresh();
+  const model = structureOf(state);
+  assert.deepEqual(model.levels.map((level) => level.name), ["outside", "inside"]);
+  assert.deepEqual(model.edges.map((edge) => `${edge.component}/${edge.name}`), ["src/store/single writer"]);
+  assert.equal(model.invariantsWithoutCrossing, 3);
+  const first = renderStructureSvg(model).text;
+  const second = renderStructureSvg(structureOf(state)).text;
+  assert.equal(first, second, "the same model produces byte-identical SVG");
+  assert.match(first, /data-state="structural defect"/);
+  assert.match(first, /1 bypass/);
+  assert.match(first, /structure-defect/);
+  assert.doesNotMatch(first, /read shape|open one|entry rule/, "bullets without crossings are not edges");
+
+  const preview: StructurePreview = {
+    component: "src/store",
+    name: "preview writer",
+    crossing: { from: "outside", to: "inside" },
+    chokepoints: [{ chokepoint: "write", protects: "writeRow" }],
+  };
+  state.structure.preview = [preview];
+  const proposed = renderView(state, "structure").text;
+  assert.match(proposed, /preview writer/);
+  assert.match(proposed, /data-proposed="true"/);
+  assert.match(proposed, /structure-proposed/);
+  assert.match(proposed, /reliance unknown: proposed preview has no run evidence/);
+});
+
+test("reliance reads both protected and chokepoint endpoint sites, owner first, without calling a bypass a legal door reference", () => {
+  const state = fresh();
+  setSingleWriterSites(state, [
+    { file: "src/api/door.ts", line: 7, symbol: "save", class: "chokepoint-reference", of: "chokepoint", test: false, form: "import" },
+    { file: "src/api/handler.ts", line: 12, symbol: "handle", class: "bypass", of: "protected", test: false },
+    { file: "src/store/write.ts", line: 4, symbol: "write", class: "inside", of: "protected", test: false },
+    { file: "src/api/door.test.ts", line: 9, symbol: "test save", class: "chokepoint-reference", of: "chokepoint", test: true },
+  ]);
+  const reading = allReliance(state.spec.components, state.runs.records).find((candidate) => candidate.invariant.name === "single writer");
+  assert.ok(reading !== undefined && reading.evidence.status === "complete");
+  assert.deepEqual(reading.evidence.sites.map((site) => site.file), ["src/store/write.ts", "src/api/door.test.ts", "src/api/door.ts", "src/api/handler.ts"], "owner component is first and sites are stable");
+  const rendered = card(renderView(state, "reliance").text, relianceId("src/store", "single writer"));
+  assert.match(rendered, /protected thing · inside chokepoint/);
+  assert.match(rendered, /chokepoint · reference \(runtime call not established\)/);
+  assert.match(rendered, /protected thing · bypass \(not a legal chokepoint reference\)/);
+  assert.match(rendered, /data-test="true"/);
+
+  const protectedOnly = fresh();
+  setSingleWriterSites(protectedOnly, [{ file: "src/api/handler.ts", line: 12, symbol: "handle", class: "bypass", of: "protected", test: false }]);
+  assert.match(renderView(protectedOnly, "reliance").text, /protected thing · bypass/);
+  const doorOnly = fresh();
+  setSingleWriterSites(doorOnly, [{ file: "src/api/door.ts", line: 7, symbol: "save", class: "chokepoint-reference", of: "chokepoint", test: false }]);
+  assert.match(renderView(doorOnly, "reliance").text, /chokepoint · reference/);
+});
+
+test("legacy site absence stays unknown while a complete empty site list confirms zero", () => {
+  const legacy = fresh();
+  setSingleWriterSites(legacy, undefined);
+  assert.match(renderView(legacy, "reliance").text, /reliance unknown: run carries no sites; evidence is incomplete/);
+  assert.match(renderView(legacy, "structure").text, /reliance unknown: run carries no sites; evidence is incomplete/);
+
+  const empty = fresh();
+  setSingleWriterSites(empty, []);
+  assert.match(renderView(empty, "reliance").text, /Complete site evidence records 0 references/);
+  assert.match(renderView(empty, "reliance").text, /Both endpoint queries completed and returned no references/);
+  assert.match(renderView(empty, "structure").text, /Complete run site evidence records 0 references/);
+});
+
+test("the Structure preview bridge validates crossings, selects Structure, and writes deterministic generated pages only", async () => {
+  const preview: StructurePreview = { component: "src/store", name: "preview writer", crossing: { from: "outside", to: "inside" } };
+  const output = await mkdtemp(join(tmpdir(), "coherence-structure-preview-"));
+  try {
+    const one = join(output, "preview-one.html");
+    const two = join(output, "preview-two.html");
+    const first = await writeStructurePreview(fixture.root, preview, one);
+    const second = await writeStructurePreview(fixture.root, preview, two);
+    assert.equal(first.state.activeView, "structure");
+    assert.deepEqual(first.state.structure.preview, [preview]);
+    assert.equal(await readFile(one, "utf8"), await readFile(two, "utf8"));
+    assert.match(await readFile(one, "utf8"), /preview writer/);
+    await assert.rejects(
+      writeStructurePreview(fixture.root, { ...preview, name: "bad level", crossing: { from: "missing", to: "inside" } }, join(output, "bad.html")),
+      /crossing names trust level missing/,
+    );
+    await assert.rejects(writeStructurePreview(fixture.root, preview, join(fixture.root, "preview.html")), /outside the project root/);
+  } finally {
+    await rm(output, { recursive: true, force: true });
+  }
+});
+
 test("deep links resolve: every card id on every view resolves to that view", () => {
   const state = fresh();
   for (const view of state.views) {
     const rendered = renderView(state, view.id).text;
-    const ids = cardIds(rendered).filter((id) => !id.startsWith("pinned-"));
+    const ids = view.id === "structure"
+      ? [...rendered.matchAll(/<g class="structure-focus" id="([^"]+)"/g)].map((match) => match[1]!)
+      : cardIds(rendered).filter((id) => !id.startsWith("pinned-"));
     assert.ok(ids.length > 0, `${view.id} renders cards`);
     for (const id of ids) {
       const target = resolveHash(state, `#${id}`);
@@ -473,6 +592,13 @@ test("the first adopter's tree builds as a second root: its glossary is the doma
   }
   const reliance = renderView(state, "reliance").text;
   assert.ok(reliance.includes(">writeClass</a>"), "Mnemion's kernel write chokepoint is on the reliance view");
+  const structure = structureOf(state);
+  assert.equal(structure.levels.length, 6, "Mnemion declares six trust levels");
+  assert.equal(structure.edges.length, state.spec.components.flatMap((component) => component.invariants).filter((invariant) => invariant.crossing !== undefined).length);
+  const svg = renderStructureSvg(structure).text;
+  assert.equal(svg, renderStructureSvg(structureOf(state)).text, "Mnemion's read-only state produces byte-identical SVG");
+  for (const level of structure.levels) assert.ok(svg.includes(escapeHtml(level.name)), `${level.name} is a Structure node`);
+  for (const edge of structure.edges) assert.ok(svg.includes(escapeHtml(edge.name)), `${edge.name} is a Structure edge`);
 });
 
 test("the Mnemion domain glossary renders beneath Coherence's with every concept, ruling, rejected name and trust level", {

@@ -32,7 +32,7 @@ before(async () => {
 });
 
 after(async () => {
-  await rm(root, { recursive: true, force: true });
+  if (root !== undefined) await rm(root, { recursive: true, force: true });
 });
 
 test("mergeHooks adds one Coherence entry per event, keeps everything else, and replaces its own entry on a second pass", () => {
@@ -134,16 +134,37 @@ test("the CLI installs into the current directory and reports status", async () 
     assert.equal(run.status, 0, run.stderr);
     assert.match(run.stdout, /^wrote .*\.claude\/settings\.json: SessionStart, /);
     const written = JSON.parse(await readFile(join(dir, ".claude", "settings.json"), "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
-    assert.equal(written.hooks["Stop"]![0]!.hooks[0]!.command, '"${CLAUDE_PROJECT_DIR:-.}/node_modules/.bin/coherence" hook Stop');
+    assert.ok(written.hooks["Stop"]![0]!.hooks[0]!.command.endsWith('/node_modules/.bin/coherence" hook Stop'));
+    assert.ok(written.hooks["Stop"]![0]!.hooks[0]!.command.includes('while [ "$dir"'));
 
     const shown = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", "status"], { cwd: dir, encoding: "utf8" });
     assert.equal(shown.status, 0, shown.stderr);
-    assert.match(shown.stdout, /claude: .*\n  SessionStart: "\$\{CLAUDE_PROJECT_DIR:-\.\}\/node_modules\/\.bin\/coherence" hook SessionStart/);
+    assert.match(shown.stdout, /claude: .*\n  SessionStart: .*\/node_modules\/\.bin\/coherence" hook SessionStart/);
     assert.match(shown.stdout, /codex: .*\(absent\)/);
 
     const noHost = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", "install"], { cwd: dir, encoding: "utf8" });
     assert.equal(noHost.status, 64);
   } finally {
     await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("the checkout installs start hooks for both hosts", async () => {
+  const checkout = resolve(dirname(CLI), "..");
+  for (const host of ["claude", "codex"] as const) {
+    const found = await status(checkout, host);
+    assert.equal(found.present, true, `${host}: the checkout must carry its hooks`);
+    assert.deepEqual(found.missing, [], `${host}: all lifecycle events must be wired`);
+    const settings = JSON.parse(await readFile(found.path, "utf8")) as {
+      hooks: Record<string, { hooks: { command: string; additionalContextLimit?: number }[] }[]>;
+    };
+    for (const event of ["SessionStart", "SubagentStart"]) {
+      const command = found.installed.find((entry) => entry.event === event)?.command;
+      assert.ok(command, `${host}: ${event} must be installed`);
+      if (host === "codex") {
+        const handler = settings.hooks[event]!.flatMap((entry) => entry.hooks).find((hook) => hook.command === command)!;
+        assert.equal(handler.additionalContextLimit, 4000);
+      }
+    }
   }
 });

@@ -5,6 +5,7 @@
 
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -18,6 +19,11 @@ import { renderInvariant } from "./scaffold.ts";
 
 const seed = loadSeed();
 
+// Compile-time coverage: the exported command result must publicly include its
+// asynchronous preview path rather than hiding it behind a number overload.
+const publicAsyncResult: ReturnType<typeof scaffoldCommand> = Promise.resolve(0);
+void publicAsyncResult;
+
 interface Run {
   code: number;
   out: string[];
@@ -28,7 +34,9 @@ function runner(cwd: string): (...argv: string[]) => Run {
   return (...argv) => {
     const run: Run = { code: 0, out: [], err: [] };
     const io: Io = { cwd, out: (line) => run.out.push(line), err: (line) => run.err.push(line) };
-    run.code = scaffoldCommand(argv, io);
+    const result = scaffoldCommand(argv, io);
+    if (typeof result !== "number") throw new Error("a scaffold command without preview must stay synchronous");
+    run.code = result;
     return run;
   };
 }
@@ -219,4 +227,202 @@ test("the entry component is named for the project, not the checkout folder", as
   write(j(root, "coherence.config.json"), JSON.stringify({ name: "gadgetry" }));
   assert.equal(specFileName(".", root), "Gadgetry.spec.md", "coherence.config.json wins");
   assert.equal(specFileName("src/journal", root), "Journal.spec.md", "a component keeps its folder name");
+});
+
+interface AsyncRun {
+  code: number;
+  out: string[];
+  err: string[];
+}
+
+async function runAsync(cwd: string, ...argv: string[]): Promise<AsyncRun> {
+  const run: AsyncRun = { code: 0, out: [], err: [] };
+  const io: Io = { cwd, out: (line) => run.out.push(line), err: (line) => run.err.push(line) };
+  run.code = await scaffoldCommand(argv, io);
+  return run;
+}
+
+function previewFixture(): { root: string; specPath: string; original: string } {
+  const root = scratch();
+  writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ name: "fixture", entryDir: ".", include: ["**/*.spec.md"], exclude: [] }), "utf8");
+  writeFileSync(
+    join(root, "Fixture.spec.md"),
+    "# Fixture\n\nFixture root.\n\n## trust levels\n- a: first\n- b: second\n\n## invariants\n",
+    "utf8",
+  );
+  mkdirSync(join(root, "vault"));
+  const specPath = join(root, "vault", "Vault.spec.md");
+  const original = "# Vault\n\nVault.\n\n## invariants\n";
+  writeFileSync(specPath, original, "utf8");
+  return { root, specPath, original };
+}
+
+function writtenPreview(run: AsyncRun): string {
+  const line = run.out.find((entry) => entry.startsWith("preview wrote "));
+  assert.ok(line !== undefined, `preview path was printed:\n${run.out.join("\n")}`);
+  return line.slice("preview wrote ".length);
+}
+
+function embeddedState(html: string): Record<string, unknown> {
+  const match = html.match(/<script type="application\/json" id="scope-state">([^<]*)<\/script>/);
+  assert.ok(match !== null, "the preview carries its complete Scope state");
+  return JSON.parse(match[1]!) as Record<string, unknown>;
+}
+
+test("scaffold invariant --preview writes only an ephemeral proposed, dashed, unverified Structure edge", async () => {
+  const { root, specPath, original } = previewFixture();
+  try {
+    const run = await runAsync(root, "invariant", "./vault", "A thing crosses.", "--kinds", "none", "--crossing", "a -> b", "--preview");
+    assert.equal(run.code, 0, run.err.join("\n"));
+    assert.equal(readFileSync(specPath, "utf8"), original, "preview alone does not write the proposal into the spec");
+    const outPath = writtenPreview(run);
+    assert.equal(outPath.startsWith(root), false, "the generated reading is outside the adopter/source tree");
+    assert.equal(outPath.startsWith(tmpdir()), true, "the generated reading is in the system temporary area");
+    const html = readFileSync(outPath, "utf8");
+    const state = embeddedState(html);
+    assert.equal(state.activeView, "structure");
+    const proposal = ((state.structure as { preview: Record<string, unknown>[] }).preview)[0]!;
+    assert.deepEqual(proposal, { component: "vault", name: "<name>", crossing: { from: "a", to: "b" } });
+    assert.equal("grade" in proposal, false, "a proposal has no fabricated grade");
+    assert.equal("state" in proposal, false, "a proposal has no fabricated lifecycle state");
+    assert.equal("verdict" in proposal, false, "a proposal has no fabricated verdict");
+    assert.equal("reliance" in proposal, false, "a proposal has no fabricated evidence");
+    assert.match(html, /structure-edge\.structure-proposed \{[^}]*stroke-dasharray: 9 6;/, "the proposed edge is dashed");
+    assert.match(html, /proposed preview ·/, "the edge is visibly labeled as a proposal");
+    assert.match(html, /verdict: "unverified"/, "the renderer fixes proposals as unverified");
+    assert.match(html, /This dashed edge exists only in the ephemeral preview\./);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("scaffold invariant --preview --write validates first, then explicitly appends the crossing", async () => {
+  const { root, specPath } = previewFixture();
+  try {
+    const run = await runAsync(
+      root,
+      "invariant",
+      "vault",
+      "A thing crosses.",
+      "--name",
+      "one crossing",
+      "--kinds",
+      "none",
+      "--totality-oracle",
+      "--crossing",
+      "a -> b",
+      "--preview",
+      "--write",
+    );
+    assert.equal(run.code, 0, run.err.join("\n"));
+    assert.ok(existsSync(writtenPreview(run)));
+    const text = readFileSync(specPath, "utf8");
+    assert.match(text, /^- one crossing: A thing crosses\.$/m);
+    assert.match(text, /^  over: /m);
+    assert.match(text, /^  crossing: a -> b$/m);
+    assert.doesNotMatch(text, /^  protects:/m, "the requested enforcement form is preserved");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("scaffold preview refuses malformed, undeclared, and out-of-root crossings before a spec write", async () => {
+  const { root, specPath, original } = previewFixture();
+  try {
+    const malformed = await runAsync(root, "invariant", "vault", "S.", "--kinds", "none", "--crossing", "a-b", "--preview", "--write");
+    assert.equal(malformed.code, 1);
+    assert.match(malformed.err.join("\n"), /--crossing reads/);
+
+    const undeclared = await runAsync(root, "invariant", "vault", "S.", "--kinds", "none", "--crossing", "a -> nowhere", "--preview", "--write");
+    assert.equal(undeclared.code, 1);
+    assert.match(undeclared.err.join("\n"), /crossing names trust level nowhere; declared: a, b/);
+
+    const outside = await runAsync(root, "invariant", "..", "S.", "--kinds", "none", "--crossing", "a -> b", "--preview", "--write");
+    assert.equal(outside.code, 1);
+    assert.match(outside.err.join("\n"), /outside the project root/);
+    assert.equal(readFileSync(specPath, "utf8"), original, "no invalid proposal changes the spec");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the same scaffold preview inputs produce byte-identical self-contained pages", async () => {
+  const { root } = previewFixture();
+  try {
+    const argv = ["invariant", "vault", "A thing crosses.", "--name", "stable edge", "--kinds", "none", "--crossing", "a -> b", "--preview"];
+    const first = await runAsync(root, ...argv);
+    const second = await runAsync(root, ...argv);
+    assert.equal(first.code, 0, first.err.join("\n"));
+    assert.equal(second.code, 0, second.err.join("\n"));
+    assert.notEqual(writtenPreview(first), writtenPreview(second), "each artifact gets a private temporary directory");
+    assert.deepEqual(readFileSync(writtenPreview(first)), readFileSync(writtenPreview(second)));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("scaffold preview escapes proposal names in its self-contained state and rendered Structure view", async () => {
+  const { root } = previewFixture();
+  try {
+    const hostile = '</script><script data-owned="yes">alert(1)</script>';
+    const run = await runAsync(root, "invariant", "vault", "S.", "--name", hostile, "--kinds", "none", "--crossing", "a -> b", "--preview");
+    assert.equal(run.code, 0, run.err.join("\n"));
+    const html = readFileSync(writtenPreview(run), "utf8");
+    assert.doesNotMatch(html, /<script data-owned="yes">/, "the name cannot terminate the embedded state script");
+    assert.match(html, /\\u003c\/script>\\u003cscript data-owned=/, "unsafe markup is encoded in the embedded JSON");
+    const state = embeddedState(html);
+    assert.equal(((state.structure as { preview: { name: string }[] }).preview)[0]!.name, hostile, "the proposal's text survives escaping exactly");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+
+test("scaffold command types and runtime distinguish synchronous shapes from asynchronous previews", async () => {
+  const { root } = previewFixture();
+  try {
+    const syncIo: Io = { cwd: root, out: () => {}, err: () => {} };
+    const sync = scaffoldCommand(["invariant", "vault", "S.", "--kinds", "none"], syncIo);
+    assert.equal(typeof sync, "number");
+    assert.equal(sync, 0);
+
+    const previewIo: Io = { cwd: root, out: () => {}, err: () => {} };
+    const preview = scaffoldCommand(["invariant", "vault", "S.", "--kinds", "none", "--crossing", "a -> b", "--preview"], previewIo);
+    assert.ok(preview instanceof Promise, "preview exposes its asynchronous result honestly");
+    assert.equal(await preview, 0);
+
+    const errors: string[] = [];
+    const invalidIo: Io = { cwd: root, out: () => {}, err: (line) => errors.push(line) };
+    const invalid = scaffoldCommand(["invariant", "vault", "S.", "--kinds", "none", "--crossing", "a -> missing", "--preview"], invalidIo);
+    assert.ok(invalid instanceof Promise, "preview validation remains asynchronous through the public command type");
+    assert.equal(await invalid, 1);
+    assert.match(errors.join("\n"), /crossing names trust level missing/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+
+test("the root CLI awaits scaffold preview and propagates its asynchronous exit code", () => {
+  const { root } = previewFixture();
+  try {
+    const cli = join(import.meta.dirname, "..", "cli.ts");
+    const success = spawnSync(
+      process.execPath,
+      ["--disable-warning=ExperimentalWarning", cli, "scaffold", "invariant", "vault", "S.", "--kinds", "none", "--crossing", "a -> b", "--preview"],
+      { cwd: root, encoding: "utf8" },
+    );
+    assert.equal(success.status, 0, success.stderr);
+    assert.match(success.stdout, /preview wrote .*scope\.html/);
+
+    const invalid = spawnSync(
+      process.execPath,
+      ["--disable-warning=ExperimentalWarning", cli, "scaffold", "invariant", "vault", "S.", "--kinds", "none", "--crossing", "a -> missing", "--preview"],
+      { cwd: root, encoding: "utf8" },
+    );
+    assert.equal(invalid.status, 1, invalid.stdout);
+    assert.match(invalid.stderr, /crossing names trust level missing/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

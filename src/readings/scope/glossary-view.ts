@@ -6,6 +6,7 @@
  * state on every call, so the page can never disagree with itself.
  */
 
+import { glossaryReviewCommand } from "./model.ts";
 import { plural } from "./derive.ts";
 import { html, join, raw, slug, type Markup } from "./html.ts";
 import type {
@@ -71,6 +72,7 @@ function conceptMatches(concept: Concept, query: string): boolean {
     query,
     concept.name,
     concept.aliases,
+    concept.instances ?? [],
     concept.definition,
     concept.rejected.map((r) => r.alternative),
   );
@@ -206,6 +208,7 @@ function renderConcept(layer: Layer, concept: Concept, index: ConceptIndex): Mar
         ? html`<p class="status">${concept.status}</p>`
         : html`<p class="status quiet">status not recorded</p>`}
       ${renderNames(concept)}
+      ${concept.instances?.length ? html`<p>Instances: ${concept.instances.join(", ")}</p>` : null}
     </div>
     <div class="body">
       <div class="vocabulary" data-section="vocabulary">
@@ -393,11 +396,76 @@ function renderAbsentLayer(layer: Layer & { kind: "absent" }): Markup {
   </section>`;
 }
 
+/** Live evidence is a reading beside the glossary, never an address stored in a concept. */
+function renderVocabularyCoverage(state: GlossaryViewState): Markup | null {
+  const coverage = state.coverage;
+  if (!coverage) return null;
+  const query = state.query.trim().toLowerCase();
+  const population = coverage.projection?.population ?? {
+    files: coverage.population.files.length,
+    excluded: coverage.population.excluded.length,
+    unreadable: coverage.population.unreadable.length,
+  };
+  const fullContexts = coverage.projection?.contexts ?? coverage.terms.reduce((n, t) => n + t.contexts.length, 0);
+  const embeddedContexts = coverage.terms.reduce((n, t) => n + t.contexts.length, 0);
+  const embeddedUses = coverage.terms.reduce((n, t) => n + t.uses.length, 0);
+  const terms = coverage.terms.filter((t) => query
+    ? matches(query, t.term, t.concept ?? "", t.definition ?? "", JSON.stringify(t.properties), t.confusables,
+        t.meaningAlternatives?.flatMap((meaning) => [meaning.concept, meaning.layer, meaning.definition, JSON.stringify(meaning.properties), ...meaning.confusables]),
+        t.contexts.map((c) => `${c.component} ${c.disposition} ${c.because ?? ""}`), t.uses.map((u) => `${u.file} ${u.text}`))
+    : t.state === "unresolved" || t.state === "rejected" || (t.unreviewedContextCount ??
+        t.contexts.filter((c) => !["confirmed", "not-domain"].includes(c.disposition)).length) > 0);
+  return html`<section class="glossary-coverage"><h2>Vocabulary coverage and sense review</h2>
+    <p>Full observed population: ${population.files} files; ${coverage.totals.terms} observed candidate terms; ${coverage.totals.uses} uses;
+      ${coverage.totals.known} declared; ${coverage.totals.rejected} rejected; ${coverage.totals.unresolved} unresolved;
+      ${coverage.totals.unreviewedContexts} contexts awaiting review. This is not a semantic coverage percentage.</p>
+    <p>${population.excluded} exclusions; ${population.unreadable} unreadable. From this project's root, full reading:
+      <code>coherence glossary coverage --json</code>; full term drill-down: <code>coherence query glossary &lt;term&gt;</code>.
+      Record a ruling with <code>coherence glossary review</code>; this page writes nothing.</p>
+    <p>Page evidence: ${coverage.terms.length} of ${coverage.totals.terms} terms embedded; ${coverage.totals.terms - coverage.terms.length} terms omitted.
+      ${embeddedContexts} of ${fullContexts} contexts embedded; ${fullContexts - embeddedContexts} contexts omitted.
+      ${embeddedUses} of ${coverage.totals.uses} uses embedded; ${coverage.totals.uses - embeddedUses} uses omitted.</p>
+    ${coverage.projection ? html`<p>Bounded evidence selection (at most ${coverage.projection.byteLimit} embedded JSON bytes): ${coverage.projection.selection}
+      Search covers only embedded evidence. A missing term or no match does not establish absence from the full corpus.</p>` : null}
+    <p>${Math.min(terms.length, 30)} of ${terms.length} matching embedded terms displayed; ${Math.max(0, terms.length - 30)} matching terms not displayed.
+      ${query ? "Search is limited to embedded terms, contexts and use excerpts." : "Showing unresolved, rejected and awaiting-review terms."}
+      Refine the search or use the full CLI reading.</p>
+    ${query && terms.length === 0 ? html`<p>No matching evidence in this page selection; this is not a corpus absence claim.
+      Full term reading: <code>${glossaryReviewCommand(state.query.trim())}</code>.</p>` : null}
+    ${terms.slice(0, 30).map((t) => html`<details><summary>${t.term} — ${t.state}; ${t.count} uses</summary>
+      ${t.meaningAlternatives !== undefined && t.meaningAlternatives.length > 0
+        ? html`<p>${plural(t.meaningAlternatives.length, "applicable property meaning", "applicable property meanings")}; this spelling alone does not select an owner.</p>
+          <ul class="meaning-alternatives">${t.meaningAlternatives.map((meaning) => html`<li>
+            <strong>${meaning.concept}</strong> <span class="quiet">${meaning.layer}</span> — ${meaning.definition}
+            <br><span class="quiet">Properties: ${JSON.stringify(meaning.properties)}. Confusables: ${meaning.confusables.join("; ") || "none declared"}.</span>
+          </li>`)}</ul>`
+        : html`<p>${t.definition ?? "No settled definition. Declare, map, or fix; do not infer meaning from a spelling."}</p>
+          <p>Properties: ${JSON.stringify(t.properties)}. Confusables: ${t.confusables.join("; ") || "none declared"}.</p>`}
+      <p>${t.contexts.length} of ${t.contextCount ?? t.contexts.length} contexts shown; ${(t.contextCount ?? t.contexts.length) - t.contexts.length} contexts omitted.
+        ${t.unreviewedContextCount ?? t.contexts.filter((c) => !["confirmed", "not-domain"].includes(c.disposition)).length} contexts await review in the full term reading.</p>
+      ${t.contexts.map((c) => html`<p>${c.component}: ${c.disposition}${c.because ? " — " + c.because : ""}<br><code>${c.fingerprint}</code></p>`)}
+      <ul>${t.uses.slice(0, 8).map((u) => html`<li><code>${u.file}:${u.line}</code> ${u.text}</li>`)}</ul>
+      <p>${Math.min(t.uses.length, 8)} of ${t.count} uses shown; ${t.count - Math.min(t.uses.length, 8)} uses omitted.
+        Full definition, contexts, evidence keys and uses: <code>${glossaryReviewCommand(t.term)}</code>.</p>
+    </details>`)}
+    <details><summary>Population and limits</summary><p>${coverage.population.extraction}</p>
+      <p>Source reading fingerprint: <code>${coverage.fingerprint}</code>.</p>
+      <ul>${coverage.population.limits.map((l) => html`<li>${l}</li>`)}</ul>
+      <p>${Math.min(coverage.population.files.length, 30)} of ${population.files} file records shown; ${population.files - Math.min(coverage.population.files.length, 30)} file records omitted.</p>
+      <ul>${coverage.population.files.slice(0, 30).map((f) => html`<li>${f.file}: ${f.kind}, ${f.lines} lines</li>`)}</ul>
+      <p>${Math.min(coverage.population.excluded.length, 30)} of ${population.excluded} exclusion records shown; ${population.excluded - Math.min(coverage.population.excluded.length, 30)} exclusion records omitted.</p>
+      <ul>${coverage.population.excluded.slice(0, 30).map((e) => html`<li>${e.file}: ${e.reason}</li>`)}</ul>
+      <p>${Math.min(coverage.population.unreadable.length, 30)} of ${population.unreadable} unreadable records shown; ${population.unreadable - Math.min(coverage.population.unreadable.length, 30)} unreadable records omitted.</p>
+      <ul>${coverage.population.unreadable.slice(0, 30).map((e) => html`<li>${e.file}: ${e.reason}</li>`)}</ul>
+    </details>
+  </section>`;
+}
+
 /** The Glossary view body: every layer, in order, filtered by the query. */
 export function renderGlossaryView(state: GlossaryViewState): Markup {
   const index = indexConcepts(state.layers);
   return raw(
-    state.layers
+    (renderVocabularyCoverage(state)?.text ?? "") + state.layers
       .map((layer) =>
         layer.kind === "present" ? renderPresentLayer(layer, state, index) : renderAbsentLayer(layer),
       )

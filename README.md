@@ -11,7 +11,7 @@ replaces. Nothing in this tree may introduce a name the glossary rejected.
 
 Guiding artifacts kept from the reference:
 
-- `docs/glossary.json` — the settled vocabulary (39 concepts). Vocabulary fields are injected; `detail` and `provenance` are shown in Scope only.
+- `docs/glossary.json` — the settled vocabulary (40 concepts). Vocabulary fields are injected; `detail` and `provenance` are shown in Scope only.
 - `docs/glossary.md` — why the glossary is first-class: building, maintaining, and validating it, with the evidence.
 - `docs/retired.md` — the reference mechanisms retired during the glossary pass, with reasons, and the reference branch name.
 - `docs/reference/` — documents written in the reference's vocabulary; the vocabulary check does not read them.
@@ -34,6 +34,8 @@ revelation at the edit through a warm per-project server.
 Mnemion is the first adopter.
 
 ```sh
+node src/cli.ts journal                   # merged project history across every session
+node src/cli.ts journal --subjects        # subjects and a cursor; --since <cursorOrIso> reads what followed
 node src/cli.ts glossary                  # the compact form the hook injects; token estimate on stderr
 node src/cli.ts glossary --check [paths]  # rejected names and unknown nouns; exit 1 with findings
 node src/cli.ts spec --check [root]       # components, invariants with state, problems; exit 1 on problems
@@ -52,8 +54,41 @@ npm test                                  # typecheck, tests, vocabulary check, 
 
 A project names its own glossary under `glossary` in `coherence.config.json`
 (default: `glossary.json` at the root). SessionStart and SubagentStart inject
-both layers with a short instruction; Stop reports the check over changed files;
-SubagentStop refuses the stop (exit 2, reason on stderr) while findings remain.
+both layers with a short instruction, the journal read command, and a decision
+write template. This checkout carries hooks for both Claude Code and Codex;
+`node src/cli.ts hooks status` reports their installation. Stop reports the check
+over changed files; SubagentStop refuses the stop (exit 2, reason on stderr) while findings remain.
+
+## Glossary workflow
+
+Coverage, preview/apply maintenance, sense review, drafting, incremental checks,
+and optional local similarity are described in [Glossary operations](docs/glossary-operations.md).
+Run `node src/cli.ts glossary help` for the command surface. Coverage counts
+observations and unresolved questions; it is not a semantic-completeness score.
+
+## Test setup
+
+Use Node 22.18 or newer and Python 3.10 or newer. From the checkout root:
+
+```sh
+npm ci
+npm run test:setup
+npm test
+```
+
+`test:setup` creates `.venv` and installs the pinned pytest version from
+`requirements-test.txt`; it does not change the system Python. Run it again
+when that file changes. The environment is ignored by git. Tests themselves
+never install dependencies or need a network connection.
+
+`npm test` includes the real pytest integration, not just its report reader.
+A missing interpreter or pytest is a failure with setup instructions, not a
+skip. `npm run test:python` runs the Python adapter tests alone.
+
+The tests find `.venv/bin/python` relative to this checkout, even when their
+working directory differs. Set `COHERENCE_PYTHON` to use another interpreter
+with pytest; an invalid override fails instead of falling back silently.
+During `test:setup`, the same variable selects the Python that creates `.venv`.
 
 ## Settled before code
 

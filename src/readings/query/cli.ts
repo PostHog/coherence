@@ -6,7 +6,8 @@
  * The state comes from the Scope builder through its one chokepoint,
  * `buildScopePage`, so the answer draws on exactly the state the page would
  * embed for the same project; the document it also renders is dropped. The
- * economy question is the one that needs the instrument: it goes to the
+ * glossary question reads the same authoritative coverage without the page
+ * projection. The economy question needs the instrument: it goes to the
  * economy's own exported closure, which reaches the warm server as the run
  * does, and never to the page state.
  */
@@ -15,15 +16,18 @@ import { basename, resolve } from "node:path";
 import type { Io } from "../../journal/cli.ts";
 import { economyFor } from "../../economy/cli.ts";
 import { formatClosure, type Closure } from "../../economy/closure.ts";
+import { glossaryCoverage } from "../../lifecycle/glossary-coverage.ts";
 import { COHERENCE_GLOSSARY } from "../../lifecycle/project.ts";
 import { buildScopePage } from "../scope/build.ts";
-import { answer, QUERY_USAGE } from "./query.ts";
+import { answer, answerGlossary, QUERY_USAGE } from "./query.ts";
 
 export { QUERY_USAGE };
 
 /** What the command line reaches beyond the page state; a test hands in a closure that needs no instrument. */
 export interface QueryDependencies {
   economy: (root: string, paths: readonly string[]) => Promise<Closure>;
+  /** Injectable so the full-reading route can be proved without constructing a giant fixture tree. */
+  glossary?: typeof glossaryCoverage;
 }
 
 export const QUERY_DEPENDENCIES: QueryDependencies = { economy: economyFor };
@@ -73,6 +77,15 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
     }
     io.out(formatClosure(await deps.economy(root, args)));
     return 0;
+  }
+  if (question === "glossary") {
+    // Never go through buildScopePage: an omitted page term still needs full CLI access.
+    const result = args.length !== 1 || args[0]!.trim() === ""
+      ? { text: "query glossary needs one term", code: 64 }
+      : answerGlossary(await (deps.glossary ?? glossaryCoverage)(root), args);
+    if (result.code === 0) io.out(result.text);
+    else io.err(result.text);
+    return result.code;
   }
   const { state } = await buildScopePage({ root, glossaryPath: COHERENCE_GLOSSARY, project: basename(root) });
   const result = answer(state, question, args, { session: parsed.session });

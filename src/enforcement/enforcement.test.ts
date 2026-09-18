@@ -62,6 +62,17 @@ const TEST_FILE = `import { SECRET_COLUMNS } from "../store/secrets.ts";
 export const t = SECRET_COLUMNS;
 `;
 
+const PEEK_REFERENCES = `import { peek } from "../store/secrets.ts";
+
+export function inspect(pattern: string): number {
+  return peek(pattern);
+}
+`;
+
+// Deliberately never invokes or otherwise uses peek: the import reference alone is reliance evidence.
+const PEEK_IMPORT_ONLY = `import { peek } from "../store/secrets.ts";
+`;
+
 const SPEC = `# Fixture
 
 A store with one door out.
@@ -119,6 +130,8 @@ before(async () => {
   write("Fixture.spec.md", SPEC);
   write("src/store/secrets.ts", SECRETS);
   write("src/api/render.ts", RENDER_BYPASS);
+  write("src/api/inspect.ts", PEEK_REFERENCES);
+  write("src/api/peek-import-only.ts", PEEK_IMPORT_ONLY);
   write("src/__tests__/secrets.test.ts", TEST_FILE);
   adapter = new TypeScriptAdapter(root);
 });
@@ -171,6 +184,20 @@ test("grades: broken with a bypass, reference-choked when clean and exported, vi
   const hidden = await checkChokepoint(adapter, { protects: "HIDDEN", chokepoint: "peek", ...hint });
   assert.equal(hidden.grade, "visibility-choked", hidden.reason);
   assert.equal(hidden.verdict, "pass");
+  assert.equal(hidden.siteEvidence, "complete");
+  assert.deepEqual(
+    hidden.sites.map(({ file, line, symbol, class: siteClass, of, test: testSite, form }) => ({ file, line, symbol: symbol ?? "module top level", class: siteClass, of, test: testSite, ...(form === undefined ? {} : { form }) })),
+    [
+      { file: "src/api/inspect.ts", line: 1, symbol: "module top level", class: "chokepoint-reference", of: "chokepoint", test: false, form: "import" },
+      { file: "src/api/inspect.ts", line: 4, symbol: "inspect", class: "chokepoint-reference", of: "chokepoint", test: false },
+      { file: "src/api/peek-import-only.ts", line: 1, symbol: "module top level", class: "chokepoint-reference", of: "chokepoint", test: false, form: "import" },
+      { file: "src/store/secrets.ts", line: 13, symbol: "peek", class: "inside", of: "protected", test: false },
+    ],
+    "outside chokepoint references are reliance evidence without claiming that every reference executes a call",
+  );
+  const importOnly = hidden.sites.find((site) => site.file === "src/api/peek-import-only.ts")!;
+  assert.deepEqual({ class: importOnly.class, of: importOnly.of, form: importOnly.form, test: importOnly.test }, { class: "chokepoint-reference", of: "chokepoint", form: "import", test: false }, "an unused import is recorded only as an adapter-observed chokepoint reference");
+  assert.equal(hidden.bypasses.length, 0, "chokepoint references do not alter protected-reference grading");
 
   const missing = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "noSuchFunction", ...hint });
   assert.equal(missing.grade, "broken");
@@ -184,6 +211,31 @@ test("grades: broken with a bypass, reference-choked when clean and exported, vi
 
   write("src/api/render.ts", RENDER_BYPASS);
   await adapter.forget();
+});
+
+test("run sites persist protected references and chokepoint references without turning an unused import into a call", async () => {
+  const outcome = await performRun(root, {
+    session: "site-producer-focused",
+    agent: "enforcement",
+    adapter,
+    form: "chokepoint",
+    invariants: ["hidden set"],
+    now: () => new Date("2019-01-01T00:00:00Z"),
+  });
+  const entry = outcome.record.invariants[0]!;
+  assert.equal(entry.grade, "visibility-choked");
+  assert.deepEqual(entry.bypasses, [], "chokepoint references do not change protected-reference grading");
+  assert.ok(entry.sites?.some((site) => site.of === "protected" && site.class === "inside"));
+  assert.deepEqual(entry.sites?.find((site) => site.file === "src/api/peek-import-only.ts"), {
+    file: "src/api/peek-import-only.ts",
+    line: 1,
+    symbol: "module top level",
+    class: "chokepoint-reference",
+    of: "chokepoint",
+    test: false,
+    form: "import",
+  }, "the unused import is reliance evidence, not a runtime-call claim");
+  assert.deepEqual((JSON.parse(JSON.stringify(outcome.record)) as RunRecord).invariants[0]!.sites, entry.sites, "the sites survive run JSON serialization");
 });
 
 test("the automatic refutation stages a re-export in an unsaved document; a thing the module does not export is refused by the compiler; nothing is written to disk", async () => {
@@ -282,13 +334,26 @@ test("a run appends one record, never rewrites; spec --check reads the run; the 
   const first = await performRun(root, { session: "s1", agent: "enforcement", adapter, now: () => new Date("2026-09-17T10:00:00Z") });
   assert.equal(first.record.invariants.length, 5, "four chokepoint enforcements and one totality oracle");
   const byName = new Map(first.record.invariants.map((e) => [`${e.name}/${e.form}`, e]));
-  assert.equal(byName.get("digest-only egress/chokepoint")!.verdict, "fail");
-  assert.equal(byName.get("hidden set/chokepoint")!.grade, "visibility-choked");
+  const digestEntry = byName.get("digest-only egress/chokepoint")!;
+  assert.equal(digestEntry.verdict, "fail");
+  assert.deepEqual(digestEntry.sites?.filter((site) => site.of === "protected" && site.class === "bypass").map(({ file, line, symbol }) => ({ file, line, symbol })), digestEntry.bypasses, "persisted protected bypass sites preserve the bypass count and locations");
+  assert.equal(digestEntry.sites?.filter((site) => site.class === "test").length, 2, "test sites are persisted rather than promoted to bypasses");
+  const hiddenEntry = byName.get("hidden set/chokepoint")!;
+  assert.equal(hiddenEntry.grade, "visibility-choked");
+  assert.deepEqual(hiddenEntry.sites?.filter((site) => site.class === "chokepoint-reference"), [
+    { file: "src/api/inspect.ts", line: 1, symbol: "module top level", class: "chokepoint-reference", of: "chokepoint", test: false, form: "import" },
+    { file: "src/api/inspect.ts", line: 4, symbol: "inspect", class: "chokepoint-reference", of: "chokepoint", test: false },
+    { file: "src/api/peek-import-only.ts", line: 1, symbol: "module top level", class: "chokepoint-reference", of: "chokepoint", test: false, form: "import" },
+  ], "the run serializes adapter-observed chokepoint references without calling every site a runtime caller");
+  assert.equal(byName.get("prose thing/chokepoint")!.sites, undefined, "unresolved site evidence is omitted, not serialized as an empty set");
+  assert.equal(byName.get("missing door/chokepoint")!.sites, undefined, "missing chokepoint evidence is omitted, not serialized as an empty set");
   assert.equal(byName.get("prose thing/chokepoint")!.grade, "not chokeable");
   assert.equal(byName.get("missing door/chokepoint")!.verdict, "fail");
   assert.equal(byName.get("egress totality/totality oracle")!.verdict, "pass");
   assert.equal(byName.get("egress totality/totality oracle")!.refutation, "missing", "the bullet's refuted: line is prose; only a refutation record witnesses a totality oracle");
-  assert.ok(byName.get("digest-only egress/chokepoint")!.files.includes("src/api/render.ts"), "the entry lists the files it touched");
+  assert.ok(digestEntry.files.includes("src/api/render.ts"), "the entry lists the files it touched");
+  const json = JSON.parse(JSON.stringify(first.record)) as RunRecord;
+  assert.deepEqual(json.invariants.find((entry) => entry.name === "hidden set")!.sites, hiddenEntry.sites, "the JSON run record exposes the classified sites unchanged");
   const printed = formatRun(first);
   assert.match(printed, /digest-only egress\n  chokepoint seal protects SECRET_COLUMNS: broken — fail/);
   assert.match(printed, /run recorded in \.coherence\/runs\/s1\.jsonl: 5 enforcements, 2 pass, 2 fail, 1 not run/);
@@ -317,6 +382,39 @@ test("a run appends one record, never rewrites; spec --check reads the run; the 
   const noRuns = loadSpecModel(root, { runs: false });
   assert.equal(noRuns.runs, undefined);
   assert.equal(noRuns.components[0]!.invariants.find((i) => i.name === "hidden set")!.state, "requirement");
+});
+
+test("reference-query failures and legacy records never masquerade as confirmed empty sites", async () => {
+  let referenceQueries = 0;
+  const failing = new Proxy(adapter, {
+    get(target, property) {
+      if (property === "references") {
+        return async (definition: import("../adapters/adapter.ts").Definition) => {
+          referenceQueries += 1;
+          if (referenceQueries === 2) throw new Error("chokepoint references unavailable");
+          return target.references(definition);
+        };
+      }
+      const value = Reflect.get(target, property, target) as unknown;
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  const failed = await performRun(root, { session: "query-failure", agent: "enforcement", adapter: failing, form: "chokepoint", invariants: ["hidden set"], now: () => new Date("2020-01-01T00:00:00Z") });
+  const failedEntry = failed.record.invariants[0]!;
+  assert.equal(failedEntry.verdict, "not run");
+  assert.match(failedEntry.reason, /instrument failed: chokepoint references unavailable/);
+  assert.equal(failedEntry.sites, undefined, "a failed second query does not persist the first query as complete evidence");
+  const persistedFailure = JSON.parse(readFileSync(join(root, ".coherence", "runs", "query-failure.jsonl"), "utf8")) as { invariants: Record<string, unknown>[] };
+  assert.equal(Object.hasOwn(persistedFailure.invariants[0]!, "sites"), false);
+
+  const legacy: RunRecord = {
+    at: "2020-01-01T00:00:01.000Z", session: "legacy", agent: "old-producer", commit: null, dirty: false,
+    instrument: { language: "typescript", server: "none" }, latency: 1,
+    invariants: [{ component: ".", name: "hidden set", form: "chokepoint", verdict: "pass", grade: "visibility-choked", refutation: "automatic", bypasses: [], testReferences: 0, files: ["src/store/secrets.ts"], latency: 1, reason: "legacy clean" }],
+  };
+  appendRun(root, legacy);
+  const loadedLegacy = loadRuns(root).records.find((record) => record.session === "legacy")!;
+  assert.equal(loadedLegacy.invariants[0]!.sites, undefined, "an old record remains readable and honestly lacks site evidence");
 });
 
 test("appendRun refuses a session that cannot name a file", () => {

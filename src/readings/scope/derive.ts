@@ -8,14 +8,20 @@
 
 import { slug } from "./html.ts";
 import type {
+  Grade,
   JournalKind,
   JournalRecord,
   LatestEntry,
   RunRecord,
   ShellState,
+  RecordedSite,
   SpecComponent,
   SpecInvariant,
+  StructurePreview,
+  TrustLevel,
 } from "./model.ts";
+
+export type { StructurePreview } from "./model.ts";
 
 /* ------------------------------------------------------------- matching */
 
@@ -59,6 +65,11 @@ export function relianceId(component: string, name: string): string {
   return `reliance-${component === "." ? "root" : slug(component)}-${slug(name)}`;
 }
 
+/** The id shared by a drawn crossing and its expandable Structure reading. */
+export function structureId(component: string, name: string): string {
+  return `structure-${component === "." ? "root" : slug(component)}-${slug(name)}`;
+}
+
 export function runId(record: RunRecord): string {
   return `run-${slug(record.at)}-${slug(shortSession(record.session))}`;
 }
@@ -73,6 +84,7 @@ export function workId(id: string): string {
 
 /** The prefixes each view's card ids carry; a hash resolves to its view by them. */
 const ID_PREFIXES: [string, string][] = [
+  ["structure-", "structure"],
   ["component-", "components"],
   ["invariant-", "invariants"],
   ["reliance-", "reliance"],
@@ -189,6 +201,32 @@ export function defectsOf(invariant: SpecInvariant, runs: readonly RunRecord[]):
 
 /* ------------------------------------------------------------ reliance */
 
+/** One declared chokepoint on a crossing-bearing invariant. */
+export interface StructureChokepoint {
+  chokepoint: string;
+  protects: string;
+}
+
+/** One classified reference to either endpoint of a chokepoint claim. */
+export interface RelianceSite {
+  file: string;
+  line: number;
+  symbol: string;
+  target: RecordedSite["of"];
+  siteClass: RecordedSite["class"];
+  form: RecordedSite["form"] | undefined;
+  /** The component containing the site, or undefined when no declared component contains it. */
+  component: SpecComponent | undefined;
+  /** Whether the site belongs to the component that owns the invariant. */
+  owner: boolean;
+  test: boolean;
+}
+
+/** Complete means both endpoint queries completed; unknown never means empty. */
+export type RelianceEvidence =
+  | { status: "complete"; sites: RelianceSite[] }
+  | { status: "unknown"; reason: string };
+
 /** The component whose folder is the longest prefix of the file, or undefined when no component holds it. */
 export function componentOfFile(file: string, components: readonly SpecComponent[]): SpecComponent | undefined {
   let best: SpecComponent | undefined;
@@ -210,70 +248,184 @@ export function isTestFile(file: string): boolean {
   return /\.(test|spec)\.[a-z]+$/.test(parts[parts.length - 1] ?? "");
 }
 
-export interface RelianceEntry {
-  /** The component, or undefined for files in no component. */
-  component: SpecComponent | undefined;
-  /** Whether this is the component the invariant lives in. */
-  owner: boolean;
-  files: string[];
+function relianceEvidenceOf(
+  invariant: SpecInvariant,
+  components: readonly SpecComponent[],
+  entry: LatestEntry | undefined,
+): RelianceEvidence {
+  if (entry === undefined) return { status: "unknown", reason: "reliance unknown: no run has checked this chokepoint" };
+  if (entry.sites === undefined) {
+    return { status: "unknown", reason: "reliance unknown: run carries no sites; evidence is incomplete (legacy or unavailable)" };
+  }
+  const sites = entry.sites
+    .map((site): RelianceSite => {
+      const component = componentOfFile(site.file, components);
+      return {
+        file: site.file,
+        line: site.line,
+        symbol: site.symbol,
+        target: site.of,
+        siteClass: site.class,
+        form: site.form,
+        component,
+        owner: component?.folder === invariant.component,
+        test: site.test,
+      };
+    })
+    .sort(
+      (a, b) =>
+        Number(b.owner) - Number(a.owner) ||
+        (a.component?.folder ?? "~").localeCompare(b.component?.folder ?? "~") ||
+        a.file.localeCompare(b.file) ||
+        a.line - b.line ||
+        a.target.localeCompare(b.target) ||
+        a.siteClass.localeCompare(b.siteClass) ||
+        a.symbol.localeCompare(b.symbol),
+    );
+  return { status: "complete", sites };
 }
 
-/** A reference site the record locates: file, line, and the referencing symbol. */
-export interface RelianceSite {
-  file: string;
-  line: number;
-  symbol: string;
+export interface RelianceEntry {
+  component: SpecComponent | undefined;
+  owner: boolean;
+  sites: RelianceSite[];
 }
 
 export interface Reliance {
   invariant: SpecInvariant;
   chokepoint: string;
   protects: string;
-  /** The run entry the listing derives from; undefined when no run has checked the chokepoint. */
+  /** The latest chokepoint entry, when one exists. */
   entry: LatestEntry | undefined;
+  evidence: RelianceEvidence;
+  /** Complete sites grouped owner first, then by component folder. Empty while evidence is unknown. */
   entries: RelianceEntry[];
-  /**
-   * The reference sites the record locates. Today that is the bypasses and
-   * nothing else: a chokepoint entry carries the files its check touched, so
-   * every other file's part in the check is unknown.
-   */
-  sites: RelianceSite[];
-  /**
-   * What the run record carries for this chokepoint: "files" while an entry
-   * lists files, "sites" once it lists classified reference sites. The views
-   * say which, so a reader never reads a file list as a reliance count.
-   */
-  recordCarries: "files" | "sites";
 }
 
 /**
- * Every chokepoint invariant with the components whose files its latest check
- * touched, and the reference sites the record actually locates. Reliance is
- * "the components whose code references the chokepoint"; a file list is an
- * upper bound on that, because it holds the definition of the protected
- * thing, the chokepoint's own module, imports, and tests as well.
+ * Every chokepoint invariant with actual classified references to both the
+ * chokepoint and protected thing. Site absence is incomplete evidence; a
+ * present empty array alone confirms zero references.
  */
 export function relianceOf(invariant: SpecInvariant, components: readonly SpecComponent[], runs: readonly RunRecord[]): Reliance[] {
-  const entry = latestOf(invariant, runs).find((l) => l.form === "chokepoint");
+  const entry = latestOf(invariant, runs).find((candidate) => candidate.form === "chokepoint");
   return invariant.enforcements.flatMap((enforcement) => {
     if (enforcement.form !== "chokepoint") return [];
+    const evidence = relianceEvidenceOf(invariant, components, entry);
     const byFolder = new Map<string, RelianceEntry>();
-    const files = entry === undefined ? [] : [...new Set([...entry.files, ...entry.bypasses.map((b) => b.file)])].sort();
-    for (const file of files) {
-      const component = componentOfFile(file, components);
-      const key = component?.folder ?? "";
-      const existing = byFolder.get(key);
-      if (existing !== undefined) existing.files.push(file);
-      else byFolder.set(key, { component, owner: component?.folder === invariant.component, files: [file] });
+    if (evidence.status === "complete") {
+      for (const site of evidence.sites) {
+        const key = site.component?.folder ?? "";
+        const existing = byFolder.get(key);
+        if (existing === undefined) byFolder.set(key, { component: site.component, owner: site.owner, sites: [site] });
+        else existing.sites.push(site);
+      }
     }
-    const entries = [...byFolder.values()].sort((a, b) => Number(b.owner) - Number(a.owner) || (a.component?.folder ?? "~").localeCompare(b.component?.folder ?? "~"));
-    const sites: RelianceSite[] = entry === undefined ? [] : [...entry.bypasses].sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
-    return [{ invariant, chokepoint: enforcement.chokepoint, protects: enforcement.protects, entry, entries, sites, recordCarries: "files" }];
+    const entries = [...byFolder.values()].sort(
+      (a, b) => Number(b.owner) - Number(a.owner) || (a.component?.folder ?? "~").localeCompare(b.component?.folder ?? "~"),
+    );
+    return [{ invariant, chokepoint: enforcement.chokepoint, protects: enforcement.protects, entry, evidence, entries }];
   });
 }
 
 export function allReliance(components: readonly SpecComponent[], runs: readonly RunRecord[]): Reliance[] {
-  return components.flatMap((c) => c.invariants.flatMap((i) => relianceOf(i, components, runs)));
+  return components.flatMap((component) => component.invariants.flatMap((invariant) => relianceOf(invariant, components, runs)));
+}
+
+/* ------------------------------------------------------------ structure */
+
+/** One crossing-bearing invariant, ready for a renderer or the text query. */
+export interface StructureEdge {
+  id: string;
+  component: string;
+  name: string;
+  from: string;
+  to: string;
+  chokepoints: StructureChokepoint[];
+  grade: Grade | undefined;
+  enforcer: string | undefined;
+  verdict: "pass" | "fail" | "not run" | "unverified";
+  state: SpecInvariant["state"];
+  bypassCount: number;
+  proposed: boolean;
+  reliance: RelianceEvidence;
+}
+
+/** The complete pure input to the Structure render. No coordinates live here. */
+export interface StructureModel {
+  /** Declaration order from the entry spec; the order carries no semantic rank. */
+  levels: TrustLevel[];
+  /** Component order, then invariant declaration order; proposed edges follow in caller order. */
+  edges: StructureEdge[];
+  /** Existing project invariants omitted because they declare no crossing. */
+  invariantsWithoutCrossing: number;
+}
+
+/** The enforcer name at the start of a ladder rung's longer explanatory sentence. */
+function structureEnforcerName(text: string | undefined): string | undefined {
+  if (text === undefined) return undefined;
+  return text.split(/[,:;]/, 1)[0]?.trim();
+}
+
+function structureEdgeOf(state: ShellState, invariant: SpecInvariant): StructureEdge | undefined {
+  if (invariant.crossing === undefined) return undefined;
+  const latest = latestOf(invariant, state.runs.records).find((entry) => entry.form === "chokepoint");
+  const rung = latest?.grade === undefined ? undefined : state.spec.ladder.rungs.find((candidate) => candidate.grade === latest.grade);
+  const hasChokepoint = invariant.enforcements.some((enforcement) => enforcement.form === "chokepoint");
+  return {
+    id: structureId(invariant.component, invariant.name),
+    component: invariant.component,
+    name: invariant.name,
+    from: invariant.crossing.from,
+    to: invariant.crossing.to,
+    chokepoints: invariant.enforcements.flatMap((enforcement) =>
+      enforcement.form === "chokepoint" ? [{ chokepoint: enforcement.chokepoint, protects: enforcement.protects }] : [],
+    ),
+    grade: latest?.grade,
+    enforcer: latest?.enforcer ?? structureEnforcerName(rung?.enforcedBy),
+    verdict: latest?.verdict ?? "unverified",
+    state: invariant.state,
+    bypassCount: latest?.bypasses.length ?? 0,
+    proposed: false,
+    reliance: hasChokepoint
+      ? relianceEvidenceOf(invariant, state.spec.components, latest)
+      : { status: "unknown", reason: "reliance unknown: invariant declares no chokepoint" },
+  };
+}
+
+/**
+ * Derive the security spine from crossings alone. Existing edges retain the
+ * spec model's stable component/declaration order. Preview invariants are
+ * ephemeral additions in caller order, with no invented verdict or reliance.
+ */
+export function structureOf(state: ShellState, preview: readonly StructurePreview[] = state.structure.preview): StructureModel {
+  const invariants = allInvariants(state.spec.components);
+  const edges = invariants.flatMap((invariant) => {
+    const edge = structureEdgeOf(state, invariant);
+    return edge === undefined ? [] : [edge];
+  });
+  for (const proposal of preview) {
+    edges.push({
+      id: structureId(proposal.component, proposal.name),
+      component: proposal.component,
+      name: proposal.name,
+      from: proposal.crossing.from,
+      to: proposal.crossing.to,
+      chokepoints: proposal.chokepoints === undefined ? [] : [...proposal.chokepoints],
+      grade: undefined,
+      enforcer: undefined,
+      verdict: "unverified",
+      state: "requirement",
+      bypassCount: 0,
+      proposed: true,
+      reliance: { status: "unknown", reason: "reliance unknown: proposed preview has no run evidence" },
+    });
+  }
+  return {
+    levels: state.spec.trustLevels,
+    edges,
+    invariantsWithoutCrossing: invariants.filter((invariant) => invariant.crossing === undefined).length,
+  };
 }
 
 /* ------------------------------------------------------------- journal */

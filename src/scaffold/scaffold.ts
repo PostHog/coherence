@@ -104,6 +104,8 @@ export interface InvariantOptions {
   /** Kinds the requirement names; undefined prints a placeholder, "none" an examined empty set. */
   kinds: string[] | "none" | undefined;
   form: Form;
+  /** A declared crossing supplied now; absent keeps the scaffold placeholder. */
+  crossing?: { from: string; to: string } | undefined;
 }
 
 export interface InvariantScaffold {
@@ -143,6 +145,11 @@ export function renderInvariant(seed: Seed, options: InvariantOptions): Invarian
       lines.push(`  ${key}: ${PLACEHOLDERS[key]}`);
       continue;
     }
+    if (key === "crossing") {
+      const value = options.crossing === undefined ? PLACEHOLDERS.crossing : `${options.crossing.from} -> ${options.crossing.to}`;
+      lines.push(`  crossing: ${value}`);
+      continue;
+    }
     if (key === "kinds") {
       const value = options.kinds === undefined ? PLACEHOLDERS.kinds : options.kinds === "none" ? "none" : options.kinds.join(", ");
       lines.push(`  kinds: ${value}`);
@@ -155,6 +162,18 @@ export function renderInvariant(seed: Seed, options: InvariantOptions): Invarian
     lines.push(`  ${key}: ${PLACEHOLDERS[key]}`);
   }
   return { bullet: lines.join("\n") + "\n", shapes };
+}
+
+
+/** Parse the same two-ended crossing shape the spec grammar accepts. */
+export function parseCrossing(text: string): { from: string; to: string } {
+  const parts = text.split(/\s*(?:->|→)\s*/);
+  const from = parts[0]?.trim() ?? "";
+  const to = parts[1]?.trim() ?? "";
+  if (parts.length !== 2 || from === "" || to === "") {
+    throw new ScaffoldError('--crossing reads "<trust level> -> <trust level>"');
+  }
+  return { from, to };
 }
 
 /** What the agent needs in view while filling the checklist: each shape's sentence and when it applies. */

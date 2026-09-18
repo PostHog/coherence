@@ -1,6 +1,6 @@
 # Scope
 
-The reading: one surface projecting the model for a human, in six views: Glossary, Components, Invariants, Reliance, Runs, Journal; and the agent query, the same state as plain text.
+The reading: one surface projecting the model for a human, in seven views: Glossary, Components, Structure, Invariants, Reliance, Runs, Journal; and the agent query, the same state as plain text.
 
 ## invariants
 - deterministic build: The same inputs in produce a byte-identical page out, and the inputs are all of them: both glossaries, the spec tree, the run records, the journal, and the work store.
@@ -22,12 +22,12 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   crossing: record -> reading
   refuted: embedded each bullet's latest, verified and defects beside the run records they came from -> "the state stores no copy of what it derives: the latest verdicts live in the run records and nowhere else" went red in check.test.ts, the stored keys present on every bullet; restored, green (2026-09-18)
   kinds: none
-- reliance is not the file list: The Reliance view and the agent query say what the run record carries, files the check touched, and how many of them are reference sites the record actually places; neither presents the file list as reliance.
-  over: every chokepoint invariant with a latest check, on the view and in the agent query
-  via: every view renders from state: every component, invariant, run, and journal record in the fixture is on its view
-  because: the glossary defines reliance as the components whose code references the chokepoint, and a check's file list holds the definition of the protected thing, the chokepoint's own module, imports and tests as well; reading it as reliance overstates who depends on an invariant, which is exactly the number a human weighs when acknowledging a retirement. Only the bypasses are placed by line and symbol, so only they are named as sites, and the view says a run entry carrying every classified site is what would close the gap
+- reliance comes from complete endpoint sites: The Reliance and Structure views and query relies-on list actual file, line, symbol, endpoint, classification, syntax form when known, and test mark for references to either the chokepoint or protected thing; absent sites stay incomplete and only a present empty list confirms zero.
+  over: every chokepoint invariant with no run, a legacy run, complete empty sites, protected-only sites, chokepoint-only sites, and both endpoints together
+  via: reliance reads both protected and chokepoint endpoint sites, owner first, without calling a bypass a legal door reference
+  because: the glossary defines reliance from references to either endpoint. Dropping protected references hides direct consumers, while calling a protected bypass a legal chokepoint reference erases the structural defect. The run's optional sites field preserves the evidence boundary: absence is legacy or unavailable, and presence means both endpoint queries completed
   crossing: record -> reading
-  refuted: counted the whole file list as relying components and files -> "every view renders from state: every component, invariant, run, and journal record in the fixture is on its view" went red in check.test.ts at the reliance card, which claimed reliance where the record carries files; restored, green (2026-09-18)
+  refuted: filtered the site list to chokepoint references alone -> the protected-only reliance assertion went red in check.test.ts; included both endpoints with their role and classification, green (2026-09-18)
   kinds: none
 - self-contained page: The page loads nothing from outside: no external src, href, url() or @import.
   over: every src, href, url() and @import in the page
@@ -67,7 +67,7 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   refuted: made the search match every concept instead of deriving its matches from state -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
 - views render from state: Every view is a pure render over the one state value: every component, invariant, run record, and journal record in the state is on its view, and a filter or query narrows what is shown without storing anything.
-  over: every component, invariant, run record, journal record, and work order of the fixture project, on each of the five model views
+  over: every component, invariant, run record, journal record, and work order of the fixture project, on each model view
   via: every view renders from state: every component, invariant, run, and journal record in the fixture is on its view
   because: a view that dropped a record, or kept a filtered list of its own, would show a human something the records do not say; the latest verdict, the kept mark, reliance, and the open escalations are derived on every render so the page can never disagree with itself
   crossing: record -> reading
@@ -93,4 +93,32 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   because: a reading that rendered only Coherence's own tree would never have shown the two broken chokepoints the first adopter's runs recorded
   crossing: record -> reading
   refuted: made the build ignore --root, so the first adopter's tree could not be a second root -> the totality oracle went red, then green once restored (2026-09-18)
+  kinds: none
+- structure is the crossing projection: Structure draws entry-spec trust levels as nodes and every crossing-bearing invariant as one labelled edge in stable model order; bullets without crossings do not become edges and their count is said.
+  over: every trust level and bullet in the fixture and the first adopter, including structural defects and bullets with no crossing
+  via: Structure derives every edge in stable order, counts no-crossing invariants, and renders defects and previews deterministically
+  because: the crossing is the declared security marker and carries no topology beyond its two trust levels. A stored or hand-arranged picture could disagree with the spec; deriving coordinates and labels from the current model keeps the picture a reading
+  crossing: project-source -> reading
+  refuted: discarded the count of invariants without crossings from the Structure derivation -> the no-crossing count assertion went red in check.test.ts; restored the derived count, green (2026-09-18)
+  kinds: none
+- structure and spine share one order: Query spine formats the same structureOf model the Structure SVG renders, preserving trust-level declaration order and component then invariant declaration order.
+  over: every trust level and crossing-bearing invariant in the fixture and first adopter
+  via: query spine uses the same ordered crossing model as Structure
+  because: a separate query traversal could silently reorder or omit the security spine, giving an agent and a human different readings of one spec
+  crossing: reading -> reading
+  refuted: reversed the crossing order only in query spine -> the view/query edge-order assertion went red in query.test.ts; restored the shared structureOf order, green (2026-09-18)
+  kinds: none
+- structure preview is ephemeral evidence: writeStructurePreview validates a proposed crossing, selects Structure, renders it dashed and unverified, and writes only outside the project root without changing specs, runs, or the inputs that determine the page.
+  over: every generated preview page and proposed crossing endpoint
+  via: the Structure preview bridge validates crossings, selects Structure, and writes deterministic generated pages only
+  because: a preview is a view of a proposed change, not evidence that it happened. Writing it under the project would alter glossary population and make otherwise identical previews differ; accepting grade, verdict, or reliance from the caller would invent run evidence
+  crossing: project-source -> reading
+  refuted: allowed the generated preview page inside the project root -> the in-root refusal assertion went red in check.test.ts; restored outside-root confinement and generated both previews byte-identically (2026-09-18)
+  kinds: none
+- ambiguous property meanings stay plural: When one observed property spelling is owned by multiple concepts, Scope and query glossary display every meaning alternative with its owner, layer, definition, properties, and confusables; neither selects one owner nor calls the scalar absence an unsettled definition.
+  over: every projected VocabularyTerm carrying meaningAlternatives, including a spelling shared by two concepts while scalar concept, definition, and properties are intentionally unset
+  via: Scope and query glossary readings display every applicable property meaning instead of a false missing-definition line
+  because: selecting one property owner would silently change the glossary meaning, while saying no definition would discard definitions the authoritative coverage already carries. The ambiguity is evidence to display, not a choice for the reading to settle
+  crossing: record -> reading
+  refuted: ignored meaningAlternatives and formatted the unset scalar definition as missing -> the shared Scope/query reading test went red; restored every alternative, green (2026-09-18)
   kinds: none

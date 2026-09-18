@@ -9,7 +9,7 @@
 
 import { existsSync, realpathSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadGlossary, type Glossary } from "./glossary.ts";
 
@@ -39,11 +39,10 @@ export const PROJECT_DIR_VAR = "CLAUDE_PROJECT_DIR";
 
 /** A path with its symbolic links followed where they can be, so two spellings of one directory compare equal. */
 function real(path: string): string {
-  try {
-    return realpathSync(resolve(path));
-  } catch {
-    return resolve(path);
-  }
+  let existing=resolve(path); const suffix:string[]=[];
+  while(!existsSync(existing) && dirname(existing)!==existing) { suffix.unshift(basename(existing)); existing=dirname(existing); }
+  try { return resolve(realpathSync(existing),...suffix); }
+  catch { return resolve(path); }
 }
 
 /** Whether `path` is `root` itself or lies under it, comparing the directories rather than their spellings. */

@@ -4,8 +4,9 @@
  * SessionStart and SubagentStart carry orient's first slice: any escalation
  * awaiting a human first (an escalation heads every read), then the compact
  * glossary, then the session id as the exact --session value every journal
- * write must carry, a decide template, and a short fixed instruction. Both
- * hosts read it from `hookSpecificOutput.additionalContext`.
+ * write must carry, a decide template, the journal read command, and a short
+ * fixed instruction. Both hosts read it from
+ * `hookSpecificOutput.additionalContext`.
  * Stop and SubagentStop run the glossary check over the files changed in the
  * working tree. On Stop the findings are shown to the human and the session
  * ends. On SubagentStop a rejected name in a changed file, a spec problem, or
@@ -56,6 +57,9 @@ import type { Unable } from "../journal/record.ts";
 import { loadOrders, ownedIn, type WorkOrder } from "../journal/work.ts";
 import { renderCompactWithin } from "./glossary.ts";
 import { installedRoot, isCoherenceItself, loadProjectGlossaries, within } from "./project.ts";
+
+import { glossaryCoverage, type Coverage } from "./glossary-coverage.ts";
+import { baselinePath, coverageChanges, priorBaseline, saveBaseline } from "./glossary-cli.ts";
 
 const run = promisify(execFile);
 
@@ -167,6 +171,10 @@ export function escalationBlock(root: string): string {
 }
 
 function sessionOf(input: HookInput): string | undefined {
+  const child = [input.agent_id, input.agentId].find((id): id is string => typeof id === "string" && id !== "");
+  if(child) return child;
+  // Native child events without a child id cannot honestly charge the parent's session.
+  if(typeof input.hook_event_name === "string" && input.hook_event_name.startsWith("Subagent")) return undefined;
   return typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
 }
 
@@ -240,7 +248,7 @@ async function cliName(root: string): Promise<string> {
   return (await isCoherenceItself(root)) ? "node src/cli.ts" : "node_modules/.bin/coherence";
 }
 
-/** The session id as the exact --session value, a decide template, and the rule. */
+/** The session id as the exact --session value, write and read commands, and the rule. */
 export async function sessionBlock(root: string, input: HookInput): Promise<string> {
   const session = sessionOf(input);
   const agent = agentOf(input);
@@ -250,6 +258,8 @@ export async function sessionBlock(root: string, input: HookInput): Promise<stri
     `Session: ${session ?? "unknown"}`,
     `Every journal write needs --session ${id} --agent ${agent}. Record a choice as:`,
     `  ${cli} decide "<chose>" --over "<rejected>" --because "<why>" --session ${id} --agent ${agent}`,
+    "Read the project journal from the project root:",
+    `  ${cli} journal`,
     INSTRUCTION,
   ].join("\n") + "\n";
 }
@@ -350,17 +360,27 @@ export function glossaryStopText(report: CheckReport | undefined, walls: readonl
 const READING_TOOLS: ReadonlySet<string> = new Set(["Read", "Glob", "Grep", "LS", "NotebookRead", "read_file", "list_files", "search"]);
 
 /** The project-relative path a tool event wrote, or undefined when the event wrote no file under the root. */
+export function writtenFiles(root: string, input: HookInput): string[] {
+  if (typeof input.tool_name === "string" && READING_TOOLS.has(input.tool_name)) return [];
+  const record = typeof input.tool_input === "object" && input.tool_input !== null ? input.tool_input as Record<string,unknown> : {};
+  const paths = [record["file_path"],record["notebook_path"],record["path"]].filter((v):v is string=>typeof v === "string" && v !== "");
+  if(typeof input.tool_name === "string" && input.tool_name.split(".").at(-1)==="apply_patch") {
+    const patch=typeof input.tool_input === "string" ? input.tool_input : [record["patch"],record["input"],record["command"]].find((v):v is string=>typeof v === "string");
+    if(patch?.trimStart().startsWith("*** Begin Patch") && patch.trimEnd().endsWith("*** End Patch")) {
+      for(const match of patch.matchAll(/^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$/gm)) paths.push(match[1]!.trim());
+    }
+  }
+  return [...new Set(paths.flatMap(path=> {
+    const absolute=resolve(root,path);
+    if(!within(root,absolute)) return [];
+    const rel=relative(resolve(root),absolute).split(sep).join("/");
+    return rel && rel!==".." && !rel.startsWith("../") ? [rel] : [];
+  }))];
+}
+
+/** Compatibility for a caller asking about one ordinary edit; patch-aware callers use every path. */
 export function writtenFile(root: string, input: HookInput): string | undefined {
-  if (typeof input.tool_name === "string" && READING_TOOLS.has(input.tool_name)) return undefined;
-  const toolInput = input.tool_input;
-  if (typeof toolInput !== "object" || toolInput === null) return undefined;
-  const record = toolInput as Record<string, unknown>;
-  const path = [record["file_path"], record["notebook_path"], record["path"]].find((v): v is string => typeof v === "string" && v !== "");
-  if (path === undefined) return undefined;
-  const absolute = isAbsolute(path) ? path : resolve(root, path);
-  const rel = relative(resolve(root), absolute).split(sep).join("/");
-  if (rel === "" || rel.startsWith("../") || rel === "..") return undefined;
-  return rel;
+  return writtenFiles(root,input)[0];
 }
 
 /**
@@ -368,29 +388,30 @@ export function writtenFile(root: string, input: HookInput): string | undefined 
  * may involve and describe any structural defect, or nothing.
  */
 export async function editContext(root: string, input: HookInput, options: HookOptions = {}): Promise<string> {
-  const file = writtenFile(root, input);
-  if (file === undefined) return "";
+  const files = writtenFiles(root, input);
+  if (files.length === 0) return "";
   const model = specModelOrNull(root);
   if ("error" in model || model.components.length === 0) return "";
-  const absolute = resolve(root, file);
-  const text = existsSync(absolute) ? readFileSync(absolute, "utf8") : undefined;
-  const touched = model.components.flatMap((c) => c.invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint") && mayTouch(i, file, text)).map((i) => i.name));
+  const touched = model.components.flatMap((c) => c.invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint") && files.some(file=> {
+    const absolute=resolve(root,file);
+    return mayTouch(i,file,existsSync(absolute) ? readFileSync(absolute,"utf8") : undefined);
+  })).map((i) => i.name));
   if (touched.length === 0) return "";
   const session = sessionOf(input) ?? "unknown-session";
   const agent = agentOf(input);
-  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: touched, model, adapter: options.adapter, refresh: [file] });
+  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: touched, model, adapter: options.adapter, refresh: files });
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
   if (failed.length === 0) return "";
   const cli = (await isCoherenceItself(root)) ? "node src/cli.ts" : "node_modules/.bin/coherence";
-  const lines = [`Structural defect revealed at this edit (${file}); recorded in ${outcome.file ?? "the run"}:`];
+  const lines = [`Structural defect revealed at this edit (${files.join(", ")}); recorded in ${outcome.file ?? "the run"}:`];
   for (const d of failed) {
     const e = d.entry;
-    const here = e.bypasses.filter((b) => b.file === file);
+    const here = e.bypasses.filter((b) => files.includes(b.file));
     const elsewhere = e.bypasses.length - here.length;
     lines.push(`✕ ${e.component}/${e.name} — chokepoint ${d.chokepoint?.input.chokepoint ?? ""} protects ${d.chokepoint?.input.protects ?? ""}: ${e.grade ?? "broken"}`);
     for (const b of here) lines.push(`    bypass ${b.file}:${b.line} in ${b.symbol} (this edit)`);
-    if (elsewhere > 0) lines.push(`    ${elsewhere} bypass${elsewhere === 1 ? "" : "es"} elsewhere: ${e.bypasses.filter((b) => b.file !== file).map((b) => `${b.file}:${b.line} in ${b.symbol}`).join(", ")}`);
+    if (elsewhere > 0) lines.push(`    ${elsewhere} bypass${elsewhere === 1 ? "" : "es"} elsewhere: ${e.bypasses.filter((b) => !files.includes(b.file)).map((b) => `${b.file}:${b.line} in ${b.symbol}`).join(", ")}`);
     if (e.bypasses.length === 0) lines.push(`    ${e.reason}`);
   }
   lines.push("Two honest options: route the reference through the chokepoint, or escalate a retirement for a human, who must acknowledge it:");
@@ -406,10 +427,13 @@ export async function editContext(root: string, input: HookInput, options: HookO
  * the budget, the vocabulary steps down to names and then to one line that
  * points at the glossary command.
  */
-export async function startContext(root: string, input: HookInput = {}): Promise<string> {
+export async function startContext(root: string, input: HookInput = {}, report?: Coverage): Promise<string> {
   const { coherence, project } = await loadProjectGlossaries(root);
   const head = escalationBlock(root) + specBlock(root) + workBlock(root, input);
-  const tail = `\n${await sessionBlock(root, input)}`;
+  const reading=report ?? await glossaryCoverage(root);
+  const commands=await cliName(root);
+  const coverage=`\nGlossary coverage: ${reading.totals.unresolved} unresolved candidate terms; ${reading.totals.unreviewedContexts} contexts need sense review. No semantic completeness is implied. Read: ${commands} glossary coverage; maintain: ${commands} glossary help.\n`;
+  const tail = coverage + `\n${await sessionBlock(root, input)}`;
   const { text } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root));
   return head + text + tail;
 }
@@ -467,42 +491,52 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
   if (project !== undefined && !within(project, given)) {
     return { stdout: "", stderr: `hook ${event}: the working directory "${given}" is not inside the project root this hook was installed for (${project}); nothing was read and nothing was written\n`, exit: OUTSIDE_ROOT_EXIT };
   }
-  const root = given;
+  const root = project ?? given;
   switch (event) {
     case "SessionStart":
     case "SubagentStart": {
-      const context = await startContext(root, input);
+      const reading=await glossaryCoverage(root);
+      const context = await startContext(root, input, reading);
       const session = sessionOf(input);
       if (session !== undefined) openFeed(root, session);
       const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
-      return { stdout: stdout + "\n", stderr: "", exit: 0 };
+      return { stdout: stdout + "\n", stderr: "", exit: 0, ...(session ? {commit:()=>saveBaseline(root,session,reading)} : {}) };
     }
     case "UserPromptSubmit":
     case "PostToolUse": {
       const feed = feedContext(root, input);
-      if (event === "PostToolUse" && typeof input.session_id === "string" && input.session_id !== "") recordReadTrace(root, input.session_id, input);
+      const session=sessionOf(input);
+      if (event === "PostToolUse" && session) recordReadTrace(root, session, input);
       const edit = event === "PostToolUse" ? await editContext(root, input, options) : "";
-      const context = feed.text + (feed.text !== "" && edit !== "" ? "\n" : "") + edit;
+      const reading=session && existsSync(baselinePath(root,session)) ? await glossaryCoverage(root) : undefined;
+      const changes=reading && session ? coverageChanges(reading,priorBaseline(root,session)) : [];
+      const vocabulary=changes.length ? `Glossary: ${changes.length} new/changed contexts (advisory; spelling is not sense).\n${changes.slice(0,6).map(c=>`  ${c.term} in ${c.component}: ${c.reason}`).join("\n")}\nRead the full pending state: ${await cliName(root)} glossary coverage --json; settle through glossary review or propose/apply.\n` : "";
+      const context = [feed.text,edit,vocabulary].filter(Boolean).join("\n");
       if (context === "") return { stdout: "", stderr: "", exit: 0 };
       const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
-      return feed.text === "" ? { stdout: stdout + "\n", stderr: "", exit: 0 } : { stdout: stdout + "\n", stderr: "", exit: 0, commit: feed.commit };
+      const commit=()=> { if(feed.text) feed.commit(); if(changes.length && reading && session) saveBaseline(root,session,reading); };
+      return {stdout:stdout+"\n",stderr:"",exit:0,...(feed.text || changes.length ? {commit} : {})};
     }
     case "Stop":
     case "SubagentStop": {
       const changed = await changedFiles(root);
       const report = await checkChanged(root, changed.files);
-      if (typeof input.session_id === "string" && input.session_id !== "") await snapshotAtStop(root, input.session_id, changed.files, options);
+      const session=sessionOf(input);
+      if (session) await snapshotAtStop(root, session, changed.files, options);
       const walls = unableWalls(root, input);
       const spec = specStopText(root, changed.files, walls);
       const glossary = glossaryStopText(report, walls);
       const workText = workStopText(root, input);
+      const reading=session && existsSync(baselinePath(root,session)) ? await glossaryCoverage(root) : undefined;
+      const coverageText=reading && reading.totals.unreviewedContexts ? `Glossary coverage: ${reading.totals.unresolved} unresolved candidates, ${reading.totals.unreviewedContexts} unsettled contexts (advisory). Read: ${await cliName(root)} glossary coverage.` : "";
       const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the glossary check ran over nothing`;
-      if (glossary.text === "" && spec.text === "" && workText === "" && changedText === "") return { stdout: "", stderr: "", exit: 0 };
+      if (glossary.text === "" && spec.text === "" && workText === "" && changedText === "" && coverageText === "") return { stdout: "", stderr: "", exit: 0 };
       const parts: string[] = [];
       if (changedText !== "") parts.push(changedText);
       if (glossary.text !== "") parts.push(`Glossary check:\n${glossary.text}`);
       if (spec.text !== "") parts.push(`Spec:\n${spec.text}`);
       if (workText !== "") parts.push(`Work:\n${workText}`);
+      if (coverageText) parts.push(coverageText);
       const text = parts.join("\n");
       // A refusal is spent only on what the tool can prove is owed and no recorded wall excuses: a rejected name in a changed file, a spec problem, a structural defect.
       const refuse = event === "SubagentStop" && input.stop_hook_active !== true && glossary.owed + spec.owed > 0;
