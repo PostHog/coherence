@@ -13,6 +13,13 @@
  *              testResults[].assertionResults[] with ancestorTitles, title,
  *              status). Results map back to invariants by test name; when
  *              absent the pass runs one test per invocation through `test`
+ *   testFilterForm  how a name filter is written for the runner: "regex"
+ *              (default: a title is escaped and several are joined with |,
+ *              as jest, vitest, and node:test read --test-name-pattern) or
+ *              "pytest" (a `-k` expression: names as written, joined with
+ *              or). The report {out} names may be jest-shaped JSON, pytest's
+ *              JUnit XML (--junitxml), or pytest-json-report's JSON; the
+ *              pass tells them apart by their content
  *   testDir    a folder name (or testDirs, a list) whose files are tests,
  *              beside the built-in __tests__, test, tests
  */
@@ -31,6 +38,8 @@ export interface EnforcementConfig {
   testMatch: RegExp | undefined;
   /** One invocation reporting every test the bullets name, or undefined to run them one at a time. */
   testJson: string[] | string | undefined;
+  /** How a name filter is written for the runner: an escaped regex (jest, vitest, node:test) or a pytest -k expression. */
+  testFilterForm: "regex" | "pytest";
   testFolders: string[];
 }
 
@@ -41,7 +50,7 @@ function commandValue(value: unknown): string[] | string | undefined {
 }
 
 export function readEnforcementConfig(root: string): EnforcementConfig {
-  const config: EnforcementConfig = { language: "typescript", test: undefined, testMatch: undefined, testJson: undefined, testFolders: [...DEFAULT_TEST_FOLDERS] };
+  const config: EnforcementConfig = { language: "typescript", test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS] };
   const path = resolve(root, CONFIG_FILE);
   if (!existsSync(path)) return config;
   let parsed: unknown;
@@ -56,6 +65,7 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   if (typeof language === "string" && isLanguage(language)) config.language = language;
   config.test = commandValue(record["test"]);
   config.testJson = commandValue(record["testJson"]);
+  if (record["testFilterForm"] === "pytest") config.testFilterForm = "pytest";
   const testMatch = record["testMatch"];
   if (typeof testMatch === "string" && testMatch !== "") {
     try {

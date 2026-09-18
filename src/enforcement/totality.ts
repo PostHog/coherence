@@ -48,7 +48,7 @@ function shellQuote(value: string): string {
 }
 
 export async function runTotalityOracle(root: string, config: EnforcementConfig, filter: string, timeoutMs = TOTALITY_TIMEOUT_MS): Promise<TotalityResult> {
-  const spec = commandFor(config, escapeRegExp(filter));
+  const spec = commandFor(config, config.testFilterForm === "pytest" ? filter : escapeRegExp(filter));
   if (spec === undefined) {
     return { verdict: "not run", reason: "no test command configured; set test in coherence.config.json (an argv array the filter is appended to, or a string with {filter})", command: undefined, tail: "" };
   }
@@ -110,9 +110,60 @@ export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** The combined name pattern one invocation takes: every filter, escaped, as alternatives. */
-export function combinedFilter(filters: readonly string[]): string {
-  return [...new Set(filters)].map(escapeRegExp).join("|");
+/** The combined name pattern one invocation takes: every filter, escaped, as regex alternatives; or, for pytest's -k, the names as written joined with `or`. */
+export function combinedFilter(filters: readonly string[], form: "regex" | "pytest" = "regex"): string {
+  const unique = [...new Set(filters)];
+  return form === "pytest" ? unique.join(" or ") : unique.map(escapeRegExp).join("|");
+}
+
+/* --------------------------------------------------------- report shapes */
+
+/** Decode the few entities an XML attribute can carry. */
+function decodeXml(value: string): string {
+  return value.replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+}
+
+/**
+ * pytest's JUnit XML (`--junitxml=<out>`) as the jest shape: one testcase per
+ * test with `classname` (module and class, dotted) and `name`; a nested
+ * failure or error element is a fail, a skipped element a skip. No XML
+ * library: the elements are regular enough for a scan.
+ */
+export function reportFromJunit(xml: string): JsonReport {
+  const results: AssertionResult[] = [];
+  const cases = /<testcase\b([^>]*?)(\/>|>([\s\S]*?)<\/testcase>)/g;
+  for (const match of xml.matchAll(cases)) {
+    const attributes = match[1] ?? "";
+    const attribute = (key: string): string => decodeXml(new RegExp(`\\b${key}="([^"]*)"`).exec(attributes)?.[1] ?? "");
+    const inner = match[3] ?? "";
+    const status = /<(failure|error)\b/.test(inner) ? "failed" : /<skipped\b/.test(inner) ? "skipped" : "passed";
+    const classname = attribute("classname");
+    const title = attribute("name");
+    const ancestorTitles = classname === "" ? [] : classname.split(".");
+    results.push({ ancestorTitles, title, fullName: classname === "" ? title : `${classname}.${title}`, status });
+  }
+  return { testResults: [{ assertionResults: results }] };
+}
+
+/** pytest-json-report's shape (`tests[].nodeid`, `tests[].outcome`) as the jest shape. */
+function reportFromPytestJson(report: { tests?: { nodeid?: string; outcome?: string }[] }): JsonReport {
+  const results: AssertionResult[] = (report.tests ?? []).map((t) => {
+    const segments = (t.nodeid ?? "").split("::");
+    const title = segments[segments.length - 1] ?? "";
+    const outcome = t.outcome ?? "";
+    const status = outcome === "passed" || outcome === "xfailed" ? "passed" : outcome === "failed" || outcome === "error" || outcome === "xpassed" ? "failed" : "skipped";
+    return { ancestorTitles: segments.slice(0, -1), title, fullName: t.nodeid ?? title, status };
+  });
+  return { testResults: [{ assertionResults: results }] };
+}
+
+/** Whatever report the runner wrote, as the jest shape: JUnit XML, pytest-json-report, or jest itself. */
+export function parseReport(text: string): JsonReport {
+  const trimmed = text.trimStart();
+  if (trimmed.startsWith("<")) return reportFromJunit(trimmed);
+  const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+  if (Array.isArray(parsed["tests"]) && !("testResults" in parsed)) return reportFromPytestJson(parsed as { tests?: { nodeid?: string; outcome?: string }[] });
+  return parsed as JsonReport;
 }
 
 /**
@@ -157,8 +208,8 @@ export function verdictsFromReport(report: JsonReport, filters: readonly string[
  */
 export async function runTotalityBatch(root: string, config: EnforcementConfig, filters: readonly string[], timeoutMs = TOTALITY_TIMEOUT_MS): Promise<Map<string, TotalityResult> | undefined> {
   if (config.testJson === undefined || filters.length === 0) return undefined;
-  const out = join(tmpdir(), `coherence-totality-${randomBytes(4).toString("hex")}.json`);
-  const filter = combinedFilter(filters);
+  const out = join(tmpdir(), `coherence-totality-${randomBytes(4).toString("hex")}.${config.testFilterForm === "pytest" ? "xml" : "json"}`);
+  const filter = combinedFilter(filters, config.testFilterForm);
   const substitute = (arg: string): string => arg.split("{filter}").join(filter).split("{out}").join(out);
   const spec = Array.isArray(config.testJson)
     ? { command: config.testJson[0]!, args: config.testJson.slice(1).map(substitute), shell: false }
@@ -192,9 +243,9 @@ export async function runTotalityBatch(root: string, config: EnforcementConfig, 
     if (!existsSync(out)) return notRun(`${shown} exited ${output.code} and wrote no report at {out}`, tailOf(output.text));
     let report: JsonReport;
     try {
-      report = JSON.parse(readFileSync(out, "utf8")) as JsonReport;
+      report = parseReport(readFileSync(out, "utf8"));
     } catch (error) {
-      return notRun(`the report ${shown} wrote is not JSON (${error instanceof Error ? error.message : String(error)})`, tailOf(output.text));
+      return notRun(`the report ${shown} wrote is neither jest-shaped JSON, JUnit XML, nor pytest-json-report (${error instanceof Error ? error.message : String(error)})`, tailOf(output.text));
     }
     return verdictsFromReport(report, filters, shown);
   } catch (error) {
