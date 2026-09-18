@@ -133,13 +133,13 @@ test("scaffold invariant --write appends to the invariants section, and the resu
 
 /*
  * Union item 26. The fix is one line in src/spec/grammar.ts, which another agent owns, so this
- * test stands red and marked todo until that line lands:
+ * test went red before the PLACEHOLDER fix in src/spec/grammar.ts landed and green after (2026-09-18):
  *   const PLACEHOLDER = /(?:^|\s)<[a-z][^<>]*>(?:$|[\s)|])/;
  * An angle-bracket group must stand as its own token, which is how the scaffold prints every
  * slot and how a generic type never appears. Verified here: with that line the whole scaffold
  * and spec suites are green and spec --check keeps 0 problems and the same 9 unfilled slots.
  */
-test("an unfilled slot is one of the forms the scaffold prints, not any prose in angle brackets", { todo: "waiting on the one-line PLACEHOLDER fix in src/spec/grammar.ts" }, () => {
+test("an unfilled slot is one of the forms the scaffold prints, not any prose in angle brackets", () => {
   const root = scratch();
   try {
     // Every form the scaffold prints, as the scaffold prints it.
