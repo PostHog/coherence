@@ -76,6 +76,18 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   crossing: instrument -> record
   refuted: made every totality entry record the one-at-a-time mode whatever ran -> "the batched totality oracle pass: every test the bullets name in one invocation, mapped back by name; the record says which mode ran" went red in enforcement.test.ts; restored, green (2026-09-17)
   kinds: none
+- a report entry maps by exact title: A reported test belongs to the via it names by exact title, its own or one above it, with a stated fallback only for a runner that truncates titles in its report.
+  over: every entry of every report the batched pass reads and every via a bullet names
+  via: a report entry maps to a via by exact title, with the one stated fallback for a runner that truncates
+  because: the batched pass selects by pattern and maps results back by name, so the mapping is the whole basis of a totality oracle's verdict; a substring mapping let a bullet's verdict come from a different test whose title merely contained its name, which means a neighbour's failure can fail this bullet and a neighbour's pass can carry it
+  crossing: instrument -> record
+  kinds: none
+- the instrument outlives the test pass: A run keeps the instrument alive across the totality pass and asks it again afterwards; a run whose instrument did not survive records the reason on every entry it could not check and exits non-zero, never 0 with not run.
+  over: every run that needs the instrument and runs the totality pass first
+  via: the run keeps the instrument alive across the test pass, and a run whose instrument died exits non-zero with the reason
+  because: the totality pass runs the project's whole suite before the first question, and the warm server's idle timer only resets on a request line, so a suite longer than the idle killed the instrument mid-run, recorded not run for every chokepoint, and exited 0: a run that proved nothing read exactly like a clean one, which is the one thing a verification pass must never do
+  crossing: harness -> instrument
+  kinds: none
 - warm server the only path: From a hook or a reading, the language server is reached only through the warm server: one door connects over the socket, spawns the server detached when none listens, and hands the adapter to the run or to the reading that asked.
   protects: connectAdapter
   chokepoint: withWarmAdapter

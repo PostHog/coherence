@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
 import { connectAdapter, serve, serverPaths, type Serving } from "./server.ts";
+import { performRun } from "./run.ts";
 
 let root: string;
 let started: Promise<Serving> | undefined;
@@ -75,6 +76,53 @@ test("a client with spawning off fails plainly when nothing listens", async () =
   try {
     await assert.rejects(connectAdapter(other, { spawn: false }), /no warm server listening/);
   } finally {
+    rmSync(other, { recursive: true, force: true });
+  }
+});
+
+test("the run keeps the instrument alive across the test pass, and a run whose instrument died exits non-zero with the reason", async () => {
+  // The totality pass runs the whole suite before the first question, and the warm server's idle timer only
+  // resets on a request line. Reviewer A: a suite longer than the idle killed the instrument, every chokepoint
+  // recorded not run, and the run exited 0.
+  const other = mkdtempSync(join(tmpdir(), "coherence-idle-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(other, path)), { recursive: true });
+    writeFileSync(join(other, path), text, "utf8");
+  };
+  put("tsconfig.json", `{ "compilerOptions": { "strict": true, "noEmit": true, "module": "NodeNext", "moduleResolution": "NodeNext", "allowImportingTsExtensions": true }, "include": ["src/**/*.ts"] }\n`);
+  put("src/door.ts", "const KEY = 1;\nexport function open(): number {\n  return KEY;\n}\n");
+  // A runner that holds the floor for longer than the server's idle timeout, then writes a passing report.
+  const slow = 'setTimeout(() => require("node:fs").writeFileSync(process.argv[1], JSON.stringify({ testResults: [{ assertionResults: [{ ancestorTitles: [], title: "door holds", fullName: "door holds", status: "passed" }] }] })), 2500);';
+  put("coherence.config.json", JSON.stringify({ language: "typescript", testDir: "__tests__", testJson: ["node", "-e", slow, "{out}", "{filter}"] }));
+  put(
+    "Idle.spec.md",
+    ["# Idle", "", "One door.", "", "## invariants", "- key held: The key is read through open.", "  protects: KEY", "  chokepoint: open", "  over: every read of the key", "  via: door holds", "  because: one door", "  kinds: none", ""].join("\n"),
+  );
+
+  const idle = await serve(other, { idleMs: 1_200 });
+  try {
+    // No heartbeat: the instrument is gone by the time the first chokepoint is asked.
+    const died = await performRun(other, { session: "idle-1", agent: "server", heartbeatMs: 10 * 60 * 1000 });
+    const chokepoint = died.record.invariants.find((e) => e.form === "chokepoint")!;
+    assert.equal(chokepoint.verdict, "not run");
+    assert.equal(died.instrumentDied, true, "a run that proved nothing says so");
+    assert.match(died.instrumentReason ?? "", /did not survive the test pass/);
+    assert.match(chokepoint.reason, /instrument unavailable/);
+  } finally {
+    await idle.stop();
+  }
+
+  const alive = await serve(other, { idleMs: 1_200 });
+  try {
+    // The heartbeat keeps the instrument's idle timer awake while the runner holds the floor.
+    const kept = await performRun(other, { session: "idle-2", agent: "server", heartbeatMs: 400 });
+    const chokepoint = kept.record.invariants.find((e) => e.form === "chokepoint")!;
+    assert.equal(kept.instrumentDied, false, kept.instrumentReason ?? "");
+    assert.equal(chokepoint.verdict, "pass", chokepoint.reason);
+    assert.equal(chokepoint.grade, "visibility-choked", chokepoint.reason);
+    assert.equal(kept.record.invariants.find((e) => e.form === "totality oracle")!.verdict, "pass");
+  } finally {
+    await alive.stop();
     rmSync(other, { recursive: true, force: true });
   }
 });

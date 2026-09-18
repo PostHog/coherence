@@ -17,7 +17,7 @@
  *     via: <the test>
  *     because: <why it exists, what it protects against>
  *     crossing: <trust level> -> <trust level>
- *     refuted: <what was broken> -> <what was seen> (YYYY-MM-DD)
+ *     refuted: <what was broken> -> <what was seen> (YYYY-MM-DD)   the human account of a refutation record
  *     kinds: <a, b> | none
  *     checklist: <shape> declared as <invariant> | <shape> dismissed: <reason>
  *
@@ -122,6 +122,17 @@ export function isPlaceholder(value: string): boolean {
 }
 
 const ARROW = /\s*(?:->|→)\s*/;
+/** The first arrow in a value, found by position: a lazy group on either side of it backtracks quadratically. */
+const ARROW_AT = /->|→/;
+/** The date a refuted line ends with, anchored: no group before it, so the scan is linear in the value's length. */
+const REFUTED_DATE = /\((\d{4})-(\d{2})-(\d{2})\)\s*$/;
+
+/** Whether three digit groups name a day that exists: 2026-13-45 parses as digits and is no date. */
+export function isCalendarDate(year: string, month: string, day: string): boolean {
+  const text = `${year}-${month}-${day}`;
+  const date = new Date(`${text}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === text;
+}
 
 interface Field {
   key: Key;
@@ -389,12 +400,20 @@ function buildInvariant(bullet: RawBullet, problem: (line: number, message: stri
       unfilled.push("refuted");
       continue;
     }
-    const match = /^(.*?)\s*(?:->|→)\s*(.*?)\s*\((\d{4}-\d{2}-\d{2})\)\s*$/s.exec(field.value);
-    if (match === null || match[1]!.trim() === "" || match[2]!.trim() === "") {
+    const dated = REFUTED_DATE.exec(field.value);
+    if (dated !== null && !isCalendarDate(dated[1]!, dated[2]!, dated[3]!)) {
+      problem(field.line, `refuted on ${bullet.name} ends with (${dated[1]}-${dated[2]}-${dated[3]}), which is not a day that exists`);
+      continue;
+    }
+    const head = dated === null ? field.value : field.value.slice(0, dated.index);
+    const arrow = ARROW_AT.exec(head);
+    const broke = arrow === null ? "" : head.slice(0, arrow.index).trim();
+    const saw = arrow === null ? "" : head.slice(arrow.index + arrow[0].length).trim();
+    if (dated === null || arrow === null || broke === "" || saw === "") {
       problem(field.line, `refuted on ${bullet.name} reads <what was broken> -> <what was seen> (YYYY-MM-DD)`);
       continue;
     }
-    refutations.push({ broke: match[1]!.trim(), saw: match[2]!.trim(), date: match[3]!, line: field.line });
+    refutations.push({ broke, saw, date: `${dated[1]}-${dated[2]}-${dated[3]}`, line: field.line });
   }
 
   let kinds: string[] | "none" | undefined;

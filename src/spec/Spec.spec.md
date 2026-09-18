@@ -36,6 +36,12 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: made isPlaceholder answer false for every value -> "a placeholder value parses but counts as absent" went red in spec.test.ts; restored, green (2026-09-17)
   kinds: none
+- a refuted line parses in linear time: A refuted line's date is matched anchored at the end and its arrow by position, never by a lazy group on each side, and three digit groups that name no day are refused.
+  over: every refuted: line in every spec, of any length
+  via: a long refuted value parses in linear time, and three digit groups that name no day are refused
+  because: loadSpecModel runs on every hook event, and the old pattern put a lazy group before the arrow, another before the date, and \s* between them: 156 KB of a value that reaches an arrow and never reaches a date took 16.5 s, and one interior run of 8 KB of spaces took 161 s, so any agent-authored spec was a stall the session could not explain; and a date of three digit groups let 2026-13-45 stand as the day a refutation was witnessed
+  crossing: project-source -> reading
+  kinds: none
 - half a form is a problem: Half an enforcement form, an unknown key, a bad crossing, or a bad refutation is a problem reported with its file and line.
   over: every key on every bullet: the two enforcement pairs, the crossing, the refutation, and any key the grammar does not name
   via: half an enforcement form, an unknown key, a bad crossing, and a bad refutation are problems

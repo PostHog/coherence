@@ -154,15 +154,28 @@ const IN_FILE = /^([A-Za-z_$][A-Za-z0-9_$]*)\s+in\s+(\S+)$/;
 const MODULE_PATH = /^[A-Za-z0-9_./@-]+\.[A-Za-z]+$/;
 const PACKAGE_PATH = /^[A-Za-z0-9_./@-]+\/$/;
 
+/**
+ * Whether a path stays under the project root: relative, and no segment is a
+ * parent or empty. Spec text is agent-authored and never trusted about itself,
+ * so a name that would read a file above the root is prose, not a module.
+ */
+export function contained(path: string): boolean {
+  if (path.startsWith("/")) return false;
+  return path.split("/").every((segment) => segment !== ".." && segment !== "");
+}
+
 /** How a spec value reads before any instrument is asked. */
 export function parseName(value: string): NameForm {
   const text = value.trim();
   if (IDENTIFIER.test(text)) return { form: "symbol", name: text, fileHint: undefined };
   const inFile = IN_FILE.exec(text);
   if (inFile !== null) return { form: "symbol", name: inFile[1]!, fileHint: inFile[2]! };
-  if (MODULE_PATH.test(text) && text.includes("/")) return { form: "module", path: text };
+  if (MODULE_PATH.test(text) && text.includes("/") && contained(text)) return { form: "module", path: text };
   // A folder with a trailing slash is a package; the adapter decides which file is its module.
-  if (PACKAGE_PATH.test(text) && !text.includes("..")) return { form: "module", path: text.replace(/\/+$/, "") };
+  if (PACKAGE_PATH.test(text)) {
+    const path = text.replace(/\/+$/, "");
+    if (contained(path)) return { form: "module", path };
+  }
   return { form: "prose", text };
 }
 

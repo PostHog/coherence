@@ -4,6 +4,14 @@
  * the spec model, appended as one record. A selection (one form, some
  * invariants) still appends one record; the enforcements it skipped keep
  * their prior dated verdict in the status view.
+ *
+ * The totality pass runs the project's whole test suite before the first
+ * question the instrument is asked, and the warm server's idle timer only
+ * resets on a request line: a suite longer than the idle timeout used to kill
+ * the instrument mid-run, record not run for every chokepoint, and exit 0. The
+ * run now keeps the instrument alive across the test pass with a heartbeat and
+ * asks it again afterwards; a run whose instrument died says so in every entry
+ * and in `instrumentDied`, and the command exits non-zero.
  */
 
 import type { LanguageAdapter } from "../adapters/adapter.ts";
@@ -31,7 +39,14 @@ export interface RunOptions {
   server?: boolean | undefined;
   model?: SpecModel | undefined;
   now?: (() => Date) | undefined;
+  /** The idle timeout to spawn the warm server with, when this run spawns it. */
+  idleMs?: number | undefined;
+  /** How often to keep the warm server awake during the test pass; the default is well inside the shortest sane idle. */
+  heartbeatMs?: number | undefined;
 }
+
+/** How often the run touches the instrument while the test suite holds the floor. */
+export const HEARTBEAT_MS = 20_000;
 
 export interface EntryDetail {
   entry: RunEntry;
@@ -45,6 +60,8 @@ export interface RunOutcome {
   details: EntryDetail[];
   /** Why the instrument was unavailable, when it was. */
   instrumentReason: string | undefined;
+  /** True when the instrument was needed and could not answer: the run proved nothing and must not exit 0. */
+  instrumentDied: boolean;
 }
 
 function chokepointEnforcements(invariant: ModelInvariant): { protects: string; chokepoint: string }[] {
@@ -102,8 +119,25 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   if (wantTotality) {
     const filters = selected.flatMap(({ invariant }) => totalityEnforcements(invariant).map(({ via }) => adapter?.testFilter(via) ?? via));
     const t0 = Date.now();
-    batched = await runTotalityBatch(root, config, filters);
+    // The test suite can outlast the warm server's idle timeout, and its timer only resets on a request line.
+    const beat = adapter === undefined || !needsAdapter ? undefined : setInterval(() => void adapter.ready().catch(() => {}), options.heartbeatMs ?? HEARTBEAT_MS);
+    beat?.unref();
+    try {
+      batched = await runTotalityBatch(root, config, filters);
+    } finally {
+      if (beat !== undefined) clearInterval(beat);
+    }
     batchLatency = Date.now() - t0;
+    // The instrument is asked again before the first chokepoint: a suite that outlived it must not read as not run.
+    if (adapter !== undefined && instrumentReason === undefined && needsAdapter) {
+      let alive: { ok: true } | { ok: false; reason: string };
+      try {
+        alive = await adapter.ready();
+      } catch (error) {
+        alive = { ok: false, reason: error instanceof Error ? error.message : String(error) };
+      }
+      if (!alive.ok) instrumentReason = `the instrument did not survive the test pass (${Math.round(batchLatency / 1000)} s): ${alive.reason}`;
+    }
   }
 
   for (const { component, invariant } of selected) {
@@ -141,6 +175,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
               reason: `instrument failed: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`,
             }),
           });
+          instrumentReason ??= error instanceof Error ? error.message.split("\n")[0] : String(error);
           continue;
         }
         details.push({
@@ -198,11 +233,14 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     invariants: details.map((d) => d.entry),
   };
   const file = appendRun(root, record);
-  return { record, file, details, instrumentReason };
+  return { record, file, details, instrumentReason, instrumentDied: needsAdapter && instrumentReason !== undefined };
   };
 
   if (needsAdapter && options.adapter === undefined && options.server !== false) {
-    return withWarmAdapter(root, (remote, server, reason) => pass(remote, { language: remote?.language ?? config.language, server: server ?? "none" }, reason), { refresh: options.refresh ?? [] });
+    return withWarmAdapter(root, (remote, server, reason) => pass(remote, { language: remote?.language ?? config.language, server: server ?? "none" }, reason), {
+      refresh: options.refresh ?? [],
+      idleMs: options.idleMs,
+    });
   }
   const given = options.adapter;
   if (given !== undefined) {

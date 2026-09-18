@@ -11,7 +11,7 @@ import { test } from "node:test";
 import { loadGlossary } from "../lifecycle/glossary.ts";
 import { runCheck } from "../lifecycle/check.ts";
 import { COHERENCE_GLOSSARY } from "../lifecycle/project.ts";
-import { RETIRED_SECTIONS, parseSpec, type Invariant } from "./grammar.ts";
+import { RETIRED_SECTIONS, isCalendarDate, parseSpec, type Invariant } from "./grammar.ts";
 import { loadSpecModel, type SpecModel } from "./model.ts";
 import { formatReport } from "./report.ts";
 import { applicableShapes, loadSeed } from "./seed.ts";
@@ -371,4 +371,35 @@ test("a spec written in the grammar with every shape name carries no rejected na
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("a long refuted value parses in linear time, and three digit groups that name no day are refused", () => {
+  // Reviewer A: the old pattern put a lazy group on each side of the arrow and a third before the date,
+  // so a long value with no closing date backtracked quadratically: 156 KB took 16 s, on every hook event.
+  // The shape that blows up is a value that reaches the arrow and never reaches a date: 156 KB of "a -> "
+  // took 16.5 s here against the old pattern, and one interior run of 8 KB of spaces took 161 s.
+  const long = "a -> ".repeat((156 * 1024) / 5);
+  const started = Date.now();
+  const slow = parseSpec(`${ENTRY}- long: A sentence.\n  refuted: ${long}\n  because: reasons\n  kinds: none\n`, "X.spec.md", { seed });
+  const elapsed = Date.now() - started;
+  assert.ok(elapsed < 1000, `a ${long.length} character refuted value took ${elapsed} ms to refuse`);
+  assert.ok(slow.problems.some((p) => p.message.includes("refuted on long reads")));
+  const spaced = "broke it ->" + " ".repeat(8 * 1024) + "x";
+  const spacedStarted = Date.now();
+  parseSpec(`${ENTRY}- spaced: A sentence.\n  refuted: ${spaced}\n  because: reasons\n  kinds: none\n`, "X.spec.md", { seed });
+  assert.ok(Date.now() - spacedStarted < 1000, "an interior run of spaces is linear too");
+
+  // Reviewer B: the date was three digit groups, so a day the calendar does not have parsed.
+  const noSuchDay = parseSpec(`${ENTRY}- bad date: A sentence.\n  refuted: broke it -> it went red (2026-13-45)\n  because: reasons\n  kinds: none\n`, "X.spec.md", { seed });
+  assert.deepEqual(noSuchDay.invariants[0]?.refutations, []);
+  assert.ok(
+    noSuchDay.problems.some((p) => p.message === "refuted on bad date ends with (2026-13-45), which is not a day that exists"),
+    JSON.stringify(noSuchDay.problems),
+  );
+  assert.equal(isCalendarDate("2026", "02", "29"), false, "2026 is not a leap year");
+  assert.equal(isCalendarDate("2024", "02", "29"), true);
+
+  const good = parseSpec(`${ENTRY}- fine: A sentence.\n  refuted: broke it -> it went red (2026-09-18)\n  because: reasons\n  kinds: none\n`, "X.spec.md", { seed });
+  assert.deepEqual(good.problems, []);
+  assert.deepEqual({ broke: good.invariants[0]?.refutations[0]?.broke, date: good.invariants[0]?.refutations[0]?.date }, { broke: "broke it", date: "2026-09-18" });
 });

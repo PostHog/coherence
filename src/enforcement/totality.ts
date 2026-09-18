@@ -167,15 +167,27 @@ export function parseReport(text: string): JsonReport {
 }
 
 /**
- * Whether a reported test belongs to the test a `via` value names. The
- * runner selected by pattern match on the full name, so the mapping matches
- * the same way: the value is contained in a describe title above the test,
- * in its own title, or in the full name.
+ * Whether a reported test belongs to the test a `via` value names, by exact
+ * title: the value is the test's own title, one of the titles above it, or its
+ * full name. A substring mapping let a bullet's verdict come from a different
+ * test whose title merely contained its name, which is the whole mapping the
+ * batched pass rests on.
+ *
+ * The one stated fallback is a runner that truncates titles in its report: a
+ * reported title ending in an ellipsis matches the via it is a prefix of, and
+ * nothing else. Nothing else falls back.
  */
 function belongsTo(result: AssertionResult, via: string): boolean {
-  if (result.title?.includes(via)) return true;
-  if (result.ancestorTitles?.some((title) => title.includes(via))) return true;
-  return result.fullName?.includes(via) ?? false;
+  if (result.title === via || result.fullName === via) return true;
+  if (result.ancestorTitles?.includes(via) === true) return true;
+  return truncatedTo(result.title, via) || truncatedTo(result.fullName, via);
+}
+
+/** A title the runner cut short: the ellipsis it ends with, and the rest a prefix of the via. */
+function truncatedTo(reported: string | undefined, via: string): boolean {
+  if (reported === undefined) return false;
+  const cut = /^(.+?)(?:\.\.\.|…)$/.exec(reported);
+  return cut !== null && via.startsWith(cut[1]!) && cut[1]!.length < via.length;
 }
 
 /** The verdict for each test a bullet names from one jest-shaped report. */

@@ -16,6 +16,12 @@ test("a spec value reads as a bare symbol, a symbol in a file, a module path, or
   assert.deepEqual(parseName("entities/Hive/policy.ts"), { form: "module", path: "entities/Hive/policy.ts" });
   assert.equal(parseName("the kernel tables (KERNEL_TABLES) reached through data.ts").form, "prose");
   assert.equal(parseName("IMMUTABLE and IMMUTABLE_AFTER_CREATE in kernel.ts").form, "prose");
+  // A spec name can never resolve outside the project root: agent-authored text is never trusted about itself.
+  assert.equal(parseName("../../../etc/passwd.txt").form, "prose");
+  assert.equal(parseName("src/../../secrets/keys.ts").form, "prose");
+  assert.equal(parseName("/etc/hosts.conf").form, "prose");
+  assert.equal(parseName("src//double.ts").form, "prose");
+  assert.deepEqual(parseName("src/store/..secrets.ts"), { form: "module", path: "src/store/..secrets.ts" }, "a leading pair of dots in a name is not a parent segment");
 });
 
 test("a path is a test when a configured folder is a segment or the file is named .test or .spec", () => {

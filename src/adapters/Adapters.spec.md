@@ -3,12 +3,12 @@
 The language adapter seam: how to ask a language's server for definitions, references, visibility, a test filter, and a synthetic refutation.
 
 ## invariants
-- name forms: A spec value reads as a bare symbol, a symbol in its file, or a module path, and prose never resolves; one function decides the form.
+- name forms: A spec value reads as a bare symbol, a symbol in its file, or a module path that stays under the project root, and prose never resolves; one function decides the form.
   protects: IDENTIFIER in adapter.ts
   chokepoint: parseName
   over: every value a spec writes under protects, chokepoint, or as a module path
   via: a spec value reads as a bare symbol, a symbol in a file, a module path, or prose
-  because: fourteen of the reference's sixteen chokepoint claims had prose where the protected thing belongs and stood green for months; a value that does not read as a symbol or a module must be refused as prose by one function before any instrument is asked, so a claim about nothing cannot pass
+  because: fourteen of the reference's sixteen chokepoint claims had prose where the protected thing belongs and stood green for months; a value that does not read as a symbol or a module must be refused as prose by one function before any instrument is asked, so a claim about nothing cannot pass. Spec text is agent-authored and never trusted about itself, so a path with a parent segment or a leading slash is prose too: the module form accepted "..", and a spec could name a file above the project root for the tool to read
   crossing: project-source -> instrument
   refuted: made parseName read prose as a bare symbol -> "a spec value reads as a bare symbol, a symbol in a file, a module path, or prose" went red in adapter.test.ts; restored, green (2026-09-17)
   kinds: none

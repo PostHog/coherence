@@ -572,3 +572,32 @@ test("refute runs the bullet's totality oracle with the break staged, requires i
   assert.match(errors.join("\n"), /carries no totality oracle form/);
   rmSync(join(root, ".coherence", "runs"), { recursive: true, force: true });
 });
+
+test("a report entry maps to a via by exact title, with the one stated fallback for a runner that truncates", async () => {
+  const { verdictsFromReport } = await import("./totality.ts");
+  // Reviewer A and B: the mapping was by substring, so a different test whose title contains the via
+  // answered for it. Here the bullet's own test passes and a neighbour with a longer name fails.
+  const report = {
+    testResults: [
+      { assertionResults: [
+        { ancestorTitles: [], title: "egress totality", status: "passed", fullName: "egress totality" },
+        { ancestorTitles: [], title: "egress totality under load", status: "failed", fullName: "egress totality under load" },
+        { ancestorTitles: ["door totality"], title: "closes", status: "passed", fullName: "door totality closes" },
+      ] },
+    ],
+  };
+  const verdicts = verdictsFromReport(report, ["egress totality", "door totality"], "runner");
+  assert.equal(verdicts.get("egress totality")!.verdict, "pass", "the neighbour's failure is not this bullet's");
+  assert.match(verdicts.get("egress totality")!.reason, /1 test under "egress totality" passed/);
+  assert.equal(verdicts.get("door totality")!.verdict, "pass", "a title above the test still names it");
+
+  // The other direction: a via that is a prefix of nothing reported is not run, never borrowed.
+  const orphan = verdictsFromReport(report, ["egress"], "runner");
+  assert.equal(orphan.get("egress")!.verdict, "fail");
+  assert.match(orphan.get("egress")!.reason, /no test ran under the name "egress"/);
+
+  // The stated fallback: a runner that cuts the title short.
+  const cut = { testResults: [{ assertionResults: [{ ancestorTitles: [], title: "egress totality strips ever…", status: "passed", fullName: "egress totality strips ever…" }] }] };
+  assert.equal(verdictsFromReport(cut, ["egress totality strips every secret column"], "runner").get("egress totality strips every secret column")!.verdict, "pass");
+  assert.equal(verdictsFromReport(cut, ["door totality"], "runner").get("door totality")!.verdict, "fail", "a truncated title matches only the via it is a prefix of");
+});
