@@ -199,6 +199,52 @@ test("an unacknowledged escalation heads the start output; an acknowledged one d
   assert.match((JSON.parse(after.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext, /^Coherence vocabulary/);
 });
 
+test("the start injection stays under the budget with escalations present: the vocabulary steps down to names and then to a pointer, and no escalation is shortened", async () => {
+  const dir = await freshRoot();
+  try {
+    const io = { cwd: dir, out: () => {}, err: () => {} };
+    const ids: string[] = [];
+    const what = (n: number): string => `retire invariant ${n}: ${"the chokepoint no longer reflects how the store is reached and a human must weigh the reliance listing ".repeat(4)}`;
+    for (let n = 0; n < 8; n += 1) {
+      const printed: string[] = [];
+      assert.equal(journalVerbs["escalate"]!([what(n), "--because", `only the owner can retire a vertebra, and this is the ${n}th`, "--session", `peer-${n}`, "--agent", "scope"], { ...io, out: (l) => printed.push(l) }), 0);
+      ids.push(printed[0]!.split(/\s+/)[0]!);
+    }
+    const context = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
+    assert.ok(context.length <= CONTEXT_BUDGET, `${context.length} characters against a budget of ${CONTEXT_BUDGET}`);
+    for (let n = 0; n < 8; n += 1) assert.ok(context.includes(`▲ ${ids[n]}  scope  ${what(n)} — only the owner can retire a vertebra, and this is the ${n}th`), `escalation ${n} is shown whole`);
+    assert.doesNotMatch(context, /^- invariant: /m, "the vocabulary stepped down: no full concept line");
+    assert.match(context, /^Coherence vocabulary \(\d+ concepts; names only here, rejected names are defects; full entries: coherence glossary\):\n/m, "Coherence's layer at names only");
+    assert.match(context, /\nSession: s-budget\n/, "the session block still rides along");
+
+    // More escalations, until even the names do not fit: the vocabulary gives way to one line that points at the glossary command.
+    let pointed = context;
+    for (let n = 8; n < 40 && /^Coherence vocabulary/m.test(pointed); n += 1) {
+      const printed: string[] = [];
+      assert.equal(journalVerbs["escalate"]!([what(n), "--because", `only the owner can retire a vertebra, and this is the ${n}th`, "--session", `peer-${n}`, "--agent", "scope"], { ...io, out: (l) => printed.push(l) }), 0);
+      ids.push(printed[0]!.split(/\s+/)[0]!);
+      pointed = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
+    }
+    assert.doesNotMatch(pointed, /^Coherence vocabulary/m, "the names no longer fit");
+    assert.match(pointed, /^Vocabulary omitted to stay under the host budget; full entries: node_modules\/\.bin\/coherence glossary$/m, "one line points at the glossary command instead");
+    assert.ok(pointed.length <= CONTEXT_BUDGET, `${pointed.length} characters against a budget of ${CONTEXT_BUDGET}`);
+    ids.forEach((id, n) => assert.ok(pointed.includes(`▲ ${id}  scope  ${what(n)} — only the owner`), `escalation ${n} is still shown whole`));
+
+    const one = await freshRoot();
+    try {
+      assert.equal(journalVerbs["escalate"]!(["one question", "--because", "a human decides", "--session", "peer", "--agent", "scope"], { ...io, cwd: one }), 0);
+      const light = contextOf(await runHook("SessionStart", { cwd: one, session_id: "s-light" }, one));
+      assert.ok(light.length <= CONTEXT_BUDGET);
+      assert.match(light, /^Escalations awaiting a human \(1\)/);
+      assert.match(light, /^- invariant: /m, "with room to spare the vocabulary is injected in full");
+    } finally {
+      await rm(one, { recursive: true, force: true });
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("readStdinJson tolerates empty and malformed input", async () => {
   assert.deepEqual(await readStdinJson(Readable.from([""])), {});
   assert.deepEqual(await readStdinJson(Readable.from(["not json"])), {});

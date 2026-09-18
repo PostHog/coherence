@@ -221,11 +221,16 @@ export function workStopText(root: string, input: HookInput): string {
     .join("\n");
 }
 
+/** How a session at this root invokes the tool: its own source tree, or the installed bin. */
+async function cliName(root: string): Promise<string> {
+  return (await isCoherenceItself(root)) ? "node src/cli.ts" : "node_modules/.bin/coherence";
+}
+
 /** The session id as the exact --session value, a decide template, and the rule. */
 export async function sessionBlock(root: string, input: HookInput): Promise<string> {
   const session = sessionOf(input);
   const agent = agentOf(input);
-  const cli = (await isCoherenceItself(root)) ? "node src/cli.ts" : "node_modules/.bin/coherence";
+  const cli = await cliName(root);
   const id = session ?? "<the id your harness shows>";
   return [
     `Session: ${session ?? "unknown"}`,
@@ -380,11 +385,18 @@ export async function editContext(root: string, input: HookInput, options: HookO
   return lines.join("\n") + "\n";
 }
 
+/**
+ * The start injection: escalations (never shortened), what the spec and the
+ * work orders owe, the vocabulary at the richest level that leaves the whole
+ * under the budget, and the session block. When the escalations alone crowd
+ * the budget, the vocabulary steps down to names and then to one line that
+ * points at the glossary command.
+ */
 export async function startContext(root: string, input: HookInput = {}): Promise<string> {
   const { coherence, project } = await loadProjectGlossaries(root);
   const head = escalationBlock(root) + specBlock(root) + workBlock(root, input);
   const tail = `\n${await sessionBlock(root, input)}`;
-  const { text } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length);
+  const { text } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root));
   return head + text + tail;
 }
 

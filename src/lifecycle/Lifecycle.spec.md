@@ -15,12 +15,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: commit-ordered-effects dismissed: nothing is committed before the injection and it has no external effect
   checklist: circuit-breaker-policy dismissed: no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
-- injection within budget: The start injection stays under the host budget: the project layer steps down in detail until the text fits, and Coherence's layer never shrinks.
-  over: both glossary layers at every detail level
-  via: renderCompactWithin steps the project layer down until the text fits; Coherence's layer never shrinks
-  because: a host replaces an over-long injection with a file preview or spills it, so an injection that overran the budget would be read by nobody; the project layer is the one that can shrink because its full entries are one command away
+- injection within budget: The start injection stays under the host budget: the project layer steps down in detail until the whole fits; when what must be shown whole (escalations are never shortened) leaves no room, Coherence's layer steps down to names and then to one line that points at the glossary command.
+  over: every start injection, with both glossary layers at every level and any number of open escalations ahead of them
+  via: the start injection stays under the budget with escalations present: the vocabulary steps down to names and then to a pointer, and no escalation is shortened
+  because: a host replaces an over-long injection with a file preview or spills it, so an injection that overran the budget would be read by nobody, and the one record that exists for a human would be the thing that hid itself; the vocabulary can shrink because its full entries are one command away, the escalations cannot
   crossing: project-source -> reading
-  refuted: made renderCompactWithin return the full form without checking the length -> "renderCompactWithin steps the project layer down until the text fits; Coherence's layer never shrinks" went red in glossary.test.ts; restored, green (2026-09-17)
+  refuted: returned the full vocabulary unchecked whenever no project layer could step down, so eight open escalations put the start injection at 11,614 characters against 9,500 -> "the start injection stays under the budget with escalations present: the vocabulary steps down to names and then to a pointer, and no escalation is shortened" went red in hook.test.ts; restored, green (2026-09-17)
   kinds: budget
   checklist: bounded-admission dismissed: no concurrent work is admitted; the bound is a character count on one document
   checklist: fair-admission dismissed: there are no contenders for the budget
