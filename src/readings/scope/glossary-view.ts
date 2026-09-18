@@ -6,6 +6,7 @@
  * state on every call, so the page can never disagree with itself.
  */
 
+import { plural } from "./derive.ts";
 import { html, join, raw, slug, type Markup } from "./html.ts";
 import type {
   Concept,
@@ -77,10 +78,6 @@ function conceptMatches(concept: Concept, query: string): boolean {
 
 function humanize(key: string): string {
   return key.replace(/_/g, " ");
-}
-
-function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
 }
 
 /** The sentence that says how large a glossary is. Shared by the shell masthead. */

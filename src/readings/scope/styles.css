@@ -520,3 +520,551 @@ a {
 .record .quotation {
   margin-top: 0.5rem;
 }
+
+/* The model views: components, invariants, reliance, runs, journal */
+
+:root {
+  --pass: #1f7a3a;
+  --fail: #b3261e;
+  --hold: #8a6d00;
+  --pass-wash: #e6f4ea;
+  --fail-wash: #fbe9e7;
+  --hold-wash: #fff6d6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pass: #7fd39a;
+    --fail: #ff8a80;
+    --hold: #e6c35c;
+    --pass-wash: #17301f;
+    --fail-wash: #3a1a18;
+    --hold-wash: #35300f;
+  }
+}
+
+.masthead .model-counts {
+  font-size: 0.9375rem;
+  color: var(--ink-quiet);
+  max-width: 60ch;
+}
+
+.view-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 2rem;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-quiet);
+}
+
+.filter select {
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--rule);
+  border-radius: 0.375rem;
+  padding: 0.35rem 0.5rem;
+  max-width: 14rem;
+}
+
+.absence {
+  font-family: var(--serif);
+  color: var(--ink-quiet);
+  max-width: 60ch;
+  margin: 0.5rem 0 0;
+  padding: 1rem 1.25rem;
+  border-left: 3px solid var(--rule);
+}
+
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.875em;
+  overflow-wrap: anywhere;
+}
+
+/* State marks and verdicts */
+
+.state-mark,
+.verdict-word,
+.owner-mark,
+.kept,
+.dirty {
+  display: inline-block;
+  font-family: var(--sans);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  padding: 0.05rem 0.45rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--rule);
+  color: var(--ink-quiet);
+  background: var(--field);
+  vertical-align: 0.1em;
+}
+
+.state-mark[data-state="invariant"],
+.verdict[data-verdict="pass"] .verdict-word,
+.verdict-word[data-verdict="pass"] {
+  color: var(--pass);
+  border-color: var(--pass);
+  background: var(--pass-wash);
+}
+
+.state-mark[data-state="structural defect"],
+.verdict[data-verdict="fail"] .verdict-word,
+.verdict-word[data-verdict="fail"] {
+  color: var(--fail);
+  border-color: var(--fail);
+  background: var(--fail-wash);
+}
+
+.state-mark[data-state="requirement"],
+.verdict[data-verdict="not run"] .verdict-word,
+.verdict-word[data-verdict="not run"],
+.kept {
+  color: var(--hold);
+  border-color: var(--hold);
+  background: var(--hold-wash);
+}
+
+.dirty {
+  color: var(--hold);
+  border-color: var(--hold);
+}
+
+.owner-mark {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: none;
+}
+
+.entry[data-state="structural defect"] > .margin .headword,
+.defect-count,
+.count.failing {
+  color: var(--fail);
+}
+
+.grade {
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.enforced-by {
+  font-family: var(--sans);
+  font-size: 0.875rem;
+}
+
+.verdict {
+  margin-top: 0.25rem;
+}
+
+.reason {
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* Components */
+
+.component[data-depth="1"] {
+  margin-left: 1.25rem;
+}
+
+.component[data-depth="2"] {
+  margin-left: 2.5rem;
+}
+
+.component[data-depth="3"] {
+  margin-left: 3.75rem;
+}
+
+.component[aria-current="true"] {
+  background: linear-gradient(to right, var(--field), transparent 70%);
+}
+
+.counts-line {
+  margin-top: 0.75rem;
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+}
+
+.counts-line .count + .count::before,
+.definition .count + .count::before {
+  content: " · ";
+  color: var(--ink-quiet);
+}
+
+.mass {
+  margin-top: 0.5rem;
+  font-family: var(--sans);
+  font-size: 0.875rem;
+}
+
+.select-line {
+  margin-top: 0.75rem;
+}
+
+.select {
+  appearance: none;
+  font: inherit;
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 0.375rem;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+}
+
+.select:hover {
+  border-color: var(--accent);
+}
+
+.invariant-lines {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invariant-lines li {
+  padding: 0.35rem 0 0.35rem 1rem;
+  border-left: 3px solid var(--rule-soft);
+}
+
+.invariant-lines li[data-state="structural defect"] {
+  border-left-color: var(--fail);
+}
+
+.invariant-lines li + li {
+  margin-top: 0.25rem;
+}
+
+/* Invariants */
+
+.crossing {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.crossing .level {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  border-bottom: 1px dotted var(--rule);
+  cursor: help;
+}
+
+.because {
+  margin-top: 0.75rem;
+}
+
+.enforcements,
+.refutations,
+.checklist,
+.defect {
+  margin-top: 1.25rem;
+}
+
+.enforcements h4,
+.refutations h4,
+.checklist h4,
+.defect h4,
+.candidates h4,
+.steps h4,
+.damaged h4 {
+  margin: 0 0 0.375rem;
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+}
+
+.enforcements ul,
+.refutations ul,
+.checklist ul,
+.bypasses,
+.reliance-entries,
+.run-entries,
+.results,
+.candidates ul,
+.files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.enforcements li,
+.refutations li,
+.checklist li,
+.bypasses li {
+  padding: 0.5rem 0 0.5rem 1rem;
+  border-left: 3px solid var(--rule-soft);
+}
+
+.enforcements li + li,
+.refutations li + li,
+.checklist li + li,
+.bypasses li + li {
+  margin-top: 0.375rem;
+}
+
+.refutation-word {
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.refutation[data-refutation="witnessed"] .refutation-word,
+.refutation[data-refutation="automatic"] .refutation-word {
+  color: var(--pass);
+}
+
+.refutation[data-refutation="missing"] .refutation-word {
+  color: var(--hold);
+}
+
+.refutation .arrow {
+  color: var(--ink-quiet);
+}
+
+.checklist .shape {
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.checklist li[data-outcome="missing"] {
+  border-left-color: var(--hold);
+}
+
+.lacks {
+  margin-top: 1rem;
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+  color: var(--hold);
+}
+
+.defect {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--fail);
+  border-radius: 0.375rem;
+  background: var(--fail-wash);
+}
+
+.defect h4 {
+  color: var(--fail);
+}
+
+.defect h5 {
+  margin: 1rem 0 0.375rem;
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.defect .bypasses li {
+  border-left-color: var(--fail);
+}
+
+.options {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.options li + li {
+  margin-top: 0.5rem;
+}
+
+.ladder {
+  margin-top: 0.75rem;
+}
+
+/* Reliance */
+
+.reliance-entries > li {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0 0.5rem 1rem;
+  border-left: 3px solid var(--rule-soft);
+}
+
+.reliance-entries > li[data-owner="true"] {
+  border-left-color: var(--accent);
+}
+
+.reliance-component {
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+}
+
+.files {
+  margin-top: 0.25rem;
+}
+
+.files li {
+  font-size: 0.9375rem;
+}
+
+/* Runs */
+
+.run-facts {
+  margin-top: 0.5rem;
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+}
+
+.run-facts .label {
+  margin-right: 0.25rem;
+}
+
+.run-facts .label:not(:first-child) {
+  margin-left: 0.75rem;
+}
+
+.run-entries li {
+  padding: 0.5rem 0 0.5rem 1rem;
+  border-left: 3px solid var(--rule-soft);
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+}
+
+.run-entries li + li {
+  margin-top: 0.25rem;
+}
+
+.run-entries li[data-verdict="fail"] {
+  border-left-color: var(--fail);
+}
+
+.run-entries li[data-verdict="pass"] {
+  border-left-color: var(--pass);
+}
+
+.verdict-glyph {
+  display: inline-block;
+  width: 1.25rem;
+  color: var(--ink-quiet);
+}
+
+.run-entry[data-verdict="fail"] .verdict-glyph {
+  color: var(--fail);
+}
+
+.run-entry[data-verdict="pass"] .verdict-glyph {
+  color: var(--pass);
+}
+
+.run[data-defects="true"] > .margin .headword {
+  color: var(--fail);
+}
+
+/* Journal */
+
+.journal-record .glyph {
+  display: inline-block;
+  width: 1.25rem;
+  color: var(--ink-quiet);
+}
+
+.journal-record[data-kind="escalation"] .glyph,
+.journal-record[data-kind="defect"] .glyph,
+.journal-record[data-kind="unable"] .glyph {
+  color: var(--fail);
+}
+
+.journal-record[data-kind="decision"] .glyph {
+  color: var(--accent);
+}
+
+.journal-record[data-kind="resolution"] .glyph,
+.journal-record[data-kind="acknowledgement"] .glyph {
+  color: var(--pass);
+}
+
+.record-status {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  color: var(--pass);
+}
+
+.escalations .entry {
+  background: linear-gradient(to right, var(--fail-wash), transparent 70%);
+}
+
+.candidates {
+  margin-top: 1rem;
+}
+
+.candidates li {
+  padding: 0.35rem 0 0.35rem 1rem;
+  border-left: 3px solid var(--rule-soft);
+}
+
+.candidates li + li {
+  margin-top: 0.25rem;
+}
+
+.discriminated {
+  margin-top: 0.75rem;
+}
+
+.steps {
+  margin-top: 1rem;
+}
+
+.steps ol {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.results li {
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+}
+
+.work-order[data-state="active"] > .margin .status {
+  color: var(--pass);
+}
+
+.damaged {
+  margin-top: 2rem;
+}
+
+.damaged ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+  color: var(--fail);
+}
+
+@media (max-width: 30rem) {
+  .views ul {
+    flex-wrap: wrap;
+  }
+
+  .views button {
+    font-size: 0.9375rem;
+    padding: 0.4rem 0.2rem 0.6rem;
+  }
+
+  .component[data-depth="1"],
+  .component[data-depth="2"],
+  .component[data-depth="3"] {
+    margin-left: 0.75rem;
+  }
+}
