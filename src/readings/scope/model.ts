@@ -173,34 +173,8 @@ export type LifecycleState = "requirement" | "invariant" | "structural defect";
 
 export type Lack = "enforcement" | "refutation" | "kinds" | "checklist" | "because";
 
-export type Form = "chokepoint" | "totality oracle";
-export type Verdict = "pass" | "fail" | "not run";
-export type Grade = "visibility-choked" | "reference-choked" | "broken" | "not chokeable";
-export type RefutationState = "automatic" | "witnessed" | "missing";
-
-/** One reference site outside the chokepoint: a structural defect's evidence. */
-export interface Bypass {
-  file: string;
-  line: number;
-  symbol: string;
-}
-
-/** One enforcement's entry in one run, as src/enforcement records it. */
-export interface RunEntry {
-  component: string;
-  name: string;
-  form: Form;
-  verdict: Verdict;
-  grade?: Grade;
-  mode?: "batched" | "one-at-a-time";
-  refutation: RefutationState;
-  bypasses: Bypass[];
-  testReferences: number;
-  /** Files the check touched: definitions and every reference site. */
-  files: string[];
-  latency: number;
-  reason: string;
-}
+export type { Form, Verdict, Grade, RefutationState, Bypass, RunEntry, RunRecord } from "../../enforcement/record.ts";
+import type { Bypass, Form, Grade, RefutationState, RunEntry, RunRecord, Verdict } from "../../enforcement/record.ts";
 
 /** A run entry with the run it came from: the latest verdict for one enforcement. */
 export interface LatestEntry extends RunEntry {
@@ -283,17 +257,6 @@ export interface SpecData {
   ladder: Ladder;
 }
 
-/** One run record, as src/enforcement appends it. */
-export interface RunRecord {
-  at: string;
-  session: string;
-  agent: string;
-  commit: string | null;
-  dirty: boolean;
-  instrument: { language: string; server: "cold" | "warm" | "none" };
-  latency: number;
-  invariants: RunEntry[];
-}
 
 /** A line of a record file that would not parse, reported and never dropped. */
 export interface Damaged {
