@@ -140,12 +140,285 @@ export interface ViewIdentity {
   label: string;
 }
 
+/*
+ * The spec model, as the page carries it. These shapes mirror what
+ * `loadSpecModel` in src/spec returns, minus the machine's absolute root, so
+ * the browser bundle reads them without importing the tool's own modules.
+ * Every field is the tool's own fact; the views derive the rest.
+ */
+
+export type SpecEnforcement =
+  | { form: "chokepoint"; protects: string; chokepoint: string; line: number }
+  | { form: "totality oracle"; over: string; via: string; line: number };
+
+export interface SpecRefutation {
+  broke: string;
+  saw: string;
+  date: string;
+  line: number;
+}
+
+export interface SpecCrossing {
+  from: string;
+  to: string;
+  line: number;
+}
+
+export type SpecChecklistLine =
+  | { shape: string; outcome: "declared"; as: string; line: number }
+  | { shape: string; outcome: "dismissed"; reason: string; line: number };
+
+/** The lifecycle state of a bullet, as src/spec derives it. */
+export type LifecycleState = "requirement" | "invariant" | "structural defect";
+
+export type Lack = "enforcement" | "refutation" | "kinds" | "checklist" | "because";
+
+export type Form = "chokepoint" | "totality oracle";
+export type Verdict = "pass" | "fail" | "not run";
+export type Grade = "visibility-choked" | "reference-choked" | "broken" | "not chokeable";
+export type RefutationState = "automatic" | "witnessed" | "missing";
+
+/** One reference site outside the chokepoint: a structural defect's evidence. */
+export interface Bypass {
+  file: string;
+  line: number;
+  symbol: string;
+}
+
+/** One enforcement's entry in one run, as src/enforcement records it. */
+export interface RunEntry {
+  component: string;
+  name: string;
+  form: Form;
+  verdict: Verdict;
+  grade?: Grade;
+  mode?: "batched" | "one-at-a-time";
+  refutation: RefutationState;
+  bypasses: Bypass[];
+  testReferences: number;
+  /** Files the check touched: definitions and every reference site. */
+  files: string[];
+  latency: number;
+  reason: string;
+}
+
+/** A run entry with the run it came from: the latest verdict for one enforcement. */
+export interface LatestEntry extends RunEntry {
+  at: string;
+  commit: string | null;
+  session: string;
+}
+
+export interface SpecInvariant {
+  name: string;
+  sentence: string;
+  line: number;
+  enforcements: SpecEnforcement[];
+  because: string | undefined;
+  crossing: SpecCrossing | undefined;
+  refutations: SpecRefutation[];
+  kinds: string[] | "none" | undefined;
+  checklist: SpecChecklistLine[];
+  unfilled: string[];
+  /** The folder of the component the bullet lives in. */
+  component: string;
+  applicable: string[];
+  missingShapes: string[];
+  state: LifecycleState;
+  lacks: Lack[];
+  /** The latest run entry per form that checked this bullet; empty when none has. */
+  latest: LatestEntry[];
+  verified: LatestEntry[];
+  defects: LatestEntry[];
+}
+
+export interface SpecComponent {
+  /** Relative to the root, with "." for the root itself. */
+  folder: string;
+  name: string;
+  specPath: string;
+  intent: string;
+  trustLevels: TrustLevel[] | undefined;
+  invariants: SpecInvariant[];
+  parent: string | undefined;
+  children: string[];
+}
+
+export interface SpecProblem {
+  file: string;
+  line: number;
+  message: string;
+}
+
+export interface SpecCounts {
+  components: number;
+  bullets: number;
+  invariants: number;
+  requirements: number;
+  structuralDefects: number;
+  lacking: Record<Lack, number>;
+  unfilled: number;
+  problems: number;
+}
+
+/** One rung of the chokepoint grade ladder and who enforces it. */
+export interface LadderRung {
+  grade: Grade;
+  enforcedBy: string;
+}
+
+/** The ladder the project's language adapter defines, top rung first. */
+export interface Ladder {
+  language: string;
+  rungs: LadderRung[];
+}
+
+export interface SpecData {
+  /** The entry component's folder, when a spec is there. */
+  entry: string | undefined;
+  trustLevels: TrustLevel[];
+  components: SpecComponent[];
+  problems: SpecProblem[];
+  counts: SpecCounts;
+  ladder: Ladder;
+}
+
+/** One run record, as src/enforcement appends it. */
+export interface RunRecord {
+  at: string;
+  session: string;
+  agent: string;
+  commit: string | null;
+  dirty: boolean;
+  instrument: { language: string; server: "cold" | "warm" | "none" };
+  latency: number;
+  invariants: RunEntry[];
+}
+
+/** A line of a record file that would not parse, reported and never dropped. */
+export interface Damaged {
+  file: string;
+  line: number;
+  reason: string;
+}
+
+export interface RunsData {
+  /** Oldest first, as the loader orders them. */
+  records: RunRecord[];
+  damaged: Damaged[];
+}
+
+/* The journal, as src/journal records it. */
+
+export type JournalKind =
+  | "decision"
+  | "retraction"
+  | "conjecture"
+  | "resolution"
+  | "dismissal"
+  | "defect"
+  | "experiment"
+  | "close"
+  | "unable"
+  | "escalation"
+  | "acknowledgement";
+
+export interface JournalHead {
+  id: string;
+  kind: JournalKind;
+  at: string;
+  session: string;
+  agent: string;
+  work?: string;
+  commit: string | null;
+  dirty: boolean;
+}
+
+export interface JournalStep {
+  id: string;
+  text: string;
+}
+
+export type JournalRecord =
+  | (JournalHead & { kind: "decision"; chose: string; over: string[] | "none"; because: string })
+  | (JournalHead & { kind: "retraction"; of: string; because: string })
+  | (JournalHead & { kind: "conjecture"; observation: string; couldBe: string[]; discriminatedBy: string })
+  | (JournalHead & { kind: "resolution"; of: string; because: string; as?: string })
+  | (JournalHead & { kind: "dismissal"; of: string; because: string })
+  | (JournalHead & { kind: "defect"; what: string; evidence: string; files: string[] })
+  | (JournalHead & { kind: "experiment"; expectation: string; context: string[]; actions: JournalStep[]; criteria: JournalStep[] })
+  | (JournalHead & { kind: "close"; of: string; results: Record<string, "pass" | "fail" | "unknown">; outcome: "success" | "failure" | "inconclusive" })
+  | (JournalHead & { kind: "unable"; what: string; because: string })
+  | (JournalHead & { kind: "escalation"; what: string; because: string })
+  | (JournalHead & { kind: "acknowledgement"; of: string; because: string });
+
+/**
+ * One work order, read tolerantly: the id and every field the file said.
+ * The work orders' shape belongs to the journal; the page renders what it
+ * finds and names the fields it recognizes (state, objective, owner).
+ */
+export interface WorkOrder {
+  id: string;
+  fields: Fields;
+}
+
+/** The work orders under .coherence/work, or their absence with the reason. */
+export type WorkData =
+  | { kind: "present"; orders: WorkOrder[]; damaged: Damaged[] }
+  | { kind: "absent"; because: string };
+
+export interface JournalData {
+  /** Oldest first, as the loader orders them. */
+  records: JournalRecord[];
+  damaged: Damaged[];
+  work: WorkData;
+}
+
+/* The reader's state per view: a query and, where the view filters, the filter. */
+
+export interface ComponentsViewState {
+  query: string;
+  /** The folder of the selected component, whose invariants are shown. Absent until the reader selects one. */
+  selected?: string;
+}
+
+export interface InvariantsViewState {
+  query: string;
+  /** "" for every state. */
+  state: LifecycleState | "";
+  /** A component folder, or "" for every component. */
+  component: string;
+}
+
+export interface RelianceViewState {
+  query: string;
+}
+
+export interface RunsViewState {
+  query: string;
+}
+
+export interface JournalViewState {
+  query: string;
+  kind: JournalKind | "";
+  agent: string;
+  session: string;
+}
+
 /** The whole state of the Scope shell. The page is a function of this value. */
 export interface ShellState {
   project: string;
   views: ViewIdentity[];
   activeView: string;
   glossary: GlossaryViewState;
+  spec: SpecData;
+  runs: RunsData;
+  journal: JournalData;
+  components: ComponentsViewState;
+  invariants: InvariantsViewState;
+  reliance: RelianceViewState;
+  runsView: RunsViewState;
+  journalView: JournalViewState;
 }
 
 /** The keys of a concept entry that are vocabulary, detail, or provenance. Everything else is record. */

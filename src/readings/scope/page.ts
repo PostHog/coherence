@@ -4,15 +4,18 @@
  * The page holds one `ShellState`, parsed once from the JSON the builder
  * embedded. Every change to what the reader sees is a change to that state
  * followed by a render; nothing is written to the DOM that a render could not
- * regenerate. The only other place a value lives is the search field, whose
- * current text is copied into `state.glossary.query` on every input event.
+ * regenerate. The only other places a value lives are the search field and
+ * the filter selects, whose current values are copied into the active view's
+ * state on every input or change event. The hash is read, never written to
+ * the state: a hash resolves to a view and a card on load and on change.
  *
  * This file is stripped of types and inlined into the page together with the
  * modules it imports, so it must not rely on anything outside them.
  */
 
-import type { ShellState } from "./model.ts";
-import { renderGlossaryResults, renderShell } from "./shell.ts";
+import { componentOfHash, resolveHash } from "./derive.ts";
+import type { JournalKind, LifecycleState, ShellState } from "./model.ts";
+import { renderShell, renderViewResults } from "./shell.ts";
 
 function readEmbeddedState(): ShellState {
   const node = document.getElementById("scope-state");
@@ -20,6 +23,44 @@ function readEmbeddedState(): ShellState {
     throw new Error("Scope: the embedded state is missing from this page.");
   }
   return JSON.parse(node.textContent) as ShellState;
+}
+
+/** The query field of the active view. */
+function setQuery(state: ShellState, value: string): void {
+  switch (state.activeView) {
+    case "glossary":
+      state.glossary.query = value;
+      return;
+    case "components":
+      state.components.query = value;
+      return;
+    case "invariants":
+      state.invariants.query = value;
+      return;
+    case "reliance":
+      state.reliance.query = value;
+      return;
+    case "runs":
+      state.runsView.query = value;
+      return;
+    case "journal":
+      state.journalView.query = value;
+      return;
+    default:
+      return;
+  }
+}
+
+/** A filter of the active view. Unknown names are ignored. */
+function setFilter(state: ShellState, name: string, value: string): void {
+  if (state.activeView === "invariants") {
+    if (name === "state") state.invariants.state = value as LifecycleState | "";
+    if (name === "component") state.invariants.component = value;
+  } else if (state.activeView === "journal") {
+    if (name === "kind") state.journalView.kind = value as JournalKind | "";
+    if (name === "agent") state.journalView.agent = value;
+    if (name === "session") state.journalView.session = value;
+  }
 }
 
 function boot(): void {
@@ -34,13 +75,42 @@ function boot(): void {
   const renderResults = (): void => {
     const results = root.querySelector<HTMLElement>("[data-results]");
     if (results === null) return renderAll();
-    results.innerHTML = renderGlossaryResults(state).text;
+    results.innerHTML = renderViewResults(state).text;
+  };
+
+  const showView = (view: string): void => {
+    if (view === state.activeView) return;
+    state.activeView = view;
+    renderAll();
+  };
+
+  /** Land on what the hash names: its view first, then the card. */
+  const followHash = (): void => {
+    const target = resolveHash(state, location.hash);
+    if (target === undefined) return;
+    if (target.id !== undefined) {
+      const component = componentOfHash(state, target.id);
+      if (component !== undefined) state.components.selected = component.folder;
+    }
+    const changed = target.view !== state.activeView;
+    state.activeView = target.view;
+    if (changed || target.id !== undefined) renderAll();
+    if (target.id !== undefined) document.getElementById(decodeURIComponent(target.id))?.scrollIntoView();
   };
 
   root.addEventListener("input", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement) || !target.hasAttribute("data-search")) return;
-    state.glossary.query = target.value;
+    setQuery(state, target.value);
+    renderResults();
+  });
+
+  root.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLSelectElement)) return;
+    const name = target.dataset["filter"];
+    if (name === undefined) return;
+    setFilter(state, name, target.value);
     renderResults();
   });
 
@@ -52,19 +122,39 @@ function boot(): void {
     if (tab !== null) {
       const view = tab.dataset["view"];
       if (view !== undefined && view !== state.activeView) {
-        state.activeView = view;
-        renderAll();
+        showView(view);
+        history.replaceState(null, "", `#${view}`);
         root.querySelector<HTMLElement>("[role=tab][aria-selected=true]")?.focus();
       }
       return;
     }
 
-    // A related link must land on its card even when the query has hidden it:
-    // clear the query and render before the browser follows the link.
-    const link = target.closest<HTMLAnchorElement>("a.related-link");
-    if (link !== null && state.glossary.query !== "") {
-      state.glossary.query = "";
-      renderAll();
+    const select = target.closest<HTMLElement>("[data-select-component]");
+    if (select !== null) {
+      const folder = select.dataset["selectComponent"];
+      if (folder === undefined || state.components.selected === folder) delete state.components.selected;
+      else state.components.selected = folder;
+      renderResults();
+      return;
+    }
+
+    // A link into a card must land on it even when a query has hidden it or
+    // another view holds it: clear the active view's query, then let the
+    // hash change resolve the view.
+    const link = target.closest<HTMLAnchorElement>("a[href^='#']");
+    if (link !== null) {
+      const hash = link.getAttribute("href") ?? "";
+      const resolved = resolveHash(state, hash);
+      if (resolved === undefined) return;
+      if (resolved.view === state.activeView) {
+        setQuery(state, "");
+        renderResults();
+      }
+      if (hash === location.hash) {
+        // Same hash again fires no hashchange; follow it by hand.
+        event.preventDefault();
+        followHash();
+      }
     }
   });
 
@@ -78,18 +168,16 @@ function boot(): void {
     const step = event.key === "ArrowRight" ? 1 : -1;
     const next = ids[(current + step + ids.length) % ids.length];
     if (next === undefined) return;
-    state.activeView = next;
-    renderAll();
+    showView(next);
+    history.replaceState(null, "", `#${next}`);
     root.querySelector<HTMLElement>("[role=tab][aria-selected=true]")?.focus();
     event.preventDefault();
   });
 
-  renderAll();
+  window.addEventListener("hashchange", followHash);
 
-  // Honor a hash that arrived before the first render.
-  if (location.hash.length > 1) {
-    document.getElementById(decodeURIComponent(location.hash.slice(1)))?.scrollIntoView();
-  }
+  renderAll();
+  followHash();
 }
 
 boot();

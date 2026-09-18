@@ -10,11 +10,17 @@
 
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
-import { test } from "node:test";
+import { dirname } from "node:path";
+import { after, before, test } from "node:test";
+import { loadRuns } from "../../enforcement/record.ts";
+import { loadJournal } from "../../journal/store.ts";
+import { loadSpecModel } from "../../spec/model.ts";
 import { DEFAULTS, buildScopePage, writeScopePage, type BuildOptions } from "./build.ts";
+import { makeFixture, type Fixture } from "./check-fixture.ts";
+import { componentId, invariantId, journalId, relianceId, resolveHash, runId, workId } from "./derive.ts";
 import { escapeHtml } from "./html.ts";
 import type { Glossary, ShellState } from "./model.ts";
-import { renderShell } from "./shell.ts";
+import { renderShell, renderView } from "./shell.ts";
 
 const options: BuildOptions = {
   glossaryPath: DEFAULTS.glossaryPath,
@@ -23,8 +29,37 @@ const options: BuildOptions = {
 
 const MNEMION_GLOSSARY =
   process.env["COHERENCE_DOMAIN_GLOSSARY"] ?? "/Users/daniloc/Documents/Dev/mnemion/mnemion-js/glossary.json";
+const MNEMION_ROOT = dirname(MNEMION_GLOSSARY);
 
 const TWO_MB = 2 * 1024 * 1024;
+const THREE_MB = 3 * 1024 * 1024;
+
+let fixture: Fixture;
+let fixtureState: ShellState;
+
+before(async () => {
+  fixture = makeFixture();
+  ({ state: fixtureState } = await buildScopePage({ root: fixture.root, glossaryPath: DEFAULTS.glossaryPath, project: "Fixture" }));
+});
+
+after(() => fixture.remove());
+
+/** A fresh copy of the fixture state, so a test's filters never leak into another's. */
+function fresh(): ShellState {
+  return JSON.parse(JSON.stringify(fixtureState)) as ShellState;
+}
+
+/** The markup of one card on a view. */
+function card(rendered: string, id: string): string {
+  const start = rendered.indexOf(`id="${id}"`);
+  assert.ok(start !== -1, `card ${id} is on the page`);
+  return rendered.slice(start, rendered.indexOf("</article>", start));
+}
+
+/** Every card id a view renders, in order. */
+function cardIds(rendered: string): string[] {
+  return [...rendered.matchAll(/<article class="entry[^"]*" id="([^"]+)"/g)].map((m) => m[1]!);
+}
 
 function firstGlossary(state: ShellState): Glossary {
   const layer = state.glossary.layers[0];
@@ -54,11 +89,14 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-test("the page builds to the default path and stays under 2 MB", async () => {
-  const { bytes } = await writeScopePage(options, DEFAULTS.outPath);
+test("the page builds to the default path and stays under 3 MB with Coherence's own data", async () => {
+  const { bytes, state } = await writeScopePage(options, DEFAULTS.outPath);
   const onDisk = await readFile(DEFAULTS.outPath, "utf8");
   assert.equal(Buffer.byteLength(onDisk, "utf8"), bytes);
-  assert.ok(bytes < TWO_MB, `page is ${bytes} bytes, must be under ${TWO_MB}`);
+  assert.ok(bytes < THREE_MB, `page is ${bytes} bytes, must be under ${THREE_MB}`);
+  assert.equal(state.spec.components.length, loadSpecModel(process.cwd()).components.length, "every component of Coherence's own tree is in the state");
+  assert.equal(state.runs.records.length, loadRuns(process.cwd()).records.length, "every run record is in the state");
+  assert.equal(state.journal.records.length, loadJournal(process.cwd()).records.length, "every journal record is in the state");
 });
 
 test("the page is self-contained: no external src, href, url() or @import", async () => {
@@ -70,8 +108,10 @@ test("the page is self-contained: no external src, href, url() or @import", asyn
       `external reference in page: ${value}`,
     );
   }
-  assert.doesNotMatch(html, /url\(\s*["']?(?:https?:)?\/\//, "no external url() in styles");
-  assert.doesNotMatch(html, /@import/, "no @import in styles");
+  const style = /<style>([\s\S]*?)<\/style>/.exec(html)?.[1] ?? "";
+  assert.ok(style.length > 0, "the page carries its styles inline");
+  assert.doesNotMatch(style, /url\(\s*["']?(?:https?:)?\/\//, "no external url() in styles");
+  assert.doesNotMatch(style, /@import/, "no @import in styles");
   assert.doesNotMatch(html, /^\s*import\s/m, "the inline module has no import statements left");
 });
 
@@ -188,12 +228,14 @@ function stringsIn(value: unknown): string[] {
   return [];
 }
 
-test("the render has one view strip with a Glossary tab", async () => {
+test("the render has one view strip with the six views in order", async () => {
   const { state } = await buildScopePage(options);
   const rendered = renderShell(state).text;
-  const tabs = [...rendered.matchAll(/role="tab"/g)];
-  assert.equal(tabs.length, 1);
-  assert.ok(rendered.includes(">Glossary</button>"));
+  const tabs = [...rendered.matchAll(/role="tab"[^>]*data-view="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(tabs, ["glossary", "components", "invariants", "reliance", "runs", "journal"]);
+  for (const label of ["Glossary", "Components", "Invariants", "Reliance", "Runs", "Journal"]) {
+    assert.ok(rendered.includes(`>${label}</button>`), `${label} tab`);
+  }
 });
 
 test("the search derives its matches from state and hides the rest", async () => {
@@ -232,6 +274,137 @@ test("the build is deterministic: the same glossary in, byte-identical page out"
   const first = await buildScopePage(options);
   const second = await buildScopePage(options);
   assert.equal(first.html, second.html);
+});
+
+test("every view renders from state: every component, invariant, run, and journal record in the fixture is on its view", () => {
+  const state = fresh();
+  const n = fixture.names;
+
+  const components = renderView(state, "components").text;
+  for (const folder of n.components) assert.ok(components.includes(`id="${componentId(folder)}"`), `component ${folder} has a card`);
+  assert.equal([...components.matchAll(/data-slot="mass"/g)].length, n.components.length, "every component reserves its mass slot");
+  assert.ok(components.includes("mass: not measured"));
+  assert.ok(components.includes('data-depth="2"'), "nesting follows the folders");
+  assert.ok(!components.includes("data-selected-invariants"), "no component is selected until the reader selects one");
+  state.components.selected = "src/store";
+  const selected = renderView(state, "components").text;
+  const storeCard = card(selected, componentId("src/store"));
+  assert.ok(storeCard.includes("data-selected-invariants"), "the selected component shows its invariants");
+  for (const { component, name } of n.invariants.filter((i) => i.component === "src/store")) {
+    assert.ok(storeCard.includes(`href="#${invariantId(component, name)}"`), `${name} is listed with a link`);
+  }
+  assert.ok(storeCard.includes('data-count="invariants">1 invariant<') && storeCard.includes('data-count="requirements">1 requirement<'), "counts per state");
+
+  const invariants = renderView(state, "invariants").text;
+  for (const { component, name, state: lifecycle } of n.invariants) {
+    const c = card(invariants, invariantId(component, name));
+    assert.ok(c.includes(`data-state="${lifecycle}"`), `${name} is a ${lifecycle}`);
+  }
+  assert.ok(invariants.includes("enforced by the language itself"), "the ladder's top rung names its enforcer");
+  assert.ok(invariants.includes('data-refutation="witnessed"') && invariants.includes('data-refutation="automatic"') && invariants.includes('data-refutation="missing"'), "all three refutation states render");
+  assert.ok(invariants.includes("outside</span> → <span class=\"level\" title=\"The store&#39;s own code.\">inside"), "a crossing names its trust levels with their meanings");
+  assert.ok(card(invariants, invariantId("src/store", "read shape")).includes("kept from an earlier run"), "a verdict the latest run skipped is marked as kept");
+  assert.ok(card(invariants, invariantId("src/store", "open one")).includes("lacks</span> enforcement, refutation, kinds"), "what a requirement lacks is said");
+  state.invariants.state = "structural defect";
+  assert.deepEqual(cardIds(renderView(state, "invariants").text), [invariantId("src/store", "single writer")], "the state filter narrows to the defect");
+  state.invariants.state = "";
+  state.invariants.component = ".";
+  assert.deepEqual(cardIds(renderView(state, "invariants").text), [invariantId(".", "entry rule")], "the component filter narrows to the root");
+  state.invariants.component = "";
+  state.invariants.query = "row shape";
+  assert.deepEqual(cardIds(renderView(state, "invariants").text), [invariantId("src/store", "read shape")], "the search narrows by sentence");
+  state.invariants.query = "";
+
+  const reliance = renderView(state, "reliance").text;
+  const relianceCard = card(reliance, relianceId("src/store", "single writer"));
+  assert.ok(relianceCard.includes("owns the invariant") && relianceCard.includes("src/store/write.ts"), "the owning component comes first with its files");
+  assert.ok(relianceCard.includes(`href="#${componentId("src/api")}"`) && relianceCard.includes("src/api/handler.ts"), "the relying component and its file are listed");
+  assert.ok(relianceCard.includes("1 component relies"));
+  assert.ok(reliance.includes('data-field="record-limit"'), "what the run record lacks is said on the view");
+
+  const runs = renderView(state, "runs").text;
+  const runIds = cardIds(runs).filter((id) => id.startsWith("run-"));
+  assert.deepEqual(runIds, [...state.runs.records].reverse().map(runId), "runs are listed latest first");
+  const latest = card(runs, runIds[0]!);
+  assert.ok(latest.includes('data-count="pass">0 pass<') && latest.includes('data-count="fail">1 fail<') && latest.includes('data-count="not-run">0 not run<'));
+  assert.ok(latest.includes("<code>def5678</code>") && latest.includes("data-dirty"), "commit and dirty flag");
+  assert.ok(latest.includes('data-field="verdicts"') && latest.includes("<details"), "verdicts are one click away");
+  assert.ok(latest.includes(`kept from the run at 2026-09-10 10:00`) && latest.includes(n.keptName), "the kept mark names the earlier run");
+  assert.ok(latest.includes("fixture") && latest.includes("s1-fixtu"), "agent and session");
+
+  const journal = renderView(state, "journal").text;
+  for (const id of n.journalIds) assert.ok(journal.includes(`id="journal-${id}"`), `journal record ${id} has a card`);
+  assert.ok(journal.includes(`id="pinned-journal-${n.openEscalation}"`), "the open escalation is pinned at the top");
+  assert.ok(!journal.includes(`id="pinned-journal-${n.acknowledgedEscalation}"`), "an acknowledged escalation is not pinned");
+  assert.ok(journal.indexOf('data-field="escalations"') < journal.indexOf('id="journal-heading"'), "pinned before the timeline");
+  assert.ok(card(journal, `journal-${n.acknowledgedEscalation}`).includes("acknowledged by ak-00000005"), "the answer a later record gives is in the margin");
+  assert.ok(journal.includes(n.decisionOver), "a decision's rejected alternative is shown");
+  assert.ok(journal.includes(n.conjectureCandidate) && journal.includes("log the key at both sites"), "a conjecture's candidates and discriminating test");
+  assert.ok(journal.includes(`id="${workId(n.workOrder)}"`) && journal.includes("make every write pass through one door"), "the work order renders");
+  state.journalView.kind = "decision";
+  assert.deepEqual(cardIds(renderView(state, "journal").text).filter((id) => id.startsWith("journal-")), ["journal-d-00000001"], "the kind filter narrows");
+  state.journalView.kind = "";
+  state.journalView.query = "language server";
+  assert.deepEqual(cardIds(renderView(state, "journal").text).filter((id) => id.startsWith("journal-")), ["journal-u-00000006"], "the search narrows");
+  state.journalView.query = "";
+  const absent = fresh();
+  absent.journal.work = { kind: "absent", because: "nothing here" };
+  assert.ok(renderView(absent, "journal").text.includes("No work orders: nothing here"), "absent work orders are a rendered fact");
+});
+
+test("a structural defect renders its bypass sites and both honest options", () => {
+  const state = fresh();
+  const n = fixture.names;
+  const c = card(renderView(state, "invariants").text, invariantId("src/store", "single writer"));
+  assert.ok(c.includes('data-field="defect"'));
+  assert.ok(c.includes('data-grade="broken"') && c.includes("enforced by nobody"), "the broken rung and its enforcer");
+  const bypasses = c.slice(c.indexOf('data-field="bypasses"'));
+  assert.ok(bypasses.includes(`<code>${n.bypass.file}:${n.bypass.line}</code>`) && bypasses.includes(`<code>${n.bypass.symbol}</code>`), "file, line, symbol");
+  assert.ok(c.includes('data-option="route"') && c.includes("Route through the chokepoint") && c.includes(`<code>${n.chokepoint}</code>`), "option one");
+  assert.ok(c.includes('data-option="retire"') && c.includes("Escalate a retirement") && c.includes(`href="#${relianceId("src/store", "single writer")}"`), "option two links the reliance listing");
+  for (const { component, name, state: lifecycle } of n.invariants) {
+    if (lifecycle === "structural defect") continue;
+    assert.ok(!card(renderView(state, "invariants").text, invariantId(component, name)).includes('data-field="defect"'), `${name} shows no defect section`);
+  }
+});
+
+test("deep links resolve: every card id on every view resolves to that view", () => {
+  const state = fresh();
+  for (const view of state.views) {
+    const rendered = renderView(state, view.id).text;
+    const ids = cardIds(rendered).filter((id) => !id.startsWith("pinned-"));
+    assert.ok(ids.length > 0, `${view.id} renders cards`);
+    for (const id of ids) {
+      const target = resolveHash(state, `#${id}`);
+      assert.ok(target !== undefined && target.view === view.id && target.id === id, `#${id} resolves to ${view.id}`);
+    }
+    assert.deepEqual(resolveHash(state, `#${view.id}`), { view: view.id, id: undefined }, `#${view.id} names the view alone`);
+  }
+  assert.equal(resolveHash(state, "#nothing-here"), undefined);
+  assert.equal(resolveHash(state, ""), undefined);
+  const links = [...renderView(state, "invariants").text.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!);
+  for (const link of links) assert.ok(resolveHash(state, `#${link}`) !== undefined, `link #${link} resolves`);
+});
+
+test("the first adopter's tree builds as a second root: its glossary is the domain layer and its run records show its structural defects", {
+  skip: (await exists(MNEMION_GLOSSARY)) ? false : `${MNEMION_GLOSSARY} is not on this machine`,
+}, async () => {
+  const { html, state } = await buildScopePage({ root: MNEMION_ROOT, glossaryPath: DEFAULTS.glossaryPath, project: "Mnemion" });
+  assert.ok(Buffer.byteLength(html, "utf8") < THREE_MB);
+  assert.ok(state.glossary.layers[1]?.kind === "present" && state.glossary.layers[1].title === "Mnemion glossary", "Mnemion's glossary.json is located from its root");
+  assert.ok(state.spec.components.length > 1 && state.runs.records.length > 0, "Mnemion's specs and runs are loaded");
+  const invariants = renderView(state, "invariants").text;
+  const defects = state.spec.components.flatMap((c) => c.invariants.filter((i) => i.state === "structural defect"));
+  assert.equal([...invariants.matchAll(/<article class="entry invariant" id="[^"]+" data-state="structural defect"/g)].length, defects.length, "every structural defect the model derives is a defect card");
+  for (const defect of defects) {
+    const c = card(invariants, invariantId(defect.component, defect.name));
+    assert.ok(c.includes('data-option="route"') && c.includes('data-option="retire"'), `${defect.name} shows both options`);
+    for (const site of defect.defects.flatMap((d) => d.bypasses)) {
+      assert.ok(c.includes(`<code>${escapeHtml(site.file)}:${site.line}</code>`), `${defect.name} shows bypass ${site.file}:${site.line}`);
+    }
+  }
+  const reliance = renderView(state, "reliance").text;
+  assert.ok(reliance.includes(">writeClass</a>"), "Mnemion's kernel write chokepoint is on the reliance view");
 });
 
 test("the Mnemion domain glossary renders beneath Coherence's with every concept, ruling, rejected name and trust level", {
