@@ -350,7 +350,7 @@ test("PostToolUse on a file-writing tool re-checks the invariants that may invol
 
   const stop = specStopText(root);
   assert.equal(stop.defects, 2);
-  assert.match(stop.text, /✕ \.\/digest-only egress — structural defect \(chokepoint, run 2026-09-17\): 1 reference to SECRET_COLUMNS outside seal: src\/api\/render\.ts:5 in render\.leaked/);
+  assert.match(stop.text, /✕ \.\/digest-only egress — structural defect \(chokepoint, run \d{4}-\d{2}-\d{2}\): 1 reference to SECRET_COLUMNS outside seal: src\/api\/render\.ts:5 in render\.leaked/);
   assert.match(stop.text, /stands until the reference is routed through the chokepoint or a human acknowledges a retirement/);
 });
 
