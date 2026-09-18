@@ -104,8 +104,8 @@ test("each verb writes the record its kind needs", () => {
     assert.equal(nothing.over, "none", "--over none records the string none");
     assert.equal(run("decide", "mixed", "--over", "none", "--over", "x", "--because", "b", ...WHO).code, 1);
 
-    const bound = byId(cwd, idOf(run("decide", "bound", "--because", "b", "--work", "w-1", ...WHO)));
-    assert.equal(bound.work, "w-1");
+    assert.equal(run("decide", "bound", "--because", "b", "--work", "w-00000000", ...WHO).code, 1, "--work must name an order that exists");
+    assert.equal(d.binding, "none: this session owns no active work order", "an unbound record says why");
 
     const conjecture = idOf(run("conjecture", "cold reads are slow", "--could-be", "disk cache", "--discriminated-by", "time two runs", ...WHO));
     const c = byId(cwd, conjecture);
@@ -354,6 +354,142 @@ test("subjects after a cursor: truncated text and the next cursor", () => {
     const again = run("journal", "--subjects", "--since", cursor);
     assert.deepEqual(again.out, ["nothing new", `cursor: ${cursor}`]);
     assert.equal(run("journal", "--subjects", "--since", "yesterday").code, 1);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("work orders: create, move, close, owner, inspect; terminal orders do not move and completed is close's alone", () => {
+  const cwd = scratch();
+  try {
+    const run = runIn(cwd, clock());
+    const created = run("work", "create", "ship the feed", "--success", "hook.test.ts covers the feed", "--boundary", "src/journal, src/lifecycle/hook.ts", ...WHO);
+    const id = idOf(created);
+    assert.match(id, /^w-[0-9a-f]{8}$/);
+    assert.match(created.out[0] ?? "", /owner s1; state open/);
+    assert.match(created.out[1] ?? "", new RegExp(`work move ${id} active --because`), "create prints the activation command");
+    const [line] = readFileSync(join(cwd, ".coherence", "work", "s1.jsonl"), "utf8").split("\n");
+    const record = JSON.parse(line ?? "{}") as Record<string, unknown>;
+    assert.deepEqual(
+      { kind: record["kind"], objective: record["objective"], success: record["success"], boundary: record["boundary"], owner: record["owner"], session: record["session"], agent: record["agent"], at: record["at"], dirty: typeof record["dirty"] },
+      { kind: "order", objective: "ship the feed", success: "hook.test.ts covers the feed", boundary: "src/journal, src/lifecycle/hook.ts", owner: "s1", session: "s1", agent: "alpha", at: "2026-09-17T10:00:00.000Z", dirty: "boolean" },
+    );
+    assert.deepEqual(Object.keys(record).sort(), ["agent", "at", "boundary", "commit", "dirty", "id", "kind", "objective", "owner", "session", "success"], "an order carries content and its head, nothing else");
+
+    assert.equal(run("work", "create", "no success", "--boundary", "x", ...WHO).code, 1);
+    assert.equal(run("work", "create", "no boundary", "--success", "x", ...WHO).code, 1);
+    assert.equal(run("work", "create", "no attribution", "--success", "x", "--boundary", "y").code, 1);
+    const delegated = idOf(run("work", "create", "for a child", "--success", "s", "--boundary", "b", "--owner-session", "child", ...WHO));
+    assert.match(run("work", "inspect").out.join("\n"), new RegExp(`${delegated}  open       child  for a child`));
+
+    assert.equal(run("work", "move", id, "active", ...WHO).code, 1, "a move needs --because");
+    assert.equal(run("work", "move", id, "done", "--because", "b", ...WHO).code, 1, "an unknown state is refused");
+    assert.equal(run("work", "move", id, "completed", "--because", "b", ...WHO).code, 1, "completed is what close records");
+    assert.equal(run("work", "move", "w-00000000", "active", "--because", "b", ...WHO).code, 1, "an unknown order is refused");
+    const activated = run("work", "move", id, "active", "--because", "taking it up", ...WHO);
+    assert.equal(activated.code, 0, activated.err.join("\n"));
+    assert.match(activated.out[0] ?? "", /^wm-[0-9a-f]{8}  w-[0-9a-f]{8} open -> active/);
+    assert.equal(run("work", "move", id, "active", "--because", "again", ...WHO).code, 1, "a move to the same state is refused");
+    idOf(run("work", "move", id, "waiting", "--because", "the adapter is not ready", "--session", "s2", "--agent", "beta"));
+    assert.match(run("work", "inspect", id).out[0] ?? "", new RegExp(`^${id}  waiting  owner s1$`), "anyone may move an order; the record says who");
+
+    assert.equal(run("work", "owner", id, "--owner-session", "s1", "--because", "b", ...WHO).code, 1, "the current owner is refused as the next one");
+    const moved = run("work", "owner", id, "--owner-session", "s3", "--because", "s1 ended", "--session", "s2", "--agent", "beta");
+    assert.equal(moved.code, 0, moved.err.join("\n"));
+    assert.match(moved.out[0] ?? "", /^wo-[0-9a-f]{8}  w-[0-9a-f]{8} owner s1 -> s3/);
+
+    const closed = run("work", "close", id, "--because", "the feed test is green", "--session", "s3", "--agent", "gamma");
+    assert.equal(closed.code, 0, closed.err.join("\n"));
+    assert.match(closed.out[0] ?? "", /^wc-[0-9a-f]{8}  w-[0-9a-f]{8} waiting -> completed/);
+    assert.equal(run("work", "close", id, "--because", "twice", ...WHO).code, 1, "a completed order does not close again");
+    assert.equal(run("work", "move", id, "open", "--because", "b", ...WHO).code, 1, "a completed order does not move");
+    assert.equal(run("work", "owner", id, "--owner-session", "s9", "--because", "b", ...WHO).code, 1, "a completed order does not change owner");
+    const cancelled = idOf(run("work", "move", delegated, "cancelled", "--because", "no longer wanted", ...WHO));
+    assert.match(cancelled, /^wm-/);
+    assert.equal(run("work", "close", delegated, "--because", "b", ...WHO).code, 1, "a cancelled order does not close");
+
+    const shown = run("work", "inspect", id).out;
+    assert.equal(shown[0], `${id}  completed  owner s3`);
+    assert.equal(shown[1], "  objective: ship the feed");
+    assert.equal(shown[2], "  success:   hook.test.ts covers the feed");
+    assert.equal(shown[3], "  boundary:  src/journal, src/lifecycle/hook.ts");
+    assert.match(shown.join("\n"), /-> active  alpha: taking it up\n.*-> waiting  beta: the adapter is not ready\n.*owner -> s3  beta: s1 ended\n.*-> completed  gamma: the feed test is green/);
+    assert.equal(run("work", "inspect", "w-00000000").code, 1);
+    assert.equal(run("work", "bogus").code, 1);
+
+    const files = readFileSync(join(cwd, ".coherence", "work", "s1.jsonl"), "utf8").split("\n").filter((l) => l !== "");
+    assert.equal(files[0], line, "the store is append only: the order line never changes");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("a write binds to the one active order its session owns; none or several bind nothing and say so; --work names another", () => {
+  const cwd = scratch();
+  try {
+    const run = runIn(cwd, clock());
+    const none = byId(cwd, idOf(run("decide", "before any order", "--because", "b", ...WHO)));
+    assert.ok(!("work" in none));
+    assert.equal(none.binding, "none: this session owns no active work order");
+
+    const first = idOf(run("work", "create", "first", "--success", "s", "--boundary", "b", ...WHO));
+    const open = byId(cwd, idOf(run("decide", "order open, not active", "--because", "b", ...WHO)));
+    assert.ok(!("work" in open), "an open order binds nothing");
+
+    idOf(run("work", "move", first, "active", "--because", "up", ...WHO));
+    const decided = run("decide", "while owning one active order", "--because", "b", ...WHO);
+    const inferred = byId(cwd, idOf(decided));
+    assert.equal(inferred.work, first, "inferred from sole active ownership");
+    assert.equal(inferred.binding, "inferred: the one active order this session owns");
+    assert.match(decided.out[1] ?? "", new RegExp(`^  bound to ${first} \\(inferred`), "the write prints its binding");
+    for (const verb of [
+      ["conjecture", "o", "--discriminated-by", "t"],
+      ["unable", "w", "--because", "b"],
+      ["defect", "d", "--evidence", "e"],
+      ["escalate", "e", "--because", "b"],
+      ["experiment", "create", "x", "--action", "a", "--success", "c"],
+    ]) {
+      assert.equal(byId(cwd, idOf(run(...verb, ...WHO))).work, first, `${verb[0]} binds by inference`);
+    }
+    const other = byId(cwd, idOf(run("decide", "another session", "--because", "b", "--session", "s2", "--agent", "beta")));
+    assert.ok(!("work" in other), "ownership is by session, not by project");
+
+    const second = idOf(run("work", "create", "second", "--success", "s", "--boundary", "b", ...WHO));
+    const flagged = byId(cwd, idOf(run("decide", "flagged", "--because", "b", "--work", second, ...WHO)));
+    assert.equal(flagged.work, second, "--work overrides the inference");
+    assert.equal(flagged.binding, "flag");
+    idOf(run("work", "move", second, "active", "--because", "up", ...WHO));
+    const several = byId(cwd, idOf(run("decide", "owning two", "--because", "b", ...WHO)));
+    assert.ok(!("work" in several), "several active orders bind nothing");
+    assert.equal(several.binding, `none: this session owns 2 active work orders (${first}, ${second}); pass --work <id>`);
+
+    idOf(run("work", "close", first, "--because", "done", ...WHO));
+    assert.equal(byId(cwd, idOf(run("decide", "one left", "--because", "b", ...WHO))).work, second, "a closed order leaves the other as the sole active one");
+    idOf(run("work", "owner", second, "--owner-session", "s2", "--because", "moved", ...WHO));
+    assert.ok(!("work" in byId(cwd, idOf(run("decide", "moved away", "--because", "b", ...WHO)))), "an order handed to another session no longer binds");
+    assert.equal(byId(cwd, idOf(run("decide", "moved here", "--because", "b", "--session", "s2", "--agent", "beta"))).work, second);
+
+    const inspected = run("work", "inspect", second).out.join("\n");
+    assert.match(inspected, /journal records bound: 3\n/);
+    assert.match(inspected, /◆ d-[0-9a-f]{8}  alpha  flagged\n/);
+    assert.match(inspected, /runs bound: 0/);
+    assert.match(run("journal").out.join("\n"), /before any order/, "binding never hides a record from the timeline");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("the timeline after a cursor shows whole records", () => {
+  const cwd = scratch();
+  try {
+    const run = runIn(cwd, clock());
+    const first = idOf(run("decide", "first", "--over", "x", "--because", "why first", ...WHO));
+    idOf(run("decide", "second", "--because", "why second", ...WHO));
+    const after = run("journal", "--since", `2026-09-17T10:00:00.000Z~${first}`).out;
+    assert.equal(after.length, 3, "one record after the cursor, with its two detail lines");
+    assert.match(after[0] ?? "", /second$/);
+    assert.equal(after[2], "    because: why second");
+    assert.equal(run("journal", "--json", "--since", "2026-09-17T10:00:00.000Z").code, 1);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }

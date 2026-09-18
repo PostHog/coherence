@@ -71,3 +71,27 @@ Compression: one append-only file per session of attributed, durable outcomes, r
   checklist: capability-authorization dismissed: an id names a record; it authorizes nothing
   checklist: canonical-encoding declared as one id minter
   checklist: identity-continuity dismissed: a record's id never changes after the write
+- binding inferred from sole ownership: A journal write binds to the one active work order its session owns; --work names another order, which must exist; a session owning none or several binds nothing, and the record says why.
+  over: every writing verb, every session, every state of the work store
+  via: a write binds to the one active order its session owns; none or several bind nothing and say so; --work names another
+  because: the reference bound 6 of 361 decisions from owning sessions, since binding was a flag no template printed; a default settled at the one append site forms the picture the owner wants without anyone remembering a flag, and a record that binds nothing says so rather than looking bound
+  crossing: project-source -> record
+  refuted: made workBinding answer none for a session owning one active order -> "a write binds to the one active order its session owns; none or several bind nothing and say so; --work names another" went red in journal.test.ts; restored, green (2026-09-17)
+  kinds: identity
+  checklist: capability-authorization dismissed: a binding names the order a record belongs to; it grants nothing and no permission is checked
+  checklist: canonical-encoding dismissed: the order id is stored as minted; there is no second spelling
+  checklist: identity-continuity dismissed: a binding is settled once at the append and never changes; an order that changes owner later leaves earlier records bound as they were
+- terminal orders never move: A completed or cancelled work order accepts no move, close, or owner change, and completed is written by close alone.
+  over: every work verb that writes about an existing order: move, close, owner
+  via: work orders: create, move, close, owner, inspect; terminal orders do not move and completed is close's alone
+  because: an order's end is the reader's fixed point for everything bound to it; a record after the end would file work under a closed assignment, and a second path to completed would leave a reader two record kinds to search for how an order ended
+  crossing: project-source -> record
+  refuted: removed the terminal refusal from close -> "work orders: create, move, close, owner, inspect; terminal orders do not move and completed is close's alone" went red in journal.test.ts at "a completed order does not close again"; restored, green (2026-09-17)
+  kinds: state
+  checklist: revalidated-permission dismissed: no permission is held; anyone may move an order, and the record names who
+  checklist: separation-of-duties dismissed: the writer and the owner may be one session by design; an order is context, not a control
+  checklist: legal-state-succession declared as terminal orders never move
+  checklist: supersession-safety dismissed: a later record never replaces an earlier one; the order is the fold of all of them
+  checklist: worker-fencing dismissed: no lease or fence exists; ownership is a field a reader uses to find records
+  checklist: commit-ordered-effects dismissed: the append is the only effect
+  checklist: resumption-coverage dismissed: nothing resumes from a checkpoint; the state is recomputed from every record at each read

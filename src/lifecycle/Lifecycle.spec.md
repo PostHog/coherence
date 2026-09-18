@@ -84,3 +84,38 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: graceful-drain dismissed: nothing is shut down by an install
   checklist: readiness-evidence dismissed: status reports what is written in the settings file and claims nothing about a running process
   checklist: declared-target-coverage declared as install keeps other hooks
+- feed injects subjects only: At prompt and tool boundaries the peer feed injects the subjects of records other sessions wrote since this session's cursor, twelve at most with a count of the rest and the command that shows them whole; a full record is never injected.
+  over: every record another session wrote after the cursor, at every UserPromptSubmit and PostToolUse
+  via: the peer feed injects subjects of other sessions' records since the cursor, capped, never full records
+  because: subjects carry the signal and the journal carries the text; a boundary that injected whole records would spend the session's context on other sessions' reasoning at every tool use, which is what the reference's boundary hooks did and why they were retired
+  crossing: record -> reading
+  refuted: made the feed inject each record's timeline lines instead of its subject -> "the peer feed injects subjects of other sessions' records since the cursor, capped, never full records" went red in hook.test.ts; restored, green (2026-09-17)
+  kinds: output
+  checklist: destination-confinement dismissed: one destination, the host's additionalContext, and no redirect
+  checklist: redaction declared as feed injects subjects only
+  checklist: commit-ordered-effects declared as cursor advances after the print
+  checklist: circuit-breaker-policy dismissed: the feed reads local files; no dependency is sampled
+  checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
+- cursor advances after the print: The feed cursor moves past the records a feed covered only after that feed was handed to the host; rendering alone moves nothing, and an unprinted feed is shown again.
+  over: every feed rendered for a session, at every boundary event
+  via: the feed cursor advances only after the feed is printed
+  because: a cursor moved before the print would let a hook that failed between render and output swallow what peers recorded; the advance is the commit, and it follows the effect it records
+  crossing: harness -> record
+  refuted: wrote the cursor inside the render, before the host had the text -> "the feed cursor advances only after the feed is printed" went red in hook.test.ts; restored, green (2026-09-17)
+  kinds: state
+  checklist: revalidated-permission dismissed: no permission is involved in moving a cursor
+  checklist: separation-of-duties dismissed: one session moves its own cursor and nobody else's
+  checklist: legal-state-succession declared as cursor advances after the print
+  checklist: supersession-safety dismissed: the cursor is one value per session, replaced only by a later one
+  checklist: worker-fencing dismissed: no two workers share a cursor; it is keyed by session
+  checklist: commit-ordered-effects declared as cursor advances after the print
+  checklist: resumption-coverage dismissed: a session that restarts keeps its cursor and resumes where it looked last; a session that never had one starts at the latest record by design
+- the order rides with orient and regulate: The start prints the active order the session owns with its objective, success, boundary, and the rule that maintenance outside the boundary is not this session's to do, nudges an open one toward activation; the stop reminds that an active order is closed with work close; neither ever refuses.
+  over: every start and stop event, against every work order the session owns
+  via: orient prints the active order a session owns with the boundary rule, nudges an open one, and regulate reminds that work close ends it
+  because: an order nobody reads back is the reference's failure again; the moments a session reads its heading and its debt are the moments the order must be in view, and the boundary rule is what keeps 14 of 33 reference records about a wall from recurring as nags about maintenance outside the assignment
+  crossing: record -> reading
+  refuted: made workBlock print nothing whatever the session owned -> "orient prints the active order a session owns with the boundary rule, nudges an open one, and regulate reminds that work close ends it" went red in hook.test.ts; restored, green (2026-09-17)
+  kinds: read
+  checklist: scoped-reads declared as the order rides with orient and regulate
+  checklist: redaction dismissed: the order is shown whole; objective, success, and boundary are the point
