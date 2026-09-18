@@ -102,6 +102,22 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: harness -> reading
   refuted: caught every git failure and answered no files -> "changedFiles reports a git failure instead of answering a clean tree; outside git the answer is no files" went red in hook.test.ts on the unreadable repository; restored, green (2026-09-17)
   kinds: none
+- the hook answers one project: Every event is answered for the project root the hook was installed for; a cwd from the harness that is not inside that root is refused, and nothing is read or written.
+  protects: OUTSIDE_ROOT_EXIT
+  chokepoint: runHook
+  over: every event, with a cwd inside the installed root, one outside it, and no installation to point at
+  via: the hook refuses a cwd from stdin that is not inside the project root it was installed for
+  because: the working directory arrives on stdin from the harness, which is the one input the tool does not author; a hook that answered any cwd would read a neighbouring project's journal and append its own records there, and the tree it was installed for is the one it can point at, by the settings file that carries it or by the name the harness gives
+  crossing: harness -> project-source
+  refuted: took the cwd from stdin as given, so a stranger's tree was answered for -> "the hook refuses a cwd from stdin that is not inside the project root it was installed for" went red in hook.test.ts, exit 0 where 78 was asserted; restored, green (2026-09-18)
+  kinds: none
+- the stop snapshot has an instrument: The read-trace snapshot at a stop reaches the language server through enforcement's one door, in production as in a test, and records the instrument it was handed.
+  over: every stop event that snapshots a trace, with a door that answers and a door that cannot
+  via: the Stop snapshot reaches the instrument through enforcement's one door, in production as in a test
+  because: the snapshot exists to be calibrate's input, and a closure predicted with no adapter skips the hops, so every production sample was measuring a prediction the tool would never make at the command line; the door is enforcement's because a second way to the warm server is a second lifecycle to get wrong
+  crossing: harness -> reading
+  refuted: passed only the adapter a test hands in, so a production stop recorded server "none" and reason "no adapter" -> "the Stop snapshot reaches the instrument through enforcement's one door, in production as in a test" went red in hook.test.ts, "none" where "warm" was asserted; restored, green (2026-09-18)
+  kinds: none
 - escalation heads the start: An unacknowledged escalation heads the start injection, never shortened; an acknowledged one does not.
   over: every start event, SessionStart and SubagentStart, against every escalation in the journal
   via: an unacknowledged escalation heads the start output; an acknowledged one does not
@@ -141,6 +157,18 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: subjects carry the signal and the journal carries the text; a boundary that injected whole records would spend the session's context on other sessions' reasoning at every tool use, which is what the reference's boundary hooks did and why they were retired
   crossing: record -> reading
   refuted: made the feed inject each record's timeline lines instead of its subject -> "the peer feed injects subjects of other sessions' records since the cursor, capped, never full records" went red in hook.test.ts; restored, green (2026-09-17)
+  kinds: output
+  checklist: destination-confinement dismissed: one destination, the host's additionalContext, and no redirect
+  checklist: redaction declared as feed injects subjects only
+  checklist: commit-ordered-effects declared as cursor advances after the print
+  checklist: circuit-breaker-policy dismissed: the feed reads local files; no dependency is sampled
+  checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
+- feed carries two kinds: The feed injects a peer's decisions and a peer's escalations, and no other verb.
+  over: every record kind a peer can write, at every boundary event
+  via: the peer feed injects a peer's decisions and escalations and no other kind
+  because: the glossary names decision subjects, and an escalation heads every read: a question standing before a human changes what a peer should do next, so a session that met one only at its own start would act past it for a whole cycle. Every other verb is the journal, one command away, and injecting all eleven at every tool use spends the session's budget on what nobody asked for
+  crossing: record -> reading
+  refuted: injected the subject of every record kind, so a peer's conjecture, defect, unable, retraction and resolution rode into the context too -> "the peer feed injects a peer's decisions and escalations and no other kind" went red in hook.test.ts, seven records where two were asserted; restored, green (2026-09-18)
   kinds: output
   checklist: destination-confinement dismissed: one destination, the host's additionalContext, and no redirect
   checklist: redaction declared as feed injects subjects only

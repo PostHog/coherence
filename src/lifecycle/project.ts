@@ -1,13 +1,15 @@
 /**
- * Where a project keeps its glossary, and where Coherence keeps its own.
+ * Where a project keeps its glossary, where Coherence keeps its own, and
+ * where each host keeps the settings file that carries the hook.
  *
  * `coherence.config.json` at the project root may name the project glossary
  * under `glossary`; otherwise `glossary.json` at the root is used when it
  * exists. Coherence's own glossary travels with this package.
  */
 
+import { existsSync, realpathSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadGlossary, type Glossary } from "./glossary.ts";
 
@@ -18,6 +20,63 @@ export const COHERENCE_GLOSSARY = resolve(here, "..", "..", "docs", "glossary.js
 
 export const CONFIG_FILE = "coherence.config.json";
 export const DEFAULT_PROJECT_GLOSSARY = "glossary.json";
+
+export const HOSTS = ["claude", "codex"] as const;
+export type Host = (typeof HOSTS)[number];
+
+export function isHost(name: string): name is Host {
+  return (HOSTS as readonly string[]).includes(name);
+}
+
+/** The settings file each host reads, relative to the project root. */
+export const SETTINGS_FILE: Record<Host, string> = {
+  claude: ".claude/settings.json",
+  codex: ".codex/hooks.json",
+};
+
+/** The harness's own name for the project directory, honored when it agrees with where the process runs. */
+export const PROJECT_DIR_VAR = "CLAUDE_PROJECT_DIR";
+
+/** A path with its symbolic links followed where they can be, so two spellings of one directory compare equal. */
+function real(path: string): string {
+  try {
+    return realpathSync(resolve(path));
+  } catch {
+    return resolve(path);
+  }
+}
+
+/** Whether `path` is `root` itself or lies under it, comparing the directories rather than their spellings. */
+export function within(root: string, path: string): boolean {
+  const rel = relative(real(root), real(path));
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+/**
+ * The project root the hook was installed for, or nothing when no
+ * installation can be pointed at: the harness's own name for the project when
+ * that name contains the directory the process was started in, else the
+ * nearest directory at or above that one holding a host settings file. This
+ * is the tree the hook may read and write, whatever cwd arrives on stdin.
+ *
+ * The environment variable is checked for agreement because a process started
+ * elsewhere has inherited a name that is not about the tree it is running in.
+ * Nothing is returned rather than a guess: a hook the host ran from outside
+ * any installation has no tree to defend, and refusing every event on a guess
+ * would be worse than answering the cwd it was handed.
+ */
+export function installedRoot(fallback: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const start = real(fallback);
+  const named = env[PROJECT_DIR_VAR];
+  if (typeof named === "string" && named !== "" && existsSync(named) && within(named, start)) return real(named);
+  let dir = start;
+  for (;;) {
+    if (Object.values(SETTINGS_FILE).some((file) => existsSync(join(dir, file)))) return dir;
+    const up = dirname(dir);
+    if (up === dir) return undefined;
+    dir = up;
+  }
+}
 
 export interface ProjectGlossaries {
   root: string;

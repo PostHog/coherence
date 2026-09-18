@@ -15,19 +15,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
+import { HOSTS, SETTINGS_FILE, isHost, type Host } from "./project.ts";
 
-export const HOSTS = ["claude", "codex"] as const;
-export type Host = (typeof HOSTS)[number];
-
-export function isHost(name: string): name is Host {
-  return (HOSTS as readonly string[]).includes(name);
-}
-
-/** The settings file each host reads, relative to the project root. */
-export const SETTINGS_FILE: Record<Host, string> = {
-  claude: ".claude/settings.json",
-  codex: ".codex/hooks.json",
-};
+// Where each host keeps its settings, and which hosts there are, live in the project
+// layer: the hook reads them to know which tree it was installed for.
+export { HOSTS, SETTINGS_FILE, isHost, type Host };
 
 /** How long a hook may run, in seconds. The check reads every changed file once. */
 const TIMEOUT_SECONDS = 60;

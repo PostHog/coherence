@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -11,7 +11,10 @@ import { journalVerbs } from "../journal/cli.ts";
 import { openEscalations } from "../journal/read.ts";
 import { loadJournal } from "../journal/store.ts";
 import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
-import { BOUNDARY_RULE, CONTEXT_BUDGET, INSTRUCTION, REFUSE_EXIT, changedFiles, feedContext, readStdinJson, runHook, sessionBlock } from "./hook.ts";
+import { BOUNDARY_RULE, CONTEXT_BUDGET, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, feedContext, readStdinJson, runHook, sessionBlock, type WarmDoor } from "./hook.ts";
+import { withWarmAdapter } from "../enforcement/run.ts";
+import { TRACES_DIR, recordReadTrace } from "../economy/trace.ts";
+import { installedRoot } from "./project.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
@@ -63,7 +66,7 @@ test("the block after the glossary is under 120 words: session, decide template,
 
 test("SessionStart and SubagentStart inject both glossaries and the instruction as additionalContext", async () => {
   for (const event of ["SessionStart", "SubagentStart"] as const) {
-    const result = await runHook(event, { cwd: root, session_id: "s1" }, "/nowhere");
+    const result = await runHook(event, { cwd: root, session_id: "s1" }, tmpdir());
     assert.equal(result.exit, 0);
     assert.equal(result.stderr, "");
     const parsed = JSON.parse(result.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
@@ -245,6 +248,76 @@ test("the start injection stays under the budget with escalations present: the v
   }
 });
 
+test("the hook refuses a cwd from stdin that is not inside the project root it was installed for", async () => {
+  const installed = await freshRoot();
+  const stranger = await freshRoot();
+  try {
+    await mkdir(join(installed, ".claude"), { recursive: true });
+    await writeFile(join(installed, ".claude", "settings.json"), JSON.stringify({ hooks: {} }));
+    await writeFile(join(stranger, "notes.md"), "The stranger's tree.\n");
+    assert.equal(installedRoot(installed, {}), realpathSync(installed), "the settings file names the tree the hook was installed for");
+    assert.equal(installedRoot(stranger, {}), undefined, "no settings file anywhere above it: no installation to defend");
+
+    const inside = join(installed, "src", "deep");
+    await mkdir(inside, { recursive: true });
+    assert.equal(installedRoot(inside, { CLAUDE_PROJECT_DIR: installed }), realpathSync(installed), "the harness's own name for the project is honored");
+    assert.equal(installedRoot(inside, { CLAUDE_PROJECT_DIR: stranger }), realpathSync(installed), "a name that does not contain where the process runs was inherited from elsewhere");
+    for (const event of HOOK_EVENTS) {
+      const ok = await runHook(event, { cwd: inside, session_id: "child" }, installed);
+      assert.notEqual(ok.exit, OUTSIDE_ROOT_EXIT, `${event}: a cwd under the installed root is the project's own`);
+    }
+
+    for (const event of HOOK_EVENTS) {
+      const out = await runHook(event, { cwd: stranger, session_id: "child" }, installed);
+      assert.equal(out.exit, OUTSIDE_ROOT_EXIT, `${event}: a cwd outside the installed root is refused`);
+      assert.equal(out.stdout, "", `${event}: nothing is injected from a tree that is not ours`);
+      assert.match(out.stderr, /is not inside the project root this hook was installed for/);
+      assert.match(out.stderr, new RegExp(stranger.replace(/[/\\.]/g, "\\$&")), "the refusal names the cwd it was handed");
+    }
+    assert.equal(existsSync(join(stranger, ".coherence")), false, "the stranger's tree was never written to");
+  } finally {
+    await rm(installed, { recursive: true, force: true });
+    await rm(stranger, { recursive: true, force: true });
+  }
+});
+
+test("the Stop snapshot reaches the instrument through enforcement's one door, in production as in a test", async () => {
+  assert.equal(WARM_DOOR, withWarmAdapter, "the door the hook holds is enforcement's own; a production stop passes none of its own");
+  const dir = await freshRoot();
+  try {
+    const seed = (...args: string[]): void => void execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: dir });
+    seed("init", "-q");
+    seed("add", ".");
+    seed("commit", "-q", "-m", "seed");
+    // One untracked file is the patch the snapshot predicts a closure for.
+    await writeFile(join(dir, "note.md"), "A file this session changed.\n");
+    recordReadTrace(dir, "child", { tool_name: "Read", tool_input: { file_path: join(dir, "note.md") } });
+
+    // A door that hands back an adapter, as the warm server does when one answers.
+    let asked: string | undefined;
+    const door: WarmDoor = async (root, fn) => {
+      asked = root;
+      return fn({ language: "typescript" } as never, "warm", undefined);
+    };
+    const stop = await runHook("Stop", { cwd: dir, session_id: "child" }, dir, { door });
+    assert.equal(stop.exit, 0, stop.stderr);
+    assert.equal(asked, dir, "the stop asked the door for this project's instrument");
+    const lines = readFileSync(join(dir, TRACES_DIR, "child.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as { kind: string; instrument?: { language: string; server: string; reason?: string } });
+    const snapshot = lines.find((l) => l.kind === "snapshot");
+    assert.ok(snapshot !== undefined, "the stop wrote a snapshot");
+    assert.equal(snapshot.instrument?.server, "warm", "the snapshot records the instrument the door handed over, not a hop-less closure");
+    assert.equal(snapshot.instrument?.reason, undefined, "a door that answered leaves no reason");
+
+    // A door that cannot connect hands back its reason, and the snapshot says so rather than "no adapter".
+    const shut: WarmDoor = async (root, fn) => fn(undefined, undefined, "no server answered and none could be spawned");
+    await runHook("Stop", { cwd: dir, session_id: "child2" }, dir, { door: shut });
+    const second = readFileSync(join(dir, TRACES_DIR, "child2.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as { kind: string; instrument?: { reason?: string } });
+    assert.equal(second.find((l) => l.kind === "snapshot")?.instrument?.reason, "no server answered and none could be spawned");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("readStdinJson tolerates empty and malformed input", async () => {
   assert.deepEqual(await readStdinJson(Readable.from([""])), {});
   assert.deepEqual(await readStdinJson(Readable.from(["not json"])), {});
@@ -252,15 +325,17 @@ test("readStdinJson tolerates empty and malformed input", async () => {
 });
 
 test("the CLI reads the event from stdin and uses its cwd", () => {
+  // Started in the temp root's parent and told about the temp root on stdin: only the stdin cwd reaches Widgetry.
   const run = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "SessionStart"], {
     input: JSON.stringify({ hook_event_name: "SessionStart", cwd: root, source: "startup" }),
     encoding: "utf8",
+    cwd: tmpdir(),
   });
   assert.equal(run.status, 0, run.stderr);
   const parsed = JSON.parse(run.stdout) as { hookSpecificOutput: { additionalContext: string } };
   assert.match(parsed.hookSpecificOutput.additionalContext, /Widgetry vocabulary/);
 
-  const bad = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "NoSuchEvent"], { input: "{}", encoding: "utf8" });
+  const bad = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "NoSuchEvent"], { input: "{}", encoding: "utf8", cwd: tmpdir() });
   assert.equal(bad.status, 64);
   assert.match(bad.stderr, /expected one of/);
 });
@@ -351,6 +426,36 @@ test("orient prints the active order a session owns with the boundary rule, nudg
     verb(dir, "work", "close", id, "--because", "done", "--session", "child", "--agent", "Plan");
     verb(dir, "work", "close", second, "--because", "done", "--session", "child", "--agent", "Plan");
     assert.deepEqual(await runHook("Stop", { cwd: dir, session_id: "child" }, dir), { stdout: "", stderr: "", exit: 0 }, "closed orders owe nothing");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("the peer feed injects a peer's decisions and escalations and no other kind", async () => {
+  const dir = await freshRoot();
+  try {
+    verb(dir, "decide", "before the child began", "--because", "old", "--session", "main-1", "--agent", "main");
+    await runHook("SubagentStart", { cwd: dir, session_id: "child", agent_type: "Plan" }, dir);
+
+    // One record of every other kind a peer can write, between two the feed must carry.
+    const decision = idOf(verb(dir, "decide", "a peer chose the store", "--because", "b", "--session", "peer-1", "--agent", "scope"));
+    const conjecture = idOf(verb(dir, "conjecture", "a peer noticed something", "--could-be", "one", "--discriminated-by", "a test", "--session", "peer-1", "--agent", "scope"));
+    const defect = idOf(verb(dir, "defect", "a peer saw a deviation", "--evidence", "a report", "--session", "peer-1", "--agent", "scope"));
+    const wall = idOf(verb(dir, "unable", "a peer hit a wall", "--because", "no password", "--session", "peer-1", "--agent", "scope"));
+    const retraction = idOf(verb(dir, "retract", decision, "--because", "the test said otherwise", "--session", "peer-1", "--agent", "scope"));
+    const resolution = idOf(verb(dir, "resolved", conjecture, "--because", "the test showed one", "--session", "peer-1", "--agent", "scope"));
+    const escalation = idOf(verb(dir, "escalate", "a peer needs a human", "--because", "only a human decides", "--session", "peer-2", "--agent", "economy"));
+
+    const feed = contextOf(await runHook("UserPromptSubmit", { cwd: dir, session_id: "child" }, dir));
+    const lines = feed.trimEnd().split("\n");
+    assert.match(lines[0]!, /^Peers recorded 2 since your last look/, "two records of the two kinds the feed carries, not seven");
+    assert.deepEqual(lines.slice(1), [
+      `\u25c6 ${decision} scope: a peer chose the store`,
+      `\u25b2 ${escalation} economy: a peer needs a human  [escalation: a human must answer]`,
+    ]);
+    for (const [kind, id] of [["conjecture", conjecture], ["defect", defect], ["unable", wall], ["retraction", retraction], ["resolution", resolution]] as const) {
+      assert.doesNotMatch(feed, new RegExp(id), `a peer's ${kind} is the journal's, not the feed's`);
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -17,6 +17,9 @@
  * invariant, is advisory: the wall is on record and the reader decides.
  * A stop hook that is already active (`stop_hook_active`) never refuses again,
  * so a subagent cannot be held forever.
+ * The Stop snapshot of the read trace reaches the instrument the same way the
+ * run does, through enforcement's one door to the warm server, so a
+ * production snapshot carries hops rather than a hop-less closure.
  * PostToolUse for a file-writing tool is revelation at the edit: the
  * chokepoint invariants that may involve the written file are re-checked
  * through the warm server, and a bypass is printed as additionalContext so
@@ -32,6 +35,9 @@
  * The cursor advances only after the feed was handed to the host: runHook
  * renders and returns the advance as `commit`, and the command line calls it
  * once its stdout write has succeeded, never before.
+ * The root of every event is confined to the project the hook was installed
+ * for: the harness names the working directory on stdin, and a cwd outside
+ * that tree is refused with exit 78 rather than read or written.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -40,7 +46,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
-import { mayTouch, performRun } from "../enforcement/run.ts";
+import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { openFeed, peerFeed } from "../journal/feed.ts";
 import { openEscalations } from "../journal/read.ts";
 import { recordReadTrace, snapshotTrace } from "../economy/trace.ts";
@@ -49,7 +55,7 @@ import { loadJournal } from "../journal/store.ts";
 import type { Unable } from "../journal/record.ts";
 import { loadOrders, ownedIn, type WorkOrder } from "../journal/work.ts";
 import { renderCompactWithin } from "./glossary.ts";
-import { isCoherenceItself, loadProjectGlossaries } from "./project.ts";
+import { installedRoot, isCoherenceItself, loadProjectGlossaries, within } from "./project.ts";
 
 const run = promisify(execFile);
 
@@ -70,6 +76,14 @@ export function isHookEvent(name: string): name is HookEvent {
 
 /** The exit code both hosts read as a refusal with the reason on stderr. */
 export const REFUSE_EXIT = 2;
+
+/**
+ * The exit code for an event whose cwd is not inside the project root this
+ * hook was installed for (sysexits EX_CONFIG). Not the refusal code: the
+ * agent is told nothing and held on nothing, because the event was not this
+ * project's to answer.
+ */
+export const OUTSIDE_ROOT_EXIT = 78;
 
 /**
  * The most characters a start injection may carry. Claude Code replaces hook
@@ -413,14 +427,47 @@ async function checkChanged(root: string, paths: readonly string[]): Promise<Che
   return runCheck({ root, paths: [...paths], coherence, project });
 }
 
+/**
+ * The one door to the warm instrument, as enforcement exports it. The hook
+ * holds it as a value so a test can stand a fake in its place; production
+ * never passes one and gets the real door.
+ */
+export type WarmDoor = typeof withWarmAdapter;
+
+export const WARM_DOOR: WarmDoor = withWarmAdapter;
+
 export interface HookOptions {
   /** An adapter to check with instead of the warm server (tests). */
   adapter?: LanguageAdapter | undefined;
+  /** The door to the warm instrument; enforcement's own by default. */
+  door?: WarmDoor | undefined;
+}
+
+/**
+ * The read-trace snapshot at a stop, with an instrument. A test hands its own
+ * adapter in; production has none of its own, so the snapshot goes through
+ * enforcement's one door to the warm server and the closure it predicts is
+ * computed through references rather than skipped. A door that cannot connect
+ * hands back its reason, which the snapshot records as the instrument it had.
+ */
+async function snapshotAtStop(root: string, session: string, changed: readonly string[], options: HookOptions): Promise<void> {
+  if (options.adapter !== undefined) {
+    await snapshotTrace(root, session, { adapter: options.adapter, changed });
+    return;
+  }
+  const door = options.door ?? WARM_DOOR;
+  await door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed }));
 }
 
 /** Run one event. `input` is the parsed stdin the host sent; `root` defaults to its cwd. */
 export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: string, options: HookOptions = {}): Promise<HookResult> {
-  const root = typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : fallbackRoot;
+  const project = installedRoot(fallbackRoot);
+  const given = typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : fallbackRoot;
+  // The cwd arrives on stdin from the harness; a tree that is not the one this hook was installed for is none of its business.
+  if (project !== undefined && !within(project, given)) {
+    return { stdout: "", stderr: `hook ${event}: the working directory "${given}" is not inside the project root this hook was installed for (${project}); nothing was read and nothing was written\n`, exit: OUTSIDE_ROOT_EXIT };
+  }
+  const root = given;
   switch (event) {
     case "SessionStart":
     case "SubagentStart": {
@@ -444,7 +491,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     case "SubagentStop": {
       const changed = await changedFiles(root);
       const report = await checkChanged(root, changed.files);
-      if (typeof input.session_id === "string" && input.session_id !== "") await snapshotTrace(root, input.session_id, { adapter: options.adapter, changed: changed.files });
+      if (typeof input.session_id === "string" && input.session_id !== "") await snapshotAtStop(root, input.session_id, changed.files, options);
       const walls = unableWalls(root, input);
       const spec = specStopText(root, changed.files, walls);
       const glossary = glossaryStopText(report, walls);

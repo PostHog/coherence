@@ -1056,6 +1056,16 @@
         "hook",
         "decision"
       ],
+      "detail": {
+        "kinds": {
+          "injected": [
+            "decision",
+            "escalation"
+          ],
+          "rule": "Two kinds, and no other. Decisions are what this concept was defined for. Escalations ride with them because an escalation heads every read: a question standing before a human changes what a peer should do next, and a session that learns of one only at its own start would act past it for a whole cycle. Every other verb stays in the journal, one command away, where a reader who wants it goes. Decided 2026-09-18 with the glossary in view; the owner may narrow it back to decisions alone.",
+          "open": "A retraction of a decision a peer may already have acted on is the strongest candidate for a third kind; it was left out because the feed carries subjects and a retraction's subject is an id, which reads as noise until the reader fetches the record anyway."
+        }
+      },
       "provenance": {
         "owner_words": "populating with decision subjects but not their full text before each tool use, tracking the delta since the last injection, seems sane.",
         "defined_by": "owner, 2026-09-17"
