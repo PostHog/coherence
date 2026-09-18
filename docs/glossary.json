@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "source": "reference implementation at /Users/daniloc/Documents/Dev/coherence, inventory concepts-raw.json (206 concepts)",
+  "source": "distilled from the reference implementation and an inventory of its 206 raw concepts",
   "concepts": [
     {
       "name": "invariant",
@@ -501,7 +501,7 @@
         "decision",
         "conjecture",
         "escalation",
-        "blocked",
+        "unable",
         "retraction"
       ],
       "rejected": [
@@ -525,7 +525,7 @@
           "decide (with rejected alternatives and because)",
           "retract",
           "conjecture / resolved / dismissed",
-          "blocked",
+          "unable",
           "escalate / acknowledge",
           "defect",
           "experiment"
@@ -597,7 +597,7 @@
     {
       "name": "work order",
       "status": "settled",
-      "definition": "A named unit of assigned work: an objective, an observable success criterion, a boundary and write scope, an owner session set at creation, and a state (open, active, blocked, completed, cancelled). Journal records and verification runs written by the owner session bind to it by inference. It grants no authority and gates nothing; its value is context, so a reader can see everything one assignment produced and why.",
+      "definition": "A named unit of assigned work: an objective, an observable success criterion, a boundary and write scope, an owner session set at creation, and a state (open, active, waiting, completed, cancelled). Journal records and verification runs written by the owner session bind to it by inference. It grants no authority and gates nothing; its value is context, so a reader can see everything one assignment produced and why.",
       "related": [
         "journal",
         "decision",
@@ -638,18 +638,25 @@
           "list": [
             "open",
             "active",
-            "blocked",
+            "waiting",
             "completed",
             "cancelled"
           ],
-          "rule": "Kept as given. Blocked is a valid state for a work order and a valid journal verb; naming under review.",
+          "meanings": {
+            "open": "created and not taken up; nothing binds to it",
+            "active": "its owner is working it; the owner's journal writes and runs bind to it",
+            "waiting": "it cannot proceed until something outside its owner happens: a dependency, a peer, a human; the order stands, nothing binds",
+            "completed": "closed by the one closing verb against its success criterion",
+            "cancelled": "ended without completion"
+          },
+          "rule": "Five states. The fifth was first spelled blocked; that spelling is refused for the unable verb (an agent's wall, not an order's) so it cannot stand as a second spelling of two different things, and the state is named waiting: the order waits on something outside its owner. Decided 2026-09-17 with the glossary in view; the owner may rename it.",
           "owner_words": "states can stay, and blocked is a valid state for either object class."
         },
         "boundary_note": "A session bound to an order must not be nagged about maintenance outside the order's boundary; 14 of 33 reference blocked entries were that nag."
       },
       "provenance": {
         "evidence": "~1,000 work commands across Claude, Codex, and bakeoff repos produced zero authority refusals because transition/handoff/close never compared writer to owner and nothing read granted-by. Boundary and write scope were read back by subagents; risk had no consumer; granted-by named the writer itself in 12 of 18 delegated orders. Handoffs were mostly the orchestrator repairing owner ids after spawn.",
-        "defined_by": "owner, 2026-09-17, on transcript evidence (authority-evidence.md)",
+        "defined_by": "owner, 2026-09-17, on transcript evidence: the reference's work-permission commands read back across every repository that used them",
         "finding": "In the reference, 361 decisions came from sessions that owned an order and 6 were bound. Cause: the hook never printed --work in any decide template, and binding was a flag rather than a default. The graph the owner wants (decisions contextualized by work) never formed for want of a default."
       }
     },
@@ -1078,7 +1085,7 @@
     {
       "name": "glossary",
       "status": "settled",
-      "definition": "A required component of every Coherence project: glossary.json, the settled vocabulary with, for each concept, its definition, its aliases, and the names rejected for it and why. Injected into context the same way AGENTS.md is; no run can miss it.",
+      "definition": "A required component of every Coherence project: glossary.json, the settled vocabulary with, for each concept, its definition, its aliases, and the names rejected for it and why. Injected into context the way a project's standing instructions to agents are; no run can miss it.",
       "related": [
         "hook",
         "spec",

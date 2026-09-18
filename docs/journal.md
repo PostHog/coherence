@@ -30,7 +30,7 @@ criterion, boundary (what the owner may write), owner session. It grants
 nothing; its value is that a reader sees everything one assignment produced.
 
 - `work create "<objective>" --success "<criterion>" --boundary "<files>" [--owner-session <id>]`: open, owned by the creating session unless another is named.
-- `work move <id> <open|active|waiting|cancelled> --because "<why>"`: by anyone, recorded.
+- `work move <id> <open|active|waiting|cancelled> --because "<why>"`: by anyone, recorded. Waiting is the order that cannot proceed until something outside its owner happens (a dependency, a peer, a human); nothing binds to it while it waits.
 - `work close <id> --because "<what was done>"`: the only path to completed.
 - `work owner <id> --owner-session <id> --because "<why>"`
 - `work inspect [<id>]`: one order with everything bound to it, or every order.
