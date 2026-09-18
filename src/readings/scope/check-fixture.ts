@@ -4,7 +4,8 @@
  * lifecycle state, a nested child, a second component that references the
  * first's chokepoint, two runs (the later one skips an enforcement, so its
  * verdict is kept from the earlier), a journal with an open escalation, and
- * one work order. Written to a temporary folder; the caller removes it.
+ * a work store with one active order and one completed order. Written to a
+ * temporary folder; the caller removes it.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -29,6 +30,10 @@ export interface Fixture {
     conjectureCandidate: string;
     session: string;
     workOrder: string;
+    /** The record that moved the work order to active: never an order itself. */
+    workMove: string;
+    /** An order the store holds as completed. */
+    completedOrder: string;
   };
   remove: () => void;
 }
@@ -146,7 +151,15 @@ export function makeFixture(): Fixture {
     { ...head("u-00000006", "unable", "2026-09-10T11:05:00.000Z"), what: "could not start the language server", because: "no binary on this machine" },
   ];
   write(root, `.coherence/journal/${SESSION}.jsonl`, journal.map((r) => JSON.stringify(r)).join("\n") + "\n");
-  write(root, ".coherence/work/orders.jsonl", JSON.stringify({ id: "wo-1", state: "active", objective: "make every write pass through one door", owner: SESSION, boundary: ["src/store"] }) + "\n");
+  // The work store as the journal writes it: an order and the records that moved it. The reader folds them; nothing here is an order's state.
+  const workHead = (id: string, kind: string, at: string): { id: string; kind: string; at: string; session: string; agent: string; commit: string; dirty: boolean } => ({ id, kind, at, session: SESSION, agent: "fixture", commit: "abc1234", dirty: false });
+  const work = [
+    { ...workHead("w-00000001", "order", "2026-09-10T09:00:00.000Z"), objective: "make every write pass through one door", success: "the chokepoint check passes", boundary: "src/store", owner: SESSION },
+    { ...workHead("wm-00000002", "move", "2026-09-10T09:01:00.000Z"), of: "w-00000001", state: "active", because: "taking it up" },
+    { ...workHead("w-00000003", "order", "2026-09-10T09:02:00.000Z"), objective: "retire the cache", success: "no file under src/store/cache", boundary: "src/store/cache", owner: SESSION },
+    { ...workHead("wc-00000004", "completion", "2026-09-10T09:03:00.000Z"), of: "w-00000003", state: "completed", because: "the cache is gone" },
+  ];
+  write(root, `.coherence/work/${SESSION}.jsonl`, work.map((r) => JSON.stringify(r)).join("\n") + "\n");
 
   return {
     root,
@@ -169,7 +182,9 @@ export function makeFixture(): Fixture {
       decisionOver: "a writer per caller",
       conjectureCandidate: "the key is normalized twice",
       session: SESSION,
-      workOrder: "wo-1",
+      workOrder: "w-00000001",
+      workMove: "wm-00000002",
+      completedOrder: "w-00000003",
     },
     remove: () => rmSync(root, { recursive: true, force: true }),
   };

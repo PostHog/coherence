@@ -341,6 +341,11 @@ test("every view renders from state: every component, invariant, run, and journa
   assert.ok(journal.includes(n.decisionOver), "a decision's rejected alternative is shown");
   assert.ok(journal.includes(n.conjectureCandidate) && journal.includes("log the key at both sites"), "a conjecture's candidates and discriminating test");
   assert.ok(journal.includes(`id="${workId(n.workOrder)}"`) && journal.includes("make every write pass through one door"), "the work order renders");
+  const active = card(journal, workId(n.workOrder));
+  assert.ok(active.includes('data-state="active"') && active.includes("the chokepoint check passes") && active.includes("src/store"), "the order shows its current state, success, and boundary");
+  assert.ok(active.includes(`<code>${n.workMove}</code>`), "the move is history under the order");
+  assert.ok(!journal.includes(`id="${workId(n.workMove)}"`), "a state-change record is never a card of its own");
+  assert.ok(card(journal, workId(n.completedOrder)).includes('data-state="completed"'), "a closed order shows completed");
   state.journalView.kind = "decision";
   assert.deepEqual(cardIds(renderView(state, "journal").text).filter((id) => id.startsWith("journal-")), ["journal-d-00000001"], "the kind filter narrows");
   state.journalView.kind = "";

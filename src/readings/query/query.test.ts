@@ -74,13 +74,18 @@ test("query component answers with intent, counts, bullets, and an unmeasured ma
   assert.ok(result.text.length < FEW_HUNDRED_TOKENS);
 });
 
-test("query order answers the session's active work order, and says when there are none", () => {
-  const mine = answer(state, "order", [], { session: fixture.names.session });
+test("query order answers with the order the journal folds from the store: its content and current state, never a state-change record; a completed order is not active", () => {
+  const n = fixture.names;
+  const mine = answer(state, "order", [], { session: n.session });
   assert.equal(mine.code, 0);
-  assert.ok(mine.text.startsWith(`${fixture.names.workOrder}  active`));
-  assert.ok(mine.text.includes("objective: make every write pass through one door"));
+  assert.ok(mine.text.startsWith(`${n.workOrder}  active  owner ${n.session}\n`), mine.text);
+  assert.ok(mine.text.includes("  objective: make every write pass through one door\n  success:   the chokepoint check passes\n  boundary:  src/store\n"), "the four things an order is");
+  assert.ok(mine.text.includes(`${n.workMove}  -> active  fixture: taking it up`), "the move is history under the order");
+  assert.ok(!mine.text.startsWith(n.workMove), "a move record is never answered as an order");
+  assert.ok(!mine.text.includes(`${n.completedOrder}  active`) && !mine.text.includes("retire the cache"), "a completed order is not active");
+  assert.ok(mine.text.includes("journal records bound: 0") && mine.text.includes("runs bound: 0"), "what binds to the order is said");
   const other = answer(state, "order", [], { session: "someone-else" });
-  assert.ok(other.text.startsWith("no active work order for session someone-else"));
+  assert.equal(other.text, "no active work order for session someone-else (2 on record, 1 active)");
   const absent = answer({ ...state, journal: { ...state.journal, work: { kind: "absent", because: "no folder" } } }, "order", []);
   assert.equal(absent.text, "no work orders: no folder");
 });

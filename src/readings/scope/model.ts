@@ -316,14 +316,13 @@ export type JournalRecord =
   | (JournalHead & { kind: "acknowledgement"; of: string; because: string });
 
 /**
- * One work order, read tolerantly: the id and every field the file said.
- * The work orders' shape belongs to the journal; the page renders what it
- * finds and names the fields it recognizes (state, objective, owner).
+ * One work order as the journal folds it from its records: the order's
+ * content, its owner now, its current state, and the records that moved it.
+ * The shape is the journal's own; the page never re-derives an order from
+ * the raw store.
  */
-export interface WorkOrder {
-  id: string;
-  fields: Fields;
-}
+import type { WorkOrder } from "../../journal/work.ts";
+export type { WorkOrder };
 
 /** The work orders under .coherence/work, or their absence with the reason. */
 export type WorkData =

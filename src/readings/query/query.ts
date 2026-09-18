@@ -8,7 +8,7 @@
  *   relies-on <chokepoint> who references this chokepoint
  *   status                 structural defects, open requirements, escalations
  *   component <folder>     one component and its bullets
- *   order                  the session's active work order
+ *   order                  the session's active work order, as the journal folds it
  *
  * Fixed questions first; no query language.
  */
@@ -23,7 +23,8 @@ import {
   shortSession,
   stamp,
 } from "../scope/derive.ts";
-import type { ShellState, SpecComponent, SpecInvariant, WorkOrder } from "../scope/model.ts";
+import { renderOrder } from "../../journal/workVerbs.ts";
+import type { ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
 
 export const QUESTIONS = ["invariants", "relies-on", "status", "component", "order"] as const;
 export type Question = (typeof QUESTIONS)[number];
@@ -37,7 +38,7 @@ export const QUERY_USAGE = [
   "  query relies-on <chokepoint>   who references this chokepoint, from the latest run",
   "  query status                   structural defects, open requirements, escalations awaiting a human",
   "  query component <folder>       one component: intent, counts, bullets",
-  "  query order [--session <id>]   the session's active work order, when the journal keeps work orders",
+  "  query order [--session <id>]   the active work order the session owns, folded from its records, with what binds to it",
 ].join("\n");
 
 export interface Answer {
@@ -206,30 +207,16 @@ function answerComponent(state: ShellState, args: string[]): Answer {
   return { text: lines.join("\n"), code: 0 };
 }
 
-function orderText(order: WorkOrder): string {
-  const f = order.fields;
-  const text = (key: string): string | undefined => (typeof f[key] === "string" ? (f[key] as string) : undefined);
-  const parts = [`${order.id}  ${text("state") ?? "state not recorded"}`];
-  const objective = text("objective");
-  if (objective !== undefined) parts.push(`  objective: ${objective}`);
-  for (const key of Object.keys(f)) {
-    if (key === "id" || key === "state" || key === "objective") continue;
-    const value = f[key];
-    parts.push(`  ${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`);
-  }
-  return parts.join("\n");
-}
-
 function answerOrder(state: ShellState, session: string | undefined): Answer {
   const work = state.journal.work;
   if (work.kind === "absent") return { text: `no work orders: ${work.because}`, code: 0 };
-  const active = work.orders.filter((o) => o.fields["state"] === "active");
-  const mine = session === undefined ? active : active.filter((o) => o.fields["owner"] === session || o.fields["session"] === session);
+  const active = work.orders.filter((o) => o.state === "active");
+  const mine = session === undefined ? active : active.filter((o) => o.owner === session);
   if (mine.length === 0) {
     const who = session === undefined ? "" : ` for session ${session}`;
     return { text: `no active work order${who} (${work.orders.length} on record${active.length > 0 ? `, ${active.length} active` : ""})`, code: 0 };
   }
-  return { text: mine.map(orderText).join("\n"), code: 0 };
+  return { text: mine.map((order) => renderOrder(order, state.journal.records, state.runs.records).join("\n")).join("\n"), code: 0 };
 }
 
 export interface QueryOptions {
