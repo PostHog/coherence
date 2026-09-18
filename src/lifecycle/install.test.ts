@@ -47,6 +47,27 @@ test("mergeHooks adds one Coherence entry per event, keeps everything else, and 
   const again = second["hooks"] as Record<string, { hooks: { command: string }[] }[]>;
   assert.deepEqual(again["Stop"]!.map((e) => e.hooks[0]!.command), ["./other", "node src/cli.ts hook Stop"]);
   assert.equal(again["SessionStart"]!.length, 1);
+
+  // Only a command that names this tool's binary or its own cli path is Coherence's; a stranger's cli.ts that also takes "hook Stop" is kept.
+  const foreign = [
+    "node tools/other-project/cli.ts hook Stop",
+    "./scripts/cli.ts hook Stop",
+    "npx incoherence hook Stop",
+    "my-coherence-wrapper hook Stop",
+  ];
+  const crowded = mergeHooks({ hooks: { Stop: foreign.map((command) => ({ hooks: [{ type: "command", command }] })) } }, { command: "npx coherence", host: "claude" });
+  const stop = (crowded["hooks"] as Record<string, { hooks: { command: string }[] }[]>)["Stop"]!;
+  assert.deepEqual(stop.map((e) => e.hooks[0]!.command), [...foreign, "npx coherence hook Stop"], "no foreign hook is deleted");
+  for (const command of ["npx coherence hook Stop", '"${CLAUDE_PROJECT_DIR:-.}/node_modules/.bin/coherence" hook Stop', "node src/cli.ts hook Stop", 'node "${CLAUDE_PROJECT_DIR:-.}/src/cli.ts" hook Stop', "coherence hook Stop"]) {
+    const merged = mergeHooks({ hooks: { Stop: [{ hooks: [{ type: "command", command }] }] } }, { command: "npx coherence", host: "claude" });
+    assert.deepEqual((merged["hooks"] as Record<string, { hooks: { command: string }[] }[]>)["Stop"]!.map((e) => e.hooks[0]!.command), ["npx coherence hook Stop"], `${command} is ours and is replaced`);
+  }
+
+  // An entry that carries a foreign hook beside ours keeps the foreign hook; only our command leaves it.
+  const mixed = mergeHooks({ hooks: { Stop: [{ matcher: "x", hooks: [{ type: "command", command: "./theirs" }, { type: "command", command: "npx coherence hook Stop" }] }] } }, { command: "npx coherence", host: "claude" });
+  const mixedStop = (mixed["hooks"] as Record<string, { matcher?: string; hooks: { command: string }[] }[]>)["Stop"]!;
+  assert.deepEqual(mixedStop.map((e) => e.hooks.map((h) => h.command)), [["./theirs"], ["npx coherence hook Stop"]], "the foreign hook survives in its own entry, with its matcher");
+  assert.equal(mixedStop[0]!.matcher, "x");
 });
 
 test("install --host claude merges into .claude/settings.json without clobbering", async () => {

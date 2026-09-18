@@ -6,8 +6,10 @@
  * Both use the same shape: `hooks -> EventName -> [{ matcher?, hooks: [{ type:
  * "command", command, timeout }] }]` (Claude Code: https://code.claude.com/docs/en/hooks;
  * Codex: https://learn.chatgpt.com/docs/hooks). Install merges: an existing
- * entry for another command is kept; an entry Coherence wrote earlier is
- * replaced in place; everything outside `hooks` is untouched.
+ * entry for another command is kept; a command Coherence wrote earlier is
+ * replaced, and only a command that names this tool's binary or its own cli
+ * path counts as Coherence's; everything outside `hooks` is untouched. No
+ * hook that is not ours is ever deleted.
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -40,8 +42,14 @@ const CODEX_CONTEXT_LIMIT = 4000;
 /** The events whose output is context for the model rather than a verdict. */
 const START_EVENTS: ReadonlySet<string> = new Set(["SessionStart", "SubagentStart"]);
 
-/** An entry is Coherence's when its command reaches this CLI and names one of the hook events. */
-const MINE = new RegExp(`(?:coherence|cli\\.ts)"?\\s+hook\\s+(?:${HOOK_EVENTS.join("|")})\\s*$`);
+/**
+ * A command is Coherence's when the program it runs is this tool's binary
+ * (`coherence`, bare or at the end of a path such as node_modules/.bin) or
+ * this tool's own cli path (`src/cli.ts`, as Coherence's own checkout wires
+ * it), followed by `hook <Event>`. A stranger's cli.ts, or a program whose
+ * name merely contains "coherence", is never ours and is never touched.
+ */
+const MINE = new RegExp(`(?:^|[\\s"'/])(?:coherence|src/cli\\.ts)"?\\s+hook\\s+(?:${HOOK_EVENTS.join("|")})\\s*$`);
 
 function isMine(command: unknown): command is string {
   return typeof command === "string" && MINE.test(command);
@@ -118,7 +126,12 @@ export function mergeHooks(settings: Record<string, unknown>, options: Pick<Inst
     if (options.host === "codex" && START_EVENTS.has(event)) handler["additionalContextLimit"] = CODEX_CONTEXT_LIMIT;
     const mine: HookEntry = { hooks: [handler] };
     const existing = hooks[event] ?? [];
-    const kept = existing.filter((entry) => !isCoherenceEntry(entry));
+    // Our own command leaves every entry it is in; an entry that still holds another tool's hook stays, as it was, without ours.
+    const kept = existing.flatMap((entry) => {
+      if (!isCoherenceEntry(entry)) return [entry];
+      const theirs = entry.hooks.filter((h) => !isMine(h.command));
+      return theirs.length === 0 ? [] : [{ ...entry, hooks: theirs }];
+    });
     hooks[event] = [...kept, mine];
   }
   return { ...settings, hooks };
