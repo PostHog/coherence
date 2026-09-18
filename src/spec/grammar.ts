@@ -115,7 +115,7 @@ export interface ParsedSpec {
 }
 
 /** A scaffold placeholder: angle brackets around a lowercase lead, as `<the test>`. */
-const PLACEHOLDER = /<[a-z][^<>]*>/;
+const PLACEHOLDER = /(?:^|\s)<[a-z][^<>]*>(?:$|[\s)|])/;
 
 export function isPlaceholder(value: string): boolean {
   return PLACEHOLDER.test(value);
