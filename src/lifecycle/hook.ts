@@ -37,6 +37,7 @@ import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun } from "../enforcement/run.ts";
 import { openFeed, peerFeed } from "../journal/feed.ts";
 import { openEscalations } from "../journal/read.ts";
+import { recordReadTrace, snapshotTrace } from "../economy/trace.ts";
 import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { loadOrders, ownedIn, type WorkOrder } from "../journal/work.ts";
@@ -325,6 +326,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     case "UserPromptSubmit":
     case "PostToolUse": {
       const feed = feedContext(root, input);
+      if (event === "PostToolUse" && typeof input.session_id === "string" && input.session_id !== "") recordReadTrace(root, input.session_id, input);
       const edit = event === "PostToolUse" ? await editContext(root, input, options) : "";
       const context = feed.text + (feed.text !== "" && edit !== "" ? "\n" : "") + edit;
       if (context === "") return { stdout: "", stderr: "", exit: 0 };
@@ -335,7 +337,9 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     case "Stop":
     case "SubagentStop": {
       const report = await checkChanged(root);
-      const spec = specStopText(root, await changedFiles(root));
+      const changedNow = await changedFiles(root);
+      if (typeof input.session_id === "string" && input.session_id !== "") await snapshotTrace(root, input.session_id, { adapter: options.adapter, changed: changedNow });
+      const spec = specStopText(root, changedNow);
       const glossaryText = report !== undefined && hasFindings(report) ? formatReport(report) : "";
       const workText = workStopText(root, input);
       if (glossaryText === "" && spec.text === "" && workText === "") return { stdout: "", stderr: "", exit: 0 };
