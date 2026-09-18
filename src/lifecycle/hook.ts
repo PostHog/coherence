@@ -24,8 +24,10 @@
  * rule that maintenance outside the boundary is not this session's to do;
  * the stop says the order is still active and how it is closed.
  * UserPromptSubmit and PostToolUse carry the peer feed: the subjects of what
- * other sessions recorded since this session's cursor, never full records,
- * and the cursor advances only after the feed was handed to the host.
+ * other sessions recorded since this session's cursor, never full records.
+ * The cursor advances only after the feed was handed to the host: runHook
+ * renders and returns the advance as `commit`, and the command line calls it
+ * once its stdout write has succeeded, never before.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -96,6 +98,12 @@ export interface HookResult {
   stdout: string;
   stderr: string;
   exit: number;
+  /**
+   * The advance to make once `stdout` has reached the host: the feed cursor
+   * moves past what the text covered. Present only when a feed was rendered;
+   * the caller that prints is the one that commits, after its write succeeded.
+   */
+  commit?: () => void;
 }
 
 /** Files changed in the working tree at `root`: modified against HEAD plus untracked. Empty outside git. */
@@ -331,8 +339,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const context = feed.text + (feed.text !== "" && edit !== "" ? "\n" : "") + edit;
       if (context === "") return { stdout: "", stderr: "", exit: 0 };
       const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
-      feed.commit();
-      return { stdout: stdout + "\n", stderr: "", exit: 0 };
+      return feed.text === "" ? { stdout: stdout + "\n", stderr: "", exit: 0 } : { stdout: stdout + "\n", stderr: "", exit: 0, commit: feed.commit };
     }
     case "Stop":
     case "SubagentStop": {

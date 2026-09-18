@@ -96,12 +96,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: commit-ordered-effects declared as cursor advances after the print
   checklist: circuit-breaker-policy dismissed: the feed reads local files; no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
-- cursor advances after the print: The feed cursor moves past the records a feed covered only after that feed was handed to the host; rendering alone moves nothing, and an unprinted feed is shown again.
-  over: every feed rendered for a session, at every boundary event
-  via: the feed cursor advances only after the feed is printed
-  because: a cursor moved before the print would let a hook that failed between render and output swallow what peers recorded; the advance is the commit, and it follows the effect it records
+- cursor advances after the print: The feed cursor moves past the records a feed covered only after that feed was handed to the host: rendering alone moves nothing, the hook hands the advance back to the command line, which commits it only once its stdout write succeeded, and an unprinted feed is shown again.
+  over: every feed rendered for a session, at every boundary event, through the library and through the command line that prints it
+  via: the feed cursor advances only after the feed is printed: rendering moves nothing, and the CLI commits only once its stdout write succeeded
+  because: a cursor moved before the print would let a hook that failed between render and output swallow what peers recorded; the advance is the commit, and it follows the effect it records, so it belongs to the one place that knows the write succeeded
   crossing: harness -> record
-  refuted: wrote the cursor inside the render, before the host had the text -> "the feed cursor advances only after the feed is printed" went red in hook.test.ts; restored, green (2026-09-17)
+  refuted: committed the cursor inside runHook, before the command line had written stdout -> "the feed cursor advances only after the feed is printed: rendering moves nothing, and the CLI commits only once its stdout write succeeded" went red in hook.test.ts: with the host's end of the pipe closed the cursor had moved and the host had nothing; restored, green (2026-09-17)
   kinds: state
   checklist: revalidated-permission dismissed: no permission is involved in moving a cursor
   checklist: separation-of-duties dismissed: one session moves its own cursor and nobody else's

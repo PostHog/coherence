@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -267,6 +267,7 @@ test("the peer feed injects subjects of other sessions' records since the cursor
 
     const prompt = await runHook("UserPromptSubmit", { cwd: dir, session_id: "child" }, dir);
     assert.equal(prompt.exit, 0);
+    prompt.commit?.(); // the command line commits once its print succeeded; here the print is the assertion below
     const parsed = JSON.parse(prompt.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
     assert.equal(parsed.hookSpecificOutput.hookEventName, "UserPromptSubmit");
     const feed = parsed.hookSpecificOutput.additionalContext;
@@ -282,6 +283,7 @@ test("the peer feed injects subjects of other sessions' records since the cursor
 
     for (let n = 0; n < FEED_CAP + 3; n += 1) verb(dir, "decide", `peer decision ${n}`, "--because", "b", "--session", "peer-1", "--agent", "scope");
     const tool = await runHook("PostToolUse", { cwd: dir, session_id: "child", tool_name: "Read", tool_input: { file_path: "x" } }, dir);
+    tool.commit?.();
     const capped = contextOf(tool).trimEnd().split("\n");
     assert.match(capped[0]!, new RegExp(`^Peers recorded ${FEED_CAP + 3} since your last look`));
     assert.equal(capped.length, FEED_CAP + 2, "a header, the cap, and the count of the rest");
@@ -299,7 +301,26 @@ test("the peer feed injects subjects of other sessions' records since the cursor
   }
 });
 
-test("the feed cursor advances only after the feed is printed", async () => {
+/** Run the hook CLI on an event; with `closePipe` the host's end of stdout is closed before the hook can write, as a host that died would leave it. */
+function spawnHook(dir: string, event: string, input: object, closePipe: boolean): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", event], { cwd: dir, stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => (stderr += chunk));
+    if (closePipe) child.stdout.destroy();
+    else {
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (chunk: string) => (stdout += chunk));
+    }
+    child.on("error", reject);
+    child.on("close", (status) => resolve({ status, stdout, stderr }));
+    child.stdin.end(JSON.stringify(input));
+  });
+}
+
+test("the feed cursor advances only after the feed is printed: rendering moves nothing, and the CLI commits only once its stdout write succeeded", async () => {
   const dir = await freshRoot();
   try {
     await runHook("SubagentStart", { cwd: dir, session_id: "child" }, dir);
@@ -312,7 +333,19 @@ test("the feed cursor advances only after the feed is printed", async () => {
     assert.deepEqual(readCursor(dir, "child"), before, "rendering the feed moves nothing");
     const again = feedContext(dir, { session_id: "child" });
     assert.equal(again.text, first.text, "an uncommitted feed is shown again");
-    first.commit();
+    const rendered = await runHook("UserPromptSubmit", { cwd: dir, session_id: "child" }, dir);
+    assert.match(rendered.stdout, /peer wrote/);
+    assert.deepEqual(readCursor(dir, "child"), before, "runHook renders the feed and hands the advance back; it commits nothing itself");
+    assert.equal(typeof rendered.commit, "function", "the advance rides with the result for the caller that prints");
+
+    // The CLI boundary: the host's end of the pipe is gone, so the write fails and the cursor must stay.
+    const lost = await spawnHook(dir, "UserPromptSubmit", { session_id: "child", cwd: dir }, true);
+    assert.notEqual(lost.status, 0, `a hook whose output never reached the host does not exit 0: ${lost.stderr}`);
+    assert.deepEqual(readCursor(dir, "child"), before, "the cursor did not move: the feed the host never received is shown again");
+
+    const printed = await spawnHook(dir, "UserPromptSubmit", { session_id: "child", cwd: dir }, false);
+    assert.equal(printed.status, 0, printed.stderr);
+    assert.match(printed.stdout, /peer wrote/, "the unprinted feed is shown again");
     assert.notDeepEqual(readCursor(dir, "child"), before, "the commit after the print moves the cursor");
     assert.equal(feedContext(dir, { session_id: "child" }).text, "");
   } finally {
