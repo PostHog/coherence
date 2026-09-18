@@ -7,11 +7,16 @@
  * file's textDocument/documentSymbol (`name in file.ts`); a module is its
  * file. References come from textDocument/references, and every site the
  * server reports is a reference, an import or re-export specifier
- * included: whether it is inside the chokepoint is the check's question,
- * not the adapter's. Exportedness is not in the protocol, so the adapter
- * reads the declaration text. The refutation opens an unsaved sibling
- * document that imports and uses the protected thing and asks whether the
- * instrument reports it.
+ * included: the adapter reports the syntactic form it read at the site and
+ * exempts nothing, and what the form means is the check's question, not the
+ * adapter's. A wildcard re-export (`export * from`) names no symbol, so the
+ * server reports no site for it and the adapter scans its own source files
+ * for one, once per forget. Exportedness is not in the protocol, so the
+ * adapter reads the declaration text. The refutation stages a re-export
+ * beside the protected thing and a use in the chokepoint's own module past
+ * its range; for a thing the module does not export, it opens the synthetic
+ * import instead and reads the compiler's refusal back from the published
+ * diagnostics.
  *
  * TypeScript enforces visibility: a symbol not exported from its module is
  * unreachable from any other module, so the top rung is visibility-choked.

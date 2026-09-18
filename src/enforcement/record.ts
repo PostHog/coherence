@@ -38,8 +38,9 @@ export type Grade = "closure-choked" | "visibility-choked" | "checker-choked" | 
  * `refused by the language`: the rung's enforcer is the compiler or the
  * interpreter, and it refused the synthetic outside reference; the diagnostic
  * is the proof and Coherence's own check never has to be made to fire
- * (ruling rs-e93ecdd6). `witnessed`: a refutation record for a totality
- * oracle, with a later run that found it passing. `missing`: none of these.
+ * (ruling rs-e93ecdd6). `witnessed`: a refutation record for a bullet's
+ * totality oracle, with a later run that found the same enforcement
+ * passing. `missing`: none of these.
  */
 export type RefutationState = "automatic" | "refused by the language" | "witnessed" | "missing";
 

@@ -29,6 +29,17 @@
  *   convention        the underscore prefix or __all__ exclusion alone, which
  *                     nobody enforces: reported as evidence, and the rung a
  *                     chokepoint drops to when the refutation is vacuous
+ *
+ * Every site Pyright reports is a reference, and the adapter reports the
+ * syntactic form it read at the site without exempting one: `from x import y`
+ * and `import x` are imports, an import whose name the module's `__all__`
+ * lists is a re-export, and so is a bare `from x import *`. Pyright reports
+ * no site for a star import, since it spells no name, so the adapter scans
+ * its own source files for one, once per forget. The refutation stages a
+ * re-export through `__all__` beside the protected thing and a use in the
+ * chokepoint's own module past its body; for a function-local, which no
+ * import can reach, it opens the synthetic import instead and reads the
+ * interpreter's refusal back from the published diagnostics.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";

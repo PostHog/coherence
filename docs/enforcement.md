@@ -35,9 +35,30 @@ Every reference to the protected thing is classified: inside the chokepoint
 (the chokepoint symbol's range, or its module when the chokepoint is a
 module), a test reference (reported, never a bypass), or a bypass. There is
 no fourth class: every site the language server reports is a reference, an
-import or re-export specifier included, because an import outside the
-chokepoint reaches the thing and a re-export widens its reach with no call
-at all.
+import or re-export specifier included.
+
+Two of those sites the language gives a form, and the form decides before
+the range does (ruling `d-7abd1ba8`):
+
+- A **plain import specifier** — type-only and namespace imports included —
+  is **inside** when it sits in the chokepoint's own module. That one
+  location is how the chokepoint reaches the thing, not a place the thing is
+  used. The same import in any other module is a bypass.
+- An **export-from specifier** or a **wildcard re-export** is a **bypass**
+  wherever it stands, the chokepoint's own module included: it widens the
+  thing's reach with no call at all.
+
+Python's equivalents: `from x import y` or `import x` at the top of the
+chokepoint's module is inside; the same import elsewhere is a bypass; an
+import whose name the module's `__all__` lists is a re-export, and so is a
+bare `from x import *`.
+
+The adapter reads the form forward from the top-level statement the site
+sits in, never backward for a terminator — the reading the dissolved import
+heuristic could not make, which is why a bypass beneath a semicolon-less
+bare import still grades broken. Neither language server reports a site for
+a wildcard re-export (`export * from`, `from x import *`), so each adapter
+scans its own source files for one, once per forget.
 
 - **visibility-choked**: not visible outside its module, no bypass.
 - **reference-choked**: visible, but every reference is inside the chokepoint.
@@ -56,16 +77,34 @@ below.
 Refutation is required **per enforcement**: a bullet carrying both forms
 needs both.
 
-A chokepoint refutes itself. The adapter opens an unsaved document beside
-the protected thing that imports and uses it (for a thing not exported, an
-unsaved edit of its own module), asks for references, and reports the site
-the instrument named; nothing touches disk. The check then classifies that
-site with the same function every other site goes through, and only a site
-it calls a **bypass** refutes. A site the instrument could not see at all,
+A chokepoint refutes itself, and how it does depends on who enforces the
+rung it earned.
+
+**Coherence's own check is the enforcer.** The adapter stages the two
+synthetic sites the import ruling could otherwise swallow, in one unsaved
+pass: a use of the protected thing in the chokepoint's own module past the
+chokepoint's range, and a re-export of it from a document beside it.
+Nothing touches disk. The check then classifies each staged site with the
+same function every other site goes through, and the refutation fires only
+when it calls **every one** a bypass. A site the instrument could not see,
 or one the check would call `inside` (the chokepoint covers everywhere the
 language lets the thing be named) or `test` (the protected thing lives under
-a test folder, so nothing can ever be a bypass), makes the check vacuous: the
-run says which, records not run, and the bullet stays a requirement.
+a test folder, so nothing can ever be a bypass), makes the check vacuous:
+the run says which site and why, records not run, and the bullet stays a
+requirement. A chokepoint named as a module has no inside that lies outside
+its own range, so only the re-export is staged there, and the account says
+so.
+
+**The language is the enforcer** (`visibility-choked` in TypeScript,
+`closure-choked` in Python). Coherence's check can never be made to fire
+there: the compiler refuses every import of a thing the module does not
+export, and the interpreter refuses every import of a name that is not a
+module attribute. So the adapter stages the synthetic outside reference and
+asks the language server for the diagnostic on it. A diagnostic that says
+the name is not exported or not accessible **is** the refutation, recorded
+as `refused by the language` with the diagnostic's own text (ruling
+`rs-e93ecdd6`). Demanding Coherence's own firing there would leave the
+strongest rungs weaker than the one below them.
 
 A totality oracle is refuted by hand, and the refutation is a recorded
 event, never a sentence. While the break is staged:
@@ -121,7 +160,12 @@ JUnit report (or pytest-json-report's JSON) maps back by test name.
 
 A run appends one line to `.coherence/runs/<session>.jsonl`: time, session,
 agent, commit, and one entry per enforcement: form, verdict, grade,
-refutation, bypasses, test references, files, latency, reason. Nothing is
+refutation, bypasses, test references, files, latency, reason. The
+refutation field takes one of four values: `automatic` (the check called
+every staged synthetic site a bypass), `refused by the language` (the
+compiler or the interpreter refused the synthetic outside reference),
+`witnessed` (a refutation record for a totality oracle, with a later passing
+run), and `missing`. Nothing is
 rewritten. `refute` appends its refutation records to the same files, marked
 with `kind: "refutation"`.
 
@@ -133,7 +177,8 @@ nothing must never read like a clean one.
 
 `run --status` is a view: the latest entry per enforcement across every run;
 one the latest run skipped keeps its prior dated verdict, and the line says
-so. `spec --check` reads the same view: an automatic refutation satisfies a
+so. `spec --check` reads the same view: an automatic refutation or one
+refused by the language satisfies a
 chokepoint enforcement's refutation requirement, a refutation record with a
 later passing run satisfies a totality oracle's, a passing verdict shows as
 verified, and a failing one on a bullet that was otherwise complete makes it

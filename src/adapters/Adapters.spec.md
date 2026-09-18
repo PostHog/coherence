@@ -19,10 +19,10 @@ The language adapter seam: how to ask a language's server for definitions, refer
   crossing: project-source -> instrument
   refuted: left an open document to the file watcher on forget, as the adapter did before -> "the check reads the current disk text after a forget, with the instrument's watcher blind to the file: a loop of edit-then-check yields zero wrong verdicts" went red in enforcement.test.ts with two of six verdicts answered from pre-edit text; restored, green (2026-09-18)
   kinds: none
-- every site is a reference: Every site the language server reports for the protected thing is a reference, an import or re-export specifier included; whether it is inside the chokepoint is the check's only question besides test paths.
+- every site is a reference: Every site the language server reports for the protected thing is a reference, an import or re-export specifier included; the adapter reports the syntactic form it read at the site and never exempts one, and the check alone decides what the form means.
   over: every reference site either adapter reports, import and export specifiers included
   via: every site the language server reports is a reference: a bypass beneath a semicolon-less bare import is a bypass, and an import outside the chokepoint is one too
-  because: an import of the protected thing outside the chokepoint reaches it and a re-export widens its reach with no call at all, so neither is exempt; the heuristic that told an import from a use called every site beneath a semicolon-less bare import an import, and a real bypass graded clean (decision d-0da89a08 dissolved the exemption rather than patch the parser)
+  because: an import of the protected thing outside the chokepoint reaches it and a re-export widens its reach with no call at all, so neither is exempt; the heuristic that told an import from a use called every site beneath a semicolon-less bare import an import, and a real bypass graded clean (decision d-0da89a08 dissolved the exemption rather than patch the parser). Ruling d-7abd1ba8 gives one form one meaning at one location, and the adapter still exempts nothing: it reads the form forward from the top-level statement the site sits in, which is the reading the dissolved heuristic could not make, and hands it to the check
   crossing: instrument -> reading
   refuted: exempted import specifiers from the classification, as the adapter did before -> "every site the language server reports is a reference: a bypass beneath a semicolon-less bare import is a bypass, and an import outside the chokepoint is one too" went red in enforcement.test.ts with the bypass graded pass; restored, green (2026-09-18)
   kinds: none
@@ -78,8 +78,9 @@ The language adapter seam: how to ask a language's server for definitions, refer
   chokepoint: src/adapters/typescript.ts
   over: the adopter's node_modules, Coherence's, and every folder on PATH
   via: the language server binary is found (the adapter's precondition)
-  because: the language server is an optional dependency; an adopter without it must get a reason naming where the tool looked and how to install it, and a run must record not run rather than crash, since not run is a verdict the status view can show. This stays a requirement: the binary is on PATH on this machine too, so a staged break of the node_modules lookup stays green, and the absence branch is the one that matters and cannot be staged without taking the binary off the machine
+  because: the language server is an optional dependency; an adopter without it must get a reason naming where the tool looked and how to install it, and a run must record not run rather than crash, since not run is a verdict the status view can show. The chokepoint's refutation is the compiler's own refusal of a synthetic import of SERVER_BIN, which its module does not export (ruling rs-e93ecdd6); the totality oracle was refuted by making locateServer answer before it looked anywhere, which is the absence branch staged inside the function rather than by taking the binary off the machine
   crossing: instrument -> reading
+  refuted: made locateServer return undefined before it looked anywhere, so the adapter's precondition found no binary -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: deploy
   checklist: graceful-drain dismissed: nothing is shut down by locating the binary
   checklist: readiness-evidence declared as server located or a reason

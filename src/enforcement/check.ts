@@ -3,13 +3,19 @@
  * protected thing and the chokepoint, collect every reference to the
  * protected thing, and classify each site.
  *
- *   inside   within the chokepoint symbol's range, or within its module when
- *            the chokepoint is a module; for a protected module, within the
- *            module itself
+ * Two sites carry a form the language gives them, and the form is read
+ * before the range (ruling d-7abd1ba8):
+ *
+ *   inside   a plain import specifier sitting in the chokepoint's own module
+ *            — the one location through which the chokepoint reaches the
+ *            thing — or any site within the chokepoint symbol's range, or
+ *            within its module when the chokepoint is a module; for a
+ *            protected module, within the module itself
  *   test     under a test folder or a test file by name; reported, never a bypass
- *   bypass   any other site, an import or re-export specifier included: an
- *            import of the protected thing outside the chokepoint reaches it,
- *            and a re-export widens its reach with no call at all
+ *   bypass   an export-from specifier or a wildcard re-export, wherever it
+ *            stands, because it widens the thing's reach with no call at
+ *            all; an import of the protected thing in any other module; and
+ *            every other site outside the chokepoint
  *
  * The grade follows: visibility-choked when the protected thing is not
  * visible outside its module and nothing bypasses (the adapter says whether
@@ -18,14 +24,20 @@
  * resolved; not chokeable when the protected thing cannot be resolved as a
  * symbol or a module.
  *
- * The refutation is automatic, and it must prove that this check would fire:
- * the adapter opens a synthetic reference and reports the site the instrument
- * named, and the site is then classified by the same function every other
- * site goes through. Only a synthetic site classified `bypass` refutes. A
- * synthetic site the check would call `inside` (the chokepoint covers
- * everywhere the language lets the thing be named) or `test` (the protected
- * thing lives under a test folder, so nothing can ever be a bypass) proves
- * only that the instrument answers, and the check says so and records not run.
+ * The refutation must prove that this check would fire, and who enforces the
+ * graded rung decides how. Where Coherence's check is the enforcer, the
+ * adapter stages the synthetic sites the form rule could otherwise swallow —
+ * a use in the chokepoint's own module past its range, and a re-export — and
+ * the check classifies each with the same function every other site goes
+ * through; only when it calls every one `bypass` does the refutation fire. A
+ * staged site the instrument could not see, or one the check would call
+ * `inside` (the chokepoint covers everywhere the language lets the thing be
+ * named) or `test` (the protected thing lives under a test folder, so nothing
+ * can ever be a bypass), proves only that the instrument answers, and the
+ * check says which and records not run. Where the language is the enforcer
+ * (visibility-choked, closure-choked), Coherence's check can never be made to
+ * fire, and the compiler's or interpreter's refusal of the synthetic outside
+ * reference is the refutation instead (ruling rs-e93ecdd6).
  */
 
 import { isTestPath, rangeContains, type Definition, type LanguageAdapter, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";

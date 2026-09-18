@@ -31,12 +31,12 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   checklist: capability-authorization dismissed: the session token names a file and grants nothing
   checklist: canonical-encoding declared as session names the run file
   checklist: identity-continuity dismissed: a session's id never changes
-- sites classified: Every reference to the protected thing is inside the chokepoint, a test reference, or a bypass; an import or re-export outside the chokepoint is a bypass, and a test reference is never one.
-  over: every reference the language server reports for a protected thing
-  via: classification: inside the chokepoint, a test reference, a bypass; an import outside the chokepoint is a bypass
-  because: a chokepoint holds while every reference is inside it, so the classes must partition every site: a test may reference the protected thing to check it and is reported rather than counted, and everything else outside the chokepoint is a bypass, an import that reaches the thing included; a test counted as a bypass would alarm on every test, and a bypass counted as anything else would hide a structural defect
+- sites classified: Every reference to the protected thing is inside the chokepoint, a test reference, or a bypass; a plain import specifier in the chokepoint's own module is inside, a re-export of the protected thing is a bypass wherever it stands, every other site is classified by range, and a test reference is never a bypass.
+  over: every reference the language server reports for a protected thing, and every form an adapter reads at one
+  via: a plain import specifier in the chokepoint's own module is inside; the same import elsewhere, a re-export anywhere, a wildcard re-export, and a use outside the chokepoint's range are bypasses
+  because: a chokepoint holds while every reference is inside it, so the classes must partition every site. The import at the top of the chokepoint's module is how the chokepoint reaches the thing, not a place the thing is used, so ruling d-7abd1ba8 makes that one location inside; an export-from specifier or a wildcard re-export widens the thing's reach with no call at all, so it is a bypass even there. A test may reference the protected thing to check it and is reported rather than counted; a test counted as a bypass would alarm on every test, and a bypass counted as anything else would hide a structural defect
   crossing: instrument -> reading
-  refuted: made a test reference classify as a bypass -> "classification: inside the chokepoint, a test reference, a bypass; an import outside the chokepoint is a bypass" went red in enforcement.test.ts; restored, green (2026-09-17)
+  refuted: dropped the rule that a plain import specifier in the chokepoint's own module is inside, so classifySite read that site by range like any other -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
 - grade ladder: A chokepoint grades broken with a bypass or a missing chokepoint, reference-choked when clean and visible, visibility-choked when clean and not visible, and not chokeable when the protected thing is prose.
   over: every combination of bypass count, chokepoint resolution, visibility, and name form
@@ -45,21 +45,21 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   crossing: instrument -> reading
   refuted: made every clean chokepoint grade reference-choked whatever its visibility -> "grades: broken with a bypass, reference-choked when clean and exported, visibility-choked when not exported, broken when the chokepoint is missing, not chokeable for prose" went red in enforcement.test.ts; restored, green (2026-09-17)
   kinds: none
-- automatic refutation: A chokepoint verdict is never recorded without its refutation: a synthetic reference is opened beside the protected thing and the instrument must report it, nothing touches disk, and an unseen site makes the check vacuous, never a pass.
+- automatic refutation: A chokepoint verdict is never recorded without its refutation: the adapter stages every synthetic site the classification could swallow, the instrument must report each one, nothing touches disk, and an unseen site makes the check vacuous, never a pass.
   protects: checkChokepoint
   chokepoint: performRun
   over: every chokepoint-form enforcement the run checks
-  via: the automatic refutation opens a synthetic reference and sees it; nothing is written to disk
-  because: a check that would report nothing if the chokepoint were broken is vacuous; opening a synthetic reference and confirming the instrument sees it proves the instrument would report a real bypass, doing it in an unsaved document leaves the tree untouched, and every chokepoint verdict reaches the record through the one function that always attempts it
+  via: the automatic refutation stages a re-export in an unsaved document; a thing the module does not export is refused by the compiler; nothing is written to disk
+  because: a check that would report nothing if the chokepoint were broken is vacuous; staging a synthetic reference and confirming the instrument sees it proves the instrument would report a real bypass, doing it in an unsaved document leaves the tree untouched, and every chokepoint verdict reaches the record through the one function that always attempts it. Since ruling d-7abd1ba8 makes one import location inside, the staging must cover both sites that ruling could otherwise swallow: a use in the chokepoint's own module past its range, and a re-export
   crossing: instrument -> record
-  refuted: stopped the refutation opening its synthetic document, so the instrument had nothing to see -> the totality oracle went red, then green once restored (2026-09-18)
+  refuted: made the refutation open an empty synthetic document, so the re-export it stages was never there for the instrument to report -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
-- refutation proves this check would fire: The synthetic site the adapter reports is classified by the same function every other site goes through, and only a site the check calls a bypass refutes; a synthetic site classified inside the chokepoint or as a test reference is vacuous and records not run.
-  over: every chokepoint-form enforcement whose synthetic site the instrument reported
+- refutation proves this check would fire: Every synthetic site the adapter stages is classified by the same function every other site goes through, and the refutation fires only when the check calls each one a bypass; where the graded rung's enforcer is the language, the compiler's or interpreter's refusal of the synthetic outside reference is the refutation instead, recorded as refused by the language with its diagnostic.
+  over: every chokepoint-form enforcement whose synthetic sites the instrument reported, and every rung whose enforcer is the language
   via: the automatic refutation is vacuous unless the check's own classification calls the synthetic site a bypass
-  because: the adapter decided outsideness itself and got it wrong in two ways the reviewers reproduced: a synthetic sibling document beside a protected thing under a test folder is a test reference, so nothing could ever be a bypass and the bullet read as a verified invariant; and a synthetic line appended to a module that is its own chokepoint fell past a range computed before the line was added, so the check called an inside site outside. Running the check's own classifier on the synthetic site is the only way the refutation proves the thing it claims: that this check, not the instrument, would go red
+  because: the adapter decided outsideness itself and got it wrong in two ways the reviewers reproduced: a synthetic sibling document beside a protected thing under a test folder is a test reference, so nothing could ever be a bypass and the bullet read as a verified invariant; and a synthetic line appended to a module that is its own chokepoint fell past a range computed before the line was added, so the check called an inside site outside. Running the check's own classifier on every staged site is the only way the refutation proves the thing it claims: that this check, not the instrument, would go red. Ruling rs-e93ecdd6 adds the neighbouring case: where the language itself refuses every reference the check would call a bypass, Coherence's check can never be made to fire, and demanding it would leave a stronger rung weaker than the one below it, so the refusal is the proof
   crossing: instrument -> reading
-  refuted: let any site the instrument reported count as the refutation, without classifying it -> the totality oracle went red, then green once restored (2026-09-18)
+  refuted: let every staged synthetic site count whatever the check's own classification called it, so a site classified inside or a test reference still fired the refutation -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
 - not configured never passes: The totality oracle pass reports a missing test command as not run, never as passing, and a command whose output does not match is a fail.
   over: every totality oracle the run checks
