@@ -48,7 +48,11 @@ test("query relies-on lists the components whose files reference the chokepoint'
   assert.ok(result.text.startsWith(`${fixture.names.chokepoint} protects ${fixture.names.protects}`));
   assert.ok(result.text.includes("owner src/store (Store)"), "the owning component is marked");
   assert.ok(result.text.includes("src/api (Api): src/api/handler.ts"), "the relying component and its file are named");
-  assert.ok(result.text.includes(`bypass ${fixture.names.bypass.file}:${fixture.names.bypass.line} in ${fixture.names.bypass.symbol}`));
+  assert.ok(
+    result.text.includes(`reference site ${fixture.names.bypass.file}:${fixture.names.bypass.line} in ${fixture.names.bypass.symbol} (a bypass: outside the chokepoint)`),
+    "a bypass is the one reference site the record places",
+  );
+  assert.match(result.text, /the record carries files: a file list holds the definition of the protected thing/, "and the answer says what the file list is not");
   assert.ok(answer(state, "relies-on", ["nothing"]).text.startsWith("no bullet names"));
   assert.ok(result.text.length < FEW_HUNDRED_TOKENS);
 });

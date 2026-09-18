@@ -157,6 +157,36 @@ export function verdictCounts(record: RunRecord): VerdictCounts {
   return counts;
 }
 
+/* ------------------------------------------------------- latest verdicts */
+
+/**
+ * The latest run entry per enforcement of one bullet, derived from the run
+ * records the state already holds. The rule is the run's own: the last run
+ * that checked an enforcement owns its verdict, so an enforcement a later run
+ * skipped keeps the one it was given, dated. Nothing is stored: a copy beside
+ * the records would be a second truth that could disagree with them.
+ */
+export function latestOf(invariant: SpecInvariant, runs: readonly RunRecord[]): LatestEntry[] {
+  const byForm = new Map<string, LatestEntry>();
+  for (const run of runs) {
+    for (const entry of run.invariants) {
+      if (entry.component !== invariant.component || entry.name !== invariant.name) continue;
+      byForm.set(entry.form, { ...entry, at: run.at, commit: run.commit, session: run.session });
+    }
+  }
+  return [...byForm.values()].sort((a, b) => a.form.localeCompare(b.form));
+}
+
+/** The enforcements the latest run found passing. */
+export function verifiedOf(invariant: SpecInvariant, runs: readonly RunRecord[]): LatestEntry[] {
+  return latestOf(invariant, runs).filter((e) => e.verdict === "pass");
+}
+
+/** The enforcements the latest run found failing: the structural defects. */
+export function defectsOf(invariant: SpecInvariant, runs: readonly RunRecord[]): LatestEntry[] {
+  return latestOf(invariant, runs).filter((e) => e.verdict === "fail");
+}
+
 /* ------------------------------------------------------------ reliance */
 
 /** The component whose folder is the longest prefix of the file, or undefined when no component holds it. */
@@ -188,6 +218,13 @@ export interface RelianceEntry {
   files: string[];
 }
 
+/** A reference site the record locates: file, line, and the referencing symbol. */
+export interface RelianceSite {
+  file: string;
+  line: number;
+  symbol: string;
+}
+
 export interface Reliance {
   invariant: SpecInvariant;
   chokepoint: string;
@@ -195,11 +232,29 @@ export interface Reliance {
   /** The run entry the listing derives from; undefined when no run has checked the chokepoint. */
   entry: LatestEntry | undefined;
   entries: RelianceEntry[];
+  /**
+   * The reference sites the record locates. Today that is the bypasses and
+   * nothing else: a chokepoint entry carries the files its check touched, so
+   * every other file's part in the check is unknown.
+   */
+  sites: RelianceSite[];
+  /**
+   * What the run record carries for this chokepoint: "files" while an entry
+   * lists files, "sites" once it lists classified reference sites. The views
+   * say which, so a reader never reads a file list as a reliance count.
+   */
+  recordCarries: "files" | "sites";
 }
 
-/** Every chokepoint invariant with the components whose files its latest check touched. */
-export function relianceOf(invariant: SpecInvariant, components: readonly SpecComponent[]): Reliance[] {
-  const entry = invariant.latest.find((l) => l.form === "chokepoint");
+/**
+ * Every chokepoint invariant with the components whose files its latest check
+ * touched, and the reference sites the record actually locates. Reliance is
+ * "the components whose code references the chokepoint"; a file list is an
+ * upper bound on that, because it holds the definition of the protected
+ * thing, the chokepoint's own module, imports, and tests as well.
+ */
+export function relianceOf(invariant: SpecInvariant, components: readonly SpecComponent[], runs: readonly RunRecord[]): Reliance[] {
+  const entry = latestOf(invariant, runs).find((l) => l.form === "chokepoint");
   return invariant.enforcements.flatMap((enforcement) => {
     if (enforcement.form !== "chokepoint") return [];
     const byFolder = new Map<string, RelianceEntry>();
@@ -212,12 +267,13 @@ export function relianceOf(invariant: SpecInvariant, components: readonly SpecCo
       else byFolder.set(key, { component, owner: component?.folder === invariant.component, files: [file] });
     }
     const entries = [...byFolder.values()].sort((a, b) => Number(b.owner) - Number(a.owner) || (a.component?.folder ?? "~").localeCompare(b.component?.folder ?? "~"));
-    return [{ invariant, chokepoint: enforcement.chokepoint, protects: enforcement.protects, entry, entries }];
+    const sites: RelianceSite[] = entry === undefined ? [] : [...entry.bypasses].sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
+    return [{ invariant, chokepoint: enforcement.chokepoint, protects: enforcement.protects, entry, entries, sites, recordCarries: "files" }];
   });
 }
 
-export function allReliance(components: readonly SpecComponent[]): Reliance[] {
-  return components.flatMap((c) => c.invariants.flatMap((i) => relianceOf(i, components)));
+export function allReliance(components: readonly SpecComponent[], runs: readonly RunRecord[]): Reliance[] {
+  return components.flatMap((c) => c.invariants.flatMap((i) => relianceOf(i, components, runs)));
 }
 
 /* ------------------------------------------------------------- journal */

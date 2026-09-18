@@ -200,10 +200,12 @@ export interface SpecInvariant {
   missingShapes: string[];
   state: LifecycleState;
   lacks: Lack[];
-  /** The latest run entry per form that checked this bullet; empty when none has. */
-  latest: LatestEntry[];
-  verified: LatestEntry[];
-  defects: LatestEntry[];
+  /*
+   * No latest, verified, or defects here. Those are the run records read by
+   * enforcement and invariant name, and the run records are already in this
+   * state; a stored copy beside them is a second truth that can disagree.
+   * derive.ts computes them at render: latestOf, verifiedOf, defectsOf.
+   */
 }
 
 export interface SpecComponent {

@@ -140,7 +140,13 @@ export function loadSpec(root: string): SpecData {
   const data: SpecData = {
     entry: model.entry,
     trustLevels: model.trustLevels.map((level) => ({ name: level.name, meaning: level.meaning })),
-    components: model.components,
+    // The spec model carries each bullet's latest run entries; the page does not. They are the
+    // run records, which the page already holds, read by enforcement: derive.ts reads them back
+    // at render so no copy can disagree with the records it came from.
+    components: model.components.map((component) => ({
+      ...component,
+      invariants: component.invariants.map(({ latest: _latest, verified: _verified, defects: _defects, ...invariant }) => invariant),
+    })),
     problems: model.problems,
     counts: model.counts,
     ladder: ladderFor(root),

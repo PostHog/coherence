@@ -238,6 +238,73 @@ test("calibrate: the outcome label is automatic; a later defect record labels de
   assert.equal(traced.damaged.length, 0);
 });
 
+test("mass counts reach by chokepoint or totality oracle, and says plainly when a totality oracle's run record does not name the files its test touched", () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-mass-totality-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text, "utf8");
+  };
+  try {
+    put("coherence.config.json", CONFIG);
+    put("src/gauge/Gauge.spec.md", [
+      "# Gauge",
+      "",
+      "Two bullets, each enforced only by a totality oracle.",
+      "",
+      "## invariants",
+      "- every reading is bounded: No reading leaves the gauge outside its declared range.",
+      "  over: every reading the gauge produces",
+      "  via: readings stay inside the declared range",
+      "  because: a reading outside its range is read as a fault by everything downstream",
+      "  kinds: none",
+      "- the dial is monotonic: The dial never runs backwards within one sweep.",
+      "  over: every sweep",
+      "  via: the dial never runs backwards",
+      "  because: a dial that ran backwards would be read as a second sweep",
+      "  kinds: none",
+      "",
+    ].join("\n"));
+    put("src/gauge/reading.ts", "export function reading(): number {\n  return 1;\n}\n");
+    put("src/gauge/dial.ts", "export function dial(): number {\n  return 2;\n}\n");
+
+    const entryFor = (name: string, files: string[]): RunRecord["invariants"][number] => ({
+      component: "src/gauge",
+      name,
+      form: "totality oracle",
+      verdict: "pass",
+      mode: "batched",
+      refutation: "witnessed",
+      bypasses: [],
+      testReferences: 0,
+      files,
+      latency: 1,
+      reason: "the test it is total over passed",
+    });
+    appendRun(dir, {
+      at: "2026-09-17T11:00:00.000Z",
+      session: "gauge",
+      agent: "tester",
+      commit: null,
+      dirty: false,
+      instrument: { language: "typescript", server: "cold" },
+      latency: 1,
+      invariants: [entryFor("every reading is bounded", ["src/gauge/reading.ts"]), entryFor("the dial is monotonic", [])],
+    });
+
+    const report = computeMass(dir);
+    const gauge = report.components.find((c) => c.folder === "src/gauge");
+    assert.ok(gauge !== undefined);
+    assert.deepEqual(gauge.unreachedFiles, ["src/gauge/dial.ts"], "the totality oracle that named its files reaches reading.ts");
+    assert.deepEqual(report.files.find((f) => f.file === "src/gauge/reading.ts")?.reachedBy, ["src/gauge/every reading is bounded"]);
+    assert.deepEqual(report.reachFrom, ["run"]);
+    assert.deepEqual(report.silentTotalityOracles, ["src/gauge/the dial is monotonic"], "the totality oracle whose run record names no file is named, not silently counted as no reach");
+    const printed = formatMass(report);
+    assert.match(printed, /^1 totality oracle's run record does not say which files its test touched, so nothing is counted reached through it: src\/gauge\/the dial is monotonic$/m);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("mass: a file in no component and a file in a component that no invariant reaches count as unreached; unreached prints first; deterministic", () => {
   // This test owns the runs: it may run alone under the totality oracle pass.
   rmSync(join(root, ".coherence/runs"), { recursive: true, force: true });
