@@ -45,6 +45,7 @@
  */
 
 import { isTestPath, rangeContains, type Definition, type LanguageAdapter, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
+import { projectSites } from "../adapters/project-files.ts";
 import type { Bypass, Grade, ReferenceTarget, RefutationState, SiteClass, Verdict } from "./record.ts";
 
 export interface ClassifiedSite extends ReferenceSite {
@@ -82,6 +83,8 @@ export interface ChokepointInput {
   chokepoint: string;
   component: string;
   testFolders: readonly string[];
+  /** The project root: only its own files are evidence, so a site outside them is never classified. */
+  root: string;
 }
 
 export function classifySite(site: ReferenceSite, protectedThing: Definition, chokepoint: Definition, testFolders: readonly string[]): Exclude<SiteClass, "chokepoint-reference"> {
@@ -160,13 +163,29 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
     };
   }
   const chokepoint = chokepointResolved.definition;
+  // A definition outside the project's files is no answer about this project: an instrument that indexed a nested
+  // checkout (a warm server started before the rule) resolved the name to that checkout's copy. Nothing is graded on it.
+  const foreign = [protectedThing, chokepoint].filter((d) => projectSites(input.root, [d]).length === 0);
+  if (foreign.length > 0) {
+    return {
+      ...base,
+      verdict: "not run",
+      // Not a structural defect and not a grade of this project's structure: the answer came from another tree.
+      grade: "not chokeable",
+      protectedThing,
+      chokepoint,
+      reason: `the instrument resolved ${foreign.map((d) => `${d.name} to ${d.file}`).join(" and ")}, which is not one of the project's files (ignored, or inside a nested checkout); nothing was graded. A warm server that indexed a nested checkout answers this way: stop it (coherence serve restarts it) and run again`,
+    };
+  }
 
   // These are two distinct questions. Protected references decide the grade;
   // chokepoint references describe legal reliance on the door. A run records
   // sites only after both queries complete, so a failed second query cannot
   // turn partial evidence into a confirmed empty set.
-  const protectedReferences = await adapter.references(protectedThing);
-  const chokepointReferences = await adapter.references(chokepoint);
+  // Only the project's own files are evidence (projectSites): a site in a nested checkout or an ignored file
+  // is someone else's working text, never a bypass, even from an instrument that still reports one.
+  const protectedReferences = projectSites(input.root, await adapter.references(protectedThing));
+  const chokepointReferences = projectSites(input.root, await adapter.references(chokepoint));
   const sites: ClassifiedSite[] = [
     ...protectedReferences.map((site) => ({ ...site, of: "protected" as const, test: isTestPath(site.file, input.testFolders), class: classifySite(site, protectedThing, chokepoint, input.testFolders) })),
     ...chokepointReferences.map((site) => ({ ...site, of: "chokepoint" as const, test: isTestPath(site.file, input.testFolders), class: classifyChokepointSite(site, chokepoint) })),

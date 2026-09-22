@@ -22,7 +22,7 @@
  * unreachable from any other module, so the top rung is visibility-choked.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomBytes } from "node:crypto";
@@ -45,6 +45,7 @@ import {
   type Visibility,
 } from "./adapter.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
+import { keepProjectFiles, projectFiles } from "./project-files.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..");
@@ -121,29 +122,15 @@ export function refusesReference(diagnostic: Diagnostic): boolean {
   return /not exported|no exported member|is private|is protected|not accessible/.test(diagnostic.message);
 }
 
-/** The first source file under the root: opening it makes the language server load the project. */
+/** The project's files a walk of this adapter may read: never under a dot folder or a folder no adopter's code lives in. */
+function walkedFiles(root: string): string[] {
+  return projectFiles(root).filter((rel) => rel.split("/").every((part) => !part.startsWith(".") && !SKIPPED_FOLDERS.has(part)));
+}
+
+/** The first source file of the project: opening it makes the language server load the project. */
 function firstSourceFile(root: string): string | undefined {
-  const walk = (dir: string): string | undefined => {
-    let entries: string[];
-    try {
-      entries = readdirSync(dir).sort();
-    } catch {
-      return undefined;
-    }
-    for (const name of entries) {
-      if (name.startsWith(".") || SKIPPED_FOLDERS.has(name)) continue;
-      const path = join(dir, name);
-      const stats = statSync(path);
-      if (stats.isDirectory()) {
-        const found = walk(path);
-        if (found !== undefined) return found;
-      } else if (stats.isFile() && SOURCE_EXTENSIONS.has(extensionOf(name)) && !/\.d\.ts$/.test(name)) {
-        return path;
-      }
-    }
-    return undefined;
-  };
-  return walk(root);
+  const found = walkedFiles(root).find((rel) => SOURCE_EXTENSIONS.has(extensionOf(rel)) && !/\.d\.ts$/.test(rel));
+  return found === undefined ? undefined : join(root, found);
 }
 
 function extensionOf(name: string): string {
@@ -151,29 +138,9 @@ function extensionOf(name: string): string {
   return dot === -1 ? "" : name.slice(dot);
 }
 
-/** Every source file under the root whose project-relative path is the hint or ends with `/<hint>`. */
+/** Every project file whose project-relative path is the hint or ends with `/<hint>`. */
 export function filesEndingWith(root: string, hint: string): string[] {
-  const found: string[] = [];
-  const walk = (dir: string): void => {
-    let entries: string[];
-    try {
-      entries = readdirSync(dir).sort();
-    } catch {
-      return;
-    }
-    for (const name of entries) {
-      if (name.startsWith(".") || SKIPPED_FOLDERS.has(name)) continue;
-      const path = join(dir, name);
-      if (statSync(path).isDirectory()) {
-        walk(path);
-        continue;
-      }
-      const rel = relative(root, path).split(sep).join("/");
-      if (rel === hint || rel.endsWith("/" + hint)) found.push(rel);
-    }
-  };
-  walk(root);
-  return found;
+  return walkedFiles(root).filter((rel) => rel === hint || rel.endsWith("/" + hint));
 }
 
 /** A wildcard re-export of a whole module: `export * from "./x.ts"`, `export * as ns from …`, `export type * from …`. */
@@ -205,31 +172,9 @@ export function siteForm(lines: readonly string[], line: number): SiteForm | und
   return undefined;
 }
 
-/** Every source file under the root, project-relative, skipping the folders no adopter's code lives in. */
+/** Every source file of the project, project-relative, skipping the folders no adopter's code lives in. */
 export function sourceFilesUnder(root: string): string[] {
-  const found: string[] = [];
-  const walk = (dir: string): void => {
-    let entries: string[];
-    try {
-      entries = readdirSync(dir).sort();
-    } catch {
-      return;
-    }
-    for (const name of entries) {
-      if (name.startsWith(".") || SKIPPED_FOLDERS.has(name)) continue;
-      const path = join(dir, name);
-      let stats;
-      try {
-        stats = statSync(path);
-      } catch {
-        continue;
-      }
-      if (stats.isDirectory()) walk(path);
-      else if (stats.isFile() && SOURCE_EXTENSIONS.has(extensionOf(name))) found.push(relative(root, path).split(sep).join("/"));
-    }
-  };
-  walk(root);
-  return found;
+  return walkedFiles(root).filter((rel) => SOURCE_EXTENSIONS.has(extensionOf(rel)));
 }
 
 /** The file a relative module specifier names, project-relative, or undefined when it is a package or points outside. */
@@ -268,6 +213,8 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private seed: string | undefined;
   /** Files a definition or a reference site landed in since the last forget: the ones a forget re-reads from disk. */
   private readonly touched = new Set<string>();
+  /** The unsaved documents a refutation has open right now: the adapter's own probe, never a file, and the one site outside the project's files it accepts. */
+  private readonly probes = new Set<string>();
   /** Wildcard re-export sites by the file they re-export; the reference query never reports them. Scanned once per forget. */
   private wildcards: Map<string, ReferenceSite[]> | undefined;
   /** The last diagnostics the server published, by project-relative file. */
@@ -420,7 +367,10 @@ export class TypeScriptAdapter implements LanguageAdapter {
     this.wildcards = undefined;
     this.diagnostics.clear();
     if (this.client === undefined) return;
-    const refresh = new Set([...this.touched, ...files, ...this.opened]);
+    // A named file that is not the project's (a nested checkout's copy, an ignored file) is never opened:
+    // opening it would load another project into the instrument, whose references would then answer as this one's.
+    const named = keepProjectFiles(this.root, files);
+    const refresh = new Set([...this.touched, ...files.filter((f) => named.has(f)), ...this.opened]);
     this.touched.clear();
     const synced: string[] = [];
     for (const file of refresh) {
@@ -446,6 +396,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     if (parsed.form === "module") {
       const path = join(this.root, parsed.path);
       if (!existsSync(path) || !statSync(path).isFile()) return { ok: false, reason: `module ${parsed.path} is not a file under the project` };
+      if (!keepProjectFiles(this.root, [parsed.path]).has(parsed.path)) return { ok: false, reason: `module ${parsed.path} is not one of the project's files (ignored, or inside a nested checkout)` };
       const lines = this.lines(parsed.path);
       const symbols = await this.documentSymbols(parsed.path);
       const first = symbols.find((s) => this.exportedIn(parsed.path, s));
@@ -485,8 +436,9 @@ export class TypeScriptAdapter implements LanguageAdapter {
       if (file.startsWith("..") || file.startsWith("node_modules/")) continue;
       files.add(file);
     }
+    const own = keepProjectFiles(this.root, [...files]);
     const candidates: Candidate[] = [];
-    for (const file of [...files].sort()) candidates.push(...(await this.declarationsIn(file, name)));
+    for (const file of [...files].filter((f) => own.has(f)).sort()) candidates.push(...(await this.declarationsIn(file, name)));
     return candidates;
   }
 
@@ -514,26 +466,31 @@ export class TypeScriptAdapter implements LanguageAdapter {
     } else {
       starts.push(definition.selection);
     }
-    const seen = new Set<string>();
-    const sites: ReferenceSite[] = [];
+    const reported: Location[] = [];
     for (const position of starts) {
       const locations = await client.request<Location[] | null>("textDocument/references", {
         textDocument: { uri: this.uri(definition.file) },
         position,
         context: { includeDeclaration: false },
       });
-      for (const location of locations ?? []) {
-        const file = this.relative(location.uri);
-        if (file.startsWith("..") || file.startsWith("node_modules/")) continue;
-        const start = location.range.start;
-        if (file === definition.file && rangeContains({ start: definition.selection, end: definition.selection }, start)) continue;
-        const key = `${file}:${start.line}:${start.character}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        this.touched.add(file);
-        const form = siteForm(this.linesOf(file), start.line);
-        sites.push({ file, line: start.line + 1, character: start.character, symbol: await this.enclosingSymbol(file, start), ...(form === undefined ? {} : { form }) });
-      }
+      reported.push(...(locations ?? []));
+    }
+    // Only the project's own files are evidence, and a site outside them is dropped before it is read or opened:
+    // opening a nested checkout's copy would load that checkout into the instrument as if it were this project.
+    const own = keepProjectFiles(this.root, reported.map((location) => this.relative(location.uri)));
+    const seen = new Set<string>();
+    const sites: ReferenceSite[] = [];
+    for (const location of reported) {
+      const file = this.relative(location.uri);
+      if (!(own.has(file) || this.probes.has(file)) || file.startsWith("node_modules/")) continue;
+      const start = location.range.start;
+      if (file === definition.file && rangeContains({ start: definition.selection, end: definition.selection }, start)) continue;
+      const key = `${file}:${start.line}:${start.character}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      this.touched.add(file);
+      const form = siteForm(this.linesOf(file), start.line);
+      sites.push({ file, line: start.line + 1, character: start.character, symbol: await this.enclosingSymbol(file, start), ...(form === undefined ? {} : { form }) });
     }
     // A wildcard re-export names nothing, so the server reports no site for it; it still widens the thing's reach.
     if (definition.kind === "module" || (await this.visibility(definition)).visible) {
@@ -707,6 +664,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: "typescript", version: 1, text: reExport } });
     this.lineCache.set(synthetic, reExport.split("\n"));
     this.symbolCache.set(synthetic, []);
+    this.probes.add(synthetic);
 
     // A module chokepoint has no inside that is outside its own range, so there is no same-module site to stage.
     const sameModule = chokepoint !== undefined && chokepoint.kind === "symbol" ? this.editChokepointModule(chokepoint, protectedThing, name) : undefined;
@@ -734,6 +692,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
       client.notify("textDocument/didClose", { textDocument: { uri: this.uri(synthetic) } });
       this.lineCache.delete(synthetic);
       this.symbolCache.delete(synthetic);
+      this.probes.delete(synthetic);
     }
   }
 

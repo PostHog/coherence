@@ -163,7 +163,7 @@ test("classification: inside the chokepoint, a test reference, a bypass; an impo
 });
 
 test("grades: broken with a bypass, reference-choked when clean and exported, visibility-choked when not exported, broken when the chokepoint is missing, not chokeable for prose", async () => {
-  const broken = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
+  const broken = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint, root });
   assert.equal(broken.grade, "broken");
   assert.equal(broken.verdict, "fail");
   assert.deepEqual(broken.bypasses, [
@@ -175,13 +175,13 @@ test("grades: broken with a bypass, reference-choked when clean and exported, vi
 
   write("src/api/render.ts", RENDER_CLEAN);
   await adapter.forget();
-  const clean = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
+  const clean = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint, root });
   assert.equal(clean.grade, "reference-choked", clean.reason);
   assert.equal(clean.verdict, "pass");
   assert.match(clean.reason, /visible outside its module/);
   assert.match(clean.reason, /2 test references/);
 
-  const hidden = await checkChokepoint(adapter, { protects: "HIDDEN", chokepoint: "peek", ...hint });
+  const hidden = await checkChokepoint(adapter, { protects: "HIDDEN", chokepoint: "peek", ...hint, root });
   assert.equal(hidden.grade, "visibility-choked", hidden.reason);
   assert.equal(hidden.verdict, "pass");
   assert.equal(hidden.siteEvidence, "complete");
@@ -199,12 +199,12 @@ test("grades: broken with a bypass, reference-choked when clean and exported, vi
   assert.deepEqual({ class: importOnly.class, of: importOnly.of, form: importOnly.form, test: importOnly.test }, { class: "chokepoint-reference", of: "chokepoint", form: "import", test: false }, "an unused import is recorded only as an adapter-observed chokepoint reference");
   assert.equal(hidden.bypasses.length, 0, "chokepoint references do not alter protected-reference grading");
 
-  const missing = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "noSuchFunction", ...hint });
+  const missing = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "noSuchFunction", ...hint, root });
   assert.equal(missing.grade, "broken");
   assert.equal(missing.verdict, "fail");
   assert.match(missing.reason, /no symbol named noSuchFunction/);
 
-  const prose = await checkChokepoint(adapter, { protects: "the rows every pattern keeps", chokepoint: "seal", ...hint });
+  const prose = await checkChokepoint(adapter, { protects: "the rows every pattern keeps", chokepoint: "seal", ...hint, root });
   assert.equal(prose.grade, "not chokeable");
   assert.equal(prose.verdict, "not run");
   assert.match(prose.reason, /totality oracle form .* is the compromise/);
@@ -476,7 +476,7 @@ test("the check reads the current disk text after a forget, with the instrument'
       const bypass = i % 2 === 1;
       put("src/api/render.ts", bypass ? RENDER_BYPASS : RENDER_CLEAN);
       await fresh.forget(["src/api/render.ts"]);
-      const result = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
+      const result = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint, root: other });
       const expected = bypass ? "fail" : "pass";
       if (result.verdict !== expected) wrong.push(`cycle ${i}: disk ${bypass ? "bypass" : "clean"}, verdict ${result.verdict} (${result.reason})`);
     }
@@ -501,7 +501,7 @@ test("every site the language server reports is a reference: a bypass beneath a 
   put("src/api/reexport.ts", 'export { SECRET_COLUMNS } from "../store/secrets.ts";\n');
   const fresh = new TypeScriptAdapter(other);
   try {
-    const result = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
+    const result = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint, root: other });
     assert.equal(result.verdict, "fail", result.reason);
     assert.equal(result.grade, "broken");
     assert.deepEqual(
@@ -579,7 +579,7 @@ export function seal(pattern: string): string[] {
   try {
     rmSync(join(dir, "src/api/leak.ts"));
     rmSync(join(dir, "src/api/star.ts"));
-    const result = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS in secrets.ts", chokepoint: "seal", ...hint });
+    const result = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS in secrets.ts", chokepoint: "seal", ...hint, root: dir });
     assert.equal(result.grade, "reference-choked", result.reason);
     assert.equal(result.refutation, "automatic", result.refutationAccount);
     assert.equal(result.verdict, "pass", result.reason);
@@ -616,7 +616,7 @@ test("the automatic refutation is vacuous unless the check's own classification 
   put("src/store/hidden.ts", 'const HIDDEN = new Set(["x"]);\n\nexport function peek(pattern: string): number {\n  return HIDDEN.size + pattern.length;\n}\n');
   const fresh = new TypeScriptAdapter(other);
   try {
-    const inTests = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
+    const inTests = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint, root: other });
     assert.equal(inTests.counts.bypass, 0, "every site is under a test folder");
     assert.equal(inTests.refutation, "missing", inTests.refutationAccount);
     assert.equal(inTests.verdict, "not run", inTests.reason);
@@ -624,14 +624,14 @@ test("the automatic refutation is vacuous unless the check's own classification 
 
     // Ruling rs-e93ecdd6: HIDDEN is not exported, so the compiler refuses every outside reference and
     // Coherence's own check can never be made to fire; the refusal is the refutation for that rung.
-    const ownModule = await checkChokepoint(fresh, { protects: "HIDDEN", chokepoint: "src/store/hidden.ts", ...hint });
+    const ownModule = await checkChokepoint(fresh, { protects: "HIDDEN", chokepoint: "src/store/hidden.ts", ...hint, root: other });
     assert.equal(ownModule.refutation, "refused by the language", ownModule.refutationAccount);
     assert.equal(ownModule.verdict, "pass", ownModule.reason);
     assert.equal(ownModule.grade, "visibility-choked", ownModule.reason);
     assert.match(ownModule.refutationAccount, /refused by the compiler: .*not exported/);
     assert.match(ownModule.refutationAccount, /the visibility-choked rung is enforced by the compiler, and its refusal is the refutation/);
 
-    const symbolChokepoint = await checkChokepoint(fresh, { protects: "HIDDEN", chokepoint: "peek", ...hint });
+    const symbolChokepoint = await checkChokepoint(fresh, { protects: "HIDDEN", chokepoint: "peek", ...hint, root: other });
     assert.equal(symbolChokepoint.refutation, "refused by the language", symbolChokepoint.refutationAccount);
     assert.equal(symbolChokepoint.verdict, "pass", symbolChokepoint.reason);
   } finally {

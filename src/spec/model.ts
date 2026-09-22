@@ -12,12 +12,13 @@
  * enforcement; with no run every enforcement reports as declared, unverified.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type Latest } from "../enforcement/record.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
+import { projectFiles } from "../adapters/project-files.ts";
 
 export const SPEC_SUFFIX = ".spec.md";
 export const CONFIG_FILE = "coherence.config.json";
@@ -110,22 +111,22 @@ function readConfig(root: string): Config {
 
 /** Every spec file under the root, sorted by path. */
 export function findSpecs(root: string, ignore: readonly string[] = []): string[] {
+  return walkedFiles(root, ".", ignore).filter((rel) => rel.endsWith(SPEC_SUFFIX)).map((rel) => join(root, rel)).sort();
+}
+
+/**
+ * The project's own files under a folder (projectFiles), project-relative,
+ * never inside a folder no walk enters: a spec in a nested checkout is
+ * another tree's component, and its source is not this project's.
+ */
+function walkedFiles(root: string, folder: string, ignore: readonly string[]): string[] {
   const skip = new Set([...EXCLUDED_FOLDERS, ...ignore]);
-  const found: string[] = [];
-  const walk = (dir: string): void => {
-    const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
-    for (const entry of entries) {
-      const path = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (skip.has(entry.name) || skip.has(relative(root, path))) continue;
-        walk(path);
-      } else if (entry.isFile() && entry.name.endsWith(SPEC_SUFFIX)) {
-        found.push(path);
-      }
-    }
-  };
-  walk(root);
-  return found.sort();
+  const prefix = folder === "." || folder === "" ? "" : folder.replace(/\/+$/, "") + "/";
+  return projectFiles(root).filter((rel) => {
+    if (!rel.startsWith(prefix)) return false;
+    const folders = rel.split("/").slice(0, -1);
+    return folders.every((name, i) => !skip.has(name) && !skip.has(folders.slice(0, i + 1).join("/")));
+  });
 }
 
 function folderOf(root: string, specPath: string): string {
@@ -275,18 +276,7 @@ function declaresAtTop(text: string, name: string): boolean {
 
 /** Source files under a folder, sorted, never into the folders no walk enters. */
 function sourcesUnder(root: string, folder: string, ignore: readonly string[]): string[] {
-  const skip = new Set([...EXCLUDED_FOLDERS, ...ignore]);
-  const found: string[] = [];
-  const walk = (dir: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
-      const path = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (!skip.has(entry.name) && !skip.has(relative(root, path))) walk(path);
-      } else if (entry.isFile() && SOURCE.test(entry.name)) found.push(relative(root, path).split(sep).join("/"));
-    }
-  };
-  walk(resolve(root, folder));
-  return found;
+  return walkedFiles(root, folder, ignore).filter((rel) => SOURCE.test(rel));
 }
 
 /**

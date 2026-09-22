@@ -22,6 +22,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSyn
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { keepProjectFiles, projectFiles } from "../adapters/project-files.ts";
 import type { EnforcementConfig } from "../enforcement/config.ts";
 import type { BatchObserver, CommandSpec, JsonReport } from "../enforcement/totality.ts";
 import { positionsOf, type ExecutedFile, type Span } from "./map.ts";
@@ -78,12 +79,34 @@ function real(path: string): string {
   }
 }
 
-/** A path the runtime printed, project-relative, or undefined outside the root. */
+/** The project's files per real root, enumerated once per process; a path not among them is asked of git once more before it is refused. */
+const enumerated = new Map<string, ReadonlySet<string>>();
+const owned = new Map<string, boolean>();
+
+function isOwned(realRoot: string, rel: string): boolean {
+  let files = enumerated.get(realRoot);
+  if (files === undefined) enumerated.set(realRoot, (files = new Set(projectFiles(realRoot))));
+  if (files.has(rel)) return true;
+  // A dependency's file is never the project's, and there are thousands: no second question for them.
+  if (rel.split("/").includes("node_modules")) return false;
+  const key = `${realRoot}\u0000${rel}`;
+  let own = owned.get(key);
+  // A file created after the enumeration (a test's fixture, a new module) is asked about by itself.
+  if (own === undefined) owned.set(key, (own = keepProjectFiles(realRoot, [rel]).has(rel)));
+  return own;
+}
+
+/**
+ * A path the runtime printed, project-relative, or undefined when it is not
+ * one of the project's own files: outside the root, ignored, or inside a
+ * nested checkout (projectFiles' rule), so what executed in an agent's
+ * worktree copy is never observed as this project's code.
+ */
 export function projectPath(realRoot: string, path: string): string | undefined {
   const absolute = real(isAbsolute(path) ? path : join(realRoot, path));
   const rel = relative(realRoot, absolute).split(sep).join("/");
   if (rel === "" || rel.startsWith("..")) return undefined;
-  return rel;
+  return isOwned(realRoot, rel) ? rel : undefined;
 }
 
 function reportedTests(report: JsonReport | undefined, realRoot: string): CapturedTest[] {

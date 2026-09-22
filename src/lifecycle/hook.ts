@@ -48,6 +48,7 @@ import { promisify } from "node:util";
 import { formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
+import { keepProjectFiles } from "../adapters/project-files.ts";
 import { openFeed, peerFeed } from "../journal/feed.ts";
 import { openEscalations } from "../journal/read.ts";
 import { recordReadTrace, snapshotTrace } from "../economy/trace.ts";
@@ -157,8 +158,10 @@ export async function changedFiles(root: string): Promise<ChangedFiles> {
       return { files: [], failure: `git ${args.join(" ")} failed: ${reason}` };
     }
   }
-  const all = listings.join("\n").split("\n").map((l) => l.trim()).filter((l) => l !== "");
-  return { files: [...new Set(all)] };
+  const all = [...new Set(listings.join("\n").split("\n").map((l) => l.trim()).filter((l) => l !== ""))];
+  // Only the project's own files (a nested repository lists as one folder entry, never the project's); a deletion stays.
+  const own = keepProjectFiles(root, all);
+  return { files: all.filter((f) => own.has(f) || !existsSync(resolve(root, f))) };
 }
 
 /** Escalations no human has acknowledged, under a heading, or nothing. Never shortened: a human must see them whole. */
@@ -388,7 +391,11 @@ export function writtenFile(root: string, input: HookInput): string | undefined 
  * may involve and describe any structural defect, or nothing.
  */
 export async function editContext(root: string, input: HookInput, options: HookOptions = {}): Promise<string> {
-  const files = writtenFiles(root, input);
+  // Only the project's own files are evidence: an edit in a nested checkout (an agent's worktree under the root) or to an
+  // ignored file is not an edit to this project, and re-checking it would load that checkout into this project's instrument.
+  const written = writtenFiles(root, input);
+  const own = keepProjectFiles(root, written);
+  const files = written.filter((file) => own.has(file));
   if (files.length === 0) return "";
   const model = specModelOrNull(root);
   if ("error" in model || model.components.length === 0) return "";

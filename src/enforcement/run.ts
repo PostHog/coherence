@@ -171,7 +171,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
         }
         let result: ChokepointResult;
         try {
-          result = await checkChokepoint(adapter, { protects, chokepoint, component, testFolders: config.testFolders });
+          result = await checkChokepoint(adapter, { protects, chokepoint, component, testFolders: config.testFolders, root });
         } catch (error) {
           details.push({
             entry: entryOf(component, invariant.name, "chokepoint", {

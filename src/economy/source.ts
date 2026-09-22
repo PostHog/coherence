@@ -6,9 +6,10 @@
  * references, and mass says when a number came from the scan alone.
  */
 
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { isTestPath } from "../adapters/adapter.ts";
+import { projectFiles } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
 import type { Component, SpecModel } from "../spec/model.ts";
 
@@ -25,37 +26,18 @@ export function isSourceFile(file: string, language: Language): boolean {
   return EXTENSIONS[language].some((ext) => file.endsWith(ext));
 }
 
-/** Every source file under the root for the language, project-relative with forward slashes, sorted. */
+/**
+ * Every source file of the project for the language, project-relative with
+ * forward slashes, sorted: the project's own files (projectFiles), never
+ * under a dot folder or a folder no walk enters.
+ */
 export function sourceFiles(root: string, language: Language, ignore: readonly string[] = []): string[] {
   const skip = new Set([...EXCLUDED_FOLDERS, ...ignore]);
-  const found: string[] = [];
-  const walk = (dir: string): void => {
-    let entries: string[];
-    try {
-      entries = readdirSync(dir).sort();
-    } catch {
-      return;
-    }
-    for (const name of entries) {
-      const path = resolve(dir, name);
-      const rel = toRelative(root, path);
-      if (rel === undefined) continue;
-      let stats;
-      try {
-        stats = statSync(path);
-      } catch {
-        continue;
-      }
-      if (stats.isDirectory()) {
-        if (name.startsWith(".") || skip.has(name) || skip.has(rel)) continue;
-        walk(path);
-      } else if (stats.isFile() && isSourceFile(name, language)) {
-        found.push(rel);
-      }
-    }
-  };
-  walk(resolve(root));
-  return found.sort();
+  return projectFiles(resolve(root)).filter((rel) => {
+    if (!isSourceFile(rel, language)) return false;
+    const folders = rel.split("/").slice(0, -1);
+    return folders.every((name, i) => !name.startsWith(".") && !skip.has(name) && !skip.has(folders.slice(0, i + 1).join("/")));
+  });
 }
 
 /** A path as project-relative with forward slashes, or undefined when it lies outside the root. */

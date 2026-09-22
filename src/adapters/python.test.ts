@@ -295,7 +295,7 @@ test("Python classification: inside the chokepoint, a test reference, a bypass; 
 });
 
 test("Python grades: broken with a bypass; reference-choked when clean, with the convention as evidence; closure-choked for a function-local; checker-choked once Pyright's private-usage rule is an error; broken without a chokepoint; not chokeable for prose", async () => {
-  const broken = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
+  const broken = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint, root });
   assert.equal(broken.grade, "broken");
   assert.equal(broken.verdict, "fail");
   assert.deepEqual(broken.bypasses, [
@@ -307,18 +307,18 @@ test("Python grades: broken with a bypass; reference-choked when clean, with the
 
   write("pkg/render.py", RENDER_CLEAN);
   await adapter.forget();
-  const clean = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
+  const clean = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint, root });
   assert.equal(clean.grade, "reference-choked", clean.reason);
   assert.equal(clean.verdict, "pass");
   assert.equal(clean.enforcer, "Coherence's check at the edit and in CI");
   assert.match(clean.reason, /carries no underscore prefix; __all__ in pkg\/store\.py excludes it; no Pyright configuration/);
   assert.match(clean.reason, /2 test references/);
 
-  const hidden = await checkChokepoint(adapter, { protects: "_HIDDEN", chokepoint: "peek", ...hint });
+  const hidden = await checkChokepoint(adapter, { protects: "_HIDDEN", chokepoint: "peek", ...hint, root });
   assert.equal(hidden.grade, "reference-choked", "the underscore prefix alone is a convention: the top rung without a checker is Coherence's own");
   assert.match(hidden.reason, /_HIDDEN is underscore-prefixed; __all__ in pkg\/store\.py excludes it; no Pyright configuration/);
 
-  const inner = await checkChokepoint(adapter, { protects: "INNER", chokepoint: "closure", ...hint });
+  const inner = await checkChokepoint(adapter, { protects: "INNER", chokepoint: "closure", ...hint, root });
   assert.equal(inner.grade, "closure-choked", inner.reason);
   assert.equal(inner.enforcer, "the interpreter");
   assert.match(inner.reason, /defined inside closure's body and is not a module attribute/);
@@ -328,30 +328,30 @@ test("Python grades: broken with a bypass; reference-choked when clean, with the
   assert.equal(inner.verdict, "pass", inner.reason);
   assert.match(inner.refutationAccount, /refused by the interpreter's own rule: .*unknown import symbol/);
   assert.match(inner.refutationAccount, /the closure-choked rung is enforced by the interpreter, and its refusal is the refutation/);
-  const innerElsewhere = await checkChokepoint(adapter, { protects: "INNER", chokepoint: "seal", ...hint });
+  const innerElsewhere = await checkChokepoint(adapter, { protects: "INNER", chokepoint: "seal", ...hint, root });
   assert.equal(innerElsewhere.grade, "broken", "a function-local named under another chokepoint is referenced inside its own function, outside that chokepoint");
   assert.deepEqual(innerElsewhere.bypasses, [{ file: "pkg/store.py", line: 31, symbol: "closure" }]);
 
-  const member = await checkChokepoint(adapter, { protects: "_script in store.py", chokepoint: "swap", ...hint });
+  const member = await checkChokepoint(adapter, { protects: "_script in store.py", chokepoint: "swap", ...hint, root });
   assert.equal(member.grade, "reference-choked", member.reason);
   assert.match(member.reason, /member of Tracker, reachable through the class/);
 
   write("pyrightconfig.json", JSON.stringify({ reportPrivateUsage: "error" }));
   await adapter.forget();
-  const checked = await checkChokepoint(adapter, { protects: "_HIDDEN", chokepoint: "peek", ...hint });
+  const checked = await checkChokepoint(adapter, { protects: "_HIDDEN", chokepoint: "peek", ...hint, root });
   assert.equal(checked.grade, "checker-choked", checked.reason);
   assert.match(checked.enforcer ?? "", /^Pyright \(reportPrivateUsage: error in pyrightconfig\.json\)/);
-  const stillPublic = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint });
+  const stillPublic = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "seal", ...hint, root });
   assert.equal(stillPublic.grade, "reference-choked", "a name without the prefix gains nothing from the rule");
   assert.match(stillPublic.reason, /reportPrivateUsage is an error in pyrightconfig\.json/);
   rmSync(join(root, "pyrightconfig.json"));
   await adapter.forget();
 
-  const missing = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "no_such_function", ...hint });
+  const missing = await checkChokepoint(adapter, { protects: "SECRET_COLUMNS", chokepoint: "no_such_function", ...hint, root });
   assert.equal(missing.grade, "broken");
   assert.match(missing.reason, /no symbol named no_such_function/);
 
-  const prose = await checkChokepoint(adapter, { protects: "the rows every pattern keeps", chokepoint: "seal", ...hint });
+  const prose = await checkChokepoint(adapter, { protects: "the rows every pattern keeps", chokepoint: "seal", ...hint, root });
   assert.equal(prose.grade, "not chokeable");
   assert.match(prose.reason, /totality oracle form .* is the compromise/);
 
@@ -364,7 +364,7 @@ test("a Python module or package resolves, its members are the references' start
   assert.equal(pkg.kind, "module");
   assert.equal(pkg.file, "pkg/__init__.py");
   const store = definitionOf(await adapter.resolve("pkg/store.py", hint));
-  const result = await checkChokepoint(adapter, { protects: "pkg/", chokepoint: "pkg/render.py", ...hint });
+  const result = await checkChokepoint(adapter, { protects: "pkg/", chokepoint: "pkg/render.py", ...hint, root });
   assert.equal(result.bypasses.length, 0, result.reason);
   assert.equal(result.grade, "reference-choked");
   assert.match(result.reason, /any file may import pkg/);

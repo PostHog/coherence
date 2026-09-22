@@ -29,10 +29,12 @@
  * the walk. Every path given is confined to the project root.
  */
 
+import { existsSync } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { acceptedNames, rejectedNames, type Glossary, type RejectedName } from "./glossary.ts";
 import { STOPLIST } from "./stoplist.ts";
+import { projectFiles } from "../adapters/project-files.ts";
 
 export interface CheckOptions {
   root: string;
@@ -192,6 +194,7 @@ async function walk(dir: string, walker: Walk): Promise<void> {
     const path = resolve(dir, entry.name);
     if (entry.isDirectory()) {
       if (EXCLUDED_FOLDERS.has(entry.name)) { walker.excluded.push({ file: relPath(walker.root, path), reason: "dependency, generated, host, or environment folder" }); continue; }
+      if (existsSync(resolve(path, ".git"))) { walker.excluded.push({ file: relPath(walker.root, path), reason: "a nested checkout: another repository or worktree, not the project's files" }); continue; }
       await walk(path, walker);
     } else if (entry.isFile() && kindOf(walker.root, path) !== undefined) {
       walker.found.push(path);
@@ -236,14 +239,21 @@ export async function collectFiles(options: CheckOptions): Promise<{ files: stri
     if (info.isDirectory()) await walk(path, walker);
     else if (info.isFile() && kindOf(root, path) !== undefined) walker.found.push(path);
   }
+  // Only the project's own files are vocabulary: tracked or untracked and not ignored, never inside a nested checkout.
+  const own = new Set(projectFiles(root));
   const files = [...new Set(walker.found)].filter((p) => {
     if (excluded.has(p)) return false;
+    if (!own.has(relPath(root, p))) return false;
     if (foreignDocs.some((d) => p === d || p.startsWith(d + sep))) return false;
     const rel = relPath(root, p);
     if (rel.split("/")[0] === COHERENCE_DIR && !isRecordFile(rel)) return false;
     return !dirname(rel).split("/").some((part) => EXCLUDED_FOLDERS.has(part));
   });
-  for (const path of walker.found) if (!files.includes(path)) walker.excluded.push({ file: relPath(root, path), reason: "glossary, reference vocabulary, generated state, or excluded folder" });
+  for (const path of walker.found) {
+    if (files.includes(path)) continue;
+    const rel = relPath(root, path);
+    walker.excluded.push({ file: rel, reason: own.has(rel) ? "glossary, reference vocabulary, generated state, or excluded folder" : "not one of the project's files: ignored, or inside a nested checkout" });
+  }
   return { files, unreadable: walker.unreadable, excluded: walker.excluded };
 }
 

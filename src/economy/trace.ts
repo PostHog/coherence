@@ -21,6 +21,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
+import { keepProjectFiles } from "../adapters/project-files.ts";
 import type { HookInput } from "../lifecycle/hook.ts";
 import type { SpecModel } from "../spec/model.ts";
 import { predictClosure, type Instrument } from "./closure.ts";
@@ -120,8 +121,10 @@ export function patchFiles(root: string): string[] {
   const diff = git(root, ["diff", "--name-only", "HEAD"]);
   const untracked = git(root, ["ls-files", "--others", "--exclude-standard"]);
   if (diff === null && untracked === null) return [];
-  const all = `${diff ?? ""}\n${untracked ?? ""}`.split("\n").map((l) => l.trim()).filter((l) => l !== "");
-  return [...new Set(all)].sort();
+  const all = [...new Set(`${diff ?? ""}\n${untracked ?? ""}`.split("\n").map((l) => l.trim()).filter((l) => l !== ""))];
+  // Only the project's own files (a nested repository lists as one folder entry, never the project's); a deletion stays.
+  const own = keepProjectFiles(root, all);
+  return all.filter((f) => own.has(f) || !existsSync(join(root, f))).sort();
 }
 
 export interface SessionTrace {
