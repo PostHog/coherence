@@ -54,7 +54,7 @@ function renderVerdict(state: ShellState, entry: LatestEntry | undefined): Marku
     <p class="reason quiet">${entry.reason}</p>`;
 }
 
-function renderEnforcement(state: ShellState, invariant: SpecInvariant, enforcement: SpecEnforcement): Markup {
+export function renderEnforcement(state: ShellState, invariant: SpecInvariant, enforcement: SpecEnforcement): Markup {
   const entry = latestOf(invariant, state.runs.records).find((l) => l.form === enforcement.form);
   if (enforcement.form === "chokepoint") {
     return html`<li class="enforcement" data-form="chokepoint">
@@ -69,7 +69,7 @@ function renderEnforcement(state: ShellState, invariant: SpecInvariant, enforcem
   </li>`;
 }
 
-function renderRefutation(invariant: SpecInvariant, runs: readonly RunRecord[]): Markup {
+export function renderRefutation(invariant: SpecInvariant, runs: readonly RunRecord[]): Markup {
   const automatic = latestOf(invariant, runs).find((l) => l.form === "chokepoint" && l.refutation === "automatic");
   const refused = latestOf(invariant, runs).find((l) => l.form === "chokepoint" && l.refutation === "refused by the language");
   const parts: Markup[] = [];

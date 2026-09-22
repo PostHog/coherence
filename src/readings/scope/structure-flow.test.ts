@@ -16,7 +16,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
@@ -29,7 +29,7 @@ import { readComponentInterfaces } from "./component-interfaces.ts";
 import { flowChokepointId, flowLevelId, relianceId, resolveHash, structureId } from "./derive.ts";
 import type { InterfaceReading, InterfaceSymbol, RecordedSite, RunEntry, ShellState, SpecComponent, SpecEntrance, SpecInvariant } from "./model.ts";
 import { renderView } from "./shell.ts";
-import { CORE_RULE, FLOW_CHANGE_ID, compareFlows, flowEdgeId, flowEntranceId, flowLabelLines, flowNodeId, flowOf, flowSelection, type FlowModel } from "./structure-flow.ts";
+import { CORE_RULE, FLOW_CHANGE_ID, FLOW_NONE_ID, compareFlows, flowDefaultSelection, flowEdgeId, flowEntranceId, flowKeyAction, flowLabelLines, flowNodeId, flowOf, flowSelected, flowSelection, type FlowModel } from "./structure-flow.ts";
 import { flowLayout, renderFlowSvg } from "./structure-flow-view.ts";
 import { measureSvg } from "./structure-measure.ts";
 
@@ -268,8 +268,7 @@ test("a core dependency is a rail labelled once: its callers carry a stub and no
   }
   assert.ok(model.routes.every((route) => !route.stops.includes("src/journal")), "no route runs through a core dependency");
   const stubs = measureSvg(renderFlowSvg(model, undefined).text).lines.filter((line) => line.id.startsWith("stub "));
-  assert.equal(stubs.length, 3);
-  for (const stub of stubs) assert.ok(Math.abs(stub.points[1]![1] - stub.points[0]![1]) <= 12, "a stub is short");
+  assert.equal(stubs.length, 3, "one stub per caller");
 });
 
 test("each structural route is one colored path through its components in order", () => {
@@ -281,7 +280,7 @@ test("each structural route is one colored path through its components in order"
     const colors = new Set<string>();
     for (const route of model.routes) {
       const paths = [...svg.matchAll(new RegExp(`<path class="flow-line flow-route" data-line="${route.id}" d="([^"]+)" stroke="([^"]+)"`, "g"))];
-      assert.equal(paths.length, 1, `route ${route.letter} is one path`);
+      assert.equal(paths.length, 1, `route ${route.id} is one path`);
       colors.add(paths[0]![2]!);
       const points = [...paths[0]![1]!.matchAll(/[ML] (-?[\d.]+) (-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])] as const);
       const visited: string[] = [];
@@ -289,8 +288,8 @@ test("each structural route is one colored path through its components in order"
         const at = [...layout.stations.values()].find((s) => x >= s.x - 0.5 && x <= s.x + s.w + 0.5 && y >= s.y - 0.5 && y <= s.y + s.h + 0.5 && Math.abs(x - (s.x + s.w / 2)) < 0.6);
         if (at !== undefined && visited[visited.length - 1] !== at.folder) visited.push(at.folder);
       }
-      assert.deepEqual(visited, route.stops, `route ${route.letter} passes the centre of each stop, in order`);
-      for (let i = 1; i < route.stops.length; i++) assert.ok(model.edges.some((edge) => edge.from === route.stops[i - 1] && edge.to === route.stops[i]), `route ${route.letter}: ${route.stops[i - 1]} -> ${route.stops[i]} is a component interface, caller to callee`);
+      assert.deepEqual(visited, route.stops, `route ${route.id} passes the centre of each stop, in order`);
+      for (let i = 1; i < route.stops.length; i++) assert.ok(model.edges.some((edge) => edge.from === route.stops[i - 1] && edge.to === route.stops[i]), `route ${route.id}: ${route.stops[i - 1]} -> ${route.stops[i]} is a component interface, caller to callee`);
     }
     assert.equal(colors.size, Math.min(model.routes.length, 8) + (model.routes.length > 8 ? 1 : 0), "each route has its own color, up to the eight validated ones");
   }
@@ -298,26 +297,296 @@ test("each structural route is one colored path through its components in order"
   assert.deepEqual(run.stops, [".", "src/hooks", "src/core", "src/store"], "the root dispatches run to the hooks, then the heaviest interface onward, past the rail");
 });
 
-test("stability: adding one component interface moves only the components it touches", () => {
-  const seats = (state: ShellState): Map<string, string> => new Map([...flowLayout(flowOf(state)).stations.entries()].map(([folder, station]) => [folder, `${station.seat.x},${station.seat.y}`]));
-  const before = seats(projectState());
-  const additions: [string, string][] = [["src/journal", "src/hooks"], ["src/reader", "src/hooks"], [".", "src/store"], ["src/hooks", "src/reader"], ["src/store", "src/reader"]];
-  for (const [from, to] of additions) {
-    const after = seats(projectState({ symbols: [...SYMBOLS, sym(from, to, "added", `${to}/added.ts`)] }));
-    const moved = [...before.keys()].filter((folder) => after.has(folder) && before.get(folder) !== after.get(folder));
-    assert.ok(moved.every((folder) => folder === from || folder === to), `adding ${from} -> ${to} moved ${moved.join(", ")}`);
+/** What an added interface reaches: its callee and everything the callee reaches, and all its caller reaches when it stops the caller being a core dependency. */
+function reachedBy(before: FlowModel, after: FlowModel, from: string, to: string): Set<string> {
+  const reach = (start: string): string[] => {
+    const seen = new Set([start]);
+    const queue = [start];
+    while (queue.length > 0) {
+      const at = queue.shift()!;
+      for (const edge of after.edges) if (edge.from === at && !seen.has(edge.to)) { seen.add(edge.to); queue.push(edge.to); }
+    }
+    return [...seen];
+  };
+  const wasCore = before.nodes.find((n) => n.folder === from)?.core === true && after.nodes.find((n) => n.folder === from)?.core !== true;
+  return new Set([from, to, ...reach(to), ...(wasCore ? reach(from) : [])]);
+}
+
+test("stability: adding one component interface never reorders the components it does not touch", () => {
+  const place = (model: FlowModel): Map<string, { column: number; row: number; core: boolean }> => new Map(model.nodes.map((n) => [n.folder, { column: n.column, row: n.row, core: n.core }]));
+  const adding = (make: () => ShellState, from: string, to: string): ShellState => {
+    const state = make();
+    if (state.componentInterfaces.kind === "read") state.componentInterfaces.symbols = [...state.componentInterfaces.symbols, sym(from, to, "added", `${to}/added.ts`)];
+    return state;
+  };
+  // The flow fixture: from an entrance's component, into a component nothing called, across a column, and two that bring a callee and all it reaches nearer.
+  // The crowded fixture: columns of several components, where an order read from anything but the component itself would show.
+  const cases: [() => ShellState, [string, string][]][] = [
+    [projectState, [["src/journal", "src/hooks"], ["src/reader", "src/hooks"], [".", "src/store"], ["src/hooks", "src/reader"], ["src/store", "src/reader"], [".", "src/core"], ["src/reader", "src/journal"]]],
+    [crowdedState, [[".", "src/indexer"], ["src/gateway", "src/telemetry"], ["src/search", "src/billing"], ["src/storage", "src/sessions"], ["src/accounts", "src/gateway"], ["src/telemetry", "src/search"]]],
+  ];
+  for (const [make, additions] of cases) {
+    const baseline = flowOf(make());
+    const before = place(baseline);
+    for (const [from, to] of additions) {
+      const changed = flowOf(adding(make, from, to));
+      const after = place(changed);
+      const touched = reachedBy(baseline, changed, from, to);
+      const kept = [...before.keys()].filter((folder) => !touched.has(folder) && !before.get(folder)!.core && !after.get(folder)!.core);
+      for (const folder of kept) assert.equal(after.get(folder)!.column, before.get(folder)!.column, `adding ${from} -> ${to} moved ${folder}, which it does not reach, out of its column`);
+      const stayed = [...before.keys()].filter((folder) => !before.get(folder)!.core && !after.get(folder)!.core && before.get(folder)!.column === after.get(folder)!.column);
+      for (const a of stayed) {
+        for (const b of stayed) {
+          if (a >= b || before.get(a)!.column !== before.get(b)!.column) continue;
+          assert.equal(Math.sign(after.get(a)!.row - after.get(b)!.row), Math.sign(before.get(a)!.row - before.get(b)!.row), `adding ${from} -> ${to} reordered ${a} and ${b} within their column`);
+        }
+      }
+    }
+    assert.deepEqual(place(flowOf(make())), before, "the same inputs place the same components the same way");
   }
-  assert.deepEqual(seats(projectState()), before, "the same inputs place the same components the same way");
 });
 
-test("a component's column is its distance from where work enters, read from its own callers; its row is its folder order", () => {
+test("a component's column is its true distance from where work enters, uncapped, never through a core dependency; within a column rows follow folder order", () => {
   const model = flowOf(projectState());
   const column = (folder: string): number | undefined => model.nodes.find((node) => node.folder === folder)?.column;
   assert.equal(column("."), 0, "the root declares the entrances");
   assert.equal(column("src/reader"), 0, "nothing calls the reader: it stands where work enters, undeclared");
   assert.equal(column("src/hooks"), 1, "the root calls the hooks");
-  assert.equal(column("src/core"), 2, "only components one step in call the core");
-  assert.deepEqual(model.nodes.map((node) => node.row), model.nodes.map((_, index) => index));
+  assert.equal(column("src/core"), 2, "the hooks call the core");
+  assert.equal(column("src/store"), 3, "the core calls the store: three interfaces from the entrance, not capped at two");
+  for (const state of [projectState(), crowdedState()]) {
+    const placed = flowOf(state).nodes.filter((n) => !n.core);
+    for (const a of placed) {
+      for (const b of placed) {
+        if (a.column === b.column && placed.indexOf(a) < placed.indexOf(b)) assert.ok(a.row + a.span <= b.row, `${a.folder} stands above ${b.folder} in their column (folder order is the model's component order), clear of it`);
+      }
+    }
+  }
+});
+
+test("no structural route doubles back to a column left of one it has visited", () => {
+  // The store reaching back to the hooks, and the reader, heavily: the heaviest onward interface points left.
+  const back = projectState({ symbols: [...SYMBOLS, sym("src/store", "src/hooks", "rewind", "src/hooks/rewind.ts", 40), sym("src/core", "src/reader", "peek", "src/reader/peek.ts", 40)] });
+  for (const state of [projectState(), crowdedState(), back]) {
+    const model = flowOf(state);
+    const column = new Map(model.nodes.map((n) => [n.folder, n.column]));
+    for (const route of model.routes) {
+      const columns = route.stops.map((stop) => column.get(stop)!);
+      columns.forEach((c, i) => assert.ok(i === 0 || c >= Math.max(...columns.slice(0, i)), `${route.names.join(", ")}: ${route.stops.join(" -> ")} doubles back at ${route.stops[i]} (columns ${columns.join(" ")})`));
+    }
+  }
+});
+
+/** The flow fixture with a second entrance handled by the same handler as run: the two share one route. */
+function sharedState(): ShellState {
+  const state = projectState();
+  const root = state.spec.components.find((c) => c.folder === ".")!;
+  root.entrances = [...root.entrances, { name: "replay a whole session from its journal", meaning: "replays", handler: "runHooks in src/hooks/run.ts", line: 9, handlerLine: 10, component: ".", file: "src/hooks/run.ts" }];
+  if (state.componentInterfaces.kind === "read") state.componentInterfaces.entrances = [...state.componentInterfaces.entrances, { component: ".", name: "replay a whole session from its journal", file: "src/hooks/run.ts" }];
+  return state;
+}
+
+/** The flow fixture with no entrance declared: every route is derived from the root's interfaces. */
+function derivedState(): ShellState {
+  const state = projectState();
+  for (const component of state.spec.components) component.entrances = [];
+  if (state.componentInterfaces.kind === "read") state.componentInterfaces.entrances = [];
+  return state;
+}
+
+/** The terminus of a route as drawn: the text lines inside its terminus group, top to bottom. */
+function terminusLines(svg: string, routeId: string): { text: string; y: number }[] {
+  const group = new RegExp(`<g class="flow-route-group[^"]*" id="${routeId}"[^>]*>([^]*?)</g>\\s*</g>`).exec(svg);
+  assert.ok(group !== null, `${routeId} is drawn`);
+  const terminus = /<g class="flow-terminus[^"]*"[^>]*>([^]*)/.exec(group[1]!);
+  assert.ok(terminus !== null, `${routeId} has a terminus`);
+  return [...terminus[1]!.matchAll(/<text[^>]*y="([\d.]+)"[^>]*>([^<]*)<\/text>/g)].map((m) => ({ y: Number(m[1]), text: m[2]!.replace(/&amp;/g, "&") }));
+}
+
+test("every terminus names the entrances its route starts from, in full, one per line, and never truncated", () => {
+  for (const state of [projectState(), crowdedState(), sharedState()]) {
+    const model = flowOf(state);
+    for (const selected of [undefined, FLOW_NONE_ID, ...model.routes.map((r) => r.id)]) {
+      const svg = renderFlowSvg(model, flowSelected(model, selected)).text;
+      const measured = measureSvg(svg);
+      assert.deepEqual(measured.truncated, []);
+      assert.deepEqual(measured.overlaps, [], `${selected ?? "default"}: termini never collide`);
+      for (const route of model.routes.filter((r) => !r.derived)) {
+        const names = route.entrances.map((id) => model.entrances.find((e) => e.id === id)!.name);
+        assert.deepEqual(route.names, names, "a route is named for every entrance it starts from, in declaration order");
+        const lines = terminusLines(svg, route.id);
+        assert.deepEqual(lines.map((l) => l.text), names, `${route.id}: each entrance name on its own line, in full`);
+        for (let i = 1; i < lines.length; i++) assert.ok(lines[i]!.y > lines[i - 1]!.y, "stacked, top to bottom");
+      }
+      assert.doesNotMatch(svg, /data-route="[A-Z]{1,2}"/, "no route wears a letter");
+    }
+  }
+  const shared = flowOf(sharedState()).routes.find((r) => r.entrances.includes(flowEntranceId(".", "run")))!;
+  assert.deepEqual(shared.names, ["run", "replay a whole session from its journal"], "two entrances on one route: both named, the long one whole");
+});
+
+test("a derived route is named via the first component it reaches, and marked derived", () => {
+  const model = flowOf(derivedState());
+  assert.equal(model.routesFrom, "root interfaces");
+  assert.ok(model.routes.length > 0);
+  const svg = renderFlowSvg(model, undefined).text;
+  for (const route of model.routes) {
+    assert.equal(route.derived, true);
+    const via = model.nodes.find((n) => n.folder === route.stops[1])!;
+    assert.deepEqual(route.names, [`via ${via.name}`]);
+    assert.match(svg, new RegExp(`<g class="flow-route-group[^"]*" id="${route.id}"[^>]*data-derived="true"`), `${route.id} is marked derived on the map`);
+    assert.deepEqual(terminusLines(svg, route.id).map((l) => l.text), [`via ${via.name}`, "derived"], "the terminus says derived in words, not only by a mark");
+  }
+  for (const route of flowOf(projectState()).routes) assert.equal(route.derived, false, "a route an entrance starts is not derived");
+});
+
+/** The busiest entrance's route, by the rule's own words: the most components reached, ties by name. */
+function busiest(model: FlowModel): string | undefined {
+  const candidates = model.routes.flatMap((route) => (route.derived ? [{ name: route.names[0]!, route }] : route.entrances.map((id) => ({ name: model.entrances.find((e) => e.id === id)!.name, route }))));
+  candidates.sort((a, b) => b.route.stops.length + (b.route.rail === undefined ? 0 : 1) - (a.route.stops.length + (a.route.rail === undefined ? 0 : 1)) || a.name.localeCompare(b.name));
+  return candidates[0]?.route.id;
+}
+
+test("the map opens on the busiest entrance's route, every other route muted; clearing mutes them all; a deep link selects anything", () => {
+  for (const state of [projectState(), crowdedState(), sharedState(), derivedState()]) {
+    const model = flowOf(state);
+    const expected = busiest(model);
+    assert.ok(expected !== undefined);
+    assert.equal(flowDefaultSelection(model), expected, "the default is the busiest entrance's route");
+    delete state.structure.selected;
+    const opened = renderView(state, "structure").text;
+    assert.match(opened, new RegExp(`data-selected="${expected}"`), "the page opens on that story");
+    const classes = [...opened.matchAll(/<g class="flow-route-group ([^"]*)" id="([^"]+)"/g)].map((m) => [m[2]!, m[1]!.split(" ")] as const);
+    for (const [id, cls] of classes) assert.ok(id === expected ? cls.includes("is-lit") : cls.includes("is-dim"), `${id} at rest: ${cls.join(" ")}`);
+    state.structure.selected = FLOW_NONE_ID;
+    const cleared = renderView(state, "structure").text;
+    assert.match(cleared, /data-selected=""/);
+    for (const m of cleared.matchAll(/<g class="flow-route-group ([^"]*)" id="([^"]+)"/g)) assert.deepEqual(m[1]!.split(" "), ["is-muted"], `${m[2]} is thin and muted with nothing selected`);
+    const other = model.routes.find((r) => r.id !== expected);
+    if (other !== undefined) {
+      state.structure.selected = other.id;
+      assert.match(renderView(state, "structure").text, new RegExp(`<g class="flow-route-group is-lit" id="${other.id}"`), "a deep link still selects any route");
+    }
+  }
+});
+
+test("every stub visibly meets its rail", () => {
+  for (const state of [projectState(), crowdedState()]) {
+    const model = flowOf(state);
+    const layout = flowLayout(model);
+    const svg = renderFlowSvg(model, undefined).text;
+    const rails = new Map([...svg.matchAll(/<line class="flow-line flow-rail-line" data-line="rail ([^"]+)" x1="([\d.]+)" y1="([\d.]+)" x2="([\d.]+)"/g)].map((m) => [m[1]!, { x0: Number(m[2]), y: Number(m[3]), x1: Number(m[4]) }]));
+    assert.equal(rails.size, model.coreDependencies.length);
+    for (const core of model.coreDependencies) {
+      for (const id of core.stubs) {
+        const edge = model.edges.find((e) => e.id === id)!;
+        const station = layout.stations.get(edge.from);
+        const line = measureSvg(svg).lines.find((l) => l.id === `stub ${id}`);
+        assert.ok(line !== undefined, `${id} is drawn as a stub`);
+        const end = line.points[line.points.length - 1]!;
+        const rail = rails.get(core.folder)!;
+        assert.ok(Math.abs(end[1] - rail.y) < 0.6 && end[0] >= rail.x0 && end[0] <= rail.x1, `${id} ends on the ${core.folder} rail (at ${end.join(",")}, rail at y ${rail.y})`);
+        if (station !== undefined) {
+          const start = line.points[0]!;
+          const onEdge = start[0] >= station.x - 0.6 && start[0] <= station.x + station.w + 0.6 && start[1] >= station.y - 0.6 && start[1] <= station.y + station.h + 0.6;
+          assert.ok(onEdge, `${id} starts at its caller's station`);
+        }
+      }
+    }
+  }
+});
+
+test("a core dependency's interface identifiers are drawn once, on its rail, never beside each caller", () => {
+  for (const state of [projectState(), crowdedState()]) {
+    const model = flowOf(state);
+    for (const selected of [undefined, ...model.coreDependencies.map((c) => model.nodes.find((n) => n.folder === c.folder)!.id)]) {
+      const svg = renderFlowSvg(model, selected).text;
+      for (const core of model.coreDependencies) {
+        const expected = [...new Set(core.stubs.flatMap((id) => model.edges.find((e) => e.id === id)!.identifiers))];
+        for (const id of core.stubs) assert.doesNotMatch(svg, new RegExp(`class="flow-tag[^"]*" data-edge="${id}"`), `${id}: no identifier beside the caller`);
+        const onRail = [...svg.matchAll(new RegExp(`<g class="flow-tag[^"]*" data-rail="${core.folder}" data-identifier="([^"]+)"`, "g"))].map((m) => m[1]!);
+        assert.deepEqual(onRail.sort(), [...expected].sort(), `${core.folder}: each identifier on its stubs once, on the rail`);
+      }
+    }
+  }
+  const journal = flowOf(projectState()).coreDependencies.find((c) => c.folder === "src/journal")!;
+  assert.ok(journal.stubs.filter((id) => flowOf(projectState()).edges.find((e) => e.id === id)!.identifiers.includes("X2")).length > 1, "the fixture puts one identifier on more than one stub, so repeating it would show");
+});
+
+test("activating an interface identifier selects it and opens the inspector with its invariant", () => {
+  const state = projectState({ sites: { "single writer": [{ file: "src/core/save.ts", line: 3, symbol: "save", class: "chokepoint-reference", of: "chokepoint", test: false }] } });
+  state.spec.components.find((c) => c.folder === "src/store")!.invariants[0]!.refutations = [{ broke: "wrote a row outside write", saw: "the check went red", date: "2026-09-20", line: 9 }];
+  const model = flowOf(state);
+  const writer = model.identifiers.find((i) => i.name === "single writer")!;
+  const svg = renderFlowSvg(model, undefined).text;
+  const target = new RegExp(`<g class="flow-tag[^"]*" data-edge="${flowEdgeId("src/core", "src/store")}" data-identifier="${writer.text}" data-structure-select="${writer.chokepoint}" role="button" tabindex="0" aria-label="${writer.text}: single writer"`);
+  assert.match(svg, target, "the identifier is its own button, named for its invariant");
+  assert.deepEqual(flowKeyAction({ key: "Enter", select: writer.chokepoint, button: false }), { select: writer.chokepoint }, "Enter activates it");
+  assert.deepEqual(flowKeyAction({ key: " ", select: writer.chokepoint, button: false }), { select: writer.chokepoint }, "Space activates it");
+  state.structure.selected = writer.chokepoint;
+  const page = renderView(state, "structure").text;
+  const inspector = /<aside class="flow-inspector"([^>]*)>([^]*?)<\/aside>/.exec(page);
+  assert.ok(inspector !== null);
+  assert.match(inspector[1]!, /data-open="true"/, "the inspector is open");
+  const body = inspector[2]!;
+  for (const [what, pattern] of [
+    ["the invariant's name", /single writer/],
+    ["its sentence", /single writer\./],
+    ["its component", /src\/store/],
+    ["the enforcement form", /data-form="chokepoint"/],
+    ["the chokepoint and the protected thing", /<code>write<\/code>[^]*<code>writeRow<\/code>/],
+    ["the grade", /data-grade="reference-choked"/],
+    ["the crossing, with both trust levels and their meanings", /outside<\/span>[^]*a caller beyond the store[^]*inside<\/span>[^]*the store(?:'|&#39;)s own code/],
+    ["the refutation, dated", /data-refutation="witnessed"[^]*2026-09-20/],
+    ["the latest verdict", /data-verdict="pass"/],
+    ["the interface it sits on, with its symbol count", /src\/core → src\/store[^]*2 symbols/],
+    ["the structural routes through it", /data-field="routes-through"[^]*run/],
+    ["a close button", /data-structure-close/],
+  ] as const) assert.match(body, pattern, `the inspector shows ${what}`);
+  const broken = projectState({ states: { "single writer": "structural defect" }, bypasses: { "single writer": [{ file: "src/reader/look.ts", line: 9, symbol: "peek" }] } });
+  broken.structure.selected = writer.chokepoint;
+  const defect = renderView(broken, "structure").text;
+  assert.match(defect, /<code>src\/reader\/look\.ts:9<\/code>[^]*data-option="route"[^]*data-option="retire"/, "a bypass shows its sites and both honest options");
+});
+
+test("Escape and the close button close the inspector; the selection hash reopens it", () => {
+  const state = projectState();
+  const model = flowOf(state);
+  const writer = model.identifiers[0]!;
+  assert.deepEqual(flowKeyAction({ key: "Escape", select: undefined, button: false }), { select: FLOW_NONE_ID }, "Escape clears the selection");
+  assert.equal(flowKeyAction({ key: "a", select: writer.chokepoint, button: false }), undefined, "other keys do nothing");
+  state.structure.selected = writer.chokepoint;
+  const open = renderView(state, "structure").text;
+  assert.match(open, new RegExp(`<button type="button" class="flow-close" data-structure-close data-structure-select="${FLOW_NONE_ID}" aria-label="Close the inspector"`), "the close button clears to nothing selected");
+  state.structure.selected = FLOW_NONE_ID;
+  assert.match(renderView(state, "structure").text, /<aside class="flow-inspector"[^>]*data-open="false"/, "closed");
+  assert.deepEqual(resolveHash(state, `#${writer.chokepoint}`), { view: "structure", id: writer.chokepoint }, "the selection hash reopens it");
+  assert.deepEqual(resolveHash(state, `#${FLOW_NONE_ID}`), { view: "structure", id: FLOW_NONE_ID });
+});
+
+test("at desktop width the inspector stands beside the canvas and never covers it; at phone width it is a dismissible sheet", () => {
+  const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+  const block = (media: RegExp): string => {
+    const start = css.search(media);
+    assert.ok(start >= 0, `${media} is in the styles`);
+    let depth = 0;
+    for (let i = css.indexOf("{", start); i < css.length; i++) {
+      if (css[i] === "{") depth += 1;
+      if (css[i] === "}") { depth -= 1; if (depth === 0) return css.slice(start, i + 1); }
+    }
+    return css.slice(start);
+  };
+  const desktop = block(/@media \(min-width: 64rem\)/);
+  assert.match(desktop, /\.flow-stage\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) [\d.]+rem/, "two columns: the canvas, then the inspector");
+  assert.match(desktop, /\.flow-inspector\s*\{[^}]*grid-column:\s*2/, "the inspector has its own column");
+  assert.match(desktop, /\.flow-canvas\s*\{[^}]*grid-column:\s*1/, "the canvas has the other");
+  const phone = block(/@media \(max-width: 63\.99rem\)/);
+  assert.match(phone, /\.flow-inspector\[data-open="true"\]\s*\{[^}]*position:\s*fixed[^}]*bottom:\s*0/, "below desktop width an open inspector is a sheet over the bottom of the screen");
+  const outside = css.replace(desktop, "").replace(phone, "");
+  assert.doesNotMatch(outside, /\.flow-inspector[^{]*\{[^}]*position:\s*(fixed|absolute)/, "nowhere else does the inspector float over the map");
+  assert.doesNotMatch(desktop, /\.flow-inspector[^{]*\{[^}]*position:\s*(fixed|absolute)/, "at desktop width it never floats");
+  const page = renderView(projectState(), "structure").text;
+  assert.match(page, /<div class="flow-stage">\s*<div class="flow-canvas"[^]*<\/svg><\/div>\s*<aside class="flow-inspector"/, "the canvas and the inspector are siblings in the stage");
 });
 
 test("selecting an entrance lights its structural route and dims the rest", () => {
@@ -335,7 +604,7 @@ test("selecting an entrance lights its structural route and dims the rest", () =
   assert.match(svg, /<g class="flow-station flow-unconnected is-dim"|<g class="flow-station is-dim" id="structure--node-src-reader"/, "the reader dims");
   assert.match(svg, new RegExp(`<g class="flow-route-group is-lit" id="${route.id}"`), "the route is lit");
   assert.match(svg, /data-kind="entrance"/);
-  assert.match(svg, /Route A<\/strong>: Flow \(root\) → Hooks → Core → Store/);
+  assert.match(svg, /<strong>run<\/strong>: Flow \(root\) → Hooks → Core → Store/, "the route is named for its entrance");
 });
 
 test("selecting a component lights its direct component interfaces and keeps its routes, never everything it reaches", () => {
@@ -361,8 +630,9 @@ test("every chokepoint and crossing on a drawn interface wears its interface ide
     for (const edge of identifier.edges) {
       const drawn = model.edges.find((e) => e.id === edge)!;
       if (drawn.routes.length === 0 && !drawn.stub && !drawn.loadBearing) continue;
-      const tag = new RegExp(`<g class="flow-tag[^"]*" data-edge="${edge}" data-identifiers="[^"]*\\b${identifier.text}\\b[^"]*"[^>]*>([^]*?)</g>`).exec(svg);
-      assert.ok(tag !== null, `${identifier.text} stands on ${edge}`);
+      const where = drawn.stub ? `data-rail="${drawn.to}"` : `data-edge="${edge}"`;
+      const tag = new RegExp(`<g class="flow-tag[^"]*" ${where} data-identifier="${identifier.text}"[^>]*>([^]*?)</g>`).exec(svg);
+      assert.ok(tag !== null, `${identifier.text} stands on ${drawn.stub ? `the ${drawn.to} rail` : edge}`);
       assert.equal(tag[1]!.includes('class="flow-boundary"'), identifier.crossing !== undefined, `${identifier.text}: a trust boundary exactly when a crossing stands there`);
     }
   }
@@ -381,7 +651,7 @@ test("selecting a trust level lights the path its data takes; selecting a chokep
   assert.deepEqual([...inside.edges].sort(), [flowEdgeId("src/core", "src/journal"), flowEdgeId("src/core", "src/store"), flowEdgeId("src/store", "src/journal")].sort(), "every interface whose crossing touches inside");
   state.structure.selected = flowLevelId("record");
   const record = renderView(state, "structure").text;
-  assert.match(record, new RegExp(`<g class="flow-tag is-lit" data-edge="${flowEdgeId("src/core", "src/journal")}"`), "the boundary crossing on the stub to the journal lights");
+  assert.match(record, /<g class="flow-tag is-lit" data-rail="src\/journal" data-identifier="X2"/, "the boundary crossing on the stubs to the journal lights, on its rail");
   assert.match(record, new RegExp(`<g class="flow-tag is-dim" data-edge="${flowEdgeId("src/core", "src/store")}"`), "a crossing that does not carry record dims");
   const writer = flowChokepointId("src/store", "single writer");
   assert.deepEqual([...flowSelection(model, writer).edges], [flowEdgeId("src/core", "src/store")]);
@@ -417,10 +687,10 @@ test("query structure prints the routes, core dependencies and interface identif
       }
       return out;
     };
-    const queriedRoutes = section(/^structural routes/).map((line) => line.split(/ {2}/).slice(0, 2).join(" "));
-    const drawnRoutes = [...svg.matchAll(/data-route="([^"]+)" data-stops="([^"]+)" data-edges="[^"]*"(?: data-rail="([^"]+)")?/g)].map((m) => `${m[1]} ${m[2]!.split(" ").join(" -> ")}${m[3] === undefined ? "" : ` -> ${m[3]} (rail)`}`);
+    const queriedRoutes = section(/^structural routes/).map((line) => line.split(/ {2}/).slice(0, 2).join(" | "));
+    const drawnRoutes = [...svg.matchAll(/data-names="([^"]+)" data-derived="(true|false)" data-stops="([^"]+)" data-edges="[^"]*"(?: data-rail="([^"]+)")?/g)].map((m) => `${m[1]!.replace(/&amp;/g, "&")}${m[2] === "true" ? " (derived)" : ""} | ${m[3]!.split(" ").join(" -> ")}${m[4] === undefined ? "" : ` -> ${m[4]} (rail)`}`);
     assert.ok(drawnRoutes.length > 0);
-    assert.deepEqual(queriedRoutes, drawnRoutes, "routes: letter and stops in order");
+    assert.deepEqual(queriedRoutes, drawnRoutes, "routes: named origin and stops in order");
     const queriedCore = section(/^core dependencies/).map((line) => line.split(/ {2}/)[0]);
     const drawnCore = [...svg.matchAll(/<g class="flow-rail[^"]*" id="[^"]+" data-folder="([^"]+)" data-core="true"/g)].map((m) => m[1]);
     assert.deepEqual(queriedCore, drawnCore, "core dependencies: one rail each");
@@ -430,10 +700,12 @@ test("query structure prints the routes, core dependencies and interface identif
       return on.map((pair) => `${text} ${pair}`);
     }).sort();
     const model = flowOf(state);
-    const drawnIds = [...svg.matchAll(/<g class="flow-tag[^"]*" data-edge="([^"]+)" data-identifiers="([^"]+)"/g)].flatMap((m) => {
-      const edge = model.edges.find((e) => e.id === m[1])!;
-      return m[2]!.split(" ").filter((t) => /^[CX]\d+$/.test(t)).map((t) => `${t} ${edge.from} -> ${edge.to}`);
-    });
+    const drawnIds = [...svg.matchAll(/<g class="flow-tag[^"]*" (?:data-edge="([^"]+)"|data-rail="[^"]+") data-identifier="([CX]\d+)"(?: data-edges="([^"]+)")?/g)].flatMap((m) =>
+      (m[1] !== undefined ? [m[1]] : m[3]!.split(" ")).map((id) => {
+        const edge = model.edges.find((e) => e.id === id)!;
+        return `${m[2]} ${edge.from} -> ${edge.to}`;
+      }),
+    );
     const offMap = model.edges.filter((e) => e.routes.length === 0 && !e.stub && !e.loadBearing && e.bypasses.length === 0);
     assert.deepEqual(queriedIds.filter((id) => !offMap.some((e) => id.endsWith(` ${e.from} -> ${e.to}`))), drawnIds.sort(), "identifiers: each on the interfaces it stands on");
   }

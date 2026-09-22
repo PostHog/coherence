@@ -16,7 +16,7 @@
 import { componentOfHash, resolveHash } from "./derive.ts";
 import type { JournalKind, LifecycleState, ShellState } from "./model.ts";
 import { renderShell, renderViewResults } from "./shell.ts";
-import { flowExpanded, isFlowId } from "./structure-flow.ts";
+import { FLOW_NONE_ID, flowDefaultSelection, flowExpanded, flowKeyAction, flowOf, isFlowId } from "./structure-flow.ts";
 
 function readEmbeddedState(): ShellState {
   const node = document.getElementById("scope-state");
@@ -94,19 +94,28 @@ function boot(): void {
     const changed = target.view !== state.activeView;
     state.activeView = target.view;
     if (changed || target.id !== undefined) renderAll();
-    if (target.id !== undefined) document.getElementById(decodeURIComponent(target.id))?.scrollIntoView();
+    // A card scrolls into view; a map element does not, since the map is already where Structure opens and the inspector shows it.
+    const landed = target.id === undefined ? null : document.getElementById(decodeURIComponent(target.id));
+    if (landed !== null && landed.closest(".flow-svg") === null) landed.scrollIntoView();
   };
 
-  /** Select a story in the Structure flow, or clear it when it is already selected; the hash follows so it can be linked. */
+  /**
+   * Select a story in the Structure flow, opening the inspector beside the
+   * map; selecting what is already selected (the default story included), the
+   * close button, and Escape clear it to nothing selected, which closes the
+   * inspector. The hash follows so it can be linked.
+   */
   const selectStory = (id: string): void => {
-    if (id === "" || state.structure.selected === id) delete state.structure.selected;
-    else state.structure.selected = id;
-    history.replaceState(null, "", `#${state.structure.selected ?? "structure"}`);
+    const current = state.structure.selected ?? flowDefaultSelection(flowOf(state));
+    const closing = id === "" || id === FLOW_NONE_ID || current === id;
+    if (closing && state.structure.selected === FLOW_NONE_ID) return;
+    state.structure.selected = closing ? FLOW_NONE_ID : id;
+    history.replaceState(null, "", `#${state.structure.selected}`);
     renderResults();
-    if (state.structure.selected !== undefined) {
-      const again = root.querySelector<HTMLElement | SVGElement>(`[id="${state.structure.selected}"][data-structure-select]`);
-      again?.focus({ preventScroll: true });
-    }
+    const again = closing
+      ? root.querySelector<HTMLElement | SVGElement>(`[data-structure-select="${current ?? ""}"]`) ?? root.querySelector<HTMLElement>(".flow-canvas")
+      : root.querySelector<HTMLElement | SVGElement>(`[id="${id}"][data-structure-select]`) ?? root.querySelector<HTMLElement | SVGElement>(`svg [data-structure-select="${id}"]`);
+    again?.focus({ preventScroll: true });
   };
 
   root.addEventListener("input", (event) => {
@@ -187,12 +196,22 @@ function boot(): void {
     }
   });
 
+  // Escape closes the Structure inspector wherever focus is.
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || state.activeView !== "structure" || state.structure.selected === FLOW_NONE_ID) return;
+    const action = flowKeyAction({ key: event.key, select: undefined, button: false });
+    if (action === undefined) return;
+    event.preventDefault();
+    selectStory(action.select);
+  });
+
   root.addEventListener("keydown", (event) => {
     const target = event.target;
-    if (target instanceof Element && target.hasAttribute("data-structure-select") && !(target instanceof HTMLButtonElement)) {
-      if (event.key !== "Enter" && event.key !== " ") return;
+    if (target instanceof Element && target.hasAttribute("data-structure-select")) {
+      const action = flowKeyAction({ key: event.key, select: target.getAttribute("data-structure-select") ?? undefined, button: target instanceof HTMLButtonElement });
+      if (action === undefined || event.key === "Escape") return;
       event.preventDefault();
-      selectStory(target.getAttribute("data-structure-select") ?? "");
+      selectStory(action.select);
       return;
     }
     if (!(target instanceof HTMLElement) || target.getAttribute("role") !== "tab") return;

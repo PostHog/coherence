@@ -70,37 +70,50 @@ derivation, read by the SVG in `structure-flow-view.ts` and by
 - Structural routes. Each entrance's route is the component that declares
   it, the component holding its handler, then from each stop the heaviest
   component interface (most reference sites, ties by folder) to a component
-  not yet on it and not a core dependency. Entrances whose routes are the
-  same stops share one line. A route is one path of its own color (the
-  validated eight-color order, then neutral) from a lettered terminus in the
-  left margin through the centre of each station in order; routes through
-  one component meet at its station, and parallel routes run side by side
-  at a fixed six-pixel offset, never merged. Every segment is horizontal,
-  vertical, or at 45 degrees: a line leaves a station by a port, turns in a
-  lane of the column's turning gap (lanes ordered so parallel runs do not
-  cross), and runs along its callee's row, where no other station stands. A
-  project that declares no entrance (the first adopter) has its routes
-  derived from the root component's interfaces, one per callee, and the
-  canvas says so.
+  not yet on it, not a core dependency, and not in a column left of the one
+  the route stands in: a route never doubles back. Entrances whose routes are
+  the same stops share one line. A route is named for its origin, never
+  lettered: the names of the entrances it starts from, in full, one per line,
+  set to end at its dot in a left margin sized to the widest name; a project
+  that declares no entrance (the first adopter) has its routes derived from
+  the root component's interfaces, one per callee, each named "via" the first
+  component it reaches with a second line "derived" beside a hollow dashed
+  dot. A route is one path of its own color (the validated eight-color order,
+  then neutral) through the centre of each station in order; routes through
+  one component meet at its station, and parallel routes run side by side at
+  a fixed six-pixel offset, never merged. Every segment is horizontal,
+  vertical, or at 45 degrees: a step into the next column leaves by a port on
+  the right and turns in a lane of the gap; a step to the neighbouring station
+  in the same column drops straight down (or up) between them; a step past a
+  station in the same column turns in the column's own lane, nearest the
+  stations, shortest innermost so nested lanes never cross.
+- Rest and selection. The map opens on the busiest entrance's route
+  (`flowDefaultSelection`: the entrance whose route reaches the most
+  components, its rail counted, ties by entrance name), lit, with every other
+  route dimmed; an absent selection means that default. Clearing the selection
+  stores `structure--none`: nothing lit and every route thin and muted. Any
+  deep link still selects anything.
 - Core dependencies. A component called by more than half of the other
   visible components, by at least three, with at least three quarters of its
   component interfaces incoming (`CORE_RULE`), is a rail along the foot of
-  the map, labelled once. Each caller carries a short stub in the rail's
-  color under its station; no line or arrow reaches the rail and no route
-  runs through it.
+  the map, labelled once. Each caller's stub runs from the foot of its
+  station to one shared drop per rail beside its column (the side with fewer
+  tracks to cross) and down to the rail, meeting it at a joint; no route line
+  or arrow reaches the rail and no route runs through it.
 - Interface identifiers. Each chokepoint gets a short identifier from its
   place in the chokepoint list, `C3` for a chokepoint and `X7` for one whose
-  invariant carries a crossing, drawn as a tag on each component interface it
-  stands on; a crossing draws a dashed red trust boundary across the pipe
-  through its tag. A bypass adds `✕n` to the tag. The meaning is in the
-  inspector and the text form. What an interface reveals comes from the
-  invariants, never authored: the chokepoint that stands on it, that
-  invariant's crossing, and the classes of data that pass; the inspector's
-  label reads them in that order, else its most-referenced symbols; never a
-  verb.
-- Text. Every piece of canvas text has a priority (station names, rail
-  labels, the caption, route letters, identifiers, defect marks, proposals,
-  column captions) and is placed at its first candidate that overlaps no
+  invariant carries a crossing, drawn as a small box on each component
+  interface it stands on, one keyboard-reachable button each (named "X7:
+  <invariant>"); a crossing draws a dashed red trust boundary across the pipe
+  through it. A core dependency's identifiers are drawn once, on its rail,
+  never beside each caller. A bypass adds a `✕n` box that selects the
+  interface. What an interface reveals comes from the invariants, never
+  authored: the chokepoint that stands on it, that invariant's crossing, and
+  the classes of data that pass; the inspector's label reads them in that
+  order, else its most-referenced symbols; never a verb.
+- Text. Every piece of canvas text has a priority (station names, the
+  entrance names at each route's start and rail labels, the caption,
+  identifiers, defect marks, proposals, column captions) and is placed at its first candidate that overlaps no
   placed text and no station, preferring places no line runs through; lower
   priority text is dropped, never overlapped, never truncated. The dropped
   keys are on the SVG's `data-dropped`. `measureSvg` computes text boxes from
@@ -110,29 +123,33 @@ derivation, read by the SVG in `structure-flow-view.ts` and by
   `docs/spec.md`) and resolved again through the adapter; its route starts at
   the declaring component, and a dispatcher's entrance is unreachable unless
   the component interface from the declaring component carries the handler.
-- Stability. Positions are never stored, and each station's seat is placed
-  by its own facts alone: its row is its place in folder order among the
-  visible components, and its column its distance from where work enters,
-  read from its own callers and capped at two (0 declares an entrance, or is
-  the root when none is declared, or nothing calls it; 1 an entrance's
-  component calls it; 2 otherwise). Adding one component interface moves at
-  most the components it touches. True distance would move every component
-  downstream of the new interface's callee, so the map keeps stability over
-  route straightness and straightens routes by routing instead (journal
-  d-1f1ce391). A core dependency's row stays empty; its rail is at the foot.
+- Placement and stability. Positions are never stored. A component's
+  column is its true distance from where work enters, uncapped: the fewest
+  component interfaces from a component that declares an entrance (the root
+  when none does), never through a core dependency; what no entrance reaches
+  is measured from a component only a core dependency calls, which stands
+  where work enters, undeclared. Within a column components keep folder
+  order; each asks for the row that keeps the routes reaching it from the
+  column before straight (the median of where they come from) and takes it
+  when the component above leaves room. A component where routes start spans
+  the rows its entrance names need. Stability is stable relative order:
+  adding one component interface moves out of its column only what the
+  interface reaches (its callee and what the callee reaches, or all its
+  caller reaches when it stops the caller being a core dependency), and never
+  reorders, within a column, components that keep their columns (journal
+  d-41cad841, replacing the cap at two of d-1f1ce391, which made routes
+  double back).
 - Zoom. One level of the component tree at a time: the top level is open,
   and a component with children opens in place (its station stays for its
   own code). A closed component carries its children's interfaces at its
   edge. Source in no component's folder is its own labelled mass.
-- One map. Selection is state (`state.structure.selected`, an id prefixed
-  `structure--`) and lights one story while everything else dims: an
-  entrance or a route lights that route; a trust level lights the
+- One map, one inspector. Selection is state (`state.structure.selected`,
+  an id prefixed `structure--`) and lights one story while everything else
+  dims: an entrance or a route lights that route; a trust level lights the
   identifiers whose crossings carry that class of data (the security spine)
-  and the interfaces they stand on; a chokepoint lights every interface it
-  stands on and lists its reliance, the classified reference sites of the
-  latest run, owner first (a protected bypass is never a legal chokepoint
-  reference, and an absent `sites` field is incomplete evidence, never
-  zero); a component lights its direct component interfaces and keeps the
+  and the interfaces they stand on; an interface identifier (its
+  chokepoint's selection) lights where it stands and the routes through
+  there; a component lights its direct component interfaces and keeps the
   routes through it, never everything it reaches; an interface lights
   itself. The change selection is the diff's place: `compareFlows(before,
   after)` already measures entrance added or removed, interface added,
@@ -140,6 +157,23 @@ derivation, read by the SVG in `structure-flow-view.ts` and by
   removed, and a data path gaining a branch; comparing with the previous
   commit, or one the agent names, is the next slice. The page writes the
   selection to the hash, and `followHash` reads it back.
+- The inspector stands beside the canvas at desktop widths (its own grid
+  column, sticky, never over the map; the canvas keeps its full height and
+  the shell widens while Structure is shown) and is a dismissible sheet over
+  the bottom of the screen below that. It is open while something is
+  selected, showing that thing; with nothing selected it shows the map's
+  summary. Its close button and the `Escape` key clear the selection
+  (`flowKeyAction` decides what a key does: `Enter` and `Space` activate a map
+  element, `Escape` closes). An identifier's inspector shows the invariant's
+  name and sentence, its component, every enforcement with its latest
+  verdict, grade and enforcer, the crossing with both trust levels and their
+  meanings, the refutation (witnessed, automatic, or refused by the
+  language, dated), bypass sites with the two honest options, the component
+  interfaces it stands on with their symbol counts, the structural routes
+  through them, and its reliance: the classified reference sites of the
+  latest run, owner first (a protected bypass is never a legal chokepoint
+  reference, and an absent `sites` field is incomplete evidence, never
+  zero).
 
 **Invariants** shows every bullet: state, enforcement form with its latest
 verdict, the chokepoint grade with the rung's enforcer, crossing over the
@@ -180,8 +214,9 @@ warm instrument rather than to the page state. Plain text, a few hundred
 tokens at most, no query language.
 
 `query structure` reads the component interfaces through the language
-adapter and formats `flowOf`: the structural routes with their stops in
-order, the core dependencies with the rule and their callers, the interface
+adapter and formats `flowOf`: the structural routes, each by its entrance
+names (or `via <component> (derived)`), with their stops in order and the
+route the map opens on, the core dependencies with the rule and their callers, the interface
 identifiers with the interfaces they stand on, every interface with its
 label and where it is drawn, the entrances with where each starts or why it
 is unreachable, and each component's row and column.

@@ -30,7 +30,7 @@ import {
   structureOf,
   type RelianceSite,
 } from "../scope/derive.ts";
-import { CORE_RULE, flowLabelLines, flowOf } from "../scope/structure-flow.ts";
+import { CORE_RULE, flowDefaultSelection, flowLabelLines, flowOf, routeName } from "../scope/structure-flow.ts";
 import { renderOrder } from "../../journal/workVerbs.ts";
 import { glossaryReviewCommand } from "../scope/model.ts";
 import type { GlossaryCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
@@ -205,7 +205,8 @@ export function answerSpine(state: ShellState): Answer {
  * the structural routes, the core dependencies, the interface identifiers,
  * the component interfaces with their labels, and the placement cannot
  * differ between the human reading and the agent's. A route is
- * `A  stop -> stop -> stop [-> rail (rail)]  entrances`; an interface is
+ * `named origin  stop -> stop -> stop [-> rail (rail)]`, its named origin
+ * the entrances it starts from, or `via <component> (derived)`; an interface is
  * `caller -> callee  label`, the label lines joined by " · ", with its
  * identifiers and where it is drawn.
  */
@@ -216,10 +217,9 @@ export function answerStructure(state: ShellState): Answer {
     `evidence: static and computed; ${model.evidence === "language adapter" ? `resolved references through the ${model.language} language adapter` : `run sites only (${model.unread}); plain component interfaces unknown`}`,
     `structural routes (${model.routes.length}), ${model.routesFrom === "root interfaces" ? "derived from the root component's component interfaces: no entrance is declared" : model.routesFrom === "entrances" ? "one per distinct path from the declared entrances" : "none: no entrance is declared and there is no root"}:`,
   ];
-  for (const route of model.routes) {
-    const names = route.entrances.map((id) => model.entrances.find((e) => e.id === id)?.name ?? id);
-    lines.push(`  ${route.letter}  ${route.stops.join(" -> ")}${route.rail === undefined ? "" : ` -> ${route.rail} (rail)`}${names.length === 0 ? "" : `  ${names.join(", ")}`}`);
-  }
+  for (const route of model.routes) lines.push(`  ${routeName(route)}  ${route.stops.join(" -> ")}${route.rail === undefined ? "" : ` -> ${route.rail} (rail)`}`);
+  const opens = model.routes.find((route) => route.id === flowDefaultSelection(model));
+  if (opens !== undefined) lines.push(`the map opens on: ${routeName(opens)} (the busiest entrance: most components reached, ties by name)`);
   lines.push(`core dependencies (${model.coreDependencies.length}), each ${CORE_RULE}:`);
   for (const core of model.coreDependencies) lines.push(`  ${core.folder}  called by ${core.callers.join(", ")}`);
   lines.push(`interface identifiers (${model.identifiers.length}):`);
@@ -228,15 +228,15 @@ export function answerStructure(state: ShellState): Answer {
   }
   lines.push(`component interfaces (${model.edges.length}, ${bearing} load-bearing), caller -> callee:`);
   for (const edge of model.edges) {
-    const drawn = edge.stub ? "stub" : edge.routes.length > 0 ? `route ${edge.routes.map((id) => model.routes.find((r) => r.id === id)!.letter).join(" ")}` : edge.loadBearing ? "off route" : "faint";
+    const drawn = edge.stub ? "stub" : edge.routes.length > 0 ? `route ${edge.routes.map((id) => routeName(model.routes.find((r) => r.id === id)!)).join("; ")}` : edge.loadBearing ? "off route" : "faint";
     lines.push(`  ${edge.from} -> ${edge.to}  ${flowLabelLines(edge).map((line) => line.text).join(" · ")}  [${drawn}${edge.identifiers.length === 0 ? "" : `; ${edge.identifiers.join(" ")}`}]`);
   }
   lines.push(`entrances (${model.entrances.length}):`);
   for (const entrance of model.entrances) {
     lines.push(`  ${entrance.declaredBy}/${entrance.name}  ${entrance.handler ?? "no handler"}  ${entrance.reachable ? `starts in ${entrance.start}` : entrance.reason ?? "unreachable"}`);
   }
-  lines.push("placement, row (folder order)  column (0 where work enters, 1 one interface in, 2 further):");
-  for (const node of model.nodes) lines.push(`  ${node.row}  ${node.core ? "rail" : node.column}  ${node.folder}${node.unconnected ? "  no component interface" : ""}`);
+  lines.push("placement, row (rows keep routes straight; folder order within a column)  column (true distance from where work enters):");
+  for (const node of model.nodes) lines.push(`  ${node.core ? "rail" : node.row}  ${node.core ? "rail" : node.column}  ${node.folder}${node.span > 1 ? `  spans ${node.span} rows` : ""}${node.unconnected ? "  no component interface" : ""}`);
   if (model.unowned !== undefined && model.unowned.files > 0) lines.push(`  no component  ${model.unowned.files} files, ${model.unowned.lines} lines`);
   const broken = model.nodes.flatMap((node) => node.defects.filter((d) => d.internal > 0).map((d) => `  ${node.folder}/${d.name}  ${d.state}; ${d.internal} of ${d.bypasses} bypasses inside ${node.folder}, on no component interface`));
   if (broken.length > 0) lines.push("broken chokepoints no interface shows:", ...broken);

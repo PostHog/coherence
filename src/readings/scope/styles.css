@@ -930,19 +930,26 @@ code {
   max-width: 80ch;
 }
 
+/* The map needs its width: the shell widens while Structure is shown. */
+.shell:has(.flow-stage) {
+  max-width: 100rem;
+}
+
+.flow-stage {
+  margin: 1rem 0;
+}
+
 .flow-canvas {
   max-width: 100%;
   overflow-x: auto;
   border-radius: 0.75rem;
-  margin: 1rem 0;
 }
 
+/* The map fills its canvas, never below its own size (text never shrinks below what was measured) and at most a quarter above it. */
 .flow-canvas svg {
   display: block;
   width: 100%;
-  min-width: 56rem;
   height: auto;
-  margin: 0 auto;
 }
 
 .flow-inspector {
@@ -952,6 +959,65 @@ code {
   background: var(--field);
   font-size: 0.9375rem;
   overflow-wrap: anywhere;
+  margin-top: 1rem;
+}
+
+.flow-close {
+  float: right;
+  margin: -0.25rem -0.25rem 0.25rem 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  font: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+/* Desktop: the inspector stands beside the canvas in its own column, never over it; the canvas keeps its full height. */
+@media (min-width: 64rem) {
+  .flow-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 24rem;
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .flow-canvas {
+    grid-column: 1;
+  }
+
+  .flow-inspector {
+    grid-column: 2;
+    margin-top: 0;
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+}
+
+/* Below desktop width: an open inspector is a sheet over the bottom of the screen, dismissed by its close button or Escape. */
+@media (max-width: 63.99rem) {
+  .flow-inspector[data-open="true"] {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    max-height: 55vh;
+    overflow-y: auto;
+    margin: 0;
+    border-radius: 0.75rem 0.75rem 0 0;
+    box-shadow: 0 -0.5rem 1.5rem rgb(0 0 0 / 0.18);
+  }
+
+  .flow-stage:has(.flow-inspector[data-open="true"]) {
+    padding-bottom: 55vh;
+  }
 }
 
 .flow-inspector h3 {
