@@ -4,11 +4,12 @@
  */
 
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execFile, execFileSync, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
-import { connectAdapter, serve, serverPaths, type Serving } from "./server.ts";
+import { CODE_SALT_ENV, codeFingerprint, connectAdapter, serve, serverPaths, type Serving } from "./server.ts";
 import { performRun } from "./run.ts";
 
 let root: string;
@@ -125,4 +126,167 @@ test("the run keeps the instrument alive across the test pass, and a run whose i
     await alive.stop();
     rmSync(other, { recursive: true, force: true });
   }
+});
+
+/* ------------------------------------------- one server per root, current code */
+
+const SERVER_TS = new URL("./server.ts", import.meta.url).href;
+
+/** A throwaway TypeScript project the warm server can load. */
+function project(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  mkdirSync(join(dir, "src"), { recursive: true });
+  writeFileSync(join(dir, "tsconfig.json"), `{ "compilerOptions": { "strict": true, "noEmit": true, "module": "NodeNext", "moduleResolution": "NodeNext", "allowImportingTsExtensions": true }, "include": ["src/**/*.ts"] }\n`, "utf8");
+  writeFileSync(join(dir, "src/door.ts"), "const KEY = 1;\nexport function open(): number {\n  return KEY;\n}\n", "utf8");
+  return dir;
+}
+
+/** The pids of every `serve` process started for this root, read from the process table. */
+function servePids(dir: string): number[] {
+  const marker = `--root ${realpathSync(dir)}`;
+  const table = execFileSync("ps", ["-axww", "-o", "pid=,command="], { encoding: "utf8" });
+  return table
+    .split("\n")
+    .filter((line) => line.includes("cli.ts serve") && (line.endsWith(marker) || line.includes(`${marker} `)))
+    .map((line) => Number(line.trim().split(/\s+/)[0]));
+}
+
+function running(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function until(condition: () => boolean, ms: number): Promise<boolean> {
+  const deadline = Date.now() + ms;
+  while (Date.now() < deadline) {
+    if (condition()) return true;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return condition();
+}
+
+/** Stop every server this test started for the root, politely and then by signal. */
+async function stopAll(dir: string): Promise<void> {
+  try {
+    const connected = await connectAdapter(dir, { spawn: false });
+    await connected.adapter.stopServer();
+    await connected.adapter.close();
+  } catch {
+    // Nothing listening.
+  }
+  const pids = servePids(dir);
+  await until(() => pids.every((pid) => !running(pid)), 5_000);
+  for (const pid of servePids(dir)) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // Already gone.
+    }
+  }
+}
+
+/** One client in its own process: connects (spawning when nothing listens) and prints the pid that answered. */
+function clientProcess(dir: string): Promise<{ pid: number; server: string }> {
+  const script = `import { connectAdapter } from ${JSON.stringify(SERVER_TS)};\nconst c = await connectAdapter(process.argv[1], { idleMs: 60_000 });\nconst s = await c.adapter.status();\nconsole.log(JSON.stringify({ pid: s.pid, server: c.server }));\nawait c.adapter.close();\n`;
+  return new Promise((answered, reject) => {
+    execFile(process.execPath, ["--disable-warning=ExperimentalWarning", "--input-type=module", "-e", script, dir], { timeout: 60_000 }, (error, stdout, stderr) => {
+      if (error !== null) reject(new Error(`${error.message}\n${stderr}`));
+      else answered(JSON.parse(stdout.trim()) as { pid: number; server: string });
+    });
+  });
+}
+
+test("ten concurrent clients for one root are served by exactly one server process", async () => {
+  const dir = project("coherence-race-");
+  try {
+    const answers = await Promise.all(Array.from({ length: 10 }, () => clientProcess(dir)));
+    const pids = new Set(answers.map((a) => a.pid));
+    assert.equal(pids.size, 1, `every client is answered by one server: ${[...pids].join(", ")}`);
+    // A client that lost the race waited for the winner; none spawned a second server that lingers.
+    await new Promise((r) => setTimeout(r, 500));
+    assert.deepEqual(servePids(dir), [...pids], "exactly one serve process runs for the root");
+  } finally {
+    await stopAll(dir);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a lock whose owner is dead is reclaimed by the next client", async () => {
+  const dir = project("coherence-deadowner-");
+  try {
+    const dead = spawnSync(process.execPath, ["-e", ""]).pid!;
+    assert.equal(running(dead), false);
+    const paths = serverPaths(dir);
+    mkdirSync(paths.dir, { recursive: true });
+    writeFileSync(paths.lock, JSON.stringify({ pid: dead, at: new Date().toISOString() }) + "\n", "utf8");
+    const connected = await connectAdapter(dir, { idleMs: 60_000 });
+    const status = await connected.adapter.status();
+    await connected.adapter.close();
+    assert.notEqual(status.pid, dead);
+    assert.equal((JSON.parse(readFileSync(paths.lock, "utf8")) as { pid: number }).pid, status.pid, "the lock names the new owner");
+  } finally {
+    await stopAll(dir);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("serve refuses a root a live server holds and never unlinks that server's socket", async () => {
+  const dir = project("coherence-owner-");
+  const first = await serve(dir, { idleMs: 60_000 });
+  try {
+    await assert.rejects(serve(dir, { idleMs: 60_000 }), /holds this root/);
+    // A serve process of its own is refused the same way, and exits rather than lingering.
+    const cli = new URL("../cli.ts", import.meta.url).pathname;
+    const other = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", cli, "serve", "--root", dir], { encoding: "utf8", timeout: 30_000 });
+    assert.equal(other.status, 1, other.stderr);
+    assert.match(other.stderr, /holds this root/);
+    assert.ok(existsSync(first.paths.socket), "the owner's socket is still there");
+    const connected = await connectAdapter(dir, { spawn: false });
+    assert.equal((await connected.adapter.status()).pid, process.pid);
+    await connected.adapter.close();
+  } finally {
+    await first.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a server running other code is replaced by a fresh process", async () => {
+  const dir = project("coherence-stale-");
+  const saved = process.env[CODE_SALT_ENV];
+  try {
+    process.env[CODE_SALT_ENV] = "before the edit";
+    const old = await connectAdapter(dir, { idleMs: 60_000 });
+    const oldStatus = await old.adapter.status();
+    await old.adapter.close();
+    assert.equal(oldStatus.fingerprint, codeFingerprint());
+
+    process.env[CODE_SALT_ENV] = "after the edit";
+    const fresh = await connectAdapter(dir, { idleMs: 60_000 });
+    const freshStatus = await fresh.adapter.status();
+    await fresh.adapter.close();
+    assert.notEqual(freshStatus.pid, oldStatus.pid, "a new process answers");
+    assert.equal(freshStatus.fingerprint, codeFingerprint(), "the new process runs the client's code");
+    assert.equal(fresh.server, "cold");
+    assert.ok(await until(() => !running(oldStatus.pid), 5_000), "the stale server exited");
+  } finally {
+    if (saved === undefined) delete process.env[CODE_SALT_ENV];
+    else process.env[CODE_SALT_ENV] = saved;
+    await stopAll(dir);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a server whose root is deleted exits", async () => {
+  const dir = project("coherence-gone-");
+  const serving = await serve(dir, { idleMs: 60_000, checkMs: 100 });
+  let exited = false;
+  void serving.done.then(() => (exited = true));
+  rmSync(dir, { recursive: true, force: true });
+  const gone = await until(() => exited, 5_000);
+  if (!gone) await serving.stop();
+  assert.ok(gone, "the server shut down once its root was removed");
 });
