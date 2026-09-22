@@ -16,7 +16,7 @@
 
 interface TestEvent {
   type: string;
-  data: { name?: string; nesting?: number; file?: string; skip?: boolean | string; todo?: boolean | string };
+  data: { name?: string; nesting?: number; file?: string; skip?: boolean | string; todo?: boolean | string; details?: { error?: unknown } };
 }
 
 interface AssertionResult {
@@ -24,6 +24,17 @@ interface AssertionResult {
   title: string;
   fullName: string;
   status: "passed" | "failed" | "skipped";
+  /** For a failure, jest's field: the stack of what the test threw (node:test wraps it as the cause of a test failure). */
+  failureMessages?: string[];
+}
+
+/** The stack of the error a failing test threw, unwrapped from node:test's own test-failure error. */
+export function failureText(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null) return error === undefined ? undefined : String(error);
+  const outer = error as { cause?: unknown; stack?: unknown; message?: unknown; code?: unknown };
+  const inner = outer.code === "ERR_TEST_FAILURE" && typeof outer.cause === "object" && outer.cause !== null ? (outer.cause as { stack?: unknown; message?: unknown }) : outer;
+  if (typeof inner.stack === "string") return inner.stack;
+  return typeof inner.message === "string" ? inner.message : undefined;
 }
 
 export default async function* nodeTestReporter(source: AsyncIterable<TestEvent>): AsyncGenerator<string> {
@@ -46,7 +57,8 @@ export default async function* nodeTestReporter(source: AsyncIterable<TestEvent>
     const skipped = (data.skip !== undefined && data.skip !== false) || (data.todo !== undefined && data.todo !== false);
     const status: AssertionResult["status"] = event.type === "test:fail" ? "failed" : skipped ? "skipped" : "passed";
     const results = files.get(file) ?? [];
-    results.push({ ancestorTitles, title: name, fullName: [...ancestorTitles, name].join(" "), status });
+    const failure = status === "failed" ? failureText(data.details?.error) : undefined;
+    results.push({ ancestorTitles, title: name, fullName: [...ancestorTitles, name].join(" "), status, ...(failure === undefined ? {} : { failureMessages: [failure] }) });
     files.set(file, results);
   }
   const testResults = [...files].map(([name, assertionResults]) => ({ name, assertionResults }));

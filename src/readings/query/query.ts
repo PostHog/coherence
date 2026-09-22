@@ -34,7 +34,7 @@ import { renderOrder } from "../../journal/workVerbs.ts";
 import { glossaryReviewCommand } from "../scope/model.ts";
 import type { GlossaryCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
 
-export const QUESTIONS = ["invariants", "relies-on", "spine", "status", "component", "order", "economy", "glossary"] as const;
+export const QUESTIONS = ["invariants", "relies-on", "spine", "status", "component", "order", "economy", "glossary", "observed"] as const;
 export type Question = (typeof QUESTIONS)[number];
 
 export function isQuestion(value: string): value is Question {
@@ -50,6 +50,7 @@ export const QUERY_USAGE = [
   "  query component <folder>       one component: intent, counts, bullets",
   "  query order [--session <id>]   the active work order the session owns, folded from its records, with what binds to it",
   "  query economy <path...>        what must be loaded to change these files safely: the economy prediction, through the instrument",
+  "  query observed [<component>] [--failures [--since <commit>]]   each component interface exercised by N tests or never observed, from the latest observation, fresh or stale; failing tests with what broke, the likely site, and the region",
 ].join("\n");
 
 export interface Answer {

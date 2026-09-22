@@ -19,6 +19,7 @@ import { formatClosure, type Closure } from "../../economy/closure.ts";
 import { glossaryCoverage } from "../../lifecycle/glossary-coverage.ts";
 import { COHERENCE_GLOSSARY } from "../../lifecycle/project.ts";
 import { buildScopePage } from "../scope/build.ts";
+import { observedCommand } from "../../observation/observed.ts";
 import { answer, answerGlossary, QUERY_USAGE } from "./query.ts";
 
 export { QUERY_USAGE };
@@ -57,6 +58,8 @@ function parse(argv: string[]): Parsed {
 }
 
 export async function queryCommand(argv: string[], io: Io, deps: QueryDependencies = QUERY_DEPENDENCIES): Promise<number> {
+  // The observed question reads the observation store, never the page state, and takes its own flags.
+  if (argv[0] === "observed") return observedCommand(io.cwd, argv.slice(1), io);
   let parsed: Parsed;
   try {
     parsed = parse(argv);

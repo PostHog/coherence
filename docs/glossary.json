@@ -1214,6 +1214,19 @@
         "defined_by": "owner, 2026-09-22 (journal d-54e128e1, d-f65a033c)",
         "owner_words": "Interface is good. Computed is essential, we need this to be a live view of the real project, not a rotting map. / component interface as qualification?"
       }
+    },
+    {
+      "name": "observation",
+      "definition": "A record of runtime behavior captured from a named source (a test pass, later a trace window), bound to a commit and a session, never read as current once its commit is not the head.",
+      "detail": {
+        "staleness": "An observation whose commit is not the head, or whose tree was dirty when it was captured, is stale and every reader says so; it is never blended into the current reading unlabeled.",
+        "co-execution": "Coverage records what executed, not who called whom: a component interface is crossed in a test when a referencing site in one component and the referenced symbol's body in the other both executed in that test. The record says co-executed, never called.",
+        "attribution": "Per test where the runner can attribute coverage to a test; per run, said so, where it cannot. Per-test attribution is never fabricated."
+      },
+      "provenance": {
+        "defined_by": "owner, 2026-09-22 (journal d-26cec1ac; work order w-74382035)",
+        "owner_words": "do it (runtime overlay on Structure)"
+      }
     }
   ],
   "metaphors": {

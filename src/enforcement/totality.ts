@@ -96,15 +96,18 @@ function tailOf(output: string, lines = 12): string {
 
 /* ------------------------------------------------------- one invocation */
 
-interface AssertionResult {
+export interface AssertionResult {
   ancestorTitles?: string[];
   title?: string;
   fullName?: string;
   status?: string;
+  /** Jest's field: for a failure, the message and stack the runner reported. */
+  failureMessages?: string[];
 }
 
-interface JsonReport {
-  testResults?: { assertionResults?: AssertionResult[] }[];
+export interface JsonReport {
+  /** The test file, where the runner names it (jest, vitest, and the node:test reporter do). */
+  testResults?: { name?: string; assertionResults?: AssertionResult[] }[];
 }
 
 /** A test title as a runner name filter: every regex metacharacter escaped, so a title with parentheses selects itself and nothing else. */
@@ -142,19 +145,21 @@ export function reportFromJunit(xml: string): JsonReport {
     const classname = attribute("classname");
     const title = attribute("name");
     const ancestorTitles = classname === "" ? [] : classname.split(".");
-    results.push({ ancestorTitles, title, fullName: classname === "" ? title : `${classname}.${title}`, status });
+    const failure = status === "failed" ? /<(?:failure|error)\b[^>]*>([\s\S]*?)<\/(?:failure|error)>/.exec(inner)?.[1] : undefined;
+    results.push({ ancestorTitles, title, fullName: classname === "" ? title : `${classname}.${title}`, status, ...(failure === undefined ? {} : { failureMessages: [decodeXml(failure)] }) });
   }
   return { testResults: [{ assertionResults: results }] };
 }
 
 /** pytest-json-report's shape (`tests[].nodeid`, `tests[].outcome`) as the jest shape. */
-function reportFromPytestJson(report: { tests?: { nodeid?: string; outcome?: string }[] }): JsonReport {
+function reportFromPytestJson(report: { tests?: { nodeid?: string; outcome?: string; call?: { longrepr?: unknown } }[] }): JsonReport {
   const results: AssertionResult[] = (report.tests ?? []).map((t) => {
     const segments = (t.nodeid ?? "").split("::");
     const title = segments[segments.length - 1] ?? "";
     const outcome = t.outcome ?? "";
     const status = outcome === "passed" || outcome === "xfailed" ? "passed" : outcome === "failed" || outcome === "error" || outcome === "xpassed" ? "failed" : "skipped";
-    return { ancestorTitles: segments.slice(0, -1), title, fullName: t.nodeid ?? title, status };
+    const longrepr = t.call?.longrepr;
+    return { ancestorTitles: segments.slice(0, -1), title, fullName: t.nodeid ?? title, status, ...(typeof longrepr === "string" ? { failureMessages: [longrepr] } : {}) };
   });
   return { testResults: [{ assertionResults: results }] };
 }
@@ -179,7 +184,7 @@ export function parseReport(text: string): JsonReport {
  * reported title ending in an ellipsis matches the via it is a prefix of, and
  * nothing else. Nothing else falls back.
  */
-function belongsTo(result: AssertionResult, via: string): boolean {
+export function belongsTo(result: AssertionResult, via: string): boolean {
   if (result.title === via || result.fullName === via) return true;
   if (result.ancestorTitles?.includes(via) === true) return true;
   return truncatedTo(result.title, via) || truncatedTo(result.fullName, via);
@@ -220,14 +225,35 @@ export function verdictsFromReport(report: JsonReport, filters: readonly string[
  * mapped back by name. Undefined when the config names no such command,
  * so the caller falls back to one test per invocation.
  */
-export async function runTotalityBatch(root: string, config: EnforcementConfig, filters: readonly string[], timeoutMs = TOTALITY_TIMEOUT_MS): Promise<Map<string, TotalityResult> | undefined> {
+/** The one invocation, as spawned. */
+export interface CommandSpec {
+  command: string;
+  args: string[];
+  shell: boolean;
+  /** Variables added to the environment the runner inherits. */
+  env?: Record<string, string>;
+}
+
+/**
+ * An observed pass (src/observation) rides the same invocation: it may add
+ * coverage flags and environment to the one command, and it is handed the
+ * parsed report before the report is removed. It never adds an invocation.
+ */
+export interface BatchObserver {
+  wrap(spec: CommandSpec): CommandSpec;
+  /** The report the runner wrote, parsed; undefined when none was written or it did not parse. */
+  report(report: JsonReport | undefined): void;
+}
+
+export async function runTotalityBatch(root: string, config: EnforcementConfig, filters: readonly string[], timeoutMs = TOTALITY_TIMEOUT_MS, observer?: BatchObserver): Promise<Map<string, TotalityResult> | undefined> {
   if (config.testJson === undefined || filters.length === 0) return undefined;
   const out = join(tmpdir(), `coherence-totality-${randomBytes(4).toString("hex")}.${config.testFilterForm === "pytest" ? "xml" : "json"}`);
   const filter = combinedFilter(filters, config.testFilterForm);
   const substitute = (arg: string): string => arg.split("{filter}").join(filter).split("{out}").join(out);
-  const spec = Array.isArray(config.testJson)
+  const plain: CommandSpec = Array.isArray(config.testJson)
     ? { command: config.testJson[0]!, args: config.testJson.slice(1).map(substitute), shell: false }
     : { command: config.testJson.split("{filter}").join(shellQuote(filter)).split("{out}").join(shellQuote(out)), args: [] as string[], shell: true };
+  const spec = observer === undefined ? plain : observer.wrap(plain);
   // The combined pattern and the report path are long and the same for every entry: shown collapsed.
   const shown = (Array.isArray(config.testJson) ? config.testJson.join(" ") : config.testJson)
     .split("{filter}")
@@ -235,10 +261,11 @@ export async function runTotalityBatch(root: string, config: EnforcementConfig, 
     .split("{out}")
     .join("<report>");
   const notRun = (reason: string, tail = ""): Map<string, TotalityResult> => new Map(filters.map((via) => [via, { verdict: "not run" as Verdict, reason, command: shown, tail, matched: 0 }]));
+  let parsed: JsonReport | undefined;
   try {
     const output = await new Promise<{ code: number | null; text: string }>((resolve, reject) => {
       let text = "";
-      const child = spawn(spec.command, spec.args, { cwd: root, shell: spec.shell, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: process.env["CI"] ?? "1" } });
+      const child = spawn(spec.command, spec.args, { cwd: root, shell: spec.shell, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: process.env["CI"] ?? "1", ...spec.env } });
       const timer = setTimeout(() => {
         child.kill("SIGKILL");
         reject(new Error(`gave no verdict in ${Math.round(timeoutMs / 1000)} s`));
@@ -255,16 +282,16 @@ export async function runTotalityBatch(root: string, config: EnforcementConfig, 
       });
     });
     if (!existsSync(out)) return notRun(`${shown} exited ${output.code} and wrote no report at {out}`, tailOf(output.text));
-    let report: JsonReport;
     try {
-      report = parseReport(readFileSync(out, "utf8"));
+      parsed = parseReport(readFileSync(out, "utf8"));
     } catch (error) {
       return notRun(`the report ${shown} wrote is neither jest-shaped JSON, JUnit XML, nor pytest-json-report (${error instanceof Error ? error.message : String(error)})`, tailOf(output.text));
     }
-    return verdictsFromReport(report, filters, shown);
+    return verdictsFromReport(parsed, filters, shown);
   } catch (error) {
     return notRun(`test command could not run: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
     rmSync(out, { force: true });
+    observer?.report(parsed);
   }
 }
