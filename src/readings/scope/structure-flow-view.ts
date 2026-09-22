@@ -71,8 +71,11 @@ const FLOW_DROP_GAP = 5;
 const FLOW_GAP_MIN = 96;
 /** Named origins: the size of a name, the height of its line, the gap between routes, the terminus dot. */
 const FLOW_NAME_SIZE = 11;
-const FLOW_NAME_LINE = 13;
-const FLOW_NAME_GAP = 7;
+const FLOW_NAME_LINE = 14;
+const FLOW_NAME_GAP = 10;
+/** The colored token behind a route's named origin: horizontal and vertical padding. */
+const FLOW_TOKEN_PAD_X = 6;
+const FLOW_TOKEN_PAD_Y = 3;
 const FLOW_DOT_R = 5;
 
 /** Route colors, light and dark: the validated categorical order (identity is also the name, never color alone). */
@@ -127,8 +130,9 @@ const FLOW_SVG_STYLE = `
 .flow-svg .flow-route { fill: none; stroke-width: 3.5; stroke-linejoin: round; stroke-linecap: butt; }
 .flow-svg .flow-terminus-dot { stroke: var(--flow-surface); stroke-width: 1.5; }
 .flow-svg .flow-derived .flow-terminus-dot { fill: var(--flow-surface); stroke-width: 2.5; stroke-dasharray: 3 2; }
-.flow-svg .flow-origin { fill: var(--flow-ink); }
-.flow-svg .flow-origin-derived { fill: var(--flow-muted); font-style: italic; }
+.flow-svg .flow-origin { fill: #fff; }
+.flow-svg .flow-origin-derived { fill: #fff; font-style: italic; font-weight: 400; }
+.flow-svg .flow-derived .flow-origin-token { stroke: #fff; stroke-width: 1; stroke-dasharray: 3 2; }
 .flow-svg .flow-faint { fill: none; stroke: var(--flow-quiet); stroke-width: 1.4; stroke-dasharray: 5 4; }
 .flow-svg .flow-bearing-line { fill: none; stroke: var(--flow-quiet); stroke-width: 1.6; }
 .flow-svg .flow-broken-line { stroke: var(--flow-defect); stroke-width: 2; stroke-dasharray: 6 3; }
@@ -140,7 +144,7 @@ const FLOW_SVG_STYLE = `
 .flow-svg .flow-tag.flow-tag-broken rect { stroke: var(--flow-defect); stroke-width: 1.8; }
 .flow-svg .flow-tag:focus rect, .flow-svg .flow-tag.is-selected rect { stroke: var(--flow-lit); stroke-width: 2.5; }
 .flow-svg .flow-boundary { stroke: var(--flow-boundary); stroke-width: 2.2; stroke-dasharray: 3 2; }
-.flow-svg .flow-caption, .flow-svg .flow-colcap, .flow-svg .flow-defect-mark, .flow-svg .flow-rail-label, .flow-svg .flow-origin { paint-order: stroke; stroke: var(--flow-surface); stroke-width: 3px; stroke-linejoin: round; }
+.flow-svg .flow-caption, .flow-svg .flow-colcap, .flow-svg .flow-defect-mark, .flow-svg .flow-rail-label { paint-order: stroke; stroke: var(--flow-surface); stroke-width: 3px; stroke-linejoin: round; }
 .flow-svg .structure-edge.structure-proposed { fill: none; stroke: var(--flow-proposed); stroke-width: 2; stroke-dasharray: 9 6; }
 .flow-svg .structure-proposed-word { fill: var(--flow-proposed); }
 .flow-svg [data-structure-select], .flow-svg [data-structure-expand] { cursor: pointer; }
@@ -154,7 +158,8 @@ const FLOW_SVG_STYLE = `
 .flow-svg .flow-route-group.is-muted .flow-terminus-dot { opacity: 0.6; }
 .flow-svg .flow-route-group.is-dim .flow-route, .flow-svg .flow-route-group.is-dim .flow-terminus-dot { opacity: 0.16; }
 .flow-svg .flow-route-group.is-dim .flow-route { stroke-width: 2; }
-.flow-svg .flow-route-group.is-dim .flow-origin { opacity: 0.62; }
+.flow-svg .flow-route-group.is-dim .flow-origin, .flow-svg .flow-route-group.is-dim .flow-origin-token { opacity: 0.45; }
+.flow-svg .flow-route-group.is-muted .flow-origin-token { opacity: 0.7; }
 .flow-svg .flow-route-group:focus .flow-origin, .flow-svg .flow-route-group.is-lit .flow-origin { font-weight: 700; }
 .flow-svg .is-dim { opacity: 0.16; }
 .flow-svg .flow-route-group.is-dim { opacity: 1; }
@@ -436,7 +441,7 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
 
   // The left margin: the widest named origin, its dot, and room for the lines to fan into their stations.
   const termW = Math.max(0, ...drawn.flatMap((route) => originLines(route).map((line) => textWidth(line, FLOW_NAME_SIZE, false))));
-  const dotX = r1(FLOW_PAD + termW + 8 + FLOW_DOT_R);
+  const dotX = r1(FLOW_PAD + termW + 2 * FLOW_TOKEN_PAD_X + 8 + FLOW_DOT_R);
   const blocks = new Map<string, { top: number; groups: { route: FlowRoute; lines: string[]; y0: number; dot: number }[] }>();
   let fan = 0;
   for (const [folder, routes] of starts) {
@@ -685,7 +690,7 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
     for (const group of block.groups) {
       group.lines.forEach((line, j) => {
         const derivedWord = group.route.derived && j === group.lines.length - 1;
-        tryPlace([{ text: line, x: dotX - FLOW_DOT_R - 6, y: r1(group.y0 + (j + 1) * FLOW_NAME_LINE - 3), size: FLOW_NAME_SIZE, bold: false, align: "end" }], `origin ${group.route.id} ${j}`, 2, derivedWord ? "flow-origin flow-origin-derived" : "flow-origin", false);
+        tryPlace([{ text: line, x: dotX - FLOW_DOT_R - 6 - FLOW_TOKEN_PAD_X, y: r1(group.y0 + (j + 1) * FLOW_NAME_LINE - 3), size: FLOW_NAME_SIZE, bold: true, align: "end" }], `origin ${group.route.id} ${j}`, 2, derivedWord ? "flow-origin flow-origin-derived" : "flow-origin", false);
       });
     }
   }
@@ -853,6 +858,17 @@ function flowLit(selection: FlowSelection, lit: boolean): string {
   return lit ? "is-lit" : "is-dim";
 }
 
+/** The colored token behind a route's named origin: one rounded rectangle around all its lines, in the route's color. */
+function originToken(lines: FlowText[], color: string): Markup {
+  if (lines.length === 0) return html``;
+  const boxes = lines.map(textBox);
+  const x0 = Math.min(...boxes.map((b) => b.x)) - FLOW_TOKEN_PAD_X;
+  const x1 = Math.max(...boxes.map((b) => b.x + b.w)) + FLOW_TOKEN_PAD_X;
+  const y0 = Math.min(...boxes.map((b) => b.y)) - FLOW_TOKEN_PAD_Y;
+  const y1 = Math.max(...boxes.map((b) => b.y + b.h)) + FLOW_TOKEN_PAD_Y;
+  return html`<rect class="flow-origin-token" x="${r1(x0)}" y="${r1(y0)}" width="${r1(x1 - x0)}" height="${r1(y1 - y0)}" rx="5" fill="${color}"/>`;
+}
+
 function renderText(t: FlowText): Markup {
   // Every text is set from its left edge: middle and end alignment are resolved here from the embedded metrics.
   const box = textBox(t);
@@ -895,7 +911,7 @@ export function renderFlowSvg(model: FlowModel, selected: string | undefined, pr
     const dim = lit === undefined ? active && !tag.edges.some((id) => selection.edges.has(id) || (model.edges.find((e) => e.id === id)?.routes.some((r) => selection.routes.has(r)) ?? false)) : !lit;
     return ["flow-tag", tag.broken ? "flow-tag-broken" : "", lit === true ? "is-lit" : dim ? "is-dim" : "", tag.chokepoint !== undefined && tag.chokepoint === selected ? "is-selected" : ""].filter(Boolean).join(" ");
   };
-  return html`<svg class="flow-svg" xmlns="http://www.w3.org/2000/svg" role="group" aria-labelledby="flow-svg-title" viewBox="0 0 ${layout.width} ${layout.height}" width="${layout.width}" height="${layout.height}" style="${`min-width: ${layout.width}px; max-width: ${Math.round(layout.width * 1.25)}px`}" data-selected="${selection.id ?? ""}" data-dropped="${layout.dropped.join("|")}">
+  return html`<svg class="flow-svg" xmlns="http://www.w3.org/2000/svg" role="group" aria-labelledby="flow-svg-title" viewBox="0 0 ${layout.width} ${layout.height}" width="${layout.width}" height="${layout.height}" style="${`min-width: ${layout.width}px`}" data-selected="${selection.id ?? ""}" data-dropped="${layout.dropped.join("|")}">
     <title id="flow-svg-title">Structure: ${plural(model.routes.length, "structural route", "structural routes")} through ${plural(model.nodes.length, "component", "components")}, ${plural(model.coreDependencies.length, "core dependency", "core dependencies")} drawn as rails</title>
     <style>${raw(FLOW_SVG_STYLE)}${raw(routeVars())}</style>
     <defs>
@@ -917,7 +933,7 @@ export function renderFlowSvg(model: FlowModel, selected: string | undefined, pr
     ${layout.routes.map((draw) => html`<g class="flow-route-group ${routeClass(draw.route)}" id="${draw.route.id}" data-names="${draw.route.names.join(", ")}" data-derived="${draw.route.derived ? "true" : "false"}" data-stops="${draw.route.stops.join(" ")}" data-edges="${draw.route.edges.join(" ")}"${draw.route.rail === undefined ? null : raw(` data-rail="${draw.route.rail}"`)} data-structure-select="${draw.route.id}" role="button" tabindex="0" aria-pressed="${selection.id === draw.route.id ? "true" : "false"}" aria-label="${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(", ")}">
       <title>${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(" → ")}${draw.route.rail === undefined ? "" : ` → ${byFolder.get(draw.route.rail)!.name} (rail)`}</title>
       <path class="flow-line flow-route" data-line="${draw.route.id}" d="${pathD(draw.path)}" stroke="${draw.color}"/>
-      <g class="flow-terminus${draw.route.derived ? " flow-derived" : ""}"><circle class="flow-terminus-dot" cx="${draw.terminus[0]}" cy="${draw.terminus[1]}" r="${FLOW_DOT_R}" fill="${draw.color}"${draw.route.derived ? raw(` stroke="${draw.color}"`) : null}/>${texts(`origin ${draw.route.id} `).map(renderText)}</g>
+      <g class="flow-terminus${draw.route.derived ? " flow-derived" : ""}"><circle class="flow-terminus-dot" cx="${draw.terminus[0]}" cy="${draw.terminus[1]}" r="${FLOW_DOT_R}" fill="${draw.color}"${draw.route.derived ? raw(` stroke="${draw.color}"`) : null}/>${originToken(texts(`origin ${draw.route.id} `), draw.color)}${texts(`origin ${draw.route.id} `).map(renderText)}</g>
     </g>`)}
     ${[...layout.stations.entries()].map(([folder, station]) => renderStation(byFolder.get(folder)!, station, layout.texts, selection, selected, model))}
     ${layout.tags.map((tag) => {

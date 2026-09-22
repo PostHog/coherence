@@ -945,7 +945,7 @@ code {
   border-radius: 0.75rem;
 }
 
-/* The map fills its canvas, never below its own size (text never shrinks below what was measured) and at most a quarter above it. */
+/* The map fills its canvas and never shrinks below its own size (text never shrinks below what was measured). */
 .flow-canvas svg {
   display: block;
   width: 100%;
@@ -981,7 +981,8 @@ code {
 @media (min-width: 64rem) {
   .flow-stage {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 24rem;
+    /* The map takes the room; the inspector is a fixed, modest column beside it. */
+    grid-template-columns: minmax(0, 1fr) 21rem;
     gap: 1rem;
     align-items: start;
   }
