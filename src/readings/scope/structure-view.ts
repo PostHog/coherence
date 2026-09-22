@@ -11,7 +11,7 @@ import { renderFlowSection } from "./structure-flow-view.ts";
 
 /** Structure keeps no filter; selection and zoom live in the map. */
 export function renderStructureTools(_state: ShellState): Markup {
-  return html`<div class="tool-copy"><p>Every component interface, from caller to callee. Select an entrance, a trust level, a component, an interface, or a chokepoint to light its story.</p></div>`;
+  return html`<div class="tool-copy"><p>Each colored line is the path work takes from an entrance through the components. Select a route, an entrance, a trust level, a component, an interface, or a chokepoint to light its story.</p></div>`;
 }
 
 /**

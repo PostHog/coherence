@@ -49,7 +49,7 @@ const FLOW_COL_W = 330;
 /** Where a column's turning gap starts, from the column's left edge: every station box is narrower. */
 const FLOW_TURN = 176;
 const FLOW_TOP = 58;
-const FLOW_ROW_H = 64;
+const FLOW_ROW_H = 70;
 /** The tallest a station may be: its tracks close up rather than grow past its row. */
 const FLOW_BOX_MAX_H = 52;
 /** The fixed offset between parallel tracks. */
@@ -57,6 +57,8 @@ const FLOW_TRACK = 6;
 const FLOW_CHAMFER = 8;
 const FLOW_RAIL_GAP = 34;
 const FLOW_BOX_MIN_H = 34;
+/** Stubs under a station stand this far apart, one slot per rail, so each can carry its identifier beside it. */
+const FLOW_STUB_GAP = 34;
 
 /** Route colors, light and dark: the validated categorical order (identity is also the letter, never color alone). */
 const FLOW_ROUTE_COLORS: [string, string][] = [
@@ -131,6 +133,9 @@ const FLOW_SVG_STYLE = `
 .flow-svg .flow-faint.is-lit, .flow-svg .flow-bearing-line.is-lit { stroke: var(--flow-lit); stroke-opacity: 1; }
 .flow-svg .flow-route-group.is-lit .flow-route { stroke-width: 4.5; }
 .flow-svg .is-dim { opacity: 0.16; }
+.flow-svg .flow-station.is-dim { opacity: 1; }
+.flow-svg .flow-station.is-dim rect { stroke-opacity: 0.2; }
+.flow-svg .flow-station.is-dim text { opacity: 0.22; }
 @media (prefers-color-scheme: dark) {
   .flow-svg {
     --flow-surface: #111827;
@@ -399,7 +404,7 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
     const inGap = runs.filter((run) => run.gap === gap);
     const up = inGap.filter((run) => !run.backward && run.to[1] < run.from[1]).sort((a, b) => a.from[1] - b.from[1] || a.key.localeCompare(b.key));
     const down = inGap.filter((run) => !run.backward && run.to[1] >= run.from[1]).sort((a, b) => b.from[1] - a.from[1] || a.key.localeCompare(b.key));
-    [...up, ...down].forEach((run, index) => lanes.set(run.key, start + 10 + index * FLOW_TRACK));
+    [...down, ...up].forEach((run, index) => lanes.set(run.key, start + 10 + index * FLOW_TRACK));
     const back = inGap.filter((run) => run.backward);
     const backUp = back.filter((run) => run.to[1] < run.from[1]).sort((a, b) => a.from[1] - b.from[1] || a.key.localeCompare(b.key));
     const backDown = back.filter((run) => run.to[1] >= run.from[1]).sort((a, b) => b.from[1] - a.from[1] || a.key.localeCompare(b.key));
@@ -482,7 +487,7 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
       const edge = edgeById.get(id)!;
       const station = stations.get(edge.from);
       if (station !== undefined) {
-        const x = r1(station.x + 10 + index * 9);
+        const x = r1(station.x + 8 + index * FLOW_STUB_GAP);
         stubs.push({ edge, rail: index, from: [x, r1(station.y + station.h)], to: [x, r1(station.y + station.h + 8)] });
       } else {
         const caller = rails.find((rail) => rail.folder === edge.from);
