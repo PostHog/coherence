@@ -896,7 +896,9 @@ code {
 
 /* Structure */
 
-.structure-view .section-heading {
+/* Structure: one map */
+
+.flow .section-heading {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
@@ -904,71 +906,135 @@ code {
   gap: 0.5rem 1.5rem;
 }
 
-.structure-view .section-heading h2,
-.structure-view .section-heading p {
+.flow .section-heading h3,
+.flow .section-heading p {
   margin: 0;
 }
 
-.structure-view .eyebrow {
+.flow h3#flow-heading {
+  font-size: 1.375rem;
+}
+
+.flow .eyebrow,
+.flow-inspect .eyebrow {
+  margin: 0;
   font-size: 0.8125rem;
   font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.structure-canvas {
-  max-width: 100%;
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
-  border-radius: 0.75rem;
-  scrollbar-gutter: stable;
-}
-
-.structure-canvas svg {
-  display: block;
-  max-width: none;
-}
-
-.structure-readings {
-  margin-top: 1.5rem;
-}
-
-.structure-readings h3 {
-  font-size: 1rem;
   color: var(--ink-quiet);
 }
 
-.structure-reading {
-  padding: 0.75rem 0;
-  border-top: 1px solid var(--rule-soft);
+.flow-evidence {
+  font-size: 0.9375rem;
+  max-width: 80ch;
 }
 
-.structure-reading summary {
+.flow-canvas {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 0.75rem;
+  margin: 1rem 0;
+}
+
+.flow-canvas svg {
+  display: block;
+  width: 100%;
+  min-width: 56rem;
+  height: auto;
+  margin: 0 auto;
+}
+
+.flow-inspector {
+  border: 1px solid var(--rule);
+  border-radius: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: var(--field);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.flow-inspector h3 {
+  margin: 0.25rem 0;
+  font-size: 1.125rem;
+}
+
+.flow-inspector h4 {
+  margin: 1rem 0 0.375rem;
+  font-size: 0.875rem;
+}
+
+.flow-inspector h5 {
+  margin: 0 0 0.375rem;
+  font-size: 0.875rem;
+}
+
+.flow-inspector p {
+  margin: 0.375rem 0;
+}
+
+.flow-picks,
+.flow-uses,
+.flow-reduced,
+.flow-defects {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.flow-picks {
+  list-style: none;
+  padding-left: 0;
+}
+
+.flow-picks li,
+.flow-uses li,
+.flow-reduced li,
+.flow-defects li {
+  margin: 0.2rem 0;
+}
+
+.flow-pick {
+  font: inherit;
+  font-weight: 650;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 0.375rem;
+  padding: 0.1rem 0.5rem;
   cursor: pointer;
+  text-align: left;
+}
+
+.flow-pick[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
+.flow-uses li[data-how="drawn"] code,
+.flow-uses li[data-how="implied"] code {
   font-weight: 650;
 }
 
-.structure-reading p,
-.structure-reading ul {
-  margin-top: 0.5rem;
-}
-
-/* Reliance */
-
-.reliance-entries > li {
+.flow-carried {
   margin-top: 0.75rem;
-  padding: 0.5rem 0 0.5rem 1rem;
-  border-left: 3px solid var(--rule-soft);
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--rule-soft);
 }
 
-.reliance-entries > li[data-owner="true"] {
-  border-left-color: var(--accent);
+.flow-carried h4 {
+  margin-top: 0;
 }
 
-.reliance-component {
-  font-family: var(--sans);
-  font-size: 0.9375rem;
+.flow-carried .defect {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
 }
+
+.flow-legend {
+  font-size: 0.875rem;
+  max-width: 70ch;
+}
+
+/* Reference sites, on the Structure inspector */
 
 .site-list {
   margin-top: 0.25rem;

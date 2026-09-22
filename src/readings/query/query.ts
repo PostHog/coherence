@@ -30,11 +30,12 @@ import {
   structureOf,
   type RelianceSite,
 } from "../scope/derive.ts";
+import { FLOW_BANDS, flowLabelLines, flowOf } from "../scope/structure-flow.ts";
 import { renderOrder } from "../../journal/workVerbs.ts";
 import { glossaryReviewCommand } from "../scope/model.ts";
 import type { GlossaryCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
 
-export const QUESTIONS = ["invariants", "relies-on", "spine", "status", "component", "order", "economy", "glossary"] as const;
+export const QUESTIONS = ["invariants", "relies-on", "spine", "structure", "status", "component", "order", "economy", "glossary"] as const;
 export type Question = (typeof QUESTIONS)[number];
 
 export function isQuestion(value: string): value is Question {
@@ -46,6 +47,7 @@ export const QUERY_USAGE = [
   "  query invariants <path...>     which invariants touch these files, by component and by reference site",
   "  query relies-on <chokepoint>   who references this chokepoint, from the latest run",
   "  query spine                    trust levels and every crossing-bearing invariant, in Structure order",
+  "  query structure                the edges Structure draws (only invariant-carrying reliance), their invariants, and the ranks",
   "  query status                   structural defects, open requirements, escalations awaiting a human",
   "  query component <folder>       one component: intent, counts, bullets",
   "  query order [--session <id>]   the active work order the session owns, folded from its records, with what binds to it",
@@ -197,6 +199,37 @@ export function answerSpine(state: ShellState): Answer {
   return { text: lines.join("\n"), code: 0 };
 }
 
+/**
+ * The Structure map as text: the same `flowOf` derivation the view draws, so
+ * the component interfaces, their labels, the rows, and the entrances cannot
+ * differ between the human reading and the agent's. One interface per line:
+ * `caller -> callee  label`, the label lines joined by " · ".
+ */
+export function answerStructure(state: ShellState): Answer {
+  const model = flowOf(state);
+  const bearing = model.edges.filter((edge) => edge.loadBearing).length;
+  const lines = [
+    `evidence: static and computed; ${model.evidence === "language adapter" ? `resolved references through the ${model.language} language adapter` : `run sites only (${model.unread}); plain component interfaces unknown`}`,
+    `component interfaces (${model.edges.length}, ${bearing} load-bearing), caller -> callee:`,
+  ];
+  for (const edge of model.edges) lines.push(`  ${edge.from} -> ${edge.to}  ${flowLabelLines(edge).map((line) => line.text).join(" · ")}`);
+  lines.push(`entrances (${model.entrances.length}):`);
+  for (const entrance of model.entrances) {
+    lines.push(`  ${entrance.declaredBy}/${entrance.name}  ${entrance.handler ?? "no handler"}  ${entrance.reachable ? `starts in ${entrance.start}` : entrance.reason ?? "unreachable"}`);
+  }
+  lines.push("rows, entrances and callers first:");
+  for (let band = 0; band < FLOW_BANDS; band++) {
+    const folders = model.nodes.filter((node) => node.band === band).map((node) => node.folder);
+    lines.push(`  ${band}  ${folders.length === 0 ? "-" : folders.join(", ")}`);
+  }
+  const unconnected = model.nodes.filter((node) => node.band === undefined).map((node) => node.folder);
+  if (unconnected.length > 0) lines.push(`  no component interface  ${unconnected.join(", ")}`);
+  if (model.unowned !== undefined && model.unowned.files > 0) lines.push(`  no component  ${model.unowned.files} files, ${model.unowned.lines} lines`);
+  const broken = model.nodes.flatMap((node) => node.defects.filter((d) => d.internal > 0).map((d) => `  ${node.folder}/${d.name}  ${d.state}; ${d.internal} of ${d.bypasses} bypasses inside ${node.folder}, on no component interface`));
+  if (broken.length > 0) lines.push("broken chokepoints no interface shows:", ...broken);
+  return { text: lines.join("\n"), code: 0 };
+}
+
 function answerStatus(state: ShellState): Answer {
   const all = allInvariants(state.spec.components);
   const defects = all.filter((i) => i.state === "structural defect");
@@ -314,6 +347,8 @@ export function answer(state: ShellState, question: string, args: string[], opti
       return answerReliesOn(state, args);
     case "spine":
       return args.length === 0 ? answerSpine(state) : { text: `query spine takes no arguments\n${QUERY_USAGE}`, code: 64 };
+    case "structure":
+      return args.length === 0 ? answerStructure(state) : { text: `query structure takes no arguments\n${QUERY_USAGE}`, code: 64 };
     case "status":
       return answerStatus(state);
     case "component":

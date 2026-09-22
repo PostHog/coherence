@@ -194,6 +194,9 @@ export function renderJournalResults(state: ShellState): Markup {
         : shown.length === 0
           ? html`<p class="match-summary">No record matches.</p>`
           : html`<p class="match-summary">${shown.length} of ${plural(records.length, "record", "records")} shown.</p>`}
+    ${state.journal.omitted === undefined
+      ? null
+      : html`<p class="quiet" data-field="omitted">${plural(state.journal.omitted, "earlier record is", "earlier records are")} not embedded in this page; the whole journal is one command away: <code>journal</code>.</p>`}
     ${shown.map((r) => renderRecord(r, status.get(r.id)))}
     ${state.journal.damaged.length > 0
       ? html`<section class="damaged"><h4>Unreadable lines</h4><ul>${state.journal.damaged.map((d) => html`<li><code>${d.file}:${d.line}</code> ${d.reason}</li>`)}</ul></section>`

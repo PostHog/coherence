@@ -9,6 +9,10 @@
  *   ## trust levels            (entry spec only)
  *   - owner-trusted: full kernel access
  *
+ *   ## entrances               (any spec)
+ *   - <name>: <one-line meaning: what work enters here from outside>
+ *     handler: <symbol, or symbol in file>
+ *
  *   ## invariants
  *   - <name>: <sentence>
  *     protects: <symbol or module>            chokepoint form, with
@@ -48,7 +52,11 @@ export const RETIRED_SECTIONS: readonly RetiredSection[] = (
 ).sections;
 
 export const TRUST_LEVELS_SECTION = "trust levels";
+export const ENTRANCES_SECTION = "entrances";
 export const INVARIANTS_SECTION = "invariants";
+
+/** What a spec may hold, for the problems that name it. */
+const SECTIONS_SENTENCE = "a spec holds ## trust levels (entry spec only), ## entrances and ## invariants";
 
 /** The keys an invariant bullet may carry, in the order the scaffold prints them. */
 export const KEYS = ["protects", "chokepoint", "over", "via", "because", "crossing", "refuted", "kinds", "checklist"] as const;
@@ -65,6 +73,21 @@ export interface TrustLevel {
   name: string;
   meaning: string;
   line: number;
+}
+
+/**
+ * Where work enters the system from outside: a command, a host event, a
+ * route, a tool. The handler is the code that receives it, named as a symbol
+ * or a symbol in a file; the model checks that it resolves.
+ */
+export interface Entrance {
+  name: string;
+  meaning: string;
+  /** Undefined when the bullet names no handler, which is a problem. */
+  handler: string | undefined;
+  line: number;
+  /** The handler line, or the bullet's own line when there is none. */
+  handlerLine: number;
 }
 
 export type Enforcement =
@@ -110,6 +133,8 @@ export interface ParsedSpec {
   /** Undefined when the spec has no trust levels section. */
   trustLevels: TrustLevel[] | undefined;
   trustLevelsLine: number | undefined;
+  /** Empty when the spec has no entrances section. */
+  entrances: Entrance[];
   invariants: Invariant[];
   problems: Problem[];
 }
@@ -172,9 +197,11 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
   let intent: string | undefined;
   let trustLevels: TrustLevel[] | undefined;
   let trustLevelsLine: number | undefined;
+  let entrancesSeen = false;
+  const entrances: Entrance[] = [];
   const bullets: RawBullet[] = [];
 
-  type Section = "head" | "trust levels" | "invariants" | "skip";
+  type Section = "head" | "trust levels" | "entrances" | "invariants" | "skip";
   let section: Section = "head";
   let paragraph: string[] = [];
   let paragraphLine = 0;
@@ -217,7 +244,7 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         return;
       }
       if (level > 2) {
-        problem(line, "no sub-headings: a spec holds ## trust levels (entry spec only) and ## invariants");
+        problem(line, `no sub-headings: ${SECTIONS_SENTENCE}`);
         section = "skip";
         return;
       }
@@ -229,6 +256,12 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         section = "trust levels";
         return;
       }
+      if (key === ENTRANCES_SECTION) {
+        if (entrancesSeen) problem(line, "## entrances given twice");
+        entrancesSeen = true;
+        section = "entrances";
+        return;
+      }
       if (key === INVARIANTS_SECTION) {
         section = "invariants";
         return;
@@ -237,7 +270,7 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
       if (retired !== undefined) {
         problem(line, `## ${retired.section} is retired; its replacement is ${retired.replacement}`);
       } else {
-        problem(line, `unknown section "${name}": a spec holds ## trust levels (entry spec only) and ## invariants`);
+        problem(line, `unknown section "${name}": ${SECTIONS_SENTENCE}`);
       }
       section = "skip";
       return;
@@ -272,6 +305,37 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         if (meaning === "") problem(line, `trust level ${name} needs a one-line meaning`);
         if (trustLevels!.some((level) => level.name === name)) problem(line, `trust level ${name} declared twice`);
         trustLevels!.push({ name, meaning, line });
+        return;
+      }
+      case "entrances": {
+        if (raw.trim() === "") return;
+        const bullet = /^[-*]\s+(.*)$/.exec(raw);
+        if (bullet !== null) {
+          const colon = bullet[1]!.indexOf(":");
+          if (colon <= 0) {
+            problem(line, "an entrance is one bullet: - <name>: <one-line meaning>, with an indented handler: <symbol> line");
+            return;
+          }
+          const name = bullet[1]!.slice(0, colon).trim();
+          const meaning = bullet[1]!.slice(colon + 1).trim();
+          if (meaning === "") problem(line, `entrance ${name} needs a one-line meaning`);
+          if (entrances.some((entrance) => entrance.name === name)) problem(line, `entrance ${name} declared twice`);
+          entrances.push({ name, meaning, handler: undefined, line, handlerLine: line });
+          return;
+        }
+        const current = entrances[entrances.length - 1];
+        const field = /^\s+([a-z]+):\s*(.*)$/.exec(raw);
+        if (current === undefined || field === null) {
+          problem(line, "expected an entrance bullet (- <name>: <meaning>) or an indented handler: <symbol> line under one");
+          return;
+        }
+        if (field[1] !== "handler") {
+          problem(line, `unknown key "${field[1]}": an entrance carries handler`);
+          return;
+        }
+        if (current.handler !== undefined) problem(line, `entrance ${current.name} names its handler twice`);
+        current.handler = field[2]!.trim();
+        current.handlerLine = line;
         return;
       }
       case "invariants": {
@@ -322,8 +386,13 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
   if (intent === undefined) problem(1, "a spec needs its intent: one line after the title");
   if (fenced) problem(lines.length, "unclosed fenced block");
 
+  for (const entrance of entrances) {
+    if (entrance.handler === undefined || entrance.handler === "" || isPlaceholder(entrance.handler)) {
+      problem(entrance.line, `entrance ${entrance.name} names no handler: add handler: <symbol, or symbol in file>`);
+    }
+  }
   const invariants = bullets.map((bullet) => buildInvariant(bullet, problem, options.seed));
-  return { file, title, intent, trustLevels, trustLevelsLine, invariants, problems };
+  return { file, title, intent, trustLevels, trustLevelsLine, entrances, invariants, problems };
 }
 
 function buildInvariant(bullet: RawBullet, problem: (line: number, message: string) => void, seed: Seed | undefined): Invariant {

@@ -3,9 +3,33 @@
 A component is any folder with a spec file, `<Name>.spec.md`. Folders without
 one are transparent; a super folder becomes a component when a relationship
 invariant about its children needs a home. The spec holds a title, a one-line
-intent, `## trust levels` in the entry spec only, and `## invariants`. No other
-section: the parser refuses the reference's sections by name and says what
-replaced each.
+intent, `## trust levels` in the entry spec only, `## entrances`, and
+`## invariants`. No other section: the parser refuses the reference's sections
+by name and says what replaced each.
+
+## Entrances
+
+An entrance is where work enters the system from outside it: a command, a host
+event, a route, a tool. The component that receives it declares it, one bullet
+each, with a one-line meaning and the handler that receives the work:
+
+```markdown
+## entrances
+- run: an agent verifies the invariants and appends the run record
+  handler: runCommand in src/enforcement/cli.ts
+- SessionStart: the agent host starts a session
+  handler: runHook in hook.ts
+```
+
+The handler is a symbol, or a symbol in a file read relative to the
+component's folder and then to the root. The model checks that some file
+declares it at its top level; a handler it cannot find is a spec problem, so a
+declared entrance cannot rot unseen. Structure resolves the handler again
+through the language adapter and starts the entrance's flow at the component
+that holds the handler; when that is not the declaring component (the root
+dispatcher declares each command family, and the family's handler lives where
+the work is done), the component interface from the declaring component must
+carry the handler, or the entrance is shown as unreachable.
 
 ```sh
 node src/cli.ts spec --check [root]   # components, invariants with state, problems; exit 1 on problems

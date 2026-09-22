@@ -19,11 +19,11 @@ import { loadJournal } from "../../journal/store.ts";
 import { loadSpecModel } from "../../spec/model.ts";
 import { DEFAULTS, buildScopePage, writeScopePage, writeStructurePreview, type BuildOptions } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
-import { allReliance, componentId, defectsOf, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, structureOf, verifiedOf, workId } from "./derive.ts";
+import { allReliance, componentId, defectsOf, flowChokepointId, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, verifiedOf, workId } from "./derive.ts";
 import { escapeHtml } from "./html.ts";
 import type { Glossary, GlossaryCoverage, RecordedSite, ShellState, StructurePreview } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
-import { renderStructureSvg } from "./structure-view.ts";
+import { flowOf } from "./structure-flow.ts";
 
 const options: BuildOptions = {
   glossaryPath: DEFAULTS.glossaryPath,
@@ -98,8 +98,41 @@ test("the page builds to the default path and stays under 3 MB with Coherence's 
   assert.equal(Buffer.byteLength(onDisk, "utf8"), bytes);
   assert.ok(bytes < THREE_MB, `page is ${bytes} bytes, must be under ${THREE_MB}`);
   assert.equal(state.spec.components.length, loadSpecModel(process.cwd()).components.length, "every component of Coherence's own tree is in the state");
-  assert.equal(state.runs.records.length, loadRuns(process.cwd()).records.length, "every run record is in the state");
-  assert.equal(state.journal.records.length, loadJournal(process.cwd()).records.length, "every journal record is in the state");
+  assert.equal(state.runs.records.length + (state.runs.omitted ?? 0), loadRuns(process.cwd()).records.length, "every run record is embedded or counted");
+  assert.equal(state.journal.records.length + (state.journal.omitted ?? 0), loadJournal(process.cwd()).records.length, "every journal record is embedded or counted");
+});
+
+test("the page stays bounded as the journal and the runs grow: a window of each is embedded, and every derived verdict is unchanged", async () => {
+  const grown = makeFixture();
+  try {
+    const session = "s-growth";
+    const grow = (records: number, runs: number, from: number): void => {
+      const journal = Array.from({ length: records }, (_, i) => JSON.stringify({ id: `d-${(from + i).toString(16).padStart(8, "0")}`, kind: "decision", at: new Date(Date.UTC(2026, 8, 12) + (from + i) * 1000).toISOString(), session, agent: "growth", commit: "abc1234", dirty: false, chose: `choice ${from + i} with some words to weigh the record`, over: ["the other one"], because: "the test grows the journal" }));
+      appendFileSync(join(grown.root, `.coherence/journal/${session}.jsonl`), journal.join("\n") + "\n");
+      const run = (i: number): string => JSON.stringify({ at: new Date(Date.UTC(2026, 8, 12) + (from + i) * 1000).toISOString(), session, agent: "growth", commit: "abc1234", dirty: false, instrument: { language: "typescript", server: "warm" }, latency: 3, invariants: [{ component: "src/store", name: "read shape", form: "totality oracle", verdict: "pass", mode: "batched", refutation: "witnessed", bypasses: [], testReferences: 0, files: [], latency: 1, reason: "1 test passed" }] });
+      appendFileSync(join(grown.root, `.coherence/runs/${session}.jsonl`), Array.from({ length: runs }, (_, i) => run(i)).join("\n") + "\n");
+    };
+    const build = async (): Promise<{ bytes: number; state: ShellState }> => {
+      const { html, state } = await buildScopePage({ root: grown.root, glossaryPath: DEFAULTS.glossaryPath, project: "Fixture" });
+      return { bytes: Buffer.byteLength(html, "utf8"), state };
+    };
+    grow(400, 60, 0);
+    const first = await build();
+    grow(2000, 300, 400);
+    const second = await build();
+    assert.ok(Math.abs(second.bytes - first.bytes) < 1024, `the page stays bounded: ${first.bytes} bytes, then ${second.bytes} after 2000 records and 300 runs more`);
+    assert.equal(second.state.journal.records.length + (second.state.journal.omitted ?? 0), loadJournal(grown.root).records.length, "every journal record is embedded or counted");
+    assert.equal(second.state.runs.records.length + (second.state.runs.omitted ?? 0), loadRuns(grown.root).records.length, "every run is embedded or counted");
+    assert.ok(second.state.journal.records.some((r) => r.id === grown.names.openEscalation), "an open escalation stays embedded however old");
+    const all = await buildScopePage({ root: grown.root, glossaryPath: DEFAULTS.glossaryPath, project: "Fixture", window: false });
+    for (const invariant of all.state.spec.components.flatMap((c) => c.invariants)) {
+      assert.deepEqual(latestOf(invariant, second.state.runs.records), latestOf(invariant, all.state.runs.records), `${invariant.name}: the window derives the same latest verdicts`);
+    }
+    assert.match(renderView(second.state, "journal").text, /earlier records are not embedded in this page/);
+    assert.match(renderShell(second.state).text, new RegExp(`${loadJournal(grown.root).records.length} journal records`), "the masthead counts every record");
+  } finally {
+    grown.remove();
+  }
 });
 
 test("the page is self-contained: no external src, href, url() or @import", async () => {
@@ -231,12 +264,12 @@ function stringsIn(value: unknown): string[] {
   return [];
 }
 
-test("the render has one view strip with the seven views in order", async () => {
+test("the render has one view strip with the six views in order", async () => {
   const { state } = await buildScopePage(options);
   const rendered = renderShell(state).text;
   const tabs = [...rendered.matchAll(/role="tab"[^>]*data-view="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs, ["glossary", "components", "structure", "invariants", "reliance", "runs", "journal"]);
-  for (const label of ["Glossary", "Components", "Structure", "Invariants", "Reliance", "Runs", "Journal"]) {
+  assert.deepEqual(tabs, ["glossary", "components", "structure", "invariants", "runs", "journal"]);
+  for (const label of ["Glossary", "Components", "Structure", "Invariants", "Runs", "Journal"]) {
     assert.ok(rendered.includes(`>${label}</button>`), `${label} tab`);
   }
 });
@@ -397,10 +430,11 @@ test("every view renders from state: every component, invariant, run, and journa
   assert.deepEqual(cardIds(renderView(state, "invariants").text), [invariantId("src/store", "read shape")], "the search narrows by sentence");
   state.invariants.query = "";
 
-  const reliance = renderView(state, "reliance").text;
-  const relianceCard = card(reliance, relianceId("src/store", "single writer"));
-  assert.ok(relianceCard.includes("reliance unknown: run carries no sites"), "a legacy run is explicitly incomplete");
-  assert.ok(reliance.includes('data-field="record-limit"'), "the evidence boundary is said on the view");
+  state.structure.selected = flowChokepointId("src/store", "single writer");
+  const reliance = renderView(state, "structure").text;
+  assert.ok(reliance.includes('data-kind="chokepoint"') && reliance.includes("reliance unknown: run carries no sites"), "a legacy run is explicitly incomplete on the chokepoint's selection");
+  assert.ok(reliance.includes('data-field="evidence"'), "the evidence boundary is said on the map");
+  delete state.structure.selected;
 
   const relied = allReliance(state.spec.components, state.runs.records).find((reading) => reading.invariant.name === "single writer");
   assert.ok(relied !== undefined && relied.evidence.status === "unknown");
@@ -465,20 +499,13 @@ function setSingleWriterSites(state: ShellState, sites: RecordedSite[] | undefin
   else entry.sites = sites;
 }
 
-test("Structure derives every edge in stable order, counts no-crossing invariants, and renders defects and previews deterministically", () => {
-  const state = fresh();
-  const model = structureOf(state);
-  assert.deepEqual(model.levels.map((level) => level.name), ["outside", "inside"]);
-  assert.deepEqual(model.edges.map((edge) => `${edge.component}/${edge.name}`), ["src/store/single writer"]);
-  assert.equal(model.invariantsWithoutCrossing, 3);
-  const first = renderStructureSvg(model).text;
-  const second = renderStructureSvg(structureOf(state)).text;
-  assert.equal(first, second, "the same model produces byte-identical SVG");
-  assert.match(first, /data-state="structural defect"/);
-  assert.match(first, /1 bypass/);
-  assert.match(first, /structure-defect/);
-  assert.doesNotMatch(first, /read shape|open one|entry rule/, "bullets without crossings are not edges");
+/** The Structure view with one selection made: the one map's reading of it. */
+function selectedOn(state: ShellState, selected: string): string {
+  return renderView({ ...state, structure: { ...state.structure, selected } }, "structure").text;
+}
 
+test("a scaffold preview is drawn dashed and unverified on its component in the one map", () => {
+  const state = fresh();
   const preview: StructurePreview = {
     component: "src/store",
     name: "preview writer",
@@ -487,10 +514,11 @@ test("Structure derives every edge in stable order, counts no-crossing invariant
   };
   state.structure.preview = [preview];
   const proposed = renderView(state, "structure").text;
-  assert.match(proposed, /preview writer/);
+  assert.match(proposed, /proposed preview · preview writer/);
   assert.match(proposed, /data-proposed="true"/);
-  assert.match(proposed, /structure-proposed/);
-  assert.match(proposed, /reliance unknown: proposed preview has no run evidence/);
+  assert.match(proposed, /class="structure-edge structure-proposed"/);
+  assert.match(proposed, /Reliance unknown: a proposal has no run evidence\. This dashed edge exists only in the ephemeral preview\./);
+  assert.equal(proposed, renderView(JSON.parse(JSON.stringify(state)) as ShellState, "structure").text, "the same state renders the same bytes");
 });
 
 test("reliance reads both protected and chokepoint endpoint sites, owner first, without calling a bypass a legal door reference", () => {
@@ -504,7 +532,7 @@ test("reliance reads both protected and chokepoint endpoint sites, owner first, 
   const reading = allReliance(state.spec.components, state.runs.records).find((candidate) => candidate.invariant.name === "single writer");
   assert.ok(reading !== undefined && reading.evidence.status === "complete");
   assert.deepEqual(reading.evidence.sites.map((site) => site.file), ["src/store/write.ts", "src/api/door.test.ts", "src/api/door.ts", "src/api/handler.ts"], "owner component is first and sites are stable");
-  const rendered = card(renderView(state, "reliance").text, relianceId("src/store", "single writer"));
+  const rendered = selectedOn(state, flowChokepointId("src/store", "single writer"));
   assert.match(rendered, /protected thing · inside chokepoint/);
   assert.match(rendered, /chokepoint · reference \(runtime call not established\)/);
   assert.match(rendered, /protected thing · bypass \(not a legal chokepoint reference\)/);
@@ -512,23 +540,20 @@ test("reliance reads both protected and chokepoint endpoint sites, owner first, 
 
   const protectedOnly = fresh();
   setSingleWriterSites(protectedOnly, [{ file: "src/api/handler.ts", line: 12, symbol: "handle", class: "bypass", of: "protected", test: false }]);
-  assert.match(renderView(protectedOnly, "reliance").text, /protected thing · bypass/);
+  assert.match(selectedOn(protectedOnly, flowChokepointId("src/store", "single writer")), /protected thing · bypass/);
   const doorOnly = fresh();
   setSingleWriterSites(doorOnly, [{ file: "src/api/door.ts", line: 7, symbol: "save", class: "chokepoint-reference", of: "chokepoint", test: false }]);
-  assert.match(renderView(doorOnly, "reliance").text, /chokepoint · reference/);
+  assert.match(selectedOn(doorOnly, flowChokepointId("src/store", "single writer")), /chokepoint · reference/);
 });
 
 test("legacy site absence stays unknown while a complete empty site list confirms zero", () => {
   const legacy = fresh();
   setSingleWriterSites(legacy, undefined);
-  assert.match(renderView(legacy, "reliance").text, /reliance unknown: run carries no sites; evidence is incomplete/);
-  assert.match(renderView(legacy, "structure").text, /reliance unknown: run carries no sites; evidence is incomplete/);
+  assert.match(selectedOn(legacy, flowChokepointId("src/store", "single writer")), /reliance unknown: run carries no sites; evidence is incomplete/);
 
   const empty = fresh();
   setSingleWriterSites(empty, []);
-  assert.match(renderView(empty, "reliance").text, /Complete site evidence records 0 references/);
-  assert.match(renderView(empty, "reliance").text, /Both endpoint queries completed and returned no references/);
-  assert.match(renderView(empty, "structure").text, /Complete run site evidence records 0 references/);
+  assert.match(selectedOn(empty, flowChokepointId("src/store", "single writer")), /Complete run site evidence records 0 references/);
 });
 
 test("the Structure preview bridge validates crossings, selects Structure, and writes deterministic generated pages only", async () => {
@@ -558,7 +583,7 @@ test("deep links resolve: every card id on every view resolves to that view", ()
   for (const view of state.views) {
     const rendered = renderView(state, view.id).text;
     const ids = view.id === "structure"
-      ? [...rendered.matchAll(/<g class="structure-focus" id="([^"]+)"/g)].map((match) => match[1]!)
+      ? [...rendered.matchAll(/ id="(structure--[^"]+)"/g)].map((match) => match[1]!)
       : cardIds(rendered).filter((id) => !id.startsWith("pinned-"));
     assert.ok(ids.length > 0, `${view.id} renders cards`);
     for (const id of ids) {
@@ -590,15 +615,15 @@ test("the first adopter's tree builds as a second root: its glossary is the doma
       assert.ok(c.includes(`<code>${escapeHtml(site.file)}:${site.line}</code>`), `${defect.name} shows bypass ${site.file}:${site.line}`);
     }
   }
-  const reliance = renderView(state, "reliance").text;
-  assert.ok(reliance.includes(">writeClass</a>"), "Mnemion's kernel write chokepoint is on the reliance view");
-  const structure = structureOf(state);
-  assert.equal(structure.levels.length, 6, "Mnemion declares six trust levels");
-  assert.equal(structure.edges.length, state.spec.components.flatMap((component) => component.invariants).filter((invariant) => invariant.crossing !== undefined).length);
-  const svg = renderStructureSvg(structure).text;
-  assert.equal(svg, renderStructureSvg(structureOf(state)).text, "Mnemion's read-only state produces byte-identical SVG");
-  for (const level of structure.levels) assert.ok(svg.includes(escapeHtml(level.name)), `${level.name} is a Structure node`);
-  for (const edge of structure.edges) assert.ok(svg.includes(escapeHtml(edge.name)), `${edge.name} is a Structure edge`);
+  const writer = selectedOn(state, flowChokepointId("entities/Hive", "kernel write boundary"));
+  assert.ok(writer.includes('data-kind="chokepoint"') && writer.includes("<code>writeClass</code>"), "Mnemion's kernel write chokepoint is one selection on the map");
+  const map = flowOf(state);
+  assert.equal(map.levels.length, 6, "Mnemion declares six trust levels, each a selection");
+  const hive = map.nodes.find((node) => node.folder === "entities/Hive");
+  assert.ok(hive !== undefined && hive.defects.some((d) => d.name === "kernel write boundary" && d.bypasses === 5 && d.internal === 5), "the kernel write boundary's five bypasses sit inside entities/Hive, on the component");
+  const svg = renderView(state, "structure").text;
+  assert.equal(svg, renderView(JSON.parse(JSON.stringify(state)) as ShellState, "structure").text, "Mnemion's read-only state renders byte-identically");
+  for (const node of map.nodes) assert.ok(svg.includes(`id="${node.id}"`), `${node.folder} is on the map`);
 });
 
 test("the Mnemion domain glossary renders beneath Coherence's with every concept, ruling, rejected name and trust level", {

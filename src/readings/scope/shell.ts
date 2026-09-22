@@ -13,7 +13,6 @@ import { html, type Markup } from "./html.ts";
 import { renderInvariantsResults, renderInvariantsTools } from "./invariants-view.ts";
 import { renderJournalResults, renderJournalTools } from "./journal-view.ts";
 import type { ShellState } from "./model.ts";
-import { renderRelianceResults, renderRelianceTools } from "./reliance-view.ts";
 import { renderRunsResults, renderRunsTools } from "./runs-view.ts";
 import { renderStructureResults, renderStructureTools } from "./structure-view.ts";
 
@@ -23,7 +22,6 @@ export const VIEWS = [
   { id: "components", label: "Components" },
   { id: "structure", label: "Structure" },
   { id: "invariants", label: "Invariants" },
-  { id: "reliance", label: "Reliance" },
   { id: "runs", label: "Runs" },
   { id: "journal", label: "Journal" },
 ] as const;
@@ -34,8 +32,8 @@ export function modelCounts(state: ShellState): string {
   const parts = [
     plural(c.components, "component", "components"),
     `${plural(c.bullets, "bullet", "bullets")} (${c.invariants} ${c.invariants === 1 ? "invariant" : "invariants"}, ${c.requirements} ${c.requirements === 1 ? "requirement" : "requirements"}${c.structuralDefects > 0 ? `, ${plural(c.structuralDefects, "structural defect", "structural defects")}` : ""})`,
-    plural(state.runs.records.length, "run", "runs"),
-    plural(state.journal.records.length, "journal record", "journal records"),
+    plural(state.runs.records.length + (state.runs.omitted ?? 0), "run", "runs"),
+    plural(state.journal.records.length + (state.journal.omitted ?? 0), "journal record", "journal records"),
   ];
   const open = openEscalations(state.journal.records).length;
   if (open > 0) parts.push(`${plural(open, "escalation", "escalations")} awaiting a human`);
@@ -87,8 +85,6 @@ export function renderViewResults(state: ShellState): Markup {
       return renderStructureResults(state);
     case "invariants":
       return renderInvariantsResults(state);
-    case "reliance":
-      return renderRelianceResults(state);
     case "runs":
       return renderRunsResults(state);
     case "journal":
@@ -113,8 +109,6 @@ function renderViewTools(state: ShellState): Markup | null {
       return renderStructureTools(state);
     case "invariants":
       return renderInvariantsTools(state);
-    case "reliance":
-      return renderRelianceTools(state);
     case "runs":
       return renderRunsTools(state);
     case "journal":

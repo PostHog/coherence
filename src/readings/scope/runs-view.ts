@@ -96,6 +96,9 @@ export function renderRunsResults(state: ShellState): Markup {
         : shown.length === 0
           ? html`<p class="match-summary">No run matches “${state.runsView.query}”.</p>`
           : html`<p class="match-summary">${shown.length} of ${plural(records.length, "run", "runs")} match “${state.runsView.query}”.</p>`}
+    ${state.runs.omitted === undefined
+      ? null
+      : html`<p class="quiet" data-field="omitted">${plural(state.runs.omitted, "earlier run is", "earlier runs are")} not embedded in this page: none holds any enforcement's latest verdict. Every run is under <code>.coherence/runs</code>; <code>run --status</code> reads the latest verdicts from all of them.</p>`}
     ${shown.map((r, i) => renderRun(state, r, i === 0 && r === records[0]))}
     ${damaged.length > 0
       ? html`<section class="damaged"><h4>Unreadable lines</h4><ul>${damaged.map((d) => html`<li><code>${d.file}:${d.line}</code> ${d.reason}</li>`)}</ul></section>`

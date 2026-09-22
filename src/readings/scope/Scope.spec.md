@@ -1,9 +1,13 @@
 # Scope
 
-The reading: one surface projecting the model for a human, in seven views: Glossary, Components, Structure, Invariants, Reliance, Runs, Journal; and the agent query, the same state as plain text.
+The reading: one surface projecting the model for a human, in six views: Glossary, Components, Structure, Invariants, Runs, Journal; and the agent query, the same state as plain text.
+
+## entrances
+- scope page: a human or agent builds the Scope page over this project or another root
+  handler: main in build.ts
 
 ## invariants
-- deterministic build: The same inputs in produce a byte-identical page out, and the inputs are all of them: both glossaries, the spec tree, the run records, the journal, and the work store.
+- deterministic build: The same inputs in produce a byte-identical page out, and the inputs are all of them: both glossaries, the spec tree, the run records, the journal, the work store, and the component interface reading when the builder is given one.
   protects: loadState
   chokepoint: buildScopePage
   over: every byte of the page, against every input it reads: both glossaries, every spec file, every run record, every journal record, and every work record
@@ -22,12 +26,19 @@ The reading: one surface projecting the model for a human, in seven views: Gloss
   crossing: record -> reading
   refuted: embedded each bullet's latest, verified and defects beside the run records they came from -> "the state stores no copy of what it derives: the latest verdicts live in the run records and nowhere else" went red in check.test.ts, the stored keys present on every bullet; restored, green (2026-09-18)
   kinds: none
-- reliance comes from complete endpoint sites: The Reliance and Structure views and query relies-on list actual file, line, symbol, endpoint, classification, syntax form when known, and test mark for references to either the chokepoint or protected thing; absent sites stay incomplete and only a present empty list confirms zero.
+- reliance comes from complete endpoint sites: Structure's chokepoint selection and query relies-on list actual file, line, symbol, endpoint, classification, syntax form when known, and test mark for references to either the chokepoint or protected thing; absent sites stay incomplete and only a present empty list confirms zero.
   over: every chokepoint invariant with no run, a legacy run, complete empty sites, protected-only sites, chokepoint-only sites, and both endpoints together
   via: reliance reads both protected and chokepoint endpoint sites, owner first, without calling a bypass a legal door reference
   because: the glossary defines reliance from references to either endpoint. Dropping protected references hides direct consumers, while calling a protected bypass a legal chokepoint reference erases the structural defect. The run's optional sites field preserves the evidence boundary: absence is legacy or unavailable, and presence means both endpoint queries completed
   crossing: record -> reading
   refuted: filtered the site list to chokepoint references alone -> the protected-only reliance assertion went red in check.test.ts; included both endpoints with their role and classification, green (2026-09-18)
+  kinds: none
+- bounded page: The page embeds a bounded window of the two stores that grow with every session, the run records and the journal, so its size does not grow with them, while every verdict it derives is the one every record derives and every record left out is counted.
+  over: every run record and journal record of a fixture grown by 2400 journal records and 360 runs, and the latest verdict of every invariant in it
+  via: the page stays bounded as the journal and the runs grow: a window of each is embedded, and every derived verdict is unchanged
+  because: defect df-d6deded9: the page over Coherence passed its 2 MB budget because it embedded every run and journal record, and both grow every session (the runs were 1.16 MB of 2.06 MB). Raising the budget would only move the day it fails. The window keeps the latest records, every open escalation, what those records point at, and every run holding some enforcement's latest entry, so no derivation changes; the whole journal is one journal command away and the agent query reads every record
+  crossing: record -> reading
+  refuted: made buildScopePage embed every run and journal record unless a window was asked for -> the bounded-page totality oracle went red naming 451606 then 1096410 bytes; restored, green (2026-09-22)
   kinds: none
 - self-contained page: The page loads nothing from outside: no external src, href, url() or @import.
   over: every src, href, url() and @import in the page
@@ -80,7 +91,7 @@ The reading: one surface projecting the model for a human, in seven views: Gloss
   crossing: record -> reading
   refuted: withheld the retirement option from the defect section in renderDefect -> "a structural defect renders its bypass sites and both honest options" went red in check.test.ts; restored, green (2026-09-17)
   kinds: none
-- deep links resolve: Every card id on every view resolves, by its prefix, to the view that renders it, and a hash naming a view alone resolves to that view.
+- deep links resolve: Every card id on every view resolves, by its prefix, to the view that renders it, a hash naming a view alone resolves to that view, and a link into the retired Reliance view or security spine lands on the map's selection that replaced it.
   over: every card id every view renders for the fixture project, and every link the Invariants view carries
   via: deep links resolve: every card id on every view resolves to that view
   because: a link into a card on another view must open that view first or it lands nowhere; one id space with a prefix per view is decided in one function, and the check walks every rendered id through it
@@ -94,19 +105,40 @@ The reading: one surface projecting the model for a human, in seven views: Gloss
   crossing: record -> reading
   refuted: made the build ignore --root, so the first adopter's tree could not be a second root -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
-- structure is the crossing projection: Structure draws entry-spec trust levels as nodes and every crossing-bearing invariant as one labelled edge in stable model order; bullets without crossings do not become edges and their count is said.
-  over: every trust level and bullet in the fixture and the first adopter, including structural defects and bullets with no crossing
-  via: Structure derives every edge in stable order, counts no-crossing invariants, and renders defects and previews deterministically
-  because: the crossing is the declared security marker and carries no topology beyond its two trust levels. A stored or hand-arranged picture could disagree with the spec; deriving coordinates and labels from the current model keeps the picture a reading
-  crossing: project-source -> reading
-  refuted: discarded the count of invariants without crossings from the Structure derivation -> the no-crossing count assertion went red in check.test.ts; restored the derived count, green (2026-09-18)
+- structure draws every component interface: Structure draws one arrow from caller to callee for every component interface, every pair of components one of which references the other's symbols in non-test code, and removes none because a path of other interfaces implies it.
+  over: every component pair the flow fixture's reading resolves, including pairs a path through another component implies, and no pair in the callee-to-caller direction
+  via: every component interface is drawn from caller to callee, and none is implied away
+  because: the owner defined the component interface as computed, never declared, so Structure is a live view of the real project and not a rotting map (d-54e128e1); an interface a path implies is still a real surface a change can widen, and the earlier rule that drew only invariant-carrying references, reduced, hid most of how work flows. Arrows point the way work goes, caller to callee (structure detail, direction)
+  crossing: record -> reading
+  refuted: drew only the load-bearing interfaces in flowOf, as the invariant-carrying edge rule did -> the totality oracle went red; restored, green (2026-09-22)
   kinds: none
-- structure and spine share one order: Query spine formats the same structureOf model the Structure SVG renders, preserving trust-level declaration order and component then invariant declaration order.
-  over: every trust level and crossing-bearing invariant in the fixture and first adopter
-  via: query spine uses the same ordered crossing model as Structure
-  because: a separate query traversal could silently reorder or omit the security spine, giving an agent and a human different readings of one spec
+- component interfaces reveal their invariants: A component interface is annotated from the invariants and never authored: the chokepoint that stands on it when a chokepoint symbol is among its symbols, that invariant's crossing, and the classes of data its crossings carry; its label reads them in that order, else names its most-referenced symbols, and never a verb.
+  over: every interface of the flow fixture, load-bearing and plain, and every line of every label
+  via: a component interface is annotated from the invariants: its chokepoint, its crossing, the data that passes; a plain one by its most-referenced symbols, never a verb
+  because: the glossary says what an interface reveals comes from the invariants; an authored relationship label rots, and the topology prototype's every arrow said consumes, which told nobody anything. Deriving the annotation from the chokepoint symbols the interface actually carries keeps load-bearing and plain honestly apart
+  crossing: record -> reading
+  refuted: stopped finding the chokepoints that stand on an interface in flowOf -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none
+- structure positions are stable: Structure's layout is a pure function of entrances and component interfaces with ties broken by name, and adding one component interface moves only the two components it joins; no position is stored.
+  over: every component of the flow fixture before and after one component interface is added
+  via: stability: adding one component interface moves only the two components it joins
+  because: the owner ruled stable positions essential (structure detail, stability): a reader who learned where things are must not lose them when one reference is added, and a diff can only show what moved if nothing else did. Each component is placed by its own column in folder order and its own share of incoming interfaces, so no other component's facts can move it
+  crossing: record -> reading
+  refuted: let every component's band depend on how many interfaces the whole map has -> the totality oracle went red naming the components that moved; restored, green (2026-09-22)
+  kinds: none
+- one selection answers each reviewer question: On the built page, each reviewer question is answered by one selection on the one map: where work enters, what a change touches and what it weakened (the comparison's place), where sensitive data goes (a trust level), what is load-bearing here (a component), and a chokepoint's reliance.
+  over: the five reviewer questions the owner named, each against the page built over the Scope fixture with a component interface reading
+  via: each reviewer question is answered by one selection on the built page
+  because: the owner's success measure for Structure (structure detail, success, one_map): the security spine and reliance stopped being a section and a view of their own so that each question is one selection on one map, and a question that took two views to answer would put the map back in pieces
+  crossing: record -> reading
+  refuted: made the change selection name nothing on the map -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none
+- structure flow and query structure share one derivation: Query structure prints the same component interfaces, labels, and rows the Structure map draws, from the one flowOf derivation.
+  over: every component interface, its label, and every row of the flow fixture
+  via: query structure prints the edge set, labels and ranks the view draws, from the same derivation
+  because: an agent and a human reading different edge sets of one project would each be told a different story about the system; one derivation read twice cannot drift
   crossing: reading -> reading
-  refuted: reversed the crossing order only in query spine -> the view/query edge-order assertion went red in query.test.ts; restored the shared structureOf order, green (2026-09-18)
+  refuted: reversed the edge order only in query structure -> the totality oracle went red; restored, green (2026-09-22)
   kinds: none
 - structure preview is ephemeral evidence: writeStructurePreview validates a proposed crossing, selects Structure, renders it dashed and unverified, and writes only outside the project root without changing specs, runs, or the inputs that determine the page.
   over: every generated preview page and proposed crossing endpoint

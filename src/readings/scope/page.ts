@@ -16,6 +16,7 @@
 import { componentOfHash, resolveHash } from "./derive.ts";
 import type { JournalKind, LifecycleState, ShellState } from "./model.ts";
 import { renderShell, renderViewResults } from "./shell.ts";
+import { flowExpanded, isFlowId } from "./structure-flow.ts";
 
 function readEmbeddedState(): ShellState {
   const node = document.getElementById("scope-state");
@@ -36,9 +37,6 @@ function setQuery(state: ShellState, value: string): void {
       return;
     case "invariants":
       state.invariants.query = value;
-      return;
-    case "reliance":
-      state.reliance.query = value;
       return;
     case "runs":
       state.runsView.query = value;
@@ -91,11 +89,24 @@ function boot(): void {
     if (target.id !== undefined) {
       const component = componentOfHash(state, target.id);
       if (component !== undefined) state.components.selected = component.folder;
-    }
+      if (isFlowId(target.id)) state.structure.selected = target.id;
+    } else if (target.view === "structure") delete state.structure.selected;
     const changed = target.view !== state.activeView;
     state.activeView = target.view;
     if (changed || target.id !== undefined) renderAll();
     if (target.id !== undefined) document.getElementById(decodeURIComponent(target.id))?.scrollIntoView();
+  };
+
+  /** Select a story in the Structure flow, or clear it when it is already selected; the hash follows so it can be linked. */
+  const selectStory = (id: string): void => {
+    if (id === "" || state.structure.selected === id) delete state.structure.selected;
+    else state.structure.selected = id;
+    history.replaceState(null, "", `#${state.structure.selected ?? "structure"}`);
+    renderResults();
+    if (state.structure.selected !== undefined) {
+      const again = root.querySelector<HTMLElement | SVGElement>(`[id="${state.structure.selected}"][data-structure-select]`);
+      again?.focus({ preventScroll: true });
+    }
   };
 
   root.addEventListener("input", (event) => {
@@ -126,6 +137,24 @@ function boot(): void {
         history.replaceState(null, "", `#${view}`);
         root.querySelector<HTMLElement>("[role=tab][aria-selected=true]")?.focus();
       }
+      return;
+    }
+
+    const expand = target.closest<Element>("[data-structure-expand]");
+    if (expand !== null) {
+      // One level of the component tree at a time: open or close this component in place.
+      const folder = expand.getAttribute("data-structure-expand") ?? "";
+      const open = flowExpanded(state);
+      if (open.has(folder)) open.delete(folder);
+      else open.add(folder);
+      state.structure.expanded = [...open].sort();
+      renderResults();
+      return;
+    }
+
+    const story = target.closest<Element>("[data-structure-select]");
+    if (story !== null) {
+      selectStory(story.getAttribute("data-structure-select") ?? "");
       return;
     }
 
@@ -160,6 +189,12 @@ function boot(): void {
 
   root.addEventListener("keydown", (event) => {
     const target = event.target;
+    if (target instanceof Element && target.hasAttribute("data-structure-select") && !(target instanceof HTMLButtonElement)) {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      selectStory(target.getAttribute("data-structure-select") ?? "");
+      return;
+    }
     if (!(target instanceof HTMLElement) || target.getAttribute("role") !== "tab") return;
     if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
     const ids = state.views.map((v) => v.id);

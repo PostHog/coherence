@@ -70,6 +70,16 @@ export function structureId(component: string, name: string): string {
   return `structure-${component === "." ? "root" : slug(component)}-${slug(name)}`;
 }
 
+/** The Structure selection of an invariant's chokepoint: every component interface it stands on, and its reliance. */
+export function flowChokepointId(component: string, name: string): string {
+  return `structure--chokepoint-${component === "." ? "root" : slug(component)}--${slug(name)}`;
+}
+
+/** The Structure selection of a trust level: the interfaces whose crossings carry that class of data. */
+export function flowLevelId(level: string): string {
+  return `structure--level-${slug(level)}`;
+}
+
 export function runId(record: RunRecord): string {
   return `run-${slug(record.at)}-${slug(shortSession(record.session))}`;
 }
@@ -87,7 +97,6 @@ const ID_PREFIXES: [string, string][] = [
   ["structure-", "structure"],
   ["component-", "components"],
   ["invariant-", "invariants"],
-  ["reliance-", "reliance"],
   ["run-", "runs"],
   ["journal-", "journal"],
   ["work-", "journal"],
@@ -107,10 +116,33 @@ export function resolveHash(state: ShellState, hash: string): HashTarget | undef
   const text = hash.startsWith("#") ? hash.slice(1) : hash;
   if (text === "") return undefined;
   if (state.views.some((v) => v.id === text)) return { view: text, id: undefined };
+  const redirected = retiredStructureLink(state, text);
+  if (redirected !== undefined) return redirected;
   for (const [prefix, view] of ID_PREFIXES) {
     if (text.startsWith(prefix)) return { view, id: text };
   }
   return undefined;
+}
+
+/**
+ * Links into the retired Reliance view and the retired security-spine section
+ * land on the one map's selection that replaced them: a reliance card, or a
+ * spine crossing of an invariant with a chokepoint, selects that chokepoint;
+ * a spine crossing with no chokepoint selects the trust level it leaves.
+ */
+function retiredStructureLink(state: ShellState, text: string): HashTarget | undefined {
+  if (text === "reliance") return { view: "structure", id: undefined };
+  const spine = text.startsWith("structure-") && !text.startsWith("structure--");
+  if (!text.startsWith("reliance-") && !spine) return undefined;
+  for (const component of state.spec.components) {
+    for (const invariant of component.invariants) {
+      if (text !== relianceId(invariant.component, invariant.name) && text !== structureId(invariant.component, invariant.name)) continue;
+      if (invariant.enforcements.some((e) => e.form === "chokepoint")) return { view: "structure", id: flowChokepointId(invariant.component, invariant.name) };
+      if (invariant.crossing !== undefined) return { view: "structure", id: flowLevelId(invariant.crossing.from) };
+      return { view: "invariants", id: invariantId(invariant.component, invariant.name) };
+    }
+  }
+  return text.startsWith("reliance-") ? { view: "structure", id: undefined } : undefined;
 }
 
 /** The component a hash names, when it names one. */
@@ -426,6 +458,47 @@ export function structureOf(state: ShellState, preview: readonly StructurePrevie
     edges,
     invariantsWithoutCrossing: invariants.filter((invariant) => invariant.crossing === undefined).length,
   };
+}
+
+/* -------------------------------------------------------------- window */
+
+/** How many of the latest run records a page embeds, beyond those that hold a latest entry. */
+export const RUN_WINDOW = 12;
+/** How many of the latest journal records a page embeds, beyond open escalations and what they point at. */
+export const JOURNAL_WINDOW = 150;
+
+/**
+ * The run records a page embeds: the latest `keep`, and every run that holds
+ * the latest entry of some enforcement, in their original order. Every
+ * derivation over runs (the latest verdict, what the latest run kept from an
+ * earlier one) reads the last entry per enforcement, so it is the same over
+ * the window as over every record; only the count of the rest is carried.
+ */
+export function windowRuns(records: readonly RunRecord[], keep: number = RUN_WINDOW): { records: RunRecord[]; omitted: number } {
+  const holders = new Map<string, number>();
+  records.forEach((record, index) => {
+    for (const entry of record.invariants) holders.set(entryKey(entry.component, entry.name, entry.form), index);
+  });
+  const kept = new Set(holders.values());
+  for (let index = Math.max(0, records.length - keep); index < records.length; index++) kept.add(index);
+  const window = records.filter((_, index) => kept.has(index));
+  return { records: window, omitted: records.length - window.length };
+}
+
+/**
+ * The journal records a page embeds: the latest `keep`, every open
+ * escalation, and every record one of those points at (so a retraction or a
+ * close can name what it answers), in their original order.
+ */
+export function windowJournal(records: readonly JournalRecord[], keep: number = JOURNAL_WINDOW): { records: JournalRecord[]; omitted: number } {
+  const kept = new Set<string>(records.slice(Math.max(0, records.length - keep)).map((record) => record.id));
+  for (const escalation of openEscalations(records)) kept.add(escalation.id);
+  for (const record of records) {
+    const of = kept.has(record.id) ? pointsAt(record) : null;
+    if (of !== null) kept.add(of);
+  }
+  const window = records.filter((record) => kept.has(record.id));
+  return { records: window, omitted: records.length - window.length };
 }
 
 /* ------------------------------------------------------------- journal */

@@ -14,7 +14,7 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { parseSpec, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
+import { parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type Latest } from "../enforcement/record.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
@@ -49,9 +49,18 @@ export interface Component {
   specPath: string;
   intent: string;
   trustLevels: TrustLevel[] | undefined;
+  /** Where work enters through this component, as its spec declares; each handler was found declared in the code. */
+  entrances: ModelEntrance[];
   invariants: ModelInvariant[];
   parent: string | undefined;
   children: string[];
+}
+
+export interface ModelEntrance extends Entrance {
+  /** The folder of the component whose spec declares it. */
+  component: string;
+  /** The project-relative file whose top level declares the handler, when one was found. */
+  file: string | undefined;
 }
 
 export interface Counts {
@@ -221,12 +230,22 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       );
       invariants.push({ ...invariant, component: folder, applicable, missingShapes, state, lacks, latest: entries, verified, defects });
     }
+    const entrances: ModelEntrance[] = parsed.entrances.map((entrance) => {
+      if (entrance.handler === undefined || entrance.handler === "") return { ...entrance, component: folder, file: undefined };
+      const found = handlerFile(root, folder, entrance.handler, config.ignore);
+      if (typeof found !== "string") {
+        problems.push({ file: specPath, line: entrance.handlerLine, message: `entrance ${entrance.name}: ${found.reason}` });
+        return { ...entrance, component: folder, file: undefined };
+      }
+      return { ...entrance, component: folder, file: found };
+    });
     components.push({
       folder,
       name: parsed.title ?? basename(folder === "." ? root : folder),
       specPath,
       intent: parsed.intent ?? "",
       trustLevels: parsed.trustLevels,
+      entrances,
       invariants,
       parent: parentOf(folder, folders),
       children: [],
@@ -241,6 +260,61 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
 
   const counts = countModel(components, problems);
   return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs };
+}
+
+const HANDLER = /^([A-Za-z_$][\w$]*)(?:\s+in\s+(\S+))?$/;
+const SOURCE = /\.(?:[cm]?[jt]sx?|py)$/;
+
+/** Whether a source text declares the name at its top level (TypeScript, JavaScript, or Python). */
+function declaresAtTop(text: string, name: string): boolean {
+  const escaped = name.replace(/\$/g, "\\$");
+  const typescript = new RegExp(`^(?:export\\s+)?(?:default\\s+)?(?:declare\\s+)?(?:abstract\\s+)?(?:async\\s+)?(?:function\\*?|const|let|var|class|interface|type|enum|namespace)\\s+${escaped}\\b`, "m");
+  const python = new RegExp(`^(?:async\\s+)?(?:def|class)\\s+${escaped}\\b|^${escaped}\\s*(?::[^=\\n]+)?=`, "m");
+  return typescript.test(text) || python.test(text);
+}
+
+/** Source files under a folder, sorted, never into the folders no walk enters. */
+function sourcesUnder(root: string, folder: string, ignore: readonly string[]): string[] {
+  const skip = new Set([...EXCLUDED_FOLDERS, ...ignore]);
+  const found: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (!skip.has(entry.name) && !skip.has(relative(root, path))) walk(path);
+      } else if (entry.isFile() && SOURCE.test(entry.name)) found.push(relative(root, path).split(sep).join("/"));
+    }
+  };
+  walk(resolve(root, folder));
+  return found;
+}
+
+/**
+ * The file whose top level declares an entrance's handler, or why none does.
+ * `name in file` reads the file relative to the component, then to the root;
+ * a bare name searches the component's own source. This is the spec's own
+ * check that the handler exists; the language adapter resolves it again at
+ * the reading, where reachability is known.
+ */
+function handlerFile(root: string, folder: string, handler: string, ignore: readonly string[]): string | { reason: string } {
+  const parsed = HANDLER.exec(handler.trim());
+  if (parsed === null) return { reason: `handler "${handler}" reads <symbol> or <symbol> in <file>` };
+  const [, name, file] = parsed as unknown as [string, string, string | undefined];
+  const candidates =
+    file === undefined
+      ? sourcesUnder(root, folder, ignore)
+      : [folder === "." ? file : `${folder}/${file}`, file].filter((path, index, all) => all.indexOf(path) === index && !path.split("/").includes(".."));
+  for (const candidate of candidates) {
+    const path = resolve(root, candidate);
+    if (!existsSync(path) || !statSync(path).isFile()) continue;
+    if (declaresAtTop(readFileSync(path, "utf8"), name)) return candidate;
+  }
+  return {
+    reason:
+      file === undefined
+        ? `handler ${name} is declared at the top level of no source file under ${folder}`
+        : `handler ${name} is not declared at the top level of ${file} (read under ${folder} and under the root)`,
+  };
 }
 
 function countModel(components: Component[], problems: Problem[]): Counts {

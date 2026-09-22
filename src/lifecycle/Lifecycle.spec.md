@@ -2,6 +2,20 @@
 
 The gyroscope delivered through harness events: orient at start, regulate at stop, the glossary injected and checked.
 
+## entrances
+- SessionStart: the agent host starts a session; orient injects the vocabulary, the project's standing, and the session's work order
+  handler: runHook in hook.ts
+- SubagentStart: the agent host starts a subagent; it is oriented as a session is
+  handler: runHook in hook.ts
+- UserPromptSubmit: a human sends a prompt; the peer feed injects what peers recorded since the last look
+  handler: runHook in hook.ts
+- PostToolUse: a tool finished; the edit is checked, the read trace recorded, and the peer feed and vocabulary changes injected
+  handler: runHook in hook.ts
+- Stop: the session is about to stop; regulate reports what it owes
+  handler: runHook in hook.ts
+- SubagentStop: a subagent is about to stop; regulate refuses the stop while it owes what the tool can prove
+  handler: runHook in hook.ts
+
 ## invariants
 - compact injection: The injection at session start carries the vocabulary only: nothing from detail, provenance, or metaphors.
   over: every concept of both glossary layers

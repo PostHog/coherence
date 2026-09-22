@@ -32,8 +32,10 @@ import { glossaryCoverage } from "../../lifecycle/glossary-coverage.ts";
 import { COHERENCE_GLOSSARY, projectGlossaryPath } from "../../lifecycle/project.ts";
 import { loadSpecModel } from "../../spec/model.ts";
 import { projectGlossaryCoverage } from "./glossary-projection.ts";
+import { windowJournal, windowRuns } from "./derive.ts";
 import { escapeHtml } from "./html.ts";
-import { parseGlossary, type Glossary, type Ladder, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
+import { readComponentInterfaces } from "./component-interfaces.ts";
+import { parseGlossary, type Glossary, type InterfaceReading, type Ladder, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
 import { VIEWS } from "./shell.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -47,11 +49,12 @@ const BROWSER_SOURCES = [
   "html.ts",
   "model.ts",
   "derive.ts",
+  "structure-flow.ts",
   "glossary-view.ts",
   "components-view.ts",
+  "structure-flow-view.ts",
   "structure-view.ts",
   "invariants-view.ts",
-  "reliance-view.ts",
   "runs-view.ts",
   "journal-view.ts",
   "shell.ts",
@@ -71,6 +74,10 @@ export interface BuildOptions {
   project: string;
   /** Ephemeral proposed crossings embedded only in this generated page. */
   structurePreview?: readonly StructurePreview[];
+  /** False keeps every run and journal record in the state; the agent query reads them all. A page embeds a bounded window (default). */
+  window?: boolean;
+  /** The component interfaces as the language adapter read them (readComponentInterfaces); unread when absent. */
+  componentInterfaces?: InterfaceReading;
 }
 
 export const DEFAULTS = {
@@ -235,12 +242,29 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
     spec,
     runs: { records: runs.records, damaged: runs.damaged },
     journal: { records: journal.records, damaged: journal.damaged, work: loadWork(root) },
+    componentInterfaces: options.componentInterfaces ?? { kind: "unread", because: "no instrument was asked when this page was built" },
     components: { query: "" },
     structure: { preview: options.structurePreview === undefined ? [] : options.structurePreview.map((proposal) => ({ ...proposal, crossing: { ...proposal.crossing }, ...(proposal.chokepoints === undefined ? {} : { chokepoints: proposal.chokepoints.map((entry) => ({ ...entry })) }) })) },
     invariants: { query: "", state: "", component: "" },
-    reliance: { query: "" },
     runsView: { query: "" },
     journalView: { query: "", kind: "", agent: "", session: "" },
+  };
+}
+
+/**
+ * The state a page embeds: every store whole except the two that grow with
+ * every session, the run records and the journal, which are bounded windows
+ * that keep every derivation the views make exact (see windowRuns and
+ * windowJournal) and carry the count of what they leave out. The agent query
+ * builds without the window, so its answers read every record.
+ */
+function windowed(state: ShellState): ShellState {
+  const runs = windowRuns(state.runs.records);
+  const journal = windowJournal(state.journal.records);
+  return {
+    ...state,
+    runs: { ...state.runs, records: runs.records, ...(runs.omitted === 0 ? {} : { omitted: runs.omitted }) },
+    journal: { ...state.journal, records: journal.records, ...(journal.omitted === 0 ? {} : { omitted: journal.omitted }) },
   };
 }
 
@@ -284,7 +308,8 @@ function embedJson(value: unknown): string {
 
 /** Render the page document around the state. Deterministic for the same inputs. */
 export async function buildScopePage(options: BuildOptions): Promise<{ html: string; state: ShellState }> {
-  const state = await loadState(options);
+  const loaded = await loadState(options);
+  const state = options.window === false ? loaded : windowed(loaded);
   const css = await readFile(resolve(here, "styles.css"), "utf8");
   const script = await browserScript();
   const title = `${options.project} Scope`;
@@ -359,6 +384,7 @@ async function main(argv: string[]): Promise<void> {
       "domain-title": { type: "string" },
       project: { type: "string" },
       out: { type: "string", default: DEFAULTS.outPath },
+      "no-interfaces": { type: "boolean", default: false },
     },
   });
   const root = values.root === undefined ? process.cwd() : resolve(values.root);
@@ -367,6 +393,8 @@ async function main(argv: string[]): Promise<void> {
     glossaryPath: values.glossary ?? (values.root === undefined ? DEFAULTS.glossaryPath : COHERENCE_GLOSSARY),
     project: values.project ?? (values.root === undefined ? DEFAULTS.project : projectNameOf(root)),
   };
+  // Structure reads every component interface through the language adapter; --no-interfaces builds without the instrument.
+  if (values["no-interfaces"] !== true) options.componentInterfaces = await readComponentInterfaces(root);
   if (values.domain !== undefined) options.domainPath = values.domain;
   if (values["domain-title"] !== undefined) options.domainTitle = values["domain-title"];
   const { bytes, state } = await writeScopePage(options, values.out);

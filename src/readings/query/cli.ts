@@ -19,6 +19,7 @@ import { formatClosure, type Closure } from "../../economy/closure.ts";
 import { glossaryCoverage } from "../../lifecycle/glossary-coverage.ts";
 import { COHERENCE_GLOSSARY } from "../../lifecycle/project.ts";
 import { buildScopePage } from "../scope/build.ts";
+import { readComponentInterfaces } from "../scope/component-interfaces.ts";
 import { answer, answerGlossary, QUERY_USAGE } from "./query.ts";
 
 export { QUERY_USAGE };
@@ -28,6 +29,8 @@ export interface QueryDependencies {
   economy: (root: string, paths: readonly string[]) => Promise<Closure>;
   /** Injectable so the full-reading route can be proved without constructing a giant fixture tree. */
   glossary?: typeof glossaryCoverage;
+  /** Injectable so the Structure question can be answered without an instrument. */
+  interfaces?: typeof readComponentInterfaces;
 }
 
 export const QUERY_DEPENDENCIES: QueryDependencies = { economy: economyFor };
@@ -87,7 +90,15 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
     else io.err(result.text);
     return result.code;
   }
-  const { state } = await buildScopePage({ root, glossaryPath: COHERENCE_GLOSSARY, project: basename(root) });
+  // The page embeds a bounded window of runs and journal records; an answer reads every one.
+  const { state } = await buildScopePage({
+    root,
+    glossaryPath: COHERENCE_GLOSSARY,
+    project: basename(root),
+    window: false,
+    // Only the Structure question needs every component interface, read through the language adapter.
+    ...(question === "structure" ? { componentInterfaces: await (deps.interfaces ?? readComponentInterfaces)(root) } : {}),
+  });
   const result = answer(state, question, args, { session: parsed.session });
   if (result.code === 0) io.out(result.text);
   else io.err(result.text);

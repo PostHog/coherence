@@ -234,6 +234,18 @@ export interface SpecInvariant {
    */
 }
 
+/** Where work enters the system through a component, as its spec declares it. */
+export interface SpecEntrance {
+  name: string;
+  meaning: string;
+  handler: string | undefined;
+  line: number;
+  handlerLine: number;
+  component: string;
+  /** The file whose top level declares the handler, as the spec model found it. */
+  file: string | undefined;
+}
+
 export interface SpecComponent {
   /** Relative to the root, with "." for the root itself. */
   folder: string;
@@ -241,6 +253,7 @@ export interface SpecComponent {
   specPath: string;
   intent: string;
   trustLevels: TrustLevel[] | undefined;
+  entrances: SpecEntrance[];
   invariants: SpecInvariant[];
   parent: string | undefined;
   children: string[];
@@ -294,9 +307,16 @@ export interface Damaged {
 }
 
 export interface RunsData {
-  /** Oldest first, as the loader orders them. */
+  /** Oldest first, as the loader orders them. On a page, a bounded window of them (see `omitted`). */
   records: RunRecord[];
   damaged: Damaged[];
+  /**
+   * How many older run records the page does not embed. The window keeps the
+   * latest runs and every run that holds some enforcement's latest entry, so
+   * every verdict derived from `records` is the one derived from all of them.
+   * Absent when nothing was left out.
+   */
+  omitted?: number;
 }
 
 /* The journal, as src/journal records it. */
@@ -358,10 +378,17 @@ export type WorkData =
   | { kind: "absent"; because: string };
 
 export interface JournalData {
-  /** Oldest first, as the loader orders them. */
+  /** Oldest first, as the loader orders them. On a page, a bounded window of them (see `omitted`). */
   records: JournalRecord[];
   damaged: Damaged[];
   work: WorkData;
+  /**
+   * How many records the page does not embed. The window keeps the latest
+   * records, every open escalation, and every record a kept record points
+   * at; the whole journal is one `journal` command away. Absent when nothing
+   * was left out.
+   */
+  omitted?: number;
 }
 
 /* The reader's state per view: a query and, where the view filters, the filter. */
@@ -380,9 +407,50 @@ export interface InvariantsViewState {
   component: string;
 }
 
-export interface RelianceViewState {
-  query: string;
+/**
+ * One symbol a component interface carries: declared at the top level of a
+ * file in `to`, and referenced from non-test code in `from`, as the language
+ * adapter resolved it. A component interface is every such symbol for one
+ * ordered pair of components.
+ */
+export interface InterfaceSymbol {
+  from: string;
+  to: string;
+  symbol: string;
+  /** The project-relative file whose top level declares the symbol. */
+  file: string;
+  /** How many non-test reference sites in `from` resolve to it. */
+  sites: number;
 }
+
+/** An entrance's handler as the language adapter resolved it. */
+export interface EntranceResolution {
+  component: string;
+  name: string;
+  /** The project-relative file of the handler's definition, when it resolved. */
+  file?: string;
+  /** Why it did not resolve, when it did not. */
+  reason?: string;
+}
+
+/**
+ * The reading of every component interface, taken through the language
+ * adapter when the page was built. `unread` when no instrument was asked (a
+ * test, a preview) or none answered; Structure then reads only the references
+ * the latest runs recorded and says so. The shape is what a run could record
+ * per commit, which is how two states become comparable.
+ */
+export type InterfaceReading =
+  | {
+      kind: "read";
+      language: string;
+      declarations: number;
+      symbols: InterfaceSymbol[];
+      entrances: EntranceResolution[];
+      /** Non-test source under no component's folder: code no spec owns, shown as its own mass. */
+      unowned: { files: number; lines: number };
+    }
+  | { kind: "unread"; because: string };
 
 /** One proposed crossing added to an ephemeral Structure page, never to the spec model. */
 export interface StructurePreview {
@@ -392,9 +460,13 @@ export interface StructurePreview {
   chokepoints?: { chokepoint: string; protects: string }[];
 }
 
-/** Structure has no filters; only an optional generated-page preview. */
+/** Structure has no filters: an optional generated-page preview, and what the reader selected in the flow. */
 export interface StructureViewState {
   preview: StructurePreview[];
+  /** A flow id (an entrance, a trust level, a component, a component interface, a chokepoint) whose story is lit. Absent until the reader selects one. */
+  selected?: string;
+  /** Component folders opened in place, one level of the tree at a time. Absent: the top level is open. */
+  expanded?: string[];
 }
 
 export interface RunsViewState {
@@ -417,10 +489,11 @@ export interface ShellState {
   spec: SpecData;
   runs: RunsData;
   journal: JournalData;
+  /** Every component interface, as the language adapter resolved the references when the page was built. */
+  componentInterfaces: InterfaceReading;
   components: ComponentsViewState;
   structure: StructureViewState;
   invariants: InvariantsViewState;
-  reliance: RelianceViewState;
   runsView: RunsViewState;
   journalView: JournalViewState;
 }
