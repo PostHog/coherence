@@ -26,11 +26,11 @@ import { answer, answerStructure } from "../query/query.ts";
 import { buildScopePage } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
-import { flowChokepointId, flowLevelId, relianceId, resolveHash, structureId } from "./derive.ts";
-import type { InterfaceReading, InterfaceSymbol, RecordedSite, RunEntry, ShellState, SpecComponent, SpecEntrance, SpecInvariant } from "./model.ts";
+import { allInvariants, flowChokepointId, flowLevelId, relianceId, resolveHash, structureId } from "./derive.ts";
+import type { InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, RunEntry, ShellState, SpecComponent, SpecEntrance, SpecInvariant } from "./model.ts";
 import { renderView } from "./shell.ts";
-import { CORE_RULE, FLOW_CHANGE_ID, FLOW_NONE_ID, compareFlows, flowDefaultSelection, flowEdgeId, flowEntranceId, flowKeyAction, flowLabelLines, flowNodeId, flowOf, flowSelected, flowSelection, type FlowModel } from "./structure-flow.ts";
-import { flowLayout, renderFlowSvg } from "./structure-flow-view.ts";
+import { CORE_RULE, FLOW_CHANGE_ID, FLOW_HEALTH_KINDS, FLOW_NONE_ID, compareFlows, flowBrokenId, flowHealthId, flowHealthMembers, flowDefaultSelection, flowEdgeId, flowEntranceId, flowKeyAction, flowLabelLines, flowNodeId, flowOf, flowSelected, flowSelection, type FlowModel } from "./structure-flow.ts";
+import { FLOW_NEUTRAL_ROUTE, FLOW_ROUTE_COLORS, flowLayout, renderFlowSvg, whiteContrast } from "./structure-flow-view.ts";
 import { measureSvg, textWidth } from "./structure-measure.ts";
 
 let fixture: Fixture;
@@ -253,7 +253,7 @@ test("the map's type is a product UI scale: one system family, three sizes, two 
     }
   }
   assert.deepEqual([...sizes].sort(), ["11", "12", "13"], "three sizes: 13 for a component's name, 12 for the caption, 11 for folders, column captions, rails and tokens");
-  assert.deepEqual([...weights].sort(), ["400", "600"], "regular and semibold, nothing bolder");
+  assert.deepEqual([...weights].sort(), ["400", "500"], "regular and medium on the canvas: the owner found semibold too heavy there");
   const style = /<style>([^]*?)<\/style>/.exec(renderFlowSvg(flowOf(projectState()), undefined).text)![1]!;
   assert.match(style, /\.flow-svg text \{ font-family: system-ui, -apple-system/, "the map is set in the page's system family");
   assert.doesNotMatch(style, /text-transform|letter-spacing|font-style: italic|font-weight: 700/, "no capitals, tracking, italics or heavy weight on the map");
@@ -469,24 +469,24 @@ test("a derived route is named via the first component it reaches, and marked de
     const via = model.nodes.find((n) => n.folder === route.stops[1])!;
     assert.deepEqual(route.names, [`via ${via.name}`]);
     assert.match(svg, new RegExp(`<g class="flow-route-group[^"]*" id="${route.id}"[^>]*data-derived="true"`), `${route.id} is marked derived on the map`);
-    assert.deepEqual(terminusLines(svg, route.id).map((l) => l.text), [`via ${via.name}`, "derived"], "the terminus says derived in words, not only by a mark");
+    assert.deepEqual(terminusLines(svg, route.id).map((l) => l.text), [`via ${via.name}`, "reference weight"], "the terminus says it is reference weight in words, not only by a mark");
   }
   for (const route of flowOf(projectState()).routes) assert.equal(route.derived, false, "a route an entrance starts is not derived");
 });
 
-/** The busiest entrance's route, by the rule's own words: the most components reached, ties by name. */
+/** The busiest route, by the rule's own words: the most reference sites along its component interfaces, then the most entrances, then by name. */
 function busiest(model: FlowModel): string | undefined {
-  const candidates = model.routes.flatMap((route) => (route.derived ? [{ name: route.names[0]!, route }] : route.entrances.map((id) => ({ name: model.entrances.find((e) => e.id === id)!.name, route }))));
-  candidates.sort((a, b) => b.route.stops.length + (b.route.rail === undefined ? 0 : 1) - (a.route.stops.length + (a.route.rail === undefined ? 0 : 1)) || a.name.localeCompare(b.name));
-  return candidates[0]?.route.id;
+  const sites = (route: FlowModel["routes"][number]): number => route.edges.reduce((sum, id) => sum + model.edges.find((e) => e.id === id)!.sites, 0);
+  return [...model.routes].sort((a, b) => sites(b) - sites(a) || b.entrances.length - a.entrances.length || a.names[0]!.localeCompare(b.names[0]!))[0]?.id;
 }
 
-test("the map opens on the busiest entrance's route, every other route muted; clearing mutes them all; a deep link selects anything", () => {
+test("the map opens on the busiest route, every other route muted; clearing mutes them all; a deep link selects anything", () => {
   for (const state of [projectState(), crowdedState(), sharedState(), derivedState()]) {
     const model = flowOf(state);
     const expected = busiest(model);
     assert.ok(expected !== undefined);
-    assert.equal(flowDefaultSelection(model), expected, "the default is the busiest entrance's route");
+    assert.equal(flowDefaultSelection(model), expected, "the default is the busiest route");
+    assert.match(renderView(state, "structure").text, /The map opens on the busiest route: the most reference sites along its component interfaces/, "the key states the rule");
     delete state.structure.selected;
     const opened = renderView(state, "structure").text;
     assert.match(opened, new RegExp(`data-selected="${expected}"`), "the page opens on that story");
@@ -553,7 +553,7 @@ test("activating an interface identifier selects it and opens the inspector with
   const model = flowOf(state);
   const writer = model.identifiers.find((i) => i.name === "single writer")!;
   const svg = renderFlowSvg(model, undefined).text;
-  const target = new RegExp(`<g class="flow-tag[^"]*" data-edge="${flowEdgeId("src/core", "src/store")}" data-identifier="${writer.text}" data-structure-select="${writer.chokepoint}" role="button" tabindex="0" aria-label="${writer.text}: single writer"`);
+  const target = new RegExp(`<g class="flow-tag[^"]*" data-edge="${flowEdgeId("src/core", "src/store")}" data-identifier="${writer.text}" data-state="verified" data-structure-select="${writer.chokepoint}" role="button" tabindex="0" aria-label="${writer.text}: single writer, verified 2026-09-20"`);
   assert.match(svg, target, "the identifier is its own button, named for its invariant");
   assert.deepEqual(flowKeyAction({ key: "Enter", select: writer.chokepoint, button: false }), { select: writer.chokepoint }, "Enter activates it");
   assert.deepEqual(flowKeyAction({ key: " ", select: writer.chokepoint, button: false }), { select: writer.chokepoint }, "Space activates it");
@@ -613,14 +613,14 @@ test("at desktop width the inspector stands beside the canvas and never covers i
   const desktop = block(/@media \(min-width: 64rem\)/);
   assert.match(desktop, /\.flow-stage\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) [\d.]+rem/, "two columns: the canvas, then the inspector");
   assert.match(desktop, /\.flow-inspector\s*\{[^}]*grid-column:\s*2/, "the inspector has its own column");
-  assert.match(desktop, /\.flow-canvas\s*\{[^}]*grid-column:\s*1/, "the canvas has the other");
+  assert.match(desktop, /\.flow-map\s*\{[^}]*grid-column:\s*1/, "the map (its health strip and canvas) has the other");
   const phone = block(/@media \(max-width: 63\.99rem\)/);
-  assert.match(phone, /\.flow-inspector\[data-open="true"\]\s*\{[^}]*position:\s*fixed[^}]*bottom:\s*0/, "below desktop width an open inspector is a sheet over the bottom of the screen");
+  assert.match(phone, /\.flow-inspector\[data-open="true"\]:not\(\[data-default="true"\]\)\s*\{[^}]*position:\s*fixed[^}]*bottom:\s*0/, "below desktop width an inspector the reader opened is a sheet over the bottom of the screen; the default story's never is");
   const outside = css.replace(desktop, "").replace(phone, "");
   assert.doesNotMatch(outside, /\.flow-inspector[^{]*\{[^}]*position:\s*(fixed|absolute)/, "nowhere else does the inspector float over the map");
   assert.doesNotMatch(desktop, /\.flow-inspector[^{]*\{[^}]*position:\s*(fixed|absolute)/, "at desktop width it never floats");
   const page = renderView(projectState(), "structure").text;
-  assert.match(page, /<div class="flow-stage">\s*<div class="flow-canvas"[^]*<\/svg><\/div>\s*<aside class="flow-inspector"/, "the canvas and the inspector are siblings in the stage");
+  assert.match(page, /<div class="flow-stage">\s*<div class="flow-map">[^]*<div class="flow-canvas"[^]*<\/svg><\/div>\s*<\/div>\s*<aside class="flow-inspector"/, "the map and the inspector are siblings in the stage");
 });
 
 test("selecting an entrance lights its structural route and dims the rest", () => {
@@ -671,7 +671,7 @@ test("every chokepoint and crossing on a drawn interface wears its interface ide
     }
   }
   const lit = renderFlowSvg(model, flowLevelId("outside")).text;
-  assert.match(lit, new RegExp(`<g class="flow-tag is-lit" data-edge="${flowEdgeId("src/core", "src/store")}"`), "selecting a trust level lights its boundary crossings");
+  assert.match(lit, new RegExp(`<g class="flow-tag [^"]*\\bis-lit\\b[^"]*" data-edge="${flowEdgeId("src/core", "src/store")}"`), "selecting a trust level lights its boundary crossings");
 });
 
 test("selecting a trust level lights the path its data takes; selecting a chokepoint lights where it stands and lists its reliance", () => {
@@ -685,8 +685,8 @@ test("selecting a trust level lights the path its data takes; selecting a chokep
   assert.deepEqual([...inside.edges].sort(), [flowEdgeId("src/core", "src/journal"), flowEdgeId("src/core", "src/store"), flowEdgeId("src/store", "src/journal")].sort(), "every interface whose crossing touches inside");
   state.structure.selected = flowLevelId("record");
   const record = renderView(state, "structure").text;
-  assert.match(record, /<g class="flow-tag is-lit" data-rail="src\/journal" data-identifier="X2"/, "the boundary crossing on the stubs to the journal lights, on its rail");
-  assert.match(record, new RegExp(`<g class="flow-tag is-dim" data-edge="${flowEdgeId("src/core", "src/store")}"`), "a crossing that does not carry record dims");
+  assert.match(record, /<g class="flow-tag [^"]*\bis-lit\b[^"]*" data-rail="src\/journal" data-identifier="X2"/, "the boundary crossing on the stubs to the journal lights, on its rail");
+  assert.match(record, new RegExp(`<g class="flow-tag [^"]*\\bis-dim\\b[^"]*" data-edge="${flowEdgeId("src/core", "src/store")}"`), "a crossing that does not carry record dims");
   const writer = flowChokepointId("src/store", "single writer");
   assert.deepEqual([...flowSelection(model, writer).edges], [flowEdgeId("src/core", "src/store")]);
   state.structure.selected = writer;
@@ -731,10 +731,10 @@ test("query structure prints the routes, core dependencies and interface identif
     const queriedIds = section(/^interface identifiers/).flatMap((line) => {
       const [text, , ...rest] = line.split(/ {2}/);
       const on = rest[rest.length - 1]!.replace(/^on /, "").split(", ");
-      return on.map((pair) => `${text} ${pair}`);
+      return on.filter((pair) => pair.includes(" -> ")).map((pair) => `${text} ${pair}`);
     }).sort();
     const model = flowOf(state);
-    const drawnIds = [...svg.matchAll(/<g class="flow-tag[^"]*" (?:data-edge="([^"]+)"|data-rail="[^"]+") data-identifier="([CX]\d+)"(?: data-edges="([^"]+)")?/g)].flatMap((m) =>
+    const drawnIds = [...svg.matchAll(/<g class="flow-tag[^"]*" (?:data-edge="([^"]+)"|data-rail="[^"]+") data-identifier="([CX]\d+)" data-state="[a-z]+"(?: data-edges="([^"]+)")?/g)].flatMap((m) =>
       (m[1] !== undefined ? [m[1]] : m[3]!.split(" ")).map((id) => {
         const edge = model.edges.find((e) => e.id === id)!;
         return `${m[2]} ${edge.from} -> ${edge.to}`;
@@ -863,8 +863,231 @@ test("the language adapter reads component interfaces from resolved references, 
       return;
     }
     assert.deepEqual(read.symbols.map((s) => `${s.from} -> ${s.to} ${s.symbol} ${s.file} ${s.sites}`), ["src/api -> src/store write src/store/rows.ts 3"], "import and two uses; the test file and the store's own use are not an interface");
-    assert.deepEqual(read.entrances, [{ component: ".", name: "go", file: "src/api/api.ts" }]);
+    assert.deepEqual(read.entrances, [{ component: ".", name: "go", file: "src/api/api.ts", reach: [{ from: "src/api", to: "src/store", symbol: "write", file: "src/store/rows.ts", sites: 2 }] }], "the handler's reach: its two calls into the store, not the import, which no declaration encloses");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+/* ------------------------------------------------ health, trust, routes, inspector (the 2026-09-22 review) */
+
+/** The flow fixture with every state: the journal's append a requirement, the store's writer a structural defect bypassed from the reader, and one crossing on an invariant with only a totality oracle. */
+function healthState(): ShellState {
+  const state = projectState({ states: { "append-only store": "requirement", "single writer": "structural defect" }, bypasses: { "single writer": [{ file: "src/reader/look.ts", line: 9, symbol: "peek" }, { file: "src/store/inner.ts", line: 4, symbol: "raw" }] } });
+  const core = state.spec.components.find((c) => c.folder === "src/core")!;
+  core.invariants.push({ ...core.invariants[0]!, name: "rows stay typed", sentence: "rows stay typed.", enforcements: [{ form: "totality oracle", over: "every row", via: "rows stay typed", line: 9 }] as SpecInvariant["enforcements"], crossing: { from: "outside", to: "record", line: 10 }, state: "invariant" });
+  return state;
+}
+
+test("the health strip counts are the spec model's, each a selection whose inspector lists its set", async () => {
+  const { state } = await buildScopePage({ root: fixture.root, glossaryPath: COHERENCE_GLOSSARY, project: "Fixture" });
+  state.activeView = "structure";
+  const model = flowOf(state);
+  const page = renderView(state, "structure").text;
+  const count = (kind: string): number => Number(new RegExp(`data-health="${kind}" data-count="(\\d+)"`).exec(page)![1]);
+  assert.equal(count("verified"), state.spec.counts.invariants, "enforced and verified: the spec model's invariants");
+  assert.equal(count("requirements"), state.spec.counts.requirements, "requirements: the spec model's");
+  assert.equal(count("defects"), state.spec.counts.structuralDefects, "structural defects: the spec model's");
+  for (const kind of FLOW_HEALTH_KINDS.filter((k) => k !== "escalations")) {
+    const members = flowHealthMembers(model, kind);
+    const inspector = renderView({ ...state, structure: { ...state.structure, selected: flowHealthId(kind) } }, "structure").text;
+    assert.match(inspector, new RegExp(`data-kind="health" data-health="${kind}"`), `${kind} opens its inspector`);
+    for (const member of members) assert.ok(inspector.includes(`data-invariant="${member.name.replace(/"/g, "&quot;")}"`), `${kind} lists ${member.name}`);
+  }
+  // Nothing enforced says so on the map, not in grey header text.
+  const none = healthState();
+  for (const c of none.spec.components) for (const i of c.invariants) i.state = "requirement";
+  none.runs.records = [];
+  assert.match(renderView(none, "structure").text, /data-field="nothing-enforced">Nothing is enforced yet/);
+});
+
+test("every identifier and every component is drawn in its invariant's state: solid verified, outlined requirement, red broken", () => {
+  const state = healthState();
+  const model = flowOf(state);
+  const svg = renderFlowSvg(model, undefined).text;
+  const drawn = [...svg.matchAll(/data-identifier="([CX]\d+)" data-state="([a-z]+)"/g)].map((m) => [m[1]!, m[2]!] as const);
+  assert.ok(drawn.length > 0);
+  for (const [text, drawnState] of drawn) {
+    const identifier = model.identifiers.find((i) => i.text === text)!;
+    assert.equal(drawnState, identifier.verdict.state, `${text} is drawn ${identifier.verdict.state}`);
+    assert.match(svg, new RegExp(`<g class="flow-tag flow-tag-${drawnState}[^"]*"[^>]*data-identifier="${text}"`), `${text} wears the ${drawnState} style`);
+  }
+  assert.deepEqual([...new Set(drawn.map(([, s]) => s))].sort(), ["broken", "requirement", "verified"], "the fixture shows all three");
+  const style = /<style>([^]*?)<\/style>/.exec(svg)![1]!;
+  assert.match(style, /\.flow-tag-verified rect \{ fill: var\(--flow-verified\)/, "verified is solid");
+  assert.match(style, /\.flow-tag-requirement rect \{[^}]*stroke-dasharray/, "a requirement is outlined, dashed");
+  assert.match(style, /\.flow-tag-broken rect \{ fill: var\(--flow-defect\)/, "broken is red");
+  for (const node of model.nodes.filter((n) => !n.core && n.state !== undefined)) {
+    assert.match(svg, new RegExp(`id="${node.id}"[^>]*data-state="${node.state}"[^]*?data-state-bar="${node.state}"`), `${node.folder} carries its worst verdict, ${node.state}, as a drawn bar`);
+  }
+});
+
+test("a component with a broken chokepoint carries a broken mark on its box that lists every bypass site, inside ones named as inside", () => {
+  const state = healthState();
+  const model = flowOf(state);
+  const store = model.nodes.find((n) => n.folder === "src/store")!;
+  const layout = flowLayout(model);
+  const mark = layout.tags.find((t) => t.kind === "broken" && t.node === "src/store");
+  assert.ok(mark !== undefined, "the store's broken mark is drawn");
+  const station = layout.stations.get("src/store")!;
+  const touches = mark.box.x <= station.x + station.w + 0.5 && mark.box.x + mark.box.w >= station.x - 0.5 && mark.box.y <= station.y + station.h + 0.5 && mark.box.y + mark.box.h >= station.y - 0.5;
+  assert.ok(touches, "attached to its box, not floating");
+  assert.match(renderFlowSvg(model, undefined).text, new RegExp(`data-mark="broken" data-state="broken" data-structure-select="${flowBrokenId("src/store")}" role="button"`), "the mark is a button");
+  state.structure.selected = flowBrokenId("src/store");
+  const inspector = renderView(state, "structure").text;
+  assert.match(inspector, /data-kind="broken"/);
+  for (const site of store.defects[0]!.sites) assert.ok(inspector.includes(`<code>${site.file}:${site.line}</code>`), `${site.file}:${site.line} is listed`);
+  assert.match(inspector, /data-inside="true"[^]*<span class="label">inside<\/span>/, "a bypass inside the component is listed and named as inside");
+  const allInside = projectState({ states: { "single writer": "structural defect" }, bypasses: { "single writer": [{ file: "src/store/inner.ts", line: 4, symbol: "raw" }] } });
+  allInside.structure.selected = flowBrokenId("src/store");
+  assert.match(renderView(allInside, "structure").text, /All 1 bypass sit inside Store, so no component interface carries them; they are listed here/);
+});
+
+test("every crossing is drawn: on its interface, on the entrance line it guards, or on its component's boundary mark", () => {
+  for (const state of [healthState(), projectState(), crowdedState(), trustState()]) {
+    const model = flowOf(state);
+    const svg = renderFlowSvg(model, undefined).text;
+    assert.equal(model.crossings.length, allInvariants(state.spec.components).filter((i) => i.crossing !== undefined).length, "every crossing-bearing invariant is placed");
+    for (const crossing of model.crossings) {
+      const identifier = model.identifiers.find((i) => i.component === crossing.component && i.name === crossing.name);
+      const onInterface = identifier !== undefined && (svg.includes(`data-identifier="${identifier.text}"`));
+      const onEntrance = identifier !== undefined && crossing.routes.some((id) => svg.includes(`data-entry="${id}" data-identifier="${identifier.text}"`));
+      const onComponent = crossing.on === "component" && svg.includes(`data-node="${crossing.component}" data-mark="boundary"`);
+      assert.ok(onInterface || onEntrance || onComponent, `${crossing.component}/${crossing.name} (${crossing.from} -> ${crossing.to}) is drawn (${crossing.on})`);
+      if (crossing.on === "component") assert.ok(onComponent, `${crossing.name} stands on no interface, so its component carries it on its boundary mark`);
+    }
+    for (const level of model.levels) assert.deepEqual(level.unplaced, [], `${level.name}: no crossing stands nowhere`);
+  }
+  const model = flowOf(healthState());
+  assert.equal(model.crossings.find((c) => c.name === "rows stay typed")!.on, "component", "a crossing whose invariant has only a totality oracle has no chokepoint to stand on an interface");
+});
+
+test("selecting any trust level lights at least one drawn thing, and only the identifiers whose crossing carries it", () => {
+  for (const state of [healthState(), projectState(), crowdedState(), trustState()]) {
+    const model = flowOf(state);
+    for (const level of model.levels) {
+      if (!model.crossings.some((c) => c.from === level.name || c.to === level.name)) continue;
+      const svg = renderFlowSvg(model, level.id).text;
+      const lit = [...svg.matchAll(/<g class="flow-tag [^"]*\bis-lit\b[^"]*"[^>]*?(?:data-identifier="([CX]\d+)"|data-mark="boundary")/g)];
+      assert.ok(lit.length > 0, `${level.name} lights something`);
+      for (const m of lit) {
+        if (m[1] === undefined) continue;
+        const crossing = model.identifiers.find((i) => i.text === m[1])!.crossing;
+        assert.ok(crossing !== undefined && (crossing.from === level.name || crossing.to === level.name), `${m[1]} lights only because its crossing carries ${level.name}`);
+      }
+    }
+  }
+});
+
+/** The flow fixture's hooks handler is itself a chokepoint with a crossing: entrances it handles carry that trust in; another handled beside it does not. */
+function trustState(): ShellState {
+  const state = projectState({ symbols: [...SYMBOLS, sym(".", "src/hooks", "tickHooks", "src/hooks/run.ts", 1)] });
+  const hooks = state.spec.components.find((c) => c.folder === "src/hooks")!;
+  hooks.entrances = [
+    { name: "hook event", meaning: "the host sends an event", handler: "runHooks in run.ts", line: 3, handlerLine: 4, component: "src/hooks", file: "src/hooks/run.ts" },
+    { name: "tick", meaning: "a timer fires", handler: "tickHooks in run.ts", line: 5, handlerLine: 6, component: "src/hooks", file: "src/hooks/run.ts" },
+  ];
+  hooks.invariants = [{ ...state.spec.components.find((c) => c.folder === "src/store")!.invariants[0]!, component: "src/hooks", name: "the hook answers one project", enforcements: [{ form: "chokepoint", chokepoint: "runHooks", protects: "cwd", line: 6 }], crossing: { from: "outside", to: "inside", line: 7 } }];
+  if (state.componentInterfaces.kind === "read") state.componentInterfaces.entrances = [...state.componentInterfaces.entrances, { component: "src/hooks", name: "hook event", file: "src/hooks/run.ts" }, { component: "src/hooks", name: "tick", file: "src/hooks/run.ts" }];
+  state.runs.records[0]!.invariants.push({ component: "src/hooks", name: "the hook answers one project", form: "chokepoint", verdict: "pass", grade: "reference-choked", refutation: "automatic", bypasses: [], testReferences: 0, files: [], latency: 1, reason: "fixture" });
+  return state;
+}
+
+test("entrances whose trust differs get their own routes, and an entrance's own chokepoint crosses on the line where work enters", () => {
+  const model = flowOf(trustState());
+  const event = model.entrances.find((e) => e.name === "hook event")!;
+  const tick = model.entrances.find((e) => e.name === "tick")!;
+  assert.deepEqual(event.trust, ["outside"], "the handler is the chokepoint of a crossing from outside");
+  assert.deepEqual(tick.trust, []);
+  const eventRoute = model.routes.find((r) => r.entrances.includes(event.id))!;
+  const tickRoute = model.routes.find((r) => r.entrances.includes(tick.id))!;
+  assert.deepEqual(eventRoute.stops, tickRoute.stops, "the same path");
+  assert.notEqual(eventRoute.id, tickRoute.id, "different trust, different routes");
+  const identifier = model.identifiers.find((i) => i.name === "the hook answers one project")!;
+  assert.deepEqual(eventRoute.entry, [identifier.text]);
+  const svg = renderFlowSvg(model, flowLevelId("outside")).text;
+  assert.match(svg, new RegExp(`<g class="flow-tag [^"]*\\bis-lit\\b[^"]*" data-entry="${eventRoute.id}" data-identifier="${identifier.text}"[^>]*>[^]*?class="flow-boundary"`), "the outside trust level visibly crosses on the entrance line, with its boundary");
+  // Entrances that share both path and trust share a route.
+  const shared = flowOf(sharedState()).routes.find((r) => r.entrances.includes(flowEntranceId(".", "run")))!;
+  assert.equal(shared.entrances.length, 2);
+});
+
+test("with the handler's reach read, a route follows the handler and stops where its work ends: never through a utility another component calls, never a type", () => {
+  const withReach = (reach: ReachReference[]): ShellState => {
+    const state = projectState({ symbols: [...SYMBOLS, sym("src/hooks", "src/core", "hookCore", "src/core/hook.ts", 2)] });
+    if (state.componentInterfaces.kind === "read") state.componentInterfaces.entrances = state.componentInterfaces.entrances.map((e) => (e.name === "run" ? { ...e, reach } : e));
+    return state;
+  };
+  // door is also called by the reader: a utility, so the route ends at the hooks.
+  const utility = flowOf(withReach([{ from: "src/hooks", to: "src/core", symbol: "door", file: "src/core/door.ts", sites: 3 }])).routes.find((r) => r.entrances.includes(flowEntranceId(".", "run")))!;
+  assert.deepEqual(utility.stops, [".", "src/hooks"]);
+  assert.equal(utility.followed, "reach");
+  // hookCore only the hooks call; write only the core calls: the route follows both, and no further.
+  const dedicated = flowOf(withReach([{ from: "src/hooks", to: "src/core", symbol: "hookCore", file: "src/core/hook.ts", sites: 2 }, { from: "src/core", to: "src/store", symbol: "write", file: "src/store/write.ts", sites: 1 }])).routes.find((r) => r.entrances.includes(flowEntranceId(".", "run")))!;
+  assert.deepEqual(dedicated.stops, [".", "src/hooks", "src/core", "src/store"]);
+  // Without a reach the route is reference weight, and says so.
+  assert.equal(flowOf(projectState()).routes[0]!.followed, "weight");
+  assert.match(renderView({ ...projectState(), structure: { selected: flowOf(projectState()).routes[0]!.id, preview: [] } } as ShellState, "structure").text, /By <[^>]+>reference weight<\/[a-z]+>, not flow/);
+});
+
+test("an origin token shows at most four entrance names and a count of the rest; the route's inspector lists every one", () => {
+  const state = projectState();
+  const root = state.spec.components.find((c) => c.folder === ".")!;
+  const extra = ["replay", "rewind", "resume", "retry", "rerun"];
+  root.entrances = [...root.entrances, ...extra.map((name, i): SpecEntrance => ({ name, meaning: `${name} enters`, handler: "runHooks in src/hooks/run.ts", line: 20 + i, handlerLine: 21 + i, component: ".", file: "src/hooks/run.ts" }))];
+  if (state.componentInterfaces.kind === "read") state.componentInterfaces.entrances = [...state.componentInterfaces.entrances, ...extra.map((name) => ({ component: ".", name, file: "src/hooks/run.ts" }))];
+  const model = flowOf(state);
+  const route = model.routes.find((r) => r.entrances.includes(flowEntranceId(".", "run")))!;
+  assert.equal(route.names.length, 6);
+  assert.deepEqual(terminusLines(renderFlowSvg(model, undefined).text, route.id).map((l) => l.text), ["run", "replay", "rewind", "resume", "+2 more"]);
+  state.structure.selected = route.id;
+  const inspector = renderView(state, "structure").text;
+  for (const name of route.names) assert.match(inspector, new RegExp(`data-field="entrances"[^]*>${name}</button>`), `${name} is listed when the route is selected`);
+});
+
+test("a component's inspector leads with its own invariants and their verdicts, before its routes, callers and callees", () => {
+  const state = healthState();
+  state.structure.selected = flowNodeId("src/store");
+  const inspector = /<aside class="flow-inspector"[^>]*>([^]*?)<\/aside>/.exec(renderView(state, "structure").text)![1]!;
+  const own = inspector.indexOf('data-field="own-invariants"');
+  assert.ok(own > 0 && own < inspector.indexOf('data-field="routes"') && own < inspector.indexOf("Called by <span"), "its invariants come first");
+  assert.match(inspector, /data-invariant="single writer" data-verdict-state="broken"[^]*structural defect 2026-09-20/, "each with its one verdict, dated");
+});
+
+test("one verdict per invariant: the inspector shows one dated state, and every per-enforcement record and test command is folded", () => {
+  const state = projectState();
+  state.runs.records.push({ ...state.runs.records[0]!, at: "2026-09-21T10:00:00.000Z", invariants: [] });
+  state.structure.selected = flowChokepointId("src/store", "single writer");
+  const inspector = /<aside class="flow-inspector"[^>]*>([^]*?)<\/aside>/.exec(renderView(state, "structure").text)![1]!;
+  assert.equal([...inspector.matchAll(/data-field="verdict"/g)].length, 1);
+  assert.match(inspector, /data-field="verdict"><span class="flow-verdict" data-verdict-state="verified">[^]*?verified 2026-09-20/);
+  const unfolded = inspector.replace(/<details[^]*?<\/details>/g, "");
+  assert.doesNotMatch(unfolded, /kept from an earlier run|not run|data-verdict="/, "no second verdict outside the folds");
+  assert.doesNotMatch(inspector, /<details[^>]*\bopen\b/, "every fold starts closed");
+});
+
+test("below the side-by-side width the default story's inspector never opens over the map", () => {
+  const state = projectState();
+  delete state.structure.selected;
+  assert.match(renderView(state, "structure").text, /<aside class="flow-inspector"[^>]*data-open="true" data-default="true"/, "the default story is marked");
+  state.structure.selected = flowNodeId("src/core");
+  assert.match(renderView(state, "structure").text, /<aside class="flow-inspector"[^>]*data-open="true" data-default="false"/, "a reader's choice is not");
+});
+
+test("origin tokens keep white text, and every route color, light and dark, gives it at least 4.5:1", () => {
+  for (const [light, dark] of [...FLOW_ROUTE_COLORS, FLOW_NEUTRAL_ROUTE]) {
+    assert.ok(whiteContrast(light) >= 4.5, `${light}: white at ${whiteContrast(light).toFixed(2)}:1`);
+    assert.ok(whiteContrast(dark) >= 4.5, `${dark}: white at ${whiteContrast(dark).toFixed(2)}:1`);
+  }
+  const style = /<style>([^]*?)<\/style>/.exec(renderFlowSvg(flowOf(projectState()), undefined).text)![1]!;
+  assert.match(style, /\.flow-svg \.flow-origin \{ fill: #ffffff; \}/, "origin text is white");
+  assert.doesNotMatch(style, /--flow-route-ink/, "no per-color dark ink");
+});
+
+test("jargon links to its definition where the key and the inspector first show it", () => {
+  const state = projectState();
+  const page = renderView(state, "structure").text;
+  const key = /data-field="key"[^]*/.exec(page)![0]!;
+  for (const term of ["chokepoint", "crossing", "core-dependency", "requirement"]) assert.match(key, new RegExp(`<a class="flow-term" href="#coherence-${term}" title="[^"]+">`), `${term} links to the glossary`);
+  for (const term of ["bypass", "derived"]) assert.match(key, new RegExp(`<dfn class="flow-term" title="[^"]+">`), `${term} is defined in place`);
 });

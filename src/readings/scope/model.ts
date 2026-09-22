@@ -421,6 +421,17 @@ export interface InterfaceSymbol {
   file: string;
   /** How many non-test reference sites in `from` resolve to it. */
   sites: number;
+  /** Present when the symbol declares a type only (an interface or a type alias): a structural route never follows it. */
+  kind?: "type";
+}
+
+/** One component interface a handler's static reach uses: a reached declaration in `from` referencing a value declaration in `to`. */
+export interface ReachReference {
+  from: string;
+  to: string;
+  symbol: string;
+  file: string;
+  sites: number;
 }
 
 /** An entrance's handler as the language adapter resolved it. */
@@ -431,6 +442,8 @@ export interface EntranceResolution {
   file?: string;
   /** Why it did not resolve, when it did not. */
   reason?: string;
+  /** The component interfaces the handler's static reach uses, through value references only; absent from a reading taken before reach was read. */
+  reach?: ReachReference[];
 }
 
 /**

@@ -182,3 +182,73 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   crossing: record -> reading
   refuted: ignored meaningAlternatives and formatted the unset scalar definition as missing -> the shared Scope/query reading test went red; restored every alternative, green (2026-09-18)
   kinds: none
+- structure health is on the map: A strip above the Structure map counts every invariant by its one verdict, and its counts are the spec model's (invariants enforced and verified, requirements, structural defects), with requirements whose chokepoint check found bypasses and open escalations when there are any; each count is a selection whose inspector lists its set, and a project with nothing enforced says so on the map.
+  over: every health count of the built fixture page against its spec model's counts, and every member of every count against its inspector
+  via: the health strip counts are the spec model's, each a selection whose inspector lists its set
+  because: all three blind readers found health had no place on the map (docs/reviews/2026-09-22-structure-map-synthesis.md, item 1): the first adopter's 0 invariants and 36 requirements sat in grey header text while its identifiers looked like working controls, and Coherence's map carried no health signal at all
+  crossing: record -> reading
+  refuted: counted requirements as the verified count in renderHealthStrip -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none
+- identifiers carry their state: Every interface identifier is drawn in its invariant's one verdict, solid when enforced and verified, a dashed outline when a requirement, red when broken, and every component carries its worst verdict as a drawn bar inside its box.
+  over: every identifier and every component the rendered map draws for a fixture holding a verified invariant, a requirement, and a structural defect
+  via: every identifier and every component is drawn in its invariant's state: solid verified, outlined requirement, red broken
+  because: the security and owner readers found an unenforced, never-run requirement indistinguishable from a verified, refuted invariant (synthesis item 2); a control that is not one must not look like one
+  crossing: record -> reading
+  refuted: drew every identifier verified in flowLayout's identifierOf -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none
+- broken marks are attached and list their sites: A component with a broken chokepoint carries a red broken mark touching its box, a button that selects its broken chokepoints and lists every bypass site, naming those inside the component as inside and saying so when all are.
+  over: the broken mark and inspector of a fixture component bypassed from another component and from inside itself, and of one bypassed only from inside
+  via: a component with a broken chokepoint carries a broken mark on its box that lists every bypass site, inside ones named as inside
+  because: the first adopter's two broken chokepoints were a floating caption that named no component, could not be selected, and said its bypass sites could not be shown (synthesis item 1)
+  crossing: record -> reading
+  refuted: skipped placing every component's broken mark in flowLayout -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none
+- every crossing is drawn: Every crossing-bearing invariant is drawn on the map: on the component interfaces its chokepoint stands on, on the line where work enters when its chokepoint is the entrances' handler, and otherwise on its component's boundary mark; no trust level has a crossing placed nowhere.
+  over: every crossing of the flow fixture, the crowded fixture, a fixture with a crossing whose invariant has only a totality oracle, and one whose entrance handler is a chokepoint, against the rendered map at rest
+  via: every crossing is drawn: on its interface, on the entrance line it guards, or on its component's boundary mark
+  because: the security reader found about 2 of 20 of the first adopter's boundaries drawn, the rest listed as standing on no component interface, and Coherence's harness crossings on a line the host-hook entrances never take (synthesis item 5)
+  crossing: record -> reading
+  refuted: stopped adding a crossing on no interface to its component's boundary mark in flowOf -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none
+- a trust level always lights: Selecting any trust level that a crossing carries lights at least one drawn identifier or boundary mark, and lights an identifier only when its own crossing carries that level.
+  over: every trust level of every fixture that a crossing names, selected on the rendered map
+  via: selecting any trust level lights at least one drawn thing, and only the identifiers whose crossing carries it
+  because: selecting agent-mcp or storage on the first adopter lit nothing though they carry its central boundary, and selecting record on Coherence lit an identifier of another level beside it (security review, issues 1 and 6)
+  crossing: record -> reading
+  refuted: lit every identifier that carries any crossing when a trust level is selected, in flowSelection -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none
+- routes split by trust: Entrances share a structural route only when they share its stops and the trust they carry in, the entering side of the crossings whose chokepoint is their handler; an entrance whose handler is a chokepoint wears that identifier on the line where work enters.
+  over: two entrances of one component with the same stops, one handled by a chokepoint with a crossing and one not, and two entrances sharing a handler
+  via: entrances whose trust differs get their own routes, and an entrance's own chokepoint crosses on the line where work enters
+  because: the owner asked that routes split where the path or the trust differs, not only by the handler's component; Coherence's host-hook entrances carry harness data through runHook, which is itself the chokepoint of the harness crossings, and the map must show that crossing where the host's input enters (decision d-a5e5c691)
+  crossing: record -> reading
+  refuted: let entrances share a route by its stops and rail alone, ignoring their trust, in flowOf -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none
+- routes follow the handler: With the handler's static reach read, a structural route follows only component interfaces that reach uses through a symbol only its stop's component calls, never a type and never a utility another component also calls, and stops where the reach goes no further; without a reach it is reference weight and says so.
+  over: the run entrance of the flow fixture with a reach through a utility, with a reach through dedicated symbols, and with no reach
+  via: with the handler's reach read, a route follows the handler and stops where its work ends: never through a utility another component calls, never a type
+  because: the readers found routes were a walk along the heaviest references labelled as the path work takes: five of eight Coherence routes shared one tail and the scope page route ended in Economy (synthesis item 3)
+  crossing: record -> reading
+  refuted: let a route follow a utility another component also calls, in flowOf's follows -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none
+- origin tokens stay readable: An origin token shows at most four entrance names and a count of the rest, which the route's inspector lists in full, and its text is white on a route color darkened until white reaches 4.5:1, light and dark.
+  over: a route six entrances share, and every route color and the neutral one in both themes
+  via: an origin token shows at most four entrance names and a count of the rest; the route's inspector lists every one
+  because: the first adopter's nineteen-name block was unreadable, and the owner asked for white text in every token, calling the dark text baffling and hard to read
+  crossing: record -> reading
+  refuted: showed every entrance name on its origin token, uncapped -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none
+- the map opens on the busiest route: With nothing chosen the map opens on the route whose component interfaces carry the most reference sites, then the most entrances, then by name, and the key states that rule.
+  over: the default of the flow, crowded, shared, and derived fixtures, and the key's words
+  via: the map opens on the busiest route, every other route muted; clearing mutes them all; a deep link selects anything
+  because: the newcomer found the key claimed the busiest route while the first adopter opened on a 3-site route beside a 157-site one, and stopped trusting the key (synthesis item 9)
+  crossing: record -> reading
+  refuted: opened on the route with the fewest reference sites in flowDefaultSelection -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none
+- one verdict per invariant: The Structure inspector shows each invariant's one dated verdict, leads a component's inspector with its own invariants and their verdicts, and folds every per-enforcement record, test command, and advice, closed.
+  over: a chokepoint whose enforcement a later run kept, and a component holding a structural defect, in the rendered inspector
+  via: one verdict per invariant: the inspector shows one dated state, and every per-enforcement record and test command is folded
+  because: one invariant showed verified, not run, and kept from an earlier run at once, the inspector ran past 2000 px with test commands, and a component's own invariants were not listed at all, so "I changed Session" could not be answered (synthesis items 6 and 7)
+  crossing: record -> reading
+  refuted: opened the per-enforcement record fold in the chokepoint inspector -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none

@@ -30,51 +30,72 @@
  */
 
 import { componentId, invariantId, latestOf, plural, relianceOf, type RelianceSite } from "./derive.ts";
-import { html, join, raw, type Markup } from "./html.ts";
+import { html, join, raw, slug, type Markup } from "./html.ts";
 import { renderEnforcement, renderRefutation } from "./invariants-view.ts";
 import type { ShellState, StructurePreview } from "./model.ts";
 import {
   CORE_RULE,
+  DEFAULT_RULE,
   FLOW_CHANGE_ID,
+  FLOW_HEALTH_KINDS,
   FLOW_NONE_ID,
+  ROUTE_RULE,
+  flowBoundaryId,
+  flowBrokenId,
+  flowHealthId,
+  flowHealthMembers,
   flowLabelLines,
   flowName,
   flowOf,
   flowSelected,
+  originLines,
   routeName,
   flowSelection,
+  worstState,
   type FlowChokepoint,
+  type FlowCrossing,
   type FlowEdge,
   type FlowEntrance,
+  type FlowHealthKind,
+  type FlowInvariantRef,
   type FlowLevel,
   type FlowModel,
   type FlowNode,
   type FlowRoute,
   type FlowSelection,
+  type FlowState,
 } from "./structure-flow.ts";
 import { textWidth } from "./structure-measure.ts";
 
 /** The page's own system family: the map is UI, set in the face the inspector and the page use. */
 const FLOW_FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+/** Code-ish text on the map (a folder, an interface identifier) is set in IBM Plex Mono, embedded in the page, with a monospace fallback. */
+const FLOW_MONO = '"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace';
 /**
  * The map's type scale: three sizes and two weights, each with one role.
- * 13 semibold: a component's name. 12 regular: the map's caption. 11
- * regular: a folder, a column caption, a rail's label. 11 semibold: the text
- * in a token (a route's named origin, an interface identifier) and a defect
- * or proposal mark. Numerals stay proportional on the map: nothing there
- * aligns in a column, and tabular ones space an identifier out. The
- * measure's metrics are the system face's at these sizes (tabular digits,
- * the wider of the two, so a proportional one is never undershot).
+ * 13 medium: a component's name. 12 regular: the map's caption. 11 regular:
+ * a component's role, a column caption, a rail's label, and, in Plex Mono,
+ * a folder and an interface identifier (the page embeds Plex Mono's regular
+ * weight only). 11 medium: the text in a token (a route's named origin, a
+ * mark). Medium (500), never semibold:
+ * the owner found semibold on the map too heavy. Numerals stay proportional
+ * on the map. The measure's metrics are the system face's semibold for any
+ * weight from medium up (the wider, so medium is never undershot) and Plex
+ * Mono's fixed advance for mono text.
  */
 const TYPE_NAME = 13;
 const TYPE_LABEL = 12;
 const TYPE_SMALL = 11;
+const FLOW_WEIGHT = "500";
 const FLOW_PAD = 16;
 const FLOW_TOP = 58;
-const FLOW_ROW_H = 70;
+const FLOW_ROW_H = 88;
 /** The tallest a station may be: its tracks close up rather than grow past its row. */
-const FLOW_BOX_MAX_H = 52;
-const FLOW_BOX_MIN_H = 34;
+const FLOW_BOX_MAX_H = 68;
+/** A station holds four lines: its name, two of its role, its folder. */
+const FLOW_BOX_MIN_H = 64;
+/** The width a component's two role lines wrap at, unless its name or folder is wider: roles never widen a column past it. */
+const FLOW_ROLE_W = 140;
 /** The fixed offset between parallel tracks. */
 const FLOW_TRACK = 6;
 const FLOW_CHAMFER = 8;
@@ -92,16 +113,21 @@ const FLOW_TOKEN_PAD_X = 6;
 const FLOW_TOKEN_PAD_Y = 3;
 const FLOW_DOT_R = 5;
 
-/** Route colors, light and dark: the validated categorical order (identity is also the name, never color alone). */
-const FLOW_ROUTE_COLORS: [string, string][] = [
-  ["#2a78d6", "#3987e5"],
-  ["#eb6834", "#d95926"],
-  ["#1baf7a", "#199e70"],
-  ["#eda100", "#c98500"],
-  ["#e87ba4", "#d55181"],
-  ["#008300", "#2f9e2f"],
-  ["#4a3aa7", "#9085e9"],
-  ["#e34948", "#e66767"],
+/**
+ * Route colors, light and dark: the validated categorical order, each hue
+ * darkened only until white text on it reaches 4.5:1 (the owner asked for
+ * white text in every origin token; identity is also the name, never color
+ * alone). The check measures every one.
+ */
+export const FLOW_ROUTE_COLORS: [string, string][] = [
+  ["#2874d0", "#1d73db"],
+  ["#cb4814", "#c35022"],
+  ["#15855d", "#15845d"],
+  ["#9e6b00", "#a06a00"],
+  ["#da2b6d", "#d03a71"],
+  ["#008300", "#288628"],
+  ["#4a3aa7", "#7162e3"],
+  ["#df2c2b", "#dd3030"],
 ];
 const FLOW_RAIL_COLORS: [string, string][] = [
   ["#5f6b7a", "#9aa6b6"],
@@ -109,6 +135,8 @@ const FLOW_RAIL_COLORS: [string, string][] = [
   ["#3f7f78", "#7fbdb5"],
   ["#7a5f86", "#b79cc4"],
 ];
+/** The route past the eighth, drawn neutral and still named; white on it reaches 4.5:1 too. */
+export const FLOW_NEUTRAL_ROUTE: [string, string] = ["#6b7588", "#69758c"];
 
 /** WCAG relative luminance of a #rrggbb color. */
 function luminance(hex: string): number {
@@ -116,19 +144,14 @@ function luminance(hex: string): number {
   return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
 }
 
-/** The ink for text on a route-colored token: white or near-black, whichever contrasts more with it. */
-export function tokenInk(hex: string): string {
-  const l = luminance(hex);
-  const onWhite = 1.05 / (l + 0.05);
-  const onInk = (l + 0.05) / (luminance(FLOW_TOKEN_DARK) + 0.05);
-  return onWhite >= onInk ? "#ffffff" : FLOW_TOKEN_DARK;
+/** The WCAG contrast of white text on a #rrggbb color. */
+export function whiteContrast(hex: string): number {
+  return 1.05 / (luminance(hex) + 0.05);
 }
-const FLOW_TOKEN_DARK = "#111827";
-const FLOW_NEUTRAL_ROUTE: [string, string] = ["#7d8799", "#8d97aa"];
 
 function routeVars(): string {
-  const light = FLOW_ROUTE_COLORS.map(([l], i) => `--flow-route-${i}: ${l}; --flow-route-ink-${i}: ${tokenInk(l)};`).concat(FLOW_RAIL_COLORS.map(([l], i) => `--flow-rail-${i}: ${l};`), [`--flow-neutral-ink: ${tokenInk(FLOW_NEUTRAL_ROUTE[0])};`]);
-  const dark = FLOW_ROUTE_COLORS.map(([, d], i) => `--flow-route-${i}: ${d}; --flow-route-ink-${i}: ${tokenInk(d)};`).concat(FLOW_RAIL_COLORS.map(([, d], i) => `--flow-rail-${i}: ${d};`), [`--flow-neutral-ink: ${tokenInk(FLOW_NEUTRAL_ROUTE[1])};`]);
+  const light = FLOW_ROUTE_COLORS.map(([l], i) => `--flow-route-${i}: ${l};`).concat(FLOW_RAIL_COLORS.map(([l], i) => `--flow-rail-${i}: ${l};`));
+  const dark = FLOW_ROUTE_COLORS.map(([, d], i) => `--flow-route-${i}: ${d};`).concat(FLOW_RAIL_COLORS.map(([, d], i) => `--flow-rail-${i}: ${d};`));
   return `.flow-svg { ${light.join(" ")} }\n@media (prefers-color-scheme: dark) { .flow-svg { ${dark.join(" ")} } }`;
 }
 
@@ -145,24 +168,30 @@ const FLOW_SVG_STYLE = `
   --flow-tag: #ffffff;
   --flow-boundary: #b3261e;
   --flow-lit: #d97706;
+  --flow-verified: #1f3a5f;
   --flow-neutral-route: ${FLOW_NEUTRAL_ROUTE[0]};
 }
 .flow-svg .flow-surface { fill: var(--flow-surface); }
 .flow-svg text { font-family: ${FLOW_FONT}; fill: var(--flow-ink); }
+.flow-svg text.flow-mono { font-family: ${FLOW_MONO}; }
 .flow-svg .flow-caption { fill: var(--flow-muted); }
 .flow-svg .flow-colcap { fill: var(--flow-muted); }
-.flow-svg .flow-station rect { fill: var(--flow-node); stroke: var(--flow-node-border); stroke-width: 1.5; }
-.flow-svg .flow-station.flow-entry rect { stroke-width: 2.5; }
-.flow-svg .flow-station.flow-unconnected rect, .flow-svg .flow-mass rect { fill: var(--flow-surface); stroke-dasharray: 4 4; }
-.flow-svg .flow-station.flow-broken rect { stroke: var(--flow-defect); }
+.flow-svg .flow-station rect.flow-box { fill: var(--flow-node); stroke: var(--flow-node-border); stroke-width: 1.5; }
+.flow-svg .flow-station.flow-entry rect.flow-box { stroke-width: 2.5; }
+.flow-svg .flow-station.flow-unconnected rect.flow-box, .flow-svg .flow-mass rect { fill: var(--flow-surface); stroke-dasharray: 4 4; }
+.flow-svg .flow-station.flow-broken rect.flow-box { stroke: var(--flow-defect); }
 .flow-svg .flow-station-folder { fill: var(--flow-muted); }
-.flow-svg .flow-defect-mark { fill: var(--flow-defect); }
+.flow-svg .flow-station-role { fill: var(--flow-ink); }
+.flow-svg .flow-state-bar { stroke: none; }
+.flow-svg .flow-state-verified { fill: var(--flow-verified); }
+.flow-svg .flow-state-requirement { fill: url(#flow-hatch); stroke: var(--flow-verified); stroke-width: 0.8; }
+.flow-svg .flow-state-broken { fill: var(--flow-defect); }
 .flow-svg .flow-route { fill: none; stroke-width: 3.5; stroke-linejoin: round; stroke-linecap: butt; }
 .flow-svg .flow-terminus-dot { stroke: var(--flow-surface); stroke-width: 1.5; }
 .flow-svg .flow-derived .flow-terminus-dot { fill: var(--flow-surface); stroke-width: 2.5; stroke-dasharray: 3 2; }
-.flow-svg .flow-origin { fill: var(--flow-token-ink, #fff); }
-.flow-svg .flow-origin-derived { opacity: 0.85; }
-.flow-svg .flow-derived .flow-origin-token { stroke: var(--flow-token-ink, #fff); stroke-width: 1; stroke-dasharray: 3 2; }
+.flow-svg .flow-origin { fill: #ffffff; }
+.flow-svg .flow-origin-more { fill: #ffffff; }
+.flow-svg .flow-derived .flow-origin-token { stroke: #ffffff; stroke-width: 1; stroke-dasharray: 3 2; }
 .flow-svg .flow-faint { fill: none; stroke: var(--flow-quiet); stroke-width: 1.4; stroke-dasharray: 5 4; }
 .flow-svg .flow-bearing-line { fill: none; stroke: var(--flow-quiet); stroke-width: 1.6; }
 .flow-svg .flow-broken-line { stroke: var(--flow-defect); stroke-width: 2; stroke-dasharray: 6 3; }
@@ -171,31 +200,39 @@ const FLOW_SVG_STYLE = `
 .flow-svg .flow-joint { stroke: none; }
 .flow-svg .flow-rail-label { fill: var(--flow-ink); }
 .flow-svg .flow-station-name { fill: var(--flow-ink); }
-.flow-svg .flow-tag rect { fill: var(--flow-tag); stroke: var(--flow-node-border); stroke-width: 1; }
-.flow-svg .flow-tag.flow-tag-broken rect { stroke: var(--flow-defect); stroke-width: 1.8; }
-.flow-svg .flow-tag:focus rect, .flow-svg .flow-tag.is-selected rect { stroke: var(--flow-lit); stroke-width: 2.5; }
+.flow-svg .flow-tag rect { stroke-width: 1.2; }
+.flow-svg .flow-tag-verified rect { fill: var(--flow-verified); stroke: var(--flow-verified); }
+.flow-svg .flow-tag-verified text { fill: #ffffff; }
+.flow-svg .flow-tag-requirement rect { fill: var(--flow-tag); stroke: var(--flow-node-border); stroke-dasharray: 2.5 1.5; }
+.flow-svg .flow-tag-requirement text { fill: var(--flow-ink); }
+.flow-svg .flow-tag-broken rect { fill: var(--flow-defect); stroke: var(--flow-defect); }
+.flow-svg .flow-tag-broken text { fill: #ffffff; }
+.flow-svg .flow-tag-mark rect { fill: var(--flow-tag); stroke: var(--flow-defect); stroke-width: 1.8; }
+.flow-svg .flow-tag-mark text { fill: var(--flow-defect); }
+.flow-svg .flow-tag:focus rect, .flow-svg .flow-tag.is-selected rect { stroke: var(--flow-lit); stroke-width: 2.5; stroke-dasharray: none; }
 .flow-svg .flow-boundary { stroke: var(--flow-boundary); stroke-width: 2.2; stroke-dasharray: 3 2; }
-.flow-svg .flow-caption, .flow-svg .flow-colcap, .flow-svg .flow-defect-mark, .flow-svg .flow-rail-label { paint-order: stroke; stroke: var(--flow-surface); stroke-width: 3px; stroke-linejoin: round; }
+.flow-svg .flow-caption, .flow-svg .flow-colcap, .flow-svg .flow-rail-label { paint-order: stroke; stroke: var(--flow-surface); stroke-width: 3px; stroke-linejoin: round; }
 .flow-svg .structure-edge.structure-proposed { fill: none; stroke: var(--flow-proposed); stroke-width: 2; stroke-dasharray: 9 6; }
 .flow-svg .structure-proposed-word { fill: var(--flow-proposed); }
 .flow-svg [data-structure-select], .flow-svg [data-structure-expand] { cursor: pointer; }
 .flow-svg [data-structure-select]:focus { outline: none; }
-.flow-svg .flow-station:focus rect, .flow-svg .flow-station.is-selected rect { stroke: var(--flow-lit); stroke-width: 3; }
-.flow-svg .flow-station.is-lit rect { stroke: var(--flow-lit); stroke-width: 2.5; }
-.flow-svg .flow-tag.is-lit rect { stroke: var(--flow-lit); stroke-width: 2; }
+.flow-svg .flow-station:focus rect.flow-box, .flow-svg .flow-station.is-selected rect.flow-box { stroke: var(--flow-lit); stroke-width: 3; }
+.flow-svg .flow-station.is-lit rect.flow-box { stroke: var(--flow-lit); stroke-width: 2.5; }
+.flow-svg .flow-tag.is-lit rect { stroke: var(--flow-lit); stroke-width: 2.2; stroke-dasharray: none; }
 .flow-svg .flow-faint.is-lit, .flow-svg .flow-bearing-line.is-lit { stroke: var(--flow-lit); stroke-opacity: 1; }
 .flow-svg .flow-route-group.is-lit .flow-route { stroke-width: 5; }
 .flow-svg .flow-route-group.is-muted .flow-route { stroke-width: 2; opacity: 0.5; }
 .flow-svg .flow-route-group.is-muted .flow-terminus-dot { opacity: 0.6; }
 .flow-svg .flow-route-group.is-dim .flow-route, .flow-svg .flow-route-group.is-dim .flow-terminus-dot { opacity: 0.16; }
 .flow-svg .flow-route-group.is-dim .flow-route { stroke-width: 2; }
-.flow-svg .flow-route-group.is-dim .flow-origin, .flow-svg .flow-route-group.is-dim .flow-origin-token { opacity: 0.45; }
-.flow-svg .flow-route-group.is-muted .flow-origin-token { opacity: 0.7; }
+.flow-svg .flow-route-group.is-dim .flow-origin-token { opacity: 0.8; }
+.flow-svg .flow-route-group.is-muted .flow-origin-token { opacity: 0.85; }
 .flow-svg .is-dim { opacity: 0.16; }
 .flow-svg .flow-route-group.is-dim { opacity: 1; }
 .flow-svg .flow-station.is-dim { opacity: 1; }
-.flow-svg .flow-station.is-dim rect { stroke-opacity: 0.2; }
-.flow-svg .flow-station.is-dim text { opacity: 0.22; }
+.flow-svg .flow-station.is-dim rect.flow-box { stroke-opacity: 0.2; }
+.flow-svg .flow-station.is-dim text, .flow-svg .flow-station.is-dim .flow-state-bar { opacity: 0.25; }
+.flow-svg .flow-tag.is-dim { opacity: 0.3; }
 @media (prefers-color-scheme: dark) {
   .flow-svg {
     --flow-surface: #111827;
@@ -204,13 +241,15 @@ const FLOW_SVG_STYLE = `
     --flow-node: #1a2336;
     --flow-node-border: #9fb0d8;
     --flow-quiet: #6f7c96;
-    --flow-defect: #ff7480;
+    --flow-defect: #e5484d;
     --flow-proposed: #f2bd68;
     --flow-tag: #111827;
     --flow-boundary: #ff8a80;
     --flow-lit: #ffd166;
+    --flow-verified: #c9d6f2;
     --flow-neutral-route: ${FLOW_NEUTRAL_ROUTE[1]};
   }
+  .flow-svg .flow-tag-verified text { fill: #111827; }
 }`;
 
 /* --------------------------------------------------------------- layout */
@@ -244,6 +283,8 @@ interface FlowRouteDraw {
   terminus: Point;
   /** Per interface id along the route: the legs of its segment. */
   segments: Map<string, FlowPolyline>;
+  /** The line from its origin token toward its first station: where work enters, and where an entrance's own chokepoint stands. */
+  entry: { a: Point; b: Point };
 }
 
 interface FlowLineDraw {
@@ -281,13 +322,26 @@ export interface FlowText {
   cls: string;
   priority: number;
   within?: string;
+  /** Set in IBM Plex Mono: a folder or an interface identifier. */
+  mono?: boolean;
 }
 
-/** One interface identifier on the map: a button on its pipe, or once on a rail for a core dependency's stubs. */
+/**
+ * One token on the map: an interface identifier (a button on its pipe, on an
+ * entrance line, or once on a rail for a core dependency's stubs), a bypass
+ * mark or a count on a pipe, or a component's broken or boundary mark,
+ * attached to its box.
+ */
 interface FlowTagDraw {
-  /** The identifier text (C3, X7), or a bypass mark, or a count of identifiers that did not fit. */
+  /** The identifier text (C3, X7), a bypass mark, a count of identifiers that did not fit, or a component mark's words. */
   text: string;
-  kind: "identifier" | "bypass" | "more";
+  kind: "identifier" | "bypass" | "more" | "broken" | "boundary";
+  /** The state it is drawn in: an identifier's or boundary mark's verdict; a bypass or broken mark is broken. */
+  state: FlowState | "mark";
+  /** The route whose entrance line it stands on, for an identifier where work enters. */
+  route: string | undefined;
+  /** The component a broken or boundary mark is attached to. */
+  node: string | undefined;
   /** The chokepoint it selects, for an identifier. */
   chokepoint: string | undefined;
   /** The invariant it names, for the accessible name. */
@@ -324,8 +378,8 @@ function intersects(a: FlowBox, b: FlowBox, margin = 1): boolean {
   return a.x < b.x + b.w + margin && b.x < a.x + a.w + margin && a.y < b.y + b.h + margin && b.y < a.y + a.h + margin;
 }
 
-function textBox(t: Pick<FlowText, "text" | "x" | "y" | "size" | "bold" | "align">): FlowBox {
-  const w = textWidth(t.text, t.size, t.bold);
+function textBox(t: Pick<FlowText, "text" | "x" | "y" | "size" | "bold" | "align" | "mono">): FlowBox {
+  const w = textWidth(t.text, t.size, t.bold, 0, t.mono === true);
   const x = t.align === "middle" ? t.x - w / 2 : t.align === "end" ? t.x - w : t.x;
   return { x, y: t.y - t.size * 0.78, w, h: t.size };
 }
@@ -364,9 +418,41 @@ function railForms(name: string, callers: number, others: number): string[] {
   return [`${name}: core dependency, called by ${callers} of ${others}`, `${name}: core dependency`, name];
 }
 
-/** The lines of a route's named origin, top to bottom: each entrance name, or "via" and the word derived. */
-function originLines(route: FlowRoute): string[] {
-  return route.derived ? [...route.names, "derived"] : route.names;
+/**
+ * A component's role on its box: its spec's intent in at most two lines of
+ * `width`, shortened when it does not fit at a clause (a colon, a semicolon,
+ * a comma, a dash, or before "and", "that", "with", "through", "for",
+ * "whose", "where", "which") of three words or more, else to the words that
+ * fit, never ending on a word that only leads into the next; never an
+ * ellipsis. The whole intent is in the inspector and the box's title.
+ */
+export function roleLines(intent: string, width: number, most = 2): string[] {
+  const whole = intent.trim().replace(/[.:;,]+$/, "");
+  const wrap = (text: string): string[] => {
+    const lines: string[] = [];
+    for (const word of text.split(" ")) {
+      const last = lines[lines.length - 1];
+      if (last !== undefined && textWidth(`${last} ${word}`, TYPE_SMALL, false) <= width) lines[lines.length - 1] = `${last} ${word}`;
+      else lines.push(word);
+    }
+    return lines;
+  };
+  const fits = (text: string): boolean => {
+    const lines = wrap(text);
+    return lines.length <= most && lines.every((line) => textWidth(line, TYPE_SMALL, false) <= width);
+  };
+  if (whole === "") return [];
+  if (fits(whole)) return wrap(whole);
+  const cuts: number[] = [];
+  for (const m of whole.matchAll(/[:;,]\s| \u2014 | (?:and|that|with|through|for|whose|where|which) /g)) cuts.push(m.index);
+  const clause = cuts.map((at) => whole.slice(0, at).replace(/[.:;,]+$/, "")).filter((text) => text.split(" ").length >= 3 && fits(text)).pop();
+  if (clause !== undefined) return wrap(clause);
+  const words = whole.split(" ");
+  let count = 0;
+  while (count < words.length && fits(words.slice(0, count + 1).join(" "))) count += 1;
+  const kept = words.slice(0, Math.max(1, count));
+  while (kept.length > 1 && /^(?:a|an|the|as|of|to|and|or|for|with|by|in|on|at|that|through|from|into|one|its|their)$/i.test(kept[kept.length - 1]!.replace(/[.:;,]+$/, ""))) kept.pop();
+  return wrap(kept.join(" ").replace(/[.:;,]+$/, ""));
 }
 
 type Side = "left" | "right" | "top" | "bottom";
@@ -444,8 +530,12 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
   }
   for (const ports of sides.values()) ports.sort((a, b) => a.other - b.other || a.order - b.order || a.key.localeCompare(b.key));
 
-  // Station sizes: one width per column from the widest name in it; a height from the tracks it carries.
-  const nameW = (node: FlowNode): number => Math.ceil(Math.max(textWidth(flowName(node), TYPE_NAME, true), textWidth(node.folder === "." ? "project root" : node.folder, TYPE_SMALL)) + 20 + (node.children > 0 ? 18 : 0));
+  // Station sizes: one width per column from the widest name, folder, or role in it (a role is shortened to fit, never
+  // widening a column past FLOW_ROLE_W, where it wraps to two lines); a height from the tracks it carries, never under four lines.
+  const folderText = (node: FlowNode): string => (node.folder === "." ? "project root" : node.folder);
+  const ownW = (node: FlowNode): number => Math.max(textWidth(flowName(node), TYPE_NAME, true) + (node.children > 0 ? 18 : 0), textWidth(folderText(node), TYPE_SMALL, false, 0, true));
+  const roleW = (node: FlowNode): number => Math.min(textWidth(node.intent.trim().replace(/[.:;,]+$/, ""), TYPE_SMALL, false), Math.max(FLOW_ROLE_W, ownW(node)));
+  const nameW = (node: FlowNode): number => Math.ceil(Math.max(ownW(node), roleW(node)) + 24);
   const verticalTracks = (node: FlowNode): number => Math.max(sides.get(`${node.folder}\u0000top`)?.length ?? 0, sides.get(`${node.folder}\u0000bottom`)?.length ?? 0);
   const colW = Array.from({ length: columns }, (_, c) => Math.max(90, ...inColumn(c).map((node) => Math.max(nameW(node), verticalTracks(node) * FLOW_TRACK + 40))));
   const boxH = (node: FlowNode): number => {
@@ -475,7 +565,10 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
   const gapW = (c: number): number => Math.max(FLOW_GAP_MIN, 14 + channel(dropsRight(c)) + inGap(c, "bracket").length * FLOW_TRACK + 12 + inGap(c, "forward").length * FLOW_TRACK + 12 + inGap(c, "back").length * FLOW_TRACK + 12 + channel(c + 1 < columns ? dropsLeft(c + 1) : 0) + 14);
 
   // The left margin: the widest named origin, its dot, and room for the lines to fan into their stations.
-  const termW = Math.max(0, ...drawn.flatMap((route) => originLines(route).map((line) => textWidth(line, FLOW_NAME_SIZE, false))));
+  const termW = Math.max(0, ...drawn.flatMap((route) => originLines(route).map((line) => textWidth(line, FLOW_NAME_SIZE, true))));
+  // Identifiers where work enters stand on the line from the origin: the margin leaves them room.
+  const tagW = (text: string): number => Math.ceil(textWidth(text, TYPE_SMALL, false, 0, true) + 8);
+  const entryRoom = Math.max(0, ...drawn.map((route) => (route.entry.length === 0 ? 0 : route.entry.reduce((sum, text) => sum + tagW(text) + 3, 0) + 12)));
   const dotX = r1(FLOW_PAD + termW + 2 * FLOW_TOKEN_PAD_X + 8 + FLOW_DOT_R);
   const blocks = new Map<string, { top: number; groups: { route: FlowRoute; lines: string[]; y0: number; dot: number }[] }>();
   let fan = 0;
@@ -501,7 +594,7 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
     });
   }
   const colX: number[] = [];
-  colX[0] = r1(dotX + FLOW_DOT_R + 16 + fan + 12 + channel(dropsLeft(0)));
+  colX[0] = r1(dotX + FLOW_DOT_R + 16 + entryRoom + fan + 12 + channel(dropsLeft(0)));
   for (let c = 1; c < columns; c++) colX[c] = r1(colX[c - 1]! + colW[c - 1]! + gapW(c - 1));
   const last = columns - 1;
   const trailing = 14 + channel(dropsRight(last)) + inGap(last, "bracket").length * FLOW_TRACK + 24;
@@ -604,7 +697,7 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
       entry = leg.b;
       entrySide = side.in;
     });
-    return { route, color, path: dedupe(path), terminus, segments };
+    return { route, color, path: dedupe(path), terminus, segments, entry: { a: terminus, b: [r1(bend - dy), terminus[1]] as Point } };
   });
 
   const lines: FlowLineDraw[] = bearing.map((edge) => ({ edge, kind: "bearing", line: hopLine(hops.find((hop) => hop.key === edge.id)!) }));
@@ -709,24 +802,28 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
     return undefined;
   };
 
-  // 1. Station names and folders, inside their boxes, which were sized to hold them.
+  // 1. Station names, roles, and folders, inside their boxes, which were sized to hold them.
   for (const node of model.nodes) {
     const station = stations.get(node.folder);
     if (station === undefined) continue;
     const within = `${node.id}-box`;
-    tryPlace([{ text: flowName(node), x: station.x + 10, y: r1(station.seat.y - 2), size: TYPE_NAME, bold: true, align: "start", within }], `name ${node.folder}`, 1, "flow-station-name", false);
-    tryPlace([{ text: node.folder === "." ? "project root" : node.folder, x: station.x + 10, y: r1(station.seat.y + 12), size: TYPE_SMALL, bold: false, align: "start", within }], `folder ${node.folder}`, 4, "flow-station-folder", false);
+    const x = station.x + 12;
+    tryPlace([{ text: flowName(node), x, y: r1(station.seat.y - 17), size: TYPE_NAME, bold: true, align: "start", within }], `name ${node.folder}`, 1, "flow-station-name", false);
+    roleLines(node.intent, station.w - 24).forEach((line, i) => {
+      tryPlace([{ text: line, x, y: r1(station.seat.y - 3 + i * 13), size: TYPE_SMALL, bold: false, align: "start", within }], `role ${node.folder} ${i}`, 3, "flow-station-role", false);
+    });
+    tryPlace([{ text: folderText(node), x, y: r1(station.seat.y + 24), size: TYPE_SMALL, bold: false, align: "start", within, mono: true }], `folder ${node.folder}`, 4, "flow-station-folder flow-mono", false);
   }
   if (massBox !== undefined && model.unowned !== undefined) {
     tryPlace([{ text: "No component", x: massBox.x + 10, y: massBox.y + 15, size: TYPE_NAME, bold: true, align: "start", within: "structure--mass-box" }], "mass name", 1, "flow-station-name", false);
     tryPlace([{ text: `${plural(model.unowned.files, "file", "files")}, ${plural(model.unowned.lines, "line", "lines")}`, x: massBox.x + 10, y: massBox.y + 29, size: TYPE_SMALL, bold: false, align: "start", within: "structure--mass-box" }], "mass size", 4, "flow-station-folder", false);
   }
-  // 2. Named origins, in full, one line each, set to end at the terminus dot: the left margin was sized to hold them.
+  // 2. Named origins, one line each, set to end at the terminus dot: at most four names and a count of the rest.
   for (const block of blocks.values()) {
     for (const group of block.groups) {
       group.lines.forEach((line, j) => {
-        const derivedWord = group.route.derived && j === group.lines.length - 1;
-        tryPlace([{ text: line, x: dotX - FLOW_DOT_R - 6 - FLOW_TOKEN_PAD_X, y: r1(group.y0 + (j + 1) * FLOW_NAME_LINE - 3), size: FLOW_NAME_SIZE, bold: !derivedWord, align: "end" }], `origin ${group.route.id} ${j}`, 2, derivedWord ? "flow-origin flow-origin-derived" : "flow-origin", false);
+        const quiet = (group.route.derived && j === group.lines.length - 1) || (!group.route.derived && group.route.names.length > group.lines.length && j === group.lines.length - 1);
+        tryPlace([{ text: line, x: dotX - FLOW_DOT_R - 6 - FLOW_TOKEN_PAD_X, y: r1(group.y0 + (j + 1) * FLOW_NAME_LINE - 3), size: FLOW_NAME_SIZE, bold: !quiet, align: "end" }], `origin ${group.route.id} ${j}`, 2, quiet ? "flow-origin-more" : "flow-origin", false);
       });
     }
   }
@@ -739,26 +836,114 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
     const starts = [rail.x0, ...Array.from({ length: Math.max(0, Math.floor((rail.x1 - rail.x0) / 40)) }, (_, i) => rail.x0 + 40 * (i + 1))];
     tryPlace(forms.flatMap((text) => starts.map((x) => ({ text, x, y: rail.y - 8, size: TYPE_SMALL, bold: false, align: "start" as const }))), `rail ${rail.folder}`, 2, "flow-rail-label", true);
   }
-  // 3. The caption: how the routes were derived.
+
+  // 3. Tokens: a padded box around one line of text. A token never overlaps text, another token, or a station.
+  const tags: FlowTagDraw[] = [];
+  const TAG_H = 14;
+  const fits = (box: FlowBox): boolean => inCanvas(box) && !placedText.some((other) => intersects(box, other)) && !obstacles.some((other) => intersects(box, other, 0));
+  const tokenText = (key: string, text: string, box: FlowBox, mono: boolean, cls: string): void => {
+    // Mono text is set regular: the page embeds Plex Mono's regular weight only.
+    texts.push({ key, text, x: r1(box.x + box.w / 2), y: r1(box.y + box.h / 2 + 3.9), size: TYPE_SMALL, bold: !mono, align: "middle", cls, priority: 5, ...(mono ? { mono: true } : {}) });
+  };
+
+  // 3. A component's broken mark, attached to its box: it selects its broken chokepoints and their bypass sites.
+  const attached = (station: FlowStation, w: number, h: number): FlowBox[] => [
+    { x: r1(station.x + station.w - 1), y: r1(station.y + 3), w, h },
+    { x: r1(station.x + station.w - 8 - w), y: r1(station.y - h + 1), w, h },
+    { x: r1(station.x + 8), y: r1(station.y - h + 1), w, h },
+    { x: r1(station.x + station.w - 8 - w), y: r1(station.y + station.h - 1), w, h },
+    { x: r1(station.x + 8), y: r1(station.y + station.h - 1), w, h },
+    { x: r1(station.x + station.w / 2 - w / 2), y: r1(station.y - h + 1), w, h },
+    { x: r1(station.x + station.w / 2 - w / 2), y: r1(station.y + station.h - 1), w, h },
+  ];
+  // A token attached to a box overlaps its border by one pixel, so the station itself is not an obstacle to it.
+  const fitsAttached = (box: FlowBox, own: FlowStation): boolean => inCanvas(box) && !placedText.some((other) => intersects(box, other)) && !obstacles.some((other) => !(other.x === own.x && other.y === own.y) && intersects(box, other, 0));
+  for (const node of model.nodes) {
+    const station = stations.get(node.folder);
+    if (station === undefined || node.defects.length === 0) continue;
+    const text = `✕ ${node.defects.length} broken`;
+    const w = Math.ceil(textWidth(text, TYPE_SMALL, true) + 10);
+    const box = attached(station, w, TAG_H + 2).find((candidate) => fitsAttached(candidate, station));
+    if (box === undefined) {
+      dropped.push(`broken ${node.folder}`);
+      continue;
+    }
+    placedText.push(box);
+    tags.push({ text, kind: "broken", state: "broken", route: undefined, node: node.folder, chokepoint: undefined, name: node.defects.map((d) => d.name).join(", "), edge: undefined, rail: undefined, edges: [], broken: true, box, boundary: undefined });
+    tokenText(`mark broken ${node.folder}`, text, box, false, "flow-tag-text");
+  }
+
+  // 4. The caption: how the routes were followed.
   const root = byFolder.get(".");
   const entranceCount = model.entrances.filter((e) => e.reachable).length;
   const captions =
     model.routesFrom === "root interfaces"
-      ? [`${plural(model.routes.length, "structural route", "structural routes")} derived from ${root === undefined ? "the root component" : root.name}'s interfaces: no entrance is declared`, `${plural(model.routes.length, "structural route", "structural routes")} derived: no entrance is declared`]
+      ? [`${plural(model.routes.length, "structural route", "structural routes")} by reference weight from ${root === undefined ? "the root component" : root.name}'s interfaces, not flow: no entrance is declared`, `${plural(model.routes.length, "structural route", "structural routes")} by reference weight: no entrance is declared`]
       : model.routesFrom === "entrances"
         ? [`${plural(model.routes.length, "structural route", "structural routes")} from ${plural(entranceCount, "entrance", "entrances")}`]
         : ["No entrance is declared and there is no root component: no structural route is drawn"];
   tryPlace(captions.map((text) => ({ text, x: FLOW_PAD, y: 22, size: TYPE_LABEL, bold: false, align: "start" as const })), "caption", 3, "flow-caption");
 
-  // 5. Interface identifiers: one button each, on the pipe where it stands; a core dependency's once, on its rail.
-  const tags: FlowTagDraw[] = [];
-  const tagW = (text: string): number => Math.ceil(textWidth(text, TYPE_SMALL, true) + 8);
-  const TAG_H = 14;
-  const identifierOf = (text: string): { chokepoint: string; name: string; crossing: boolean } => {
+  // 4. A component's boundary mark, on its box's edge: the crossings standing inside it, on no interface or entrance line.
+  for (const node of model.nodes) {
+    const station = stations.get(node.folder);
+    if (station === undefined || node.boundary.length === 0) continue;
+    const text = plural(node.boundary.length, "crossing", "crossings");
+    const w = Math.ceil(textWidth(text, TYPE_SMALL, true) + 10);
+    const order = attached(station, w, TAG_H);
+    const box = [order[4]!, order[3]!, order[6]!, order[2]!, order[1]!, order[5]!, order[0]!].find((candidate) => fitsAttached(candidate, station));
+    if (box === undefined) {
+      dropped.push(`boundary ${node.folder}`);
+      continue;
+    }
+    placedText.push(box);
+    // The boundary runs along the edge the mark sits on: the box's own border, dashed red, a trust boundary on the component.
+    const side = box.x >= station.x + station.w - 1 ? "right" : box.y < station.y ? "top" : "bottom";
+    const edgeY = side === "top" ? station.y : r1(station.y + station.h);
+    const boundary = side === "right"
+      ? { x1: r1(station.x + station.w), y1: r1(box.y - 5), x2: r1(station.x + station.w), y2: r1(box.y + box.h + 5) }
+      : { x1: r1(box.x - 6), y1: edgeY, x2: r1(box.x + box.w + 6), y2: edgeY };
+    tags.push({ text, kind: "boundary", state: worstState(node.boundary.map((c) => c.verdict.state)) ?? "requirement", route: undefined, node: node.folder, chokepoint: undefined, name: `${plural(node.boundary.length, "crossing", "crossings")} inside ${node.name}`, edge: undefined, rail: undefined, edges: [], broken: false, box, boundary });
+    tokenText(`mark boundary ${node.folder}`, text, box, false, "flow-tag-text");
+  }
+
+  // 5. Interface identifiers: one button each, on the pipe where it stands, on the entrance line where work enters through
+  // it, and a core dependency's once, on its rail. Each is drawn in its invariant's state.
+  const identifierOf = (text: string): { chokepoint: string; name: string; crossing: boolean; state: FlowState } => {
     const found = model.identifiers.find((identifier) => identifier.text === text)!;
-    return { chokepoint: found.chokepoint, name: found.name, crossing: found.crossing !== undefined };
+    return { chokepoint: found.chokepoint, name: found.name, crossing: found.crossing !== undefined, state: found.verdict.state };
   };
-  const fits = (box: FlowBox): boolean => inCanvas(box) && !placedText.some((other) => intersects(box, other)) && !obstacles.some((other) => intersects(box, other, 0));
+  const boundaryOf = (box: FlowBox, vertical: boolean): FlowTagDraw["boundary"] => {
+    const mid: Point = [box.x + box.w / 2, box.y + box.h / 2];
+    return vertical ? { x1: r1(box.x - 5), y1: r1(mid[1]), x2: r1(box.x + box.w + 5), y2: r1(mid[1]) } : { x1: r1(mid[0]), y1: r1(box.y - 9), x2: r1(mid[0]), y2: r1(box.y + box.h + 9) };
+  };
+  for (const draw of routes) {
+    if (draw.route.entry.length === 0) continue;
+    const widths = draw.route.entry.map(tagW);
+    const total = widths.reduce((a, b) => a + b, 0) + (widths.length - 1) * 3;
+    const { a, b } = draw.entry;
+    let placedEntry = false;
+    for (const t of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+      const cx = r1(a[0] + (b[0] - a[0]) * t);
+      let x = cx - total / 2;
+      const boxes = widths.map((w) => {
+        const box: FlowBox = { x: r1(x), y: r1(a[1] - TAG_H / 2), w, h: TAG_H };
+        x += w + 3;
+        return box;
+      });
+      if (boxes[0]!.x < a[0] + 2 || boxes[boxes.length - 1]!.x + boxes[boxes.length - 1]!.w > b[0] - 2 || !boxes.every(fits)) continue;
+      draw.route.entry.forEach((text, i) => {
+        const box = boxes[i]!;
+        placedText.push(box);
+        const found = identifierOf(text);
+        tags.push({ text, kind: "identifier", state: found.state, route: draw.route.id, node: undefined, chokepoint: found.chokepoint, name: found.name, edge: undefined, rail: undefined, edges: [], broken: found.state === "broken", box, boundary: found.crossing ? boundaryOf(box, false) : undefined });
+        tokenText(`tag entry ${draw.route.id} ${text}`, text, box, true, "flow-tag-text");
+      });
+      placedEntry = true;
+      break;
+    }
+    if (!placedEntry) dropped.push(`tag entry ${draw.route.id}`);
+  }
   const identified = model.edges.filter((edge) => !edge.stub && (edge.identifiers.length > 0 || edge.bypasses.length > 0)).sort((a, b) => b.bypasses.length - a.bypasses.length || b.identifiers.length - a.identifiers.length || a.id.localeCompare(b.id));
   for (const edge of identified) {
     const legs: { a: Point; b: Point }[] = [];
@@ -768,17 +953,18 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
     if (line !== undefined) legs.push(...[...line.line.legs].reverse());
     const broken = edge.bypasses.length > 0;
     const marks = edge.bypasses.length > 0 ? [`✕${edge.bypasses.length}`] : [];
+    const width = (text: string): number => (text.startsWith("✕") || text.startsWith("+") ? Math.ceil(textWidth(text, TYPE_SMALL, true) + 8) : tagW(text));
     // All identifiers side by side; when they do not fit, the first and a count that selects the interface.
     const rows = [[...edge.identifiers, ...marks], ...(edge.identifiers.length > 1 ? [[edge.identifiers[0]!, `+${edge.identifiers.length - 1}`, ...marks]] : [])];
     let done = false;
     for (const row of rows) {
-      const widths = row.map(tagW);
+      const widths = row.map(width);
       const total = widths.reduce((a, b) => a + b, 0) + (row.length - 1) * 3;
       for (const leg of legs) {
         const length = Math.hypot(leg.b[0] - leg.a[0], leg.b[1] - leg.a[1]);
         if (length < 6) continue;
         const vertical = Math.abs(leg.a[0] - leg.b[0]) < 0.05;
-        for (const t of [0.5, 0.3, 0.7, 0.15, 0.85]) {
+        for (const t of [0.5, 0.3, 0.7, 0.15, 0.85, 0.4, 0.6, 0.22, 0.78, 0.08, 0.92]) {
           const cx = r1(leg.a[0] + (leg.b[0] - leg.a[0]) * t);
           const cyy = r1(leg.a[1] + (leg.b[1] - leg.a[1]) * t);
           let x = cx - total / 2;
@@ -793,12 +979,9 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
             placedText.push(box);
             const kind: FlowTagDraw["kind"] = text.startsWith("✕") ? "bypass" : text.startsWith("+") ? "more" : "identifier";
             const found = kind === "identifier" ? identifierOf(text) : undefined;
-            const mid: Point = [box.x + box.w / 2, box.y + box.h / 2];
-            const boundary = found?.crossing === true
-              ? (vertical ? { x1: r1(box.x - 5), y1: r1(mid[1]), x2: r1(box.x + box.w + 5), y2: r1(mid[1]) } : { x1: r1(mid[0]), y1: r1(box.y - 9), x2: r1(mid[0]), y2: r1(box.y + box.h + 9) })
-              : undefined;
-            tags.push({ text, kind, chokepoint: found?.chokepoint, name: found?.name ?? "", edge, rail: undefined, edges: [edge.id], broken, box, boundary });
-            texts.push({ key: `tag ${edge.id} ${text}`, text, x: r1(mid[0]), y: r1(mid[1] + 3.9), size: TYPE_SMALL, bold: true, align: "middle", cls: "flow-tag-text", priority: 5 });
+            const state: FlowTagDraw["state"] = found?.state ?? "mark";
+            tags.push({ text, kind, state, route: undefined, node: undefined, chokepoint: found?.chokepoint, name: found?.name ?? "", edge, rail: undefined, edges: [edge.id], broken, box, boundary: found?.crossing === true ? boundaryOf(box, vertical) : undefined });
+            tokenText(`tag ${edge.id} ${text}`, text, box, kind === "identifier", "flow-tag-text");
           });
           done = true;
           break;
@@ -831,10 +1014,12 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
       placedText.push(box);
       x = box.x + box.w + 6;
       const found = identifierOf(text);
-      const mid: Point = [box.x + box.w / 2, box.y + box.h / 2];
       tags.push({
         text,
         kind: "identifier",
+        state: found.state,
+        route: undefined,
+        node: undefined,
         chokepoint: found.chokepoint,
         name: found.name,
         edge: undefined,
@@ -842,31 +1027,50 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
         edges: stubEdges.filter((edge) => edge.identifiers.includes(text)).map((edge) => edge.id),
         broken: stubEdges.some((edge) => edge.identifiers.includes(text) && edge.bypasses.length > 0),
         box,
-        boundary: found.crossing ? { x1: r1(mid[0]), y1: r1(box.y - 9), x2: r1(mid[0]), y2: r1(box.y + box.h + 9) } : undefined,
+        boundary: found.crossing ? boundaryOf(box, false) : undefined,
       });
-      texts.push({ key: `tag rail ${core.folder} ${text}`, text, x: r1(mid[0]), y: r1(mid[1] + 3.9), size: TYPE_SMALL, bold: true, align: "middle", cls: "flow-tag-text", priority: 5 });
+      tokenText(`tag rail ${core.folder} ${text}`, text, box, true, "flow-tag-text");
+    }
+    // A core dependency's own marks stand on its rail: its broken chokepoints, and the crossings inside it.
+    const railNode = byFolder.get(core.folder)!;
+    const marks: { kind: "broken" | "boundary"; text: string }[] = [
+      ...(railNode.defects.length > 0 ? [{ kind: "broken" as const, text: `✕ ${railNode.defects.length} broken` }] : []),
+      ...(railNode.boundary.length > 0 ? [{ kind: "boundary" as const, text: plural(railNode.boundary.length, "crossing", "crossings") }] : []),
+    ];
+    for (const mark of marks) {
+      const w = Math.ceil(textWidth(mark.text, TYPE_SMALL, true) + 10);
+      let box: FlowBox | undefined;
+      for (let tries = 0; tries < 120 && box === undefined; tries++, x += 12) {
+        const candidate: FlowBox = { x: r1(x), y: r1(rail.y - TAG_H / 2), w, h: TAG_H };
+        if (candidate.x + candidate.w > rail.x1) break;
+        const drop = stubs.some((stub) => stub.points.some((p) => p[0] >= candidate.x - 4 && p[0] <= candidate.x + candidate.w + 4 && p[1] >= rail.y - 20));
+        if (fits(candidate) && !drop) box = candidate;
+      }
+      if (box === undefined) {
+        dropped.push(`${mark.kind} ${core.folder}`);
+        continue;
+      }
+      placedText.push(box);
+      x = box.x + box.w + 6;
+      tags.push({
+        text: mark.text,
+        kind: mark.kind,
+        state: mark.kind === "broken" ? "broken" : worstState(railNode.boundary.map((c) => c.verdict.state)) ?? "requirement",
+        route: undefined,
+        node: core.folder,
+        chokepoint: undefined,
+        name: mark.kind === "broken" ? railNode.defects.map((d) => d.name).join(", ") : `${plural(railNode.boundary.length, "crossing", "crossings")} inside ${railNode.name}`,
+        edge: undefined,
+        rail: undefined,
+        edges: [],
+        broken: mark.kind === "broken",
+        box,
+        boundary: mark.kind === "boundary" ? boundaryOf(box, false) : undefined,
+      });
+      tokenText(`mark ${mark.kind} ${core.folder}`, mark.text, box, false, "flow-tag-text");
     }
   }
 
-  // 6. Defect marks beside their stations.
-  for (const node of model.nodes) {
-    const station = stations.get(node.folder);
-    if (station === undefined || node.defects.length === 0) continue;
-    const bypasses = node.defects.reduce((sum, d) => sum + d.bypasses, 0);
-    const long = `✕ ${plural(node.defects.length, "broken chokepoint", "broken chokepoints")}, ${plural(bypasses, "bypass", "bypasses")}`;
-    const short = `✕ ${node.defects.length} broken`;
-    const candidates = [long, short].flatMap((text) => [
-      { text, x: station.x + station.w, y: r1(station.y - 3), size: TYPE_SMALL, bold: true, align: "end" as const },
-      { text, x: station.x, y: r1(station.y - 3), size: TYPE_SMALL, bold: true, align: "start" as const },
-      { text, x: station.x, y: r1(station.y + station.h + 11), size: TYPE_SMALL, bold: true, align: "start" as const },
-      { text, x: station.x + station.w + 6, y: r1(station.y + 9), size: TYPE_SMALL, bold: true, align: "start" as const },
-      { text, x: station.x + station.w, y: r1(station.y + station.h + 11), size: TYPE_SMALL, bold: true, align: "end" as const },
-      { text, x: station.x - 6, y: r1(station.y + 9), size: TYPE_SMALL, bold: true, align: "end" as const },
-      { text, x: station.x + station.w / 2, y: r1(station.y - 3), size: TYPE_SMALL, bold: true, align: "middle" as const },
-      { text, x: station.x + station.w / 2, y: r1(station.y + station.h + 11), size: TYPE_SMALL, bold: true, align: "middle" as const },
-    ]);
-    tryPlace(candidates, `defect ${node.folder}`, 6, "flow-defect-mark");
-  }
   // 7. Proposals from a scaffold preview, named beside their station.
   previews.forEach((preview, index) => {
     const station = stations.get(preview.component) ?? [...stations.values()][0];
@@ -908,7 +1112,14 @@ function originToken(lines: FlowText[], color: string): Markup {
 function renderText(t: FlowText): Markup {
   // Every text is set from its left edge: middle and end alignment are resolved here from the embedded metrics.
   const box = textBox(t);
-  return html`<text class="${t.cls}" x="${r1(box.x)}" y="${t.y}" font-size="${t.size}"${t.bold ? raw(' font-weight="600"') : null}${t.within === undefined ? null : raw(` data-within="${t.within}"`)}>${t.text}</text>`;
+  return html`<text class="${t.cls}" x="${r1(box.x)}" y="${t.y}" font-size="${t.size}"${t.bold ? raw(` font-weight="${FLOW_WEIGHT}"`) : null}${t.within === undefined ? null : raw(` data-within="${t.within}"`)}>${t.text}</text>`;
+}
+
+/** A component's verdicts in words, for its title and accessible name. */
+function stateWords(node: FlowNode): string {
+  if (node.invariants.length === 0) return "declares no invariant";
+  const count = (state: FlowState): number => node.invariants.filter((i) => i.verdict.state === state).length;
+  return [count("verified") > 0 ? `${count("verified")} verified` : "", count("requirement") > 0 ? plural(count("requirement"), "requirement", "requirements") : "", count("broken") > 0 ? `${count("broken")} broken` : ""].filter(Boolean).join(", ");
 }
 
 function renderStation(node: FlowNode, station: FlowStation, texts: FlowText[], selection: FlowSelection, selected: string | undefined, model: FlowModel): Markup {
@@ -921,10 +1132,12 @@ function renderStation(node: FlowNode, station: FlowStation, texts: FlowText[], 
     selected === node.id ? "is-selected" : "",
   ].filter(Boolean).join(" ");
   const routes = model.routes.filter((route) => route.stops.includes(node.folder)).map(routeName);
-  const own = texts.filter((t) => t.key === `name ${node.folder}` || t.key === `folder ${node.folder}`);
-  return html`<g class="${classes}" id="${node.id}" data-folder="${node.folder}" data-row="${String(node.row)}" data-column="${String(node.column)}" data-seat="${`${station.seat.x} ${station.seat.y}`}" data-structure-select="${node.id}" role="button" tabindex="0" aria-pressed="${selected === node.id ? "true" : "false"}" aria-label="${flowName(node)}, ${node.folder}, calls ${node.out}, called by ${node.in}${routes.length === 0 ? "" : `, on routes ${routes.join("; ")}`}">
-    <title>${flowName(node)} · ${node.folder} · calls ${node.out} · called by ${node.in}${routes.length === 0 ? "" : ` · routes: ${routes.join("; ")}`}</title>
-    <rect id="${node.id}-box" x="${station.x}" y="${station.y}" width="${station.w}" height="${station.h}" rx="7"/>
+  const own = texts.filter((t) => t.key === `name ${node.folder}` || t.key.startsWith(`role ${node.folder} `) || t.key === `folder ${node.folder}`);
+  const state = node.state;
+  return html`<g class="${classes}" id="${node.id}" data-folder="${node.folder}" data-row="${String(node.row)}" data-column="${String(node.column)}" data-seat="${`${station.seat.x} ${station.seat.y}`}" data-state="${state ?? "none"}" data-structure-select="${node.id}" role="button" tabindex="0" aria-pressed="${selected === node.id ? "true" : "false"}" aria-label="${flowName(node)}, ${node.folder}: ${node.intent} ${stateWords(node)}; calls ${node.out}, called by ${node.in}${routes.length === 0 ? "" : `, on routes ${routes.join("; ")}`}">
+    <title>${flowName(node)} · ${node.folder} · ${node.intent} · ${stateWords(node)} · calls ${node.out} · called by ${node.in}${routes.length === 0 ? "" : ` · routes: ${routes.join("; ")}`}</title>
+    <rect class="flow-box" id="${node.id}-box" x="${station.x}" y="${station.y}" width="${station.w}" height="${station.h}" rx="7"/>
+    ${state === undefined ? null : html`<rect class="flow-state-bar flow-state-${state}" data-state-bar="${state}" x="${r1(station.x + 3.5)}" y="${r1(station.y + 6)}" width="4" height="${r1(station.h - 12)}" rx="2"/>`}
     ${own.map(renderText)}
     ${node.children > 0 ? html`<g data-structure-expand="${node.folder}"><rect class="flow-expand" x="${station.x + station.w - 16}" y="${station.y + 2}" width="14" height="14" rx="3" fill="transparent" stroke="none"/><path class="flow-expand-mark" d="${node.expanded ? `M ${station.x + station.w - 13} ${station.y + 9} L ${station.x + station.w - 5} ${station.y + 9}` : `M ${station.x + station.w - 13} ${station.y + 9} L ${station.x + station.w - 5} ${station.y + 9} M ${station.x + station.w - 9} ${station.y + 5} L ${station.x + station.w - 9} ${station.y + 13}`}" stroke="var(--flow-muted)" stroke-width="1.5"/><title>${node.expanded ? `Close its ${plural(node.children, "component", "components")}` : `Open its ${plural(node.children, "component", "components")} in place`}</title></g>` : null}
   </g>`;
@@ -939,58 +1152,73 @@ export function renderFlowSvg(model: FlowModel, selected: string | undefined, pr
   const byFolder = new Map(model.nodes.map((node) => [node.folder, node]));
   const texts = (prefix: string): FlowText[] => layout.texts.filter((t) => t.key.startsWith(prefix));
   const tagClass = (tag: (typeof layout.tags)[number]): string => {
-    const lit = selection.kind === "chokepoint"
-      ? tag.chokepoint === selection.id
-      : selection.kind === "level" || selection.kind === "edge"
-        ? tag.edges.some((id) => selection.edges.has(id))
-        : undefined;
-    const dim = lit === undefined ? active && !tag.edges.some((id) => selection.edges.has(id) || (model.edges.find((e) => e.id === id)?.routes.some((r) => selection.routes.has(r)) ?? false)) : !lit;
-    return ["flow-tag", tag.broken ? "flow-tag-broken" : "", lit === true ? "is-lit" : dim ? "is-dim" : "", tag.chokepoint !== undefined && tag.chokepoint === selected ? "is-selected" : ""].filter(Boolean).join(" ");
+    // An identifier lights exactly when the selection names its chokepoint; a component's mark when it names the component.
+    const lit = tag.kind === "identifier"
+      ? selection.chokepoints.has(tag.chokepoint!)
+      : tag.kind === "broken" || tag.kind === "boundary"
+        ? selection.marks.has(tag.node!)
+        : tag.edges.some((id) => selection.edges.has(id));
+    const quiet = selection.kind === "route" || selection.kind === "entrance" || selection.kind === "component";
+    // A component's mark on a lit component stays: it belongs to what the story passes.
+    const onLit = tag.node !== undefined && selection.nodes.has(tag.node);
+    return [
+      "flow-tag",
+      `flow-tag-${tag.state === "mark" ? "mark" : tag.state}`,
+      tag.kind === "broken" ? "flow-tag-broken-mark" : tag.kind === "boundary" ? "flow-tag-boundary" : "",
+      active && lit && !quiet ? "is-lit" : active && !lit && !onLit ? "is-dim" : "",
+      (tag.chokepoint !== undefined && tag.chokepoint === selected) || (tag.kind === "broken" && selected === flowBrokenId(tag.node!)) || (tag.kind === "boundary" && selected === flowBoundaryId(tag.node!)) ? "is-selected" : "",
+    ].filter(Boolean).join(" ");
   };
   return html`<svg class="flow-svg" xmlns="http://www.w3.org/2000/svg" role="group" aria-labelledby="flow-svg-title" viewBox="0 0 ${layout.width} ${layout.height}" width="${layout.width}" height="${layout.height}" style="${`min-width: ${layout.width}px`}" data-selected="${selection.id ?? ""}" data-dropped="${layout.dropped.join("|")}">
     <title id="flow-svg-title">Structure: ${plural(model.routes.length, "structural route", "structural routes")} through ${plural(model.nodes.length, "component", "components")}, ${plural(model.coreDependencies.length, "core dependency", "core dependencies")} drawn as rails</title>
     <style>${raw(FLOW_SVG_STYLE)}${raw(routeVars())}</style>
     <defs>
       <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--flow-quiet)"/></marker>
+      <pattern id="flow-hatch" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="3" fill="var(--flow-node)"/><rect width="1.4" height="3" fill="var(--flow-verified)"/></pattern>
     </defs>
     <rect class="flow-surface" x="0" y="0" width="${layout.width}" height="${layout.height}" rx="12"/>
     ${texts("caption").map(renderText)}
     ${texts("column").map(renderText)}
     ${layout.rails.map((rail) => {
       const node = byFolder.get(rail.folder)!;
-      return html`<g class="flow-rail ${flowLit(selection, selection.nodes.has(rail.folder))}${selected === node.id ? " is-selected" : ""}" id="${node.id}" data-folder="${rail.folder}" data-core="true" data-structure-select="${node.id}" role="button" tabindex="0" aria-pressed="${selected === node.id ? "true" : "false"}" aria-label="${node.name}, core dependency, called by ${model.coreDependencies[rail.index]!.callers.length} components">
-        <title>${node.name} · ${node.folder} · core dependency: ${CORE_RULE}</title>
+      return html`<g class="flow-rail ${flowLit(selection, selection.nodes.has(rail.folder))}${selected === node.id ? " is-selected" : ""}" id="${node.id}" data-folder="${rail.folder}" data-core="true" data-state="${node.state ?? "none"}" data-structure-select="${node.id}" role="button" tabindex="0" aria-pressed="${selected === node.id ? "true" : "false"}" aria-label="${node.name}, core dependency, called by ${model.coreDependencies[rail.index]!.callers.length} components; ${stateWords(node)}">
+        <title>${node.name} · ${node.folder} · ${node.intent} · ${stateWords(node)} · core dependency: ${CORE_RULE}</title>
         <line class="flow-line flow-rail-line" data-line="${`rail ${rail.folder}`}" x1="${rail.x0}" y1="${rail.y}" x2="${rail.x1}" y2="${rail.y}" stroke="var(--flow-rail-${rail.index % FLOW_RAIL_COLORS.length})"/>
         ${texts(`rail ${rail.folder}`).map(renderText)}
       </g>`;
     })}
     ${layout.stubs.map((stub) => html`<g class="flow-stub-group ${flowLit(selection, selection.edges.has(stub.edge.id))}" data-stub="${stub.edge.id}" data-from="${stub.edge.from}" data-to="${stub.edge.to}"><path class="flow-line flow-stub" data-line="${`stub ${stub.edge.id}`}" d="${pathD(stub.points)}" stroke="var(--flow-rail-${stub.rail % FLOW_RAIL_COLORS.length})"/>${stub.joints.map(([x, y]) => html`<circle class="flow-joint" cx="${x}" cy="${y}" r="2.6" fill="var(--flow-rail-${stub.rail % FLOW_RAIL_COLORS.length})"/>`)}</g>`)}
     ${layout.lines.map((draw) => html`<g class="flow-interface ${flowLit(selection, selection.edges.has(draw.edge.id))}" id="${draw.edge.id}" data-from="${draw.edge.from}" data-to="${draw.edge.to}" data-drawn="${draw.kind}" data-structure-select="${draw.edge.id}" role="button" tabindex="0" aria-label="${draw.edge.from} to ${draw.edge.to}, on no structural route"><title>${draw.edge.from} → ${draw.edge.to}: on no structural route</title><path class="flow-line ${draw.kind === "faint" ? "flow-faint" : "flow-bearing-line"}${draw.edge.bypasses.length > 0 ? " flow-broken-line" : ""}${selection.edges.has(draw.edge.id) ? " is-lit" : ""}" data-line="${draw.edge.id}" data-edge="${draw.edge.id}" d="${pathD(draw.line.points)}" marker-end="url(#flow-arrow)"/></g>`)}
-    ${layout.routes.map((draw) => html`<g class="flow-route-group ${routeClass(draw.route)}" id="${draw.route.id}" data-names="${draw.route.names.join(", ")}" data-derived="${draw.route.derived ? "true" : "false"}" data-stops="${draw.route.stops.join(" ")}" data-edges="${draw.route.edges.join(" ")}"${draw.route.rail === undefined ? null : raw(` data-rail="${draw.route.rail}"`)} data-structure-select="${draw.route.id}" role="button" tabindex="0" aria-pressed="${selection.id === draw.route.id ? "true" : "false"}" aria-label="${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(", ")}">
+    ${layout.routes.map((draw) => html`<g class="flow-route-group ${routeClass(draw.route)}" id="${draw.route.id}" data-names="${draw.route.names.join(", ")}" data-derived="${draw.route.derived ? "true" : "false"}" data-stops="${draw.route.stops.join(" ")}" data-edges="${draw.route.edges.join(" ")}"${draw.route.rail === undefined ? null : raw(` data-rail="${draw.route.rail}"`)} data-trust="${draw.route.trust.join(" ")}" data-structure-select="${draw.route.id}" role="button" tabindex="0" aria-pressed="${selection.id === draw.route.id ? "true" : "false"}" aria-label="${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(", ")}">
       <title>${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(" → ")}${draw.route.rail === undefined ? "" : ` → ${byFolder.get(draw.route.rail)!.name} (rail)`}</title>
       <path class="flow-line flow-route" data-line="${draw.route.id}" d="${pathD(draw.path)}" stroke="${draw.color}"/>
-      <g class="flow-terminus${draw.route.derived ? " flow-derived" : ""}" style="${`--flow-token-ink: var(${draw.route.slot === undefined ? "--flow-neutral-ink" : `--flow-route-ink-${draw.route.slot}`})`}">${originToken(texts(`origin ${draw.route.id} `), draw.color)}${texts(`origin ${draw.route.id} `).map(renderText)}</g>
+      <g class="flow-terminus${draw.route.derived ? " flow-derived" : ""}">${originToken(texts(`origin ${draw.route.id} `), draw.color)}${texts(`origin ${draw.route.id} `).map(renderText)}</g>
     </g>`)}
     ${[...layout.stations.entries()].map(([folder, station]) => renderStation(byFolder.get(folder)!, station, layout.texts, selection, selected, model))}
     ${layout.tags.map((tag) => {
-      const where = tag.rail !== undefined ? raw(` data-rail="${tag.rail}"`) : raw(` data-edge="${tag.edge!.id}"`);
-      const on = tag.rail !== undefined ? `the ${byFolder.get(tag.rail)!.name} rail` : `${tag.edge!.from} to ${tag.edge!.to}`;
+      const where = tag.rail !== undefined ? raw(` data-rail="${tag.rail}"`) : tag.route !== undefined ? raw(` data-entry="${tag.route}"`) : tag.node !== undefined ? raw(` data-node="${tag.node}"`) : raw(` data-edge="${tag.edge!.id}"`);
+      const on = tag.rail !== undefined ? `the ${byFolder.get(tag.rail)!.name} rail` : tag.route !== undefined ? `the entrance line of ${routeName(model.routes.find((r) => r.id === tag.route)!)}` : tag.node !== undefined ? byFolder.get(tag.node)!.name : `${tag.edge!.from} to ${tag.edge!.to}`;
+      const verdict = tag.chokepoint === undefined ? undefined : model.identifiers.find((i) => i.chokepoint === tag.chokepoint)?.verdict.label;
       const what = tag.kind === "identifier"
-        ? raw(` data-identifier="${tag.text}"${tag.rail !== undefined ? ` data-edges="${tag.edges.join(" ")}"` : ""} data-structure-select="${tag.chokepoint}" role="button" tabindex="0" aria-label="${tag.text}: ${tag.name.replace(/"/g, "&quot;")}"`)
-        : raw(` data-mark="${tag.kind}" data-structure-select="${tag.edge!.id}" role="button" tabindex="0" aria-label="${tag.kind === "bypass" ? `${plural(tag.edge!.bypasses.length, "bypass", "bypasses")}` : `${tag.edge!.identifiers.length - 1} more interface identifiers`} on ${on}"`);
+        ? raw(` data-identifier="${tag.text}" data-state="${tag.state}"${tag.rail !== undefined ? ` data-edges="${tag.edges.join(" ")}"` : ""} data-structure-select="${tag.chokepoint}" role="button" tabindex="0" aria-label="${tag.text}: ${tag.name.replace(/"/g, "&quot;")}, ${verdict ?? ""}"`)
+        : tag.kind === "broken"
+          ? raw(` data-mark="broken" data-state="broken" data-structure-select="${flowBrokenId(tag.node!)}" role="button" tabindex="0" aria-label="${tag.text} in ${on}: ${tag.name.replace(/"/g, "&quot;")}"`)
+          : tag.kind === "boundary"
+            ? raw(` data-mark="boundary" data-state="${tag.state}" data-structure-select="${flowBoundaryId(tag.node!)}" role="button" tabindex="0" aria-label="${tag.name.replace(/"/g, "&quot;")}"`)
+            : raw(` data-mark="${tag.kind}" data-structure-select="${tag.edge!.id}" role="button" tabindex="0" aria-label="${tag.kind === "bypass" ? `${plural(tag.edge!.bypasses.length, "bypass", "bypasses")}` : `${tag.edge!.identifiers.length - 1} more interface identifiers`} on ${on}"`);
+      const key = tag.kind === "broken" ? `mark broken ${tag.node}` : tag.kind === "boundary" ? `mark boundary ${tag.node}` : tag.rail !== undefined ? `tag rail ${tag.rail} ${tag.text}` : tag.route !== undefined ? `tag entry ${tag.route} ${tag.text}` : `tag ${tag.edge!.id} ${tag.text}`;
+      const title = tag.kind === "identifier" ? `${tag.text}: ${tag.name}, ${verdict ?? ""} · on ${on}` : tag.kind === "bypass" ? `broken: ${plural(tag.edge!.bypasses.length, "bypass", "bypasses")} on ${on}` : tag.kind === "broken" ? `${on}: broken chokepoints ${tag.name}` : tag.kind === "boundary" ? `${tag.name}: trust boundaries on no drawn interface` : `${tag.edge!.identifiers.join(", ")} on ${on}`;
       return html`<g class="${tagClass(tag)}"${where}${what}>
-        <title>${tag.kind === "identifier" ? `${tag.text}: ${tag.name} · on ${on}` : tag.kind === "bypass" ? `broken: ${plural(tag.edge!.bypasses.length, "bypass", "bypasses")} on ${on}` : `${tag.edge!.identifiers.join(", ")} on ${on}`}</title>
+        <title>${title}</title>
         ${tag.boundary === undefined ? null : html`<line class="flow-boundary" x1="${tag.boundary.x1}" y1="${tag.boundary.y1}" x2="${tag.boundary.x2}" y2="${tag.boundary.y2}"/>`}
         <rect x="${tag.box.x}" y="${tag.box.y}" width="${tag.box.w}" height="${tag.box.h}" rx="3"/>
-        ${layout.texts.filter((t) => t.key === (tag.rail !== undefined ? `tag rail ${tag.rail} ${tag.text}` : `tag ${tag.edge!.id} ${tag.text}`)).map(renderText)}
+        ${layout.texts.filter((t) => t.key === key).map((t) => renderText({ ...t, cls: `${t.cls}${t.mono === true ? " flow-mono" : ""}` }))}
       </g>`;
     })}
     ${layout.mass === undefined ? null : html`<g class="flow-mass" data-mass="unowned"><rect id="structure--mass-box" x="${layout.mass.x}" y="${layout.mass.y}" width="${layout.mass.w}" height="${layout.mass.h}" rx="7"/>${texts("mass").map(renderText)}</g>`}
-    ${texts("defect").map(renderText)}
     ${renderFlowProposals(model, layout, previews)}
   </svg>`;
 }
-
 function renderFlowProposals(model: FlowModel, layout: FlowLayout, previews: readonly StructurePreview[]): Markup {
   return join(previews.map((preview, index) => {
     const folder = model.nodes.find((node) => node.folder === preview.component)?.folder ?? model.nodes[0]?.folder;
@@ -1010,11 +1238,28 @@ function renderFlowProposals(model: FlowModel, layout: FlowLayout, previews: rea
 /*
  * The inspector reads like a product sidebar, not a page: what kind of thing
  * is selected, its name, one line saying what it is, then rows of labelled
- * facts and lists of rows to select next. Monospace only for code
- * identifiers and paths; counts in tabular numerals; long explanations fold.
+ * facts and lists of rows to select next. One verdict per invariant, dated;
+ * what an agent needs (test commands, per-enforcement records, the two
+ * options) folds beneath it, closed. Monospace only for code identifiers and
+ * paths; counts in tabular numerals; long explanations fold.
  */
 
-function flowPick(id: string, text: string, elementId?: string): Markup {
+/** Terms the map uses that the glossary does not define: defined here, in the key, and on hover where they appear. */
+const LOCAL_TERMS: Record<string, string> = {
+  bypass: "a reference to a chokepoint's protected thing from outside the chokepoint: one is enough to break it",
+  derived: "a route drawn by reference weight from the root component's interfaces because no entrance is declared: not the path work takes",
+  "reference weight": "how many reference sites a component interface carries: what a derived route follows, which is not flow",
+};
+
+/** A term linked to its glossary definition (its title carries the definition), or defined in place when the glossary has none. */
+function termLink(state: ShellState, name: string, text: string = name): Markup {
+  const layer = state.glossary.layers.find((l) => l.kind === "present" && l.id === "coherence");
+  const concept = layer?.kind === "present" ? layer.glossary.concepts.find((c) => c.name === name) : undefined;
+  if (concept !== undefined) return html`<a class="flow-term" href="#coherence-${slug(name)}" title="${concept.definition}">${text}</a>`;
+  return html`<dfn class="flow-term" title="${LOCAL_TERMS[name] ?? name}">${text}</dfn>`;
+}
+
+function flowPick(id: string, text: string | Markup, elementId?: string): Markup {
   return html`<button type="button" class="flow-pick" data-structure-select="${id}"${elementId === undefined ? null : raw(` id="${elementId}"`)}>${text}</button>`;
 }
 
@@ -1024,8 +1269,8 @@ function flowRow(pick: Markup, meta: Markup | string | null = null, kind: "count
 }
 
 /** Labelled facts: a label and its value per row. */
-function flowFacts(rows: readonly (readonly [string, Markup | string] | null)[]): Markup {
-  const shown = rows.filter((row): row is readonly [string, Markup | string] => row !== null);
+function flowFacts(rows: readonly (readonly [string | Markup, Markup | string] | null)[]): Markup {
+  const shown = rows.filter((row): row is readonly [string | Markup, Markup | string] => row !== null);
   return shown.length === 0 ? html`` : html`<dl class="flow-facts">${shown.map(([label, value]) => html`<dt>${label}</dt><dd>${value}</dd>`)}</dl>`;
 }
 
@@ -1041,6 +1286,20 @@ function flowHead(kind: Markup | string, heading: Markup, id?: string, summary: 
     ${summary === null || summary === "" ? null : html`<p class="flow-sub">${summary}</p>`}`;
 }
 
+/** An invariant's one verdict, drawn as the map draws it: a swatch in its state and the verdict in words, dated. */
+function verdictMark(ref: Pick<FlowInvariantRef, "verdict">): Markup {
+  return html`<span class="flow-verdict" data-verdict-state="${ref.verdict.state}"><span class="flow-verdict-swatch" aria-hidden="true"></span>${ref.verdict.label}</span>`;
+}
+
+/** One invariant as a row: its name (selecting its chokepoint when it has one, else linking its card) and its one verdict. */
+function invariantRow(model: FlowModel, ref: FlowInvariantRef, where = false): Markup {
+  const chokepoint = model.chokepoints.find((c) => c.component === ref.component && c.name === ref.name);
+  const identifier = chokepoint === undefined ? undefined : model.identifiers.find((i) => i.chokepoint === chokepoint.id);
+  const pick = chokepoint === undefined ? html`<a class="flow-pick" href="#${invariantId(ref.component, ref.name)}">${ref.name}</a>` : flowPick(chokepoint.id, ref.name);
+  const lead = identifier === undefined ? null : html`<span class="flow-ident" data-verdict-state="${ref.verdict.state}">${identifier.text}</span>`;
+  return html`<li class="flow-row" data-invariant="${ref.name}" data-verdict-state="${ref.verdict.state}">${lead}${pick}<span class="flow-meta">${verdictMark(ref)}${where ? html` · ${ref.component === "." ? "the root" : ref.component}` : null}</span></li>`;
+}
+
 function flowSite(site: RelianceSite): Markup {
   const role = site.target === "protected" && site.siteClass === "bypass"
     ? "protected thing · bypass (not a legal chokepoint reference)"
@@ -1052,11 +1311,12 @@ function flowSite(site: RelianceSite): Markup {
   return html`<li data-class="${site.siteClass}" data-target="${site.target}" data-test="${site.test ? "true" : "false"}" data-owner="${site.owner ? "true" : "false"}"><code>${site.file}:${site.line}</code> in <code>${site.symbol}</code> <span class="flow-meta">${site.component?.folder ?? "outside declared components"}</span> <span class="site-role">${role}</span>${site.form === undefined ? null : html` <span class="label">${site.form}</span>`}${site.owner ? html` <span class="label">owner</span>` : null}${site.test ? html` <span class="label">test</span>` : null}</li>`;
 }
 
+/** The two honest options for a broken chokepoint: advice for the agent that repairs it, folded. */
 function renderFlowOptions(component: string, name: string, chokepoints: readonly string[]): Markup {
-  return html`<h5>The two options</h5><ol class="options" data-field="options">
+  return html`<details class="flow-more flow-agent"><summary>What an agent does next</summary><h5>The two options</h5><ol class="options" data-field="options">
     <li data-option="route"><strong>Route through the chokepoint.</strong> Move each bypass inside ${join(chokepoints.map((c, i) => html`<code>${c}</code>${i < chokepoints.length - 1 ? ", " : ""}`))} so the protected thing is reached through it and nowhere else; the next run turns the verdict green.</li>
     <li data-option="retire"><strong>Escalate a retirement.</strong> Record the decision with preservation as the rejected alternative, <code>escalate</code> it, and let a human <code>acknowledge</code> with the reliance of <a href="#${invariantId(component, name)}">${name}</a> in view. The invariant stands, and alarms, until then.</li>
-  </ol>`;
+  </ol></details>`;
 }
 
 /** The evidence the map stands on, in one line. */
@@ -1091,10 +1351,59 @@ function routeRow(model: FlowModel, route: FlowRoute): Markup {
 }
 
 function edgeName(edge: FlowEdge): string {
-  return `${edge.from} → ${edge.to}`;
+  return `${edge.from === "." ? "root" : edge.from} → ${edge.to === "." ? "root" : edge.to}`;
 }
 
-function renderFlowSummary(model: FlowModel, previews: readonly StructurePreview[]): Markup {
+/** The words each health count carries, for the strip and its inspector. */
+function healthWords(kind: FlowHealthKind, count: number): string {
+  switch (kind) {
+    case "verified":
+      return `${count} ${count === 1 ? "invariant" : "invariants"} enforced and verified`;
+    case "requirements":
+      return `${count} ${count === 1 ? "requirement" : "requirements"}, not yet enforced`;
+    case "defects":
+      return plural(count, "structural defect", "structural defects");
+    case "bypassed":
+      return `${count} ${count === 1 ? "requirement" : "requirements"} with a broken chokepoint`;
+    case "escalations":
+      return `${count} ${count === 1 ? "escalation" : "escalations"} awaiting a human`;
+  }
+}
+
+/** The health strip at the top of the map: every count is a selection, and its inspector lists the set. */
+function renderHealthStrip(model: FlowModel, selected: string | undefined): Markup {
+  const counts: Record<FlowHealthKind, number> = { verified: model.health.verified.length, requirements: model.health.requirements.length, defects: model.health.defects.length, bypassed: model.health.bypassed.length, escalations: model.health.escalations.length };
+  const shown = FLOW_HEALTH_KINDS.filter((kind) => kind === "verified" || kind === "requirements" || kind === "defects" || counts[kind] > 0);
+  const nothingEnforced = counts.verified === 0 && counts.requirements > 0;
+  return html`<div class="flow-health" data-field="health" role="group" aria-label="Health">
+    ${shown.map((kind) => html`<button type="button" class="flow-health-count" data-health="${kind}" data-count="${String(counts[kind])}" data-structure-select="${flowHealthId(kind)}" aria-pressed="${selected === flowHealthId(kind) ? "true" : "false"}"><span class="flow-health-swatch" aria-hidden="true"></span><strong>${String(counts[kind])}</strong> ${healthWords(kind, counts[kind]).replace(/^\d+ /, "")}</button>`)}
+    ${nothingEnforced ? html`<p class="flow-health-note" data-field="nothing-enforced">Nothing is enforced yet: every declared invariant is still a requirement, so no identifier on this map is a working control.</p>` : null}
+  </div>`;
+}
+
+function renderHealthInspector(state: ShellState, model: FlowModel, kind: FlowHealthKind): Markup {
+  if (kind === "escalations") {
+    return html`<div class="flow-inspect" data-kind="health" data-health="${kind}">
+      ${flowHead("Health", html`${healthWords(kind, model.health.escalations.length)}`, `${flowHealthId(kind)}-heading`, "Each waits for a human to acknowledge it.")}
+      <ul class="flow-rows" data-field="members">${model.health.escalations.map((e) => html`<li class="flow-row"><a class="flow-pick" href="#journal-${slug(e.id)}">${e.id}</a><span class="flow-meta">${e.what}</span></li>`)}</ul>
+    </div>`;
+  }
+  const members = flowHealthMembers(model, kind);
+  const summary = kind === "verified"
+    ? html`Each is an ${termLink(state, "invariant")}: enforced, its enforcement seen to fire, and verified by the latest run that checked it.`
+    : kind === "requirements"
+      ? html`Each is a ${termLink(state, "requirement")}: declared, and nothing yet detects its violation. Its identifier on the map is outlined, not solid.`
+      : kind === "defects"
+        ? html`Each is a ${termLink(state, "structural defect")}: an invariant whose enforcement no longer holds.`
+        : html`Each is a ${termLink(state, "requirement")} whose ${termLink(state, "chokepoint")} check found a ${termLink(state, "bypass")}: broken, though never enforced.`;
+  const byComponent = [...new Set(members.map((m) => m.component))];
+  return html`<div class="flow-inspect" data-kind="health" data-health="${kind}">
+    ${flowHead("Health", html`${healthWords(kind, members.length)}`, `${flowHealthId(kind)}-heading`, summary)}
+    ${members.length === 0 ? html`<p class="flow-note">None.</p>` : join(byComponent.map((component) => html`<h4>${component === "." ? "The root" : component} <span class="flow-count">${members.filter((m) => m.component === component).length}</span></h4><ul class="flow-rows" data-field="members">${members.filter((m) => m.component === component).map((m) => invariantRow(model, m))}</ul>`))}
+  </div>`;
+}
+
+function renderFlowSummary(state: ShellState, model: FlowModel, previews: readonly StructurePreview[]): Markup {
   const bearing = model.edges.filter((edge) => edge.loadBearing).length;
   const broken = model.edges.filter((edge) => edge.bypasses.length > 0).length;
   const onRoutes = model.edges.filter((edge) => edge.routes.length > 0).length;
@@ -1103,43 +1412,47 @@ function renderFlowSummary(model: FlowModel, previews: readonly StructurePreview
     ${flowHead("Nothing selected", html`${plural(model.edges.length, "component interface", "component interfaces")}`, undefined, `Between ${plural(model.nodes.length, "component", "components")}. Select anything to trace it; the rest dims.`)}
     ${flowFacts([
       ["On routes", `${onRoutes}`],
-      ["Stubs to core dependencies", `${stubs}`],
-      ["Load-bearing", html`${bearing} <span class="flow-meta">a chokepoint or a crossing stands there</span>`],
+      [html`Stubs to ${termLink(state, "core dependency", "core dependencies")}`, `${stubs}`],
+      ["Load-bearing", html`${bearing} <span class="flow-meta">a ${termLink(state, "chokepoint")} or a ${termLink(state, "crossing")} stands there</span>`],
       broken > 0 ? ["Broken", html`<span class="flow-bad">${broken}</span>`] : null,
       ["Others", html`${model.edges.length - onRoutes - stubs} <span class="flow-meta">drawn faint when a selection reaches them</span>`],
     ])}
     ${model.edges.length === 0 ? html`<p class="empty" data-field="no-interfaces">No component interface is known: ${model.evidence === "run sites only" ? "no latest run records a reference from one component into another's chokepoint or protected thing, and the language adapter was not asked." : "no component's code references another's."}</p>` : null}
     <h4>Where work enters</h4>
-    ${model.routesFrom === "root interfaces" ? html`<p class="flow-note" data-field="derived-routes">No spec declares an entrance. Each route is derived from one of the root component's component interfaces, named for the first component it reaches, and follows the heaviest interface at each stop.</p>` : null}
+    ${model.routesFrom === "root interfaces" ? html`<p class="flow-note" data-field="derived-routes">No spec declares an entrance. Each route is ${termLink(state, "derived")} from one of the root component's component interfaces by ${termLink(state, "reference weight")}, not flow, and named for the first component it reaches.</p>` : null}
     ${model.entrances.length === 0 && model.routesFrom !== "root interfaces" ? html`<p class="flow-note" data-field="no-entrances">No spec declares an entrance, and there is no root component to derive routes from.</p>` : null}
     <ul class="flow-rows" data-field="routes">${model.routes.map((route) => routeRow(model, route))}</ul>
-    ${model.entrances.length === 0 ? null : html`<details class="flow-entrances"><summary>Entrances <span class="flow-count">${model.entrances.length}</span></summary><ul class="flow-rows">${model.entrances.map((e) => flowRow(flowPick(e.id, e.name, e.id), e.reachable ? `starts in ${e.start === "." ? "the root" : e.start}` : e.reason ?? ""))}</ul></details>`}
-    ${model.coreDependencies.length === 0 ? null : html`<h4>Core dependencies</h4><p class="flow-note" data-field="core-rule">A core dependency is ${CORE_RULE}. Drawn as a rail; each caller's stub runs down to it.</p><ul class="flow-rows">${model.coreDependencies.map((core) => {
+    ${model.entrances.length === 0 ? null : html`<details class="flow-entrances"><summary>Entrances <span class="flow-count">${model.entrances.length}</span></summary><ul class="flow-rows">${model.entrances.map((e) => flowRow(flowPick(e.id, e.name, e.id), e.reachable ? `starts in ${e.start === "." ? "the root" : e.start}${e.trust.length === 0 ? "" : `, carries ${e.trust.join(", ")}`}` : e.reason ?? ""))}</ul></details>`}
+    ${model.coreDependencies.length === 0 ? null : html`<h4>Core dependencies</h4><p class="flow-note" data-field="core-rule">A ${termLink(state, "core dependency")} is ${CORE_RULE}. Drawn as a rail; each caller's stub runs down to it.</p><ul class="flow-rows">${model.coreDependencies.map((core) => {
       const node = model.nodes.find((n) => n.folder === core.folder)!;
       return flowRow(flowPick(node.id, node.name), `called by ${core.callers.map((c) => (c === "." ? "the root" : c)).join(", ")}`);
     })}</ul>`}
     <h4>Interface identifiers</h4>
-    ${model.identifiers.length === 0 ? html`<p class="flow-note">No chokepoint stands on a component interface.</p>` : html`<ul class="flow-rows" data-field="identifiers">${model.identifiers.map((identifier) => flowRow(flowPick(identifier.chokepoint, identifier.name), `${identifier.component}${identifier.crossing === undefined ? "" : `, crossing ${identifier.crossing.from} → ${identifier.crossing.to}`}, on ${plural(identifier.edges.length, "interface", "interfaces")}`, "line", html`<span class="flow-ident">${identifier.text}</span>`))}</ul>`}
+    ${model.identifiers.length === 0 ? html`<p class="flow-note">No chokepoint stands on a component interface or an entrance line.</p>` : html`<ul class="flow-rows" data-field="identifiers">${model.identifiers.map((identifier) => flowRow(flowPick(identifier.chokepoint, identifier.name), html`${verdictMark(identifier)} · ${identifier.component}${identifier.crossing === undefined ? "" : `, crossing ${identifier.crossing.from} → ${identifier.crossing.to}`}`, "line", html`<span class="flow-ident" data-verdict-state="${identifier.verdict.state}">${identifier.text}</span>`))}</ul>`}
     <h4>Where data goes, by trust level</h4>
-    <ul class="flow-rows">${model.levels.map((level) => flowRow(flowPick(level.id, level.name, level.id), plural(level.edges.length, "interface", "interfaces"), "count"))}</ul>
+    <ul class="flow-rows">${model.levels.map((level) => {
+      const drawn = model.crossings.filter((c) => c.from === level.name || c.to === level.name).length;
+      return flowRow(flowPick(level.id, level.name, level.id), plural(drawn, "crossing", "crossings"), "count");
+    })}</ul>
     <h4>What changed</h4>
     <ul class="flow-rows">${flowRow(flowPick(FLOW_CHANGE_ID, "What this change touches and weakens", FLOW_CHANGE_ID), "comparison with the previous commit")}</ul>
     <details class="flow-chokepoints"><summary>Chokepoints <span class="flow-count">${model.chokepoints.length}</span></summary>
-      <ul class="flow-rows">${model.chokepoints.map((c) => flowRow(flowPick(c.id, c.name, c.id), html`<code>${c.chokepoint}</code> in ${c.component}`))}</ul>
+      <ul class="flow-rows">${model.chokepoints.map((c) => flowRow(flowPick(c.id, c.name, c.id), html`${verdictMark(c)} · <code>${c.chokepoint}</code> in ${c.component}`))}</ul>
     </details>
     ${previews.length === 0 ? null : html`<h4>Proposed</h4><ul>${previews.map((p) => html`<li data-proposed="true">proposed preview · ${p.name}: ${p.crossing.from} → ${p.crossing.to} in ${p.component}. Reliance unknown: a proposal has no run evidence. This dashed edge exists only in the ephemeral preview.</li>`)}</ul>`}
   </div>`;
 }
 
 /** A route's stops as rows: each component interface it takes, with its identifiers or its site count. */
-function renderRouteBody(model: FlowModel, route: FlowRoute, named: boolean): Markup {
+function renderRouteBody(state: ShellState, model: FlowModel, route: FlowRoute, named: boolean): Markup {
   return html`${named ? html`<p class="flow-sub">${routeSwatch(route)} <strong>${routeName(route)}</strong>: ${routeStops(model, route)}</p>` : null}
+    ${route.entry.length === 0 ? null : html`<p class="flow-note" data-field="entry">Where work enters, its handler is itself a ${termLink(state, "chokepoint")}: ${route.entry.join(" ")} stand on the line from its entrances${route.trust.length === 0 ? "" : `, carrying ${route.trust.join(", ")} in`}.</p>`}
     <h4>Interfaces along it <span class="flow-count">${route.edges.length}</span></h4>
-    <ul class="flow-rows">${route.edges.map((id) => model.edges.find((edge) => edge.id === id)!).map((edge) => flowRow(flowPick(edge.id, edgeName(edge)), edge.identifiers.length === 0 ? plural(edge.sites, "site", "sites") : edge.identifiers.join(" "), "count"))}</ul>
-    <details class="flow-more"><summary>How a route is followed</summary><p>From each stop the route follows the heaviest component interface (most reference sites) to a component not yet on it, not a core dependency, and not in a column left of the one it stands in.</p></details>`;
+    ${route.edges.length === 0 ? html`<p class="flow-note">None: its handler's reach calls no other component except core dependencies${route.rail === undefined ? "" : `; it ends in the ${route.rail} rail`}.</p>` : html`<ul class="flow-rows">${route.edges.map((id) => model.edges.find((edge) => edge.id === id)!).map((edge) => flowRow(flowPick(edge.id, edgeName(edge)), edge.identifiers.length === 0 ? plural(edge.sites, "site", "sites") : `${edge.identifiers.join(" ")} · ${plural(edge.sites, "site", "sites")}`, "count"))}</ul>`}
+    <details class="flow-more"><summary>How a route is followed</summary><p>${route.followed === "reach" ? `By its handler's reach: ${ROUTE_RULE}.` : html`By ${termLink(state, "reference weight")}, not flow: the adapter read no handler reach, so from each stop the route follows the heaviest component interface (most reference sites) to a component not yet on it, not a core dependency, and not in a column left of the one it stands in.`}</p></details>`;
 }
 
-function renderEntranceInspector(model: FlowModel, entrance: FlowEntrance): Markup {
+function renderEntranceInspector(state: ShellState, model: FlowModel, entrance: FlowEntrance): Markup {
   const route = model.routes.find((candidate) => candidate.entrances.includes(entrance.id));
   return html`<div class="flow-inspect" data-kind="entrance">
     ${flowHead("Entrance", html`${entrance.name}`, `${entrance.id}-heading`, entrance.meaning)}
@@ -1147,45 +1460,56 @@ function renderEntranceInspector(model: FlowModel, entrance: FlowEntrance): Mark
       ["Declared by", html`<code>${entrance.declaredBy}</code>`],
       ["Handler", entrance.handler === undefined ? "none" : html`<code>${entrance.handler}</code>`],
       entrance.start === undefined ? null : ["Starts in", html`<code>${entrance.start}</code>`],
+      [html`${termLink(state, "trust level", "Trust")} in`, entrance.trust.length === 0 ? "no crossing's chokepoint is its handler" : entrance.trust.join(", ")],
     ])}
-    ${entrance.reachable ? (route === undefined ? html`<p class="flow-note">Its route is not drawn.</p>` : renderRouteBody(model, route, true)) : html`<p class="empty" data-field="unreachable">${entrance.resolved ? "Unreachable" : "Unresolved"}: ${entrance.reason}</p>`}
+    ${entrance.reachable ? (route === undefined ? html`<p class="flow-note">Its route is not drawn.</p>` : renderRouteBody(state, model, route, true)) : html`<p class="empty" data-field="unreachable">${entrance.resolved ? "Unreachable" : "Unresolved"}: ${entrance.reason}</p>`}
   </div>`;
 }
 
-function renderRouteInspector(model: FlowModel, route: FlowRoute): Markup {
+function renderRouteInspector(state: ShellState, model: FlowModel, route: FlowRoute): Markup {
   return html`<div class="flow-inspect" data-kind="route">
-    ${flowHead(route.derived ? "Derived structural route" : "Structural route", html`${routeSwatch(route)} ${routeName(route)}`, `${route.id}-heading`, routeStops(model, route))}
-    ${renderRouteBody(model, route, false)}
-    ${route.derived ? html`<p class="flow-note">Derived from the root component's component interface to ${route.stops[1] ?? "nothing"}: no spec declares an entrance, so the route is named for the first component it reaches.</p>` : html`<h4>Entrances it starts from <span class="flow-count">${route.entrances.length}</span></h4><ul class="flow-rows">${route.entrances.map((id) => model.entrances.find((e) => e.id === id)!).map((e) => flowRow(flowPick(e.id, e.name), e.meaning))}</ul>`}
+    ${flowHead(route.derived ? html`${termLink(state, "derived", "Derived")} structural route, by reference weight` : html`${termLink(state, "structural route", "Structural route")}`, html`${routeSwatch(route)} ${route.derived ? routeName(route) : plural(route.names.length, "entrance", "entrances")}`, `${route.id}-heading`, routeStops(model, route))}
+    ${renderRouteBody(state, model, route, false)}
+    ${route.derived ? html`<p class="flow-note">Derived from the root component's component interface to ${route.stops[1] ?? "nothing"} by reference weight: no spec declares an entrance, so the route is named for the first component it reaches and is not the path work takes.</p>` : html`<h4>Entrances it starts from <span class="flow-count">${route.entrances.length}</span></h4><ul class="flow-rows" data-field="entrances">${route.entrances.map((id) => model.entrances.find((e) => e.id === id)!).map((e) => flowRow(flowPick(e.id, e.name), e.meaning))}</ul>`}
   </div>`;
 }
 
-function renderLevelInspector(model: FlowModel, level: FlowLevel): Markup {
+function renderLevelInspector(state: ShellState, model: FlowModel, level: FlowLevel): Markup {
   const edges = model.edges.filter((edge) => level.edges.includes(edge.id));
+  const touching = (c: FlowCrossing): boolean => c.from === level.name || c.to === level.name;
+  const atEntrances = model.routes.filter((r) => level.routes.includes(r.id));
+  const marks = model.nodes.filter((n) => level.components.includes(n.folder));
+  const total = model.crossings.filter(touching).length;
   return html`<div class="flow-inspect" data-kind="level">
-    ${flowHead("Trust level", html`${level.name}`, `${level.id}-heading`, level.meaning)}
-    <h4>Interfaces whose crossings carry it <span class="flow-count">${edges.length}</span></h4>
-    <ul class="flow-rows">${edges.map((edge) => flowRow(flowPick(edge.id, edgeName(edge)), edge.crossings.filter((c) => c.from === level.name || c.to === level.name).map((c) => `${c.name} (${c.from} → ${c.to})`).join("; ")))}</ul>
-    ${level.unplaced.length === 0 ? null : html`<h4>Crossings on no component interface</h4><ul class="flow-rows">${level.unplaced.map((c) => html`<li class="flow-row"><a href="#${invariantId(c.component, c.name)}">${c.name}</a><span class="flow-meta">${c.from} → ${c.to}, in ${c.component === "." ? "the root" : c.component}; it stands on no component interface</span></li>`)}</ul>`}
+    ${flowHead(html`${termLink(state, "trust level", "Trust level")}`, html`${level.name}`, `${level.id}-heading`, level.meaning)}
+    <p class="flow-note">${plural(total, "crossing", "crossings")} carry it, every one drawn: on the interfaces its chokepoint stands on, on an entrance line, or on a component's boundary mark.</p>
+    ${edges.length === 0 ? null : html`<h4>On component interfaces <span class="flow-count">${edges.length}</span></h4><ul class="flow-rows">${edges.map((edge) => flowRow(flowPick(edge.id, edgeName(edge)), edge.crossings.filter(touching).map((c) => `${c.name} (${c.from} → ${c.to}), ${c.verdict.label}`).join("; ")))}</ul>`}
+    ${atEntrances.length === 0 ? null : html`<h4>Where work enters <span class="flow-count">${atEntrances.length}</span></h4><ul class="flow-rows">${atEntrances.map((route) => flowRow(flowPick(route.id, routeName(route)), model.crossings.filter((c) => touching(c) && c.routes.includes(route.id)).map((c) => `${c.name} (${c.from} → ${c.to})`).join("; ")))}</ul>`}
+    ${marks.length === 0 ? null : html`<h4>Inside components <span class="flow-count">${marks.length}</span></h4><ul class="flow-rows">${marks.map((node) => flowRow(flowPick(flowBoundaryId(node.folder), node.name), node.boundary.filter(touching).map((c) => `${c.name} (${c.from} → ${c.to})`).join("; ")))}</ul>`}
+    ${level.unplaced.length === 0 ? null : html`<h4>Crossings the map could not place</h4><ul class="flow-rows">${level.unplaced.map((c) => html`<li class="flow-row"><a href="#${invariantId(c.component, c.name)}">${c.name}</a><span class="flow-meta">${c.from} → ${c.to}, in ${c.component === "." ? "the root" : c.component}</span></li>`)}</ul>`}
+    ${total === 0 ? html`<p class="flow-note" data-field="no-crossing">No crossing names this trust level.</p>` : null}
   </div>`;
 }
 
-function renderComponentInspector(model: FlowModel, node: FlowNode): Markup {
+function renderComponentInspector(state: ShellState, model: FlowModel, node: FlowNode): Markup {
   const out = model.edges.filter((edge) => edge.from === node.folder);
   const into = model.edges.filter((edge) => edge.to === node.folder);
   const bearing = [...out, ...into].filter((edge) => edge.loadBearing || edge.bypasses.length > 0);
   const through = model.routes.filter((r) => r.stops.includes(node.folder) || r.rail === node.folder);
+  const count = (s: FlowState): number => node.invariants.filter((i) => i.verdict.state === s).length;
   return html`<div class="flow-inspect" data-kind="component">
-    ${flowHead(node.core ? "Core dependency" : "Component", html`<a href="#${componentId(node.folder)}">${flowName(node)}</a>`, undefined, node.intent)}
+    ${flowHead(node.core ? html`${termLink(state, "core dependency", "Core dependency")}` : html`${termLink(state, "component", "Component")}`, html`<a href="#${componentId(node.folder)}">${flowName(node)}</a>`, undefined, node.intent)}
+    <h4 data-field="own-invariants">Its invariants <span class="flow-count">${node.invariants.length}</span></h4>
+    ${node.invariants.length === 0 ? html`<p class="flow-note">It declares no invariant: nothing here is enforced.</p>` : html`<p class="flow-note" data-field="own-verdicts">${[count("verified") > 0 ? `${count("verified")} verified` : "", count("requirement") > 0 ? plural(count("requirement"), "requirement", "requirements") : "", count("broken") > 0 ? `${count("broken")} broken` : ""].filter(Boolean).join(", ")}</p><ul class="flow-rows" data-field="invariants">${node.invariants.map((ref) => invariantRow(model, ref))}</ul>`}
+    ${node.defects.length === 0 ? null : html`<p><button type="button" class="flow-pick flow-action flow-bad" data-structure-select="${flowBrokenId(node.folder)}">${plural(node.defects.length, "broken chokepoint", "broken chokepoints")}: see the bypass sites</button></p>`}
+    ${node.boundary.length === 0 ? null : html`<p><button type="button" class="flow-pick flow-action" data-structure-select="${flowBoundaryId(node.folder)}">${plural(node.boundary.length, "crossing", "crossings")} inside it</button></p>`}
     ${flowFacts([
       ["Folder", html`<code>${node.folder}</code>`],
       ["Calls", `${plural(out.length, "component", "components")}`],
       ["Called by", `${plural(into.length, "component", "components")}`],
-      node.defects.length === 0 ? null : ["Broken", html`<span class="flow-bad">${plural(node.defects.length, "chokepoint", "chokepoints")}</span>`],
     ])}
     ${node.children > 0 ? html`<p><button type="button" class="flow-pick flow-action" data-structure-expand="${node.folder}">${node.expanded ? "Close" : "Open"} its ${plural(node.children, "component", "components")} in place</button></p>` : null}
     ${node.core ? html`<p class="flow-note" data-field="core">A core dependency: ${CORE_RULE}. Drawn as a rail; each caller's stub runs down to it.</p>` : null}
-    ${node.defects.length === 0 ? null : html`<h4>Broken chokepoints</h4><ul class="flow-rows">${node.defects.map((d) => html`<li class="flow-row"><a href="#${invariantId(node.folder, d.name)}">${d.name}</a><span class="flow-meta">${d.state}, ${plural(d.bypasses, "bypass", "bypasses")}, ${d.internal} inside ${node.folder}${d.internal === d.bypasses ? " (no interface can show them)" : ""}</span></li>`)}</ul>`}
     <h4 data-field="routes">Structural routes through it (${through.length})</h4>
     <ul class="flow-rows">${through.map((route) => routeRow(model, route))}</ul>
     <h4 data-field="load-bearing">Load-bearing here (${bearing.length})</h4>
@@ -1193,78 +1517,107 @@ function renderComponentInspector(model: FlowModel, node: FlowNode): Markup {
     <h4>Calls <span class="flow-count">${out.length}</span></h4>
     <ul class="flow-rows">${out.map((edge) => flowRow(flowPick(edge.id, `→ ${edge.to}`), plural(edge.symbols.length, "symbol", "symbols"), "count"))}</ul>
     <h4>Called by <span class="flow-count">${into.length}</span></h4>
-    <ul class="flow-rows">${into.map((edge) => flowRow(flowPick(edge.id, `← ${edge.from}`), plural(edge.symbols.length, "symbol", "symbols"), "count"))}</ul>
+    <ul class="flow-rows">${into.map((edge) => flowRow(flowPick(edge.id, `← ${edge.from === "." ? "root" : edge.from}`), plural(edge.symbols.length, "symbol", "symbols"), "count"))}</ul>
   </div>`;
 }
 
-function renderEdgeInspector(model: FlowModel, edge: FlowEdge): Markup {
+/** A component's broken chokepoints: every bypass site, and, when all sit inside the component, that it says so and lists them. */
+function renderBrokenInspector(state: ShellState, model: FlowModel, node: FlowNode): Markup {
+  return html`<div class="flow-inspect" data-kind="broken">
+    ${flowHead(html`Broken ${termLink(state, "chokepoint", "chokepoints")}`, html`<a href="#${componentId(node.folder)}">${node.name}</a>: ${plural(node.defects.length, "broken chokepoint", "broken chokepoints")}`, `${flowBrokenId(node.folder)}-heading`, html`A ${termLink(state, "bypass")} reaches a protected thing from outside its chokepoint.`)}
+    ${join(node.defects.map((defect) => {
+      const ref = node.invariants.find((i) => i.name === defect.name);
+      const inside = defect.sites.filter((s) => s.inside);
+      const outside = defect.sites.filter((s) => !s.inside);
+      return html`<section class="flow-defect" data-defect="${defect.name}">
+        <h4>${flowPick(defect.chokepoint, defect.name)} ${ref === undefined ? null : verdictMark(ref)}</h4>
+        <p class="flow-note" data-field="where">${defect.sites.length === 0 ? "The latest run failed it and recorded no bypass site." : inside.length === defect.sites.length ? `All ${plural(defect.sites.length, "bypass", "bypasses")} sit inside ${node.name}, so no component interface carries them; they are listed here.` : `${plural(outside.length, "bypass", "bypasses")} from other components, drawn on their interfaces; ${inside.length} inside ${node.name}.`}</p>
+        <ul class="site-list" data-field="sites">${defect.sites.map((s) => html`<li data-class="bypass" data-inside="${s.inside ? "true" : "false"}"><code>${s.file}:${s.line}</code> in <code>${s.symbol}</code>${s.inside ? html` <span class="label">inside</span>` : null}</li>`)}</ul>
+        ${renderFlowOptions(node.folder, defect.name, [model.chokepoints.find((c) => c.id === defect.chokepoint)?.chokepoint ?? defect.name])}
+      </section>`;
+    }))}
+  </div>`;
+}
+
+/** The crossings standing inside a component, on no drawn interface or entrance line: its boundary mark's inspector. */
+function renderBoundaryInspector(state: ShellState, model: FlowModel, node: FlowNode): Markup {
+  const pairs = [...new Set(node.boundary.map((c) => `${c.from} → ${c.to}`))];
+  return html`<div class="flow-inspect" data-kind="boundary">
+    ${flowHead(html`Trust boundaries inside a component`, html`<a href="#${componentId(node.folder)}">${node.name}</a>: ${plural(node.boundary.length, "crossing", "crossings")}`, `${flowBoundaryId(node.folder)}-heading`, html`Each ${termLink(state, "crossing")} stands inside ${node.name}: both sides of its chokepoint are in it, or it has no chokepoint, so no component interface can carry it.`)}
+    ${join(pairs.map((pair) => {
+      const members = node.boundary.filter((c) => `${c.from} → ${c.to}` === pair);
+      return html`<h4>${pair} <span class="flow-count">${members.length}</span></h4><ul class="flow-rows" data-field="crossings">${members.map((c) => invariantRow(model, c))}</ul>`;
+    }))}
+  </div>`;
+}
+
+function renderEdgeInspector(state: ShellState, model: FlowModel, edge: FlowEdge): Markup {
   const shown = edge.symbols.slice(0, 24);
   const byInvariant = [...new Set(edge.bypasses.map((b) => b.invariant))];
   const through = model.routes.filter((route) => edge.routes.includes(route.id));
-  const kind = edge.bypasses.length > 0 ? `Broken component interface, ${plural(edge.bypasses.length, "bypass", "bypasses")}` : edge.loadBearing ? "Load-bearing component interface" : "Component interface";
+  const kind = edge.bypasses.length > 0 ? html`Broken component interface, ${plural(edge.bypasses.length, "bypass", "bypasses")}` : edge.loadBearing ? "Load-bearing component interface" : html`${termLink(state, "component interface", "Component interface")}`;
   return html`<div class="flow-inspect" data-kind="edge">
     ${flowHead(kind, html`${edgeName(edge)}`, undefined, `Code in ${edge.from} references ${plural(edge.symbols.length, "symbol", "symbols")} of ${edge.to} at ${plural(edge.sites, "site", "sites")}.`)}
     ${flowFacts([
       ["Drawn", edge.stub ? "A stub: its callee is a core dependency, drawn as a rail." : through.length > 0 ? `On ${through.map(routeName).join("; ")}.` : "On no structural route: drawn faint when a selection reaches it."],
     ])}
-    ${edge.identifiers.length === 0 ? null : html`<h4>Interface identifiers</h4><ul class="flow-rows" data-field="identifiers">${edge.identifiers.map((text) => { const found = model.identifiers.find((i) => i.text === text)!; return flowRow(flowPick(found.chokepoint, found.name), null, "line", html`<span class="flow-ident">${text}</span>`); })}</ul>`}
-    ${edge.chokepoints.length === 0 ? null : html`<h4>Chokepoints standing here</h4><ul class="flow-rows">${edge.chokepoints.map((c) => flowRow(flowPick(c.id, c.name), html`<code>${c.chokepoint}</code> protects ${codeOrText(c.protects)}, ${c.state}`))}</ul>`}
+    ${edge.identifiers.length === 0 ? null : html`<h4>Interface identifiers</h4><ul class="flow-rows" data-field="identifiers">${edge.identifiers.map((text) => { const found = model.identifiers.find((i) => i.text === text)!; return flowRow(flowPick(found.chokepoint, found.name), verdictMark(found), "line", html`<span class="flow-ident" data-verdict-state="${found.verdict.state}">${text}</span>`); })}</ul>`}
+    ${edge.chokepoints.length === 0 ? null : html`<h4>Chokepoints standing here</h4><ul class="flow-rows">${edge.chokepoints.map((c) => flowRow(flowPick(c.id, c.name), html`<code>${c.chokepoint}</code> protects ${codeOrText(c.protects)} · ${verdictMark(c)}`))}</ul>`}
     ${edge.crossings.length === 0 ? null : html`<h4>Crossings</h4><ul class="flow-rows">${edge.crossings.map((c) => html`<li class="flow-row">${c.from} → ${c.to}<span class="flow-meta">${c.name}</span></li>`)}</ul>`}
     ${edge.bypasses.length === 0 ? null : html`<div class="defect" data-field="defect"><h5>Bypass sites</h5><ul class="site-list">${edge.bypasses.map((b) => html`<li data-class="bypass"><code>${b.file}:${b.line}</code> in <code>${b.symbol}</code> <span class="site-role">bypass of the protected thing of ${b.invariant}</span></li>`)}</ul>${join(byInvariant.map((name) => renderFlowOptions(edge.to, name, edge.chokepoints.filter((c) => c.name === name).map((c) => c.chokepoint))))}</div>`}
     <h4>Symbols <span class="flow-count">${edge.symbols.length}</span></h4>
-    <ul class="flow-rows flow-symbols">${shown.map((s) => html`<li class="flow-row flow-row-count"><code>${s.symbol}</code><span class="flow-meta">${s.file === "" ? "" : `${s.file}, `}${plural(s.sites, "site", "sites")}</span></li>`)}</ul>
+    <ul class="flow-rows flow-symbols">${shown.map((s) => html`<li class="flow-row flow-row-count"><code>${s.symbol}</code><span class="flow-meta">${s.file === "" ? "" : `${s.file}, `}${plural(s.sites, "site", "sites")}${s.kind === "type" ? ", type" : ""}</span></li>`)}</ul>
     ${edge.symbols.length > shown.length ? html`<p class="flow-note">and ${edge.symbols.length - shown.length} more</p>` : null}
   </div>`;
 }
 
 /**
- * An interface identifier's inspector: the invariant behind the chokepoint, in
- * full, and where it stands on the map. Its reliance follows.
+ * An interface identifier's inspector: the invariant behind the chokepoint,
+ * its one verdict, and where it stands on the map. What an agent needs
+ * (per-enforcement records and test commands, the refutation record, the
+ * reliance sites, the two options) folds beneath, closed.
  */
 function renderChokepointInspector(state: ShellState, model: FlowModel, chokepoint: FlowChokepoint, selection: FlowSelection): Markup {
   const invariant = state.spec.components.find((c) => c.folder === chokepoint.component)?.invariants.find((i) => i.name === chokepoint.name);
   const reliance = invariant === undefined ? [] : relianceOf(invariant, state.spec.components, state.runs.records).filter((r) => r.chokepoint === chokepoint.chokepoint);
   const edges = model.edges.filter((edge) => selection.edges.has(edge.id));
   const identifier = model.identifiers.find((i) => i.chokepoint === chokepoint.id);
-  const through = model.routes.filter((route) => edges.some((edge) => edge.routes.includes(route.id) || (edge.stub && route.rail === edge.to && route.stops[route.stops.length - 1] === edge.from)));
+  const through = model.routes.filter((route) => edges.some((edge) => edge.routes.includes(route.id) || (edge.stub && route.rail === edge.to && route.stops[route.stops.length - 1] === edge.from)) || (identifier?.routes.includes(route.id) ?? false));
   const meaning = (level: string): string => state.spec.trustLevels.find((l) => l.name === level)?.meaning ?? "not a declared trust level";
   const bypasses = invariant === undefined ? [] : latestOf(invariant, state.runs.records).filter((entry) => entry.form === "chokepoint").flatMap((entry) => entry.bypasses);
   return html`<div class="flow-inspect" data-kind="chokepoint" data-reliance-of="${chokepoint.name}">
-    ${flowHead(identifier === undefined ? "Chokepoint and its reliance" : html`Interface identifier <span class="flow-ident">${identifier.text}</span>`, html`<a href="#${invariantId(chokepoint.component, chokepoint.name)}">${chokepoint.name}</a>`, `${chokepoint.id}-heading`, invariant === undefined ? null : html`<span data-field="sentence">${invariant.sentence}</span>`)}
+    ${flowHead(identifier === undefined ? html`${termLink(state, "chokepoint", "Chokepoint")} and its reliance` : html`${termLink(state, "interface identifier", "Interface identifier")} <span class="flow-ident" data-verdict-state="${identifier.verdict.state}">${identifier.text}</span>`, html`<a href="#${invariantId(chokepoint.component, chokepoint.name)}">${chokepoint.name}</a>`, `${chokepoint.id}-heading`, invariant === undefined ? null : html`<span data-field="sentence">${invariant.sentence}</span>`)}
     ${flowFacts([
+      ["Verdict", html`<span data-field="verdict">${verdictMark(chokepoint)}</span>`],
       ["Component", html`<code>${chokepoint.component}</code>`],
-      ["State", html`<span class="state-mark" data-state="${chokepoint.state}">${chokepoint.state}</span>`],
-      ["Chokepoint", html`<code>${chokepoint.chokepoint}</code>`],
+      [html`${termLink(state, "chokepoint", "Chokepoint")}`, html`<code>${chokepoint.chokepoint}</code>`],
       ["Protects", codeOrText(chokepoint.protects)],
-      invariant?.crossing === undefined ? null : ["Crossing", html`<span class="crossing" data-field="crossing"><span class="level">${invariant.crossing.from}</span> → <span class="level">${invariant.crossing.to}</span></span>`],
-      ["Stands on", plural(edges.length, "interface", "interfaces")],
+      invariant?.crossing === undefined ? null : [html`${termLink(state, "crossing", "Crossing")}`, html`<span class="crossing" data-field="crossing"><span class="level">${invariant.crossing.from}</span> → <span class="level">${invariant.crossing.to}</span></span>`],
+      ["Stands on", `${plural(edges.length, "interface", "interfaces")}${identifier !== undefined && identifier.routes.length > 0 ? `, and where work enters by ${plural(identifier.routes.length, "route", "routes")}` : ""}`],
     ])}
     ${invariant?.crossing === undefined ? null : html`<dl class="flow-levels"><dt><span class="level">${invariant.crossing.from}</span></dt><dd>${meaning(invariant.crossing.from)}</dd><dt><span class="level">${invariant.crossing.to}</span></dt><dd>${meaning(invariant.crossing.to)}</dd></dl>`}
-    ${bypasses.length === 0 ? null : html`<div class="defect" data-field="defect"><h5>Bypass sites</h5><ul class="site-list">${bypasses.map((b) => html`<li data-class="bypass"><code>${b.file}:${b.line}</code> in <code>${b.symbol}</code></li>`)}</ul>${renderFlowOptions(chokepoint.component, chokepoint.name, [chokepoint.chokepoint])}</div>`}
+    ${bypasses.length === 0 ? null : html`<div class="defect" data-field="defect"><h5>${termLink(state, "bypass", "Bypass")} sites</h5><ul class="site-list">${bypasses.map((b) => html`<li data-class="bypass"><code>${b.file}:${b.line}</code> in <code>${b.symbol}</code></li>`)}</ul>${renderFlowOptions(chokepoint.component, chokepoint.name, [chokepoint.chokepoint])}</div>`}
     <h4>The component interfaces it stands on (${edges.length})</h4>
     <ul class="flow-rows" data-field="interfaces">${edges.map((edge) => flowRow(flowPick(edge.id, edgeName(edge)), `${plural(edge.symbols.length, "symbol", "symbols")}${edge.stub ? ", a stub to a core dependency" : ""}`, edge.stub ? "line" : "count"))}</ul>
     <h4 data-field="routes-through">Structural routes through it (${through.length})</h4>
     ${through.length === 0 ? html`<p class="flow-note">No structural route passes the interfaces it stands on.</p>` : html`<ul class="flow-rows">${through.map((route) => routeRow(model, route))}</ul>`}
-    ${invariant === undefined ? null : html`<details class="flow-more flow-enforcement"><summary>Enforcement <span class="flow-meta">${enforcementSummary(state, invariant)}</span></summary><ul class="enforcements">${join(invariant.enforcements.map((enforcement) => renderEnforcement(state, invariant, enforcement)))}</ul></details>`}
-    ${invariant === undefined ? null : html`<details class="flow-more flow-refutation" open><summary>Refutation</summary>${renderRefutation(invariant, state.runs.records)}</details>`}
-    <h4>Reliance</h4>
+    ${invariant === undefined ? null : html`<details class="flow-more flow-enforcement flow-agent"><summary>Enforcement record, for agents <span class="flow-meta">${enforcementSummary(state, invariant)}</span></summary><ul class="enforcements">${join(invariant.enforcements.map((enforcement) => renderEnforcement(state, invariant, enforcement)))}</ul></details>`}
+    ${invariant === undefined ? null : html`<details class="flow-more flow-refutation flow-agent"><summary>${termLink(state, "refutation", "Refutation")} record</summary>${renderRefutation(invariant, state.runs.records)}</details>`}
+    <details class="flow-more flow-reliance flow-agent"><summary>${termLink(state, "reliance", "Reliance")}: the recorded reference sites</summary>
     ${join(reliance.map((r) => r.evidence.status === "unknown"
       ? html`<p class="flow-note" data-reliance="unknown">${r.evidence.reason}</p>`
       : r.evidence.sites.length === 0
         ? html`<p class="flow-note" data-reliance="complete">Complete run site evidence records 0 references to the chokepoint or protected thing.</p>`
         : html`<p class="flow-note" data-reliance="complete">${plural(r.evidence.sites.length, "recorded reference site", "recorded reference sites")} to the chokepoint or protected thing; owner component first.</p><ul class="site-list">${r.evidence.sites.map(flowSite)}</ul>`))}
+    </details>
     ${invariant !== undefined && invariant.state === "structural defect" && bypasses.length === 0 ? renderFlowOptions(chokepoint.component, chokepoint.name, [chokepoint.chokepoint]) : null}
   </div>`;
 }
 
-/** One line per enforcement form and its latest verdict, for the folded Enforcement heading. */
+/** The enforcement forms, for the folded record's heading: the forms only; the one verdict is above. */
 function enforcementSummary(state: ShellState, invariant: NonNullable<ShellState["spec"]["components"][number]["invariants"][number]>): string {
-  const latest = latestOf(invariant, state.runs.records);
-  return invariant.enforcements.map((enforcement) => {
-    const entry = latest.find((l) => l.form === enforcement.form);
-    const verdict = entry === undefined ? "unverified" : entry.verdict === "pass" ? "verified" : entry.verdict === "fail" ? "structural defect" : "not run";
-    return `${enforcement.form === "chokepoint" ? "chokepoint" : "totality oracle"}, ${verdict}`;
-  }).join("; ");
+  void state;
+  return invariant.enforcements.map((enforcement) => (enforcement.form === "chokepoint" ? "chokepoint" : "totality oracle")).join(", ");
 }
 
 function renderChangeInspector(): Markup {
@@ -1282,31 +1635,41 @@ function renderChangeInspector(): Markup {
 }
 
 /**
- * The one inspector, beside the map: whatever is selected, else the
- * map's summary. Open while something is selected; closed by its close
- * button or Escape, which clear the selection. The selection hash reopens it.
+ * The one inspector, beside the map: whatever is selected, else the map's
+ * summary. Open while something is selected; closed by its close button or
+ * Escape, which clear the selection. The selection hash reopens it. When the
+ * selection is only the default story (the reader chose nothing), it is
+ * marked so: below the side-by-side width it then stays in the page's flow
+ * under the map instead of opening as a sheet over it.
  */
-function renderFlowInspector(state: ShellState, model: FlowModel, selection: FlowSelection, previews: readonly StructurePreview[]): Markup {
+function renderFlowInspector(state: ShellState, model: FlowModel, selection: FlowSelection, previews: readonly StructurePreview[], chosen: boolean): Markup {
+  const health = FLOW_HEALTH_KINDS.find((kind) => flowHealthId(kind) === selection.id);
   const body =
     selection.kind === "entrance"
-      ? renderEntranceInspector(model, model.entrances.find((e) => e.id === selection.id)!)
+      ? renderEntranceInspector(state, model, model.entrances.find((e) => e.id === selection.id)!)
       : selection.kind === "route"
-        ? renderRouteInspector(model, model.routes.find((r) => r.id === selection.id)!)
+        ? renderRouteInspector(state, model, model.routes.find((r) => r.id === selection.id)!)
       : selection.kind === "level"
-        ? renderLevelInspector(model, model.levels.find((l) => l.id === selection.id)!)
+        ? renderLevelInspector(state, model, model.levels.find((l) => l.id === selection.id)!)
         : selection.kind === "component"
-          ? renderComponentInspector(model, model.nodes.find((n) => n.id === selection.id)!)
+          ? renderComponentInspector(state, model, model.nodes.find((n) => n.id === selection.id)!)
           : selection.kind === "edge"
-            ? renderEdgeInspector(model, model.edges.find((e) => e.id === selection.id)!)
+            ? renderEdgeInspector(state, model, model.edges.find((e) => e.id === selection.id)!)
             : selection.kind === "chokepoint"
               ? renderChokepointInspector(state, model, model.chokepoints.find((c) => c.id === selection.id)!, selection)
-              : selection.kind === "change"
-                ? renderChangeInspector()
-                : null;
+              : selection.kind === "health" && health !== undefined
+                ? renderHealthInspector(state, model, health)
+                : selection.kind === "broken"
+                  ? renderBrokenInspector(state, model, model.nodes.find((n) => flowBrokenId(n.folder) === selection.id)!)
+                  : selection.kind === "boundary"
+                    ? renderBoundaryInspector(state, model, model.nodes.find((n) => flowBoundaryId(n.folder) === selection.id)!)
+                    : selection.kind === "change"
+                      ? renderChangeInspector()
+                      : null;
   const open = body !== null;
-  return html`<aside class="flow-inspector" aria-label="Structure inspector" data-selection="${selection.kind}" data-open="${open ? "true" : "false"}"${open ? raw(' role="dialog" aria-modal="false"') : null}>
+  return html`<aside class="flow-inspector" aria-label="Structure inspector" data-selection="${selection.kind}" data-open="${open ? "true" : "false"}" data-default="${open && !chosen ? "true" : "false"}"${open ? raw(' role="dialog" aria-modal="false"') : null}>
     ${open ? html`<button type="button" class="flow-close" data-structure-close data-structure-select="${FLOW_NONE_ID}" aria-label="Close the inspector" title="Close (Escape)">×</button>` : null}
-    ${body ?? renderFlowSummary(model, previews)}
+    ${body ?? renderFlowSummary(state, model, previews)}
   </aside>`;
 }
 
@@ -1315,31 +1678,38 @@ function keyItem(glyph: string, label: Markup | string): Markup {
   return html`<li><svg class="flow-key-glyph" viewBox="0 0 28 14" width="28" height="14" aria-hidden="true">${raw(glyph)}</svg><span>${label}</span></li>`;
 }
 
-/** The key below the map: each mark and what it is; how the map is laid out folds beneath it. */
-function renderFlowKey(): Markup {
+/** The key below the map: each mark and what it is, the terms it uses, and how the map is laid out, folded beneath. */
+function renderFlowKey(state: ShellState): Markup {
   return html`<div class="flow-key" data-field="key">
     <ul aria-label="Map key">
-      ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-route-0)" stroke-width="3.5"/>', "Structural route, from the entrances named at its start")}
-      ${keyItem('<rect x="2" y="2" width="24" height="10" rx="3" fill="none" stroke="currentColor" stroke-dasharray="3 2"/>', html`Derived route: no entrance declared, named “via” the first component it reaches`)}
-      ${keyItem('<rect x="2" y="1.5" width="24" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/>', "Component; a heavier border declares an entrance")}
-      ${keyItem('<path d="M1 11 H27" stroke="var(--flow-key-rail)" stroke-width="4" stroke-linecap="round"/><path d="M8 1 V11" stroke="var(--flow-key-rail)" stroke-width="1.5"/>', "Core dependency (rail) and a caller's stub to it")}
-      ${keyItem('<rect x="4" y="1.5" width="20" height="11" rx="2.5" fill="none" stroke="currentColor"/><text x="11" y="10.2" font-size="8.5" font-weight="600" fill="currentColor">X</text>', "Interface identifier: C a chokepoint, X one whose invariant carries a crossing")}
-      ${keyItem('<path d="M14 0 V14" stroke="var(--fail)" stroke-width="2" stroke-dasharray="3 2"/><path d="M1 7 H27" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>', "Trust boundary the interface crosses")}
+      ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-route-0)" stroke-width="3.5"/>', html`${termLink(state, "structural route", "Structural route")}: the path its entrances' handler takes; its origin token names up to four entrances and counts the rest`)}
+      ${keyItem('<rect x="2" y="2" width="24" height="10" rx="3" fill="none" stroke="currentColor" stroke-dasharray="3 2"/>', html`${termLink(state, "derived", "Derived")} route: no entrance declared, drawn by ${termLink(state, "reference weight")}, not flow`)}
+      ${keyItem('<rect x="2" y="1.5" width="24" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="4" y="3.5" width="2.5" height="7" rx="1" fill="currentColor"/>', html`${termLink(state, "component", "Component")}: its name, its role, its folder; the bar at its left is its worst verdict; a heavier border declares an entrance`)}
+      ${keyItem('<rect x="4" y="1.5" width="20" height="11" rx="2.5" fill="var(--flow-key-verified)"/><text x="8" y="10.2" font-size="8.5" font-weight="500" fill="var(--paper)">X</text>', html`${termLink(state, "interface identifier", "Interface identifier")}, solid: its ${termLink(state, "invariant")} is enforced and verified`)}
+      ${keyItem('<rect x="4" y="1.5" width="20" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-dasharray="2.5 1.5"/><text x="8" y="10.2" font-size="8.5" font-weight="500" fill="currentColor">X</text>', html`Outlined: a ${termLink(state, "requirement")}, declared and not yet enforced, so not a working control`)}
+      ${keyItem('<rect x="4" y="1.5" width="20" height="11" rx="2.5" fill="var(--fail)"/><text x="8" y="10.2" font-size="8.5" font-weight="500" fill="#fff">X</text>', html`Red: broken, a ${termLink(state, "structural defect")} or a ${termLink(state, "chokepoint")} with a ${termLink(state, "bypass")}; a component with one carries a red broken mark that lists its bypass sites`)}
+      ${keyItem('<text x="2" y="10.2" font-size="8.5" font-weight="500" fill="currentColor">C X</text>', html`C: a ${termLink(state, "chokepoint")}; X: one whose invariant carries a ${termLink(state, "crossing")}`)}
+      ${keyItem('<path d="M14 0 V14" stroke="var(--fail)" stroke-width="2" stroke-dasharray="3 2"/><path d="M1 7 H27" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>', html`Trust boundary: where a crossing's ${termLink(state, "trust level")} changes, on its interface, on the line where work enters, or on a component's edge with a count of the crossings inside it`)}
+      ${keyItem('<path d="M1 11 H27" stroke="var(--flow-key-rail)" stroke-width="4" stroke-linecap="round"/><path d="M8 1 V11" stroke="var(--flow-key-rail)" stroke-width="1.5"/>', html`${termLink(state, "core dependency", "Core dependency")} (rail) and a caller's stub to it`)}
       ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-quiet)" stroke-width="1.6"/>', "Load-bearing interface on no route")}
       ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-quiet)" stroke-width="1.4" stroke-dasharray="5 4"/>', "Interface a selection reached")}
     </ul>
+    <details class="flow-more flow-terms"><summary>Terms</summary>
+      <dl class="flow-levels">${Object.entries(LOCAL_TERMS).map(([name, meaning]) => html`<dt><dfn id="structure--term-${slug(name)}">${name}</dfn></dt><dd>${meaning}</dd>`)}</dl>
+    </details>
     <details class="flow-more flow-rules"><summary>How the map is laid out</summary>
       <ul class="flow-list">
-        <li>A route runs through components in order, caller to callee, and never back to a column it has left. Routes through one component meet at its box.</li>
+        <li>A route: ${ROUTE_RULE}.</li>
+        <li>Entrances share a route only when they share its stops and the trust they carry in: the entering side of the crossings whose chokepoint is their handler.</li>
         <li>A component's column is its distance from where work enters. Within a column components keep folder order, so adding an interface never reorders the ones it does not reach.</li>
         <li>An identifier on a rail stands on the stubs to that core dependency.</li>
-        <li>The map opens on the busiest entrance's route. Close the inspector to see every route muted.</li>
+        <li>The map opens on ${DEFAULT_RULE}. Close the inspector to see every route muted.</li>
       </ul>
     </details>
   </div>`;
 }
 
-/** The one map: the evidence it stands on, the canvas and the inspector beside it, and its key. */
+/** The one map: the evidence it stands on, the health strip, the canvas and the inspector beside it, and its key. */
 export function renderFlowSection(state: ShellState, previews: readonly StructurePreview[] = state.structure.preview, model: FlowModel = flowOf(state)): Markup {
   const selected = flowSelected(model, state.structure.selected);
   const selection = flowSelection(model, selected);
@@ -1351,9 +1721,12 @@ export function renderFlowSection(state: ShellState, previews: readonly Structur
       ${renderEvidence(model)}
     </div>
     <div class="flow-stage">
-      <div class="flow-canvas" tabindex="0" role="region" aria-label="Scrollable Structure map">${renderFlowSvg(model, selected, previews)}</div>
-      ${renderFlowInspector(state, model, selection, previews)}
+      <div class="flow-map">
+        ${renderHealthStrip(model, selected)}
+        <div class="flow-canvas" tabindex="0" role="region" aria-label="Scrollable Structure map">${renderFlowSvg(model, selected, previews)}</div>
+      </div>
+      ${renderFlowInspector(state, model, selection, previews, state.structure.selected !== undefined)}
     </div>
-    ${renderFlowKey()}
+    ${renderFlowKey(state)}
   </section>`;
 }

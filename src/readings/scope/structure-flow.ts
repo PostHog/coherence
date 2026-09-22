@@ -14,17 +14,20 @@
  * the model says so. Every component interface is in the model; none is
  * implied away.
  *
- * Structural routes. Each entrance's route is the path work takes from it:
- * the component that declares it, the component holding its handler, then,
- * from each stop, the heaviest component interface (most reference sites,
- * ties by folder) to a component not yet on the route, not a core
- * dependency, and not in a column left of the one the route stands in, until
- * none is left: a route never doubles back. Entrances whose routes are the
- * same stops share one line, and the line is named for them: its named
- * origin is every entrance name it starts from, in full. A project that
- * declares no entrance has its routes derived from the root component's
- * component interfaces, one per callee, each named "via" the first component
- * it reaches and marked derived.
+ * Structural routes. Each entrance's route is the path its handler takes
+ * (ROUTE_RULE): the component that declares it, the component holding its
+ * handler, then, with the handler's static reach read, from each stop the
+ * heaviest component interface that reach uses through a symbol only that
+ * stop's component calls (never a type, never a utility another component
+ * also calls), never into a core dependency and never to a column left of
+ * the last: it stops where the reach goes no further. Without a reach, the
+ * heaviest interface onward, which is reference weight, not flow, and says
+ * so. Entrances share one line only when they share its stops and its trust
+ * (the entering side of the crossings whose chokepoint is their handler);
+ * the line is named for them, at most four names on its token. A project
+ * that declares no entrance has its routes derived from the root
+ * component's component interfaces, one per callee, each named "via" the
+ * first component it reaches and marked reference weight.
  *
  * Core dependencies. A component that more than half of the other visible
  * components call, with at least three callers and at least three quarters
@@ -62,12 +65,28 @@
  * will show.
  */
 
-import { allInvariants, componentOfFile, flowChokepointId, flowLevelId, latestOf, type RelianceSite } from "./derive.ts";
+import { allInvariants, componentOfFile, flowChokepointId, flowLevelId, invariantVerdict, latestOf, openEscalations, subjectOf, type InvariantVerdict, type RelianceSite } from "./derive.ts";
 import { slug } from "./html.ts";
-import type { InterfaceSymbol, RecordedSite, ShellState, SpecComponent, SpecInvariant } from "./model.ts";
+import type { InterfaceSymbol, ReachReference, RecordedSite, ShellState, SpecComponent, SpecInvariant } from "./model.ts";
 
 /** How many terminus name lines one row holds: a component whose routes start with more spans more rows. */
 export const FLOW_ROW_LINES = 5;
+
+/** The most entrance names one origin token shows; the rest are counted on one more line and listed when the route is selected. */
+export const FLOW_TOKEN_NAMES = 4;
+
+/** The lines of a route's origin token, top to bottom: at most four entrance names and a count of the rest, or "via" and the words reference weight. */
+export function originLines(route: Pick<FlowRoute, "names" | "derived">): string[] {
+  if (route.derived) return [...route.names, "reference weight"];
+  if (route.names.length <= FLOW_TOKEN_NAMES) return route.names;
+  return [...route.names.slice(0, FLOW_TOKEN_NAMES), `+${route.names.length - FLOW_TOKEN_NAMES} more`];
+}
+
+/** The rule a route is followed by, as the map's key and the query state it. */
+export const ROUTE_RULE = "a route starts where its entrance is declared and handled, then follows the handler's static reach: from each stop, the heaviest component interface that reach uses through a symbol only that stop's component calls, never a type, never a utility another component also calls, never into a core dependency, never back to a column it has left; it stops where the reach goes no further";
+
+/** The rule the map opens by, as the key and the query state it. */
+export const DEFAULT_RULE = "the busiest route: the most reference sites along its component interfaces, then the most entrances, then by name";
 
 /** The rule that makes a component a core dependency, as the map and the query state it. */
 export const CORE_RULE = "called by more than half of the other visible components, by at least three, with at least three quarters of its component interfaces incoming";
@@ -115,6 +134,16 @@ export interface FlowInvariantRef {
   component: string;
   name: string;
   state: SpecInvariant["state"];
+  /** Its one verdict: verified, requirement, or broken, dated (see invariantVerdict). */
+  verdict: InvariantVerdict;
+}
+
+/** The states the map draws on an identifier, a component, and a boundary mark. */
+export type FlowState = InvariantVerdict["state"];
+
+/** The worst of several states: broken, then requirement, then verified. */
+export function worstState(states: readonly FlowState[]): FlowState | undefined {
+  return states.includes("broken") ? "broken" : states.includes("requirement") ? "requirement" : states.includes("verified") ? "verified" : undefined;
 }
 
 export interface FlowChokepoint extends FlowInvariantRef {
@@ -173,6 +202,14 @@ export interface FlowRoute {
   edges: string[];
   /** The core dependency the route ends into, when its next stop would be one. */
   rail: string | undefined;
+  /** The trust its entrances carry in: the entering levels of the crossings whose chokepoint is their handler; empty when none is. */
+  trust: string[];
+  /** Interface identifiers standing where work enters: a chokepoint that is its entrances' handler, drawn on the line from its origin. */
+  entry: string[];
+  /** Reference sites along its interfaces: what makes one route busier than another. */
+  sites: number;
+  /** How its stops were followed: the handler's static reach, or, without one, the heaviest interface (reference weight, not flow). */
+  followed: "reach" | "weight";
 }
 
 /** A core dependency: a component most others call, drawn as a rail. */
@@ -196,6 +233,10 @@ export interface FlowIdentifier {
   crossing: { from: string; to: string } | undefined;
   /** Component interface ids it stands on. */
   edges: string[];
+  /** Routes on whose entrance line it stands: the chokepoint is their entrances' handler. */
+  routes: string[];
+  /** Its invariant's one verdict, drawn on the identifier. */
+  verdict: InvariantVerdict;
 }
 
 export interface FlowEntrance {
@@ -211,6 +252,10 @@ export interface FlowEntrance {
   reachable: boolean;
   /** Why it is unresolved or unreachable. */
   reason: string | undefined;
+  /** The trust work carries in by it: the entering side of every crossing whose chokepoint is its handler, in level order. */
+  trust: string[];
+  /** The component interfaces its handler's static reach uses, when the adapter read them. */
+  reach: ReachReference[] | undefined;
 }
 
 export interface FlowNode {
@@ -238,8 +283,14 @@ export interface FlowNode {
   /** Components nested beneath it, and whether they are shown. */
   children: number;
   expanded: boolean;
-  /** Broken chokepoints of its invariants, with the bypasses inside it that no edge can show. */
-  defects: { name: string; state: SpecInvariant["state"]; bypasses: number; internal: number }[];
+  /** Broken chokepoints of its invariants: every bypass site, and how many are inside it, where no edge can show them. */
+  defects: { name: string; state: SpecInvariant["state"]; chokepoint: string; bypasses: number; internal: number; sites: { file: string; line: number; symbol: string; inside: boolean }[] }[];
+  /** Its own invariants (and its hidden children's), each with its one verdict, broken first. */
+  invariants: FlowInvariantRef[];
+  /** The worst verdict among its invariants; undefined when it declares none. */
+  state: FlowState | undefined;
+  /** Crossings standing inside it, on no drawn component interface or entrance line: its boundary mark. */
+  boundary: FlowCrossing[];
 }
 
 export interface FlowLevel {
@@ -248,8 +299,51 @@ export interface FlowLevel {
   meaning: string;
   /** Interfaces whose crossings carry this class of data. */
   edges: string[];
-  /** Crossing-bearing invariants naming this level that stand on no interface. */
+  /** Routes whose entrance line carries a crossing of this class of data. */
+  routes: string[];
+  /** Components whose boundary mark carries a crossing of this class of data. */
+  components: string[];
+  /** Crossing-bearing invariants naming this level that the map places nowhere: none, when every crossing is drawn. */
   unplaced: FlowCrossing[];
+}
+
+/** Where one crossing is drawn: on the interfaces its chokepoint stands on, on an entrance line, or on its component's boundary mark. */
+export interface FlowCrossingPlace extends FlowCrossing {
+  edges: string[];
+  routes: string[];
+  /** The visible component whose boundary mark carries it, when neither an interface nor an entrance line does. */
+  component: string;
+  on: "interface" | "entrance" | "component";
+}
+
+/** The health strip: every invariant by its one verdict, and the escalations a human has not acknowledged. */
+export interface FlowHealth {
+  /** Enforced and verified: the spec model's invariants. */
+  verified: FlowInvariantRef[];
+  /** Declared, not yet invariants: the spec model's requirements. */
+  requirements: FlowInvariantRef[];
+  /** The spec model's structural defects. */
+  defects: FlowInvariantRef[];
+  /** Requirements whose latest chokepoint check found bypasses: broken, though never enforced. */
+  bypassed: FlowInvariantRef[];
+  escalations: { id: string; what: string }[];
+}
+
+export const FLOW_HEALTH_KINDS = ["verified", "requirements", "defects", "bypassed", "escalations"] as const;
+export type FlowHealthKind = (typeof FLOW_HEALTH_KINDS)[number];
+
+export function flowHealthId(kind: FlowHealthKind): string {
+  return `structure--health-${kind}`;
+}
+
+/** A component's broken mark: selects its broken chokepoints and their bypass sites. */
+export function flowBrokenId(folder: string): string {
+  return `structure--broken-${flowSlug(folder)}`;
+}
+
+/** A component's boundary mark: selects the crossings standing inside it. */
+export function flowBoundaryId(folder: string): string {
+  return `structure--boundary-${flowSlug(folder)}`;
 }
 
 export interface FlowModel {
@@ -273,6 +367,9 @@ export interface FlowModel {
   identifiers: FlowIdentifier[];
   /** Source under no component's folder, when the adapter read the tree. */
   unowned: { files: number; lines: number } | undefined;
+  /** Every crossing, and where the map draws it. */
+  crossings: FlowCrossingPlace[];
+  health: FlowHealth;
 }
 
 /* ------------------------------------------------------ interface symbols */
@@ -358,6 +455,9 @@ export function flowOf(state: ShellState): FlowModel {
   const visible = components.filter((component) => represent(component.folder) === component.folder);
   const order = new Map(visible.map((component, index) => [component.folder, index]));
   const invariants = allInvariants(components);
+  const verdicts = new Map(invariants.map((invariant) => [`${invariant.component}\u0000${invariant.name}`, invariantVerdict(invariant, state.runs.records)]));
+  const verdictOf = (component: string, name: string): InvariantVerdict => verdicts.get(`${component}\u0000${name}`) ?? { state: "requirement", bypassed: false, at: undefined, label: "requirement" };
+  const refOf = (invariant: SpecInvariant): FlowInvariantRef => ({ component: invariant.component, name: invariant.name, state: invariant.state, verdict: verdictOf(invariant.component, invariant.name) });
   const levelOrder = new Map(state.spec.trustLevels.map((level, index) => [level.name, index]));
   const reading = state.componentInterfaces;
   const symbols = reading.kind === "read" ? reading.symbols : flowRunSymbols(state);
@@ -379,7 +479,7 @@ export function flowOf(state: ShellState): FlowModel {
   const chokepoints: FlowChokepoint[] = invariants.flatMap((invariant) =>
     invariant.enforcements.flatMap((enforcement): FlowChokepoint[] =>
       enforcement.form === "chokepoint"
-        ? [{ id: flowChokepointId(invariant.component, invariant.name), component: invariant.component, name: invariant.name, state: invariant.state, chokepoint: enforcement.chokepoint, protects: enforcement.protects }]
+        ? [{ id: flowChokepointId(invariant.component, invariant.name), ...refOf(invariant), chokepoint: enforcement.chokepoint, protects: enforcement.protects }]
         : [],
     ),
   );
@@ -396,7 +496,7 @@ export function flowOf(state: ShellState): FlowModel {
       const standing = chokepoints.filter((c) => represent(c.component) === to && list.some((symbol) => { const named = flowNamed(c.chokepoint); return named !== undefined && flowIs(symbol, named); }));
       const crossings: FlowCrossing[] = standing.flatMap((c) => {
         const crossing = invariants.find((invariant) => invariant.component === c.component && invariant.name === c.name)?.crossing;
-        return crossing === undefined ? [] : [{ component: c.component, name: c.name, state: c.state, from: crossing.from, to: crossing.to }];
+        return crossing === undefined ? [] : [{ component: c.component, name: c.name, state: c.state, verdict: c.verdict, from: crossing.from, to: crossing.to }];
       });
       const bypasses: FlowEdge["bypasses"] = [];
       for (const invariant of invariants) {
@@ -443,7 +543,12 @@ export function flowOf(state: ShellState): FlowModel {
           : reachable
             ? undefined
             : `the handler resolves in ${start}, and no component interface from ${declaredBy} carries ${handlerName ?? "it"}`;
-      return { id: flowEntranceId(component.folder, entrance.name), name: entrance.name, meaning: entrance.meaning, declaredBy, handler: entrance.handler, start, resolved: start !== undefined, reachable, reason };
+      // Its trust: the entering side of each crossing whose chokepoint is its handler, in the handler's component.
+      const trust = start === undefined || handlerName === undefined
+        ? []
+        : [...new Set(invariants.filter((invariant) => invariant.crossing !== undefined && represent(invariant.component) === start && invariant.enforcements.some((e) => e.form === "chokepoint" && flowNamed(e.chokepoint)?.symbol === handlerName)).map((invariant) => invariant.crossing!.from))]
+          .sort((a, b) => (levelOrder.get(a) ?? 99) - (levelOrder.get(b) ?? 99) || a.localeCompare(b));
+      return { id: flowEntranceId(component.folder, entrance.name), name: entrance.name, meaning: entrance.meaning, declaredBy, handler: entrance.handler, start, resolved: start !== undefined, reachable, reason, trust, reach: resolution?.reach };
     }),
   );
 
@@ -484,7 +589,11 @@ export function flowOf(state: ShellState): FlowModel {
   // A cycle nothing outside it reaches: its first component in folder order stands where work enters.
   for (let rest = placed.filter((folder) => !column.has(folder)); rest.length > 0; rest = placed.filter((folder) => !column.has(folder))) spread([rest[0]!]);
 
-  // Structural routes: the declaring component, the handler's, then the heaviest interface onward, never to a column left of the last.
+  // Structural routes. With the handler's static reach read, a route follows the handler: from each stop, the heaviest
+  // component interface the reach uses through a symbol only that stop's component calls (never a type, which the reach
+  // never follows, and never a utility another component also calls), never into a core dependency, never to a column
+  // left of the last; it stops where the reach goes no further. Without a reach, the heaviest interface onward:
+  // reference weight, not flow.
   const byPair = new Map(edges.map((edge) => [`${edge.from}\u0000${edge.to}`, edge]));
   const onward = (stops: string[]): { stops: string[]; rail: string | undefined } => {
     const route = [...stops];
@@ -497,23 +606,53 @@ export function flowOf(state: ShellState): FlowModel {
       route.push(next.to);
     }
   };
-  const drafts: { stops: string[]; rail: string | undefined; entrance: string | undefined }[] = [];
+  // Which visible components reference each symbol: one referenced by more than one is a utility, never a route's step.
+  const callersOfSymbol = new Map<string, Set<string>>();
+  for (const symbol of symbols) {
+    if (!byFolder.has(symbol.from) || !byFolder.has(symbol.to)) continue;
+    const key = `${represent(symbol.to)}\u0000${symbol.symbol}\u0000${symbol.file}`;
+    const set = callersOfSymbol.get(key) ?? new Set<string>();
+    set.add(represent(symbol.from));
+    callersOfSymbol.set(key, set);
+  }
+  const follows = (from: string, to: string, reference: ReachReference): boolean =>
+    byPair.has(`${from}\u0000${to}`) && (callersOfSymbol.get(`${to}\u0000${reference.symbol}\u0000${reference.file}`)?.size ?? 1) <= 1;
+  const alongReach = (stops: string[], reach: readonly ReachReference[]): { stops: string[]; rail: string | undefined } => {
+    const route = [...stops];
+    for (;;) {
+      const at = route[route.length - 1]!;
+      const weight = new Map<string, number>();
+      for (const reference of reach) {
+        if (!byFolder.has(reference.from) || !byFolder.has(reference.to)) continue;
+        const from = represent(reference.from);
+        const to = represent(reference.to);
+        if (from !== at || to === at || route.includes(to) || core.has(to) || column.get(to)! < column.get(at)! || !follows(from, to, reference)) continue;
+        weight.set(to, (weight.get(to) ?? 0) + reference.sites);
+      }
+      const next = [...weight.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+      if (next === undefined) return { stops: route, rail: undefined };
+      route.push(next[0]);
+    }
+  };
+  const drafts: { stops: string[]; rail: string | undefined; entrance: string | undefined; trust: string[]; followed: FlowRoute["followed"] }[] = [];
   const routesFrom: FlowModel["routesFrom"] = anyEntrance ? "entrances" : byFolder.has(".") && order.has(".") && !core.has(".") ? "root interfaces" : "none";
   if (routesFrom === "entrances") {
     for (const entrance of entrances) {
       if (!entrance.reachable || entrance.start === undefined || core.has(entrance.declaredBy)) continue;
       const first = entrance.declaredBy === entrance.start ? [entrance.start] : [entrance.declaredBy, entrance.start];
-      if (core.has(entrance.start)) drafts.push({ stops: [entrance.declaredBy], rail: entrance.start, entrance: entrance.id });
-      else drafts.push({ ...onward(first), entrance: entrance.id });
+      const followed: FlowRoute["followed"] = entrance.reach === undefined ? "weight" : "reach";
+      if (core.has(entrance.start)) drafts.push({ stops: [entrance.declaredBy], rail: entrance.start, entrance: entrance.id, trust: entrance.trust, followed });
+      else drafts.push({ ...(entrance.reach === undefined ? onward(first) : alongReach(first, entrance.reach)), entrance: entrance.id, trust: entrance.trust, followed });
     }
   } else if (routesFrom === "root interfaces") {
     const fromRoot = edges.filter((edge) => edge.from === "." && !core.has(edge.to)).sort((a, b) => b.sites - a.sites || a.to.localeCompare(b.to));
-    for (const edge of fromRoot) drafts.push({ ...onward([".", edge.to]), entrance: undefined });
+    for (const edge of fromRoot) drafts.push({ ...onward([".", edge.to]), entrance: undefined, trust: [], followed: "weight" });
   }
   const nameOf = (folder: string): string => byFolder.get(folder)!.name;
   const routes: FlowRoute[] = [];
+  // Entrances share a route only when they share its stops, its rail, and the trust they carry in.
   for (const draft of drafts) {
-    const known = routes.find((route) => route.stops.join("\u0000") === draft.stops.join("\u0000") && route.rail === draft.rail);
+    const known = routes.find((route) => route.stops.join("\u0000") === draft.stops.join("\u0000") && route.rail === draft.rail && route.trust.join("\u0000") === draft.trust.join("\u0000"));
     if (known !== undefined) {
       if (draft.entrance !== undefined) {
         known.entrances.push(draft.entrance);
@@ -527,13 +666,22 @@ export function flowOf(state: ShellState): FlowModel {
       id: draft.entrance === undefined ? flowRouteId({ via }) : flowRouteId({ entrance: draft.entrance }),
       names: draft.entrance === undefined ? [`via ${nameOf(via)}`] : [entrances.find((e) => e.id === draft.entrance)!.name],
       derived: draft.entrance === undefined,
-      slot: routes.length < 8 ? routes.length : undefined,
+      slot: undefined,
       entrances: draft.entrance === undefined ? [] : [draft.entrance],
       stops: draft.stops,
       edges: routeEdges,
       rail: draft.rail,
+      trust: draft.trust,
+      entry: [],
+      sites: draft.stops.slice(1).reduce((sum, to, index) => sum + byPair.get(`${draft.stops[index]}\u0000${to}`)!.sites, 0),
+      followed: draft.followed,
     });
   }
+  // Eight colors: the routes most entrances take wear them, in route order; the rest are drawn neutral and still named.
+  const ranked = routes.map((route, index) => ({ route, index })).sort((a, b) => b.route.entrances.length - a.route.entrances.length || b.route.sites - a.route.sites || a.index - b.index);
+  const colored = new Set(ranked.slice(0, 8).map((r) => r.route.id));
+  let slot = 0;
+  for (const route of routes) if (colored.has(route.id)) route.slot = slot++;
   for (const route of routes) for (const id of route.edges) edges.find((edge) => edge.id === id)!.routes.push(route.id);
 
   // Rows. A component spans the rows its termini's names need. Within a column components keep folder order; each asks for
@@ -542,7 +690,7 @@ export function flowOf(state: ShellState): FlowModel {
   // the rows their routes go on to, and the columns after them are placed again.
   const span = new Map(placed.map((folder) => {
     const starting = routes.filter((route) => route.stops[0] === folder);
-    const lines = starting.reduce((sum, route) => sum + route.names.length + (route.derived ? 1 : 0), 0);
+    const lines = starting.reduce((sum, route) => sum + originLines(route).length, 0);
     return [folder, Math.max(1, Math.ceil(lines / FLOW_ROW_LINES))] as const;
   }));
   const row = new Map<string, number>();
@@ -576,14 +724,20 @@ export function flowOf(state: ShellState): FlowModel {
     const callers = callersOf.get(component.folder)!;
     const out = calleesOf.get(component.folder)!.length;
     const into = callers.length;
-    const defects = invariants
-      .filter((invariant) => represent(invariant.component) === component.folder && invariant.enforcements.some((e) => e.form === "chokepoint"))
+    const own = invariants.filter((invariant) => represent(invariant.component) === component.folder);
+    const defects = own
+      .filter((invariant) => invariant.enforcements.some((e) => e.form === "chokepoint"))
       .flatMap((invariant) => {
         const entry = latestOf(invariant, state.runs.records).find((candidate) => candidate.form === "chokepoint");
         if (entry?.verdict !== "fail") return [];
-        const internal = entry.bypasses.filter((b) => { const at = componentOfFile(b.file, components); return at !== undefined && represent(at.folder) === component.folder; }).length;
-        return [{ name: invariant.name, state: invariant.state, bypasses: entry.bypasses.length, internal }];
+        const sites = flowBypasses(state, invariant).map((b) => {
+          const at = componentOfFile(b.file, components);
+          return { file: b.file, line: b.line, symbol: b.symbol, inside: at !== undefined && represent(at.folder) === component.folder };
+        });
+        return [{ name: invariant.name, state: invariant.state, chokepoint: flowChokepointId(invariant.component, invariant.name), bypasses: sites.length, internal: sites.filter((s) => s.inside).length, sites }];
       });
+    const rank = { broken: 0, requirement: 1, verified: 2 } as const;
+    const mine = own.map(refOf).sort((a, b) => rank[a.verdict.state] - rank[b.verdict.state] || a.name.localeCompare(b.name));
     return {
       id: flowNodeId(component.folder),
       folder: component.folder,
@@ -601,6 +755,9 @@ export function flowOf(state: ShellState): FlowModel {
       children: components.filter((candidate) => candidate.parent === component.folder).length,
       expanded: expanded.has(component.folder),
       defects,
+      invariants: mine,
+      state: worstState(mine.map((ref) => ref.verdict.state)),
+      boundary: [],
     };
   });
 
@@ -611,24 +768,62 @@ export function flowOf(state: ShellState): FlowModel {
     return { folder: node.folder, callers: stubs.map((edge) => edge.from), stubs: stubs.map((edge) => edge.id) };
   });
 
-  // Interface identifiers: each chokepoint's place in the list, on every interface it stands on.
+  // Where work enters through a chokepoint: one that is the handler of a route's entrances, in the component that handles them.
+  const entryOf = (chokepoint: FlowChokepoint): string[] =>
+    routes.filter((route) => route.entrances.some((id) => {
+      const entrance = entrances.find((e) => e.id === id)!;
+      return entrance.declaredBy === entrance.start && entrance.start === represent(chokepoint.component) && entrance.handler !== undefined && flowNamed(chokepoint.chokepoint)?.symbol === entrance.handler.split(/\s+in\s+/)[0];
+    })).map((route) => route.id);
+
+  // Interface identifiers: each chokepoint's place in the list, on every interface it stands on and every entrance line it guards.
   const identifiers: FlowIdentifier[] = chokepoints.flatMap((chokepoint, index) => {
     const on = edges.filter((edge) => edge.chokepoints.some((c) => c.id === chokepoint.id));
-    if (on.length === 0) return [];
+    const at = entryOf(chokepoint);
+    if (on.length === 0 && at.length === 0) return [];
     const crossing = invariants.find((invariant) => invariant.component === chokepoint.component && invariant.name === chokepoint.name)?.crossing;
     const text = `${crossing === undefined ? "C" : "X"}${index + 1}`;
     for (const edge of on) edge.identifiers.push(text);
-    return [{ text, chokepoint: chokepoint.id, component: chokepoint.component, name: chokepoint.name, crossing: crossing === undefined ? undefined : { from: crossing.from, to: crossing.to }, edges: on.map((edge) => edge.id) }];
+    for (const route of routes) if (at.includes(route.id)) route.entry.push(text);
+    return [{ text, chokepoint: chokepoint.id, component: chokepoint.component, name: chokepoint.name, crossing: crossing === undefined ? undefined : { from: crossing.from, to: crossing.to }, edges: on.map((edge) => edge.id), routes: at, verdict: chokepoint.verdict }];
   });
 
-  const levels = state.spec.trustLevels.map((level) => {
-    const carrying = edges.filter((edge) => edge.levels.includes(level.name));
-    const placed = new Set(carrying.flatMap((edge) => edge.crossings.map((c) => `${c.component}\u0000${c.name}`)));
-    const unplaced = invariants
-      .filter((invariant) => invariant.crossing !== undefined && (invariant.crossing.from === level.name || invariant.crossing.to === level.name) && !placed.has(`${invariant.component}\u0000${invariant.name}`))
-      .map((invariant): FlowCrossing => ({ component: invariant.component, name: invariant.name, state: invariant.state, from: invariant.crossing!.from, to: invariant.crossing!.to }));
-    return { id: flowLevelId(level.name), name: level.name, meaning: level.meaning, edges: carrying.map((edge) => edge.id), unplaced };
+  // Every crossing is drawn: on the interfaces its chokepoint stands on, on the entrance line it guards, else on its component's boundary mark.
+  const crossings: FlowCrossingPlace[] = invariants.flatMap((invariant): FlowCrossingPlace[] => {
+    if (invariant.crossing === undefined) return [];
+    const id = flowChokepointId(invariant.component, invariant.name);
+    const identifier = identifiers.find((i) => i.chokepoint === id);
+    const on = edges.filter((edge) => edge.crossings.some((c) => c.component === invariant.component && c.name === invariant.name)).map((edge) => edge.id);
+    const at = identifier?.routes ?? [];
+    const home = represent(invariant.component);
+    const place = { ...refOf(invariant), from: invariant.crossing.from, to: invariant.crossing.to, edges: on, routes: at, component: home };
+    if (on.length > 0) return [{ ...place, on: "interface" }];
+    if (at.length > 0) return [{ ...place, on: "entrance" }];
+    nodes.find((node) => node.folder === home)?.boundary.push({ component: invariant.component, name: invariant.name, state: invariant.state, verdict: place.verdict, from: place.from, to: place.to });
+    return [{ ...place, on: "component" }];
   });
+
+  const touches = (c: { from: string; to: string }, level: string): boolean => c.from === level || c.to === level;
+  const levels = state.spec.trustLevels.map((level): FlowLevel => {
+    const carrying = edges.filter((edge) => edge.levels.includes(level.name));
+    const named = crossings.filter((c) => touches(c, level.name));
+    return {
+      id: flowLevelId(level.name),
+      name: level.name,
+      meaning: level.meaning,
+      edges: carrying.map((edge) => edge.id),
+      routes: [...new Set(named.flatMap((c) => c.routes))],
+      components: [...new Set(named.filter((c) => c.on === "component").map((c) => c.component))],
+      unplaced: named.filter((c) => !nodes.some((node) => node.folder === c.component)).map(({ component, name, state: s, verdict, from, to }) => ({ component, name, state: s, verdict, from, to })),
+    };
+  });
+
+  const health: FlowHealth = {
+    verified: invariants.filter((i) => i.state === "invariant").map(refOf),
+    requirements: invariants.filter((i) => i.state === "requirement").map(refOf),
+    defects: invariants.filter((i) => i.state === "structural defect").map(refOf),
+    bypassed: invariants.filter((i) => verdictOf(i.component, i.name).bypassed).map(refOf),
+    escalations: openEscalations(state.journal.records).map((record) => ({ id: record.id, what: subjectOf(record) })),
+  };
 
   return {
     evidence: reading.kind === "read" ? "language adapter" : "run sites only",
@@ -644,13 +839,15 @@ export function flowOf(state: ShellState): FlowModel {
     coreDependencies,
     identifiers,
     unowned: reading.kind === "read" ? reading.unowned : undefined,
+    crossings,
+    health,
   };
 }
 
 /* ---------------------------------------------------------- selection */
 
 export interface FlowSelection {
-  kind: "none" | "entrance" | "route" | "level" | "component" | "edge" | "chokepoint" | "change";
+  kind: "none" | "entrance" | "route" | "level" | "component" | "edge" | "chokepoint" | "change" | "health" | "broken" | "boundary";
   id: string | undefined;
   /** Component folders on the story; every other component dims. */
   nodes: Set<string>;
@@ -658,31 +855,47 @@ export interface FlowSelection {
   edges: Set<string>;
   /** Routes on the story; every other route dims. */
   routes: Set<string>;
+  /** Chokepoint ids whose interface identifiers light; every other identifier dims. */
+  chokepoints: Set<string>;
+  /** Component folders whose broken or boundary mark lights. */
+  marks: Set<string>;
 }
 
-function flowRouteLight(model: FlowModel, route: FlowRoute): { nodes: Set<string>; edges: Set<string>; routes: Set<string> } {
+function flowRouteLight(model: FlowModel, route: FlowRoute): Omit<FlowSelection, "kind" | "id"> {
   const railStub = route.rail === undefined ? undefined : model.edges.find((edge) => edge.from === route.stops[route.stops.length - 1] && edge.to === route.rail);
+  const edges = new Set([...route.edges, ...(railStub === undefined ? [] : [railStub.id])]);
   return {
     nodes: new Set([...route.stops, ...(route.rail === undefined ? [] : [route.rail])]),
-    edges: new Set([...route.edges, ...(railStub === undefined ? [] : [railStub.id])]),
+    edges,
     routes: new Set([route.id]),
+    chokepoints: new Set(model.identifiers.filter((i) => i.routes.includes(route.id) || i.edges.some((id) => edges.has(id))).map((i) => i.chokepoint)),
+    marks: new Set(),
   };
+}
+
+/** The members of one health count: the invariants it counts. */
+export function flowHealthMembers(model: FlowModel, kind: FlowHealthKind): FlowInvariantRef[] {
+  return kind === "verified" ? model.health.verified : kind === "requirements" ? model.health.requirements : kind === "defects" ? model.health.defects : kind === "bypassed" ? model.health.bypassed : [];
 }
 
 /**
  * What a selection lights. An entrance lights its structural route; a route
- * lights itself; a trust level lights the interfaces whose crossings carry
- * that class of data, and so its trust boundaries; a chokepoint lights every
- * interface it stands on (reliance); a component lights its direct
+ * lights itself; a trust level lights every crossing that carries that class
+ * of data, wherever it is drawn (its interfaces, an entrance line, a
+ * component's boundary mark), and only those identifiers; a chokepoint lights
+ * every interface it stands on (reliance); a component lights its direct
  * component interfaces and the components at their other ends, and keeps
  * the routes through it undimmed, never everything it transitively
- * reaches; an interface lights itself. The change selection lights nothing
- * until two states are compared. An id that names nothing selects nothing.
+ * reaches; an interface lights itself; a health count lights the components
+ * and identifiers of the invariants it counts; a broken or boundary mark
+ * lights its component. The change selection lights nothing until two
+ * states are compared. An id that names nothing selects nothing.
  */
 export function flowSelection(model: FlowModel, selected: string | undefined): FlowSelection {
-  const none: FlowSelection = { kind: "none", id: undefined, nodes: new Set(), edges: new Set(), routes: new Set() };
+  const none: FlowSelection = { kind: "none", id: undefined, nodes: new Set(), edges: new Set(), routes: new Set(), chokepoints: new Set(), marks: new Set() };
   if (selected === undefined) return none;
   if (selected === FLOW_CHANGE_ID) return { ...none, kind: "change", id: selected };
+  const identifiersOn = (edges: Set<string>): Set<string> => new Set(model.identifiers.filter((i) => i.edges.some((id) => edges.has(id))).map((i) => i.chokepoint));
   const entrance = model.entrances.find((candidate) => candidate.id === selected);
   if (entrance !== undefined) {
     const route = model.routes.find((candidate) => candidate.entrances.includes(entrance.id));
@@ -694,36 +907,61 @@ export function flowSelection(model: FlowModel, selected: string | undefined): F
   const level = model.levels.find((candidate) => candidate.id === selected);
   if (level !== undefined) {
     const lit = model.edges.filter((edge) => level.edges.includes(edge.id));
-    return { kind: "level", id: selected, nodes: new Set(lit.flatMap((edge) => [edge.from, edge.to])), edges: new Set(lit.map((edge) => edge.id)), routes: new Set() };
+    const routes = model.routes.filter((r) => level.routes.includes(r.id));
+    const chokepoints = new Set(model.identifiers.filter((i) => i.crossing !== undefined && (i.crossing.from === level.name || i.crossing.to === level.name)).map((i) => i.chokepoint));
+    return {
+      kind: "level",
+      id: selected,
+      nodes: new Set([...lit.flatMap((edge) => [edge.from, edge.to]), ...routes.map((r) => r.stops[0]!), ...level.components]),
+      edges: new Set(lit.map((edge) => edge.id)),
+      routes: new Set(routes.map((r) => r.id)),
+      chokepoints,
+      marks: new Set(level.components),
+    };
   }
   const chokepoint = model.chokepoints.find((candidate) => candidate.id === selected);
   if (chokepoint !== undefined) {
     const lit = model.edges.filter((edge) => edge.chokepoints.some((c) => c.id === chokepoint.id));
-    return { kind: "chokepoint", id: selected, nodes: new Set([chokepoint.component, ...lit.flatMap((edge) => [edge.from, edge.to])]), edges: new Set(lit.map((edge) => edge.id)), routes: new Set(lit.flatMap((edge) => edge.routes)) };
+    const entry = model.identifiers.find((i) => i.chokepoint === chokepoint.id)?.routes ?? [];
+    return { kind: "chokepoint", id: selected, nodes: new Set([chokepoint.component, ...lit.flatMap((edge) => [edge.from, edge.to])]), edges: new Set(lit.map((edge) => edge.id)), routes: new Set([...lit.flatMap((edge) => edge.routes), ...entry]), chokepoints: new Set([chokepoint.id]), marks: new Set() };
   }
   const node = model.nodes.find((candidate) => candidate.id === selected);
   if (node !== undefined) {
     const direct = model.edges.filter((edge) => edge.from === node.folder || edge.to === node.folder);
+    const edges = new Set(direct.map((edge) => edge.id));
     return {
       kind: "component",
       id: selected,
       nodes: new Set([node.folder, ...direct.flatMap((edge) => [edge.from, edge.to])]),
-      edges: new Set(direct.map((edge) => edge.id)),
+      edges,
       routes: new Set(model.routes.filter((r) => r.stops.includes(node.folder) || r.rail === node.folder).map((r) => r.id)),
+      chokepoints: identifiersOn(edges),
+      marks: new Set([node.folder]),
     };
   }
   const edge = model.edges.find((candidate) => candidate.id === selected);
-  if (edge !== undefined) return { kind: "edge", id: selected, nodes: new Set([edge.from, edge.to]), edges: new Set([edge.id]), routes: new Set(edge.routes) };
+  if (edge !== undefined) return { kind: "edge", id: selected, nodes: new Set([edge.from, edge.to]), edges: new Set([edge.id]), routes: new Set(edge.routes), chokepoints: identifiersOn(new Set([edge.id])), marks: new Set() };
+  const health = FLOW_HEALTH_KINDS.find((kind) => flowHealthId(kind) === selected);
+  if (health !== undefined) {
+    const members = new Set(flowHealthMembers(model, health).map((m) => `${m.component}\u0000${m.name}`));
+    const holders = model.nodes.filter((n) => n.invariants.some((i) => members.has(`${i.component}\u0000${i.name}`)));
+    const chokepoints = new Set(model.identifiers.filter((i) => members.has(`${i.component}\u0000${i.name}`)).map((i) => i.chokepoint));
+    return { ...none, kind: "health", id: selected, nodes: new Set(holders.map((n) => n.folder)), chokepoints, marks: new Set(holders.filter((n) => n.boundary.some((c) => members.has(`${c.component}\u0000${c.name}`)) || (health !== "verified" && health !== "requirements" && n.defects.length > 0)).map((n) => n.folder)) };
+  }
+  const brokenAt = model.nodes.find((n) => flowBrokenId(n.folder) === selected && n.defects.length > 0);
+  if (brokenAt !== undefined) {
+    const edges = new Set(model.edges.filter((e) => e.to === brokenAt.folder && e.bypasses.length > 0).map((e) => e.id));
+    return { ...none, kind: "broken", id: selected, nodes: new Set([brokenAt.folder, ...model.edges.filter((e) => edges.has(e.id)).map((e) => e.from)]), edges, chokepoints: new Set(brokenAt.defects.map((d) => d.chokepoint)), marks: new Set([brokenAt.folder]) };
+  }
+  const boundaryAt = model.nodes.find((n) => flowBoundaryId(n.folder) === selected && n.boundary.length > 0);
+  if (boundaryAt !== undefined) return { ...none, kind: "boundary", id: selected, nodes: new Set([boundaryAt.folder]), marks: new Set([boundaryAt.folder]) };
   return none;
 }
 
-/** The story the map opens on when the reader has selected nothing. */
+/** The story the map opens on when the reader has selected nothing: the busiest route (DEFAULT_RULE). */
 export function flowDefaultSelection(model: FlowModel): string | undefined {
-  // The busiest entrance: the one whose route reaches the most components, its rail counted; ties by name.
-  const reached = (route: FlowRoute): number => route.stops.length + (route.rail === undefined ? 0 : 1);
-  const candidates = model.routes.flatMap((route) => route.names.slice(0, route.derived ? 1 : undefined).map((name) => ({ name, route })));
-  candidates.sort((a, b) => reached(b.route) - reached(a.route) || a.name.localeCompare(b.name));
-  return candidates[0]?.route.id;
+  const name = (route: FlowRoute): string => route.names[0] ?? "";
+  return [...model.routes].sort((a, b) => b.sites - a.sites || b.entrances.length - a.entrances.length || name(a).localeCompare(name(b)))[0]?.id;
 }
 
 /** What is selected: the reader's selection, else the default story; the cleared selection selects nothing. */

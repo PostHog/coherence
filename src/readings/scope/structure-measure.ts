@@ -27,8 +27,17 @@ const BOLD = [
 ];
 const WIDE: Record<string, number> = { "·": 343, "–": 625, "—": 901, "…": 917, "→": 943, "←": 943, "✕": 763, "▸": 492, "−": 670 };
 
-/** The rendered width of `text` at `size` px: the embedded advance widths, with a small allowance for the system face. */
-export function textWidth(text: string, size: number, bold = false, letterSpacing = 0): number {
+/** IBM Plex Mono's advance: every glyph is 600 thousandths of an em. */
+const MONO_ADVANCE = 600;
+
+/**
+ * The rendered width of `text` at `size` px: the embedded advance widths, with
+ * a small allowance for the system face. `bold` is any weight from medium
+ * (500) up, measured by the semibold table, the wider, so medium is never
+ * undershot; `mono` is IBM Plex Mono's fixed advance.
+ */
+export function textWidth(text: string, size: number, bold = false, letterSpacing = 0, mono = false): number {
+  if (mono) return ([...text].length * MONO_ADVANCE / 1000) * size * 1.02 + letterSpacing * [...text].length;
   const table = bold ? BOLD : REGULAR;
   let units = 0;
   for (const ch of text) {
@@ -88,9 +97,9 @@ function classes(el: Element): string[] {
 }
 
 /** Font of a text element: its own attributes first, else the classes the earlier map used. */
-function fontOf(el: Element, stack: Element[]): { size: number; bold: boolean; upper: boolean; spacing: number } {
+function fontOf(el: Element, stack: Element[]): { size: number; bold: boolean; upper: boolean; spacing: number; mono?: boolean } {
   const size = el.attrs["font-size"];
-  if (size !== undefined) return { size: Number(size), bold: Number(el.attrs["font-weight"] ?? 400) >= 600 || el.attrs["font-weight"] === "bold", upper: false, spacing: 0 };
+  if (size !== undefined) return { size: Number(size), bold: Number(el.attrs["font-weight"] ?? 400) >= 500 || el.attrs["font-weight"] === "bold", upper: false, spacing: 0, mono: classes(el).includes("flow-mono") };
   const c = classes(el);
   if (c.includes("flow-node-name")) return { size: 13, bold: true, upper: false, spacing: 0 };
   if (c.includes("flow-node-mark") || c.includes("flow-node-tag")) return { size: 10.5, bold: true, upper: false, spacing: 0 };
@@ -251,7 +260,7 @@ export function measureSvg(svg: string): SvgMeasure {
         if (content !== "" && shown(open.stack.concat([el]))) {
           const font = fontOf(el, open.stack);
           const shownText = font.upper ? content.toUpperCase() : content;
-          const w = textWidth(shownText, font.size, font.bold, font.spacing);
+          const w = textWidth(shownText, font.size, font.bold, font.spacing, font.mono === true);
           // The map sets every text from its left edge.
           const x = Number(el.attrs["x"] ?? 0);
           const y = Number(el.attrs["y"] ?? 0) - font.size * 0.78;

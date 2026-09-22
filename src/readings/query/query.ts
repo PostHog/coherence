@@ -30,7 +30,7 @@ import {
   structureOf,
   type RelianceSite,
 } from "../scope/derive.ts";
-import { CORE_RULE, flowDefaultSelection, flowLabelLines, flowOf, routeName } from "../scope/structure-flow.ts";
+import { CORE_RULE, DEFAULT_RULE, ROUTE_RULE, flowDefaultSelection, flowLabelLines, flowOf, routeName } from "../scope/structure-flow.ts";
 import { renderOrder } from "../../journal/workVerbs.ts";
 import { glossaryReviewCommand } from "../scope/model.ts";
 import type { GlossaryCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
@@ -213,18 +213,21 @@ export function answerSpine(state: ShellState): Answer {
 export function answerStructure(state: ShellState): Answer {
   const model = flowOf(state);
   const bearing = model.edges.filter((edge) => edge.loadBearing).length;
+  const h = model.health;
   const lines = [
     `evidence: static and computed; ${model.evidence === "language adapter" ? `resolved references through the ${model.language} language adapter` : `run sites only (${model.unread}); plain component interfaces unknown`}`,
-    `structural routes (${model.routes.length}), ${model.routesFrom === "root interfaces" ? "derived from the root component's component interfaces: no entrance is declared" : model.routesFrom === "entrances" ? "one per distinct path from the declared entrances" : "none: no entrance is declared and there is no root"}:`,
+    `health: ${h.verified.length} invariants enforced and verified, ${h.requirements.length} requirements, ${h.defects.length} structural defects, ${h.bypassed.length} requirements with a broken chokepoint, ${h.escalations.length} escalations${h.verified.length === 0 && h.requirements.length > 0 ? "; nothing is enforced yet" : ""}`,
+    `crossings (${model.crossings.length}), every one drawn: ${model.crossings.filter((c) => c.on === "interface").length} on component interfaces, ${model.crossings.filter((c) => c.on === "entrance").length} on entrance lines only, ${model.crossings.filter((c) => c.on === "component").length} on component boundary marks`,
+    `structural routes (${model.routes.length}), ${model.routesFrom === "root interfaces" ? "derived from the root component's component interfaces by reference weight, not flow: no entrance is declared" : model.routesFrom === "entrances" ? `one per distinct path and trust from the declared entrances; ${ROUTE_RULE}` : "none: no entrance is declared and there is no root"}:`,
   ];
-  for (const route of model.routes) lines.push(`  ${routeName(route)}  ${route.stops.join(" -> ")}${route.rail === undefined ? "" : ` -> ${route.rail} (rail)`}`);
+  for (const route of model.routes) lines.push(`  ${routeName(route)}  ${route.stops.join(" -> ")}${route.rail === undefined ? "" : ` -> ${route.rail} (rail)`}${route.trust.length === 0 ? "" : `  trust ${route.trust.join(", ")}`}${route.entry.length === 0 ? "" : `  enters through ${route.entry.join(" ")}`}  ${route.sites} sites`);
   const opens = model.routes.find((route) => route.id === flowDefaultSelection(model));
-  if (opens !== undefined) lines.push(`the map opens on: ${routeName(opens)} (the busiest entrance: most components reached, ties by name)`);
+  if (opens !== undefined) lines.push(`the map opens on: ${routeName(opens)} (${DEFAULT_RULE})`);
   lines.push(`core dependencies (${model.coreDependencies.length}), each ${CORE_RULE}:`);
   for (const core of model.coreDependencies) lines.push(`  ${core.folder}  called by ${core.callers.join(", ")}`);
   lines.push(`interface identifiers (${model.identifiers.length}):`);
   for (const identifier of model.identifiers) {
-    lines.push(`  ${identifier.text}  ${identifier.component}/${identifier.name}${identifier.crossing === undefined ? "" : `  crossing ${identifier.crossing.from} -> ${identifier.crossing.to}`}  on ${identifier.edges.map((id) => { const edge = model.edges.find((e) => e.id === id)!; return `${edge.from} -> ${edge.to}`; }).join(", ")}`);
+    lines.push(`  ${identifier.text}  ${identifier.component}/${identifier.name}  ${identifier.verdict.label}${identifier.crossing === undefined ? "" : `  crossing ${identifier.crossing.from} -> ${identifier.crossing.to}`}${identifier.routes.length === 0 ? "" : `  where work enters by ${identifier.routes.map((id) => routeName(model.routes.find((r) => r.id === id)!)).join("; ")}`}  on ${identifier.edges.length === 0 ? "no interface" : ""}${identifier.edges.map((id) => { const edge = model.edges.find((e) => e.id === id)!; return `${edge.from} -> ${edge.to}`; }).join(", ")}`);
   }
   lines.push(`component interfaces (${model.edges.length}, ${bearing} load-bearing), caller -> callee:`);
   for (const edge of model.edges) {
@@ -238,8 +241,8 @@ export function answerStructure(state: ShellState): Answer {
   lines.push("placement, row (rows keep routes straight; folder order within a column)  column (true distance from where work enters):");
   for (const node of model.nodes) lines.push(`  ${node.core ? "rail" : node.row}  ${node.core ? "rail" : node.column}  ${node.folder}${node.span > 1 ? `  spans ${node.span} rows` : ""}${node.unconnected ? "  no component interface" : ""}`);
   if (model.unowned !== undefined && model.unowned.files > 0) lines.push(`  no component  ${model.unowned.files} files, ${model.unowned.lines} lines`);
-  const broken = model.nodes.flatMap((node) => node.defects.filter((d) => d.internal > 0).map((d) => `  ${node.folder}/${d.name}  ${d.state}; ${d.internal} of ${d.bypasses} bypasses inside ${node.folder}, on no component interface`));
-  if (broken.length > 0) lines.push("broken chokepoints no interface shows:", ...broken);
+  const broken = model.nodes.flatMap((node) => node.defects.map((d) => `  ${node.folder}/${d.name}  ${d.state}; ${d.bypasses} bypasses, ${d.internal} inside ${node.folder}: ${d.sites.map((s) => `${s.file}:${s.line}`).join(", ")}`));
+  if (broken.length > 0) lines.push("broken chokepoints, each marked on its component:", ...broken);
   return { text: lines.join("\n"), code: 0 };
 }
 

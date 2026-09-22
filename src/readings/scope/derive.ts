@@ -231,6 +231,36 @@ export function defectsOf(invariant: SpecInvariant, runs: readonly RunRecord[]):
   return latestOf(invariant, runs).filter((e) => e.verdict === "fail");
 }
 
+/**
+ * One verdict per invariant, the one Structure shows everywhere: broken when
+ * the bullet is a structural defect or its latest check of a form it still
+ * declares failed (a requirement whose chokepoint check found bypasses is
+ * broken too, and says so); else verified when the bullet is an invariant;
+ * else a requirement. Dated by the latest run that checked it. The
+ * per-enforcement verdicts it resolves stay one fold away, never beside it.
+ */
+export interface InvariantVerdict {
+  state: "verified" | "requirement" | "broken";
+  /** A requirement whose latest chokepoint check found bypasses: broken, though never an invariant. */
+  bypassed: boolean;
+  /** The latest run that checked any enforcement it declares, as YYYY-MM-DD. */
+  at: string | undefined;
+  /** The verdict in words, with its date: "verified 2026-09-22", "requirement", "structural defect 2026-09-22". */
+  label: string;
+}
+
+export function invariantVerdict(invariant: SpecInvariant, runs: readonly RunRecord[]): InvariantVerdict {
+  const forms = new Set(invariant.enforcements.map((e) => e.form));
+  const latest = latestOf(invariant, runs).filter((entry) => forms.has(entry.form));
+  const failing = latest.some((entry) => entry.verdict === "fail");
+  const at = latest.map((entry) => entry.at).sort().pop()?.slice(0, 10);
+  const dated = (words: string): string => (at === undefined ? words : `${words} ${at}`);
+  if (invariant.state === "structural defect") return { state: "broken", bypassed: false, at, label: dated("structural defect") };
+  if (failing) return invariant.state === "invariant" ? { state: "broken", bypassed: false, at, label: dated("structural defect") } : { state: "broken", bypassed: true, at, label: dated("requirement, bypassed") };
+  if (invariant.state === "invariant") return { state: "verified", bypassed: false, at, label: dated("verified") };
+  return { state: "requirement", bypassed: false, at, label: at === undefined ? "requirement" : `requirement, checked ${at}` };
+}
+
 /* ------------------------------------------------------------ reliance */
 
 /** One declared chokepoint on a crossing-bearing invariant. */

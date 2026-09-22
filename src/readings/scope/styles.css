@@ -14,6 +14,7 @@
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia,
     "Times New Roman", serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -590,7 +591,7 @@ a {
 }
 
 code {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 0.875em;
   overflow-wrap: anywhere;
 }
@@ -763,7 +764,7 @@ code {
 }
 
 .crossing .level {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 0.8125rem;
   border-bottom: 1px dotted var(--rule);
   cursor: help;
@@ -911,6 +912,8 @@ code {
 .flow {
   --flow-key-rail: #5f6b7a;
   --flow-key-quiet: #9aa5bd;
+  --flow-key-verified: #1f3a5f;
+  --flow-key-broken: #c32836;
 }
 
 /* Numbers that line up down a column of rows are tabular; identifiers are not. */
@@ -923,7 +926,138 @@ code {
   .flow {
     --flow-key-rail: #9aa6b6;
     --flow-key-quiet: #6f7c96;
+    --flow-key-verified: #c9d6f2;
+    --flow-key-broken: #d13438;
   }
+}
+
+/* The health strip: every count a selection, each drawn in the state the map draws it. */
+.flow-map {
+  min-width: 0;
+}
+
+.flow-health {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.5rem;
+  margin: 0 0 0.625rem;
+}
+
+.flow-health-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem 0.25rem 0.5rem;
+  cursor: pointer;
+}
+
+.flow-health-count strong {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.flow-health-count[aria-pressed="true"] {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.flow-health-swatch,
+.flow-verdict-swatch {
+  display: inline-block;
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 0.2rem;
+  border: 1.5px solid var(--flow-key-verified);
+  background: var(--flow-key-verified);
+}
+
+.flow-health-count[data-health="requirements"] .flow-health-swatch,
+[data-verdict-state="requirement"] > .flow-verdict-swatch {
+  background: repeating-linear-gradient(45deg, var(--flow-key-verified) 0 1.5px, transparent 1.5px 4px);
+  border-style: dashed;
+}
+
+.flow-health-count[data-health="defects"] .flow-health-swatch,
+.flow-health-count[data-health="bypassed"] .flow-health-swatch,
+[data-verdict-state="broken"] > .flow-verdict-swatch {
+  background: var(--flow-key-broken);
+  border-color: var(--flow-key-broken);
+}
+
+.flow-health-count[data-health="escalations"] .flow-health-swatch {
+  background: none;
+  border-color: var(--fail);
+  border-radius: 50%;
+}
+
+.flow-health-count[data-health="defects"][data-count="0"] .flow-health-swatch {
+  background: none;
+}
+
+.flow-health-note {
+  flex-basis: 100%;
+  margin: 0.125rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--fail);
+}
+
+.flow-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.flow-verdict[data-verdict-state="broken"] {
+  color: var(--fail);
+  font-weight: 600;
+}
+
+.flow-ident[data-verdict-state="verified"] {
+  background: var(--flow-key-verified);
+  border-color: var(--flow-key-verified);
+  color: var(--paper);
+}
+
+.flow-ident[data-verdict-state="requirement"] {
+  border-style: dashed;
+}
+
+.flow-ident[data-verdict-state="broken"] {
+  background: var(--flow-key-broken);
+  border-color: var(--flow-key-broken);
+  color: #ffffff;
+}
+
+.flow-term {
+  color: inherit;
+  font-style: normal;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+
+a.flow-term {
+  cursor: pointer;
+}
+
+.flow-defect {
+  margin-top: 0.75rem;
+}
+
+.flow-defect h4 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
 }
 
 .flow-head {
@@ -1012,7 +1146,7 @@ code {
     align-items: start;
   }
 
-  .flow-canvas {
+  .flow-map {
     grid-column: 1;
   }
 
@@ -1026,9 +1160,13 @@ code {
   }
 }
 
-/* Below desktop width: an open inspector is a sheet over the bottom of the screen, dismissed by its close button or Escape. */
+/*
+ * Below desktop width: an inspector the reader opened is a sheet over the bottom of the screen, dismissed by its close
+ * button or Escape. The default story's inspector (the reader chose nothing) never covers the map: it stays in the
+ * page's flow beneath it.
+ */
 @media (max-width: 63.99rem) {
-  .flow-inspector[data-open="true"] {
+  .flow-inspector[data-open="true"]:not([data-default="true"]) {
     position: fixed;
     left: 0;
     right: 0;
@@ -1041,7 +1179,7 @@ code {
     box-shadow: 0 -0.5rem 1.5rem rgb(0 0 0 / 0.18);
   }
 
-  .flow-stage:has(.flow-inspector[data-open="true"]) {
+  .flow-stage:has(.flow-inspector[data-open="true"]:not([data-default="true"])) {
     padding-bottom: 55vh;
   }
 }
@@ -1134,7 +1272,7 @@ code {
 }
 
 .flow-levels dt {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 0.75rem;
 }
 
@@ -1225,8 +1363,9 @@ code {
 .flow-ident {
   display: inline-block;
   min-width: 2.25rem;
+  font-family: var(--mono);
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.4;
   text-align: center;
   padding: 0 0.3rem;

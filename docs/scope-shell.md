@@ -67,18 +67,44 @@ derivation, read by the SVG in `structure-flow-view.ts` and by
   when a chokepoint, a crossing or a bypass stands on it (a thin grey line,
   dashed red when broken), and otherwise drawn faint, dashed, when a
   selection reaches it.
-- Structural routes. Each entrance's route is the component that declares
-  it, the component holding its handler, then from each stop the heaviest
-  component interface (most reference sites, ties by folder) to a component
-  not yet on it, not a core dependency, and not in a column left of the one
-  the route stands in: a route never doubles back. Entrances whose routes are
-  the same stops share one line. A route is named for its origin, never
-  lettered: the names of the entrances it starts from, in full, one per line,
-  set to end at its dot in a left margin sized to the widest name; a project
-  that declares no entrance (the first adopter) has its routes derived from
-  the root component's interfaces, one per callee, each named "via" the first
-  component it reaches with a second line "derived" beside a hollow dashed
-  dot. A route is one path of its own color (the validated eight-color order,
+- Health. A strip above the map counts every invariant by its one verdict
+  (`invariantVerdict` in `derive.ts`): enforced and verified (the spec
+  model's invariants), requirements, structural defects, requirements whose
+  chokepoint check found bypasses, and open escalations. Each count is a
+  selection; its inspector lists the set, and a project with nothing
+  enforced says so in words on the map. Every interface identifier is drawn
+  in its invariant's state (solid verified, dashed outline requirement, red
+  broken), every component carries its worst verdict as a bar inside its
+  box, and a component with a broken chokepoint carries a red `✕ n broken`
+  button attached to its box that lists every bypass site, those inside the
+  component named as inside.
+- Crossings. Every crossing is drawn (`model.crossings`): on the component
+  interfaces its chokepoint stands on; on the line from a route's origin
+  when its chokepoint is the entrances' own handler (Coherence's hook
+  entrances: `runHook` is the chokepoint of the harness crossings); else on
+  its component's boundary mark, a token on the box's edge with the edge
+  dashed red, counting the crossings inside it (a rail carries its own).
+  Selecting a trust level lights exactly the identifiers and marks whose
+  crossings carry it.
+- Structural routes. With the handler's static reach read (the adapter
+  records, per entrance, the component interfaces its handler's value
+  references reach, through every declaration they reach), a route is the
+  component that declares the entrance, the component holding its handler,
+  then from each stop the heaviest interface that reach uses through a
+  symbol only that stop's component calls (never a type, never a utility
+  another component also calls), never into a core dependency, never back to
+  a column it has left (`ROUTE_RULE`); it stops where the reach goes no
+  further. Without a reach the heaviest interface is followed and the route
+  says it is reference weight, not flow. Entrances share a route only when
+  they share its stops and their trust: the entering side of the crossings
+  whose chokepoint is their handler. A route is named for its origin, never
+  lettered: at most four entrance names, one per line, and a count of the
+  rest, which the route's inspector lists; a project that declares no
+  entrance has its routes derived from the root component's interfaces, one
+  per callee, named "via" the first component it reaches with a second line
+  "reference weight" beside a hollow dashed dot. The eight routes most
+  entrances take wear the eight colors, each darkened until white text on it
+  reaches 4.5:1; origin text is always white. A route is one path of its own color (the validated eight-color order,
   then neutral) through the centre of each station in order; routes through
   one component meet at its station, and parallel routes run side by side at
   a fixed six-pixel offset, never merged. Every segment is horizontal,
@@ -87,9 +113,9 @@ derivation, read by the SVG in `structure-flow-view.ts` and by
   in the same column drops straight down (or up) between them; a step past a
   station in the same column turns in the column's own lane, nearest the
   stations, shortest innermost so nested lanes never cross.
-- Rest and selection. The map opens on the busiest entrance's route
-  (`flowDefaultSelection`: the entrance whose route reaches the most
-  components, its rail counted, ties by entrance name), lit, with every other
+- Rest and selection. The map opens on the busiest route
+  (`flowDefaultSelection`, `DEFAULT_RULE`: the most reference sites along its
+  component interfaces, then the most entrances, then by name), lit, with every other
   route dimmed; an absent selection means that default. Clearing the selection
   stores `structure--none`: nothing lit and every route thin and muted. Any
   deep link still selects anything.
@@ -132,7 +158,9 @@ derivation, read by the SVG in `structure-flow-view.ts` and by
   order; each asks for the row that keeps the routes reaching it from the
   column before straight (the median of where they come from) and takes it
   when the component above leaves room. A component where routes start spans
-  the rows its entrance names need. Stability is stable relative order:
+  the rows its origin lines need. A station holds its name, its role (its
+  spec's intent in two lines, shortened at a clause or whole words, never an
+  ellipsis), and its folder in IBM Plex Mono, embedded in the page. Stability is stable relative order:
   adding one component interface moves out of its column only what the
   interface reaches (its callee and what the callee reaches, or all its
   caller reaches when it stops the caller being a core dependency), and never
@@ -159,8 +187,9 @@ derivation, read by the SVG in `structure-flow-view.ts` and by
   selection to the hash, and `followHash` reads it back.
 - The inspector stands beside the canvas at desktop widths (its own grid
   column, sticky, never over the map; the canvas keeps its full height and
-  the shell widens while Structure is shown) and is a dismissible sheet over
-  the bottom of the screen below that. It is open while something is
+  the shell widens while Structure is shown) and, below that, a dismissible
+  sheet over the bottom of the screen for anything the reader selects; the
+  default story's inspector stays in the page under the map there. It is open while something is
   selected, showing that thing; with nothing selected it shows the map's
   summary. Its close button and the `Escape` key clear the selection
   (`flowKeyAction` decides what a key does: `Enter` and `Space` activate a map

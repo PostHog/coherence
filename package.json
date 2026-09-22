@@ -21,6 +21,7 @@
     "test:python": "node --disable-warning=ExperimentalWarning --test src/adapters/python.test.ts"
   },
   "devDependencies": {
+    "@ibm/plex-mono": "2.5.0",
     "@types/node": "^22.20.3",
     "typescript": "^5.9.3"
   },
