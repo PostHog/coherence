@@ -321,7 +321,9 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
   const sideOf = (from: FlowNode, to: FlowNode): { out: Side; in: Side } =>
     to.column > from.column ? { out: "right", in: "left" } : to.column < from.column ? { out: "left", in: "right" } : { out: "right", in: "right" };
   const drawn = model.routes.filter((route) => route.stops.every((stop) => byFolder.has(stop) && !byFolder.get(stop)!.core));
-  const bearing = model.edges.filter((edge) => (edge.loadBearing || edge.bypasses.length > 0) && edge.routes.length === 0 && !edge.stub);
+  const atRest = (edge: FlowEdge): boolean => (edge.loadBearing || edge.bypasses.length > 0) && edge.routes.length === 0 && !edge.stub;
+  // Load-bearing or broken interfaces on no route get ports like a route's; one leaving a rail rises from the rail instead.
+  const bearing = model.edges.filter((edge) => atRest(edge) && !byFolder.get(edge.from)!.core);
   drawn.forEach((route, index) => {
     const first = byFolder.get(route.stops[0]!)!;
     addPort(first.folder, "left", { key: `term ${route.id}`, other: rowY(first.row) - 1000 + index, route: index });
@@ -449,7 +451,8 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
   // Faint: a plain interface on no route, drawn only when the selection reaches it; from a rail it rises from the rail.
   let faintIndex = 0;
   for (const edge of model.edges) {
-    if (edge.routes.length > 0 || edge.stub || edge.loadBearing || edge.bypasses.length > 0 || !selection.edges.has(edge.id)) continue;
+    const fromRail = byFolder.get(edge.from)!.core;
+    if (edge.routes.length > 0 || edge.stub || (atRest(edge) && !fromRail) || (!atRest(edge) && !selection.edges.has(edge.id))) continue;
     const from = byFolder.get(edge.from)!;
     const to = byFolder.get(edge.to)!;
     const b = stations.get(to.folder)!;
@@ -459,7 +462,7 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
       const x = r1(b.x - 24 - faintIndex * 4);
       faintIndex += 1;
       const pb: Point = [b.x, r1(b.y + b.h - 4)];
-      lines.push({ edge, kind: "faint", line: { points: [[x, rail.y], [x, r1(pb[1] + 8)], [r1(x + 8), pb[1]], pb], legs: [{ a: [x, rail.y], b: [x, r1(pb[1] + 8)] }] } });
+      lines.push({ edge, kind: atRest(edge) ? "bearing" : "faint", line: { points: [[x, rail.y], [x, r1(pb[1] + 8)], [r1(x + 8), pb[1]], pb], legs: [{ a: [x, rail.y], b: [x, r1(pb[1] + 8)] }] } });
       continue;
     }
     const side = sideOf(from, to);

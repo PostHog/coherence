@@ -110,6 +110,7 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   via: every component interface is on the map, caller to callee, and none is implied away
   because: the owner defined the component interface as computed, never declared, so Structure is a live view of the real project and not a rotting map (d-54e128e1); an interface a path implies is still a real surface a change can widen. The transit redraw (w-2b931e15, d-4a122d41) draws journeys rather than every connection at rest, so the rule moved from one arrow each to a place on the map each: a route, a stub, a load-bearing line, or a faint line one selection away
   crossing: record -> reading
+  refuted: stopped drawing a plain interface on no route when a selection reaches it, in flowLayout -> the totality oracle went red; restored, green (2026-09-22). Before the transit redraw: drew only the load-bearing interfaces in flowOf -> red; restored, green (2026-09-22)
   kinds: none
 - component interfaces reveal their invariants: A component interface is annotated from the invariants and never authored: the chokepoint that stands on it when a chokepoint symbol is among its symbols, that invariant's crossing, and the classes of data its crossings carry; its label reads them in that order, else names its most-referenced symbols, and never a verb.
   over: every interface of the flow fixture, load-bearing and plain, and every line of every label
@@ -123,6 +124,7 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   via: stability: adding one component interface moves only the components it touches
   because: the owner ruled stable positions essential (structure detail, stability): a reader who learned where things are must not lose them when one reference is added, and a diff can only show what moved if nothing else did. Each station's seat is its row in folder order and its column read from its own callers (distance from where work enters, capped at two), so no other component's facts can move it; true distance would move every component downstream of the new interface's callee, and the order keeps stability over route straightness (d-1f1ce391)
   crossing: record -> reading
+  refuted: made every component's column past the entrances depend on how many interfaces the whole map has, in flowOf -> the totality oracle went red naming the components that moved; restored, green (2026-09-22)
   kinds: none
 - one selection answers each reviewer question: On the built page, each reviewer question is answered by one selection on the one map: where work enters, what a change touches and what it weakened (the comparison's place), where sensitive data goes (a trust level), what is load-bearing here (a component), and a chokepoint's reliance.
   over: the five reviewer questions the owner named, each against the page built over the Scope fixture with a component interface reading
@@ -136,30 +138,35 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   via: query structure prints the routes, core dependencies and interface identifiers the view draws, from the same derivation
   because: an agent and a human reading different routes of one project would each be told a different story about the system; one derivation read twice cannot drift
   crossing: reading -> reading
+  refuted: reversed the route order only in query structure -> the totality oracle went red; restored, green (2026-09-22)
   kinds: none
 - structure text never collides: No text on the Structure map overlaps other text, is truncated, or leaves the canvas or the station it is declared to sit within, under any selection; lower-priority text is dropped instead.
   over: every text element of the rendered SVG, measured by embedded font metrics, over the flow fixture and a twelve-component crowded fixture, at rest and under every entrance, route, trust level, chokepoint, component and interface selection
   via: the map's text never overlaps, is never truncated, and never leaves its canvas or its station, under every selection
-  because: the owner judged the earlier map unusable partly for floating labels that overlapped and truncated (resolveRegisterTok...). Cartography's rule is that every label has a priority and lower-priority text is dropped, never overlapped; the check measures rendered text boxes from font metrics of its own rather than trusting the layout that placed them
+  because: the owner judged the earlier map unusable partly for floating labels that overlapped and truncated (resolveRegisterTok...). Cartography's rule is that every label has a priority and lower-priority text is dropped, never overlapped; the check measures rendered text boxes from font metrics of its own rather than trusting the layout that placed them. Two weaker breaks (the folder set on its name's baseline; the placer skipping its placed-text check) left the check green, because the placer or the fixtures' first candidates kept text apart, so the crowded fixture now carries identifiers and defects on every route
   crossing: record -> reading
+  refuted: placed interface identifier tags in flowLayout without checking the text already placed -> the totality oracle went red naming the overlapping boxes; restored, green (2026-09-22)
   kinds: none
 - structure segments are octilinear: Every line segment the Structure map draws is horizontal, vertical, or at 45 degrees, under any selection.
   over: every path and line the rendered SVG draws as a route, an interface, a stub or a rail, over the flow fixture and a twelve-component crowded fixture, at rest and under every selection
   via: every drawn segment is horizontal, vertical, or at 45 degrees, under every selection
   because: transit maps read because their segments hold three directions; the curves of the earlier map carried no route and crossed at every angle
   crossing: record -> reading
+  refuted: made the first chamfer of every lane turn in lanePath twice as steep as it is wide -> the totality oracle went red; restored, green (2026-09-22)
   kinds: none
 - a core dependency draws no caller arrow: A core dependency is drawn as one rail labelled once; each caller carries a short stub and no line or arrow from any caller reaches it, and no route runs through it.
   over: every caller interface of every core dependency in the flow fixture, at rest and under every selection
   via: a core dependency is a rail labelled once: its callers carry a stub and no arrow or line reaches it
   because: the earlier map fanned seven arrows into Core on the first adopter; a process drawing does not pipe a utility to every unit (d-d8c45333 records the rule that makes a component one)
   crossing: record -> reading
+  refuted: piped every caller to its rail with a line from the station down to the rail, beside its stub, in flowLayout -> the totality oracle went red; restored, green (2026-09-22)
   kinds: none
 - each structural route is one colored path: Each structural route is drawn as one path of its own color that passes through the centre of each of its stops in order, every consecutive pair of stops a component interface from caller to callee.
   over: every structural route of the flow fixture and a twelve-component crowded fixture, and every vertex of its path
   via: each structural route is one colored path through its components in order
   because: a transit map draws journeys, not connections: a route that broke into pieces or skipped a stop would not show the path work takes from its entrance (d-b72bd2e0)
   crossing: record -> reading
+  refuted: dropped every second interchange from each route's path in flowLayout, so the line skips that stop -> the totality oracle went red; restored, green (2026-09-22)
   kinds: none
 - structure preview is ephemeral evidence: writeStructurePreview validates a proposed crossing, selects Structure, renders it dashed and unverified, and writes only outside the project root without changing specs, runs, or the inputs that determine the page.
   over: every generated preview page and proposed crossing endpoint
