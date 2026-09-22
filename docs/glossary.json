@@ -1181,6 +1181,18 @@
       },
       "name": "agent host",
       "definition": "The application that runs an agent session and supplies its lifecycle events and tool results. Coherence delivers readings through hooks in that application."
+    },
+    {
+      "name": "structure",
+      "definition": "The reading that answers what a system is made of and how work flows through it, so a human can inspect and reason about the behavior of a system agentic coding has made opaque. It extends to a change set as a visual diff of how the change affects structure and behavior."
+    },
+    {
+      "name": "entrance",
+      "definition": "Where work enters the system from outside it: a command, a host event, a route, a tool. Declared in the owning component's spec and checked against the code: the named handler must resolve and be reachable, so a declared entrance cannot rot unseen."
+    },
+    {
+      "name": "interface",
+      "definition": "The surface one component exposes and another uses: computed, never declared, as the set of resolved references from one component to another, so Structure is a live view of the real project, not a rotting map. What an interface reveals comes from the invariants: its chokepoint if one stands there, its crossing if trust changes there, and the classes of data that pass through it."
     }
   ],
   "metaphors": {
