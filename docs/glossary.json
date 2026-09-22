@@ -1227,6 +1227,18 @@
         "defined_by": "owner, 2026-09-22 (journal d-26cec1ac; work order w-74382035)",
         "owner_words": "do it (runtime overlay on Structure)"
       }
+    },
+    {
+      "name": "structural route",
+      "definition": "The path one entrance takes through the components it reaches, in the order work flows, drawn as one line of its own color. Computed from the entrance and the component interfaces, never declared. Components on more than one structural route are where those routes meet."
+    },
+    {
+      "name": "core dependency",
+      "definition": "A component that most other components call, drawn in Structure as a rail its callers attach to by a short stub rather than as an arrow from every caller. Computed from the component interfaces, never declared."
+    },
+    {
+      "name": "interface identifier",
+      "definition": "The short identifier drawn on a component interface where a chokepoint or a crossing stands, like a valve tag on a pipe. The map shows only the identifier; its meaning is in the inspector. Never truncated, and dropped by priority rather than overlapped."
     }
   ],
   "metaphors": {
