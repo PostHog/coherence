@@ -4,10 +4,10 @@
  * and the adapter; this owns the mapping and the store.
  */
 
+import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import type { EnforcementConfig } from "../enforcement/config.ts";
-import { gitState } from "../journal/store.ts";
 import { workBinding } from "../journal/work.ts";
 import type { SpecModel } from "../spec/model.ts";
 import type { Capture } from "./capture.ts";
@@ -38,6 +38,19 @@ export interface RecordInput {
   agent: string;
   at: string;
   passLatency: number;
+  /** The commit the run recorded. */
+  commit: string | null;
+}
+
+/**
+ * Whether the code the pass ran differs from the commit: a change anywhere
+ * but under .coherence, whose records (journal, runs, work) every session
+ * appends to and which never execute. Counted with them, every observation
+ * after the first run of a session would be dirty, and so stale.
+ */
+export function codeDirty(root: string): boolean {
+  const status = spawnSync("git", ["status", "--porcelain", "--", ".", ":(exclude).coherence"], { cwd: root, encoding: "utf8" });
+  return status.status === 0 && status.stdout.trim() !== "";
 }
 
 export async function recordObservation(input: RecordInput): Promise<ObservationOutcome> {
@@ -57,7 +70,8 @@ export async function recordObservation(input: RecordInput): Promise<Observation
   } catch {
     realRoot = input.root;
   }
-  const { commit, dirty } = gitState(input.root);
+  const commit = input.commit;
+  const dirty = commit !== null && codeDirty(input.root);
   const record = buildObservation({
     root: input.root,
     realRoot,

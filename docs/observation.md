@@ -115,6 +115,11 @@ it was captured, is **stale**, and every reader says so on every fact it
 prints (invariant: src/observation/stale never current). The rule has one
 home, `freshness` in `src/observation/record.ts`.
 
+Dirty means the code differs from the commit: any change outside
+`.coherence/`. The records there (journal, runs, work) are appended by every
+session and by the run itself during the pass, and never execute; counted,
+they would make every observation after a session's first run stale.
+
 ## The seam for the map overlay
 
 `observedEvidence(records, head, from, to)` in `src/observation/record.ts`

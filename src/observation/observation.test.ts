@@ -120,7 +120,8 @@ before(async () => {
       testJson: `echo run >> invocations.log && ${node} --disable-warning=ExperimentalWarning --test --test-concurrency=1 --test-reporter=${JSON.stringify(REPORTER)} --test-reporter-destination={out} --test-name-pattern={filter} tests/use.test.ts`,
     }),
   );
-  write(".gitignore", ".coherence/\ninvocations.log\n");
+  // .coherence is not ignored: the run appends to it during the pass, and that must not make the observation dirty.
+  write(".gitignore", "invocations.log\n");
   write("Fixture.spec.md", SPEC);
   write("front/Front.spec.md", "# A\n\nThe component that uses b and c.\n");
   write("back/Back.spec.md", "# B\n\nThe component a crosses into.\n");

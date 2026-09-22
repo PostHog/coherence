@@ -274,6 +274,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
         agent: options.agent,
         at: record.at,
         passLatency: batchLatency,
+        commit,
       });
     }
   }
