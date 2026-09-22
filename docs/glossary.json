@@ -1184,7 +1184,7 @@
     },
     {
       "name": "structure",
-      "definition": "The reading that answers what a system is made of and how work flows through it, so a human can inspect and reason about the behavior of a system agentic coding has made opaque. It extends to a change set as a visual diff of how the change affects structure and behavior.",
+      "definition": "The reading of what a system is made of and how work flows through it. It lets a human inspect and reason about the behavior of a system agentic coding has made opaque, and extends to a change set as a visual diff of how the change affects structure and behavior.",
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-9a5fbe0a and this define)",
         "owner_words": "Arrows point the way work goes, caller to callee, yes. Zoom makes sense. Diff compared to previous commit, or to a specific commit the agent provides for the user. Stable positions are essential and that rule makes sense. One map, yes. Seven is a good start. We'll test and revisit."
@@ -1209,7 +1209,7 @@
     },
     {
       "name": "component interface",
-      "definition": "The surface one component exposes and another uses: computed, never declared, as the set of resolved references from one component to another, so Structure is a live view of the real project, not a rotting map. What an interface reveals comes from the invariants: its chokepoint if one stands there, its crossing if trust changes there, and the classes of data that pass through it.",
+      "definition": "The surface one component exposes and another uses. Computed, never declared, as the set of resolved references from one component to another, so Structure is a live view of the real project, not a rotting map. What it reveals comes from the invariants: its chokepoint if one stands there, its crossing if trust changes there, and the classes of data that pass through it.",
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-54e128e1, d-f65a033c)",
         "owner_words": "Interface is good. Computed is essential, we need this to be a live view of the real project, not a rotting map. / component interface as qualification?"
@@ -1217,7 +1217,7 @@
     },
     {
       "name": "observation",
-      "definition": "A record of runtime behavior captured from a named source (a test pass, later a trace window), bound to a commit and a session, never read as current once its commit is not the head.",
+      "definition": "A record of runtime behavior from a named source, bound to a commit and a session. The source is a test pass, later a trace window; an observation is never read as current once its commit is not the head.",
       "detail": {
         "staleness": "An observation whose commit is not the head, or whose tree was dirty when it was captured, is stale and every reader says so; it is never blended into the current reading unlabeled.",
         "co-execution": "Coverage records what executed, not who called whom: a component interface is crossed in a test when a referencing site in one component and the referenced symbol's body in the other both executed in that test. The record says co-executed, never called.",
@@ -1230,15 +1230,27 @@
     },
     {
       "name": "structural route",
-      "definition": "The path one entrance takes through the components it reaches, in the order work flows, drawn as one line of its own color. Computed from the entrance and the component interfaces, never declared. Components on more than one structural route are where those routes meet."
+      "definition": "The path one entrance takes through the components it reaches, in the order work flows, drawn as one line of its own color. Computed from the entrance and the component interfaces, never declared. Components on more than one structural route are where those routes meet.",
+      "provenance": {
+        "defined_by": "owner, 2026-09-22 (journal d-e4cd0983)",
+        "owner_words": "structural route. not utility, core dependency. not tag. interface identifier"
+      }
     },
     {
       "name": "core dependency",
-      "definition": "A component that most other components call, drawn in Structure as a rail its callers attach to by a short stub rather than as an arrow from every caller. Computed from the component interfaces, never declared."
+      "definition": "A component that most other components call. Structure draws it as a rail its callers attach to by a short stub rather than as an arrow from every caller. Computed from the component interfaces, never declared.",
+      "provenance": {
+        "defined_by": "owner, 2026-09-22 (journal d-82a69e00)",
+        "owner_words": "not utility, core dependency"
+      }
     },
     {
       "name": "interface identifier",
-      "definition": "The short identifier drawn on a component interface where a chokepoint or a crossing stands, like a valve tag on a pipe. The map shows only the identifier; its meaning is in the inspector. Never truncated, and dropped by priority rather than overlapped."
+      "definition": "The short identifier drawn on a component interface where a chokepoint or a crossing stands, like a valve tag on a pipe. The map shows only the identifier; its meaning is in the inspector. Never truncated, and dropped by priority rather than overlapped.",
+      "provenance": {
+        "defined_by": "owner, 2026-09-22 (journal d-08478016)",
+        "owner_words": "not tag. interface identifier"
+      }
     }
   ],
   "metaphors": {
