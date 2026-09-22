@@ -16,6 +16,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { LanguageAdapter, Range, SiteForm } from "../adapters/adapter.ts";
+import { projectSites } from "../adapters/project-files.ts";
 import { componentOf, declarationsOf, isTest, sourceFiles } from "../economy/source.ts";
 import type { EnforcementConfig } from "../enforcement/config.ts";
 import type { SpecModel } from "../spec/model.ts";
@@ -115,7 +116,7 @@ export async function readInterfaceMap(root: string, adapter: LanguageAdapter, m
       const resolved = await adapter.resolve(`${declaration.name} in ${file}`, { component: owner, testFolders });
       if (!resolved.ok || resolved.definition.file !== file) continue;
       const kind = declares(lines[declaration.line - 1] ?? "", config.language);
-      for (const site of await adapter.references(resolved.definition)) {
+      for (const site of projectSites(root, await adapter.references(resolved.definition))) {
         if (isTest(site.file, testFolders)) continue;
         const from = componentOf(model, site.file)?.folder;
         if (from === undefined || from === owner) continue;

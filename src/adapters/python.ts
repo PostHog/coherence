@@ -66,6 +66,7 @@ import {
   type Visibility,
 } from "./adapter.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
+import { keepProjectFiles, nestedCheckouts, projectFiles } from "./project-files.ts";
 
 /** The small JSON-RPC surface the adapter needs, exposed so a test can control server ordering. */
 export interface PythonLanguageClient {
@@ -238,34 +239,55 @@ function isVenv(dir: string): boolean {
   return existsSync(join(dir, "pyvenv.cfg"));
 }
 
-/** Every Python file under `start` (project-relative paths), skipping venvs, caches, and dot folders. */
-export function pythonFiles(root: string, start = "."): string[] {
-  const found: string[] = [];
-  const walk = (dir: string): void => {
-    let entries: string[];
+/**
+ * The exclude list Pyright's workspace gets so it never indexes a nested
+ * checkout, or nothing when the root holds none. A list given replaces
+ * Pyright's defaults and turns off its own virtual-environment exclusion, so
+ * the defaults and every virtual environment outside the nested checkouts are
+ * named again. A pyrightconfig.json or [tool.pyright] section outranks
+ * workspace settings; there the reference results' own filter is what keeps
+ * a nested checkout out of the evidence.
+ */
+export function workspaceExclusions(root: string): string[] | undefined {
+  const nested = nestedCheckouts(root);
+  if (nested.length === 0) return undefined;
+  const venvs: string[] = [];
+  const walk = (folder: string): void => {
+    let entries;
     try {
-      entries = readdirSync(dir).sort();
+      entries = readdirSync(join(root, folder), { withFileTypes: true });
     } catch {
       return;
     }
-    for (const name of entries) {
-      if (name.startsWith(".") || SKIPPED_FOLDERS.has(name)) continue;
-      const path = join(dir, name);
-      let stats;
-      try {
-        stats = statSync(path);
-      } catch {
-        continue;
-      }
-      if (stats.isDirectory()) {
-        if (!isVenv(path)) walk(path);
-      } else if (stats.isFile() && name.endsWith(".py")) {
-        found.push(relative(root, path).split(sep).join("/"));
-      }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith(".") || SKIPPED_FOLDERS.has(entry.name)) continue;
+      const rel = folder === "" ? entry.name : `${folder}/${entry.name}`;
+      if (nested.includes(rel)) continue;
+      if (isVenv(join(root, rel))) venvs.push(rel);
+      else walk(rel);
     }
   };
-  walk(start === "." ? root : join(root, start));
-  return found;
+  walk("");
+  return ["**/node_modules", "**/__pycache__", "**/.*", ...venvs, ...nested];
+}
+
+/** Every Python file of the project under `start` (project-relative paths), skipping venvs, caches, and dot folders. */
+export function pythonFiles(root: string, start = "."): string[] {
+  const prefix = start === "." ? "" : start.replace(/^\.\//, "").replace(/\/+$/, "") + "/";
+  const venv = new Map<string, boolean>();
+  const inVenv = (rel: string): boolean => {
+    const parts = rel.split("/");
+    for (let i = 1; i < parts.length; i++) {
+      const folder = parts.slice(0, i).join("/");
+      let answer = venv.get(folder);
+      if (answer === undefined) venv.set(folder, (answer = isVenv(join(root, folder))));
+      if (answer) return true;
+    }
+    return false;
+  };
+  return projectFiles(root).filter(
+    (rel) => rel.endsWith(".py") && rel.startsWith(prefix) && rel.split("/").every((part) => !part.startsWith(".") && !SKIPPED_FOLDERS.has(part)) && !inVenv(rel),
+  );
 }
 
 /** Every Python file whose project-relative path is the hint or ends with `/<hint>`. */
@@ -395,6 +417,8 @@ export class PythonAdapter implements LanguageAdapter {
   /** The document version last sent per open file; a change carries the next one. */
   private readonly versions = new Map<string, number>();
   private readonly touched = new Set<string>();
+  /** The unsaved documents a refutation has open right now: the adapter's own probe, never a file, and the one site outside the project's files it accepts. */
+  private readonly probes = new Set<string>();
   private checkerFacts: CheckerFacts | undefined;
   /** Star-import sites by the module path they re-export; Pyright reports no site for a name the statement never spells. Scanned once per forget. */
   private wildcards: Map<string, ReferenceSite[]> | undefined;
@@ -437,11 +461,12 @@ export class PythonAdapter implements LanguageAdapter {
         found(Number(match[1]));
       }
     };
+    const exclude = workspaceExclusions(this.root);
     client.onRequest = (method, params) => {
       if (method !== "workspace/configuration") return null;
       const items = (params as { items?: { section?: string }[] }).items ?? [];
       // Diagnostics for open files only: the check asks for references and symbols, never for a workspace-wide type check.
-      return items.map((item) => (item.section === "python" ? { analysis: { diagnosticMode: "openFilesOnly" } } : null));
+      return items.map((item) => (item.section === "python" ? { analysis: { diagnosticMode: "openFilesOnly", ...(exclude === undefined ? {} : { exclude }) } } : null));
     };
     try {
       await client.request("initialize", {
@@ -563,7 +588,9 @@ export class PythonAdapter implements LanguageAdapter {
     const since = this.lastForget - 1000;
     this.lastForget = Date.now();
     if (this.client === undefined) return;
-    const sync = new Set([...files, ...this.opened]);
+    // A named file that is not the project's (a nested checkout's copy, an ignored file) is never opened.
+    const named = keepProjectFiles(this.root, files);
+    const sync = new Set([...files.filter((f) => named.has(f)), ...this.opened]);
     const report = new Set(this.touched);
     this.touched.clear();
     for (const file of pythonFiles(this.root)) {
@@ -629,9 +656,11 @@ export class PythonAdapter implements LanguageAdapter {
   /** A module path is a file, or a package folder whose module is its __init__.py. */
   private moduleFile(path: string): string | undefined {
     const full = join(this.root, path);
-    if (existsSync(full) && statSync(full).isFile()) return path;
-    if (existsSync(full) && statSync(full).isDirectory() && existsSync(join(full, "__init__.py"))) return `${path.replace(/\/+$/, "")}/__init__.py`;
-    return undefined;
+    const file = existsSync(full) && statSync(full).isFile()
+      ? path
+      : existsSync(full) && statSync(full).isDirectory() && existsSync(join(full, "__init__.py")) ? `${path.replace(/\/+$/, "")}/__init__.py` : undefined;
+    // A module in a nested checkout or an ignored file is not the project's, whatever the spec names.
+    return file !== undefined && keepProjectFiles(this.root, [file]).has(file) ? file : undefined;
   }
 
   /** A bare name: files whose text can declare it, the component's first (a unique non-test hit there settles it), then the whole tree. */
@@ -685,26 +714,30 @@ export class PythonAdapter implements LanguageAdapter {
     } else {
       starts.push(definition.selection);
     }
-    const seen = new Set<string>();
-    const sites: ReferenceSite[] = [];
+    const reported: Location[] = [];
     for (const position of starts) {
       const locations = await client.request<Location[] | null>("textDocument/references", {
         textDocument: { uri: this.uri(definition.file) },
         position,
         context: { includeDeclaration: false },
       }, ENUMERATION_TIMEOUT_MS);
-      for (const location of locations ?? []) {
-        const file = this.relative(location.uri);
-        if (file.startsWith("..") || file.startsWith("node_modules/") || file.includes("/site-packages/")) continue;
-        const start = location.range.start;
-        if (file === definition.file && rangeContains({ start: definition.selection, end: definition.selection }, start)) continue;
-        const key = `${file}:${start.line}:${start.character}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        this.touched.add(file);
-        const form = pythonSiteForm(this.linesOf(file), start.line, start.character, this.exportList(file));
-        sites.push({ file, line: start.line + 1, character: start.character, symbol: await this.enclosingSymbol(file, start), ...(form === undefined ? {} : { form }) });
-      }
+      reported.push(...(locations ?? []));
+    }
+    // Only the project's own files are evidence, and a site outside them is dropped before it is read or opened.
+    const own = keepProjectFiles(this.root, reported.map((location) => this.relative(location.uri)));
+    const seen = new Set<string>();
+    const sites: ReferenceSite[] = [];
+    for (const location of reported) {
+      const file = this.relative(location.uri);
+      if (!(own.has(file) || this.probes.has(file)) || file.startsWith("node_modules/") || file.includes("/site-packages/")) continue;
+      const start = location.range.start;
+      if (file === definition.file && rangeContains({ start: definition.selection, end: definition.selection }, start)) continue;
+      const key = `${file}:${start.line}:${start.character}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      this.touched.add(file);
+      const form = pythonSiteForm(this.linesOf(file), start.line, start.character, this.exportList(file));
+      sites.push({ file, line: start.line + 1, character: start.character, symbol: await this.enclosingSymbol(file, start), ...(form === undefined ? {} : { form }) });
     }
     // A bare star import spells no name, so Pyright reports no site for it; it still hands the module's names on.
     for (const site of this.starImports(definition.file)) {
@@ -979,6 +1012,7 @@ export class PythonAdapter implements LanguageAdapter {
     client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: "python", version: 1, text } });
     this.lineCache.set(synthetic, text.split("\n"));
     this.symbolCache.set(synthetic, []);
+    this.probes.add(synthetic);
 
     // A module chokepoint has no inside that is outside its own range, so there is no same-module site to stage.
     const sameModule = chokepoint !== undefined && chokepoint.kind === "symbol" ? this.editChokepointModule(chokepoint, protectedThing, importName, access) : undefined;
@@ -1006,6 +1040,7 @@ export class PythonAdapter implements LanguageAdapter {
       client.notify("textDocument/didClose", { textDocument: { uri: this.uri(synthetic) } });
       this.lineCache.delete(synthetic);
       this.symbolCache.delete(synthetic);
+      this.probes.delete(synthetic);
     }
   }
 

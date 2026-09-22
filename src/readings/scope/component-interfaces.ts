@@ -17,6 +17,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
+import { projectSites } from "../../adapters/project-files.ts";
 import { adapterFor } from "../../adapters/index.ts";
 import { componentOf, declarationsOf, isTest, sourceFiles } from "../../economy/source.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
@@ -60,7 +61,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
         declarations += 1;
         const resolved = await adapter.resolve(`${declaration.name} in ${file}`, { component: owner, testFolders });
         if (!resolved.ok || resolved.definition.file !== file) continue;
-        for (const site of await adapter.references(resolved.definition)) {
+        for (const site of projectSites(root, await adapter.references(resolved.definition))) {
           if (isTest(site.file, testFolders)) continue;
           const from = componentOf(model, site.file)?.folder;
           if (from === undefined || from === owner) continue;

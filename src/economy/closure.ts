@@ -25,6 +25,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Definition, LanguageAdapter } from "../adapters/adapter.ts";
+import { projectSites } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
@@ -138,7 +139,7 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
       for (const declaration of declarationsOf(texts.get(file)!, language)) {
         const resolved = await adapter.resolve(`${declaration.name} in ${file}`, hint(file));
         if (!resolved.ok) continue;
-        for (const site of await adapter.references(resolved.definition)) {
+        for (const site of projectSites(root, await adapter.references(resolved.definition))) {
           if (givenSet.has(site.file)) continue;
           const kind = isTest(site.file, config.testFolders) ? "test references" : "references";
           out.add(site.file, `${kind} ${declaration.name} (${file}) at line ${site.line}${site.symbol === undefined ? "" : ` in ${site.symbol}`}`);
@@ -153,7 +154,7 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
         const name = imported.name === undefined ? imported.module : `${imported.name} in ${imported.module}`;
         const resolved = await adapter.resolve(name, hint(imported.module));
         if (!resolved.ok) continue;
-        const sites = await adapter.references(resolved.definition);
+        const sites = projectSites(root, await adapter.references(resolved.definition));
         const used = sites.filter((s) => s.file === file);
         if (used.length === 0) continue;
         const label = imported.name === undefined ? "the module" : imported.name;

@@ -86,3 +86,9 @@ The language adapter seam: how to ask a language's server for definitions, refer
   checklist: graceful-drain dismissed: nothing is shut down by locating the binary
   checklist: readiness-evidence declared as server located or a reason
   checklist: declared-target-coverage dismissed: three places are looked in, in order; there is no registry of targets
+- only the project's files: Only the project's own files are ever evidence: a file is the project's when git tracks it or lists it untracked and not ignored, and it lies inside no nested checkout; one function set decides it (projectFiles, keepProjectFiles, projectSites in project-files.ts), and every walk of the project and every reference an instrument reports passes through it.
+  over: every walk of the project (the adapters' source scans, the spec walker, economy and mass, the vocabulary check's corpus, observation's path mapping, the changed-file listings) and every reference site accepted from an instrument (the adapters, the chokepoint check, the edit hook's re-check, the economy closure, the observed and Scope component interfaces)
+  via: only the project's own files are ever evidence: a nested checkout and an ignored path are no bypass, no vocabulary, and no mass
+  because: agents work in git worktrees under .claude/worktrees, inside the main checkout, and each worktree's copy of a file reads to a language server as more of the project; a reference in an agent's copy of verbs.ts graded attributed writes broken in the main checkout, the edit hook reported the same false bypasses to several agents, and the Structure map shown to reviewers carried the false broken (conjecture c-16d2f394, resolution rs-b4cf50f6). Git's own ignore rules already say what is not the project's, and a folder holding a .git is another checkout even when git cannot follow its gitdir, so both halves are one rule
+  crossing: instrument -> reading
+  kinds: none
