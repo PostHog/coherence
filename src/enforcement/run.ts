@@ -23,6 +23,7 @@ import { readEnforcementConfig, type EnforcementConfig } from "./config.ts";
 import { appendRun, entryKey, loadRuns, type Form, type RunEntry, type RunRecord } from "./record.ts";
 import { connectAdapter, type RemoteAdapter } from "./server.ts";
 import { runTotalityBatch, runTotalityOracle, type TotalityResult } from "./totality.ts";
+import { createObserver, recordObservation, type ObservationOutcome, type TotalityVia } from "../observation/index.ts";
 
 export interface RunOptions {
   session: string;
@@ -43,6 +44,8 @@ export interface RunOptions {
   idleMs?: number | undefined;
   /** How often to keep the warm server awake during the test pass; the default is well inside the shortest sane idle. */
   heartbeatMs?: number | undefined;
+  /** Observe the batched pass (src/observation): coverage rides the same one invocation, and one observation record is appended. */
+  observe?: boolean | undefined;
 }
 
 /** How often the run touches the instrument while the test suite holds the floor. */
@@ -62,6 +65,10 @@ export interface RunOutcome {
   instrumentReason: string | undefined;
   /** True when the instrument was needed and could not answer: the run proved nothing and must not exit 0. */
   instrumentDied: boolean;
+  /** The observation appended, when the run was observed and the batched pass ran. */
+  observation?: ObservationOutcome;
+  /** Why an observed run appended no observation. */
+  observationSkipped?: string;
 }
 
 function chokepointEnforcements(invariant: ModelInvariant): { protects: string; chokepoint: string }[] {
@@ -116,14 +123,17 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   // Every test a bullet names in one invocation, when the runner can report per test; else one at a time below.
   let batched: Map<string, TotalityResult> | undefined;
   let batchLatency = 0;
+  // An observed run rides the same one invocation: the observer only adds coverage to it.
+  const observing = options.observe === true && wantTotality && config.testJson !== undefined ? createObserver(root, config) : undefined;
+  const vias: TotalityVia[] = selected.flatMap(({ component, invariant }) => totalityEnforcements(invariant).map(({ via }) => ({ component, name: invariant.name, filter: adapter?.testFilter(via) ?? via })));
   if (wantTotality) {
-    const filters = selected.flatMap(({ invariant }) => totalityEnforcements(invariant).map(({ via }) => adapter?.testFilter(via) ?? via));
+    const filters = vias.map((o) => o.filter);
     const t0 = Date.now();
     // The test suite can outlast the warm server's idle timeout, and its timer only resets on a request line.
-    const beat = adapter === undefined || !needsAdapter ? undefined : setInterval(() => void adapter.ready().catch(() => {}), options.heartbeatMs ?? HEARTBEAT_MS);
+    const beat = adapter === undefined || (!needsAdapter && observing === undefined) ? undefined : setInterval(() => void adapter.ready().catch(() => {}), options.heartbeatMs ?? HEARTBEAT_MS);
     beat?.unref();
     try {
-      batched = await runTotalityBatch(root, config, filters);
+      batched = await runTotalityBatch(root, config, filters, undefined, observing?.observer);
     } finally {
       if (beat !== undefined) clearInterval(beat);
     }
@@ -242,10 +252,36 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     invariants: details.map((d) => d.entry),
   };
   const file = appendRun(root, record);
-  return { record, file, details, instrumentReason, instrumentDied: needsAdapter && instrumentReason !== undefined };
+  const outcome: RunOutcome = { record, file, details, instrumentReason, instrumentDied: needsAdapter && instrumentReason !== undefined };
+  if (options.observe === true) {
+    if (observing === undefined || batched === undefined) {
+      outcome.observationSkipped = !wantTotality
+        ? "the run checked no totality oracle, so no test ran to observe"
+        : config.testJson === undefined
+          ? "no testJson command: observation rides only the one batched invocation"
+          : "no bullet names a test, so no batched pass ran";
+      observing?.collect();
+    } else {
+      outcome.observation = await recordObservation({
+        root,
+        capture: observing.collect(),
+        adapter,
+        instrumentReason: needsAdapter ? instrumentReason : unavailable,
+        model,
+        config,
+        vias,
+        session: options.session,
+        agent: options.agent,
+        at: record.at,
+        passLatency: batchLatency,
+        commit,
+      });
+    }
+  }
+  return outcome;
   };
 
-  if (needsAdapter && options.adapter === undefined && options.server !== false) {
+  if ((needsAdapter || options.observe === true) && options.adapter === undefined && options.server !== false) {
     return withWarmAdapter(root, (remote, server, reason) => pass(remote, { language: remote?.language ?? config.language, server: server ?? "none" }, reason), {
       refresh: options.refresh ?? [],
       idleMs: options.idleMs,
