@@ -1,8 +1,10 @@
 /**
  * The Structure map's measure: read a rendered SVG the way a reader's eye
  * does and count what makes a map unreadable. Text boxes come from font
- * metrics embedded here (Helvetica's, which Arial shares and which the map's
- * text is set in), never from the renderer's own layout, so the check cannot
+ * metrics embedded here (the system face's, SF Pro on the supported platform,
+ * with tabular numerals, which the map's text is set in: the widest advance
+ * Chrome reported for each character at 10 to 13 px, regular and semibold),
+ * never from the renderer's own layout, so the check cannot
  * agree with the layout merely because both made the same mistake.
  *
  * Counts: pairs of visible text boxes that overlap; text that is truncated
@@ -16,14 +18,14 @@
  * the check in structure-flow.test.ts both call it.
  */
 
-/** Advance widths in thousandths of an em, for the ASCII range 32..126. */
+/** Advance widths in thousandths of an em, for the ASCII range 32..126: regular (400) and semibold (600). */
 const REGULAR = [
-  278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, 333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584,
+  293, 323, 490, 642, 642, 938, 724, 309, 394, 394, 484, 642, 309, 484, 309, 317, 642, 642, 642, 642, 642, 642, 642, 642, 642, 642, 309, 309, 642, 642, 642, 525, 930, 686, 669, 728, 739, 608, 584, 759, 754, 280, 550, 671, 580, 886, 754, 784, 647, 784, 665, 649, 646, 749, 686, 980, 691, 667, 674, 394, 317, 394, 642, 560, 512, 564, 626, 572, 626, 583, 374, 622, 600, 259, 259, 555, 265, 882, 596, 603, 623, 622, 402, 527, 375, 596, 554, 787, 537, 555, 551, 394, 271, 394, 642,
 ];
 const BOLD = [
-  278, 333, 474, 556, 556, 889, 722, 238, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 333, 333, 584, 584, 584, 611, 975, 722, 722, 722, 722, 667, 611, 778, 722, 278, 556, 722, 611, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 333, 278, 333, 584, 556, 333, 556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611, 611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584,
+  293, 353, 551, 670, 670, 1011, 746, 343, 425, 425, 492, 670, 343, 492, 343, 337, 670, 670, 670, 670, 670, 670, 670, 670, 670, 670, 343, 343, 670, 670, 670, 555, 936, 725, 693, 745, 753, 625, 601, 768, 782, 313, 592, 705, 598, 908, 771, 793, 673, 793, 693, 675, 664, 765, 718, 1008, 725, 703, 683, 425, 337, 425, 670, 590, 512, 589, 651, 590, 651, 603, 408, 645, 630, 286, 286, 594, 293, 924, 625, 622, 647, 647, 435, 556, 411, 625, 582, 835, 574, 591, 569, 425, 298, 425, 670,
 ];
-const WIDE: Record<string, number> = { "·": 278, "–": 556, "—": 1000, "…": 1000, "→": 1000, "←": 1000, "✕": 1000, "▸": 1000, "−": 584 };
+const WIDE: Record<string, number> = { "·": 343, "–": 625, "—": 901, "…": 917, "→": 943, "←": 943, "✕": 763, "▸": 492, "−": 670 };
 
 /** The rendered width of `text` at `size` px: the embedded advance widths, with a small allowance for the system face. */
 export function textWidth(text: string, size: number, bold = false, letterSpacing = 0): number {
@@ -88,7 +90,7 @@ function classes(el: Element): string[] {
 /** Font of a text element: its own attributes first, else the classes the earlier map used. */
 function fontOf(el: Element, stack: Element[]): { size: number; bold: boolean; upper: boolean; spacing: number } {
   const size = el.attrs["font-size"];
-  if (size !== undefined) return { size: Number(size), bold: el.attrs["font-weight"] === "700" || el.attrs["font-weight"] === "bold", upper: false, spacing: 0 };
+  if (size !== undefined) return { size: Number(size), bold: Number(el.attrs["font-weight"] ?? 400) >= 600 || el.attrs["font-weight"] === "bold", upper: false, spacing: 0 };
   const c = classes(el);
   if (c.includes("flow-node-name")) return { size: 13, bold: true, upper: false, spacing: 0 };
   if (c.includes("flow-node-mark") || c.includes("flow-node-tag")) return { size: 10.5, bold: true, upper: false, spacing: 0 };
