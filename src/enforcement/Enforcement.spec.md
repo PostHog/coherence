@@ -107,3 +107,38 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   crossing: harness -> instrument
   refuted: made the second client report a cold server whether or not one was warm -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
+- one warm server per root: However many clients find nothing listening at once, exactly one server process runs for a root: only the client that creates the root's lock file exclusively spawns, and every other client waits for the winner's socket.
+  over: every client that connects to a root and finds nothing listening, and every serve process started for that root
+  via: ten concurrent clients for one root are served by exactly one server process
+  because: a check at the edit fires from several hooks and agents at once; without an exclusive lock each client that found no listener spawned its own server, each holding a language server of hundreds of megabytes, and six were seen for the main checkout within 30 seconds of one command and sixteen for one agent worktree (defect df-f947f1d1). An O_EXCL create is atomic on the local file system, so exactly one client wins; the lock names its owner's pid, and the spawning client hands it to the server it started
+  crossing: harness -> instrument
+  refuted: opened the root lock with "w" instead of "wx", so every client that found nothing listening created it and spawned -> the totality oracle went red, then green once restored (2026-09-22)
+  kinds: none
+- a dead owner's lock is reclaimed: A lock whose owner pid is dead, or alive but not listening long after it took the lock, is reclaimed by the next client, which then spawns the server; the reclaim runs under its own exclusive guard.
+  over: every lock file a client finds when nothing listens on the root's socket
+  via: a lock whose owner is dead is reclaimed by the next client
+  because: a server killed by a signal or a crash never removes its lock, and a lock nobody can reclaim would leave the root with no server for good, every client waiting out its deadline at every edit; two reclaimers without a guard could each remove the lock and one could remove the other's fresh lock, which is the duplicate spawn again
+  crossing: harness -> instrument
+  refuted: stopped counting a lock whose owner pid is dead as stale, so nobody reclaimed it -> the totality oracle went red, then green once restored (2026-09-22)
+  kinds: none
+- serve never takes a held root: serve refuses to start while a live server holds the root's lock, and only the lock's owner unlinks the socket, the pointer, or the lock.
+  over: every serve started for a root and every shutdown of a server
+  via: serve refuses a root a live server holds and never unlinks that server's socket
+  because: serve used to unlink whatever socket it found and stop unlinked the socket unconditionally, so two servers coexisted and the orphan's shutdown made the live one unreachable (review item 6: A-F12, B-F4), after which every client spawned yet another
+  crossing: harness -> instrument
+  refuted: made serve take the root's lock whoever held it, in this process or another -> the totality oracle went red, then green once restored (2026-09-22)
+  kinds: none
+- a warm server never answers with stale code: A client compares the fingerprint of the Coherence code on disk with the one the server reports; a server that runs other code is asked to stop, and a fresh one answers instead.
+  over: every connection a client makes to a running server
+  via: a server running other code is replaced by a fresh process
+  because: a warm server started 41 minutes earlier kept answering with code that had since changed, and resolved a symbol to a worktree's file after the fix that forbade it (conjecture c-7ef91910); a verdict from old code is a verdict about nothing in the tree. The fingerprint is a hash of every source file under Coherence's src and its package.json, read from disk at each connect, so it is exact and costs a few milliseconds; a server that predates the fingerprint reports none and counts as other code
+  crossing: harness -> instrument
+  refuted: made the client accept a server whatever code fingerprint it reported -> the totality oracle went red, then green once restored (2026-09-22)
+  kinds: none
+- a server ends with its root: Besides idle shutdown, a server exits when its root directory no longer exists or its lock no longer names it.
+  over: every running server, at every check of its lifetime
+  via: a server whose root is deleted exits
+  because: a removed worktree left its servers running until they idled, and a server displaced from its lock would otherwise answer beside the new owner; checking the root and the lock every few seconds ends both
+  crossing: harness -> instrument
+  refuted: made the lifetime check return before looking at the root or the lock -> the totality oracle went red, then green once restored (2026-09-22)
+  kinds: none
