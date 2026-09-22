@@ -898,36 +898,56 @@ code {
 
 /* Structure: one map */
 
-.flow .section-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: space-between;
-  gap: 0.5rem 1.5rem;
+/*
+ * Type scale for the Structure view: product UI, one system family.
+ * Page: 20 semibold (the view heading), 17 semibold (the inspector heading),
+ * 15 regular (the lede), 14 regular (inspector body and picks), 13 (labels,
+ * meta, section heads semibold, key). Canvas: 13 / 12 / 11, set in the map.
+ * Sentence case throughout; weight marks hierarchy; color marks state and
+ * what can be selected, never decoration. Monospace only for code
+ * identifiers and paths.
+ */
+
+.flow {
+  --flow-key-rail: #5f6b7a;
+  --flow-key-quiet: #9aa5bd;
 }
 
-.flow .section-heading h3,
-.flow .section-heading p {
+/* Numbers that line up down a column of rows are tabular; identifiers are not. */
+.flow-row-count .flow-meta,
+.flow-facts dd {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-color-scheme: dark) {
+  .flow {
+    --flow-key-rail: #9aa6b6;
+    --flow-key-quiet: #6f7c96;
+  }
+}
+
+.flow-head {
+  margin: 1.5rem 0 0;
+}
+
+.flow-head h3 {
   margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
-.flow h3#flow-heading {
-  font-size: 1.375rem;
-}
-
-.flow .eyebrow,
-.flow-inspect .eyebrow {
-  margin: 0;
-  font-size: 0.8125rem;
-  font-weight: 650;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-quiet);
+.flow-lede {
+  margin: 0.25rem 0 0;
+  font-size: 0.9375rem;
+  max-width: 72ch;
 }
 
 .flow-evidence {
-  font-size: 0.9375rem;
-  max-width: 80ch;
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+  max-width: 96ch;
 }
 
 /* The map needs its width: the shell widens while Structure is shown. */
@@ -955,9 +975,10 @@ code {
 .flow-inspector {
   border: 1px solid var(--rule);
   border-radius: 0.75rem;
-  padding: 0.875rem 1rem;
+  padding: 0.875rem 1rem 1rem;
   background: var(--field);
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
   overflow-wrap: anywhere;
   margin-top: 1rem;
 }
@@ -965,16 +986,20 @@ code {
 .flow-close {
   float: right;
   margin: -0.25rem -0.25rem 0.25rem 0.5rem;
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
   font: inherit;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   line-height: 1;
-  color: var(--ink);
+  color: var(--ink-quiet);
   background: var(--paper);
   border: 1px solid var(--rule);
-  border-radius: 0.5rem;
+  border-radius: 0.375rem;
   cursor: pointer;
+}
+
+.flow-close:hover {
+  color: var(--ink);
 }
 
 /* Desktop: the inspector stands beside the canvas in its own column, never over it; the canvas keeps its full height. */
@@ -1021,105 +1046,333 @@ code {
   }
 }
 
+/* The inspector: kind, heading, one-line summary, facts, then rows. */
+
+.flow-kind {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
 .flow-inspector h3 {
-  margin: 0.25rem 0;
-  font-size: 1.125rem;
+  margin: 0.125rem 0 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.flow-inspector h3 a {
+  color: inherit;
+  text-decoration-color: var(--rule);
+}
+
+.flow-sub {
+  margin: 0.375rem 0 0;
 }
 
 .flow-inspector h4 {
-  margin: 1rem 0 0.375rem;
-  font-size: 0.875rem;
+  margin: 1.125rem 0 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
 }
 
 .flow-inspector h5 {
-  margin: 0 0 0.375rem;
-  font-size: 0.875rem;
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
 }
 
 .flow-inspector p {
   margin: 0.375rem 0;
 }
 
-.flow-picks,
-.flow-uses,
-.flow-reduced,
-.flow-defects {
+.flow-inspector code {
+  font-size: 0.8125rem;
+}
+
+.flow-count {
+  font-weight: 400;
+  color: var(--ink-quiet);
+}
+
+.flow-count {
+  margin-left: 0.25rem;
+}
+
+.flow-note {
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.flow-facts,
+.flow-levels {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.25rem 0.75rem;
+  margin: 0.75rem 0 0;
+  padding: 0.625rem 0 0;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.flow-facts dt,
+.flow-levels dt {
+  color: var(--ink-quiet);
+}
+
+.flow-facts dd,
+.flow-levels dd {
   margin: 0;
-  padding-left: 1.1rem;
+  min-width: 0;
 }
 
-.flow-picks {
+.flow-levels {
+  font-size: 0.8125rem;
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0.375rem;
+}
+
+.flow-levels dt {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.flow-facts .crossing {
+  margin: 0;
+  font-size: inherit;
+}
+
+.flow-bad {
+  color: var(--fail);
+  font-weight: 600;
+}
+
+.flow-rows,
+.flow-list {
+  margin: 0;
+  padding: 0;
   list-style: none;
-  padding-left: 0;
 }
 
-.flow-picks li,
-.flow-uses li,
-.flow-reduced li,
-.flow-defects li {
-  margin: 0.2rem 0;
+.flow-list li {
+  position: relative;
+  padding-left: 0.875rem;
+  margin: 0.25rem 0;
+}
+
+.flow-list li::before {
+  content: "";
+  position: absolute;
+  left: 0.125rem;
+  top: 0.6em;
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 50%;
+  background: var(--ink-quiet);
+}
+
+.flow-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.5rem;
+  padding: 0.3rem 0;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.flow-rows > .flow-row:first-child {
+  border-top: 0;
+}
+
+.flow-row .flow-meta {
+  flex-basis: 100%;
+}
+
+.flow-row-count .flow-meta {
+  flex-basis: auto;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.flow-meta {
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
 }
 
 .flow-pick {
   font: inherit;
-  font-weight: 650;
   color: var(--accent);
   background: none;
-  border: 1px solid var(--rule);
-  border-radius: 0.375rem;
-  padding: 0.1rem 0.5rem;
+  border: 0;
+  border-radius: 0.25rem;
+  padding: 0;
   cursor: pointer;
   text-align: left;
 }
 
-.flow-pick[aria-pressed="true"] {
-  border-color: var(--accent);
+.flow-pick:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
-.flow-uses li[data-how="drawn"] code,
-.flow-uses li[data-how="implied"] code {
-  font-weight: 650;
+.flow-action {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--rule);
+  background: var(--paper);
 }
 
-.flow-carried {
-  margin-top: 0.75rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--rule-soft);
+.flow-ident {
+  display: inline-block;
+  min-width: 2.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  padding: 0 0.3rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  background: var(--paper);
+  color: var(--ink);
 }
 
-.flow-carried h4 {
-  margin-top: 0;
+.flow-kind .flow-ident {
+  min-width: 0;
+  margin-left: 0.125rem;
 }
 
-.flow-carried .defect {
+.flow-swatch {
+  display: inline-block;
+  flex: none;
+  width: 1.25rem;
+  height: 0.375rem;
+  border-radius: 1rem;
+  vertical-align: middle;
+  align-self: center;
+}
+
+.flow-swatch-derived {
+  opacity: 0.7;
+}
+
+.flow-inspector details {
+  margin-top: 1rem;
+}
+
+.flow-inspector details > summary,
+.flow-key details > summary {
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+}
+
+.flow-inspector details[open] > summary {
+  margin-bottom: 0.25rem;
+}
+
+.flow-inspector details .flow-rows {
+  margin-top: 0.25rem;
+}
+
+/* The shared enforcement and refutation blocks, compacted for the column. */
+.flow-inspector .enforcements,
+.flow-inspector .refutations {
+  margin-top: 0.25rem;
+}
+
+.flow-inspector .refutations h4 {
+  display: none;
+}
+
+.flow-inspector .enforcements li,
+.flow-inspector .refutations li {
+  padding: 0.25rem 0 0.25rem 0.625rem;
+  border-left-width: 2px;
+}
+
+.flow-inspector .enforcement p {
+  margin: 0.125rem 0;
+}
+
+.flow-inspector .reason,
+.flow-inspector .enforced-by,
+.flow-inspector .refutation .quiet {
+  font-size: 0.8125rem;
+}
+
+.flow-inspector .label {
+  color: var(--ink-quiet);
+}
+
+.flow-inspector .defect {
   margin-top: 0.75rem;
   padding: 0.75rem;
 }
 
-.flow-legend {
-  font-size: 0.875rem;
-  max-width: 70ch;
+/* The key below the map: each mark and what it means. */
+
+.flow-key {
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.flow-key > ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.375rem 1.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow-key > ul > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.flow-key-glyph {
+  flex: none;
+  margin-top: 0.1rem;
+  color: var(--ink-quiet);
+}
+
+.flow-key details {
+  margin-top: 0.75rem;
+  max-width: 80ch;
+}
+
+.flow-key details .flow-list {
+  margin-top: 0.375rem;
 }
 
 /* Reference sites, on the Structure inspector */
 
 .site-list {
-  margin-top: 0.25rem;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
 }
 
 .site-list li {
-  font-size: 0.9375rem;
+  padding: 0.3rem 0;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.site-list li:first-child {
+  border-top: 0;
 }
 
 .site-role {
-  display: inline-block;
-  margin-left: 0.35rem;
+  display: block;
+  font-size: 0.8125rem;
   color: var(--ink-quiet);
 }
 
 .site-list li[data-target="protected"][data-class="bypass"] .site-role {
   color: var(--fail);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 /* Runs */

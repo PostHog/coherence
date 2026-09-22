@@ -9,9 +9,9 @@ import { html, type Markup } from "./html.ts";
 import type { ShellState, StructurePreview } from "./model.ts";
 import { renderFlowSection } from "./structure-flow-view.ts";
 
-/** Structure keeps no filter; selection and zoom live in the map. */
-export function renderStructureTools(_state: ShellState): Markup {
-  return html`<div class="tool-copy"><p>Each colored line is the path work takes from an entrance through the components. Select a route, an entrance, a trust level, a component, an interface, or a chokepoint to light its story.</p></div>`;
+/** Structure keeps no filter and no tool line: selection and zoom live in the map, and how to use it is said once, under its heading. */
+export function renderStructureTools(_state: ShellState): Markup | null {
+  return null;
 }
 
 /**

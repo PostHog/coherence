@@ -31,7 +31,7 @@ import type { InterfaceReading, InterfaceSymbol, RecordedSite, RunEntry, ShellSt
 import { renderView } from "./shell.ts";
 import { CORE_RULE, FLOW_CHANGE_ID, FLOW_NONE_ID, compareFlows, flowDefaultSelection, flowEdgeId, flowEntranceId, flowKeyAction, flowLabelLines, flowNodeId, flowOf, flowSelected, flowSelection, type FlowModel } from "./structure-flow.ts";
 import { flowLayout, renderFlowSvg } from "./structure-flow-view.ts";
-import { measureSvg } from "./structure-measure.ts";
+import { measureSvg, textWidth } from "./structure-measure.ts";
 
 let fixture: Fixture;
 let base: ShellState;
@@ -237,6 +237,40 @@ test("the map's text never overlaps, is never truncated, and never leaves its ca
   assert.equal(bad.overlaps.length, 3);
   assert.deepEqual(bad.truncated, ["again…"]);
   assert.deepEqual(bad.clipped, ["Much too long"]);
+});
+
+test("the map's type is a product UI scale: one system family, three sizes, two weights, sentence case, no tracking, and metrics that never undershoot the face", () => {
+  const sizes = new Set<string>();
+  const weights = new Set<string>();
+  for (const state of [projectState(), crowdedState(), derivedState()]) {
+    const model = flowOf(state);
+    for (const selected of everySelection(model)) {
+      const svg = renderFlowSvg(model, selected).text;
+      for (const m of svg.matchAll(/<text\b([^>]*)>/g)) {
+        sizes.add(/font-size="([^"]+)"/.exec(m[1]!)?.[1] ?? "none");
+        weights.add(/font-weight="([^"]+)"/.exec(m[1]!)?.[1] ?? "400");
+      }
+    }
+  }
+  assert.deepEqual([...sizes].sort(), ["11", "12", "13"], "three sizes: 13 for a component's name, 12 for the caption, 11 for folders, column captions, rails and tokens");
+  assert.deepEqual([...weights].sort(), ["400", "600"], "regular and semibold, nothing bolder");
+  const style = /<style>([^]*?)<\/style>/.exec(renderFlowSvg(flowOf(projectState()), undefined).text)![1]!;
+  assert.match(style, /\.flow-svg text \{ font-family: system-ui, -apple-system/, "the map is set in the page's system family");
+  assert.doesNotMatch(style, /text-transform|letter-spacing|font-style: italic|font-weight: 700/, "no capitals, tracking, italics or heavy weight on the map");
+  // Widths Chrome reported for the system face on the supported platform (SF Pro, tabular numerals): the embedded metrics must never be narrower.
+  for (const [text, size, bold, measured] of [["Coherence (root)", 13, true, 108.5], ["src/readings/scope", 11, false, 99.96], ["X13", 11, true, 22.5], ["Adapters: core dependency, called by 5 of 9", 12, false, 249.55]] as const) {
+    assert.ok(textWidth(text, size, bold) >= measured, `${text} at ${size}px: ${textWidth(text, size, bold).toFixed(1)} covers the rendered ${measured}`);
+  }
+});
+
+test("the Structure page's own type has no tracked capitals and no stacked header counts", () => {
+  const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+  const structure = css.slice(css.indexOf("/* Structure: one map */"), css.indexOf("/* Runs */"));
+  assert.doesNotMatch(structure, /text-transform:\s*uppercase|letter-spacing:\s*0\.\d+em/, "sentence case, no tracked capitals");
+  const state = projectState();
+  const page = renderView(state, "structure").text;
+  assert.doesNotMatch(page, /class="eyebrow"/, "no eyebrow labels in the Structure view");
+  assert.doesNotMatch(page, /class="quiet flow-legend"><p|<p class="quiet flow-legend"/, "the legend is a key, not a paragraph");
 });
 
 test("every drawn segment is horizontal, vertical, or at 45 degrees, under every selection", () => {
