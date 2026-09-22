@@ -16,7 +16,9 @@ node src/cli.ts query observed --failures [--since <commit>] [<component>]
 ## Capture: one invocation
 
 `run --observe` is the ordinary batched pass with coverage added to its one
-runner invocation (invariant: src/observation/one runner invocation). The
+runner invocation (invariant: src/observation/one runner invocation). It
+observes the tests the pass runs, which are the tests the bullets name as
+totality oracles, not the whole suite. The
 observer may add flags and environment to the command the config's
 `testJson` names, and it is handed the report the runner wrote; it never
 invokes the runner again. Without a `testJson` command there is no batched
@@ -37,7 +39,9 @@ The preload is inert in the runner's parent (no `NODE_TEST_CONTEXT`) and in
 anything a test spawns: it deletes its variables once active, so a test that
 runs `node` or `node --test` never observes itself. Its own hooks are
 excluded from every region. What runs while a test file loads, before its
-first test, belongs to no test and is dropped. Tests inside one file must
+first test, belongs to no test and is dropped. The same deletion means code a
+test reaches only through a child process (a test that spawns
+`node src/cli.ts …`) is not observed. Tests inside one file must
 run one at a time for attribution to hold (node:test's default within a
 file); a suite that runs a file's tests concurrently blurs them.
 
