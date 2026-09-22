@@ -30,7 +30,8 @@ import {
 export const GLOSSARY_WORK_USAGE = `  glossary coverage [--json]              observed vocabulary, uses, exclusions and uncertainty
   glossary review <term> [--json]          definition, live contexts, evidence keys and prior rulings
   glossary review <term> --component <folder> --evidence <key> --disposition confirmed|not-domain|deferred|defect --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>]
-  glossary propose declare|define|alias|reject|rename|retire <concept> [value] [--definition <text>] [--entry <file.json>] --because <reason>
+  glossary propose declare|define|alias|reject|rename|retire <concept> [value] [--definition <text>] [--entry <file.json>] [--qualify] --because <reason>
+                                          rename --qualify: the old name keeps its other senses and is not rejected
   glossary apply <proposal-id> --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>] [--work <id>]
   glossary recover                        finish an interrupted application without overwriting intervening edits
   glossary draft [--out <file>]            unsettled candidates, collisions and review questions; never overwrites
@@ -163,6 +164,7 @@ export async function glossaryWorkCommand(
       file: "one",
       sha256: "one",
       download: "switch",
+      qualify: "switch",
       help: "switch",
     });
     if (p.switches.has("help")) {
@@ -208,6 +210,7 @@ export async function glossaryWorkCommand(
             ? { definition: get(p, "definition")! }
             : {}),
           ...(entry ? { entry } : {}),
+          ...(p.switches.has("qualify") ? { qualify: true } : {}),
           because: need(p, "because"),
         }),
       );

@@ -30,6 +30,8 @@ export interface Change {
   value?: string;
   definition?: string;
   entry?: Record<string, unknown>;
+  /** rename only: the old name keeps other senses (a keyword, another layer's term), so it is not rejected. */
+  qualify?: boolean;
   because: string;
 }
 export interface Proposal {
@@ -249,10 +251,11 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
   } else if (change.action === "rename") {
     if (!change.value?.trim()) throw new Error("a rename needs a new name");
     existing!["name"] = change.value;
-    existing!["rejected"] = [
-      ...((existing!["rejected"] as unknown[]) ?? []),
-      { alternative: change.name, because: change.because },
-    ];
+    if (!change.qualify)
+      existing!["rejected"] = [
+        ...((existing!["rejected"] as unknown[]) ?? []),
+        { alternative: change.name, because: change.because },
+      ];
     for (const c of concepts)
       if (Array.isArray(c["related"]))
         c["related"] = c["related"].map((n) =>

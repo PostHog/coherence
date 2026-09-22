@@ -1184,21 +1184,27 @@
     },
     {
       "name": "structure",
-      "definition": "The reading that answers what a system is made of and how work flows through it, so a human can inspect and reason about the behavior of a system agentic coding has made opaque. It extends to a change set as a visual diff of how the change affects structure and behavior."
+      "definition": "The reading that answers what a system is made of and how work flows through it, so a human can inspect and reason about the behavior of a system agentic coding has made opaque. It extends to a change set as a visual diff of how the change affects structure and behavior.",
+      "provenance": {
+        "defined_by": "owner, 2026-09-22 (journal d-9a5fbe0a)",
+        "owner_words": "Yes, the answer is the first. agentic coding makes the system opaque and we need a high efficiency means of letting the human inspect and reason about that system's behavior. And this should extend to changes as well, presenting a visual diff to help understand how a change set impacts structure and behavior."
+      }
     },
     {
       "name": "entrance",
-      "definition": "Where work enters the system from outside it: a command, a host event, a route, a tool. Declared in the owning component's spec and checked against the code: the named handler must resolve and be reachable, so a declared entrance cannot rot unseen."
+      "definition": "Where work enters the system from outside it: a command, a host event, a route, a tool. Declared in the owning component's spec and checked against the code: the named handler must resolve and be reachable, so a declared entrance cannot rot unseen.",
+      "provenance": {
+        "defined_by": "owner, 2026-09-22 (journal d-0db9b17b)",
+        "owner_words": "Declared and checked for entrypoints is good."
+      }
     },
     {
       "name": "component interface",
       "definition": "The surface one component exposes and another uses: computed, never declared, as the set of resolved references from one component to another, so Structure is a live view of the real project, not a rotting map. What an interface reveals comes from the invariants: its chokepoint if one stands there, its crossing if trust changes there, and the classes of data that pass through it.",
-      "rejected": [
-        {
-          "alternative": "interface",
-          "because": "owner, 2026-09-22: qualify the term; bare interface collides with the TypeScript keyword, the language adapter's interface, and adopters' own senses"
-        }
-      ]
+      "provenance": {
+        "defined_by": "owner, 2026-09-22 (journal d-54e128e1, d-f65a033c)",
+        "owner_words": "Interface is good. Computed is essential, we need this to be a live view of the real project, not a rotting map. / component interface as qualification?"
+      }
     }
   ],
   "metaphors": {

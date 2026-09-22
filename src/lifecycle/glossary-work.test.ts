@@ -656,3 +656,18 @@ test("named instances are distinct from aliases and become known without pretend
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("rename --qualify gives the concept a qualified name and leaves the old name free for its other senses", async () => {
+  const { mkdtempSync, writeFileSync: write, readFileSync: read } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { propose } = await import("./glossary-maintain.ts");
+  const root = mkdtempSync(join(tmpdir(), "coherence-qualify-"));
+  write(join(root, "glossary.json"), JSON.stringify({ version: 1, project: "p", concepts: [{ name: "interface", definition: "d", rejected: [] }] }));
+  const plain = await propose(root, { action: "rename", name: "interface", value: "component interface", because: "b" });
+  assert.match(plain.after, /"alternative": "interface"/, "a plain rename rejects the old name");
+  const qualified = await propose(root, { action: "rename", name: "interface", value: "component interface", qualify: true, because: "b" });
+  assert.doesNotMatch(qualified.after, /"alternative": "interface"/, "a qualifying rename leaves the old name free");
+  assert.match(qualified.after, /"name": "component interface"/);
+  void read;
+});
