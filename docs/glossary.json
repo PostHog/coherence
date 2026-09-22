@@ -1186,8 +1186,17 @@
       "name": "structure",
       "definition": "The reading that answers what a system is made of and how work flows through it, so a human can inspect and reason about the behavior of a system agentic coding has made opaque. It extends to a change set as a visual diff of how the change affects structure and behavior.",
       "provenance": {
-        "defined_by": "owner, 2026-09-22 (journal d-9a5fbe0a)",
-        "owner_words": "Yes, the answer is the first. agentic coding makes the system opaque and we need a high efficiency means of letting the human inspect and reason about that system's behavior. And this should extend to changes as well, presenting a visual diff to help understand how a change set impacts structure and behavior."
+        "defined_by": "owner, 2026-09-22 (journal d-9a5fbe0a and this define)",
+        "owner_words": "Arrows point the way work goes, caller to callee, yes. Zoom makes sense. Diff compared to previous commit, or to a specific commit the agent provides for the user. Stable positions are essential and that rule makes sense. One map, yes. Seven is a good start. We'll test and revisit."
+      },
+      "detail": {
+        "evidence_tier": "Structure states the tier of its evidence on screen. Static and computed (resolved references, declared entrances, invariants) is the default. Observed runtime behavior is a separate, labeled tier, never blended in unlabeled.",
+        "direction": "Arrows point the way work goes: caller to callee. Data paths are a highlight on selecting a trust level, never a second arrow.",
+        "zoom": "One level of the component tree at a time, expanding in place; a collapsed component shows its heaviest component interfaces at its edge; code in no component is shown as its own labeled mass.",
+        "diff": "A change set is compared with the previous commit by default, or with a commit the agent names for the user. Measures: entrance added or removed; component interface added, removed, or widened (references new symbols); chokepoint gaining a bypass; crossing added or removed; data path gaining a branch.",
+        "stability": "Positions are never stored and must be stable: layout is a pure function of entrances and component interfaces with ties broken by name, and a change that adds one component interface moves only the components it touches.",
+        "one_map": "One map. The security spine is selecting a trust level; reliance is selecting a component interface's chokepoint. No separate spine section and no separate reliance view.",
+        "success": "Each reviewer question is answerable from the map in one selection: where does work enter; what does this change touch; where does sensitive data go; what is load-bearing here; what did this change weaken. To be tested and revisited."
       }
     },
     {
