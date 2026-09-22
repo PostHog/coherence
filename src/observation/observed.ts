@@ -65,7 +65,8 @@ export function answerObserved(records: readonly ObservationRecord[], head: stri
   const never = mine.filter((i) => i.exercisedBy === 0 && !i.noBody);
   const noBody = mine.filter((i) => i.exercisedBy === 0 && i.noBody);
   lines.push(`component interfaces${component === undefined ? "" : ` of ${component}`}: ${mine.length} known; ${exercised.length} exercised, ${never.length} never observed, ${noBody.length} with no runtime body`);
-  lines.push(...capped(exercised, (i) => `  ${i.id}  ${exercisedText(i, record, label)}`));
+  // The whole project's answer lists the most-exercised few; a component's lists all of its own.
+  lines.push(...capped(exercised, (i) => `  ${i.id}  ${exercisedText(i, record, label)}`, component === undefined ? 6 : LIMIT));
   lines.push(...capped(never, (i) => `  ${i.id}  ${exercisedText(i, record, label)}`));
   lines.push(...capped(noBody, (i) => `  ${i.id}  ${exercisedText(i, record, label)}`, component === undefined ? 4 : LIMIT));
   const entrances = component === undefined ? record.entrances : record.entrances.filter((e) => e.component === component);
