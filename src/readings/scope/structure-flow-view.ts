@@ -534,7 +534,8 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
     const first = stations.get(route.stops[0]!)!;
     const startPort = portAt(first.folder, "left", `term ${route.id}`);
     const group = blocks.get(first.folder)!.groups.find((g) => g.route === route)!;
-    const terminus: Point = [dotX, group.dot];
+    // The route starts at the right edge of its origin token, as the lettered dots did: the line leaves the name itself.
+    const terminus: Point = [r1(dotX - FLOW_DOT_R - 6), group.dot];
     const dy = Math.abs(terminus[1] - startPort[1]);
     const bend = r1(startPort[0] - 10 - channel(byFolder.get(first.folder)!.column === 0 ? dropsLeft(0) : 0));
     const path: Point[] = [terminus, [r1(bend - dy), terminus[1]], [bend, startPort[1]], startPort];
@@ -933,7 +934,7 @@ export function renderFlowSvg(model: FlowModel, selected: string | undefined, pr
     ${layout.routes.map((draw) => html`<g class="flow-route-group ${routeClass(draw.route)}" id="${draw.route.id}" data-names="${draw.route.names.join(", ")}" data-derived="${draw.route.derived ? "true" : "false"}" data-stops="${draw.route.stops.join(" ")}" data-edges="${draw.route.edges.join(" ")}"${draw.route.rail === undefined ? null : raw(` data-rail="${draw.route.rail}"`)} data-structure-select="${draw.route.id}" role="button" tabindex="0" aria-pressed="${selection.id === draw.route.id ? "true" : "false"}" aria-label="${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(", ")}">
       <title>${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(" → ")}${draw.route.rail === undefined ? "" : ` → ${byFolder.get(draw.route.rail)!.name} (rail)`}</title>
       <path class="flow-line flow-route" data-line="${draw.route.id}" d="${pathD(draw.path)}" stroke="${draw.color}"/>
-      <g class="flow-terminus${draw.route.derived ? " flow-derived" : ""}"><circle class="flow-terminus-dot" cx="${draw.terminus[0]}" cy="${draw.terminus[1]}" r="${FLOW_DOT_R}" fill="${draw.color}"${draw.route.derived ? raw(` stroke="${draw.color}"`) : null}/>${originToken(texts(`origin ${draw.route.id} `), draw.color)}${texts(`origin ${draw.route.id} `).map(renderText)}</g>
+      <g class="flow-terminus${draw.route.derived ? " flow-derived" : ""}">${originToken(texts(`origin ${draw.route.id} `), draw.color)}${texts(`origin ${draw.route.id} `).map(renderText)}</g>
     </g>`)}
     ${[...layout.stations.entries()].map(([folder, station]) => renderStation(byFolder.get(folder)!, station, layout.texts, selection, selected, model))}
     ${layout.tags.map((tag) => {
