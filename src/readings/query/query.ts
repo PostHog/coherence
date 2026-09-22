@@ -30,7 +30,7 @@ import {
   structureOf,
   type RelianceSite,
 } from "../scope/derive.ts";
-import { FLOW_BANDS, flowLabelLines, flowOf } from "../scope/structure-flow.ts";
+import { CORE_RULE, flowLabelLines, flowOf } from "../scope/structure-flow.ts";
 import { renderOrder } from "../../journal/workVerbs.ts";
 import { glossaryReviewCommand } from "../scope/model.ts";
 import type { GlossaryCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
@@ -47,7 +47,7 @@ export const QUERY_USAGE = [
   "  query invariants <path...>     which invariants touch these files, by component and by reference site",
   "  query relies-on <chokepoint>   who references this chokepoint, from the latest run",
   "  query spine                    trust levels and every crossing-bearing invariant, in Structure order",
-  "  query structure                the edges Structure draws (only invariant-carrying reliance), their invariants, and the ranks",
+  "  query structure                the structural routes, core dependencies, interface identifiers and component interfaces Structure draws, and the placement",
   "  query status                   structural defects, open requirements, escalations awaiting a human",
   "  query component <folder>       one component: intent, counts, bullets",
   "  query order [--session <id>]   the active work order the session owns, folded from its records, with what binds to it",
@@ -202,29 +202,41 @@ export function answerSpine(state: ShellState): Answer {
 
 /**
  * The Structure map as text: the same `flowOf` derivation the view draws, so
- * the component interfaces, their labels, the rows, and the entrances cannot
- * differ between the human reading and the agent's. One interface per line:
- * `caller -> callee  label`, the label lines joined by " · ".
+ * the structural routes, the core dependencies, the interface identifiers,
+ * the component interfaces with their labels, and the placement cannot
+ * differ between the human reading and the agent's. A route is
+ * `A  stop -> stop -> stop [-> rail (rail)]  entrances`; an interface is
+ * `caller -> callee  label`, the label lines joined by " · ", with its
+ * identifiers and where it is drawn.
  */
 export function answerStructure(state: ShellState): Answer {
   const model = flowOf(state);
   const bearing = model.edges.filter((edge) => edge.loadBearing).length;
   const lines = [
     `evidence: static and computed; ${model.evidence === "language adapter" ? `resolved references through the ${model.language} language adapter` : `run sites only (${model.unread}); plain component interfaces unknown`}`,
-    `component interfaces (${model.edges.length}, ${bearing} load-bearing), caller -> callee:`,
+    `structural routes (${model.routes.length}), ${model.routesFrom === "root interfaces" ? "derived from the root component's component interfaces: no entrance is declared" : model.routesFrom === "entrances" ? "one per distinct path from the declared entrances" : "none: no entrance is declared and there is no root"}:`,
   ];
-  for (const edge of model.edges) lines.push(`  ${edge.from} -> ${edge.to}  ${flowLabelLines(edge).map((line) => line.text).join(" · ")}`);
+  for (const route of model.routes) {
+    const names = route.entrances.map((id) => model.entrances.find((e) => e.id === id)?.name ?? id);
+    lines.push(`  ${route.letter}  ${route.stops.join(" -> ")}${route.rail === undefined ? "" : ` -> ${route.rail} (rail)`}${names.length === 0 ? "" : `  ${names.join(", ")}`}`);
+  }
+  lines.push(`core dependencies (${model.coreDependencies.length}), each ${CORE_RULE}:`);
+  for (const core of model.coreDependencies) lines.push(`  ${core.folder}  called by ${core.callers.join(", ")}`);
+  lines.push(`interface identifiers (${model.identifiers.length}):`);
+  for (const identifier of model.identifiers) {
+    lines.push(`  ${identifier.text}  ${identifier.component}/${identifier.name}${identifier.crossing === undefined ? "" : `  crossing ${identifier.crossing.from} -> ${identifier.crossing.to}`}  on ${identifier.edges.map((id) => { const edge = model.edges.find((e) => e.id === id)!; return `${edge.from} -> ${edge.to}`; }).join(", ")}`);
+  }
+  lines.push(`component interfaces (${model.edges.length}, ${bearing} load-bearing), caller -> callee:`);
+  for (const edge of model.edges) {
+    const drawn = edge.stub ? "stub" : edge.routes.length > 0 ? `route ${edge.routes.map((id) => model.routes.find((r) => r.id === id)!.letter).join(" ")}` : edge.loadBearing ? "off route" : "faint";
+    lines.push(`  ${edge.from} -> ${edge.to}  ${flowLabelLines(edge).map((line) => line.text).join(" · ")}  [${drawn}${edge.identifiers.length === 0 ? "" : `; ${edge.identifiers.join(" ")}`}]`);
+  }
   lines.push(`entrances (${model.entrances.length}):`);
   for (const entrance of model.entrances) {
     lines.push(`  ${entrance.declaredBy}/${entrance.name}  ${entrance.handler ?? "no handler"}  ${entrance.reachable ? `starts in ${entrance.start}` : entrance.reason ?? "unreachable"}`);
   }
-  lines.push("rows, entrances and callers first:");
-  for (let band = 0; band < FLOW_BANDS; band++) {
-    const folders = model.nodes.filter((node) => node.band === band).map((node) => node.folder);
-    lines.push(`  ${band}  ${folders.length === 0 ? "-" : folders.join(", ")}`);
-  }
-  const unconnected = model.nodes.filter((node) => node.band === undefined).map((node) => node.folder);
-  if (unconnected.length > 0) lines.push(`  no component interface  ${unconnected.join(", ")}`);
+  lines.push("placement, row (folder order)  column (0 where work enters, 1 one interface in, 2 further):");
+  for (const node of model.nodes) lines.push(`  ${node.row}  ${node.core ? "rail" : node.column}  ${node.folder}${node.unconnected ? "  no component interface" : ""}`);
   if (model.unowned !== undefined && model.unowned.files > 0) lines.push(`  no component  ${model.unowned.files} files, ${model.unowned.lines} lines`);
   const broken = model.nodes.flatMap((node) => node.defects.filter((d) => d.internal > 0).map((d) => `  ${node.folder}/${d.name}  ${d.state}; ${d.internal} of ${d.bypasses} bypasses inside ${node.folder}, on no component interface`));
   if (broken.length > 0) lines.push("broken chokepoints no interface shows:", ...broken);

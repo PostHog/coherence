@@ -52,6 +52,7 @@ const BROWSER_SOURCES = [
   "structure-flow.ts",
   "glossary-view.ts",
   "components-view.ts",
+  "structure-measure.ts",
   "structure-flow-view.ts",
   "structure-view.ts",
   "invariants-view.ts",
