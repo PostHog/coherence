@@ -34,7 +34,7 @@ A prosthetic for proprioception: specs, invariants, and the readings that keep a
   handler: queryCommand in src/readings/query/cli.ts
 - glossary: an agent reads, reviews, or maintains the settled vocabulary, or checks text against it
   handler: glossaryCommand in src/cli.ts
-- hooks install: a human installs or inspects Coherence's hooks for an agent host
+- hooks install: a human installs, removes, checks, or inspects Coherence's hooks for an agent host
   handler: hooksCommand in src/cli.ts
 
 ## invariants

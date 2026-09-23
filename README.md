@@ -46,8 +46,10 @@ node src/cli.ts run [--session --agent]   # the chokepoint check and the totalit
 node src/cli.ts run --status              # the latest verdict per enforcement, a view over every run
 node src/cli.ts serve                     # the warm language server for this project (spawned on demand otherwise)
 node src/cli.ts hook <event>              # answer one harness event (event JSON on stdin)
-node src/cli.ts hooks install --host claude|codex
-node src/cli.ts hooks status
+node src/cli.ts hooks install --host claude|codex [--command "<prefix>"]
+node src/cli.ts hooks uninstall --host claude|codex   # removes only Coherence's commands; other hooks and settings stay byte for byte
+node src/cli.ts hooks --check --host claude|codex     # exit 1 naming each event missing, stale, or extra against what install would write
+node src/cli.ts hooks status                          # the wiring per agent host, and what each event delivers for this project
 npm run spec:check                        # the spec check alone
 npm test                                  # typecheck, tests, vocabulary check, spec check; any one failing fails the tree
 ```
@@ -56,7 +58,9 @@ A project names its own glossary under `glossary` in `coherence.config.json`
 (default: `glossary.json` at the root). SessionStart and SubagentStart inject
 both layers with a short instruction, the journal read command, and a decision
 write template. This checkout carries hooks for both Claude Code and Codex;
-`node src/cli.ts hooks status` reports their installation. Stop reports the check
+`node src/cli.ts hooks status` reports their installation and what each event
+carries here (orient at the starts, the peer feed at prompt and tool boundaries,
+regulate at the stops), and `hooks --check` is the CI form. Stop reports the check
 over changed files; SubagentStop refuses the stop (exit 2, reason on stderr) while findings remain.
 
 ## Glossary workflow

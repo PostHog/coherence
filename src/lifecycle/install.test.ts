@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { HOOK_EVENTS } from "./hook.ts";
-import { formatStatus, install, mergeHooks, status } from "./install.ts";
+import { driftOf, formatCheck, formatStatus, install, mergeHooks, status, stripHooks, uninstall } from "./install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
@@ -166,5 +166,175 @@ test("the checkout installs start hooks for both hosts", async () => {
         assert.equal(handler.additionalContextLimit, 4000);
       }
     }
+  }
+});
+
+/** An adopter's settings: other settings, other tools' hooks (one with a matcher), an empty event list, and a layout of its own. */
+const ADOPTER = {
+  permissions: { allow: ["Bash(npm test)"] },
+  env: { A: "1" },
+  hooks: {
+    Stop: [{ hooks: [{ type: "command", command: "./other-tool stop" }] }],
+    PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "./lint", timeout: 5 }] }],
+    Notification: [],
+  },
+  model: "x",
+};
+
+test("uninstall removes only Coherence's commands and returns the settings to what they were before install", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "coherence-uninstall-"));
+  try {
+    // Every host, and every layout: two spaces with a final newline, a tab without one, and settings with no hooks at all.
+    const layouts: [string, string][] = [
+      ["two spaces", JSON.stringify(ADOPTER, null, 2) + "\n"],
+      ["tab, no final newline", JSON.stringify(ADOPTER, null, "\t")],
+      ["no hooks object", JSON.stringify({ permissions: ADOPTER.permissions }, null, 4) + "\n"],
+    ];
+    for (const host of ["claude", "codex"] as const) {
+      for (const [layout, original] of layouts) {
+        const path = join(dir, host === "claude" ? ".claude/settings.json" : ".codex/hooks.json");
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(path, original);
+        await install({ root: dir, host, command: "npx coherence" });
+        assert.notEqual(await readFile(path, "utf8"), original, `${host}/${layout}: install wrote`);
+        const first = await uninstall(dir, host);
+        assert.equal(first.removed.length, HOOK_EVENTS.length, `${host}/${layout}: one command per event removed`);
+        assert.equal(await readFile(path, "utf8"), original, `${host}/${layout}: the round trip gives back the file byte for byte`);
+        const second = await uninstall(dir, host);
+        assert.deepEqual([second.removed, second.changed], [[], false], `${host}/${layout}: a second uninstall changes nothing`);
+        assert.equal(await readFile(path, "utf8"), original);
+      }
+    }
+    assert.deepEqual(
+      await uninstall(join(dir, "nowhere"), "claude"),
+      { path: join(dir, "nowhere", ".claude", "settings.json"), removed: [], changed: false },
+      "no settings file: nothing to do, nothing created",
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+
+  // Pure: a foreign hook sharing an entry with ours stays in that entry with its matcher; an event list that held only ours goes;
+  // a list another tool left empty stays; commands that merely look like ours are never touched.
+  const foreign = ["node tools/other-project/cli.ts hook Stop", "npx incoherence hook Stop", "my-coherence-wrapper hook Stop"];
+  const { settings, removed } = stripHooks({
+    hooks: {
+      Stop: [
+        { matcher: "x", hooks: [{ type: "command", command: "./theirs" }, { type: "command", command: "npx coherence hook Stop" }] },
+        ...foreign.map((command) => ({ hooks: [{ type: "command", command }] })),
+      ],
+      SessionStart: [{ hooks: [{ type: "command", command: 'node "${CLAUDE_PROJECT_DIR:-.}/src/cli.ts" hook SessionStart' }] }],
+      Notification: [],
+    },
+  });
+  assert.deepEqual(settings, {
+    hooks: {
+      Stop: [{ matcher: "x", hooks: [{ type: "command", command: "./theirs" }] }, ...foreign.map((command) => ({ hooks: [{ type: "command", command }] }))],
+      Notification: [],
+    },
+  });
+  assert.deepEqual(removed.map((r) => r.event), ["Stop", "SessionStart"]);
+  assert.deepEqual(
+    stripHooks({ hooks: { Stop: [{ hooks: [{ type: "command", command: "coherence hook Stop" }] }] }, other: 1 }).settings,
+    { other: 1 },
+    "an emptied hooks object goes",
+  );
+});
+
+type Hooks = Record<string, { matcher?: string; hooks: Record<string, unknown>[] }[]>;
+
+test("the check names every drift from what install would write: missing, stale, and extra", () => {
+  const options = { command: "npx coherence", host: "codex" } as const;
+  const clean = mergeHooks(structuredClone(ADOPTER), options);
+  assert.deepEqual(driftOf(clean, options), [], "what install writes has no drift, beside other tools' hooks");
+  assert.deepEqual(driftOf(ADOPTER, options).map((d) => [d.event, d.kind]), HOOK_EVENTS.map((e) => [e, "missing"]), "nothing installed: every event missing");
+
+  const edit = (change: (hooks: Hooks) => void) => {
+    const copy = structuredClone(clean);
+    change(copy["hooks"] as Hooks);
+    return driftOf(copy, options);
+  };
+  const ours = (hooks: Hooks, event: string) => hooks[event]!.find((e) => e.hooks.some((h) => String(h["command"]).includes("coherence hook")))!;
+
+  // Missing: one event's entry gone.
+  assert.deepEqual(edit((h) => { h["UserPromptSubmit"] = []; }), [{ event: "UserPromptSubmit", kind: "missing", expected: "npx coherence hook UserPromptSubmit" }]);
+  // Stale command: another prefix, and the wrong event named.
+  const stale = edit((h) => {
+    ours(h, "Stop").hooks[0]!["command"] = "node src/cli.ts hook Stop";
+    ours(h, "PostToolUse").hooks[0]!["command"] = "npx coherence hook Stop";
+  });
+  assert.deepEqual(stale.map((d) => [d.event, d.kind]), [["PostToolUse", "stale"], ["Stop", "stale"]]);
+  assert.deepEqual(stale[1]!.kind === "stale" ? stale[1]!.differences : [], ['command: installed "node src/cli.ts hook Stop"; install would write "npx coherence hook Stop"']);
+  // Stale fields: a timeout changed, a Codex start limit dropped, an entry shared with another tool's hook, a matcher added.
+  const fields = edit((h) => {
+    ours(h, "Stop").hooks[0]!["timeout"] = 5;
+    delete ours(h, "SessionStart").hooks[0]!["additionalContextLimit"];
+    ours(h, "SubagentStop").hooks.unshift({ type: "command", command: "./theirs" });
+    ours(h, "SubagentStart").matcher = "*";
+  });
+  const byEvent = Object.fromEntries(fields.map((d) => [d.event, d.kind === "stale" ? d.differences : [d.kind]]));
+  assert.deepEqual(Object.keys(byEvent).sort(), ["SessionStart", "Stop", "SubagentStart", "SubagentStop"]);
+  assert.deepEqual(byEvent["Stop"], ["timeout: installed 5; install would write 60"]);
+  assert.deepEqual(byEvent["SessionStart"], ["additionalContextLimit: installed absent; install would write 4000"]);
+  assert.match(byEvent["SubagentStop"]!.join("\n"), /shared with 1 other hook/);
+  assert.match(byEvent["SubagentStart"]!.join("\n"), /entry field matcher: installed "\*"/);
+  // Extra: a duplicate entry of ours, and ours under an event install never wires.
+  const extra = edit((h) => {
+    h["Stop"]!.push({ hooks: [{ type: "command", command: "npx coherence hook Stop", timeout: 60 }] });
+    h["PreToolUse"]!.push({ hooks: [{ type: "command", command: "coherence hook Stop" }] });
+  });
+  assert.deepEqual(extra, [
+    { event: "Stop", kind: "extra", found: "npx coherence hook Stop", reason: "a second entry of ours for this event" },
+    { event: "PreToolUse", kind: "extra", found: "coherence hook Stop", reason: "install wires no hook for this event" },
+  ]);
+  // Another tool's hook changing is not drift of ours.
+  assert.deepEqual(edit((h) => { h["Stop"]![0]!.hooks[0]!["command"] = "./other-tool v2"; }), []);
+
+  const text = formatCheck({ host: "codex", path: "/p/.codex/hooks.json", present: true, drift: [...stale, ...extra] });
+  assert.match(text, /^codex: \/p\/\.codex\/hooks\.json: 3 events drifted from what install would write\n  PostToolUse: stale\n    command: /);
+  assert.match(text, /\n  Stop: extra Coherence entry \(a second entry of ours for this event\): npx coherence hook Stop\n/);
+  assert.match(formatCheck({ host: "claude", path: "/p", present: true, drift: [] }), /all 6 events match what install would write/);
+});
+
+test("the CLI checks, uninstalls, and exits by what it found", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "coherence-cli-check-"));
+  const cli = (...args: string[]) => spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", ...args], { cwd: dir, encoding: "utf8" });
+  try {
+    const path = join(dir, ".claude", "settings.json");
+    await mkdir(dirname(path), { recursive: true });
+    const original = JSON.stringify(ADOPTER, null, 2) + "\n";
+    await writeFile(path, original);
+
+    const absent = cli("--check", "--host", "claude");
+    assert.equal(absent.status, 1, absent.stderr);
+    assert.match(absent.stdout, /6 events drifted/);
+
+    assert.equal(cli("install", "--host", "claude").status, 0);
+    const clean = cli("--check", "--host", "claude");
+    assert.equal(clean.status, 0, clean.stdout);
+    assert.match(clean.stdout, /all 6 events match/);
+    assert.match(cli("install", "--host", "claude").stdout, /^unchanged /, "a second install writes nothing");
+
+    const other = cli("--check", "--host", "claude", "--command", "npx coherence");
+    assert.equal(other.status, 1);
+    assert.match(other.stdout, /SessionStart: stale\n    command: installed ".*node_modules\/\.bin\/coherence\\" hook SessionStart"; install would write "npx coherence hook SessionStart"/);
+
+    const gone = cli("uninstall", "--host", "claude");
+    assert.equal(gone.status, 0, gone.stderr);
+    assert.match(gone.stdout, /^claude: removed 6 Coherence hooks from /);
+    assert.equal(await readFile(path, "utf8"), original);
+    assert.match(cli("uninstall", "--host", "claude").stdout, /no Coherence hook installed; nothing changed/);
+
+    await writeFile(path, "{ not json");
+    const broken = cli("--check", "--host", "claude");
+    assert.equal(broken.status, 2, "a settings file the check cannot read is neither clean nor drift");
+    assert.match(broken.stderr, /^hooks --check: /);
+
+    assert.equal(cli("--check").status, 64, "the check names its agent host");
+    assert.equal(cli("uninstall").status, 64);
+    assert.equal(cli("uninstall", "--host", "claude", "--command", "x").status, 64, "uninstall takes no prefix: ownership is by the command");
+    assert.equal(cli("status", "--bogus").status, 64);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });

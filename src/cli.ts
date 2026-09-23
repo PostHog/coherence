@@ -18,8 +18,10 @@
  *   coherence serve                    the warm language server for this project
  *   coherence query <question> ...     the agent query: what Scope shows a human, as plain text
  *   coherence hook <event>             answer one harness event (event JSON on stdin)
- *   coherence hooks install --host <claude|codex>
- *   coherence hooks status
+ *   coherence hooks install --host <claude|codex>   merge one entry per event into the agent host's settings
+ *   coherence hooks uninstall --host <claude|codex> remove exactly those entries; every other hook stays
+ *   coherence hooks --check --host <claude|codex>   exit 1 with each event's drift from what install would write
+ *   coherence hooks status             the wiring per agent host and what each event delivers for this project
  *   coherence decide | retract | conjecture | ... | journal   (see JOURNAL_USAGE)
  *   coherence work create | move | close | owner | inspect   (see WORK_USAGE)
  *
@@ -34,7 +36,8 @@ import { JOURNAL_USAGE, journalVerbs, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, runCheck } from "./lifecycle/check.ts";
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/glossary.ts";
 import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook } from "./lifecycle/hook.ts";
-import { formatStatus, HOSTS, install, isHost, status } from "./lifecycle/install.ts";
+import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
+import { check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, status, uninstall } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectGlossaries } from "./lifecycle/project.ts";
 import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
 import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
@@ -56,6 +59,8 @@ ${ECONOMY_USAGE}
 ${QUERY_USAGE}
   coherence hook <${HOOK_EVENTS.join("|")}>
   coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"]
+  coherence hooks uninstall --host <${HOSTS.join("|")}>
+  coherence hooks --check --host <${HOSTS.join("|")}> [--command "<prefix>"]
   coherence hooks status
 ${JOURNAL_USAGE}
 `;
@@ -175,27 +180,51 @@ async function hookCommand(args: string[], root: string): Promise<number> {
   return result.exit;
 }
 
+/** The flags each hooks verb takes; anything else is a usage error rather than silently ignored. */
+const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {
+  install: new Set(["host", "command"]),
+  uninstall: new Set(["host"]),
+  check: new Set(["check", "host", "command"]),
+  status: new Set(),
+};
+
 async function hooksCommand(args: string[], root: string): Promise<number> {
   const { flags, positionals } = parse(args, new Set(["host", "command"]));
-  const verb = positionals[0];
-  if (verb === "install") {
-    const host = flags.get("host");
-    if (typeof host !== "string" || !isHost(host)) fail(`hooks install: --host must be one of ${HOSTS.join(", ")}\n${USAGE}`);
-    const command = flags.get("command");
-    const result = await install({
-      root,
-      host,
-      command: typeof command === "string" ? command : await defaultCommand(root),
-    });
-    process.stdout.write(`wrote ${result.path}: ${result.events.join(", ")}\n`);
-    return 0;
-  }
+  // The check is the noun's --check, as glossary --check and spec --check are; the other actions are verbs.
+  const verb = flags.has("check") && positionals.length === 0 ? "check" : positionals[0];
+  const allowed = verb === undefined ? undefined : HOOKS_FLAGS[verb];
+  if (allowed === undefined || positionals.length > (verb === "check" ? 0 : 1)) fail(USAGE);
+  const unknown = [...flags.keys()].filter((flag) => !allowed.has(flag));
+  if (unknown.length > 0) fail(`hooks ${verb}: unknown flag${unknown.length === 1 ? "" : "s"} ${unknown.map((f) => `--${f}`).join(", ")}\n${USAGE}`);
   if (verb === "status") {
     const statuses = await Promise.all(HOSTS.map((host) => status(root, host)));
-    process.stdout.write(formatStatus(statuses));
+    process.stdout.write(formatStatus(statuses) + "\n" + formatDeliveries(await deliveries(root), statuses));
     return 0;
   }
-  fail(USAGE);
+  const host = flags.get("host");
+  const label = verb === "check" ? "hooks --check" : `hooks ${verb}`;
+  if (typeof host !== "string" || !isHost(host)) fail(`${label}: --host must be one of ${HOSTS.join(", ")}\n${USAGE}`);
+  const given = flags.get("command");
+  if (given === true) fail(`${label}: --command needs a value\n${USAGE}`);
+  if (verb === "uninstall") {
+    process.stdout.write(formatUninstall(host, await uninstall(root, host)));
+    return 0;
+  }
+  const command = given ?? (await defaultCommand(root));
+  if (verb === "check") {
+    let result;
+    try {
+      result = await check(root, host, command);
+    } catch (error) {
+      process.stderr.write(`hooks --check: ${error instanceof Error ? error.message : String(error)}\n`);
+      return 2;
+    }
+    process.stdout.write(formatCheck(result));
+    return result.drift.length === 0 ? 0 : 1;
+  }
+  const result = await install({ root, host, command });
+  process.stdout.write(`${result.changed ? "wrote" : "unchanged"} ${result.path}: ${result.events.join(", ")}\n`);
+  return 0;
 }
 
 async function main(argv: string[]): Promise<number> {
