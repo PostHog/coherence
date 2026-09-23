@@ -196,10 +196,10 @@ test("the prefilter never hides a cross-component reference", { timeout: 600_000
     "tsconfig.json": TS_CONFIG,
     "src/lib/Lib.spec.md": "# Lib\n\nThe library.\n\n## invariants\n",
     "src/app/App.spec.md": "# App\n\nUses the library.\n\n## entrances\n- start: work arrives\n  handler: start in src/app/main.ts\n\n## invariants\n",
-    "src/gate/Gate.spec.md": "# Gate\n\nRe-exports the library wholesale.\n\n## invariants\n",
+    "src/relay/Relay.spec.md": "# Relay\n\nRe-exports the library wholesale.\n\n## invariants\n",
     "src/lib/core.ts": "export function renamed(): number {\n  return 1;\n}\nexport function aliased(): number {\n  return 2;\n}\nexport function starred(): number {\n  return 3;\n}\nexport default function defaulted(): number {\n  return 4;\n}\n",
     "src/lib/index.ts": "export { renamed as outward } from \"./core.ts\";\n",
-    "src/gate/all.ts": "export * from \"../lib/core.ts\";\n",
+    "src/relay/all.ts": "export * from \"../lib/core.ts\";\n",
     "src/app/main.ts": "import { outward } from \"../lib/index.ts\";\nimport { aliased as other } from \"../lib/core.ts\";\nimport anything from \"../lib/core.ts\";\nexport function start(): number {\n  return outward() + other() + anything();\n}\n",
   });
   // Python: a star import, an alias on import, and a name only an __all__ string and a getattr spell.
@@ -218,7 +218,7 @@ test("the prefilter never hides a cross-component reference", { timeout: 600_000
     else {
       sameMap(tsReadings.exhaustive, tsReadings.filtered, "the TypeScript escape hatches");
       const edges = tsReadings.filtered.kind === "read" ? tsReadings.filtered.symbols.map((s) => `${s.from} -> ${s.to} ${s.symbol}`) : [];
-      for (const edge of ["src/gate -> src/lib starred", "src/app -> src/lib aliased", "src/app -> src/lib defaulted"]) assert.ok(edges.includes(edge), `${edge} survives the prefilter: ${edges.join("; ")}`);
+      for (const edge of ["src/relay -> src/lib starred", "src/app -> src/lib aliased", "src/app -> src/lib defaulted"]) assert.ok(edges.includes(edge), `${edge} survives the prefilter: ${edges.join("; ")}`);
     }
     const pyReadings = await bothWays(new PythonAdapter(py.root), py.root);
     if (pyReadings.filtered.kind === "unread") t.diagnostic(`no Python instrument: ${pyReadings.filtered.because}`);

@@ -421,7 +421,7 @@ export function languageServerMemory(pid?: number): Promise<number | undefined> 
 export interface ReadOptions {
   /** The budget; each part given overrides the config's, which overrides the default. */
   budget?: Partial<InterfaceBudget>;
-  /** Ask every declaration, as before the word index: the oracle the prefilter is checked against. */
+  /** Ask every declaration, as before the word index: the reading the prefilter is checked against. */
   exhaustive?: boolean;
   /** The language server's memory in megabytes (default: languageServerMemory); a test stubs it. */
   memory?: () => Promise<number | undefined>;
