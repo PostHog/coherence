@@ -238,21 +238,21 @@ The reading: one surface projecting the model for a human, in six views: Lexicon
   via: interfaces read only within the declared components
   because: on a PostHog adoption whose root component is the whole monorepo the reading asked every declaration of some 19,700 files and never finished; the map draws interfaces between the project's components, and the config's bounds are the adopter's own word for what the project is. A caller the reading found outside every component is counted, so the bound is never a silent drop
   crossing: instrument -> reading
-  refuted: dropped every reference site in code no component owns, in readComponentInterfaces, instead of counting it into its callee -> the totality oracle went red; restored, green (2026-09-23, refutation recorded by refute)
+  refuted: dropped every reference site in code no component owns, in readComponentInterfaces, instead of counting it into its callee -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
 - the prefilter never hides a cross-component reference: A declaration is asked for its references only when component code of another component spells its name or an alias it is given, star-imports or wildcard re-exports its module, or it is a default export, and a handler's reach asks what the files it has entered spell; the reading so asked is the reading that asks every declaration, interface for interface, site for site, and reach for reach.
   over: every component interface, site count and entrance reach of a TypeScript project with a wildcard re-export, a renamed re-export, an alias and a default export, of a Python project with a star import, an alias and a getattr string, of the bounded fixture, and of Coherence's own tree, each read with and without the word index
   via: the prefilter never hides a cross-component reference
   because: a language server reports a reference only where the text names the thing, so a name no other component's text spells cannot have a site there; the escape hatches (a star import or wildcard re-export spells no name, an alias or default import spells another) are exactly where that argument needs help, and each is handled rather than assumed away
   crossing: instrument -> reading
-  refuted: stopped asking about a declaration whose module another component wildcard re-exports or star-imports, in namedElsewhere -> the totality oracle went red on the TypeScript escape hatches; restored, green (2026-09-23, refutation recorded by refute)
+  refuted: stopped asking about a declaration whose module another component wildcard re-exports or star-imports, in namedElsewhere -> the totality oracle went red on the TypeScript escape hatches; restored, green (2026-09-23)
   kinds: none
 - the interface reading is bounded in time and says when it is partial: The component interface reading stops asking when its time budget or its language server's memory budget is spent, the config's interfaceBudget or ten minutes and three gigabytes by default, keeps what it read, and the map and query structure say it is partial, which budget stopped it, and whose declarations were not all read; a stalled server never holds it past its budget.
   over: a server that never answers one question, a server over its memory ceiling, a reading that finishes, and the budget from the config and from a flag, each through the reading, the Structure page and query structure
   via: the interface reading is bounded in time and says when it is partial
   because: the reading of a PostHog adoption ran 30 to 90 minutes with its language server at 3.5 GB and never finished, and nothing said so; a partial map presented as complete would be worse than none, since a missing interface reads as no dependency
   crossing: instrument -> reading
-  refuted: awaited the language server's answer without racing it against the deadline, in readComponentInterfaces' within, so a stalled server held the reading -> the totality oracle went red; restored, green (2026-09-23, refutation recorded by refute)
+  refuted: awaited the language server's answer without racing it against the deadline, in readComponentInterfaces' within, so a stalled server held the reading -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
 - origin tokens stay readable: An origin token shows at most four entrance names and a count of the rest, which the route's inspector lists in full.
   over: a route six entrances share
