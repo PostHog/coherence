@@ -42,12 +42,32 @@ export function modelCounts(state: ShellState): string {
 }
 
 /**
+ * Where the state comes from, in one line: a snapshot that never updates, or
+ * a live page connecting, following the stores, or disconnected and retrying.
+ * Nothing when the page has not said (a render in a test).
+ */
+export function renderConnection(state: ShellState): Markup | null {
+  const connection = state.connection;
+  if (connection === undefined) return null;
+  const mark = connection.mode === "snapshot" ? "snapshot" : connection.status;
+  const text =
+    connection.mode === "snapshot"
+      ? html`Snapshot: this file does not update. <code>coherence scope</code> opens the live reading.`
+      : connection.status === "connecting"
+        ? html`Connecting to the warm server…`
+        : connection.status === "live"
+          ? html`Live: follows the journal, runs, work orders and specs as they change.`
+          : html`Disconnected from the warm server${connection.reason === undefined ? "" : ` (${connection.reason})`}; retrying${connection.attempt === undefined ? "" : `, attempt ${connection.attempt}`}. What is shown is as of the last update. If it stays down, <code>coherence scope</code> starts it again.`;
+  return html`<p class="connection" data-field="connection" data-connection="${mark}" role="status" aria-live="polite"><span class="connection-dot" aria-hidden="true"></span> ${text}</p>`;
+}
+
+/**
  * The masthead leads with health: one verdict in large type, the link to its
  * set on the Structure map (the broken component's mark when one component
  * holds everything broken), and what else the verdict leaves out beneath it.
  * The glossary and the record counts are demoted to one small line.
  */
-function renderMasthead(state: ShellState): Markup {
+export function renderMasthead(state: ShellState): Markup {
   const first = state.glossary.layers[0];
   const counts =
     first !== undefined && first.kind === "present"
@@ -63,6 +83,7 @@ function renderMasthead(state: ShellState): Markup {
   ].filter(Boolean).join(" · ");
   return html`<div class="masthead">
     <p class="reading-name">Scope</p>
+    ${renderConnection(state)}
     <h1>${state.project}</h1>
     <a class="verdict" data-field="verdict" data-verdict="${verdict.kind}" href="#${verdict.select}">${verdict.text}</a>
     ${detail === "" ? null : html`<p class="verdict-detail" data-field="verdict-detail">${detail}</p>`}

@@ -1,6 +1,6 @@
 # Enforcement
 
-Enforcement by detection: the chokepoint check with its grade ladder and automatic refutation, the totality oracle pass, the run as the primary record, and the warm server.
+Enforcement by detection: the chokepoint check with its grade ladder and automatic refutation, the totality oracle pass, the run as the primary record, and the warm server, with its authenticated socket and its guarded HTTP for the live Scope reading.
 
 ## invariants
 - run appended never rewritten: A run is appended as one line and never rewritten; the latest verdict per enforcement is a view derived from every run, and a skipped enforcement keeps its prior dated verdict.
@@ -142,3 +142,60 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   crossing: harness -> instrument
   refuted: made the lifetime check return before looking at the root or the lock -> the totality oracle went red, then green once restored (2026-09-22)
   kinds: none
+- socket clients are authenticated: Every request line on the warm server's socket carries the root's token, a random secret in .coherence/run/http.json copied into the pointer, both readable by the user alone (mode 0600) as the socket is; a line without it, or with another, is refused and its connection closed.
+  over: every request line the socket reads, and the modes of the pointer, the token file, and the socket
+  via: a socket client without the root's token is refused, and the token lives only in files this user can read
+  because: security review item B-F12: the socket was unauthenticated, and a root whose path is too long puts it in the shared temp folder, where any local process could ask the instrument to read the tree or stop the server. A caller that can read the pointer is the user; one that cannot gets nothing
+  crossing: harness -> instrument
+  refuted: let a request line through serve's line handler without checking its token -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: credential
+  checklist: capability-authorization declared as socket clients are authenticated
+  checklist: message-authenticity declared as socket clients are authenticated
+  checklist: revalidated-permission dismissed: every line is checked against the token, so there is no granted session to revalidate
+  checklist: encrypted-storage dismissed: the token rests on the user's own disk in files only the user can read; encryption at rest would guard against no one the file mode does not
+  checklist: key-rotation-compatibility dismissed: removing http.json rotates the token at the next start, and a client reads it from the pointer at each connect
+  checklist: separation-of-duties dismissed: one user asks one instrument; nothing is approved
+- a client request times out: Every request a client sends the warm server fails after a bounded wait (seconds for status, stop and http, which the server answers at once; minutes for an instrument question), naming the method, rather than hanging on a server that stopped answering.
+  over: every request a line client sends
+  via: a client request the server never answers fails after its timeout, naming the method
+  because: security review item B-F12: a client had no request timeout, so a wedged server hung every hook and run that asked it; status, stop and http never wait behind the instrument's queue, so their short bound cannot fire on a busy but healthy server
+  crossing: harness -> instrument
+  refuted: made LineClient.request ignore the timeout it was given -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: budget
+  checklist: execution-budget declared as a client request times out
+  checklist: bounded-admission dismissed: the server's queue admits every authenticated line; the bound is on the client's wait
+  checklist: fair-admission dismissed: the clients are one user's hooks and runs
+  checklist: rate-budget dismissed: the socket is the user's own and authenticated
+  checklist: memory-budget dismissed: a timed-out request drops its pending entry
+  checklist: circuit-breaker-policy dismissed: a request that times out fails once and its run records not run; there is nothing remote to trip a breaker on
+- HTTP is loopback, tokened and same-origin: The warm server answers HTTP on 127.0.0.1 alone, and its one guard admits a request only when its `Host` header names that address or localhost with the server's port, its method is GET or HEAD, any `Origin` header names the server itself and no fetch is marked cross-site, and it carries the root's token (in the query for the page itself, in the Authorization header for everything else); no answer carries a CORS header.
+  over: every request shape the guard sees (no token, a wrong token, the token in an API query, a foreign `Host` header, loopback on another port, a foreign `Origin` header, a cross-site fetch, POST, PUT, DELETE and a CORS preflight), every answer's headers, and every interface of the machine but loopback
+  via: HTTP answers on loopback alone and refuses a request without the token, addressed to another server or sent from another site, or not a GET, and sends no CORS header
+  because: the owner ruled the Scope reading be served live (d-eef7da19), which puts the whole model behind a local port. Any page the user visits can aim requests at localhost and a rebinding name at 127.0.0.1, so the `Host` header is checked against the server's own address, the token is required on every request and sent as a header a cross-origin page cannot make the browser add, and the API is read-only with no CORS header, so no other origin can read an answer
+  refuted: staged broken in turn in admitHttp and the HTTP listener: the Host header unchecked, the token not required, a bind to 0.0.0.0, Access-Control-Allow-Origin: * on every answer, every method but TRACE admitted, a foreign Origin header admitted -> the totality oracle went red for each; restored, green (2026-09-23)
+  kinds: credential, message
+  checklist: capability-authorization declared as HTTP is loopback, tokened and same-origin
+  checklist: message-authenticity declared as HTTP is loopback, tokened and same-origin
+  checklist: destination-confinement declared as HTTP is loopback, tokened and same-origin
+  checklist: input-validation declared as HTTP is loopback, tokened and same-origin
+  checklist: revalidated-permission dismissed: the token is checked on every request; nothing is granted beyond one answer
+  checklist: encrypted-storage dismissed: the token rests on the user's own disk in files only the user can read
+  checklist: key-rotation-compatibility dismissed: removing http.json rotates the token at the next start; a page must then be opened again from the new address
+  checklist: separation-of-duties dismissed: one user reads; nothing is approved
+  checklist: retry-recognition dismissed: every admitted request is a read with no effect, so a retry is harmless
+  checklist: duplicate-suppression dismissed: a read has no effect to duplicate
+  checklist: keyed-ordering dismissed: requests are independent reads; the event stream's order is the reading's own invariant
+  checklist: acknowledgment-barrier dismissed: nothing is acknowledged; a page resumes from cursors derived from what it holds
+  checklist: retry-classification dismissed: a refused request is refused for its shape and would be refused again
+- HTTP requests time out: An HTTP client has a few seconds to send its headers and its request, and the server holds a bounded number of connections, so a client that never finishes cannot hold one open.
+  over: every HTTP connection, from its first byte to its last header
+  via: an HTTP client that never finishes its headers is cut off
+  because: a port on loopback is reachable by every local process and, through the browser, by every page the user visits; a request that never finished would hold a connection, and enough of them would starve the page the user is reading. The event stream, once admitted, is long by design and carries a keepalive
+  refuted: gave HTTP a ten-minute header timeout and no request timeout -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: budget
+  checklist: bounded-admission declared as HTTP requests time out
+  checklist: execution-budget declared as HTTP requests time out
+  checklist: fair-admission dismissed: one user on loopback
+  checklist: rate-budget dismissed: every answer needs the token, and the server is the user's own
+  checklist: memory-budget dismissed: requests carry no body, and answers are the bounded first load and history pages capped at 500 records
+  checklist: circuit-breaker-policy dismissed: the server depends on nothing remote

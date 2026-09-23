@@ -1,23 +1,25 @@
 # Scope
 
-The reading: one surface projecting the model for a human, in six views: Glossary, Components, Structure, Invariants, Runs, Journal; and the agent query, the same state as plain text.
+The reading: one surface projecting the model for a human, in six views: Glossary, Components, Structure, Invariants, Runs, Journal; a fixed shell that loads its state from the warm server and follows the stores live, or carries one state as a snapshot file; and the agent query, the same state as plain text.
 
 ## entrances
-- scope page: a human or agent builds the Scope page over this project or another root
-  handler: main in build.ts
+- scope: a human opens the live reading from the root's warm server, or an agent writes a snapshot of this project or another root
+  handler: scopeCommand in cli.ts
+- scope http: a browser asks the warm server for the shell, the first load, history by cursor, and the event stream
+  handler: scopeApp in live.ts
 
 ## invariants
-- deterministic build: The same inputs in produce a byte-identical page out, and the inputs are all of them: both glossaries, the spec tree, the run records, the journal, the work store, and the component interface reading when the builder is given one.
+- fixed shell: The shell's bytes (its HTML, script, styles and embedded font) depend on no project content, and the same state in gives the same render and the same snapshot bytes out; the state is a function of all its inputs: both glossaries, the spec tree, the run records, the journal, the work store, and the component interface reading when one is given.
   protects: loadState
-  chokepoint: buildScopePage
-  over: every byte of the page, against every input it reads: both glossaries, every spec file, every run record, every journal record, and every work record
-  via: the build is deterministic: the same glossaries, specs, runs, journal and work in, byte-identical page out
-  because: the page is derived and never stored as truth; a build that differed for the same input would make the derived page look like it carried something of its own. Naming only the glossaries was false in the direction that matters: appending one journal record changes the page, so a reader who trusted the sentence would have read a stale page as a fresh one. Its totality oracle appends to each store in turn and asserts both halves, that the page moved and that it is identical again
+  chokepoint: scopeState
+  over: every byte of the shell, built over two projects and after appending to each store the state reads, and every render and snapshot of the same state
+  via: the shell's bytes are independent of project content; the same state in renders the same page out
+  because: the owner ruled (d-eef7da19) that the reading be "a fixed object that loaded content dynamically", since static, baked content is the opposite of what the reading is for. A shell that varied with the project would be a generated page again, and a render that differed for the same state would make the page look like it carried something of its own. Every reader (a snapshot, the live server, the agent query) loads the state through scopeState, so no second path reads the stores differently. Its totality oracle appends to each store in turn and asserts both halves: the state moved, and the shell did not
   crossing: project-source -> reading
-  refuted: appended the clock to the page title in buildScopePage -> "the build is deterministic: the same glossaries, specs, runs, journal and work in, byte-identical page out" went red in check.test.ts; restored, green (2026-09-17). The narrower sentence naming the glossaries alone was falsified by appending one journal record to the fixture and seeing the page change (2026-09-18)
+  refuted: stamped the build time into the shell's title in buildShell -> the totality oracle went red; restored, green (2026-09-23)
   kinds: encoding
   checklist: semantic-preservation declared as embedded state unchanged
-  checklist: canonical-encoding declared as deterministic build
+  checklist: canonical-encoding declared as fixed shell
   checklist: key-rotation-compatibility dismissed: nothing is encrypted
 - no stored derivation: The state stores nothing it derives from records it already holds: the latest verdict per enforcement, what passed, and what failed are read from the run records at render.
   over: every bullet of every component in the state, against the run records in the same state
@@ -33,26 +35,26 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   crossing: record -> reading
   refuted: filtered the site list to chokepoint references alone -> the protected-only reliance assertion went red in check.test.ts; included both endpoints with their role and classification, green (2026-09-18)
   kinds: none
-- bounded page: The page embeds a bounded window of the two stores that grow with every session, the run records and the journal, so its size does not grow with them, while every verdict it derives is the one every record derives and every record left out is counted.
-  over: every run record and journal record of a fixture grown by 2400 journal records and 360 runs, and the latest verdict of every invariant in it
-  via: the page stays bounded as the journal and the runs grow: a window of each is embedded, and every derived verdict is unchanged
-  because: defect df-d6deded9: the page over Coherence passed its 2 MB budget because it embedded every run and journal record, and both grow every session (the runs were 1.16 MB of 2.06 MB). Raising the budget would only move the day it fails. The window keeps the latest records, every open escalation, what those records point at, and every run holding some enforcement's latest entry, so no derivation changes; the whole journal is one journal command away and the agent query reads every record
+- bounded first load: The first load (the state the live server sends first, and a snapshot's state) carries a bounded window of the two stores that grow with every session, the run records and the journal, so its size does not grow with them, while every verdict it derives is the one every record derives, every record left out is counted, and paging back by cursor loads every record left out, once.
+  over: every run record and journal record of a fixture grown by 2400 journal records and 360 runs, the latest verdict of every invariant in it, and every page of history from the first load's hint back to the first record
+  via: the first load stays flat as the journal and the runs grow, every derived verdict is unchanged, and history loads every record left out by cursor, once
+  because: defect df-d6deded9: the page over Coherence passed its 2 MB budget because it embedded every run and journal record, and both grow every session (the runs were 1.16 MB of 2.06 MB). Raising the budget would only move the day it fails. The window keeps the latest records, every open escalation, what those records point at, and every run holding some enforcement's latest entry, so no derivation changes. With the reading live (d-eef7da19) the window bounds the first load and no longer what a reader can see: older records load on demand by cursor, a search reaches every record, and a cited record loads by id
   crossing: record -> reading
-  refuted: made buildScopePage embed every run and journal record unless a window was asked for -> the bounded-page totality oracle went red naming 451606 then 1096410 bytes; restored, green (2026-09-22)
+  refuted: made windowState return the whole state, so the first load carried every run and journal record -> the totality oracle went red; restored, green (2026-09-23). Before the reading was live: made buildScopePage embed every run and journal record -> red naming 451606 then 1096410 bytes; restored, green (2026-09-22)
   kinds: none
-- self-contained page: The page loads nothing from outside: no external src, href, url() or @import.
-  over: every src, href, url() and @import in the page
-  via: the page is self-contained: no external src, href, url() or @import
-  because: the reading is opened from a file on a machine with no network to assume; a page that fetched anything from outside would render differently, or not at all, by where it was opened
+- self-contained snapshot: A snapshot is the shell byte for byte with one inline state, and neither loads anything from outside: no external src, href, url() or @import, and the script fetches only its own origin's paths.
+  over: every src, href, url(), @import and fetch in the snapshot and in the shell
+  via: a snapshot is the shell with one inline state and loads nothing from outside: no external src, href, url() or @import
+  because: a snapshot is what is shared, kept as a CI artifact, and written by other agents with scope --root and --out, then opened from a file on a machine with no network or server to assume; a page that fetched anything from outside would render differently, or not at all, by where it was opened. Being the shell plus a state, not a second page, it cannot drift from what the live reading shows
   crossing: project-source -> reading
-  refuted: injected an external stylesheet link into the page in buildScopePage -> "the page is self-contained: no external src, href, url() or @import" went red in check.test.ts naming the link; restored, green (2026-09-17)
+  refuted: linked an external stylesheet from the shell's head in buildShell -> the totality oracle went red; restored, green (2026-09-23)
   kinds: output
-  checklist: destination-confinement declared as self-contained page
+  checklist: destination-confinement declared as self-contained snapshot
   checklist: redaction dismissed: nothing in the glossary is sensitive; provenance is separated, not removed
   checklist: commit-ordered-effects dismissed: the page has no effect
   checklist: circuit-breaker-policy dismissed: the page has no dependency to sample
   checklist: declared-target-coverage dismissed: one file is written
-- embedded state unchanged: The state embedded in the page is the loaded glossary, unchanged.
+- embedded state unchanged: The state a snapshot embeds is the loaded glossary, unchanged.
   over: every field of the loaded glossary
   via: the embedded state is the loaded glossary, unchanged
   because: the browser renders from the embedded state; a build that reshaped the glossary on the way in would show a human something other than the settled vocabulary
@@ -60,7 +62,7 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   refuted: embedded an extra field beside the state in buildScopePage -> "the embedded state is the loaded glossary, unchanged" went red in check.test.ts; restored, green (2026-09-17)
   kinds: encoding
   checklist: semantic-preservation declared as embedded state unchanged
-  checklist: canonical-encoding declared as deterministic build
+  checklist: canonical-encoding declared as fixed shell
   checklist: key-rotation-compatibility dismissed: nothing is encrypted
 - provenance one click away: Provenance and detail render only under their disclosures; no provenance key or value appears in the vocabulary.
   over: every concept and every key of its provenance
@@ -328,4 +330,18 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   because: a citation's link should land on a card, as a retraction's pointer already does; following citations without a cap would let a densely cited journal pull the whole store back into the page past its 2 MB budget (defect df-d6deded9), so the window follows one hop, serves the latest citers first, and stops at the cap, and a citation past it renders as an id with the command that shows it
   crossing: record -> reading
   refuted: made windowJournal follow no citation, so an old cited record was left out of the page -> the totality oracle went red in check.test.ts; restored, green (2026-09-23)
+  kinds: none
+- live updates reach a connected page: A journal record or a run appended while a page holds the event stream open reaches it as the records that are new, and the page's merge holds each once and renders it, without a reload.
+  over: a journal record and a run appended to the fixture while a client holds the live reading's event stream open, and the journal view rendered from the merged state
+  via: a journal record appended while a page is connected reaches it as a live update, and a run the same way
+  because: the owner's words (d-eef7da19): "it would be neat if it could update with new journal content as it goes"; a reading that has to be rebuilt to show the latest record is the baked page again, and a reader who trusted it would act on a journal that had moved on
+  crossing: record -> reading
+  refuted: sent each journal update with no records in LiveReading.refresh -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none
+- reconnect resumes from its cursors: A page that reconnects, to the same server or to one restarted on the root, resumes from cursors derived from the state it holds and receives every record appended while it was away, including one a slower writer stamped before its latest, holding each exactly once.
+  over: records appended after the page's cursor and one stamped before it, while the page is away from a running server and across a server restart on the same address and token, against every record the page held before
+  via: a page that reconnects with its cursors gets every record appended while it was away, each once, across a server restart
+  because: a live page that dropped a record while its server restarted, or showed one twice, would disagree with the journal it claims to follow. The journal's cursor orders by time then id, and two writers can append out of that order, so the catch-up reaches a minute before each cursor and the merge is keyed, which makes the overlap harmless; the cursors are derived from the state, never stored beside it, so they cannot disagree with what the page holds
+  crossing: record -> reading
+  refuted: dropped the catch-up's slack in withSlack, so a record a slower writer stamped before the page's latest was never sent -> the totality oracle went red once it also reconnected to a running server, where only the catch-up can bring the record (across a restart the new snapshot carried it, and the same break first stayed green); restored, green (2026-09-23)
   kinds: none

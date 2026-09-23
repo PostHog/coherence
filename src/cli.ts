@@ -17,6 +17,7 @@
  *   coherence refute <component>/<name> --broke "<what you changed>"   the totality oracle with the break staged; it must fail
  *   coherence serve                    the warm language server for this project
  *   coherence query <question> ...     the agent query: what Scope shows a human, as plain text
+ *   coherence scope [--no-open]        open the live Scope reading from the warm server; --snapshot [--out <file>] writes one file
  *   coherence hook <event>             answer one harness event (event JSON on stdin)
  *   coherence hooks install --host <claude|codex>   merge one entry per event into the agent host's settings
  *   coherence hooks uninstall --host <claude|codex> remove exactly those entries; every other hook stays
@@ -40,6 +41,8 @@ import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
 import { check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, status, uninstall } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectGlossaries } from "./lifecycle/project.ts";
 import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
+import { SCOPE_USAGE, scopeCommand } from "./readings/scope/cli.ts";
+import { scopeApp } from "./readings/scope/live.ts";
 import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
 import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
 
@@ -57,6 +60,7 @@ ${SCAFFOLD_USAGE}
 ${ENFORCEMENT_USAGE}
 ${ECONOMY_USAGE}
 ${QUERY_USAGE}
+${SCOPE_USAGE}
   coherence hook <${HOOK_EVENTS.join("|")}>
   coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"]
   coherence hooks uninstall --host <${HOSTS.join("|")}>
@@ -252,7 +256,10 @@ async function main(argv: string[]): Promise<number> {
     case "refute":
       return refuteCommand(rest, io);
     case "serve":
-      return serveCommand(rest, io);
+      // The warm server answers the live Scope reading over HTTP besides the instrument over its socket.
+      return serveCommand(rest, io, { http: scopeApp() });
+    case "scope":
+      return scopeCommand(rest, io);
     case "economy":
       return economyCommand(rest, io);
     case "calibrate":

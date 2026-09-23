@@ -746,7 +746,7 @@
     {
       "name": "scope",
       "status": "settled",
-      "definition": "The reading. One surface projecting the model (components, invariants with enforcement, grade, crossing, refutation and because, references, reliance, runs, journal records, work orders) for a human, in views. Replaces every other render.",
+      "definition": "The reading. One surface projecting the model (components, invariants with enforcement, grade, crossing, refutation and because, references, reliance, runs, journal records, work orders) for a human, in views. A fixed shell loads the state from the warm server and follows the stores as they change; a snapshot carries one state whole in a file. Replaces every other render.",
       "rejected": [
         {
           "alternative": "panel (live TUI)",
@@ -790,7 +790,8 @@
       },
       "properties": {
         "structure": "The Structure view projects declared trust levels and crossing-bearing invariants in a stable order. Positions are computed from the current model, not maintained as separate layout truth.",
-        "proposed_crossing": "A proposed crossing is visibly provisional and carries no invented grade, verdict, bypass result or reliance evidence."
+        "proposed_crossing": "A proposed crossing is visibly provisional and carries no invented grade, verdict, bypass result or reliance evidence.",
+        "live": "A fixed shell whose bytes depend on no project content loads the state from the root's warm server, on loopback behind the root's token, and follows the journal, runs, work orders and specs as they change; a snapshot is the same shell with one state inline, for sharing and CI. The first load is a bounded window; older records load on demand by cursor."
       }
     },
     {
@@ -1296,7 +1297,7 @@
       "detail": {
         "validation": "Every cited id must name a record already in the journal or the work store when the citation is written; one unknown id refuses the whole write and appends nothing. An id given twice is refused. A record that cites nothing carries no cites field, so records written before citations read unchanged.",
         "reading": "journal and journal --json show each record's cites and what cites it; journal <id> names both directions by kind and subject; work inspect and query order list what an order's records cite, what binds to it, and what cites it; Scope's Journal view links both directions; orient names what an open escalation cites. The peer feed stays subjects only.",
-        "scope_window": "The page keeps, one hop and up to a cap, the older records its kept records and work orders cite; a citation past the cap shows its id and the command that reads it."
+        "scope_window": "Scope's first load keeps, one hop and up to a cap, the older records its kept records and work orders cite; a citation past the cap shows its id, which the live page loads on request and a snapshot answers with the command that reads it."
       },
       "provenance": {
         "defined_by": "agent relations (session a40acfaebbf15f7f7), 2026-09-23, on the owner-approved approach for relationships between journal and work records"

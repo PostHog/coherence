@@ -1,29 +1,48 @@
 /**
  * The browser side of the Scope reading.
  *
- * The page holds one `ShellState`, parsed once from the JSON the builder
- * embedded. Every change to what the reader sees is a change to that state
+ * The page holds one `ShellState`. Every change to what the reader sees is a change to that state
  * followed by a render; nothing is written to the DOM that a render could not
  * regenerate. The only other places a value lives are the search field and
  * the filter selects, whose current values are copied into the active view's
  * state on every input or change event. The hash is read, never written to
  * the state: a hash resolves to a view and a card on load and on change.
  *
+ * The state arrives one of two ways. A snapshot carries it inline, and the
+ * page never asks for anything. The fixed shell the warm server serves
+ * carries none: the page fetches the first load with the token from its own
+ * address (sent as a header, never in a later address), then follows the
+ * server's event stream, merging each update into the state (updates.ts) and
+ * rendering again. When the stream ends the page says it is disconnected and
+ * reconnects with backoff, resuming from cursors derived from the state it
+ * holds, so nothing appended while it was away is lost or held twice.
+ *
  * This file is stripped of types and inlined into the page together with the
  * modules it imports, so it must not rely on anything outside them.
  */
 
-import { componentOfHash, resolveHash } from "./derive.ts";
-import type { JournalKind, LifecycleState, ShellState } from "./model.ts";
-import { renderShell, renderViewResults } from "./shell.ts";
+import { componentOfHash, journalId, resolveHash } from "./derive.ts";
+import type { JournalKind, JournalRecord, LifecycleState, RunRecord, ShellState } from "./model.ts";
+import { renderMasthead, renderShell, renderViewResults } from "./shell.ts";
 import { FLOW_NONE_ID, flowDefaultSelection, flowExpanded, flowKeyAction, flowOf, isFlowId } from "./structure-flow.ts";
+import { applyUpdate, cursorsOf, mergeJournal, mergeRuns, parseStream } from "./updates.ts";
 
-function readEmbeddedState(): ShellState {
-  const node = document.getElementById("scope-state");
-  if (node === null || node.textContent === null) {
-    throw new Error("Scope: the embedded state is missing from this page.");
-  }
-  return JSON.parse(node.textContent) as ShellState;
+/** The state a snapshot carries inline; undefined in the shell, whose state the warm server serves. */
+function readEmbeddedState(): ShellState | undefined {
+  const text = document.getElementById("scope-state")?.textContent ?? "";
+  return text.trim() === "" ? undefined : (JSON.parse(text) as ShellState);
+}
+
+/** How long a stream may stay silent before the page counts it lost; the server sends a keepalive far more often. */
+const STREAM_SILENCE_MS = 45_000;
+/** The longest wait between reconnection attempts. */
+const RECONNECT_MAX_MS = 15_000;
+/** How many records one history page asks for. */
+const HISTORY_PAGE = 200;
+
+/** What a live page can ask its server for, beyond the stream: pages of history and single records. */
+interface LiveAccess {
+  get(path: string): Promise<unknown>;
 }
 
 /** The query field of the active view. */
@@ -61,13 +80,66 @@ function setFilter(state: ShellState, name: string, value: string): void {
   }
 }
 
-function boot(): void {
-  const root = document.getElementById("scope-root");
-  if (root === null) throw new Error("Scope: the root element is missing from this page.");
-  const state = readEmbeddedState();
-
+/**
+ * Show one state and handle every reader interaction on it. Returns `update`,
+ * which a live page calls after merging an update: the masthead and the
+ * active view's results render again, and the whole shell when no control
+ * of the page holds focus, so a reader typing a query is never interrupted.
+ */
+function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefined): { update: () => void } {
   const renderAll = (): void => {
+    document.title = `${state.project} Scope`;
     root.innerHTML = renderShell(state).text;
+  };
+
+  const update = (): void => {
+    const focused = document.activeElement;
+    const typing = focused instanceof HTMLInputElement || focused instanceof HTMLSelectElement || focused instanceof HTMLTextAreaElement;
+    if (!typing || !root.contains(focused)) {
+      const scroll = window.scrollY;
+      renderAll();
+      window.scrollTo({ top: scroll, behavior: "instant" });
+      return;
+    }
+    document.title = `${state.project} Scope`;
+    const masthead = root.querySelector<HTMLElement>(".masthead");
+    if (masthead !== null) masthead.outerHTML = renderMasthead(state).text;
+    renderResults();
+  };
+
+  /**
+   * Fetch records the page has not loaded (a page of history, a search, one
+   * record), merge them as older records, and render. Resolves to the answer,
+   * or undefined when the fetch failed, which the button says.
+   */
+  const loadHistory = async (button: HTMLButtonElement, path: string, store: "journal" | "runs"): Promise<{ records: (JournalRecord | RunRecord)[]; more: boolean } | undefined> => {
+    if (live === undefined) return undefined;
+    button.disabled = true;
+    try {
+      const answer = (await live.get(path)) as { records: (JournalRecord | RunRecord)[]; more: boolean };
+      if (store === "journal") mergeJournal(state, answer.records as JournalRecord[], true);
+      else mergeRuns(state, answer.records as RunRecord[], true);
+      return answer;
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = `Could not load (${error instanceof Error ? error.message : String(error)}); try again`;
+      return undefined;
+    }
+  };
+
+  /**
+   * Page back from where the last page stopped: first the server's hint (the
+   * oldest record of the first load's latest window), then the oldest record
+   * each page returned; the server answers oldest first.
+   */
+  const pageBack = async (button: HTMLButtonElement, store: "journal" | "runs"): Promise<void> => {
+    const connection = state.connection;
+    const before = connection?.history?.[store] ?? "";
+    const answer = await loadHistory(button, `/api/${store}?before=${encodeURIComponent(before)}&limit=${HISTORY_PAGE}`, store);
+    if (answer === undefined) return;
+    const oldest = answer.records[0] as { at: string; id?: string; session?: string } | undefined;
+    if (connection !== undefined) connection.history = { ...connection.history, [store]: !answer.more || oldest === undefined ? "" : `${oldest.at}~${oldest.id ?? oldest.session ?? ""}` };
+    update();
   };
 
   const renderResults = (): void => {
@@ -165,6 +237,32 @@ function boot(): void {
     const target = event.target;
     if (!(target instanceof Element)) return;
 
+    const older = target.closest<HTMLButtonElement>("button[data-history]");
+    if (older !== null) {
+      const store = older.dataset["history"] === "runs" ? "runs" : "journal";
+      void pageBack(older, store);
+      return;
+    }
+
+    const search = target.closest<HTMLButtonElement>("button[data-history-search]");
+    if (search !== null) {
+      const query = state.journalView.query.trim();
+      void loadHistory(search, `/api/journal?q=${encodeURIComponent(query)}&limit=${HISTORY_PAGE}`, "journal").then((answer) => answer !== undefined && update());
+      return;
+    }
+
+    const one = target.closest<HTMLButtonElement>("button[data-load-record]");
+    if (one !== null) {
+      const id = one.dataset["loadRecord"] ?? "";
+      void loadHistory(one, `/api/record?id=${encodeURIComponent(id)}`, "journal").then((answer) => {
+        const record = answer?.records[0] as JournalRecord | undefined;
+        if (record === undefined) return;
+        update();
+        location.hash = `#${journalId(record)}`;
+      });
+      return;
+    }
+
     const tab = target.closest<HTMLElement>("[role=tab][data-view]");
     if (tab !== null) {
       const view = tab.dataset["view"];
@@ -259,6 +357,100 @@ function boot(): void {
 
   renderAll();
   followHash();
+  return { update };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Follow the warm server: fetch the first load, then read the event stream
+ * until it ends, merging each update and rendering; when it ends, say so and
+ * reconnect with backoff (1, 2, 4, 8, then every 15 s), resuming from the
+ * cursors of the state the page holds. A restarted server that answers on
+ * the same address resumes the page where it stopped.
+ */
+async function follow(root: HTMLElement, token: string): Promise<void> {
+  const headers = { authorization: `Bearer ${token}` };
+  const get = async (path: string): Promise<unknown> => {
+    const response = await fetch(path, { headers, cache: "no-store" });
+    if (!response.ok) throw new Error(response.status === 401 ? "the server refused this page's token" : `the server answered ${response.status}`);
+    return response.json();
+  };
+  let state: ShellState | undefined;
+  let shown: { update: () => void } | undefined;
+  let attempt = 0;
+  for (;;) {
+    let reason = "the stream ended";
+    try {
+      if (state === undefined) {
+        const first = (await get("/api/state")) as { state: ShellState; version: string; history: { journal?: string; runs?: string } };
+        state = first.state;
+        state.connection = { mode: "live", status: "connecting", version: first.version, history: first.history };
+        shown = start(root, state, { get });
+      }
+      const held: ShellState = state;
+      const cursors = cursorsOf(held);
+      const query = new URLSearchParams({ journal: cursors.journal, runs: cursors.runs, work: cursors.work, version: held.connection?.version ?? "" });
+      const watchdog = new AbortController();
+      let silence = setTimeout(() => watchdog.abort(), STREAM_SILENCE_MS);
+      const response = await fetch(`/api/events?${query.toString()}`, { headers, cache: "no-store", signal: watchdog.signal });
+      if (!response.ok || response.body === null) throw new Error(response.status === 401 ? "the server refused this page's token" : `the server answered ${response.status}`);
+      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buffer = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        clearTimeout(silence);
+        silence = setTimeout(() => watchdog.abort(), STREAM_SILENCE_MS);
+        const parsed = parseStream(buffer + value);
+        buffer = parsed.rest;
+        let changed = false;
+        for (const event of parsed.events) {
+          const data: unknown = JSON.parse(event.data);
+          if (event.event === "ready") {
+            attempt = 0;
+            held.connection = { ...held.connection, mode: "live", status: "live", version: (data as { version: string }).version };
+            delete held.connection.attempt;
+            delete held.connection.reason;
+            changed = true;
+          } else changed = applyUpdate(held, event.event, data) || changed;
+        }
+        if (changed) shown?.update();
+      }
+      clearTimeout(silence);
+    } catch (error) {
+      reason = error instanceof Error && error.name !== "AbortError" ? error.message : "the server went quiet";
+      if (reason === "Failed to fetch" || reason === "network error" || reason.startsWith("NetworkError")) reason = "the server is not answering";
+    }
+    attempt += 1;
+    if (state !== undefined) {
+      state.connection = { ...state.connection, mode: "live", status: "disconnected", attempt, reason };
+      shown?.update();
+    } else {
+      root.innerHTML = `<p class="absence connection-waiting" data-connection="disconnected">Could not load the reading from the warm server (${reason.replace(/[<&>]/g, "")}); retrying, attempt ${attempt}.</p>`;
+    }
+    await sleep(Math.min(RECONNECT_MAX_MS, 1000 * 2 ** Math.min(attempt - 1, 4)));
+  }
+}
+
+function boot(): void {
+  const root = document.getElementById("scope-root");
+  if (root === null) throw new Error("Scope: the root element is missing from this page.");
+  const embedded = readEmbeddedState();
+  if (embedded !== undefined) {
+    embedded.connection = { mode: "snapshot", status: "live" };
+    start(root, embedded, undefined);
+    return;
+  }
+  const token = new URLSearchParams(location.search).get("token");
+  if (token === null) {
+    root.innerHTML = '<p class="absence">This page is the Scope shell and carries no state. Open it through <code>coherence scope</code>, which prints its address with the token.</p>';
+    return;
+  }
+  root.innerHTML = '<p class="absence connection-waiting" data-connection="connecting">Connecting to the warm server…</p>';
+  void follow(root, token);
 }
 
 boot();

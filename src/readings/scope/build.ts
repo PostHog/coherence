@@ -1,27 +1,31 @@
 /**
- * Build the Scope reading: one self-contained HTML file.
+ * The Scope reading's two halves: the state, and the fixed shell that shows it.
  *
- * The builder loads Coherence's glossary (and the project's domain glossary
- * of the same shape, when it has one), the spec model, the run records, and
- * the journal records into the model once, embeds that state in the page as
- * JSON, and inlines the styles and the browser script. It renders nothing
- * itself: the browser turns the crank on the embedded state. The same files
- * in produce a byte-identical page out.
+ * The state: Coherence's glossary (and the project's domain glossary of the
+ * same shape, when it has one), the spec model, the run records, the journal
+ * records and the work orders, loaded into the model once by scopeState, the
+ * one function every reader of the state goes through (the snapshot here,
+ * the warm server's live reading in live.ts, the agent query).
  *
- *   npm run scope -- [--root <project>] [--glossary docs/glossary.json] [--domain path.json]
- *                    [--domain-title "Domain glossary"] [--project <name>] [--out public/_scope.html]
+ * The shell: the styles, the embedded font and the browser script joined into
+ * one HTML document whose bytes depend on no project content. Live, the warm
+ * server serves it and the page fetches its state and follows the stores as
+ * they grow (live.ts). A snapshot is the same shell with one inline state, a
+ * self-contained file for sharing and CI (snapshotOf). The browser renders
+ * either with the same pure render.
  *
- * With --root the page is built over another project: its spec tree, its
+ * With --root the state is read over another project: its spec tree, its
  * .coherence/runs, .coherence/journal and .coherence/work, and its glossary
  * (named in coherence.config.json under `glossary`, else glossary.json at
- * its root) as the domain layer beneath Coherence's own.
+ * its root) as the domain layer beneath Coherence's own. The command line is
+ * cli.ts.
  */
 
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { stripTypeScriptTypes } from "node:module";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { parseArgs } from "node:util";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { adapterFor } from "../../adapters/index.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
@@ -33,8 +37,6 @@ import { COHERENCE_GLOSSARY, projectGlossaryPath } from "../../lifecycle/project
 import { loadSpecModel } from "../../spec/model.ts";
 import { projectGlossaryCoverage } from "./glossary-projection.ts";
 import { windowJournal, windowRuns } from "./derive.ts";
-import { escapeHtml } from "./html.ts";
-import { readComponentInterfaces } from "./component-interfaces.ts";
 import { parseGlossary, type Glossary, type InterfaceReading, type Ladder, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
 import { VIEWS } from "./shell.ts";
 
@@ -59,6 +61,7 @@ const BROWSER_SOURCES = [
   "runs-view.ts",
   "journal-view.ts",
   "shell.ts",
+  "updates.ts",
   "page.ts",
 ];
 
@@ -253,13 +256,14 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
 }
 
 /**
- * The state a page embeds: every store whole except the two that grow with
- * every session, the run records and the journal, which are bounded windows
- * that keep every derivation the views make exact (see windowRuns and
- * windowJournal) and carry the count of what they leave out. The agent query
- * builds without the window, so its answers read every record.
+ * The state a first load carries: every store whole except the two that grow
+ * with every session, the run records and the journal, which are bounded
+ * windows that keep every derivation the views make exact (see windowRuns and
+ * windowJournal) and carry the count of what they leave out; the live page
+ * loads the rest on demand, by cursor. The agent query reads without the
+ * window, so its answers read every record.
  */
-function windowed(state: ShellState): ShellState {
+export function windowState(state: ShellState): ShellState {
   const runs = windowRuns(state.runs.records);
   const journal = windowJournal(state.journal.records, undefined, state.journal.work.kind === "present" ? state.journal.work.orders : []);
   return {
@@ -331,34 +335,71 @@ async function plexMono(): Promise<string> {
   return `/* IBM Plex Mono 2.5.0, Copyright © 2017 IBM Corp. with Reserved Font Name "Plex", licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org). Regular, Latin subset, embedded unmodified. */\n${faces.join("\n")}\n`;
 }
 
-/** Render the page document around the state. Deterministic for the same inputs. */
-export async function buildScopePage(options: BuildOptions): Promise<{ html: string; state: ShellState }> {
+
+/**
+ * The state every reader of the Scope reading goes through: the loaded model,
+ * windowed for a first load unless `window` is false. The same inputs in give
+ * the same state out; a snapshot, the live server's first load and the agent
+ * query all start here.
+ */
+export async function scopeState(options: BuildOptions): Promise<ShellState> {
   const loaded = await loadState(options);
-  const state = options.window === false ? loaded : windowed(loaded);
+  return options.window === false ? loaded : windowState(loaded);
+}
+
+/** The element a snapshot fills with its state; empty in the shell, where the page fetches the state instead. */
+export const STATE_SLOT = '<script type="application/json" id="scope-state"></script>';
+
+export interface Shell {
+  /** The whole document: styles, the embedded font, the browser script, an empty state slot. */
+  html: string;
+  /** The CSP source for the one inline script, so the live server can allow exactly it. */
+  scriptHash: string;
+}
+
+/**
+ * The fixed shell: one HTML document built from the styles, the font and the
+ * browser sources alone, so its bytes depend on no project content. The
+ * title names the reading; the page names the project once its state is in.
+ */
+export async function buildShell(): Promise<Shell> {
   const css = (await plexMono()) + (await readFile(resolve(here, "styles.css"), "utf8"));
-  const script = await browserScript();
-  const title = `${options.project} Scope`;
+  const script = `\n${await browserScript()}\n`;
   const html = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${escapeHtml(title)}</title>
+<meta name="referrer" content="no-referrer">
+<title>Scope</title>
 <style>
 ${css}
 </style>
 </head>
 <body>
-<noscript><p style="padding:1.25rem;font-family:system-ui,sans-serif">This reading renders from the state embedded in this file and needs scripts enabled to show it.</p></noscript>
+<noscript><p style="padding:1.25rem;font-family:system-ui,sans-serif">This reading renders from its state, carried in this file or loaded from the warm server, and needs scripts enabled to show it.</p></noscript>
 <div id="scope-root"></div>
-<script type="application/json" id="scope-state">${embedJson(state)}</script>
-<script type="module">
-${script}
-</script>
+${STATE_SLOT}
+<script type="module">${script}</script>
 </body>
 </html>
 `;
-  return { html, state };
+  return { html, scriptHash: `sha256-${createHash("sha256").update(script, "utf8").digest("base64")}` };
+}
+
+/** A snapshot: the shell, byte for byte, with one state in its slot. Self-contained: it loads nothing. */
+export function snapshotOf(shell: string, state: ShellState): string {
+  const at = shell.indexOf(STATE_SLOT);
+  if (at === -1) throw new Error("Scope: the shell has no state slot");
+  const filled = `<script type="application/json" id="scope-state">${embedJson(state)}</script>`;
+  return shell.slice(0, at) + filled + shell.slice(at + STATE_SLOT.length);
+}
+
+/** Build a snapshot page: the shell with the state inline. The same inputs in give the same bytes out. */
+export async function buildScopePage(options: BuildOptions): Promise<{ html: string; state: ShellState }> {
+  const state = await scopeState(options);
+  const { html: shell } = await buildShell();
+  return { html: snapshotOf(shell, state), state };
 }
 
 export async function writeScopePage(options: BuildOptions, outPath: string): Promise<{ bytes: number; state: ShellState }> {
@@ -386,7 +427,7 @@ export async function writeStructurePreview(root: string, preview: StructurePrev
 }
 
 /** The project's name from its config, capitalized, else its folder name. */
-function projectNameOf(root: string): string {
+export function projectNameOf(root: string): string {
   const path = resolve(root, "coherence.config.json");
   if (existsSync(path)) {
     try {
@@ -399,42 +440,17 @@ function projectNameOf(root: string): string {
   return capitalize(basename(root));
 }
 
-async function main(argv: string[]): Promise<void> {
-  const { values } = parseArgs({
-    args: argv,
-    options: {
-      root: { type: "string" },
-      glossary: { type: "string" },
-      domain: { type: "string" },
-      "domain-title": { type: "string" },
-      project: { type: "string" },
-      out: { type: "string", default: DEFAULTS.outPath },
-      "no-interfaces": { type: "boolean", default: false },
-    },
-  });
-  const root = values.root === undefined ? process.cwd() : resolve(values.root);
-  const options: BuildOptions = {
-    root,
-    glossaryPath: values.glossary ?? (values.root === undefined ? DEFAULTS.glossaryPath : COHERENCE_GLOSSARY),
-    project: values.project ?? (values.root === undefined ? DEFAULTS.project : projectNameOf(root)),
-  };
-  // Structure reads every component interface through the language adapter; --no-interfaces builds without the instrument.
-  if (values["no-interfaces"] !== true) options.componentInterfaces = await readComponentInterfaces(root);
-  if (values.domain !== undefined) options.domainPath = values.domain;
-  if (values["domain-title"] !== undefined) options.domainTitle = values["domain-title"];
-  const { bytes, state } = await writeScopePage(options, values.out);
-  const first = state.glossary.layers[0];
-  const count = first?.kind === "present" ? first.glossary.concepts.length : 0;
-  const domain = state.glossary.layers[1]?.kind === "present" ? "with a domain glossary" : "no domain glossary";
-  const c = state.spec.counts;
-  console.log(
-    `Scope: wrote ${values.out} (${bytes} bytes, ${count} concepts, ${domain}, ${c.components} components, ${c.bullets} bullets, ${state.runs.records.length} runs, ${state.journal.records.length} journal records).`,
-  );
+/** The options a reading of `root` builds with when nothing more is given: Coherence's glossary, the project's own name. */
+export function rootOptions(root: string): BuildOptions {
+  return { root: resolve(root), glossaryPath: COHERENCE_GLOSSARY, project: projectNameOf(root) };
 }
 
+// Run directly, this file is the scope command (cli.ts), kept so an older invocation still writes its snapshot.
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main(process.argv.slice(2)).catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
+  const { scopeCommand } = await import("./cli.ts");
+  process.exitCode = await scopeCommand(process.argv.slice(2), {
+    cwd: process.cwd(),
+    out: (line) => process.stdout.write(`${line}\n`),
+    err: (line) => process.stderr.write(`${line}\n`),
   });
 }

@@ -9,7 +9,7 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "scope": "node --disable-warning=ExperimentalWarning src/readings/scope/build.ts",
+    "scope": "node --disable-warning=ExperimentalWarning src/cli.ts scope",
     "scope:check": "node --disable-warning=ExperimentalWarning --test src/readings/scope/check.test.ts",
     "journal:check": "node --disable-warning=ExperimentalWarning --test src/journal/journal.test.ts",
     "glossary:check": "node --disable-warning=ExperimentalWarning src/cli.ts glossary --check",

@@ -45,12 +45,14 @@ const CITED_SUBJECT = 110;
 
 /** What a page can resolve a citation against: the embedded records by id, and the citation index both ways. */
 interface Links extends Citations {
+  /** Whether the page is live, so a record it has not loaded can be fetched rather than named. */
+  live: boolean;
   records: Map<string, JournalRecord>;
 }
 
 function linksOf(state: ShellState): Links {
   const orders = state.journal.work.kind === "present" ? state.journal.work.orders : [];
-  return { ...citations(state.journal.records, orders), records: new Map(state.journal.records.map((r) => [r.id, r])) };
+  return { ...citations(state.journal.records, orders), records: new Map(state.journal.records.map((r) => [r.id, r])), live: state.connection?.mode === "live" };
 }
 
 function cut(text: string): string {
@@ -71,6 +73,7 @@ function renderCitation(id: string, links: Links): Markup {
     const subject = event === undefined ? order.objective : `${order.id} ${event.kind === "owner" ? `owner → ${shortSession(event.owner)}` : `→ ${event.state}`}: ${event.because}`;
     return html`<li data-cited="${id}"><a class="related-link" href="#${workId(order.id)}">${id}</a> <span class="label">${what}</span> <span class="cited-subject">${cut(subject)}</span></li>`;
   }
+  if (links.live) return html`<li data-cited="${id}" data-absent><code>${id}</code> <span class="quiet">not loaded yet</span> <button type="button" class="history-load" data-load-record="${id}">Load it</button></li>`;
   return html`<li data-cited="${id}" data-absent><code>${id}</code> <span class="quiet">not embedded in this page; <code>journal ${id}</code> shows it</span></li>`;
 }
 
@@ -277,7 +280,9 @@ export function renderJournalResults(state: ShellState): Markup {
           : html`<p class="match-summary">${shown.length} of ${plural(records.length, "record", "records")} shown.</p>`}
     ${state.journal.omitted === undefined
       ? null
-      : html`<p class="quiet" data-field="omitted">${plural(state.journal.omitted, "earlier record is", "earlier records are")} not embedded in this page; the whole journal is one command away: <code>journal</code>.</p>`}
+      : state.connection?.mode === "live"
+        ? html`<p class="quiet history" data-field="omitted">${plural(state.journal.omitted, "earlier record is", "earlier records are")} not loaded yet. <button type="button" class="history-load" data-history="journal">Load earlier records</button>${query === "" ? null : html` <button type="button" class="history-load" data-history-search="journal">Search every earlier record for “${view.query}”</button>`}</p>`
+        : html`<p class="quiet" data-field="omitted">${plural(state.journal.omitted, "earlier record is", "earlier records are")} not embedded in this page; the whole journal is one command away: <code>journal</code>.</p>`}
     ${shown.map((r) => renderRecord(r, status.get(r.id), links))}
     ${state.journal.damaged.length > 0
       ? html`<section class="damaged"><h4>Unreadable lines</h4><ul>${state.journal.damaged.map((d) => html`<li><code>${d.file}:${d.line}</code> ${d.reason}</li>`)}</ul></section>`

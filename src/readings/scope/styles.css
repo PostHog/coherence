@@ -106,6 +106,73 @@ a {
   color: var(--ink-quiet);
 }
 
+/* Where the state comes from: a quiet line while live or a snapshot, amber attention (never the broken red) while disconnected. */
+.connection {
+  --connection-live: #2f7d4f;
+  --connection-lost: #945400;
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.connection-dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  transform: translateY(-0.05rem);
+}
+
+.connection[data-connection="live"] .connection-dot {
+  border-color: var(--connection-live);
+  background: var(--connection-live);
+}
+
+.connection[data-connection="connecting"] .connection-dot {
+  border-style: dashed;
+}
+
+.connection[data-connection="disconnected"] {
+  color: var(--connection-lost);
+  font-weight: 600;
+}
+
+.connection[data-connection="disconnected"] .connection-dot {
+  background: var(--connection-lost);
+}
+
+@media (prefers-color-scheme: dark) {
+  .connection {
+    --connection-live: #6fcf97;
+    --connection-lost: #f0b04a;
+  }
+}
+
+.history-load {
+  margin-left: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.history-load:hover {
+  border-color: var(--accent);
+}
+
+.history-load:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
 .masthead h1 {
   margin: 0;
   font-size: clamp(2rem, 5vw, 2.75rem);

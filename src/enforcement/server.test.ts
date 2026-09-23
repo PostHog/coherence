@@ -5,11 +5,13 @@
 
 import assert from "node:assert/strict";
 import { execFile, execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { request as httpRequest } from "node:http";
+import { createConnection, createServer, type Socket } from "node:net";
+import { networkInterfaces, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
-import { CODE_SALT_ENV, codeFingerprint, connectAdapter, serve, serverPaths, type Serving } from "./server.ts";
+import { CODE_SALT_ENV, QUICK_REQUEST_MS, REQUEST_MS, codeFingerprint, connectAdapter, openLineClient, serve, serverPaths, type HttpAppFactory, type Serving } from "./server.ts";
 import { performRun } from "./run.ts";
 
 let root: string;
@@ -289,4 +291,215 @@ test("a server whose root is deleted exits", async () => {
   const gone = await until(() => exited, 5_000);
   if (!gone) await serving.stop();
   assert.ok(gone, "the server shut down once its root was removed");
+});
+
+/* ------------------------------------------- authenticated socket, bounded waits, guarded HTTP */
+
+/** The token the pointer carries, as a client reads it. */
+function pointerToken(dir: string): string {
+  return (JSON.parse(readFileSync(serverPaths(dir).pointer, "utf8")) as { token: string }).token;
+}
+
+/** Send one raw line on the socket and read what comes back until the server closes the connection or 3 s pass. */
+function rawLine(socketPath: string, line: string): Promise<{ answer: string; closed: boolean }> {
+  return new Promise((resolve, reject) => {
+    const socket = createConnection(socketPath);
+    let answer = "";
+    const timer = setTimeout(() => {
+      socket.destroy();
+      resolve({ answer, closed: false });
+    }, 3_000);
+    socket.on("data", (chunk) => (answer += chunk.toString("utf8")));
+    socket.on("close", () => {
+      clearTimeout(timer);
+      resolve({ answer, closed: true });
+    });
+    socket.on("error", reject);
+    socket.on("connect", () => socket.write(line + "\n"));
+  });
+}
+
+test("a socket client without the root's token is refused, and the token lives only in files this user can read", async () => {
+  const dir = project("coherence-auth-");
+  const serving = await serve(dir, { idleMs: 60_000 });
+  try {
+    const paths = serverPaths(dir);
+    for (const file of [paths.pointer, paths.http, serving.paths.socket]) {
+      assert.equal(statSync(file).mode & 0o777, 0o600, `${file} is readable and writable by this user alone`);
+    }
+    const token = pointerToken(dir);
+    assert.match(token, /^[0-9a-f]{64}$/, "the token is 32 random bytes");
+    const bare = await rawLine(serving.paths.socket, JSON.stringify({ id: 1, method: "status", params: [] }));
+    assert.match(bare.answer, /unauthenticated/, "a line without the token is refused");
+    assert.doesNotMatch(bare.answer, /"result"/, "and answered nothing");
+    assert.equal(bare.closed, true, "and its connection closed");
+    const wrong = await rawLine(serving.paths.socket, JSON.stringify({ id: 1, method: "status", params: [], token: "0".repeat(64) }));
+    assert.match(wrong.answer, /unauthenticated/, "a wrong token is refused");
+    const client = await openLineClient(serving.paths.socket, token);
+    const status = await client.request<{ pid: number }>("status");
+    assert.equal(status.pid, process.pid, "the token from the pointer is accepted");
+    client.end();
+    const connected = await connectAdapter(dir, { spawn: false });
+    assert.equal((await connected.adapter.status()).pid, process.pid, "connectAdapter reads the token from the pointer");
+    await connected.adapter.close();
+  } finally {
+    await serving.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a client request the server never answers fails after its timeout, naming the method", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-mute-"));
+  const path = join(dir, "mute.sock");
+  const held: Socket[] = [];
+  const mute = createServer((socket) => void held.push(socket));
+  await new Promise<void>((r) => mute.listen(path, () => r()));
+  try {
+    const client = await openLineClient(path, "token");
+    const started = Date.now();
+    const outcome = await Promise.race([
+      client.request("status", [], 300).then(
+        () => "answered",
+        (error: unknown) => (error instanceof Error ? error.message : String(error)),
+      ),
+      new Promise<string>((r) => setTimeout(() => r("still waiting after 3 s"), 3_000).unref()),
+    ]);
+    assert.match(outcome, /did not answer status within 0.3 s/, "the request failed at its timeout, naming the method");
+    assert.ok(Date.now() - started < 2_000, "the client gave up at its timeout");
+    client.end();
+    assert.ok(QUICK_REQUEST_MS > 0 && QUICK_REQUEST_MS <= 30_000, "a quick question waits seconds, not forever");
+    assert.ok(Number.isFinite(REQUEST_MS), "an instrument question waits a bounded time");
+  } finally {
+    for (const socket of held) socket.destroy();
+    mute.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+interface Answer {
+  status: number;
+  headers: Record<string, string | string[] | undefined>;
+  body: string;
+}
+
+/** One HTTP request with any headers (fetch will not set Host), to the loopback port. */
+function ask(port: number, path: string, options: { method?: string; headers?: Record<string, string> } = {}): Promise<Answer> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest({ host: "127.0.0.1", port, path, method: options.method ?? "GET", headers: options.headers ?? {} }, (res) => {
+      let body = "";
+      res.on("data", (chunk: Buffer) => (body += chunk.toString("utf8")));
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body }));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+/** A stand-in reading: answers every admitted request with ok, and records it. */
+function stubApp(seen: string[]): HttpAppFactory {
+  return () => ({
+    handle(request, response, url) {
+      seen.push(`${request.method ?? ""} ${url.pathname}`);
+      response.writeHead(200, { "content-type": "text/plain" });
+      response.end("ok");
+    },
+    close() {},
+  });
+}
+
+function refusedConnection(host: string, port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = createConnection({ host, port });
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.once("error", () => resolve(true));
+  });
+}
+
+test("HTTP answers on loopback alone and refuses a request without the token, addressed to another server or sent from another site, or not a GET, and sends no CORS header", async () => {
+  const dir = project("coherence-http-");
+  const seen: string[] = [];
+  const serving = await serve(dir, { idleMs: 60_000, http: stubApp(seen) });
+  try {
+    const connected = await connectAdapter(dir, { spawn: false });
+    const { port, url } = await connected.adapter.openHttp();
+    await connected.adapter.close();
+    const token = pointerToken(dir);
+    assert.equal(new URL(url).hostname, "127.0.0.1", "the address the launcher opens is loopback");
+    assert.equal(new URL(url).searchParams.get("token"), token, "and carries the root's token");
+    assert.equal((JSON.parse(readFileSync(serverPaths(dir).http, "utf8")) as { port: number }).port, port, "the port is recorded beside the pointer");
+    // Loopback alone: nothing answers on IPv6 loopback or on any other interface of this machine.
+    assert.equal(await refusedConnection("::1", port), true, "nothing listens on ::1");
+    for (const address of Object.values(networkInterfaces()).flat()) {
+      if (address === undefined || address.internal || address.family !== "IPv4") continue;
+      assert.equal(await refusedConnection(address.address, port), true, `nothing listens on ${address.address}`);
+    }
+    const bearer = { authorization: `Bearer ${token}` };
+    const own = `127.0.0.1:${port}`;
+    const cases: { name: string; path: string; method?: string; headers: Record<string, string>; status: number }[] = [
+      { name: "the page with its token", path: `/?token=${token}`, headers: { host: own }, status: 200 },
+      { name: "the page by localhost", path: `/?token=${token}`, headers: { host: `localhost:${port}` }, status: 200 },
+      { name: "an API path with the token as a header", path: "/api/state", headers: { host: own, ...bearer }, status: 200 },
+      { name: "the page without a token", path: "/", headers: { host: own }, status: 401 },
+      { name: "the page with a wrong token", path: `/?token=${"0".repeat(64)}`, headers: { host: own }, status: 401 },
+      { name: "an API path with the token in the query", path: `/api/state?token=${token}`, headers: { host: own }, status: 401 },
+      { name: "an API path with a wrong bearer", path: "/api/state", headers: { host: own, authorization: `Bearer ${"1".repeat(64)}` }, status: 401 },
+      { name: "a foreign Host (DNS rebinding)", path: `/?token=${token}`, headers: { host: `attacker.example:${port}`, ...bearer }, status: 421 },
+      { name: "loopback on another port", path: `/?token=${token}`, headers: { host: `127.0.0.1:${port + 1}` }, status: 421 },
+      { name: "a foreign Origin", path: "/api/state", headers: { host: own, origin: "http://attacker.example", ...bearer }, status: 403 },
+      { name: "a cross-site fetch", path: "/api/state", headers: { host: own, "sec-fetch-site": "cross-site", ...bearer }, status: 403 },
+      { name: "this server's own Origin", path: "/api/state", headers: { host: own, origin: `http://${own}`, ...bearer }, status: 200 },
+      { name: "a POST", path: "/api/state", method: "POST", headers: { host: own, origin: `http://${own}`, ...bearer }, status: 405 },
+      { name: "a PUT", path: "/api/state", method: "PUT", headers: { host: own, ...bearer }, status: 405 },
+      { name: "a DELETE", path: "/api/state", method: "DELETE", headers: { host: own, ...bearer }, status: 405 },
+      { name: "a CORS preflight", path: "/api/state", method: "OPTIONS", headers: { host: own, origin: "http://attacker.example", "access-control-request-method": "GET" }, status: 405 },
+    ];
+    for (const c of cases) {
+      const answer = await ask(port, c.path, { method: c.method ?? "GET", headers: c.headers });
+      assert.equal(answer.status, c.status, `${c.name}: ${answer.status} ${answer.body}`);
+      const cors = Object.keys(answer.headers).filter((name) => name.toLowerCase().startsWith("access-control-"));
+      assert.deepEqual(cors, [], `${c.name}: no CORS header`);
+      assert.equal(answer.headers["cache-control"], "no-store", `${c.name}: nothing is cached`);
+    }
+    assert.deepEqual(seen, ["GET /", "GET /", "GET /api/state", "GET /api/state"], "the reading saw only the requests the guard admitted");
+  } finally {
+    await serving.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an HTTP client that never finishes its headers is cut off", async () => {
+  const dir = project("coherence-slow-");
+  const serving = await serve(dir, { idleMs: 60_000, http: stubApp([]), httpHeadersMs: 500 });
+  try {
+    const connected = await connectAdapter(dir, { spawn: false });
+    const { port } = await connected.adapter.openHttp();
+    await connected.adapter.close();
+    const started = Date.now();
+    const outcome = await new Promise<{ closed: boolean; answer: string }>((resolve) => {
+      const socket = createConnection({ host: "127.0.0.1", port });
+      let answer = "";
+      const timer = setTimeout(() => {
+        socket.destroy();
+        resolve({ closed: false, answer });
+      }, 5_000);
+      socket.on("data", (chunk) => (answer += chunk.toString("utf8")));
+      socket.on("close", () => {
+        clearTimeout(timer);
+        resolve({ closed: true, answer });
+      });
+      socket.on("error", () => {});
+      // A request line and one header, then nothing: a slow client holding a connection open.
+      socket.on("connect", () => socket.write(`GET / HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n`));
+    });
+    const took = Date.now() - started;
+    assert.equal(outcome.closed, true, "the server closed the connection");
+    assert.ok(took < 4_000, `within its header timeout (${took} ms)`);
+    assert.doesNotMatch(outcome.answer, /200 OK/, "and answered nothing but the timeout");
+  } finally {
+    await serving.stop();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

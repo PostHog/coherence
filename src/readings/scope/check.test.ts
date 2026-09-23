@@ -17,7 +17,7 @@ import { after, before, test } from "node:test";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { loadSpecModel } from "../../spec/model.ts";
-import { DEFAULTS, buildScopePage, writeScopePage, writeStructurePreview, type BuildOptions } from "./build.ts";
+import { DEFAULTS, STATE_SLOT, buildScopePage, buildShell, scopeState, snapshotOf, writeScopePage, writeStructurePreview, type BuildOptions } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { CITED_WINDOW, windowJournal, allReliance, componentId, defectsOf, flowChokepointId, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, verifiedOf, workId } from "./derive.ts";
 import { escapeHtml } from "./html.ts";
@@ -102,53 +102,25 @@ test("the page builds to the default path and stays under 3 MB with Coherence's 
   assert.equal(state.journal.records.length + (state.journal.omitted ?? 0), loadJournal(process.cwd()).records.length, "every journal record is embedded or counted");
 });
 
-test("the page stays bounded as the journal and the runs grow: a window of each is embedded, and every derived verdict is unchanged", async () => {
-  const grown = makeFixture();
-  try {
-    const session = "s-growth";
-    const grow = (records: number, runs: number, from: number): void => {
-      const journal = Array.from({ length: records }, (_, i) => JSON.stringify({ id: `d-${(from + i).toString(16).padStart(8, "0")}`, kind: "decision", at: new Date(Date.UTC(2026, 8, 12) + (from + i) * 1000).toISOString(), session, agent: "growth", commit: "abc1234", dirty: false, chose: `choice ${from + i} with some words to weigh the record`, over: ["the other one"], because: "the test grows the journal" }));
-      appendFileSync(join(grown.root, `.coherence/journal/${session}.jsonl`), journal.join("\n") + "\n");
-      const run = (i: number): string => JSON.stringify({ at: new Date(Date.UTC(2026, 8, 12) + (from + i) * 1000).toISOString(), session, agent: "growth", commit: "abc1234", dirty: false, instrument: { language: "typescript", server: "warm" }, latency: 3, invariants: [{ component: "src/store", name: "read shape", form: "totality oracle", verdict: "pass", mode: "batched", refutation: "witnessed", bypasses: [], testReferences: 0, files: [], latency: 1, reason: "1 test passed" }] });
-      appendFileSync(join(grown.root, `.coherence/runs/${session}.jsonl`), Array.from({ length: runs }, (_, i) => run(i)).join("\n") + "\n");
-    };
-    const build = async (): Promise<{ bytes: number; state: ShellState }> => {
-      const { html, state } = await buildScopePage({ root: grown.root, glossaryPath: DEFAULTS.glossaryPath, project: "Fixture" });
-      return { bytes: Buffer.byteLength(html, "utf8"), state };
-    };
-    grow(400, 60, 0);
-    const first = await build();
-    grow(2000, 300, 400);
-    const second = await build();
-    assert.ok(Math.abs(second.bytes - first.bytes) < 1024, `the page stays bounded: ${first.bytes} bytes, then ${second.bytes} after 2000 records and 300 runs more`);
-    assert.equal(second.state.journal.records.length + (second.state.journal.omitted ?? 0), loadJournal(grown.root).records.length, "every journal record is embedded or counted");
-    assert.equal(second.state.runs.records.length + (second.state.runs.omitted ?? 0), loadRuns(grown.root).records.length, "every run is embedded or counted");
-    assert.ok(second.state.journal.records.some((r) => r.id === grown.names.openEscalation), "an open escalation stays embedded however old");
-    const all = await buildScopePage({ root: grown.root, glossaryPath: DEFAULTS.glossaryPath, project: "Fixture", window: false });
-    for (const invariant of all.state.spec.components.flatMap((c) => c.invariants)) {
-      assert.deepEqual(latestOf(invariant, second.state.runs.records), latestOf(invariant, all.state.runs.records), `${invariant.name}: the window derives the same latest verdicts`);
+test("a snapshot is the shell with one inline state and loads nothing from outside: no external src, href, url() or @import", async () => {
+  const { html, state } = await buildScopePage(options);
+  const { html: shell } = await buildShell();
+  assert.equal(html.replace(/<script type="application\/json" id="scope-state">[\s\S]*?<\/script>/, STATE_SLOT), shell, "the snapshot is the shell byte for byte, its state slot filled");
+  assert.deepEqual(embeddedState(html), state, "and the state it carries is the state the reading loads");
+  for (const [name, page] of [["snapshot", html], ["shell", shell]] as const) {
+    const attributes = [...page.matchAll(/\b(?:src|href)\s*=\s*["']([^"']*)["']/g)].map((m) => m[1] ?? "");
+    for (const value of attributes) {
+      assert.ok(value.startsWith("#") || value.startsWith("data:"), `${name}: external reference: ${value}`);
     }
-    assert.match(renderView(second.state, "journal").text, /earlier records are not embedded in this page/);
-    assert.match(renderShell(second.state).text, new RegExp(`${loadJournal(grown.root).records.length} journal records`), "the masthead counts every record");
-  } finally {
-    grown.remove();
+    const style = /<style>([\s\S]*?)<\/style>/.exec(page)?.[1] ?? "";
+    assert.ok(style.length > 0, `${name}: the styles are inline`);
+    assert.doesNotMatch(style, /url\(\s*["']?(?:https?:)?\/\//, `${name}: no external url() in styles`);
+    assert.doesNotMatch(style, /@import/, `${name}: no @import in styles`);
+    assert.doesNotMatch(page, /^\s*import\s/m, `${name}: the inline module has no import statements left`);
+    // The script asks only its own origin, by path: the live page's API, never another host.
+    const script = /<script type="module">([\s\S]*?)<\/script>/.exec(page)?.[1] ?? "";
+    assert.doesNotMatch(script, /fetch\(\s*["'`]https?:/, `${name}: no fetch leaves the page's own origin`);
   }
-});
-
-test("the page is self-contained: no external src, href, url() or @import", async () => {
-  const { html } = await buildScopePage(options);
-  const attributes = [...html.matchAll(/\b(?:src|href)\s*=\s*["']([^"']*)["']/g)].map((m) => m[1] ?? "");
-  for (const value of attributes) {
-    assert.ok(
-      value.startsWith("#") || value.startsWith("data:"),
-      `external reference in page: ${value}`,
-    );
-  }
-  const style = /<style>([\s\S]*?)<\/style>/.exec(html)?.[1] ?? "";
-  assert.ok(style.length > 0, "the page carries its styles inline");
-  assert.doesNotMatch(style, /url\(\s*["']?(?:https?:)?\/\//, "no external url() in styles");
-  assert.doesNotMatch(style, /@import/, "no @import in styles");
-  assert.doesNotMatch(html, /^\s*import\s/m, "the inline module has no import statements left");
 });
 
 test("the embedded state is the loaded glossary, unchanged", async () => {
@@ -344,32 +316,43 @@ test("related names that resolve become links; the rest are marked unresolved", 
   assert.ok(rendered.includes('class="unresolved"'), "some related names are not concepts and say so");
 });
 
-test("the build is deterministic: the same glossaries, specs, runs, journal and work in, byte-identical page out", async () => {
-  const first = await buildScopePage(options);
-  const second = await buildScopePage(options);
-  assert.equal(first.html, second.html);
+test("the shell's bytes are independent of project content; the same state in renders the same page out", async () => {
+  const shell = (await buildShell()).html;
+  assert.equal((await buildShell()).html, shell, "the shell builds identically twice");
+  assert.ok(shell.includes(STATE_SLOT), "the shell carries an empty state slot");
+  assert.doesNotMatch(shell, /<title>[^<]*Coherence/, "the shell's title names no project");
 
-  // Union item 28: every input the page depends on, named. Adding a record to any of them
-  // changes the page, which is why the claim is about all of them and not the glossaries alone.
+  // Every input the state depends on, named. Appending to any of them changes the state and leaves the shell alone.
   // Its own copy of the fixture: this test appends to every record store, and the shared one must not move.
   const own = makeFixture();
   const fixtureOptions: BuildOptions = { root: own.root, glossaryPath: DEFAULTS.glossaryPath, project: "Fixture" };
-  const before = (await buildScopePage(fixtureOptions)).html;
-  assert.equal((await buildScopePage(fixtureOptions)).html, before, "the fixture builds identically twice");
+  const same = async (): Promise<ShellState> => {
+    const first = await scopeState(fixtureOptions);
+    const second = await scopeState(fixtureOptions);
+    assert.deepEqual(second, first, "the same inputs load the same state");
+    assert.equal(renderShell(second).text, renderShell(first).text, "the same state renders the same page");
+    assert.equal(snapshotOf(shell, second), snapshotOf(shell, first), "and the same snapshot bytes");
+    return first;
+  };
+  let previous = await same();
+  for (const id of [...own.names.journalIds, own.names.session, own.names.workOrder]) assert.ok(!shell.includes(id), `the shell carries none of the project's records: ${id}`);
   const inputs: { name: string; write: () => void }[] = [
     { name: "the journal", write: () => appendFileSync(join(own.root, ".coherence", "journal", `${own.names.session}.jsonl`), JSON.stringify({ id: "d-00009999", kind: "decision", at: "2026-09-12T10:00:00.000Z", session: own.names.session, agent: "fixture", commit: "abc1234", dirty: false, chose: "one more door", over: ["two doors"], because: "a later record must reach the page" }) + "\n") },
     { name: "the runs", write: () => appendFileSync(join(own.root, ".coherence", "runs", `${own.names.session}.jsonl`), JSON.stringify({ at: "2026-09-12T10:00:00.000Z", session: own.names.session, agent: "fixture", commit: "abc1234", dirty: false, instrument: { language: "typescript", server: "cold" }, latency: 1, invariants: [{ component: "src/store", name: "single writer", form: "chokepoint", grade: "reference-choked", verdict: "pass", refutation: "automatic", bypasses: [], testReferences: 0, files: ["src/store/write.ts"], latency: 1, reason: "clean again" }] }) + "\n") },
     { name: "the work store", write: () => appendFileSync(join(own.root, ".coherence", "work", `${own.names.session}.jsonl`), JSON.stringify({ id: "wm-00009999", kind: "move", at: "2026-09-12T10:00:00.000Z", session: own.names.session, agent: "fixture", commit: "abc1234", dirty: false, of: own.names.workOrder, state: "waiting", because: "a later record must reach the page" }) + "\n") },
     { name: "the specs", write: () => appendFileSync(join(own.root, "src", "api", "Api.spec.md"), "- one more: The api keeps one rule of its own.\n  because: a later bullet must reach the page\n") },
   ];
-  let previous = before;
   for (const input of inputs) {
     input.write();
-    const after = (await buildScopePage(fixtureOptions)).html;
-    assert.notEqual(after, previous, `${input.name} is an input the page depends on`);
-    assert.equal((await buildScopePage(fixtureOptions)).html, after, `${input.name} changed, and the page is deterministic again`);
+    const after = await same();
+    assert.notDeepEqual(after, previous, `${input.name} is an input the state depends on`);
+    assert.equal((await buildShell()).html, shell, `${input.name} changed, and the shell did not`);
     previous = after;
   }
+  // Another project entirely: the same shell.
+  const other = await scopeState(options);
+  assert.notEqual(other.project, previous.project);
+  assert.equal((await buildShell()).html, shell, "a second project reads through the same shell");
   own.remove();
 });
 

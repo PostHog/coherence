@@ -522,6 +522,26 @@ export interface ShellState {
   invariants: InvariantsViewState;
   runsView: RunsViewState;
   journalView: JournalViewState;
+  /** How the page holds its state: set by the page, never by the builder, so no snapshot or first load carries it. */
+  connection?: ConnectionState;
+}
+
+/**
+ * Where the page's state comes from and whether it is following the stores:
+ * a snapshot file never updates; a live page is connecting, live, or
+ * disconnected from its warm server and retrying.
+ */
+export interface ConnectionState {
+  mode: "snapshot" | "live";
+  status: "connecting" | "live" | "disconnected";
+  /** The version of the snapshot the server last sent, so a reconnect is sent a new one only when it changed. */
+  version?: string;
+  /** Reconnection attempts since the connection was lost. */
+  attempt?: number;
+  /** Why the last connection ended, in words. */
+  reason?: string;
+  /** Where the next page of history starts, per store: the cursor below which records may not be loaded yet. */
+  history?: { journal?: string; runs?: string };
 }
 
 /** The keys of a concept entry that are vocabulary, detail, or provenance. Everything else is record. */
