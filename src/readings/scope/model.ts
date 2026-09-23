@@ -466,6 +466,19 @@ export interface EntranceResolution {
  * the latest runs recorded and says so. The shape is what a run could record
  * per commit, which is how two states become comparable.
  */
+export interface InterfacePartial {
+  /** The budget that was spent. */
+  limit: "time" | "memory";
+  /** The budget, as a reader reads it: "600 s", "3072 MB". */
+  budget: string;
+  /** The memory the language server held when the memory budget stopped the reading. */
+  observed?: string;
+  /** How long the reading ran. */
+  seconds: number;
+  /** Component folders whose declarations were not all read. */
+  unread: string[];
+}
+
 export type InterfaceReading =
   | {
       kind: "read";
@@ -475,6 +488,18 @@ export type InterfaceReading =
       entrances: EntranceResolution[];
       /** Non-test source under no component's folder: code no spec owns, shown as its own mass. */
       unowned: { files: number; lines: number };
+      /**
+       * What the reading was bounded to: the declared components, the files of
+       * component code the word index read, the declarations another
+       * component's text could reference (the candidates), and every
+       * declaration asked, the reach's included. Absent from a reading taken
+       * before the reading was bounded.
+       */
+      bounds?: { components: number; files: number; candidates: number; asked: number };
+      /** Reference sites from code outside every declared component (no component, or past the config's bounds), by callee: counted, never drawn. */
+      outside?: { sites: number; files: number; into: { component: string; sites: number }[] };
+      /** Present when a budget stopped the reading: which budget, its size, and the components whose declarations were not all read. */
+      partial?: InterfacePartial;
     }
   | { kind: "unread"; because: string };
 

@@ -1405,6 +1405,12 @@ a.flow-term {
   max-width: 96ch;
 }
 
+/* A partial map says so before anything else is read: the attention color, not the quiet one. */
+.flow-evidence.flow-partial {
+  color: var(--flow-key-attention);
+  font-weight: 600;
+}
+
 /* The map needs its width: the shell widens while Structure is shown. */
 .shell:has(.flow-stage) {
   max-width: 100rem;

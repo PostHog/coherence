@@ -17,8 +17,10 @@
  * from its store and sent as the records that are new (by id, or a run's time
  * and session); a spec, a lexicon or the config changing reloads the state
  * and sends it as a snapshot with a new version. The component interfaces
- * are read through the server's own instrument when the reading is first
- * asked for and again when a run lands, never on every file save.
+ * are read through the server's own instrument (or, for a Python adoption
+ * the config bounds, a bounded server the reading keeps for itself) when the
+ * reading is first asked for and again when a run lands, never on every file
+ * save, within the same budget as a snapshot's.
  *
  * A page resumes from cursors derived from what it holds. The catch-up sends
  * every record at or after a little before each cursor, since a writer whose
@@ -36,7 +38,8 @@ import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { foldOrders, loadWork as loadWorkRecords } from "../../journal/work.ts";
 import { buildShell, rootOptions, scopeState, windowState, type BuildOptions, type Shell } from "./build.ts";
-import { readComponentInterfaces } from "./component-interfaces.ts";
+import { interfaceAdapter, interfaceBounds, readComponentInterfaces } from "./component-interfaces.ts";
+import type { LanguageAdapter } from "../../adapters/adapter.ts";
 import { JOURNAL_WINDOW, RUN_WINDOW } from "./derive.ts";
 import type { InterfaceReading, JournalRecord, RunRecord, ShellState, WorkOrder } from "./model.ts";
 import { runKeyOf } from "./updates.ts";
@@ -115,6 +118,8 @@ class LiveReading implements HttpApp {
   private interfaces: InterfaceReading;
   private reading: Promise<void> | undefined;
   private readAgain = false;
+  /** The reading's own bounded server, when the shared instrument reads a whole workspace the reading never draws. */
+  private readingServer: { adapter: LanguageAdapter; bounds: string } | undefined;
   private readonly clients = new Set<ServerResponse>();
   private readonly watchers: FSWatcher[] = [];
   private readonly timers = new Map<Store, NodeJS.Timeout>();
@@ -250,8 +255,10 @@ class LiveReading implements HttpApp {
       do {
         this.readAgain = false;
         try {
-          await this.context.adapter.forget([]);
-          const reading = await readComponentInterfaces(this.root, this.context.adapter);
+          const adapter = await this.interfaceServer();
+          await adapter.forget([]);
+          // The same reading, bounds and budget (the config's) as a snapshot's: the refresh on a run is never a second rule.
+          const reading = await readComponentInterfaces(this.root, adapter);
           if (this.closed) return;
           this.interfaces = reading;
           if (this.base !== undefined) this.base.componentInterfaces = reading;
@@ -263,6 +270,21 @@ class LiveReading implements HttpApp {
     })().finally(() => {
       this.reading = undefined;
     });
+  }
+
+  /**
+   * The server the interface reading asks: a bounded one of its own, kept warm
+   * across refreshes and rebuilt when the config's bounds change, when the
+   * shared instrument would read a whole workspace the reading never draws;
+   * otherwise the shared instrument.
+   */
+  private async interfaceServer(): Promise<LanguageAdapter> {
+    if (this.readingServer !== undefined && this.readingServer.bounds !== interfaceBounds(this.root)) {
+      await this.readingServer.adapter.close();
+      this.readingServer = undefined;
+    }
+    this.readingServer ??= interfaceAdapter(this.root);
+    return this.readingServer?.adapter ?? this.context.adapter;
   }
 
   private send(event: string, data: unknown): void {
@@ -401,6 +423,8 @@ class LiveReading implements HttpApp {
     for (const watcher of this.watchers) watcher.close();
     for (const client of this.clients) client.end();
     this.clients.clear();
+    void this.readingServer?.adapter.close();
+    this.readingServer = undefined;
   }
 }
 

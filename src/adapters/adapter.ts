@@ -184,6 +184,18 @@ export interface LanguageAdapter {
    */
   forget(files?: readonly string[]): Promise<void>;
   close(): Promise<void>;
+  /** The language server's process id while it runs, so a reading can bound that server's memory; absent where the adapter cannot say. */
+  serverPid?(): number | undefined;
+}
+
+/**
+ * How an adapter may be narrowed for a reading that needs only part of the
+ * project: the folders (by name, or by project-relative path) its server
+ * leaves out of its workspace. Only the component interface reading asks
+ * for it; a chokepoint check never does, since a bypass can sit anywhere.
+ */
+export interface AdapterBounds {
+  exclude: readonly string[];
 }
 
 export interface ResolveHint {

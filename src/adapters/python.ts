@@ -5,11 +5,18 @@
  *
  * Pyright enumerates the whole workspace at start and says so in a log
  * message ("Found N source files"); every question waits for it, since an
- * answer before it is silently partial. The workspace is never narrowed: a
- * Python reference to anything can sit in any file, so a narrower root or
- * an include list can only prove the absence of a bypass inside the scope,
- * and Pyright ignores a settings-level include when the project carries a
- * pyrightconfig.json or a pyproject [tool.pyright] anyway. Enumerating
+ * answer before it is silently partial. A check's workspace is never
+ * narrowed: a Python reference to anything can sit in any file, so a
+ * narrower root or an include list can only prove the absence of a bypass
+ * inside the scope, and Pyright ignores a settings-level include when the
+ * project carries a pyrightconfig.json or a pyproject [tool.pyright] anyway.
+ * Only the component interface reading, which counts nothing past the
+ * config's bounds, asks for a bounded adapter: Pyright is started on a
+ * scratch folder outside the project holding the project's own
+ * configuration re-rooted, with the bounds added to its exclude. A
+ * references query scans every workspace file that spells the name, so on
+ * PostHog one query for `main` costs 10 s and 2.6 GB whole and 1.7 s and
+ * 650 MB bounded to the feature-flags adoption's 1,577 files. Enumerating
  * PostHog (19,693 files) costs about two seconds and 350 MB; a references
  * query about half a second warm. workspace/symbol is never used: it parses
  * every file (30 s and 3.5 GB on PostHog), so a bare name resolves by a text
@@ -42,7 +49,8 @@
  * interpreter's refusal back from the published diagnostics.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomBytes } from "node:crypto";
@@ -51,6 +59,7 @@ import {
   parseName,
   rangeContains,
   statementStartLine,
+  type AdapterBounds,
   type Definition,
   type Ladder,
   type LanguageAdapter,
@@ -271,6 +280,113 @@ export function workspaceExclusions(root: string): string[] | undefined {
   return ["**/node_modules", "**/__pycache__", "**/.*", ...venvs, ...nested];
 }
 
+/* ------------------------------------------------- a bounded workspace */
+
+/** The Pyright settings that hold paths, which move when the configuration is read from another folder. */
+const PATH_KEYS = new Set(["include", "exclude", "ignore", "strict", "extraPaths", "stubPath", "typeshedPath", "venvPath"]);
+
+/** One TOML value as JSON: a string, a number, a boolean, or an array of them; undefined for anything else (a table, a date). */
+function tomlValue(text: string): unknown {
+  const value = text.trim();
+  if (/^'[^']*'$/.test(value)) return value.slice(1, -1);
+  try {
+    return JSON.parse(value.replace(/,\s*\]$/, "]").replace(/'([^']*)'/g, (_, s: string) => JSON.stringify(s)));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The project's own Pyright configuration as JSON: pyrightconfig.json, or
+ * the [tool.pyright] table of pyproject.toml; {} when there is none;
+ * undefined when it holds what cannot be carried faithfully (a sub-table,
+ * an inline table, a value that is not plain), so the caller keeps the
+ * whole workspace rather than guess.
+ */
+export function projectPyrightConfig(root: string): Record<string, unknown> | undefined {
+  const json = join(root, "pyrightconfig.json");
+  if (existsSync(json)) {
+    const body = readFileSync(json, "utf8");
+    try {
+      return JSON.parse(body.replace(/^\s*\/\/.*$/gm, "")) as Record<string, unknown>;
+    } catch {
+      return undefined;
+    }
+  }
+  const pyproject = join(root, "pyproject.toml");
+  if (!existsSync(pyproject)) return {};
+  const toml = readFileSync(pyproject, "utf8");
+  if (new RegExp(String.raw`^\s*\[\[?tool\.pyright\.`, "m").test(toml)) return undefined;
+  const section = sectionOf(toml, "tool.pyright");
+  if (section === undefined) return {};
+  const config: Record<string, unknown> = {};
+  // One key per statement; an array may run over several lines until its brackets close.
+  const statements: string[] = [];
+  for (const line of section.split(/\r?\n/)) {
+    const bare = line.replace(/\s+#.*$/, "").trimEnd();
+    if (bare.trim() === "" || bare.trim().startsWith("#")) continue;
+    const last = statements[statements.length - 1];
+    const open = last !== undefined && (last.match(/\[/g) ?? []).length > (last.match(/\]/g) ?? []).length;
+    if (open) statements[statements.length - 1] = `${last} ${bare.trim()}`;
+    else statements.push(bare.trim());
+  }
+  for (const statement of statements) {
+    const m = /^([A-Za-z_][\w-]*)\s*=\s*(.+)$/.exec(statement);
+    if (m === null) return undefined;
+    const value = tomlValue(m[2]!);
+    if (value === undefined || (typeof value === "object" && value !== null && !Array.isArray(value))) return undefined;
+    config[m[1]!] = value;
+  }
+  return config;
+}
+
+/**
+ * The Pyright configuration for a workspace bounded to part of the project,
+ * written to be read from `folder` (a scratch folder outside the project):
+ * the project's own configuration with every path re-rooted, its include
+ * (the whole root when it names none), and an exclude that adds each bound
+ * (a bare name anywhere, a path from the root), every nested checkout and
+ * every virtual environment, since a list given replaces Pyright's defaults.
+ * extraPaths gains the root, so imports resolve from it as before. Undefined
+ * when the project's configuration cannot be carried faithfully.
+ */
+export function boundedWorkspaceConfig(root: string, folder: string, bounds: AdapterBounds): Record<string, unknown> | undefined {
+  const own = projectPyrightConfig(root);
+  if (own === undefined) return undefined;
+  const from = (path: string): string => relative(folder, resolve(root, path)).split(sep).join("/");
+  const moved = (value: unknown): unknown => (typeof value === "string" ? (value.startsWith("**") ? value : from(value)) : Array.isArray(value) ? value.map(moved) : value);
+  const config: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(own)) config[key] = PATH_KEYS.has(key) ? moved(value) : value;
+  if (Array.isArray(own["executionEnvironments"])) {
+    config["executionEnvironments"] = (own["executionEnvironments"] as Record<string, unknown>[]).map((env) => ({ ...env, ...(env["root"] === undefined ? {} : { root: moved(env["root"]) }), ...(env["extraPaths"] === undefined ? {} : { extraPaths: moved(env["extraPaths"]) }) }));
+  }
+  config["include"] = Array.isArray(config["include"]) ? config["include"] : [from(".")];
+  const skip = new Set(bounds.exclude);
+  const nested = nestedCheckouts(root);
+  const venvs: string[] = [];
+  const walk = (dir: string): void => {
+    let entries;
+    try {
+      entries = readdirSync(join(root, dir), { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith(".") || SKIPPED_FOLDERS.has(entry.name) || skip.has(entry.name)) continue;
+      const rel = dir === "" ? entry.name : `${dir}/${entry.name}`;
+      if (skip.has(rel) || nested.includes(rel)) continue;
+      if (isVenv(join(root, rel))) venvs.push(rel);
+      else walk(rel);
+    }
+  };
+  walk("");
+  const defaults = ["**/node_modules", "**/__pycache__", "**/.*"];
+  const bound = [...skip].map((b) => (b.includes("/") ? from(b) : `**/${b}`));
+  config["exclude"] = [...(Array.isArray(config["exclude"]) ? (config["exclude"] as unknown[]) : defaults), ...bound, ...nested.map(from), ...venvs.map(from)];
+  config["extraPaths"] = [...(Array.isArray(config["extraPaths"]) ? (config["extraPaths"] as unknown[]) : []), from(".")];
+  return config;
+}
+
 /** Every Python file of the project under `start` (project-relative paths), skipping venvs, caches, and dot folders. */
 export function pythonFiles(root: string, start = "."): string[] {
   const prefix = start === "." ? "" : start.replace(/^\.\//, "").replace(/\/+$/, "") + "/";
@@ -427,9 +543,44 @@ export class PythonAdapter implements LanguageAdapter {
   /** When the workspace was last reported to Pyright as possibly changed. */
   private lastForget = Date.now();
 
-  constructor(root: string, clientFactory: PythonClientFactory = JsonRpcClient.spawn) {
+  /** The folders a bounded workspace leaves out; undefined for the whole workspace every check needs. */
+  private readonly bounds: AdapterBounds | undefined;
+  /** The scratch folder a bounded workspace's configuration lives in, removed at close. */
+  private boundedFolder: string | undefined;
+  /** Whether the workspace is bounded, or why it could not be. */
+  bounded: { ok: true; sourceFiles?: number } | { ok: false; reason: string } | undefined;
+
+  constructor(root: string, clientFactory: PythonClientFactory = JsonRpcClient.spawn, bounds?: AdapterBounds) {
     this.root = resolve(root);
     this.clientFactory = clientFactory;
+    this.bounds = bounds;
+  }
+
+  serverPid(): number | undefined {
+    return (this.client as { pid?: number } | undefined)?.pid;
+  }
+
+  /**
+   * The workspace folder Pyright is started on: the root, or for a bounded
+   * adapter a scratch folder outside the project holding the bounded
+   * configuration, since Pyright reads only the project's own configuration
+   * when one exists and ignores a settings-level exclude. Nothing is written
+   * into the project.
+   */
+  private workspaceFolder(): string {
+    if (this.bounds === undefined) return this.root;
+    if (this.boundedFolder !== undefined) return this.boundedFolder;
+    const folder = mkdtempSync(join(tmpdir(), "coherence-bounded-pyright-"));
+    const config = boundedWorkspaceConfig(this.root, folder, this.bounds);
+    if (config === undefined) {
+      rmSync(folder, { recursive: true, force: true });
+      this.bounded = { ok: false, reason: "the project's Pyright configuration holds a table this adapter cannot carry to a bounded workspace, so the whole workspace is read" };
+      return this.root;
+    }
+    writeFileSync(join(folder, "pyrightconfig.json"), JSON.stringify(config, null, 2));
+    this.boundedFolder = folder;
+    this.bounded = { ok: true };
+    return folder;
   }
 
   ready(): Promise<{ ok: true } | { ok: false; reason: string }> {
@@ -442,6 +593,7 @@ export class PythonAdapter implements LanguageAdapter {
     if (server === undefined) {
       return { ok: false, reason: `${SERVER_BIN} not found; looked in the project's node_modules, Coherence's, and PATH. Install it: npm install --save-dev pyright (or pip install pyright)` };
     }
+    const workspace = this.workspaceFolder();
     const client = this.clientFactory(server.path, ["--stdio"], this.root);
     this.client = client;
     const started = Date.now();
@@ -461,7 +613,7 @@ export class PythonAdapter implements LanguageAdapter {
         found(Number(match[1]));
       }
     };
-    const exclude = workspaceExclusions(this.root);
+    const exclude = workspace === this.root ? workspaceExclusions(this.root) : undefined;
     client.onRequest = (method, params) => {
       if (method !== "workspace/configuration") return null;
       const items = (params as { items?: { section?: string }[] }).items ?? [];
@@ -471,8 +623,8 @@ export class PythonAdapter implements LanguageAdapter {
     try {
       await client.request("initialize", {
         processId: process.pid,
-        rootUri: pathToFileURL(this.root).href,
-        workspaceFolders: [{ uri: pathToFileURL(this.root).href, name: "project" }],
+        rootUri: pathToFileURL(workspace).href,
+        workspaceFolders: [{ uri: pathToFileURL(workspace).href, name: "project" }],
         capabilities: {
           textDocument: { documentSymbol: { hierarchicalDocumentSymbolSupport: true }, publishDiagnostics: {} },
           workspace: { workspaceFolders: true, configuration: true },
@@ -1076,6 +1228,10 @@ export class PythonAdapter implements LanguageAdapter {
     const client = this.client;
     this.client = undefined;
     this.starting = undefined;
+    if (this.boundedFolder !== undefined) {
+      rmSync(this.boundedFolder, { recursive: true, force: true });
+      this.boundedFolder = undefined;
+    }
     if (client === undefined) return;
     try {
       await client.request("shutdown", null, 3_000);

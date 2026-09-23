@@ -9,6 +9,7 @@
  */
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -756,6 +757,29 @@ test("refute runs the bullet's totality oracle with the break staged, requires i
   assert.equal(chokepointOnly, 64);
   assert.match(errors.join("\n"), /carries no totality oracle form/);
   rmSync(join(root, ".coherence", "runs"), { recursive: true, force: true });
+});
+
+test("refute reports a detector that does not finish in its time as refuting nothing, and kills every process it started", { timeout: 60_000 }, async () => {
+  rmSync(join(root, ".coherence", "runs"), { recursive: true, force: true });
+  const errors: string[] = [];
+  const io = { cwd: root, out: () => {}, err: (line: string) => errors.push(line) };
+  // A staged break that makes the detector loop forever: the command never exits, and the child it starts neither.
+  write("coherence.config.json", JSON.stringify({ language: "typescript", testDir: "__tests__", test: "sh -c 'sleep 47.25; exit 1'" }));
+  try {
+    const started = Date.now();
+    const code = await refuteCommand(["./egress totality", "--broke", "made the detector loop forever", "--session", "r1", "--agent", "enforcement", "--timeout", "1"], io);
+    assert.equal(code, 1);
+    assert.ok(Date.now() - started < 20_000, "refute returns once its timeout passes");
+    assert.match(errors.join("\n"), /the detector did not finish in 1 s; its test process and every process it started were killed, so nothing was refuted and nothing was recorded/);
+    assert.equal(loadRuns(root).refutations.length, 0, "a detector that never answered is not a red one");
+    const left = spawnSync("ps", ["-A", "-o", "args="], { encoding: "utf8" }).stdout.split("\n").filter((line) => line.includes("sleep 47.25") && !line.includes("ps -A"));
+    assert.deepEqual(left, [], "no process of the detector is left running");
+    const refused = await refuteCommand(["./egress totality", "--broke", "x", "--timeout", "soon"], io);
+    assert.equal(refused, 64);
+  } finally {
+    write("coherence.config.json", CONFIG);
+    rmSync(join(root, ".coherence", "runs"), { recursive: true, force: true });
+  }
 });
 
 test("a report entry maps to a via by exact title, with the one stated fallback for a runner that truncates", async () => {

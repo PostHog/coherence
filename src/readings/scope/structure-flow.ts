@@ -65,9 +65,13 @@
  * will show.
  */
 
-import { allInvariants, componentOfFile, flowChokepointId, flowLevelId, invariantVerdict, latestOf, openEscalations, subjectOf, type InvariantVerdict, type RelianceSite } from "./derive.ts";
+import { allInvariants, componentOfFile, flowChokepointId, flowLevelId, invariantVerdict, latestOf, openEscalations, plural, subjectOf, type InvariantVerdict, type RelianceSite } from "./derive.ts";
 import { slug } from "./html.ts";
-import type { InterfaceSymbol, ReachReference, RecordedSite, ShellState, SpecComponent, SpecInvariant } from "./model.ts";
+import type { InterfacePartial, InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, ShellState, SpecComponent, SpecInvariant } from "./model.ts";
+
+type ReadInterfaces = Extract<InterfaceReading, { kind: "read" }>;
+type InterfaceBounds = NonNullable<ReadInterfaces["bounds"]>;
+type InterfaceOutside = NonNullable<ReadInterfaces["outside"]>;
 
 /** How many terminus name lines one row holds: a component whose routes start with more spans more rows. */
 export const FLOW_ROW_LINES = 5;
@@ -383,6 +387,12 @@ export interface FlowModel {
   identifiers: FlowIdentifier[];
   /** Source under no component's folder, when the adapter read the tree. */
   unowned: { files: number; lines: number } | undefined;
+  /** What the adapter's reading was bounded to, when it read and said so. */
+  bounds: InterfaceBounds | undefined;
+  /** Reference sites the adapter's reading found outside every declared component, counted and never drawn. */
+  outside: InterfaceOutside | undefined;
+  /** Present when a budget stopped the adapter's reading: the map is partial. */
+  partial: InterfacePartial | undefined;
   /** Every crossing, and where the map draws it. */
   crossings: FlowCrossingPlace[];
   health: FlowHealth;
@@ -874,9 +884,39 @@ export function flowOf(state: ShellState): FlowModel {
     coreDependencies,
     identifiers,
     unowned: reading.kind === "read" ? reading.unowned : undefined,
+    bounds: reading.kind === "read" ? reading.bounds : undefined,
+    outside: reading.kind === "read" ? reading.outside : undefined,
+    partial: reading.kind === "read" ? reading.partial : undefined,
     crossings,
     health,
   };
+}
+
+/**
+ * What the adapter's reading was bounded to, in one clause, the same words
+ * on the map's evidence line and in query structure; undefined when the
+ * reading does not say (the run-sites fallback, or a reading from before it
+ * was bounded).
+ */
+export function flowBoundsText(model: Pick<FlowModel, "bounds" | "outside">): string | undefined {
+  if (model.bounds === undefined) return undefined;
+  const b = model.bounds;
+  const outside = model.outside;
+  const into = outside === undefined || outside.sites === 0 ? "" : `: ${outside.into.map((o) => `${o.sites} into ${o.component}`).join(", ")}`;
+  return (
+    `read only within the ${plural(b.components, "declared component", "declared components")} (${plural(b.files, "file", "files")} of component code; ` +
+    `${plural(b.candidates, "declaration", "declarations")} another component's text names, ${b.asked} asked with the handlers' reach); ` +
+    `${plural(outside?.sites ?? 0, "reference site", "reference sites")} from ${plural(outside?.files ?? 0, "file", "files")} in no declared component counted, not drawn${into}; ` +
+    `a declaration only such code names is not asked, and code past the config's bounds is not read`
+  );
+}
+
+/** Why the map is partial, in one sentence, or undefined when the reading finished. */
+export function flowPartialText(model: Pick<FlowModel, "partial">): string | undefined {
+  const p = model.partial;
+  if (p === undefined) return undefined;
+  const spent = p.limit === "time" ? `its time budget (${p.budget})` : `its memory budget (${p.budget}; the language server held ${p.observed ?? "more"})`;
+  return `partial map: the interface reading stopped at ${spent} after ${p.seconds} s, so the declarations of ${p.unread.length === 0 ? "no component" : p.unread.join(", ")} were not all read and interfaces may be missing; raise ${"interfaceBudget"} in the config or pass --interface-seconds / --interface-memory`;
 }
 
 /* ---------------------------------------------------------- selection */

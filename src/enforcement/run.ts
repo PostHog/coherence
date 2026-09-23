@@ -46,6 +46,8 @@ export interface RunOptions {
   heartbeatMs?: number | undefined;
   /** Observe the batched pass (src/observation): coverage rides the same one invocation, and one observation record is appended. */
   observe?: boolean | undefined;
+  /** How long the one test invocation may run before its whole process tree is killed and its totality oracles read unfinished (default TOTALITY_TIMEOUT_MS). */
+  timeoutMs?: number | undefined;
 }
 
 /** How often the run touches the instrument while the test suite holds the floor. */
@@ -133,7 +135,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     const beat = adapter === undefined || (!needsAdapter && observing === undefined) ? undefined : setInterval(() => void adapter.ready().catch(() => {}), options.heartbeatMs ?? HEARTBEAT_MS);
     beat?.unref();
     try {
-      batched = await runTotalityBatch(root, config, filters, undefined, observing?.observer);
+      batched = await runTotalityBatch(root, config, filters, options.timeoutMs, observing?.observer);
     } finally {
       if (beat !== undefined) clearInterval(beat);
     }
@@ -218,7 +220,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
         const t0 = Date.now();
         const filter = adapter?.testFilter(via) ?? via;
         const fromBatch = batched?.get(filter);
-        const result = fromBatch ?? (await runTotalityOracle(root, config, filter));
+        const result = fromBatch ?? (await runTotalityOracle(root, config, filter, options.timeoutMs));
         details.push({
           entry: {
             ...entryOf(component, invariant.name, "totality oracle", {

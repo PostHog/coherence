@@ -18,7 +18,7 @@ import { economyFor, queryEconomyCommand, type EconomyOf } from "../../economy/c
 import { lexiconCoverage } from "../../lifecycle/lexicon-coverage.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { buildScopePage } from "../scope/build.ts";
-import { readComponentInterfaces } from "../scope/component-interfaces.ts";
+import { budgetFlags, readComponentInterfaces } from "../scope/component-interfaces.ts";
 import { observedCommand } from "../../observation/observed.ts";
 import { answer, answerLexicon, QUERY_USAGE } from "./query.ts";
 
@@ -39,12 +39,17 @@ interface Parsed {
   positionals: string[];
   session: string | undefined;
   root: string | undefined;
+  /** The interface reading's budget flags (structure): --interface-seconds, --interface-memory. */
+  budget: Map<string, string>;
 }
 
+const BUDGET_FLAG_NAMES = ["interface-seconds", "interface-memory"];
+
 function parse(argv: string[]): Parsed {
-  const parsed: Parsed = { positionals: [], session: undefined, root: undefined };
+  const parsed: Parsed = { positionals: [], session: undefined, root: undefined, budget: new Map() };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
+    const flag = arg.startsWith("--") ? arg.slice(2).split("=")[0]! : "";
     if (arg === "--session" || arg === "--root") {
       const value = argv[i + 1];
       if (value === undefined) throw new Error(`${arg} needs a value`);
@@ -53,7 +58,11 @@ function parse(argv: string[]): Parsed {
       i += 1;
     } else if (arg.startsWith("--session=")) parsed.session = arg.slice("--session=".length);
     else if (arg.startsWith("--root=")) parsed.root = arg.slice("--root=".length);
-    else if (arg.startsWith("--")) throw new Error(`unknown flag ${arg}`);
+    else if (BUDGET_FLAG_NAMES.includes(flag)) {
+      const value = arg.includes("=") ? arg.slice(arg.indexOf("=") + 1) : argv[++i];
+      if (value === undefined || value === "") throw new Error(`--${flag} needs a value`);
+      parsed.budget.set(flag, value);
+    } else if (arg.startsWith("--")) throw new Error(`unknown flag ${arg}`);
     else parsed.positionals.push(arg);
   }
   return parsed;
@@ -88,6 +97,11 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
     else io.err(result.text);
     return result.code;
   }
+  const budget = budgetFlags(parsed.budget);
+  if (typeof budget === "string") {
+    io.err(`query: ${budget}\n${QUERY_USAGE}`);
+    return 64;
+  }
   // The page embeds a bounded window of runs and journal records; an answer reads every one.
   const { state } = await buildScopePage({
     root,
@@ -95,7 +109,7 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
     project: basename(root),
     window: false,
     // Only the Structure question needs every component interface, read through the language adapter.
-    ...(question === "structure" ? { componentInterfaces: await (deps.interfaces ?? readComponentInterfaces)(root) } : {}),
+    ...(question === "structure" ? { componentInterfaces: await (deps.interfaces ?? readComponentInterfaces)(root, undefined, { budget }) } : {}),
   });
   const result = answer(state, question, args, { session: parsed.session });
   if (result.code === 0) io.out(result.text);

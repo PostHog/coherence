@@ -14,7 +14,7 @@
  * one-at-a-time path remains for runners that cannot report per test.
  */
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -31,6 +31,8 @@ export interface TotalityResult {
   tail: string;
   /** How many reported tests mapped to this via, when the runner reported per test: 0 says no test of that name ran. */
   matched?: number;
+  /** The detector did not finish inside its time: the reason says how long it had, and nothing it did counts. */
+  unfinished?: true;
 }
 
 export const TOTALITY_TIMEOUT_MS = 10 * 60 * 1000;
@@ -71,8 +73,8 @@ export async function runTotalityOracle(root: string, config: EnforcementConfig,
       return;
     }
     const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      finish({ verdict: "fail", reason: `test command gave no verdict in ${Math.round(timeoutMs / 1000)} s`, command: shown, tail: tailOf(output) });
+      killTree(child.pid);
+      finish({ verdict: "fail", reason: `the detector did not finish in ${Math.round(timeoutMs / 1000)} s; its test process and every process it started were killed`, command: shown, tail: tailOf(output), unfinished: true });
     }, timeoutMs);
     child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString("utf8")));
     child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString("utf8")));
@@ -260,15 +262,21 @@ export async function runTotalityBatch(root: string, config: EnforcementConfig, 
     .join(`<${filters.length} names>`)
     .split("{out}")
     .join("<report>");
-  const notRun = (reason: string, tail = ""): Map<string, TotalityResult> => new Map(filters.map((via) => [via, { verdict: "not run" as Verdict, reason, command: shown, tail, matched: 0 }]));
+  const notRun = (reason: string, tail = "", unfinished = false): Map<string, TotalityResult> =>
+    new Map(filters.map((via) => [via, { verdict: "not run" as Verdict, reason, command: shown, tail, matched: 0, ...(unfinished ? { unfinished: true } : {}) }]));
   let parsed: JsonReport | undefined;
+  let unfinished: string | undefined;
+  let heard = "";
   try {
     const output = await new Promise<{ code: number | null; text: string }>((resolve, reject) => {
       let text = "";
       const child = spawn(spec.command, spec.args, { cwd: root, shell: spec.shell, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: process.env["CI"] ?? "1", ...spec.env } });
       const timer = setTimeout(() => {
-        child.kill("SIGKILL");
-        reject(new Error(`gave no verdict in ${Math.round(timeoutMs / 1000)} s`));
+        // The runner's own children (a test file each) outlive a killed parent and keep looping: the whole tree goes.
+        killTree(child.pid);
+        unfinished = `the detector did not finish in ${Math.round(timeoutMs / 1000)} s; its test process and every process it started were killed`;
+        heard = text;
+        reject(new Error(unfinished));
       }, timeoutMs);
       child.stdout.on("data", (chunk: Buffer) => (text += chunk.toString("utf8")));
       child.stderr.on("data", (chunk: Buffer) => (text += chunk.toString("utf8")));
@@ -289,9 +297,34 @@ export async function runTotalityBatch(root: string, config: EnforcementConfig, 
     }
     return verdictsFromReport(parsed, filters, shown);
   } catch (error) {
+    if (unfinished !== undefined) return notRun(unfinished, tailOf(heard), true);
     return notRun(`test command could not run: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
     rmSync(out, { force: true });
     observer?.report(parsed);
+  }
+}
+
+/** Kill a process and every process below it, found through ps; a process already gone is skipped. */
+export function killTree(pid: number | undefined): void {
+  if (pid === undefined) return;
+  const listed = spawnSync("ps", ["-A", "-o", "pid=,ppid="], { encoding: "utf8" });
+  const children = new Map<number, number[]>();
+  for (const line of (listed.stdout ?? "").split("\n")) {
+    const m = /^\s*(\d+)\s+(\d+)/.exec(line);
+    if (m !== null) children.set(Number(m[2]), [...(children.get(Number(m[2])) ?? []), Number(m[1])]);
+  }
+  const all: number[] = [];
+  const walk = (at: number): void => {
+    all.push(at);
+    for (const child of children.get(at) ?? []) walk(child);
+  };
+  walk(pid);
+  for (const each of all) {
+    try {
+      process.kill(each, "SIGKILL");
+    } catch {
+      // Already gone.
+    }
   }
 }

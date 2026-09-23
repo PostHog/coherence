@@ -225,6 +225,10 @@ export class TypeScriptAdapter implements LanguageAdapter {
     this.root = resolve(root);
   }
 
+  serverPid(): number | undefined {
+    return this.client?.pid;
+  }
+
   ready(): Promise<{ ok: true } | { ok: false; reason: string }> {
     this.starting ??= this.start();
     return this.starting;

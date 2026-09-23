@@ -6,6 +6,7 @@
  *       the tokened address and open it in the browser (not with --no-open)
  *   coherence scope --snapshot [--out <file>] [--root <project>] [--lexicon <path>] [--domain <path>]
  *                   [--domain-title "<title>"] [--project <name>] [--no-interfaces]
+ *                   [--interface-seconds <n>] [--interface-memory <MB>]
  *       write one self-contained file: the shell with the state inline
  *
  * `--out` alone also writes a snapshot, so `npm run -s scope -- --root <dir>
@@ -18,15 +19,15 @@ import { withWarmAdapter } from "../../enforcement/run.ts";
 import type { Io } from "../../journal/cli.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { DEFAULTS, projectNameOf, writeScopePage, type BuildOptions } from "./build.ts";
-import { readComponentInterfaces } from "./component-interfaces.ts";
+import { BUDGET_FLAGS, budgetFlags, readComponentInterfaces } from "./component-interfaces.ts";
 
 export const SCOPE_USAGE = [
   "  scope [--root <dir>] [--no-open]   open the live Scope reading from the warm server (prints its address)",
-  "  scope --snapshot [--out <file>] [--root <dir>] [--lexicon <path>] [--domain <path>] [--domain-title <title>] [--project <name>] [--no-interfaces]",
+  `  scope --snapshot [--out <file>] [--root <dir>] [--lexicon <path>] [--domain <path>] [--domain-title <title>] [--project <name>] [--no-interfaces] ${BUDGET_FLAGS}`,
   "                                     write one self-contained file: the shell with the state inline (--out alone does the same)",
 ].join("\n");
 
-const VALUED = new Set(["root", "out", "lexicon", "domain", "domain-title", "project"]);
+const VALUED = new Set(["root", "out", "lexicon", "domain", "domain-title", "project", "interface-seconds", "interface-memory"]);
 const SWITCHES = new Set(["snapshot", "no-open", "no-interfaces"]);
 
 function parse(argv: string[]): { values: Map<string, string>; switches: Set<string> } | string {
@@ -70,7 +71,14 @@ async function snapshot(root: string, rootGiven: boolean, values: Map<string, st
     project: values.get("project") ?? (rootGiven ? projectNameOf(root) : DEFAULTS.project),
   };
   // Structure reads every component interface through the language adapter; --no-interfaces writes without the instrument.
-  if (!switches.has("no-interfaces")) options.componentInterfaces = await readComponentInterfaces(root);
+  if (!switches.has("no-interfaces")) {
+    const budget = budgetFlags(values);
+    if (typeof budget === "string") {
+      io.err(`scope: ${budget}\n${SCOPE_USAGE}`);
+      return 64;
+    }
+    options.componentInterfaces = await readComponentInterfaces(root, undefined, { budget });
+  }
   const domain = values.get("domain");
   if (domain !== undefined) options.domainPath = domain;
   const title = values.get("domain-title");

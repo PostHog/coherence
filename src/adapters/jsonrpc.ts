@@ -58,6 +58,11 @@ export class JsonRpcClient {
     return new JsonRpcClient(child);
   }
 
+  /** The server process's id, for a reading that bounds its memory. */
+  get pid(): number | undefined {
+    return this.child.pid;
+  }
+
   get alive(): boolean {
     return this.exited === undefined && this.child.exitCode === null;
   }

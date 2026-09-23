@@ -33,7 +33,7 @@ import {
   structureOf,
   type RelianceSite,
 } from "../scope/derive.ts";
-import { CORE_RULE, DEFAULT_RULE, ROUTE_RULE, flowDefaultSelection, flowLabelLines, flowOf, routeName } from "../scope/structure-flow.ts";
+import { CORE_RULE, DEFAULT_RULE, ROUTE_RULE, flowBoundsText, flowDefaultSelection, flowLabelLines, flowOf, flowPartialText, routeName } from "../scope/structure-flow.ts";
 import { renderOrder } from "../../journal/workVerbs.ts";
 import { lexiconReviewCommand } from "../scope/model.ts";
 import type { LexiconCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
@@ -50,7 +50,7 @@ export const QUERY_USAGE = [
   "  query invariants <path...>     which invariants touch these files, by component and by reference site",
   "  query relies-on <chokepoint>   who references this chokepoint, from the latest run",
   "  query spine                    trust levels and every crossing-bearing invariant, in Structure order",
-  "  query structure                the structural routes, core dependencies, interface identifiers and component interfaces Structure draws, and the placement",
+  "  query structure [--interface-seconds <n>] [--interface-memory <MB>]   the structural routes, core dependencies, interface identifiers and component interfaces Structure draws, and the placement; the interface reading is bounded to the declared components and says when a budget left it partial",
   "  query status                   structural defects, open requirements, escalations awaiting a human",
   "  query component <folder>       one component: intent, counts, bullets",
   "  query order [--session <id>]   the active work order the session owns, folded from its records, with what it cites, what binds to it, and what cites it",
@@ -217,8 +217,11 @@ export function answerStructure(state: ShellState): Answer {
   const model = flowOf(state);
   const bearing = model.edges.filter((edge) => edge.loadBearing).length;
   const h = model.health;
+  const bounded = flowBoundsText(model);
+  const partial = flowPartialText(model);
   const lines = [
-    `evidence: static and computed; ${model.evidence === "language adapter" ? `resolved references through the ${model.language} language adapter` : `run sites only (${model.unread}); plain component interfaces unknown`}`,
+    ...(partial === undefined ? [] : [partial]),
+    `evidence: static and computed; ${model.evidence === "language adapter" ? `resolved references through the ${model.language} language adapter${bounded === undefined ? "" : `, ${bounded}`}` : `run sites only (${model.unread}); plain component interfaces unknown`}`,
     `health: ${h.verified.length} invariants enforced and verified, ${h.requirements.length} requirements, ${h.defects.length} structural defects, ${h.bypassed.length} requirements with a broken chokepoint, ${h.escalations.length} escalations${h.verified.length === 0 && h.requirements.length > 0 ? "; nothing is enforced yet" : ""}`,
     `crossings (${model.crossings.length}), every one drawn: ${model.crossings.filter((c) => c.on === "interface").length} on component interfaces, ${model.crossings.filter((c) => c.on === "entrance").length} on entrance lines only, ${model.crossings.filter((c) => c.on === "component").length} on component boundary marks`,
     `structural routes (${model.routes.length}), ${model.routesFrom === "root interfaces" ? "derived from the root component's component interfaces by reference weight, not flow: no entrance is declared" : model.routesFrom === "entrances" ? `one per distinct path and trust from the declared entrances; ${ROUTE_RULE}` : "none: no entrance is declared and there is no root"}:`,
