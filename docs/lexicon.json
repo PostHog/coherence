@@ -439,7 +439,7 @@
     {
       "name": "crossing",
       "status": "settled",
-      "definition": "The first form of the security marker on an invariant: crossing A -> B names the trust levels on either side of the invariant's chokepoint. Lets \"every chokepoint where agent input reaches storage\" be a query. Carries no topology and nothing renders from it but the spine.",
+      "definition": "The first form of the security marker on an invariant: crossing A -> B names the trust levels on either side of the invariant's chokepoint. Lets \"every chokepoint where agent input reaches storage\" be a query. Where the chokepoint is an entrance's handler, its entering side must equal the trust level the entrance declares, and is the entrance's trust, labeled derived, when it declares none. Carries no topology and nothing renders from it but the spine.",
       "related": [
         "invariant",
         "trust level",
@@ -459,7 +459,7 @@
     {
       "name": "trust level",
       "status": "settled",
-      "definition": "One entry in the short list the entry spec declares for use in crossings: a name and a one-line meaning for a class of data or caller. Declared order carries no meaning. Not a place in the code and not a container of components.",
+      "definition": "One entry in the short list the entry spec declares for crossings and entrances: a name and a one-line meaning for a class of data or caller. A level marked (outside) comes from outside the system's control; an entrance carrying it with no control on its route is marked no control. Declared order carries no meaning. Not a place in the code and not a container of components.",
       "rejected": [
         {
           "alternative": "zones as a topology with residence (lives in) and nesting (inside)",
@@ -1206,7 +1206,7 @@
     },
     {
       "name": "entrance",
-      "definition": "Where work enters the system from outside it: a command, a host event, a route, a tool. Declared in the owning component's spec and checked against the code: the named handler must resolve and be reachable, so a declared entrance cannot rot unseen.",
+      "definition": "Where work enters the system from outside it: a command, a host event, a route, a tool. Declared in the owning component's spec and checked against the code: the named handler must resolve and be reachable, so a declared entrance cannot rot unseen. It declares the trust level it carries in with a trust: line; without one, its trust is derived from the crossings on its handler.",
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-0db9b17b)",
         "owner_words": "Declared and checked for entrypoints is good."

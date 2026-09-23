@@ -29,7 +29,7 @@ import { readComponentInterfaces } from "./component-interfaces.ts";
 import { allInvariants, flowChokepointId, flowLevelId, invariantVerdict, relianceId, resolveHash, structureId } from "./derive.ts";
 import type { InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, RunEntry, ShellState, SpecComponent, SpecEntrance, SpecInvariant } from "./model.ts";
 import { renderView } from "./shell.ts";
-import { CORE_RULE, FLOW_CHANGE_ID, FLOW_HEALTH_KINDS, FLOW_NONE_ID, compareFlows, flowBrokenId, flowHealthId, flowHealthMembers, flowDefaultSelection, flowEdgeId, flowEntranceId, flowKeyAction, flowLabelLines, flowNodeId, flowOf, flowSelected, flowSelection, type FlowModel } from "./structure-flow.ts";
+import { CORE_RULE, FLOW_CHANGE_ID, FLOW_HEALTH_KINDS, FLOW_NONE_ID, compareFlows, flowBrokenId, flowHealthId, flowHealthMembers, flowDefaultSelection, flowEdgeId, flowEntranceId, flowKeyAction, flowLabelLines, flowNodeId, flowOf, flowSelected, flowSelection, type FlowEntrance, type FlowModel, type FlowRoute } from "./structure-flow.ts";
 import { FLOW_HOP_DELAY, FLOW_NEUTRAL_ROUTE, FLOW_PULSE_PERIOD, FLOW_PULSE_SPEED, FLOW_RAIL_COLORS, FLOW_ROUTE_COLORS, contrast, flowLayout, flowPulses, polylineLength, renderFlowSvg } from "./structure-flow-view.ts";
 import { measureSvg, textWidth } from "./structure-measure.ts";
 
@@ -1358,9 +1358,20 @@ test("the trust tag sits outside its token, right-aligned beneath it, and never 
   const after = flowLayout(model);
   const route = model.routes.find((r) => r.trust.includes(long))!;
   assert.equal(after.width, before.width, "the map is no wider");
-  assert.ok(after.dropped.includes(`trust ${route.id}`), "the tag that does not fit is dropped");
+  assert.equal(route.trustSource, "derived");
+  assert.ok(!after.dropped.includes(`trust ${route.id}`) && after.texts.some((t) => t.key === `trust ${route.id}` && t.text === "derived"), "a derived level that does not fit still says it is derived");
   const page = renderView({ ...wide, structure: { selected: route.id, preview: [] } } as ShellState, "structure").text;
-  assert.match(page, new RegExp(`data-field="trust">${long}</span>`), "and the route's inspector states it");
+  assert.match(page, new RegExp(`data-field="trust">${long}</span> <span class="flow-meta" data-field="trust-source">\\(derived\\)`), "and the route's inspector states it");
+  // A declared level too wide for the margin is dropped, and the inspector still states it.
+  const declared = trustState();
+  declared.spec.components.find((c) => c.folder === "src/hooks")!.entrances[0]!.trust = long;
+  const declaredModel = flowOf(declared);
+  const declaredLayout = flowLayout(declaredModel);
+  const declaredRoute = declaredModel.routes.find((r) => r.trust.includes(long))!;
+  assert.equal(declaredRoute.trustSource, "declared");
+  assert.equal(declaredLayout.width, before.width, "the map is no wider");
+  assert.ok(declaredLayout.dropped.includes(`trust ${declaredRoute.id}`), "the declared tag that does not fit is dropped");
+  assert.match(renderView({ ...declared, structure: { selected: declaredRoute.id, preview: [] } } as ShellState, "structure").text, new RegExp(`data-field="trust">${long}</span> <span class="flow-meta" data-field="trust-source">\\(declared\\)`));
 });
 
 /** Routes whose tokens stand for one, two, three and six entrances, stacked at one station and at the next. */
@@ -1465,18 +1476,18 @@ test("trust shows where work enters: each entrance route's token carries the tru
       const railStub = route.rail === undefined ? undefined : model.edges.find((e) => e.from === route.stops[route.stops.length - 1] && e.to === route.rail);
       const expected = [...new Set([...route.entry, ...route.edges.flatMap((id) => model.edges.find((e) => e.id === id)!.identifiers), ...(railStub?.identifiers ?? [])])];
       assert.deepEqual(route.controls, expected, `${route.id}: its controls are every identifier on it`);
-      assert.equal(route.noControl, !route.derived && expected.length === 0, `${route.id}: no control exactly when nothing stands on it`);
+      assert.equal(route.noControl, !route.derived && expected.length === 0 && untrustedByRule(state, route.trust), `${route.id}: no control exactly when it is untrusted and nothing stands on it`);
       if (route.derived) continue;
       const group = new RegExp(`<g class="flow-route-group[^"]*" id="${route.id}"[^>]*>([^]*?)</g>\\s*</g>`).exec(svg)![1]!;
       const tag = /<g class="flow-trust[^"]*" data-trust-tag="([^"]+)" data-no-control="(true|false)"[^>]*>/.exec(group);
       assert.ok(tag !== null, `${route.id} carries a trust tag`);
-      assert.equal(tag[1], route.noControl ? "no control" : route.trust.length === 0 ? "unknown" : route.trust.join(", "));
+      assert.equal(tag[1], route.noControl ? "no control" : route.trust.length === 0 ? "unknown" : `${route.trust.join(", ")}${route.trustSource === "derived" ? " (derived)" : ""}`);
       assert.equal(tag[2], String(route.noControl));
     }
   }
   const trusted = flowOf(trustState());
   const event = trusted.routes.find((r) => r.trust.length > 0)!;
-  assert.match(renderFlowSvg(trusted, undefined).text, new RegExp(`data-trust-tag="outside" data-no-control="false" data-structure-select="${flowLevelId("outside")}"`), "a derived trust level is a selection");
+  assert.match(renderFlowSvg(trusted, undefined).text, new RegExp(`data-trust-tag="outside \\(derived\\)" data-no-control="false" data-structure-select="${flowLevelId("outside")}"`), "a derived trust level is a selection");
   assert.ok(event.controls.length > 0, "a route with derived trust always carries its handler's identifier");
   const look = flowOf(noControlState()).routes.find((r) => r.names.includes("look"))!;
   assert.equal(look.noControl, true, "the reader's route crosses no identifier");
@@ -1487,6 +1498,98 @@ test("trust shows where work enters: each entrance route's token carries the tru
   for (const level of projectState().spec.trustLevels) assert.match(key, new RegExp(`data-structure-select="${flowLevelId(level.name)}"[^>]*title="${pattern(level.meaning)}"><code>${level.name}</code></button> <span>${pattern(level.meaning.split(/[.:;]\s|\.$/)[0]!)}</span>`), `${level.name}: a selection, defined in one line`);
   assert.match(key, /<code>unknown<\/code>[^]*<code>no control<\/code>/, "the key says what unknown and no control mean");
   assert.match(answerStructure(noControlState()).text, /look {2}\. -> src\/reader -> src\/store {2}trust unknown {2}no control/, "the query says the same");
+});
+
+/** Whether trust carried in is untrusted, by the ruling's own words (d-ba18b0fd, d-6df8d09a): unknown, undeclared, or from outside the system's control. */
+function untrustedByRule(state: ShellState, trust: readonly string[]): boolean {
+  if (trust.length === 0) return true;
+  return trust.some((name) => {
+    const level = state.spec.trustLevels.find((l) => l.name === name);
+    return level === undefined || level.outside === true;
+  });
+}
+
+/** The trust fixture with its entrances declaring trust: the hook event declares record against its handler's crossing from outside, the tick declares outside. */
+function declaredTrustState(): ShellState {
+  const state = trustState();
+  const hooks = state.spec.components.find((c) => c.folder === "src/hooks")!;
+  hooks.entrances = hooks.entrances.map((e) => ({ ...e, trust: e.name === "hook event" ? "record" : "outside", trustLine: e.handlerLine + 1 }));
+  return state;
+}
+
+test("an entrance's declared trust level is its route's trust, even where a crossing on its handler would derive another", () => {
+  const derived = flowOf(trustState());
+  const declared = flowOf(declaredTrustState());
+  const event = (model: FlowModel): FlowEntrance => model.entrances.find((e) => e.name === "hook event")!;
+  assert.deepEqual([event(derived).trust, event(derived).trustSource], [["outside"], "derived"], "without a trust: line, the crossing on its handler derives it");
+  assert.deepEqual([event(declared).trust, event(declared).trustSource], [["record"], "declared"], "with one, the declaration wins");
+  const tick = declared.entrances.find((e) => e.name === "tick")!;
+  assert.deepEqual([tick.trust, tick.trustSource], [["outside"], "declared"], "a handler with no crossing carries its declared level, not unknown");
+  const route = declared.routes.find((r) => r.entrances.includes(event(declared).id))!;
+  assert.deepEqual([route.trust, route.trustSource], [["record"], "declared"]);
+  // A declared level and the same level derived are told apart: they never share a route.
+  const same = trustState();
+  same.spec.components.find((c) => c.folder === "src/hooks")!.entrances[1]!.trust = "outside";
+  const split = flowOf(same);
+  const ids = split.entrances.filter((e) => e.declaredBy === "src/hooks").map((e) => split.routes.find((r) => r.entrances.includes(e.id))!.id);
+  assert.equal(new Set(ids).size, 2, "declared outside and derived outside take their own routes");
+});
+
+test("trust derived from a crossing is labeled derived in the tag, the inspector and the query, and declared trust is labeled declared in the inspector", () => {
+  for (const [state, source] of [[trustState(), "derived"], [declaredTrustState(), "declared"]] as const) {
+    const model = flowOf(state);
+    const route = model.routes.find((r) => r.names.includes("hook event"))!;
+    assert.equal(route.trustSource, source);
+    const level = route.trust.join(", ");
+    const svg = renderFlowSvg(model, undefined).text;
+    const tag = new RegExp(`id="${route.id}"[^]*?<g class="flow-trust[^"]*" data-trust-tag="([^"]+)"[^>]*data-trust-source="(declared|derived|unknown)"[^>]*><title>([^<]*)</title>[^]*?<text class="flow-trust-text flow-mono"[^>]*>([^<]+)</text>`).exec(svg);
+    assert.ok(tag !== null, `${route.id}: its tag is drawn`);
+    assert.equal(tag[1], source === "derived" ? `${level} (derived)` : level, "the tag's words");
+    assert.ok(tag[4] === tag[1] || (source === "derived" && tag[4] === "derived"), `its drawn text is its words, or for a derived level too wide for the margin, derived (drew ${tag[4]})`);
+    assert.equal(tag[2], source);
+    assert.match(tag[3]!, source === "derived" ? /\(derived\)/ : /declared/, "the tooltip says where the trust came from");
+    const page = renderView({ ...state, structure: { selected: route.id, preview: [] } } as ShellState, "structure").text;
+    assert.match(page, new RegExp(`data-field="trust">${level}</span> <span class="flow-meta" data-field="trust-source">\\(${source}\\)`), "the inspector labels it");
+    assert.match(answerStructure(state).text, new RegExp(`hook event {2}[^\\n]*trust ${level}${source === "derived" ? " \\(derived\\)" : "(?! \\(derived\\))"}`), "the query says the same");
+  }
+  const key = /data-field="trust-key">([^]*?)<\/div>/.exec(renderView(trustState(), "structure").text)![1]!;
+  assert.match(key, /<li data-level="derived">[^]*?<code>\(derived\)<\/code>/, "the key says what derived means");
+});
+
+test("no control marks only an untrusted route with nothing on it: unknown trust or a level from outside the system's control, never a trusted one", () => {
+  // The reader's route (no identifier anywhere on it) carrying each kind of trust in.
+  const look = (trust: string | undefined, outside: boolean): FlowRoute => {
+    const state = noControlState();
+    state.spec.trustLevels = state.spec.trustLevels.map((level) => ({ ...level, outside: level.name === "outside" ? outside : false }));
+    const root = state.spec.components.find((c) => c.folder === ".")!;
+    root.entrances = root.entrances.map((e) => (e.name === "look" ? { ...e, trust, trustLine: e.handlerLine + 1 } : e));
+    const route = flowOf(state).routes.find((r) => r.names.includes("look"))!;
+    assert.deepEqual(route.controls, [], "nothing stands on the reader's route");
+    return route;
+  };
+  assert.equal(look(undefined, true).noControl, true, "unknown trust is untrusted (d-6df8d09a)");
+  assert.equal(look("outside", true).noControl, true, "a level from outside the system's control is untrusted");
+  assert.equal(look("not-declared", false).noControl, true, "a level no entry spec declares is untrusted");
+  const inside = look("inside", false);
+  assert.equal(inside.noControl, false, "a level inside the system's control is not marked");
+  assert.equal(look("outside", false).noControl, false, "nor is outside when the entry spec does not mark it outside");
+  const state = noControlState();
+  const root = state.spec.components.find((c) => c.folder === ".")!;
+  root.entrances = root.entrances.map((e) => (e.name === "look" ? { ...e, trust: "inside", trustLine: e.handlerLine + 1 } : e));
+  const model = flowOf(state);
+  const route = model.routes.find((r) => r.names.includes("look"))!;
+  const svg = renderFlowSvg(model, undefined).text;
+  assert.match(svg, new RegExp(`id="${route.id}"[^]*?data-trust-tag="inside" data-no-control="false"`), "the trusted route's tag shows its level, neutral");
+  const page = renderView({ ...state, structure: { selected: route.id, preview: [] } } as ShellState, "structure").text;
+  assert.match(page, /data-field="controls">none<\/span>/, "its inspector says nothing stands on it");
+  assert.doesNotMatch(/<aside class="flow-inspector"[^>]*>([^]*?)<\/aside>/.exec(page)![1]!, /no control/, "and never says no control");
+  assert.doesNotMatch(answerStructure(state).text, /look {2}[^\n]*no control/, "nor does the query");
+  // The key says which levels come from outside the system's control.
+  const marked = noControlState();
+  marked.spec.trustLevels = marked.spec.trustLevels.map((level) => ({ ...level, outside: level.name === "outside" }));
+  const key = /data-field="trust-key">([^]*?)<\/div>/.exec(renderView(marked, "structure").text)![1]!;
+  assert.match(key, /<code>outside<\/code><\/button> <span>[^<]*<\/span> <span class="flow-meta" data-outside="true">outside the system's control<\/span>/);
+  assert.doesNotMatch(key, /<code>inside<\/code><\/button> <span>[^<]*<\/span> <span class="flow-meta" data-outside/);
 });
 
 /** Whether a component is covered, by the rule's own words (decision d-a02f255c). */

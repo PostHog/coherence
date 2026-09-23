@@ -155,7 +155,7 @@ export function loadSpec(root: string): SpecData {
   const model = loadSpecModel(root);
   const data: SpecData = {
     entry: model.entry,
-    trustLevels: model.trustLevels.map((level) => ({ name: level.name, meaning: level.meaning })),
+    trustLevels: model.trustLevels.map((level) => ({ name: level.name, meaning: level.meaning, outside: level.outside })),
     // The spec model carries each bullet's latest run entries; the page does not. They are the
     // run records, which the page already holds, read by enforcement: derive.ts reads them back
     // at render so no copy can disagree with the records it came from.

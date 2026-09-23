@@ -172,6 +172,7 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   over: every request shape the guard sees (no token, a wrong token, the token in an API query, a foreign `Host` header, loopback on another port, a foreign `Origin` header, a cross-site fetch, POST, PUT, DELETE and a CORS preflight), every answer's headers, and every interface of the machine but loopback
   via: HTTP answers on loopback alone and refuses a request without the token, addressed to another server or sent from another site, or not a GET, and sends no CORS header
   because: the owner ruled the Scope reading be served live (d-eef7da19), which puts the whole model behind a local port. Any page the user visits can aim requests at localhost and a rebinding name at 127.0.0.1, so the `Host` header is checked against the server's own address, the token is required on every request and sent as a header a cross-origin page cannot make the browser add, and the API is read-only with no CORS header, so no other origin can read an answer
+  crossing: local-caller -> reading
   refuted: staged broken in turn in admitHttp and the HTTP listener: the Host header unchecked, the token not required, a bind to 0.0.0.0, Access-Control-Allow-Origin: * on every answer, every method but TRACE admitted, a foreign Origin header admitted -> the totality oracle went red for each; restored, green (2026-09-23)
   kinds: credential, message
   checklist: capability-authorization declared as HTTP is loopback, tokened and same-origin
@@ -191,6 +192,7 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   over: every HTTP connection, from its first byte to its last header
   via: an HTTP client that never finishes its headers is cut off
   because: a port on loopback is reachable by every local process and, through the browser, by every page the user visits; a request that never finished would hold a connection, and enough of them would starve the page the user is reading. The event stream, once admitted, is long by design and carries a keepalive
+  crossing: local-caller -> reading
   refuted: gave HTTP a ten-minute header timeout and no request timeout -> the totality oracle went red; restored, green (2026-09-23)
   kinds: budget
   checklist: bounded-admission declared as HTTP requests time out

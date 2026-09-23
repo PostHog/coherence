@@ -63,3 +63,15 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: disabled the duplicate-name problem in loadSpecModel -> "the model: names are unique within a component, declared-as names must exist, and one spec per folder" went red in spec.test.ts; restored, green (2026-09-17)
   kinds: none
+- entrance trust names a declared level: An entrance's trust: line names a trust level the entry spec declares, a level's one marker is (outside), for a level from outside the system's control, and an unknown level, another marker, an empty trust line, or a second one is a problem; a placeholder counts as absent.
+  over: every trust: line on every entrance and every trust level line with a marker
+  via: the model: an entrance's trust names a declared trust level, and a trust level's one marker is (outside)
+  because: the owner ruled (d-ba18b0fd) that entrances declare the trust level they carry in and that each level declares whether it comes from outside the system's control; a level named in a trust: line that no entry spec declares would be a trust nobody defined, and Structure would have to guess whether it is untrusted. One marker spelled one way keeps the declaration a fact the map can read, never prose it must interpret
+  crossing: project-source -> reading
+  kinds: none
+- declared trust agrees with the handler's crossing: An entrance whose declared trust differs from the entering side of a crossing whose chokepoint is its handler, in the component holding the handler, is a problem naming both.
+  over: every entrance with a trust: line, against every crossing-bearing invariant whose chokepoint is its handler, named bare or with its file
+  via: the model: an entrance's declared trust contradicting a crossing on its handler is a problem
+  because: the crossing's entering side is the trust the handler receives (d-a5e5c691); a declaration that disagrees is two statements of one fact, one of them wrong, so it is a problem that fails spec --check rather than a warning nobody reads, and the map never has to choose which to believe. Declared trust wins on the map (d-ba18b0fd) only because the check has already made the two agree
+  crossing: project-source -> reading
+  kinds: none

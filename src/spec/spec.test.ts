@@ -325,6 +325,55 @@ test("the model: crossings name declared trust levels, and only the entry spec d
   });
 });
 
+/** An entry spec whose public level comes from outside the system's control, with two entrances into a handler in src/door. */
+function trustedDoor(trust: { take?: string; peek?: string }, crossing = "public -> storage"): Record<string, string> {
+  const line = (value: string | undefined): string => (value === undefined ? "" : `  trust: ${value}\n`);
+  return {
+    "Widgetry.spec.md": `# Widgetry\n\nA store of widgets with one door in.\n\n## trust levels\n- public (outside): what anyone on the network sends\n- owner-trusted: the owner's own calls\n- storage: the rows beneath everything\n\n## entrances\n- take: a caller takes a widget\n  handler: take in src/door/door.ts\n${line(trust.take)}- peek: a caller looks at a widget\n  handler: peek in src/door/door.ts\n${line(trust.peek)}\n## invariants\n`,
+    "src/door/Door.spec.md": `# Door\n\nThe one door.\n\n## invariants\n- one door: Every take enters through take.\n  protects: widgets\n  chokepoint: take\n  crossing: ${crossing}\n`,
+    "src/door/door.ts": "export function take(): void {}\nexport function peek(): void {}\n",
+  };
+}
+
+test("the model: an entrance's trust names a declared trust level, and a trust level's one marker is (outside)", () => {
+  withModel(trustedDoor({ take: "public", peek: "owner-trusted" }), (model) => {
+    assert.deepEqual(model.problems, []);
+    assert.deepEqual(model.trustLevels.map((level) => [level.name, level.outside]), [["public", true], ["owner-trusted", false], ["storage", false]]);
+    const entrances = model.components.find((c) => c.folder === ".")!.entrances;
+    assert.deepEqual(entrances.map((e) => [e.name, e.trust]), [["take", "public"], ["peek", "owner-trusted"]]);
+    assert.ok(formatReport(model).length > 0);
+  });
+  withModel(trustedDoor({ take: "public", peek: "nowhere" }), (model) => {
+    const messages = model.problems.map((p) => `${p.file}:${p.line} ${p.message}`);
+    assert.deepEqual(messages, ["Widgetry.spec.md:16 entrance peek declares trust nowhere, which is no trust level; declared: public, owner-trusted, storage"]);
+  });
+  // No declaration is no problem: the trust is derived. A placeholder counts as absent, and an empty line is refused.
+  withModel(trustedDoor({ peek: "<trust level>" }), (model) => {
+    assert.deepEqual(model.problems, []);
+    assert.equal(model.components.find((c) => c.folder === ".")!.entrances[1]!.trust, undefined);
+  });
+  const empty = parseSpec("# A\n\nAn a.\n\n## entrances\n- in: work enters\n  handler: x\n  trust:\n  trust: public\n", "A.spec.md");
+  assert.ok(empty.problems.some((p) => p.line === 8 && p.message === "trust: on entrance in names no trust level"));
+  assert.ok(empty.problems.some((p) => p.line === 9 && p.message === "entrance in names its trust twice"));
+  // Any marker but (outside) is refused, and the level keeps its bare name.
+  const marked = parseSpec("# A\n\nAn a.\n\n## trust levels\n- public (untrusted): anyone\n- owner (outside): the owner\n", "A.spec.md");
+  assert.deepEqual(marked.trustLevels?.map((level) => [level.name, level.outside]), [["public", false], ["owner", true]]);
+  assert.deepEqual(marked.problems.map((p) => p.message), ["trust level public is marked (untrusted); the one marker is (outside), for a level from outside the system's control"]);
+});
+
+test("the model: an entrance's declared trust contradicting a crossing on its handler is a problem", () => {
+  withModel(trustedDoor({ take: "public" }), (model) => assert.deepEqual(model.problems, [], "agreeing with the crossing's entering side"));
+  withModel(trustedDoor({ take: "owner-trusted", peek: "owner-trusted" }), (model) => {
+    const messages = model.problems.map((p) => `${p.file}:${p.line} ${p.message}`);
+    assert.deepEqual(messages, ["Widgetry.spec.md:13 entrance take declares trust owner-trusted, but its handler take is the chokepoint of one door in src/door/Door.spec.md, whose crossing enters from public"], "only the entrance whose handler is the chokepoint");
+  });
+  // The chokepoint named with its file is the same handler.
+  withModel({ ...trustedDoor({ take: "storage" }), "src/door/Door.spec.md": "# Door\n\nThe one door.\n\n## invariants\n- one door: Every take enters through take.\n  protects: widgets\n  chokepoint: take in door.ts\n  crossing: public -> storage\n" }, (model) => {
+    assert.equal(model.problems.length, 1);
+    assert.match(model.problems[0]!.message, /entrance take declares trust storage, but its handler take is the chokepoint of one door/);
+  });
+});
+
 test("the model: names are unique within a component, declared-as names must exist, and one spec per folder", () => {
   withModel(
     {

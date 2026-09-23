@@ -7,9 +7,11 @@
  * config's entryDir, else the root) declares the trust levels crossings
  * name. Cross-spec facts are checked here: crossings against trust levels,
  * declared-as names against the invariants that exist, names unique within
- * a component. State is derived from what the bullet carries and, when runs
- * exist under .coherence/runs, from the latest run that checked each
- * enforcement; with no run every enforcement reports as declared, unverified.
+ * a component, an entrance's declared trust against the declared levels and
+ * against the crossings on its handler. State is derived from what the
+ * bullet carries and, when runs exist under .coherence/runs, from the latest
+ * run that checked each enforcement; with no run every enforcement reports as
+ * declared, unverified.
  */
 
 import { existsSync, readFileSync, statSync } from "node:fs";
@@ -249,6 +251,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
     });
   }
   components.sort((a, b) => a.folder.localeCompare(b.folder));
+  problems.push(...entranceTrustProblems(components, trustLevels));
   const byName = new Map(components.map((c) => [c.folder, c]));
   for (const component of components) {
     if (component.parent !== undefined) byName.get(component.parent)!.children.push(component.folder);
@@ -257,6 +260,53 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
 
   const counts = countModel(components, problems);
   return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs };
+}
+
+/** The component whose folder holds a project-relative file: the deepest component folder above it. */
+function componentHolding(components: readonly Component[], file: string): Component | undefined {
+  let best: Component | undefined;
+  for (const component of components) {
+    const inside = component.folder === "." || file.startsWith(`${component.folder}/`);
+    if (inside && (best === undefined || component.folder.length > best.folder.length || best.folder === ".")) best = component;
+  }
+  return best;
+}
+
+/**
+ * An entrance's declared trust, checked (decision d-ba18b0fd): it names a
+ * trust level the entry spec declares, and every crossing whose chokepoint is
+ * its handler, in the component holding the handler, enters from that level.
+ * The crossing's entering side is the trust the handler receives; a
+ * declaration that disagrees is two statements of one fact, one of them wrong,
+ * so it is a problem and never a warning.
+ */
+function entranceTrustProblems(components: readonly Component[], trustLevels: readonly TrustLevel[]): Problem[] {
+  const problems: Problem[] = [];
+  const names = new Set(trustLevels.map((level) => level.name));
+  for (const component of components) {
+    for (const entrance of component.entrances) {
+      if (entrance.trust === undefined) continue;
+      const line = entrance.trustLine ?? entrance.line;
+      if (!names.has(entrance.trust)) {
+        const declared = trustLevels.length === 0 ? "no entry spec declares trust levels" : `declared: ${[...names].join(", ")}`;
+        problems.push({ file: component.specPath, line, message: `entrance ${entrance.name} declares trust ${entrance.trust}, which is no trust level; ${declared}` });
+        continue;
+      }
+      const handler = entrance.handler === undefined ? undefined : HANDLER.exec(entrance.handler.trim())?.[1];
+      const holder = entrance.file === undefined ? undefined : componentHolding(components, entrance.file);
+      if (handler === undefined || holder === undefined) continue;
+      for (const invariant of holder.invariants) {
+        if (invariant.crossing === undefined || invariant.crossing.from === entrance.trust) continue;
+        if (!invariant.enforcements.some((e) => e.form === "chokepoint" && HANDLER.exec(e.chokepoint.trim())?.[1] === handler)) continue;
+        problems.push({
+          file: component.specPath,
+          line,
+          message: `entrance ${entrance.name} declares trust ${entrance.trust}, but its handler ${handler} is the chokepoint of ${invariant.name} in ${holder.specPath}, whose crossing enters from ${invariant.crossing.from}`,
+        });
+      }
+    }
+  }
+  return problems;
 }
 
 const HANDLER = /^([A-Za-z_$][\w$]*)(?:\s+in\s+(\S+))?$/;

@@ -82,6 +82,8 @@ export interface RejectedName {
 export interface TrustLevel {
   name: string;
   meaning: string;
+  /** Whether it comes from outside the system's control, as the entry spec marks it; absent reads as inside. */
+  outside?: boolean;
 }
 
 /** A ruling on a term: how a contested or uncertain name is to be used. */
@@ -249,6 +251,9 @@ export interface SpecEntrance {
   handler: string | undefined;
   line: number;
   handlerLine: number;
+  /** The trust level it declares it carries in; absent when it declares none, and its trust is derived. */
+  trust?: string | undefined;
+  trustLine?: number | undefined;
   component: string;
   /** The file whose top level declares the handler, as the spec model found it. */
   file: string | undefined;

@@ -8,10 +8,12 @@
  *
  *   ## trust levels            (entry spec only)
  *   - owner-trusted: full kernel access
+ *   - public (outside): what anyone on the network sends   outside the system's control
  *
  *   ## entrances               (any spec)
  *   - <name>: <one-line meaning: what work enters here from outside>
  *     handler: <symbol, or symbol in file>
+ *     trust: <the trust level it carries in>              optional; else derived from crossings
  *
  *   ## invariants
  *   - <name>: <sentence>
@@ -31,7 +33,8 @@
  * reference used are refused by name with their replacement; any other
  * section is refused as unknown. The parser reports problems and never
  * throws on content; cross-spec facts (trust levels, declared-as names,
- * duplicate names) are checked by the model.
+ * duplicate names, an entrance's trust against the crossings on its
+ * handler) are checked by the model.
  */
 
 import { readFileSync } from "node:fs";
@@ -72,8 +75,13 @@ export interface Problem {
 export interface TrustLevel {
   name: string;
   meaning: string;
+  /** Whether it comes from outside the system's control: the level is written `- <name> (outside): <meaning>`. */
+  outside: boolean;
   line: number;
 }
+
+/** The marker a trust level wears when it comes from outside the system's control. */
+export const OUTSIDE_MARKER = "(outside)";
 
 /**
  * Where work enters the system from outside: a command, a host event, a
@@ -88,6 +96,10 @@ export interface Entrance {
   line: number;
   /** The handler line, or the bullet's own line when there is none. */
   handlerLine: number;
+  /** The trust level it declares it carries in; undefined when it declares none, and its trust is derived. */
+  trust: string | undefined;
+  /** The trust line, when there is one. */
+  trustLine: number | undefined;
 }
 
 export type Enforcement =
@@ -292,19 +304,27 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         if (raw.trim() === "") return;
         const bullet = /^[-*]\s+(.*)$/.exec(raw);
         if (bullet === null) {
-          problem(line, "a trust level is one bullet: - <name>: <one-line meaning>");
+          problem(line, `a trust level is one bullet: - <name>: <one-line meaning>, or - <name> ${OUTSIDE_MARKER}: <one-line meaning>`);
           return;
         }
         const colon = bullet[1]!.indexOf(":");
         if (colon <= 0) {
-          problem(line, "a trust level is one bullet: - <name>: <one-line meaning>");
+          problem(line, `a trust level is one bullet: - <name>: <one-line meaning>, or - <name> ${OUTSIDE_MARKER}: <one-line meaning>`);
           return;
         }
-        const name = bullet[1]!.slice(0, colon).trim();
+        let name = bullet[1]!.slice(0, colon).trim();
         const meaning = bullet[1]!.slice(colon + 1).trim();
+        // The one marker a level may wear: it comes from outside the system's control. Any other is refused, not ignored.
+        const marked = /^(.*?)\s*(\([^()]*\))$/.exec(name);
+        let outside = false;
+        if (marked !== null) {
+          if (marked[2] === OUTSIDE_MARKER) outside = true;
+          else problem(line, `trust level ${marked[1]} is marked ${marked[2]}; the one marker is ${OUTSIDE_MARKER}, for a level from outside the system's control`);
+          name = marked[1]!;
+        }
         if (meaning === "") problem(line, `trust level ${name} needs a one-line meaning`);
         if (trustLevels!.some((level) => level.name === name)) problem(line, `trust level ${name} declared twice`);
-        trustLevels!.push({ name, meaning, line });
+        trustLevels!.push({ name, meaning, outside, line });
         return;
       }
       case "entrances": {
@@ -313,24 +333,33 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         if (bullet !== null) {
           const colon = bullet[1]!.indexOf(":");
           if (colon <= 0) {
-            problem(line, "an entrance is one bullet: - <name>: <one-line meaning>, with an indented handler: <symbol> line");
+            problem(line, "an entrance is one bullet: - <name>: <one-line meaning>, with an indented handler: <symbol> line and an optional trust: <trust level> line");
             return;
           }
           const name = bullet[1]!.slice(0, colon).trim();
           const meaning = bullet[1]!.slice(colon + 1).trim();
           if (meaning === "") problem(line, `entrance ${name} needs a one-line meaning`);
           if (entrances.some((entrance) => entrance.name === name)) problem(line, `entrance ${name} declared twice`);
-          entrances.push({ name, meaning, handler: undefined, line, handlerLine: line });
+          entrances.push({ name, meaning, handler: undefined, line, handlerLine: line, trust: undefined, trustLine: undefined });
           return;
         }
         const current = entrances[entrances.length - 1];
         const field = /^\s+([a-z]+):\s*(.*)$/.exec(raw);
         if (current === undefined || field === null) {
-          problem(line, "expected an entrance bullet (- <name>: <meaning>) or an indented handler: <symbol> line under one");
+          problem(line, "expected an entrance bullet (- <name>: <meaning>) or an indented handler: or trust: line under one");
+          return;
+        }
+        if (field[1] === "trust") {
+          if (current.trustLine !== undefined) problem(line, `entrance ${current.name} names its trust twice`);
+          const value = field[2]!.trim();
+          // A placeholder counts as absent, as on an invariant: the trust is then derived.
+          if (value === "") problem(line, `trust: on entrance ${current.name} names no trust level`);
+          else if (!isPlaceholder(value)) current.trust = value;
+          current.trustLine = line;
           return;
         }
         if (field[1] !== "handler") {
-          problem(line, `unknown key "${field[1]}": an entrance carries handler`);
+          problem(line, `unknown key "${field[1]}": an entrance carries handler and trust`);
           return;
         }
         if (current.handler !== undefined) problem(line, `entrance ${current.name} names its handler twice`);

@@ -23,8 +23,9 @@
  * the last: it stops where the reach goes no further. Without a reach, the
  * heaviest interface onward, which is reference weight, not flow, and says
  * so. Entrances share one line only when they share its stops and its trust
- * (the entering side of the crossings whose chokepoint is their handler);
- * the line is named for them, at most four names on its token. A project
+ * (the trust level each declares it carries in, else, derived, the entering
+ * side of the crossings whose chokepoint is its handler: d-ba18b0fd); the
+ * line is named for them, at most four names on its token. A project
  * that declares no entrance has its routes derived from the root
  * component's component interfaces, one per callee, each named "via" the
  * first component it reaches and marked reference weight.
@@ -206,8 +207,10 @@ export interface FlowRoute {
   edges: string[];
   /** The core dependency the route ends into, when its next stop would be one. */
   rail: string | undefined;
-  /** The trust its entrances carry in: the entering levels of the crossings whose chokepoint is their handler; empty when none is. */
+  /** The trust its entrances carry in: the level they declare, else the entering levels of the crossings whose chokepoint is their handler; empty when neither is known. */
   trust: string[];
+  /** Whether its entrances declare that trust or it is derived from the crossings on their handler (d-ba18b0fd). */
+  trustSource: TrustSource;
   /** Interface identifiers standing where work enters: a chokepoint that is its entrances' handler, drawn on the line from its origin. */
   entry: string[];
   /** Reference sites along its interfaces: what makes one route busier than another. */
@@ -217,7 +220,12 @@ export interface FlowRoute {
    * interface it takes, and on the stub to the rail it ends in.
    */
   controls: string[];
-  /** Whether nothing controls it: an entrance route with no identifier anywhere on it (so its trust is not derived either). */
+  /**
+   * Whether it is untrusted and nothing controls it: an entrance route with no
+   * identifier anywhere on it whose trust is unknown or a level from outside
+   * the system's control (d-ba18b0fd). A trusted route with no identifier is
+   * not marked.
+   */
   noControl: boolean;
   /** How its stops were followed: the handler's static reach, or, without one, the heaviest interface (reference weight, not flow). */
   followed: "reach" | "weight";
@@ -263,8 +271,10 @@ export interface FlowEntrance {
   reachable: boolean;
   /** Why it is unresolved or unreachable. */
   reason: string | undefined;
-  /** The trust work carries in by it: the entering side of every crossing whose chokepoint is its handler, in level order. */
+  /** The trust work carries in by it: the level it declares, else the entering side of every crossing whose chokepoint is its handler, in level order. */
   trust: string[];
+  /** Whether its spec declares that trust (a trust: line) or it is derived from the crossings on its handler. */
+  trustSource: TrustSource;
   /** The component interfaces its handler's static reach uses, when the adapter read them. */
   reach: ReachReference[] | undefined;
 }
@@ -310,10 +320,15 @@ export interface FlowNode {
   covered: boolean;
 }
 
+/** Where an entrance's trust comes from: its spec's trust: line, or the crossings on its handler. */
+export type TrustSource = "declared" | "derived";
+
 export interface FlowLevel {
   id: string;
   name: string;
   meaning: string;
+  /** Whether it comes from outside the system's control: an entrance carrying it with nothing on its route has no control. */
+  outside: boolean;
   /** Interfaces whose crossings carry this class of data. */
   edges: string[];
   /** Routes whose entrance line carries a crossing of this class of data. */
@@ -408,6 +423,11 @@ function flowNamed(value: string): { symbol?: string; file?: string } | undefine
   if (named !== null) return named[2] === undefined ? { symbol: named[1]! } : { symbol: named[1]!, file: named[2]! };
   if (/^[A-Za-z0-9_./@-]+\.[A-Za-z]+$/.test(value.trim())) return { file: value.trim() };
   return undefined;
+}
+
+/** Whether trust carried in is untrusted: unknown, a level no entry spec declares, or one from outside the system's control. */
+export function flowUntrusted(trust: readonly string[], declared: ReadonlyMap<string, unknown>, outside: ReadonlySet<string>): boolean {
+  return trust.length === 0 || trust.some((level) => !declared.has(level) || outside.has(level));
 }
 
 /** Whether an interface symbol is the named thing: the same symbol (in the named file, when one is named), or any symbol of a named module. */
@@ -569,12 +589,16 @@ export function flowOf(state: ShellState): FlowModel {
           : reachable
             ? undefined
             : `the handler resolves in ${start}, and no component interface from ${declaredBy} carries ${handlerName ?? "it"}`;
-      // Its trust: the entering side of each crossing whose chokepoint is its handler, in the handler's component.
-      const trust = start === undefined || handlerName === undefined
+      // Its trust: the level it declares; else, derived, the entering side of each crossing whose chokepoint is its handler,
+      // in the handler's component (d-ba18b0fd). The spec check refuses a declaration that contradicts such a crossing.
+      const trustSource: TrustSource = entrance.trust === undefined ? "derived" : "declared";
+      const trust = entrance.trust !== undefined
+        ? [entrance.trust]
+        : start === undefined || handlerName === undefined
         ? []
         : [...new Set(invariants.filter((invariant) => invariant.crossing !== undefined && represent(invariant.component) === start && invariant.enforcements.some((e) => e.form === "chokepoint" && flowNamed(e.chokepoint)?.symbol === handlerName)).map((invariant) => invariant.crossing!.from))]
           .sort((a, b) => (levelOrder.get(a) ?? 99) - (levelOrder.get(b) ?? 99) || a.localeCompare(b));
-      return { id: flowEntranceId(component.folder, entrance.name), name: entrance.name, meaning: entrance.meaning, declaredBy, handler: entrance.handler, start, resolved: start !== undefined, reachable, reason, trust, reach: resolution?.reach };
+      return { id: flowEntranceId(component.folder, entrance.name), name: entrance.name, meaning: entrance.meaning, declaredBy, handler: entrance.handler, start, resolved: start !== undefined, reachable, reason, trust, trustSource, reach: resolution?.reach };
     }),
   );
 
@@ -660,25 +684,26 @@ export function flowOf(state: ShellState): FlowModel {
       route.push(next[0]);
     }
   };
-  const drafts: { stops: string[]; rail: string | undefined; entrance: string | undefined; trust: string[]; followed: FlowRoute["followed"] }[] = [];
+  const drafts: { stops: string[]; rail: string | undefined; entrance: string | undefined; trust: string[]; trustSource: TrustSource; followed: FlowRoute["followed"] }[] = [];
   const routesFrom: FlowModel["routesFrom"] = anyEntrance ? "entrances" : byFolder.has(".") && order.has(".") && !core.has(".") ? "root interfaces" : "none";
   if (routesFrom === "entrances") {
     for (const entrance of entrances) {
       if (!entrance.reachable || entrance.start === undefined || core.has(entrance.declaredBy)) continue;
       const first = entrance.declaredBy === entrance.start ? [entrance.start] : [entrance.declaredBy, entrance.start];
       const followed: FlowRoute["followed"] = entrance.reach === undefined ? "weight" : "reach";
-      if (core.has(entrance.start)) drafts.push({ stops: [entrance.declaredBy], rail: entrance.start, entrance: entrance.id, trust: entrance.trust, followed });
-      else drafts.push({ ...(entrance.reach === undefined ? onward(first) : alongReach(first, entrance.reach)), entrance: entrance.id, trust: entrance.trust, followed });
+      const { trust, trustSource } = entrance;
+      if (core.has(entrance.start)) drafts.push({ stops: [entrance.declaredBy], rail: entrance.start, entrance: entrance.id, trust, trustSource, followed });
+      else drafts.push({ ...(entrance.reach === undefined ? onward(first) : alongReach(first, entrance.reach)), entrance: entrance.id, trust, trustSource, followed });
     }
   } else if (routesFrom === "root interfaces") {
     const fromRoot = edges.filter((edge) => edge.from === "." && !core.has(edge.to)).sort((a, b) => b.sites - a.sites || a.to.localeCompare(b.to));
-    for (const edge of fromRoot) drafts.push({ ...onward([".", edge.to]), entrance: undefined, trust: [], followed: "weight" });
+    for (const edge of fromRoot) drafts.push({ ...onward([".", edge.to]), entrance: undefined, trust: [], trustSource: "derived", followed: "weight" });
   }
   const nameOf = (folder: string): string => byFolder.get(folder)!.name;
   const routes: FlowRoute[] = [];
-  // Entrances share a route only when they share its stops, its rail, and the trust they carry in.
+  // Entrances share a route only when they share its stops, its rail, and the trust they carry in, declared or derived alike.
   for (const draft of drafts) {
-    const known = routes.find((route) => route.stops.join("\u0000") === draft.stops.join("\u0000") && route.rail === draft.rail && route.trust.join("\u0000") === draft.trust.join("\u0000"));
+    const known = routes.find((route) => route.stops.join("\u0000") === draft.stops.join("\u0000") && route.rail === draft.rail && route.trust.join("\u0000") === draft.trust.join("\u0000") && route.trustSource === draft.trustSource);
     if (known !== undefined) {
       if (draft.entrance !== undefined) {
         known.entrances.push(draft.entrance);
@@ -698,6 +723,7 @@ export function flowOf(state: ShellState): FlowModel {
       edges: routeEdges,
       rail: draft.rail,
       trust: draft.trust,
+      trustSource: draft.trustSource,
       entry: [],
       sites: draft.stops.slice(1).reduce((sum, to, index) => sum + byPair.get(`${draft.stops[index]}\u0000${to}`)!.sites, 0),
       followed: draft.followed,
@@ -817,10 +843,13 @@ export function flowOf(state: ShellState): FlowModel {
   });
 
   // What controls each route: every identifier where work enters, on an interface it takes, or on the stub to its rail.
+  // No control marks only an untrusted route with none (d-ba18b0fd): its trust unknown (treated as untrusted, d-6df8d09a),
+  // a level the entry spec does not declare, or a level from outside the system's control.
+  const outsideLevels = new Set(state.spec.trustLevels.filter((level) => level.outside === true).map((level) => level.name));
   for (const route of routes) {
     const railStub = route.rail === undefined ? undefined : edges.find((edge) => edge.from === route.stops[route.stops.length - 1] && edge.to === route.rail);
     route.controls = [...new Set([...route.entry, ...route.edges.flatMap((id) => edges.find((edge) => edge.id === id)!.identifiers), ...(railStub?.identifiers ?? [])])];
-    route.noControl = !route.derived && route.controls.length === 0;
+    route.noControl = !route.derived && route.controls.length === 0 && flowUntrusted(route.trust, levelOrder, outsideLevels);
   }
 
   // Coverage: a chokepoint on a surface the component exposes or on an entrance line into it, or a verified totality oracle of its own.
@@ -854,6 +883,7 @@ export function flowOf(state: ShellState): FlowModel {
       id: flowLevelId(level.name),
       name: level.name,
       meaning: level.meaning,
+      outside: level.outside === true,
       edges: carrying.map((edge) => edge.id),
       routes: [...new Set(named.flatMap((c) => c.routes))],
       components: [...new Set(named.filter((c) => c.on === "component").map((c) => c.component))],
@@ -1129,6 +1159,16 @@ export function flowLabelLines(edge: FlowEdge): FlowLabelLine[] {
 /** A route's name in prose: its entrances, or via its first component, marked derived. */
 export function routeName(route: FlowRoute): string {
   return route.derived ? `${route.names.join(", ")} (derived)` : route.names.join(", ");
+}
+
+/**
+ * The trust a route's entrances carry in, in words, labeled as the ruling
+ * d-ba18b0fd asks: a declared level alone, a derived one marked derived, and
+ * unknown when neither is known.
+ */
+export function trustInWords(route: Pick<FlowRoute, "trust" | "trustSource">): string {
+  if (route.trust.length === 0) return "unknown";
+  return route.trustSource === "derived" ? `${route.trust.join(", ")} (derived)` : route.trust.join(", ");
 }
 
 /** The name a component shows on the map: the root is named for what it is. */

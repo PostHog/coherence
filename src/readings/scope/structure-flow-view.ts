@@ -62,6 +62,7 @@ import {
   flowSelected,
   originLines,
   routeName,
+  trustInWords,
   flowSelection,
   worstState,
   type FlowChokepoint,
@@ -179,6 +180,8 @@ const FLOW_STACK_CLEAR = 1.5;
 const FLOW_TRUST_ROOM = 12;
 const FLOW_TRUST_GAP = 1.5;
 const FLOW_TRUST_PAD = 3;
+/** What a derived trust's tag falls back to when its level and label do not fit the margin. */
+const FLOW_DERIVED_TAG = "derived";
 
 /**
  * Route colors, light and dark: hues that never read as red, orange or
@@ -610,17 +613,30 @@ export interface FlowLayout {
   mass: FlowBox | undefined;
 }
 
-/** The trust a route's entrances carry in, in words: its levels, else "unknown". */
-export function trustWords(route: Pick<FlowRoute, "trust">): string {
-  return route.trust.length === 0 ? "unknown" : route.trust.join(", ");
+/**
+ * What a route's trust tag says: "no control" when it is untrusted and nothing
+ * controls it (decisions d-7d36881b, d-ba18b0fd), else its trust: a declared
+ * level alone, a derived one marked derived, or unknown.
+ */
+export function trustTagWords(route: Pick<FlowRoute, "trust" | "trustSource" | "noControl">): string {
+  return route.noControl ? "no control" : trustInWords(route);
 }
 
-/**
- * What a route's trust tag says: "no control" when nothing controls it (its trust
- * is then unknown by construction), else its trust (decision d-7d36881b).
- */
-export function trustTagWords(route: Pick<FlowRoute, "trust" | "noControl">): string {
-  return route.noControl ? "no control" : trustWords(route);
+/** The tag's tooltip: what its words mean for this route. */
+function trustTagTitle(route: FlowRoute, levels: readonly FlowLevel[]): string {
+  const outside = route.trust.filter((name) => levels.find((level) => level.name === name)?.outside === true);
+  if (route.noControl) {
+    const why = route.trust.length === 0
+      ? "the trust its entrances carry in is unknown (they declare none, and no crossing's chokepoint is their handler), so the map treats it as untrusted"
+      : outside.length > 0
+        ? `its entrances carry ${outside.join(", ")} in, from outside the system's control`
+        : `its entrances carry ${route.trust.join(", ")} in, which no entry spec declares`;
+    return `No control: no chokepoint or crossing stands where this route's work enters or on any interface it takes, and ${why}.`;
+  }
+  if (route.trust.length === 0) return "Trust in: unknown. Its entrances declare no trust level and no crossing's chokepoint is their handler; the map treats it as untrusted.";
+  return route.trustSource === "declared"
+    ? `Trust in: ${route.trust.join(", ")}, declared by its entrances' trust: line.`
+    : `Trust in: ${route.trust.join(", ")} (derived): its entrances declare none, so it is the entering side of the crossing whose chokepoint is their handler.`;
 }
 
 /** The length of a polyline. */
@@ -870,7 +886,12 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
     return j === n - 1 && (route.derived || route.names.length > n);
   };
   const lineW = (route: FlowRoute, j: number): number => textWidth(originLines(route)[j]!, FLOW_NAME_SIZE, !quietLine(route, j));
-  const fixedTag = drawn.some((route) => !route.derived && (route.noControl || route.trust.length === 0)) ? textWidth("no control", TYPE_SMALL, false, 0, true) : 0;
+  // A derived trust whose tag does not fit falls back to the fixed word "derived" (d-ba18b0fd), which the margin also allows.
+  const fixedWords = [
+    ...(drawn.some((route) => !route.derived && (route.noControl || route.trust.length === 0)) ? ["no control"] : []),
+    ...(drawn.some((route) => !route.derived && !route.noControl && route.trust.length > 0 && route.trustSource === "derived") ? [FLOW_DERIVED_TAG] : []),
+  ];
+  const fixedTag = Math.max(0, ...fixedWords.map((words) => textWidth(words, TYPE_SMALL, false, 0, true)));
   const termW = Math.max(0, fixedTag + 3 - (FLOW_PAD + 2 * FLOW_TOKEN_PAD_X + 8 - 6), ...drawn.flatMap((route) => originLines(route).map((_, j) => lineW(route, j))));
   /** The room a route keeps beneath its token for its trust tag: an entrance route has one, a derived route none. */
   const trustRoom = (route: FlowRoute): number => (route.derived ? 0 : FLOW_TRUST_ROOM);
@@ -1212,7 +1233,9 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
       const token = tokens.get(group.route.id)!;
       const bottom = token.box.y + token.box.h;
       const words = trustTagWords(group.route);
-      const placedTag = tryPlace([{ text: words, x: r1(tokenRight), y: r1(bottom + FLOW_TRUST_GAP + TYPE_SMALL * 0.78), size: TYPE_SMALL, bold: false, align: "end", mono: true }], `trust ${group.route.id}`, 2, "flow-trust-text flow-mono");
+      // A derived level too wide for the margin still says it is derived: the fixed word, its level in the tooltip and inspector.
+      const fallback = !group.route.noControl && group.route.trust.length > 0 && group.route.trustSource === "derived" ? [FLOW_DERIVED_TAG] : [];
+      const placedTag = tryPlace([words, ...fallback].map((text) => ({ text, x: r1(tokenRight), y: r1(bottom + FLOW_TRUST_GAP + TYPE_SMALL * 0.78), size: TYPE_SMALL, bold: false, align: "end" as const, mono: true })), `trust ${group.route.id}`, 2, "flow-trust-text flow-mono");
       if (placedTag === undefined) continue;
       const text = textBox(placedTag);
       const box: FlowBox = { x: r1(text.x - FLOW_TRUST_PAD), y: r1(text.y - 1), w: r1(text.w + FLOW_TRUST_PAD), h: r1(text.h + 2) };
@@ -1760,11 +1783,11 @@ export function renderFlowSvg(model: FlowModel, selected: string | undefined, pr
     ${layout.routes.map((draw) => {
       const trustTag = layout.trustTags.find((b) => b.route === draw.route.id);
       const level = trustTag === undefined || trustTag.levels.length !== 1 ? undefined : model.levels.find((l) => l.name === trustTag.levels[0]);
-      return html`<g class="flow-route-group ${routeClass(draw.route)}" id="${draw.route.id}" data-names="${draw.route.names.join(", ")}" data-derived="${draw.route.derived ? "true" : "false"}" data-stops="${draw.route.stops.join(" ")}" data-edges="${draw.route.edges.join(" ")}"${draw.route.rail === undefined ? null : raw(` data-rail="${draw.route.rail}"`)} data-trust="${draw.route.trust.join(" ")}" data-controls="${draw.route.controls.join(" ")}" data-structure-select="${draw.route.id}" role="button" tabindex="0" aria-pressed="${selection.id === draw.route.id ? "true" : "false"}" aria-label="${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(", ")}${draw.route.derived ? "" : `; trust ${trustWords(draw.route)}`}${draw.route.noControl ? "; no control" : ""}">
-      <title>${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(" → ")}${draw.route.rail === undefined ? "" : ` → ${byFolder.get(draw.route.rail)!.name} (rail)`}${draw.route.derived ? "" : ` · trust in: ${trustWords(draw.route)}`}</title>
+      return html`<g class="flow-route-group ${routeClass(draw.route)}" id="${draw.route.id}" data-names="${draw.route.names.join(", ")}" data-derived="${draw.route.derived ? "true" : "false"}" data-stops="${draw.route.stops.join(" ")}" data-edges="${draw.route.edges.join(" ")}"${draw.route.rail === undefined ? null : raw(` data-rail="${draw.route.rail}"`)} data-trust="${draw.route.trust.join(" ")}" data-controls="${draw.route.controls.join(" ")}" data-structure-select="${draw.route.id}" role="button" tabindex="0" aria-pressed="${selection.id === draw.route.id ? "true" : "false"}" aria-label="${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(", ")}${draw.route.derived ? "" : `; trust ${trustInWords(draw.route)}`}${draw.route.noControl ? "; no control" : ""}">
+      <title>${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(" → ")}${draw.route.rail === undefined ? "" : ` → ${byFolder.get(draw.route.rail)!.name} (rail)`}${draw.route.derived ? "" : ` · trust in: ${trustInWords(draw.route)}`}</title>
       <path class="flow-line flow-route" data-line="${draw.route.id}" d="${pathD(draw.path)}" stroke="${draw.color}"/>
       <g class="flow-token${draw.route.derived ? " flow-derived" : ""}">${texts(`origin ${draw.route.id} `).length === 0 ? null : originToken(layout.tokens.find((t) => t.route === draw.route.id)!, draw.route)}</g>
-      ${trustTag === undefined ? null : html`<g class="flow-trust${draw.route.noControl ? " flow-trust-nocontrol" : trustTag.levels.length === 0 ? " flow-trust-unknown" : ""}" data-trust-tag="${trustTagWords(draw.route)}" data-no-control="${draw.route.noControl ? "true" : "false"}"${level === undefined ? null : raw(` data-structure-select="${level.id}" role="button" tabindex="0" aria-label="trust level ${level.name}: ${level.meaning.replace(/"/g, "&quot;")}"`)}><title>${draw.route.noControl ? "No control: no chokepoint or crossing stands where this route's work enters or on any interface it takes, and the trust its entrances carry in is unknown (no crossing's chokepoint is their handler), so the map treats it as untrusted." : trustTag.levels.length === 0 ? "Trust in: unknown. No crossing's chokepoint is these entrances' handler, so the trust they carry in is not derived; the map treats it as untrusted." : `Trust in: ${trustTag.levels.join(", ")}, the entering side of the crossing whose chokepoint is these entrances' handler.`}</title><rect class="flow-trust-box" x="${trustTag.box.x}" y="${trustTag.box.y}" width="${trustTag.box.w}" height="${trustTag.box.h}"/>${texts(`trust ${draw.route.id}`).map(renderText)}</g>`}
+      ${trustTag === undefined ? null : html`<g class="flow-trust${draw.route.noControl ? " flow-trust-nocontrol" : trustTag.levels.length === 0 ? " flow-trust-unknown" : ""}" data-trust-tag="${trustTagWords(draw.route)}" data-no-control="${draw.route.noControl ? "true" : "false"}"${level === undefined ? null : raw(` data-structure-select="${level.id}" role="button" tabindex="0" aria-label="trust level ${level.name}: ${level.meaning.replace(/"/g, "&quot;")}"`)} data-trust-source="${draw.route.trust.length === 0 ? "unknown" : draw.route.trustSource}"><title>${trustTagTitle(draw.route, model.levels)}</title><rect class="flow-trust-box" x="${trustTag.box.x}" y="${trustTag.box.y}" width="${trustTag.box.w}" height="${trustTag.box.h}"/>${texts(`trust ${draw.route.id}`).map(renderText)}</g>`}
       <g class="flow-terminus${draw.route.derived ? " flow-derived" : ""}">${texts(`origin ${draw.route.id} `).map(renderText)}</g>
     </g>`;
     })}
@@ -1940,7 +1963,7 @@ function routeStops(model: FlowModel, route: FlowRoute): string {
 }
 
 function routeRow(model: FlowModel, route: FlowRoute): Markup {
-  const trust = route.derived ? "" : ` · trust ${trustWords(route)}${route.noControl ? " · no control" : ""}`;
+  const trust = route.derived ? "" : ` · trust ${trustInWords(route)}${route.noControl ? " · no control" : ""}`;
   return flowRow(flowPick(route.id, routeName(route)), `${routeStops(model, route)}${trust}`, "line", routeSwatch(route));
 }
 
@@ -1948,8 +1971,16 @@ function routeRow(model: FlowModel, route: FlowRoute): Markup {
 function renderRouteTrust(state: ShellState, route: FlowRoute): Markup {
   if (route.derived) return html``;
   return html`${flowFacts([
-    [html`${termLink(state, "trust level", "Trust")} in`, route.trust.length === 0 ? html`<span data-field="trust">unknown</span> <span class="flow-meta">no crossing's chokepoint is its entrances' handler, so the trust they carry in is not derived; treated as untrusted</span>` : html`<span data-field="trust">${route.trust.join(", ")}</span>`],
-    ["Controls on it", route.controls.length === 0 ? html`<span class="flow-attention" data-field="controls">no control</span> <span class="flow-meta">no chokepoint or crossing stands where its work enters or on any interface it takes</span>` : html`<span data-field="controls">${route.controls.join(" ")}</span>`],
+    [html`${termLink(state, "trust level", "Trust")} in`, route.trust.length === 0
+      ? html`<span data-field="trust">unknown</span> <span class="flow-meta">its entrances declare no trust level and no crossing's chokepoint is their handler; treated as untrusted</span>`
+      : route.trustSource === "declared"
+        ? html`<span data-field="trust">${route.trust.join(", ")}</span> <span class="flow-meta" data-field="trust-source">(declared)</span>`
+        : html`<span data-field="trust">${route.trust.join(", ")}</span> <span class="flow-meta" data-field="trust-source">(derived) the entering side of the crossing whose chokepoint is its entrances' handler; they declare none</span>`],
+    ["Controls on it", route.noControl
+      ? html`<span class="flow-attention" data-field="controls">no control</span> <span class="flow-meta">no chokepoint or crossing stands where its work enters or on any interface it takes, and what it carries in is untrusted</span>`
+      : route.controls.length === 0
+        ? html`<span data-field="controls">none</span> <span class="flow-meta">nothing stands on it, and it carries in a trust level inside the system's control</span>`
+        : html`<span data-field="controls">${route.controls.join(" ")}</span>`],
   ])}`;
 }
 
@@ -2007,7 +2038,7 @@ function renderHealthStrip(model: FlowModel, selected: string | undefined): Mark
     ${nothingEnforced ? html`<p class="flow-health-note" data-field="nothing-enforced">Nothing is enforced yet: every declared invariant is still a requirement, so no identifier on this map is a working control.</p>` : null}
     ${model.levels.length === 0 ? null : html`<div class="flow-trust-key" data-field="trust-key">
       <p class="flow-trust-key-title">Trust levels <span class="flow-meta">the tag beneath each entrance route's token says which it carries in; select one to see where its crossings stand</span></p>
-      <ul>${model.levels.map((level) => html`<li><button type="button" class="flow-trust-level" data-structure-select="${level.id}" aria-pressed="${selected === level.id ? "true" : "false"}" title="${level.meaning}"><code>${level.name}</code></button> <span>${levelLine(level.meaning)}</span></li>`)}${derived ? html`<li data-level="unknown"><span class="flow-trust-tag flow-trust-unknown"><code>unknown</code></span> <span>not derived, treated as untrusted</span></li><li data-level="no-control"><span class="flow-trust-tag flow-trust-nocontrol"><code>no control</code></span> <span>unknown, and nothing on the route controls it</span></li>` : null}</ul>
+      <ul>${model.levels.map((level) => html`<li><button type="button" class="flow-trust-level" data-structure-select="${level.id}" aria-pressed="${selected === level.id ? "true" : "false"}" title="${level.meaning}"><code>${level.name}</code></button> <span>${levelLine(level.meaning)}</span>${level.outside ? html` <span class="flow-meta" data-outside="true">outside the system's control</span>` : null}</li>`)}${derived ? html`<li data-level="derived"><span class="flow-trust-tag"><code>(derived)</code></span> <span>not declared on the entrance; read from the crossing on its handler</span></li><li data-level="unknown"><span class="flow-trust-tag flow-trust-unknown"><code>unknown</code></span> <span>neither declared nor derived, treated as untrusted</span></li><li data-level="no-control"><span class="flow-trust-tag flow-trust-nocontrol"><code>no control</code></span> <span>untrusted (unknown, or from outside the system's control), and nothing on the route controls it</span></li>` : null}</ul>
     </div>`}
   </div>`;
 }
@@ -2058,7 +2089,7 @@ function renderFlowSummary(state: ShellState, model: FlowModel, previews: readon
     ${model.routesFrom === "root interfaces" ? html`<p class="flow-note" data-field="derived-routes">No spec declares an entrance. Each route is ${termLink(state, "derived")} from one of the root component's component interfaces by ${termLink(state, "reference weight")}, not flow, and named for the first component it reaches.</p>` : null}
     ${model.entrances.length === 0 && model.routesFrom !== "root interfaces" ? html`<p class="flow-note" data-field="no-entrances">No spec declares an entrance, and there is no root component to derive routes from.</p>` : null}
     <ul class="flow-rows" data-field="routes">${model.routes.map((route) => routeRow(model, route))}</ul>
-    ${model.entrances.length === 0 ? null : html`<details class="flow-entrances"><summary>Entrances <span class="flow-count">${model.entrances.length}</span></summary><ul class="flow-rows">${model.entrances.map((e) => flowRow(flowPick(e.id, e.name, e.id), e.reachable ? `starts in ${e.start === "." ? "the root" : e.start}${e.trust.length === 0 ? ", trust unknown" : `, carries ${e.trust.join(", ")}`}` : e.reason ?? ""))}</ul></details>`}
+    ${model.entrances.length === 0 ? null : html`<details class="flow-entrances"><summary>Entrances <span class="flow-count">${model.entrances.length}</span></summary><ul class="flow-rows">${model.entrances.map((e) => flowRow(flowPick(e.id, e.name, e.id), e.reachable ? `starts in ${e.start === "." ? "the root" : e.start}${e.trust.length === 0 ? ", trust unknown" : `, carries ${trustInWords(e)}`}` : e.reason ?? ""))}</ul></details>`}
     <h4>Component interfaces</h4>
     ${flowFacts([
       ["On routes", `${onRoutes}`],
