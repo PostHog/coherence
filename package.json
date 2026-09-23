@@ -1,57 +1,37 @@
 {
-  "name": "@danilocampos/coherence",
-  "version": "0.37.1",
-  "description": "A spec + coherence harness for agent-developed projects: derive a multi-resolution graph from *.spec.md + code, render an explorable outline and an agent map, and verify claims/narrative/coverage. Language and platform specifics live behind adapters.",
-  "license": "MIT",
-  "author": "Danilo Campos <mail@danilocampos.com>",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/daniloc/coherence.git"
-  },
-  "homepage": "https://github.com/daniloc/coherence#readme",
-  "keywords": [
-    "agents",
-    "spec",
-    "coherence",
-    "claude-code",
-    "codex",
-    "harness",
-    "verification"
-  ],
-  "publishConfig": {
-    "access": "public"
-  },
+  "name": "coherence",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A prosthetic for proprioception: specs, invariants, and the readings that keep an agent balanced.",
   "type": "module",
-  "bin": {
-    "coherence": "dist/cli.js",
-    "coherence-hook": "dist/hook-cli.js"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "grammars",
-    "docs/assays/posthog-guarantees-v0",
-    "docs/assays/posthog-guarantees-r2",
-    "docs/assays/posthog-guarantees-r3",
-    "docs/assays/posthog-scope-v0"
-  ],
+  "license": "MIT",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && chmod +x dist/cli.js dist/hook-cli.js",
-    "typecheck": "tsc -p tsconfig.test.json",
-    "test": "node --test \"test/**/*.test.ts\"",
-    "prepare": "npm run build"
+    "scope": "node --disable-warning=ExperimentalWarning src/cli.ts scope",
+    "scope:check": "node --disable-warning=ExperimentalWarning --test src/readings/scope/check.test.ts",
+    "journal:check": "node --disable-warning=ExperimentalWarning --test src/journal/journal.test.ts",
+    "lexicon:check": "node --disable-warning=ExperimentalWarning src/cli.ts lexicon --check",
+    "spec:check": "node --disable-warning=ExperimentalWarning src/cli.ts spec --check",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:unit": "node --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\"",
+    "test": "npm run typecheck && npm run test:unit && npm run lexicon:check && npm run spec:check",
+    "test:setup": "\"${COHERENCE_PYTHON:-python3}\" -m venv .venv && .venv/bin/python -m pip install --requirement requirements-test.txt",
+    "test:python": "node --disable-warning=ExperimentalWarning --test src/adapters/python.test.ts"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "tree-sitter-python": "^0.25.0",
-    "tree-sitter-ruby": "^0.23.1",
-    "tree-sitter-typescript": "^0.23.2",
-    "typescript": "^5.7.0"
+    "@ibm/plex-mono": "2.5.0",
+    "@types/node": "^22.20.3",
+    "typescript": "^5.9.3"
   },
-  "dependencies": {
-    "web-tree-sitter": "^0.26.12"
+  "bin": {
+    "coherence": "src/cli.ts"
+  },
+  "optionalDependencies": {
+    "node-llama-cpp": "3.21.1",
+    "pyright": "^1.1.414",
+    "typescript": "^5.9.3",
+    "typescript-language-server": "^5.3.0"
   }
 }

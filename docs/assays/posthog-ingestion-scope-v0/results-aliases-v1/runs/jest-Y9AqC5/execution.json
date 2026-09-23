@@ -1,9 +1,0 @@
-{
-  "node": "/Users/daniloc/.nvm/versions/node/v24.8.0/bin/node",
-  "version": "v24.8.0",
-  "exit": 0,
-  "suites": 6,
-  "tests": 103,
-  "failedSuites": 0,
-  "commit": "c54fec2163ad9455fd23a947f86a9034c1df9388"
-}

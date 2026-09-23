@@ -1,0 +1,4937 @@
+{
+ "concepts": [
+  {
+   "name": "spec",
+   "aliases": [
+    "*.spec.md",
+    "component spec",
+    "node",
+    "spec asset",
+    "spec tree"
+   ],
+   "meaning": "A markdown file (`# Name`, intent paragraph, optional `## works when`, `## invariants`, `## refutations`, `## why`, `## zones`, `## architecture`, `## addresses`, `## relies on`, `## guarantee bindings`) whose presence makes its folder a component; the primary object the whole harness derives from.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/derivation/walk.ts",
+    "README.md#Configure the target project",
+    "docs/scope.md#Spec content coverage"
+   ],
+   "related": [
+    "component",
+    "claim",
+    "invariant",
+    "why (rationale)"
+   ],
+   "overlap_note": "'node' (walk.ts, README) and 'component' (everywhere else) name the same thing: a folder that owns a spec."
+  },
+  {
+   "name": "component",
+   "aliases": [
+    "node",
+    "organ (index)",
+    "component stack (Scope Structure)",
+    "stack",
+    "district/downtown/periphery (Structure layout)",
+    "subsystem"
+   ],
+   "meaning": "A folder containing a *.spec.md; the unit of ownership (deepest spec dir owns each file), of claims, of coverage, of co-change locality and of every reading surface.",
+   "layer": "derivation",
+   "defined_in": [
+    "src/derivation/walk.ts (nodeDirs, ownerOf)",
+    "src/readings/index-model.ts",
+    "docs/scope-structure-thesis.md#1"
+   ],
+   "related": [
+    "spec",
+    "ownership",
+    "entry component",
+    "stack"
+   ],
+   "overlap_note": "Index calls it an 'organ', Structure a 'stack'/'card', types.ts a GraphNode of kind 'component', walk.ts a 'node'."
+  },
+  {
+   "name": "intent",
+   "aliases": [
+    "description asset",
+    "sub (graph node field)",
+    "one-line intent",
+    "first paragraph",
+    "project purpose (root)"
+   ],
+   "meaning": "The first paragraph after the spec's H1: the derivable one-sentence statement of what a component is for, shown in CLAUDE.md, the outline, the panel and Structure cards.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/derivation/walk.ts (parseSpec)",
+    "docs/scope.md#Asset inventory"
+   ],
+   "related": [
+    "spec",
+    "prose (the what)",
+    "purpose declaration"
+   ],
+   "overlap_note": "Scope stores it as a `description` asset; the root architecture `purpose` declaration is a separate, explicitly authored project-level intent."
+  },
+  {
+   "name": "prose (the what)",
+   "aliases": [
+    "what",
+    "docblock body",
+    "description",
+    "derivable documentation"
+   ],
+   "meaning": "Derivable, regenerable documentation of what code does, as opposed to why; docblock text before `@why` and spec text outside the recognised sections.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "README.md#The two documentation fields",
+    "src/derivation/walk.ts (splitWhy)"
+   ],
+   "related": [
+    "why (rationale)",
+    "undocumented symbol"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "why (rationale)",
+   "aliases": [
+    "## why",
+    "@why",
+    "rationale asset",
+    "protected rationale",
+    "why-essay"
+   ],
+   "meaning": "Authored, protected rationale that the graph cannot derive; verify never generates it (an AUTHOR job instead), why-lint checks it anchors to invariants, Scope stores it as a `rationale` asset.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "README.md#The two documentation fields",
+    "src/diagnostics/why-lint.ts",
+    "src/derivation/walk.ts"
+   ],
+   "related": [
+    "prose (the what)",
+    "why-lint",
+    "invariant",
+    "verify jobs"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "claim",
+   "aliases": [
+    "works-when line",
+    "cached inference",
+    "label (electrical-panel metaphor)",
+    "claim asset",
+    "promise (loosely)"
+   ],
+   "meaning": "One bullet under `## works when`, written in the phrasebook grammar; verify grades each claim pass/fail/skip every run so a rotted doc goes red. A line matching no form is skipped, never red.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/verification/phrasebook.ts",
+    "README.md#The claim phrasebook"
+   ],
+   "related": [
+    "claim form",
+    "verdict",
+    "boundary claim",
+    "dialect gap"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "claim form",
+   "aliases": [
+    "phrasebook entry",
+    "verb",
+    "form",
+    "claim grammar",
+    "CLAIM_FORMS"
+   ],
+   "meaning": "One entry of the ordered CLAIM_FORMS registry (typechecks, exists, imports, responds, passes test, boundary, coverage, lives in, parity, conforms to); first match wins, and each form carries a tier and an evaluator.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/phrasebook.ts",
+    "src/commands.ts (renderPhrasebookBlock)"
+   ],
+   "related": [
+    "claim",
+    "phrasebook",
+    "claim tier"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "phrasebook",
+   "aliases": [
+    "claim-form table",
+    "README phrasebook block",
+    "coherence phrasebook"
+   ],
+   "meaning": "The rendered table of claim forms (name, tier, grammar, example), derived from CLAIM_FORMS into README and the terminal.",
+   "layer": "cli-surface",
+   "defined_in": [
+    "src/commands.ts",
+    "src/verification/phrasebook.ts"
+   ],
+   "related": [
+    "claim form",
+    "derived spelling"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "claim kind",
+   "aliases": [
+    "[bracket] suffix",
+    "claimKinds",
+    "kind policy (pin | warn)",
+    "measured/structural/mathematical kinds"
+   ],
+   "meaning": "A project-declared category a claim may carry as a trailing `[kind]`; policy `pin` gates normally, `warn` gates but reports, an undeclared kind is red. Off unless configured.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "README.md#Claim kinds",
+    "src/types.ts (Config.claimKinds)",
+    "src/derivation/walk.ts"
+   ],
+   "related": [
+    "claim",
+    "never-red advisory",
+    "--raise"
+   ],
+   "overlap_note": "Not to be confused with graph node kind, asset kind, journal record kind, or scaffold kind."
+  },
+  {
+   "name": "invariant",
+   "aliases": [
+    "## invariants entry",
+    "gate (promise graph)",
+    "guarantee (Scope model, guarantees command)",
+    "promise (Structure thesis)",
+    "contract (the `contract` command; conventions detector)",
+    "anchor (as in 'anchors added')",
+    "invariant promise"
+   ],
+   "meaning": "A named property a component upholds, declared under `## invariants`; every one must be anchored by a `boundary`/`coverage`/`parity` claim or coverage fails. The promise graph renders the anchored form as a gate, Scope as a guarantee, Structure as a promise.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/derivation/walk.ts",
+    "README.md#`## invariants`",
+    "src/readings/promise-model.ts",
+    "docs/scope.md#guarantees default"
+   ],
+   "related": [
+    "boundary claim",
+    "refutation",
+    "guarantee reading",
+    "gate",
+    "coverage gate"
+   ],
+   "overlap_note": "Four layer names for one authored thing (invariant/gate/guarantee/contract) with no journal decision choosing between them; the Scope Guarantees view is even titled 'Invariants'."
+  },
+  {
+   "name": "boundary claim",
+   "aliases": [
+    "boundary verb",
+    "anchor",
+    "anchoring claim",
+    "self-enforcing boundary",
+    "boundary anatomy (invariant + chokepoint + oracle)",
+    "gate (when rendered)",
+    "enforcement"
+   ],
+   "meaning": "`boundary \"<invariant>\" at <chokepoint> [over <enumeration>] [crossing a -> b] [via test|guard \"<oracle>\"]` — asserts the four-part anatomy of a self-enforcing boundary and anchors the invariant for the coverage gate.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/verification/boundary.ts (BOUNDARY_RE)",
+    "README.md#Authoring a boundary",
+    "src/verification/phrasebook.ts"
+   ],
+   "related": [
+    "invariant",
+    "chokepoint",
+    "oracle",
+    "crossing",
+    "enumeration",
+    "gate"
+   ],
+   "overlap_note": "The promise graph calls a boundary claim a gate; guarantees.ts hashes it into a g-… guarantee reference; conventions.ts calls it a contract."
+  },
+  {
+   "name": "chokepoint",
+   "aliases": [
+    "at <symbol>",
+    "anchor symbol",
+    "enforcement anchor",
+    "boundary symbol",
+    "transition symbol (atlas)",
+    "producer/consumer chokepoint (contracts)"
+   ],
+   "meaning": "The one code symbol all paths to the protected thing cross; a boundary claim fails until the symbol exists in the code graph.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "README.md#Authoring a boundary",
+    "src/verification/phrasebook.ts (boundary form)",
+    "src/diagnostics/atlas.ts"
+   ],
+   "related": [
+    "boundary claim",
+    "symbol",
+    "transition",
+    "convention / guard"
+   ],
+   "overlap_note": "Atlas transitions and contracts are keyed by the same chokepoint symbols, spelled again in config."
+  },
+  {
+   "name": "oracle",
+   "aliases": [
+    "named test",
+    "via test/guard \"<oracle>\"",
+    "describe title",
+    "test oracle",
+    "checker",
+    "breaker (panel metaphor)"
+   ],
+   "meaning": "The named test (or source guard) whose pass is the evidence behind a claim; resolved by exact describe title through the batch report, serial runner, or static index.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/phrasebook.ts (execNamedTest)",
+    "src/verification/oracle-domain.ts",
+    "README.md#The meta-oracle"
+   ],
+   "related": [
+    "boundary claim",
+    "meta-oracle",
+    "vanished oracle",
+    "via guard",
+    "test runner"
+   ],
+   "overlap_note": "'oracle' also names the machine that grades (meta-oracle, totality oracle, static oracle) — the word covers both the test and the analyzer of the test."
+  },
+  {
+   "name": "via guard",
+   "aliases": [
+    "guard verb",
+    "source-property oracle",
+    "behavioral guard",
+    "needs human eye (⚑)"
+   ],
+   "meaning": "The escape hatch verb: the oracle must still run and pass, but the live-domain meta-oracle is skipped because the oracle asserts a source property or non-domain behaviour; every guard row carries a human-eye flag.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "README.md#`via guard`",
+    "src/verification/phrasebook.ts"
+   ],
+   "related": [
+    "oracle",
+    "meta-oracle",
+    "tier (enforcement ladder)",
+    "convention / guard"
+   ],
+   "overlap_note": "'guard' also means a load-bearing guard function in the conventions detector — a different thing."
+  },
+  {
+   "name": "meta-oracle",
+   "aliases": [
+    "oracle-domain analysis",
+    "live-domain analysis",
+    "LIVE / LITERAL / NO-ITERATION / NOT-FOUND verdicts",
+    "third assertion",
+    "parity meta-oracle"
+   ],
+   "meaning": "Static analysis of a `via test` oracle's own source that classifies how it iterates its domain; LIVE passes, LITERAL/NO-ITERATION/NOT-FOUND fail. Runs even under --fast.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/oracle-domain.ts",
+    "README.md#The meta-oracle"
+   ],
+   "related": [
+    "oracle",
+    "totality",
+    "domain floor",
+    "enumeration"
+   ],
+   "overlap_note": "Overlaps with the totality gate (totality.ts), a stricter, separate admission for claims that say 'total'."
+  },
+  {
+   "name": "domain floor",
+   "aliases": [
+    "vacuous-if-empty",
+    "floor assertion",
+    "lower bound on domain size"
+   ],
+   "meaning": "An `expect(domain.length >= n)` in an oracle so a live domain that collapses to empty fails loud instead of passing vacuously; the meta-oracle annotates its absence but never fails on it.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/oracle-domain.ts",
+    "README.md#Uniform vs non-uniform domains"
+   ],
+   "related": [
+    "meta-oracle",
+    "non-vacuity floor"
+   ],
+   "overlap_note": "'floor' also names the non-vacuity floor of verify and the advisory floors (thresholds) — three unrelated floors."
+  },
+  {
+   "name": "enumeration",
+   "aliases": [
+    "over <ENUMERATION>",
+    "domain",
+    "live domain",
+    "SSOT",
+    "population",
+    "declared set"
+   ],
+   "meaning": "The concrete source-owned collection a totality or parity claim is total over; must be a symbol in the graph and (for 'total' claims) a nonempty literal const/enum directly iterated by the oracle.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/verification/boundary.ts",
+    "src/verification/totality.ts",
+    "src/verification/parity.ts"
+   ],
+   "related": [
+    "totality",
+    "parity claim",
+    "meta-oracle",
+    "redundancy"
+   ],
+   "overlap_note": "Redundancy calls the same thing an 'enumerated domain' spelled at a 'site'."
+  },
+  {
+   "name": "totality",
+   "aliases": [
+    "totality oracle",
+    "totality gate",
+    "enumeration admission",
+    "total",
+    "blower-door test (metaphor)",
+    "totality-checked (tier-2)"
+   ],
+   "meaning": "The promise that an oracle covers every member of a declared domain; a claim whose invariant or oracle says 'total' must name its enumeration and the oracle must directly iterate it, or the claim fails.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/totality.ts",
+    "src/verification/python-totality.ts",
+    "README.md#The meta-oracle",
+    "src/types.ts (totalityEnumeration)"
+   ],
+   "related": [
+    "enumeration",
+    "boundary claim",
+    "coverage claim",
+    "tier (enforcement ladder)"
+   ],
+   "overlap_note": "'totality-checked' is also the name of enforcement-ladder tier 2, which applies to any oracle-backed crossing, not only ones that say 'total'."
+  },
+  {
+   "name": "coverage claim",
+   "aliases": [
+    "coverage verb",
+    "open-domain claim",
+    "sampling claim",
+    "residual"
+   ],
+   "meaning": "`coverage \"<subject>\" at <chokepoint> residual \"<what is NOT covered>\" [via …]` — the honest verb for a set the world defines; it buys silence from the meta-oracle at the price of naming its residual.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/verification/boundary.ts (COVERAGE_RE)",
+    "src/verification/phrasebook.ts"
+   ],
+   "related": [
+    "boundary claim",
+    "totality",
+    "coverage gate"
+   ],
+   "overlap_note": "Name collision: 'coverage' is also verify's coverage gate (claims present, invariants anchored, why present) and 'coverage %' in the receipts/scope docs."
+  },
+  {
+   "name": "crossing",
+   "aliases": [
+    "crossing <from> -> <to>",
+    "wall",
+    "transition (atlas)",
+    "penetration (envelope metaphor)",
+    "zone pair"
+   ],
+   "meaning": "The declarative clause on a boundary/coverage claim naming which pair of trust zones the gate separates; promise-graph topology, never a runtime check.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/verification/boundary.ts",
+    "src/readings/promise-model.ts (axiom 2)"
+   ],
+   "related": [
+    "zone",
+    "boundary claim",
+    "transition",
+    "reliance"
+   ],
+   "overlap_note": "Atlas 'transitions' (config, between charts) and claim 'crossings' (spec, between zones) are two spellings of 'a chokepoint between trust regions'."
+  },
+  {
+   "name": "zone",
+   "aliases": [
+    "## zones",
+    "trust zone",
+    "trust region",
+    "trust order",
+    "residence",
+    "lives in <zone>"
+   ],
+   "meaning": "A declared trust region from the entry spec's `## zones` (declared order = trust order, `inside` nests); components declare residence with `lives in`, gates declare crossings between zones.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/derivation/walk.ts (parseZones)",
+    "src/readings/promise.ts",
+    "docs/scope.md (zone asset)"
+   ],
+   "related": [
+    "crossing",
+    "chart",
+    "lives in (residence)",
+    "entry component"
+   ],
+   "overlap_note": "Zones (spec) and atlas charts (config) are both 'trust domains'; docs/scope.md insists they are different concepts, but both carry the same idea."
+  },
+  {
+   "name": "lives in (residence)",
+   "aliases": [
+    "residence",
+    "declared residence",
+    "undeclared residence",
+    "unplaced"
+   ],
+   "meaning": "`lives in <zone>` declares which trust zone a component resides in so cross-component imports can be graded same-zone / covered / naked; verify only checks well-formedness.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/verification/phrasebook.ts (lives in)",
+    "src/readings/promise.ts"
+   ],
+   "related": [
+    "zone",
+    "reliance",
+    "contract (promise graph)"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "parity claim",
+   "aliases": [
+    "parity verb",
+    "agreement ratchet",
+    "two projections of one domain",
+    "parity pair"
+   ],
+   "meaning": "`parity \"<invariant>\" over <domain> between <fnA> and <fnB> via test \"<oracle>\"` — two functions declared projections of one enumerated domain that must agree; anchors an invariant like a boundary.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/verification/parity.ts",
+    "docs/novelty-and-parity.md"
+   ],
+   "related": [
+    "enumeration",
+    "redundancy",
+    "projection",
+    "meta-oracle"
+   ],
+   "overlap_note": "Redundancy is described as 'the undeclared half of parity'."
+  },
+  {
+   "name": "projection",
+   "aliases": [
+    "fnA/fnB",
+    "projector",
+    "view of a domain"
+   ],
+   "meaning": "One of the two functions a parity claim declares must agree over a domain; also used loosely for any pure derivation (scope model, structure model, orient projection).",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/verification/parity.ts",
+    "src/readings/scope-model.ts"
+   ],
+   "related": [
+    "parity claim"
+   ],
+   "overlap_note": "Heavily overloaded word: parity projection, 'trusted projection' of the journal, Scope 'projection', orient 'projection'."
+  },
+  {
+   "name": "deterministic claims",
+   "aliases": [
+    "typechecks",
+    "<file> exists at …",
+    "<file> imports <specifier>",
+    "structural claims",
+    "green trivialities (when vacuous)"
+   ],
+   "meaning": "The fast-tier forms that need no runner: typechecks shells the typecheck command; exists and imports check the file tree. The README warns a spec full of them is 'coherent and worthless'.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/verification/phrasebook.ts",
+    "README.md#Known limits"
+   ],
+   "related": [
+    "claim form",
+    "claim tier",
+    "judge ≠ notary"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "responds claim",
+   "aliases": [
+    "live tier claim",
+    "<url> responds <status>"
+   ],
+   "meaning": "A live-tier claim that fetches a URL; unreachable is a skip, wrong status/body is a fail.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/verification/phrasebook.ts"
+   ],
+   "related": [
+    "claim tier"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "passes test claim",
+   "aliases": [
+    "executable claim",
+    "passes test \"<name>\"",
+    "single front door"
+   ],
+   "meaning": "A claim that a named test passes; refuses the word 'totality' because it names no chokepoint, so it cannot name an enumeration.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/verification/phrasebook.ts"
+   ],
+   "related": [
+    "oracle",
+    "test runner",
+    "totality"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "dictionary word",
+   "aliases": [
+    "word",
+    "<Word>.md",
+    "conforms to <Word>",
+    "pattern",
+    "commitments",
+    "dictionary"
+   ],
+   "meaning": "A named pattern file (`# Word`, intent, `## commitments` claim list) that a component `conforms to`; commitments are evaluated against the conforming component, red-not-skip, and propagate on edit.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/verification/phrasebook.ts (parseWord, conforms to)",
+    "README.md#The dictionary"
+   ],
+   "related": [
+    "claim form",
+    "commitment",
+    "boundary claim"
+   ],
+   "overlap_note": "README notes words are parameterless so most commitments are global 'documentation, not discrimination'."
+  },
+  {
+   "name": "commitment",
+   "aliases": [
+    "## commitments bullet",
+    "word commitment"
+   ],
+   "meaning": "One claim line inside a dictionary word; must match a claim form or the word goes red.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/verification/phrasebook.ts"
+   ],
+   "related": [
+    "dictionary word",
+    "claim"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "refutation",
+   "aliases": [
+    "## refutations",
+    "negative control",
+    "observed negative control",
+    "smoke pencil (metaphor)",
+    "Refuted? column",
+    "proof the breaker trips",
+    "perturbation"
+   ],
+   "meaning": "`<invariant>: <what was broken> -> <what was seen>` — the recorded experiment in which an invariant's oracle actually went red; verify reports coverage over it but never fails on it.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/derivation/walk.ts (refutedInvariants)",
+    "README.md#`## refutations`"
+   ],
+   "related": [
+    "invariant",
+    "never-red advisory",
+    "four darknesses"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "architecture section",
+   "aliases": [
+    "## architecture",
+    "architecture declarations",
+    "JSON bullets",
+    "authored architecture"
+   ],
+   "meaning": "A spec section of JSON-object bullets declaring purpose, entrances and relationships with stable ids; parsed strictly, unresolved endpoints stay visible as issues.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/derivation/architecture.ts",
+    "src/derivation/walk.ts",
+    "docs/scope.md#Structure: authored architecture"
+   ],
+   "related": [
+    "purpose declaration",
+    "entrance",
+    "architectural relationship"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "purpose declaration",
+   "aliases": [
+    "project purpose",
+    "kind: purpose",
+    "project-purpose description category",
+    "project introduction"
+   ],
+   "meaning": "The architecture bullet that states what the project is for, shown above the Structure canvas; distinct from the root spec's narrower intent.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "coherence.spec.md#architecture",
+    "docs/scope-coherence-inventory.md"
+   ],
+   "related": [
+    "architecture section",
+    "intent"
+   ],
+   "overlap_note": "Overlaps with the root component's intent; both are 'what the project does'."
+  },
+  {
+   "name": "entrance",
+   "aliases": [
+    "kind: entrance",
+    "named entrance",
+    "entry point",
+    "entrance annotation",
+    "anchor (entrance anchor)"
+   ],
+   "meaning": "An architecture declaration naming where a human or agent enters the system (label, component, optional file/symbol anchor); rendered as external arrows into stacks.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/derivation/architecture.ts",
+    "docs/scope-structure-thesis.md#6"
+   ],
+   "related": [
+    "architecture section",
+    "entry component"
+   ],
+   "overlap_note": "Not the same as `entryDir` / the entry component, which is a graph root, not an execution entrance (the thesis says so explicitly)."
+  },
+  {
+   "name": "architectural relationship",
+   "aliases": [
+    "kind: relationship",
+    "architectural-link asset",
+    "handoff (Structure)",
+    "responsibility relationship",
+    "connection",
+    "meaningful arrow",
+    "from/to/label/because"
+   ],
+   "meaning": "A spec-owned assessed relationship between two components with a label and rationale; the only kind of arrow the default Structure map draws (imports never qualify).",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "src/derivation/architecture.ts",
+    "docs/scope-structure-thesis.md#10",
+    "docs/scope-coherence-inventory.md"
+   ],
+   "related": [
+    "architecture section",
+    "reliance",
+    "import edge"
+   ],
+   "overlap_note": "Structure docs call these 'handoffs'; the work ledger also has a 'handoff' event — unrelated meanings."
+  },
+  {
+   "name": "guarantee link",
+   "aliases": [
+    "## addresses",
+    "## relies on",
+    "addresses link",
+    "relies link",
+    "guarantee-link asset",
+    "link status (current | stale | invalid | unlinked)",
+    "explicit consumer"
+   ],
+   "meaning": "Spec-owned JSON bullets: a provider's `## addresses` maps a g-… claim to a taxonomy obligation via an assessment revision; a consumer's `## relies on` names a provider's claim it depends on (direct-import grade). `guarantees --check` checks link integrity only.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/guarantees.ts",
+    "src/derivation/walk.ts",
+    "README.md#Connecting obligations and guarantees"
+   ],
+   "related": [
+    "guarantee reading",
+    "obligation",
+    "assessment",
+    "reliance",
+    "architectural relationship"
+   ],
+   "overlap_note": "'relies on' (declared, spec) vs 'reliance' (derived from imports in the promise graph) are two different things called nearly the same name; Structure draws the declared one as a 'relied-on tab'."
+  },
+  {
+   "name": "guarantee binding",
+   "aliases": [
+    "## guarantee bindings",
+    "catalog binding",
+    "binding asset",
+    "binding reading",
+    "bound inputs",
+    "binding support",
+    "challenge command"
+   ],
+   "meaning": "Spec-owned adoption of a catalog definition: definition id + digest, local g-… claim, subject, assessor, applicability rationale, parameter values, exclusions, falsifier and SHA-256 evidence pins; verify retains bound inputs so support expires when inputs change.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/guarantee-bindings.ts",
+    "README.md#Connecting obligations and guarantees",
+    "src/readings/scope/binding-reading.ts"
+   ],
+   "related": [
+    "guarantee catalog",
+    "guarantee reading",
+    "input manifest / input grade"
+   ],
+   "overlap_note": "Name collision with platform 'Bindings' (types.ts: Cloudflare stores/entities/vars) — same word, unrelated."
+  },
+  {
+   "name": "ownership",
+   "aliases": [
+    "graphOwner",
+    "deepest spec dir",
+    "unowned file",
+    "owner",
+    "owning component",
+    "spec containment"
+   ],
+   "meaning": "The rule that the deepest spec'd ancestor directory owns a file; `null` when nothing owns it (represented, not fabricated). Also the parent/child containment of components, which is never an import.",
+   "layer": "derivation",
+   "defined_in": [
+    "src/derivation/walk.ts (ownerOf)",
+    "src/derivation/derive.ts (spec containment)"
+   ],
+   "related": [
+    "component",
+    "graph",
+    "four darknesses"
+   ],
+   "overlap_note": "'owner' also means the work order owner session and the guarantee's canonical owner component."
+  },
+  {
+   "name": "graph",
+   "aliases": [
+    "graph.json",
+    "derived model",
+    "source model",
+    "code graph",
+    "canonical graph",
+    "the map",
+    "Intent graph + Structure graph"
+   ],
+   "meaning": "The one derivation every renderer and verify consumes: components, files, symbols, claims, import edges, platform bindings, built by buildGraph from the spec tree plus adapters. No second walk anywhere.",
+   "layer": "derivation",
+   "defined_in": [
+    "src/derivation/derive.ts",
+    "src/types.ts (Graph, GraphNode, GraphEdge)",
+    "coherence.config.json (atlas.charts.derived-model)"
+   ],
+   "related": [
+    "component",
+    "symbol",
+    "import edge",
+    "language adapter",
+    "platform adapter"
+   ],
+   "overlap_note": "Decompose splits it into 'Intent graph' (spec tree) and 'Structure graph' (imports); atlas calls it the 'derived-model' chart."
+  },
+  {
+   "name": "symbol",
+   "aliases": [
+    "graph node kind symbol",
+    "exported symbol",
+    "s:path#name",
+    "declaration"
+   ],
+   "meaning": "A function/method/class/const captured by the language adapter; the address space boundary claims, parity claims, contracts and taxonomy subjects resolve against.",
+   "layer": "derivation",
+   "defined_in": [
+    "src/types.ts (LanguageAdapter.symbols)",
+    "src/adapters/tree-sitter.ts"
+   ],
+   "related": [
+    "chokepoint",
+    "graph",
+    "language adapter",
+    "undocumented symbol"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "import edge",
+   "aliases": [
+    "edge",
+    "imports",
+    "import graph",
+    "Structure graph",
+    "one-hop neighbours",
+    "importer/importee"
+   ],
+   "meaning": "A resolved module import between two files in the graph; the basis of reliance in the promise graph, of context closure in economy, of hubs in decompose, and explicitly NOT an architectural arrow in Structure.",
+   "layer": "derivation",
+   "defined_in": [
+    "src/types.ts (GraphEdge)",
+    "src/derivation/import-aliases.ts",
+    "docs/scope-structure-thesis.md#10.1"
+   ],
+   "related": [
+    "reliance",
+    "economy (context closure)",
+    "architectural relationship",
+    "import alias"
+   ],
+   "overlap_note": "Promise graph turns a cross-component import into a 'reliance'; Scope catalog also calls its `relies on` relation 'reliance'."
+  },
+  {
+   "name": "import alias",
+   "aliases": [
+    "importAliases",
+    "~/* mapping",
+    "declared module address space"
+   ],
+   "meaning": "Config-declared exact or trailing-star module mappings that resolve only to a unique walked file; malformed or escaping declarations refuse.",
+   "layer": "config",
+   "defined_in": [
+    "src/derivation/import-aliases.ts",
+    "README.md#Config reference"
+   ],
+   "related": [
+    "import edge",
+    "config"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "language adapter",
+   "aliases": [
+    "LanguageAdapter",
+    "language pack",
+    "grammar-backed adapter",
+    "tree-sitter adapter",
+    "capture query",
+    "docStyle",
+    "rung 1/2/3 ladder",
+    "instrument arm row (SURFACE_LANGUAGES, SITE_LANGUAGES, SINK_LANGUAGES, ORACLE_LANGUAGES)"
+   ],
+   "meaning": "How coherence reads a language: symbols, imports and docblocks through a wasm grammar plus capture queries; built-in packs are data (queries, patterns, named strategies), never code, and a project may supply its own module.",
+   "layer": "derivation",
+   "defined_in": [
+    "src/adapters/tree-sitter.ts",
+    "src/derivation/language-packs.ts",
+    "README.md#Languages"
+   ],
+   "related": [
+    "symbol",
+    "graph",
+    "pack purity"
+   ],
+   "overlap_note": "'pack' means language pack here and taxonomy pack (core/simulation) in taxonomy — unrelated."
+  },
+  {
+   "name": "pack purity",
+   "aliases": [
+    "a pack is data never code",
+    "function-free pack",
+    "purity guard"
+   ],
+   "meaning": "The rule that every built-in language table carries queries, patterns and named strategies only; a guard sweeps for function-valued fields.",
+   "layer": "derivation",
+   "defined_in": [
+    "src/derivation/language-packs.ts"
+   ],
+   "related": [
+    "language adapter"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "platform adapter",
+   "aliases": [
+    "PlatformAdapter",
+    "platform",
+    "cloudflare adapter",
+    "infra bindings",
+    "Bindings (entities, stores, vars)",
+    "resource asset",
+    "capability floor"
+   ],
+   "meaning": "How coherence reads infrastructure config: Cloudflare wrangler plus direct Env types produce store/entity nodes and declared variable names; deployment values are unrepresentable.",
+   "layer": "derivation",
+   "defined_in": [
+    "src/adapters/cloudflare.ts",
+    "src/types.ts (PlatformAdapter, Bindings)"
+   ],
+   "related": [
+    "graph",
+    "guarantee binding"
+   ],
+   "overlap_note": "'Bindings' here collides with guarantee bindings; Scope calls the result 'resource' assets."
+  },
+  {
+   "name": "entry component",
+   "aliases": [
+    "entryDir",
+    "entry spec",
+    "root component",
+    "project frame (Structure)"
+   ],
+   "meaning": "The component at `entryDir` (`.` by default); the only spec whose `## zones` has topology authority, and Structure's project frame when it owns children.",
+   "layer": "config",
+   "defined_in": [
+    "src/types.ts (Config.entryDir)",
+    "src/readings/promise.ts",
+    "docs/scope.md"
+   ],
+   "related": [
+    "zone",
+    "component",
+    "entrance"
+   ],
+   "overlap_note": "Not an execution entrance; the thesis warns against conflating entryDir with an entrance."
+  },
+  {
+   "name": "coherence root",
+   "aliases": [
+    "declared root",
+    "config presence",
+    "coherence.config.json exists",
+    "requireDeclaredRoot"
+   ],
+   "meaning": "The directory containing coherence.config.json; its presence is the declaration that walking commands may run here, so a configless run refuses instead of walking a home directory.",
+   "layer": "config",
+   "defined_in": [
+    "src/types.ts (Config.declared)",
+    "src/config.ts",
+    "README.md#Configure the target project"
+   ],
+   "related": [
+    "config",
+    "host"
+   ],
+   "overlap_note": "Distinct from the host project root (claudeProjectRoot/codexProjectRoot) and the package root."
+  },
+  {
+   "name": "config",
+   "aliases": [
+    "coherence.config.json",
+    "Config",
+    "project-owned data vs harness-owned mechanism",
+    "configuration asset"
+   ],
+   "meaning": "The project's declared settings over defaults: runner commands, language/platform, adoption of ratchets/atlas/contracts data, thresholds; an empty `{}` is complete; unparseable refuses.",
+   "layer": "config",
+   "defined_in": [
+    "src/types.ts (Config)",
+    "src/config.ts",
+    "README.md#Config reference"
+   ],
+   "related": [
+    "coherence root",
+    "claim kind",
+    "atlas",
+    "mass"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "tooling group",
+   "aliases": [
+    "tooling",
+    "demoted path prefixes"
+   ],
+   "meaning": "Config path prefixes demoted to a 'tooling' group in the outline so build scripts do not read as product structure.",
+   "layer": "config",
+   "defined_in": [
+    "src/types.ts (Config.tooling)",
+    "src/readings/render-outline.ts"
+   ],
+   "related": [
+    "graph",
+    "outline"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "file stats / claimed files",
+   "aliases": [
+    "fileStats",
+    "lines (honest mass)",
+    "content hash",
+    "claimedFilePaths",
+    "claimed vs unclaimed"
+   ],
+   "meaning": "The one on-disk read of line counts and content hashes every measurer uses, and the one definition of which files a claim blesses (path-suffix match, at most one file per token).",
+   "layer": "derivation",
+   "defined_in": [
+    "src/derivation/tree.ts"
+   ],
+   "related": [
+    "mass",
+    "four darknesses",
+    "claim"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "undocumented symbol",
+   "aliases": [
+    "doc gap",
+    "[doc] job",
+    "generate-doc job",
+    "undocumented darkness",
+    "docblock coverage"
+   ],
+   "meaning": "An exported symbol with no docblock; surfaced as an advisory job ranked hottest-first, never red.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/verify.ts",
+    "README.md#The dictionary (coverage gates …)"
+   ],
+   "related": [
+    "verify jobs",
+    "heat",
+    "prose (the what)"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "evolution graph",
+   "aliases": [
+    "git change-coupling",
+    "commit log",
+    "co-change",
+    "churn",
+    "concern-carrying commit",
+    "BULK band (2–40 files)",
+    "evolution store/memo",
+    "history window (400 / 200 commits)"
+   ],
+   "meaning": "The third graph: git history read once per process (non-merge commits with touched files, net-LOC deltas), filtered to concern-carrying commits, consumed by decompose, drift, mass, economy, atlas heat and verify.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/evolution.ts",
+    "src/diagnostics/decompose.ts"
+   ],
+   "related": [
+    "decompose",
+    "drift",
+    "heat",
+    "economy (context closure)",
+    "prune"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "verify",
+   "aliases": [
+    "coherence verify",
+    "the gate",
+    "the verify loop",
+    "coherent verdict (✓ coherent)",
+    "run"
+   ],
+   "meaning": "The command that grades every claim, the narrative chain and coverage, in a fast (deterministic) or full (live/executable) tier, files a status record, emits jobs, and optionally writes a receipt.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/verify.ts",
+    "README.md#The verify loop + verdict flow"
+   ],
+   "related": [
+    "verdict",
+    "verify run tier",
+    "coverage gate",
+    "status record",
+    "receipt"
+   ],
+   "overlap_note": "'verify' is also an orient heading and a consequence relation ('verifies')."
+  },
+  {
+   "name": "verify run tier",
+   "aliases": [
+    "--fast",
+    "fast tier",
+    "full tier",
+    "deterministic tier",
+    "live tier",
+    "executable tier",
+    "inner loop / pre-commit / CI tier",
+    "scoped run"
+   ],
+   "meaning": "Which claims a verify run executes: --fast runs structural claims, typechecks, anchoring, meta-oracle and static existence; the full run adds responds probes and test oracles. Tiers age independently in the status record.",
+   "layer": "verification",
+   "defined_in": [
+    "README.md#The verify loop",
+    "src/evidence/status.ts (lastFastAt, lastFullAt)"
+   ],
+   "related": [
+    "verify",
+    "claim tier",
+    "freshness"
+   ],
+   "overlap_note": "Three unrelated 'tier' vocabularies coexist: run tier (fast/full), claim-form tier (deterministic/live/executable/hybrid), enforcement-ladder tier (1/2/3)."
+  },
+  {
+   "name": "claim tier",
+   "aliases": [
+    "form tier",
+    "deterministic | live | executable | hybrid"
+   ],
+   "meaning": "The tier field of a claim form saying what evidence it needs; hybrid forms mix a deterministic part (anchoring, symbol lookup, meta-oracle) with an executable oracle.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/phrasebook.ts (ClaimForm.tier)"
+   ],
+   "related": [
+    "claim form",
+    "verify run tier"
+   ],
+   "overlap_note": "See verify run tier and tier (enforcement ladder)."
+  },
+  {
+   "name": "verdict",
+   "aliases": [
+    "pass | fail | skip",
+    "green | red | skipped",
+    "kind (ClaimResult)",
+    "light (panel)",
+    "claim-result asset",
+    "verdict chart (atlas)"
+   ],
+   "meaning": "What a gate is permitted to say about one claim: pass, fail or skip with a detail; recorded per claim in the status record and rendered as lights, chips and Scope claim-result assets.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/phrasebook.ts (ClaimResult)",
+    "src/evidence/status.ts",
+    "coherence.config.json (atlas.charts.verdict)"
+   ],
+   "related": [
+    "claim",
+    "dialect gap",
+    "status record",
+    "grade"
+   ],
+   "overlap_note": "The panel's 'light' adds stale/not-run/dialect-gap marks derived from the same verdicts."
+  },
+  {
+   "name": "dialect gap",
+   "aliases": [
+    "no verifier",
+    "unrecognized claim line",
+    "silent skip",
+    "? light",
+    "U grade"
+   ],
+   "meaning": "A claim line matching no form: skipped rather than red, so a typo'd verb is a silent no-op; the panel gives it its own mark and the promise graph grades it U.",
+   "layer": "verification",
+   "defined_in": [
+    "README.md#The claim phrasebook",
+    "src/readings/panel.ts",
+    "src/readings/promise.ts"
+   ],
+   "related": [
+    "verdict",
+    "claim form",
+    "grade"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "anchoring",
+   "aliases": [
+    "anchor",
+    "anchored invariant",
+    "unanchored invariant",
+    "anchors added",
+    "zero-anchor alarm"
+   ],
+   "meaning": "The relation between an invariant and the boundary/coverage/parity claim that enforces it; the coverage gate refuses unanchored invariants, and novelty/signal count 'anchors added'.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/phrasebook.ts (ClaimCtx.anchor)",
+    "src/verification/verify.ts",
+    "src/diagnostics/novelty.ts"
+   ],
+   "related": [
+    "invariant",
+    "boundary claim",
+    "coverage gate",
+    "novelty",
+    "signal"
+   ],
+   "overlap_note": "'anchor' also names an entrance anchor (file/symbol address) and atlas `anchoredBy`."
+  },
+  {
+   "name": "coverage gate",
+   "aliases": [
+    "coverage",
+    "components claimed",
+    "no-unanchored-invariant gate",
+    "the ratchet (README)",
+    "why presence"
+   ],
+   "meaning": "Verify's meta-claims over the graph: every component carries claims and a `## why`, and every declared invariant is anchored; a failure reds the run.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/verify.ts",
+    "README.md#`## invariants`"
+   ],
+   "related": [
+    "anchoring",
+    "invariant",
+    "coverage claim"
+   ],
+   "overlap_note": "Collides with the `coverage` claim verb and with 'refutation coverage' (a report line, never red)."
+  },
+  {
+   "name": "never-red advisory",
+   "aliases": [
+    "everFailed",
+    "sticky red history",
+    "green every run",
+    "never observed failing",
+    "unrefuted"
+   ],
+   "meaning": "Claims green on 3+ runs that have never been red and carry no refutation are flagged as possibly unfalsifiable; backed by everFailed/lastFailAt in the status record.",
+   "layer": "verification",
+   "defined_in": [
+    "README.md#The never-red advisory",
+    "src/evidence/status.ts"
+   ],
+   "related": [
+    "refutation",
+    "status record",
+    "--raise"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "holding cost",
+   "aliases": [
+    "verify.cost",
+    "ms per claim",
+    "report clock vs wall clock",
+    "maintenance-cost ledger",
+    "energy strip (panel)"
+   ],
+   "meaning": "What a run pays to keep each claim true: per-claim duration with the clock that produced it, summed (never blended), filed run-level in the status record.",
+   "layer": "verification",
+   "defined_in": [
+    "README.md#The maintenance-cost ledger",
+    "src/evidence/status.ts",
+    "src/verification/phrasebook.ts (ClaimResult.ms)"
+   ],
+   "related": [
+    "status record",
+    "panel",
+    "mass"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "oracle execution mode",
+   "aliases": [
+    "batched oracle execution",
+    "serial oracles",
+    "--serial-oracles",
+    "--from-report",
+    "testBatch / testBatchFormat (vitest-json | pytest-json)",
+    "batch (derived)",
+    "OracleAccess"
+   ],
+   "meaning": "How the executable tier runs: from a supplied report, one batched whole-suite run (configured or derived), or one runner boot per claim (only when named); an unrecognized runner refuses loudly.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/test-batch.ts",
+    "README.md#Batched oracle execution"
+   ],
+   "related": [
+    "test runner",
+    "oracle",
+    "testMatch"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "test runner",
+   "aliases": [
+    "config.test",
+    "config.typecheck",
+    "runner",
+    "node:test shim (run-named-test)",
+    "vitest / pytest",
+    "execNamedTest (single front door)"
+   ],
+   "meaning": "The project-configured command coherence shells to answer executable claims, plus the harness's own node:test shim that resolves a name to its owning file so a vanished name exits nonzero.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/run-named-test.ts",
+    "src/verification/phrasebook.ts",
+    "src/types.ts (Config.test)"
+   ],
+   "related": [
+    "oracle",
+    "oracle execution mode",
+    "serial canary"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "testMatch",
+   "aliases": [
+    "positive evidence rule",
+    "exit 0 is not trusted",
+    "renamed-test trap"
+   ],
+   "meaning": "A regex the runner output must contain for a serial pass to count, because runners exit 0 when a name filter matched nothing; unnecessary for batched claims.",
+   "layer": "config",
+   "defined_in": [
+    "src/types.ts (Config.testMatch)",
+    "README.md#Config reference"
+   ],
+   "related": [
+    "test runner",
+    "vanished oracle"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "vanished oracle",
+   "aliases": [
+    "VANISHED ORACLE",
+    "zero matching tests",
+    "green-by-absence",
+    "renamed or deleted test"
+   ],
+   "meaning": "A claim citing a test name nothing owns; batch mode and the static floor make it its own red verdict rather than a pass.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/test-batch.ts",
+    "src/verification/static-oracles.ts"
+   ],
+   "related": [
+    "oracle",
+    "testMatch",
+    "static oracle index"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "static oracle index",
+   "aliases": [
+    "staticOracleExistence",
+    "fast existence floor",
+    "source-derived Vitest title index",
+    "existence UNKNOWN"
+   ],
+   "meaning": "A zero-execution scan of test source that proves a named oracle exists (skip) or is statically absent (red); dynamic titles make absence UNKNOWN.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/static-oracles.ts",
+    "README.md#Source-derived oracle existence"
+   ],
+   "related": [
+    "vanished oracle",
+    "verify run tier"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "serial canary",
+   "aliases": [
+    "proveSerialRunnerCanFail",
+    "a checker never seen to fail"
+   ],
+   "meaning": "Once per serial verify, run the runner with a name that exists nowhere and require it to fail; a runner that passes cannot filter by name and is refused.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/phrasebook.ts"
+   ],
+   "related": [
+    "test runner",
+    "non-vacuity floor"
+   ],
+   "overlap_note": "'canary' also names the live swarm canary in README validation and the PostToolUse startup canary."
+  },
+  {
+   "name": "non-vacuity floor",
+   "aliases": [
+    "floor",
+    "vacuityRefusal",
+    "ratchet floor",
+    "✗ [floor]",
+    "instrument-check-first idiom"
+   ],
+   "meaning": "Before grading, prove a surface exists: a run deriving zero claims while the record remembers a graded surface refuses; a ratchet refuses to pin an empty reading over a live baseline.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/floor.ts",
+    "src/commands.ts (writesArtifacts, writesBaseline)"
+   ],
+   "related": [
+    "adoption ladder",
+    "baseline",
+    "status record"
+   ],
+   "overlap_note": "See 'floor' overload in domain floor."
+  },
+  {
+   "name": "adoption ladder",
+   "aliases": [
+    "on-ramp",
+    "adoption state",
+    "the one next action",
+    "first rung",
+    "(evicted) onboard"
+   ],
+   "meaning": "What verify prints on a project with no record and no claims instead of a green: the named adoption state and one re-runnable next action per run.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/floor.ts",
+    "README.md#In detail (Adoption)"
+   ],
+   "related": [
+    "non-vacuity floor",
+    "scaffold"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "narrative evidence chain",
+   "aliases": [
+    "narrative.json",
+    "statement",
+    "verifiedHash",
+    "pending | broken | drifted | ok",
+    "verify-statement job"
+   ],
+   "meaning": "Prose statements pinned to evidence files; verify hashes the evidence and flips statements to pending (job emitted) or broken (hard fail); verdicts re-pin them.",
+   "layer": "verification",
+   "defined_in": [
+    "README.md#The narrative evidence chain",
+    "src/verification/verify.ts"
+   ],
+   "related": [
+    "verify jobs",
+    "verdicts file"
+   ],
+   "overlap_note": "Scope docs call these 'narrative verification' exclusions from receipts."
+  },
+  {
+   "name": "verify jobs",
+   "aliases": [
+    ".coherence/verify-jobs.json",
+    "inference jobs",
+    "VERIFY / GENERATE / AUTHOR groups",
+    "generate-doc | generate-claims | author-why | verify-statement | anchor-invariant",
+    "hot (job ranking)"
+   ],
+   "meaning": "The list verify emits for a subagent: judge statements, generate derivable docs/claims, or author a missing why; ranked by churn heat.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/verify.ts",
+    "README.md#The narrative evidence chain"
+   ],
+   "related": [
+    "narrative evidence chain",
+    "undocumented symbol",
+    "heat"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "verdicts file",
+   "aliases": [
+    ".coherence/verify-verdicts.json",
+    "--apply <verdicts>",
+    "judge ≠ notary (axiom #5)",
+    "supported / corrected"
+   ],
+   "meaning": "The subagent's answers to VERIFY jobs (`{id, supported, reason, corrected}`) that verify records mechanically; the judge and the notary are deliberately separate parties.",
+   "layer": "verification",
+   "defined_in": [
+    "README.md#The narrative evidence chain",
+    "src/verification/verify.ts (applyVerdicts)"
+   ],
+   "related": [
+    "narrative evidence chain",
+    "verify jobs"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "verify scope",
+   "aliases": [
+    "--staged",
+    "--since <ref>",
+    "affected components",
+    "changed files",
+    "scoped run",
+    "word-edit propagation"
+   ],
+   "meaning": "Restricting a run to components whose files changed (plus conformers of an edited dictionary word); scoped runs replace only what they touched in the record.",
+   "layer": "verification",
+   "defined_in": [
+    "src/diagnostics/structural.ts (changedFiles, affectedComponents)",
+    "README.md#In detail (verify)"
+   ],
+   "related": [
+    "verify",
+    "status record",
+    "dictionary word"
+   ],
+   "overlap_note": "'scope' is also the Scope reading surface, work read/write scopes, and decision scope fields — four unrelated uses."
+  },
+  {
+   "name": "receipt",
+   "aliases": [
+    "verification receipt",
+    "verification:sha256-…",
+    "immutable local verification evidence",
+    "--receipt",
+    "receipts command",
+    "start record / terminal seal (.done.json) / artifacts",
+    "eligibility",
+    "incomplete run"
+   ],
+   "meaning": "An immutable, content-addressed record of one verify run (raw observations, before/after input manifests, executor and configuration fingerprints) that can be bound to a work order and cited by a `verifies` consequence edge. Local unattested testimony, not proof.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/receipts.ts",
+    "docs/verification-receipts-design.md",
+    "README.md#Immutable verification receipts"
+   ],
+   "related": [
+    "verify",
+    "work order",
+    "consequence",
+    "status record",
+    "input manifest / input grade"
+   ],
+   "overlap_note": "Overlaps with the status record (rolling, merged) — receipts exist precisely because status cannot identify one run."
+  },
+  {
+   "name": "input manifest / input grade",
+   "aliases": [
+    "inputsAfter",
+    "Git-visible working files",
+    "declared exclusions",
+    "executor identity",
+    "configuration fingerprint",
+    "before/after samples"
+   ],
+   "meaning": "The bounded set of bytes a receipt binds (tracked and untracked source, index provenance, effective config, executor id), with named exclusions (status scratch, receipts, jobs, work/consequence ledgers).",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/receipts.ts",
+    "docs/verification-receipts-design.md"
+   ],
+   "related": [
+    "receipt"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "guarantee reading",
+   "aliases": [
+    "guarantee (guarantees --json)",
+    "g-… claim reference",
+    "guaranteeRef",
+    "canonical boundary claim",
+    "evidence reading",
+    "guarantee asset",
+    "one per invariant and oracle"
+   ],
+   "meaning": "A boundary claim addressed by a stable hash of its owner directory and full parsed boundary, joined to its recorded oracle verdict, taxonomy obligations and explicit links; the unit `guarantees`, Scope's Guarantees view and guarantee links refer to.",
+   "layer": "verification",
+   "defined_in": [
+    "src/verification/guarantees.ts",
+    "src/verification/boundary.ts (guaranteeRef)",
+    "docs/scope.md#Asset inventory"
+   ],
+   "related": [
+    "boundary claim",
+    "invariant",
+    "guarantee link",
+    "grade"
+   ],
+   "overlap_note": "This is the 'guarantee' layer name for an invariant+boundary pair; the guarantee catalog's 'guarantee definitions' are a different, project-independent thing with the same word."
+  },
+  {
+   "name": "guarantee catalog",
+   "aliases": [
+    "candidate vocabulary",
+    "guarantee definition",
+    "guarantee:<slug> (36 definitions)",
+    "coherence-guarantees/v0",
+    "promise / appliesWhen / parameters / excludes / falsifier / demoteWhen / distinctFrom / example",
+    "example grade (source-inspected | test-inspected | mutation-tested)",
+    "guarantee-definition asset"
+   ],
+   "meaning": "A project-independent reference catalog of 36 scoped guarantee definitions with applicability, binding parameters, exclusions, falsifiers, demotion criteria and pinned PostHog examples; lookup loads no project and activates nothing.",
+   "layer": "guarantee-catalog",
+   "defined_in": [
+    "src/verification/guarantee-catalog.ts",
+    "README.md#Connecting obligations and guarantees",
+    "docs/assays/posthog-guarantees-v0"
+   ],
+   "related": [
+    "guarantee binding",
+    "obligation",
+    "taxonomy"
+   ],
+   "overlap_note": "Shares the `guarantee:` id namespace with taxonomy suggestions (`guarantee:G-…`), yet README says catalog ids cannot be used as taxonomy obligations — two populations, one prefix."
+  },
+  {
+   "name": "falsifier",
+   "aliases": [
+    "challenge",
+    "counterexample command",
+    "Challenge this binding"
+   ],
+   "meaning": "The catalog definition's described way to break the guarantee; Scope drafts a `coherence conjecture` challenge command from it for a binding (draft only, never recorded by the browser).",
+   "layer": "guarantee-catalog",
+   "defined_in": [
+    "src/verification/guarantee-catalog.ts",
+    "src/readings/scope/binding-reading.ts"
+   ],
+   "related": [
+    "guarantee catalog",
+    "conjecture",
+    "refutation"
+   ],
+   "overlap_note": "A falsifier is the catalog's counterpart of a refutation: the former is a planned break, the latter an observed one."
+  },
+  {
+   "name": "obligation",
+   "aliases": [
+    "taxonomy obligation",
+    "suggested obligation",
+    "activated obligation",
+    "unverified obligation",
+    "obligation asset",
+    "guarantee:G-… (taxonomy suggestion id)",
+    "applicability / mapping / satisfaction (caller-assessed | linked | unverified)",
+    "level (mandatory | conditional)"
+   ],
+   "meaning": "What a component owes by its assessed role: a taxonomy-suggested guarantee that stays unverified until an explicit `## addresses` link maps it to a local claim; never a verdict.",
+   "layer": "taxonomy-catalog",
+   "defined_in": [
+    "src/taxonomy/taxonomy-catalog.ts (guarantees array)",
+    "src/verification/guarantees.ts",
+    "docs/scope.md (obligations view)"
+   ],
+   "related": [
+    "taxonomy",
+    "guarantee link",
+    "guarantee catalog",
+    "assessment"
+   ],
+   "overlap_note": "Three 'obligations': taxonomy suggestions (implemented), the proposed `## obligations` spec section (docs/code-contracts-lessons-design.md), and doctrine/regulator 'obligations' (a rule owed an action)."
+  },
+  {
+   "name": "obligations section (proposed)",
+   "aliases": [
+    "## obligations",
+    "<slug>: <requirement>",
+    "never green",
+    "promotable to invariant",
+    "governs command (proposed)",
+    "review packet (proposed)"
+   ],
+   "meaning": "A designed-but-unimplemented spec section for rules that cannot yet go red, inheriting downward, diffed by log, promotable to an invariant; proposed alongside `coherence governs` and `coherence review`.",
+   "layer": "spec-grammar",
+   "defined_in": [
+    "docs/code-contracts-lessons-design.md"
+   ],
+   "related": [
+    "obligation",
+    "invariant",
+    "why (rationale)"
+   ],
+   "overlap_note": "Would add a third meaning of 'obligation'; the design doc itself says vocabulary must be reconciled."
+  },
+  {
+   "name": "decision journal",
+   "aliases": [
+    "the journal",
+    "durable agent record",
+    "decision ledger",
+    ".coherence/decisions/<session>.jsonl",
+    "signal residue",
+    "record chart (atlas)",
+    "permit history (metaphor)"
+   ],
+   "meaning": "Append-only, per-session JSONL of what agents chose, rejected, wondered, could not do, and escalated; merged into one timeline; it gates nothing by design.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/decisions.ts",
+    "README.md#The decision journal"
+   ],
+   "related": [
+    "decision",
+    "conjecture",
+    "session",
+    "journal stream",
+    "trusted projection vs tolerant read"
+   ],
+   "overlap_note": "'journal' names the whole record, the `journal` live-read command, and the `journal` Scope view; 'decisions' names both the read command and the storage folder holding all nine record kinds."
+  },
+  {
+   "name": "decision",
+   "aliases": [
+    "decide",
+    "chose / over / because",
+    "standing decision",
+    "kind: decision",
+    "decision asset",
+    "choice"
+   ],
+   "meaning": "A point where the work could have gone more than one way and someone picked; recorded with what was chosen, what was rejected, and why, before moving on.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/decisions.ts",
+    "src/lifecycle/hooks.ts (agentInstructions)"
+   ],
+   "related": [
+    "--over (rejected alternative)",
+    "retraction",
+    "decision position",
+    "premise lease"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "--over (rejected alternative)",
+   "aliases": [
+    "over",
+    "rejected alternatives",
+    "the field that matters most",
+    "(nothing — forced, or no alternative considered)"
+   ],
+   "meaning": "The repeatable list of what a decision rejected; the cache entry for the search that need not be re-run, and the field gate-shaped designs drop.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "README.md#Length: cap the labels",
+    "src/lifecycle/hooks.ts"
+   ],
+   "related": [
+    "decision"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "blocked",
+   "aliases": [
+    "impasse",
+    "could not",
+    "kind: blocked",
+    "Could not section"
+   ],
+   "meaning": "What an agent could NOT do and why; first-class, renders in its own section, but is historical testimony with no close lifecycle (unlike a blocked work state).",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/decisions.ts",
+    "README.md#In detail (journal verbs)"
+   ],
+   "related": [
+    "escalation",
+    "work state",
+    "decision"
+   ],
+   "overlap_note": "Collides with the `blocked` work state; orient treats journal blockage as history, work blockage as live."
+  },
+  {
+   "name": "conjecture",
+   "aliases": [
+    "kind: conjecture",
+    "open conjecture",
+    "could-be candidates",
+    "discriminated-by",
+    "[instrument] the instrument is wrong",
+    "abduction entry",
+    "question"
+   ],
+   "meaning": "What surprised an agent, with candidate explanations (the instrument-is-wrong candidate is injected) and the test that would settle it; open conjectures render above standing decisions.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/decisions.ts",
+    "README.md#The conjecture"
+   ],
+   "related": [
+    "resolution",
+    "dismissal",
+    "observed metric",
+    "--raise"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "resolution",
+   "aliases": [
+    "resolved",
+    "resolve (alias)",
+    "kind: resolution",
+    "--as / --because",
+    "supersedes"
+   ],
+   "meaning": "An append pointing at a conjecture that closes it with what the discriminating test showed; refuses ids that are not conjectures.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/decisions.ts"
+   ],
+   "related": [
+    "conjecture",
+    "dismissal",
+    "retraction"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "dismissal",
+   "aliases": [
+    "dismiss",
+    "kind: dismissal",
+    "not worth chasing",
+    "retire unanswered"
+   ],
+   "meaning": "Retiring a conjecture without answering it; its own record kind and section, never raised again by an advisory. Precedence: retraction > resolution > dismissal.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/decisions.ts",
+    "README.md#`coherence dismiss`"
+   ],
+   "related": [
+    "conjecture",
+    "resolution",
+    "--raise"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "retraction",
+   "aliases": [
+    "retract",
+    "kind: retraction",
+    "withdraw by append",
+    "--for <replacement>",
+    "supersedes pointer"
+   ],
+   "meaning": "Withdrawing a decision or conjecture by appending a record that points at it; crosses session files; a retracted conjecture may be raised again.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/decisions.ts"
+   ],
+   "related": [
+    "decision",
+    "conjecture",
+    "journal id"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "escalation",
+   "aliases": [
+    "escalate",
+    "kind: escalation",
+    "a human must see this",
+    "route to a human",
+    "AWAIT-HUMAN heading"
+   ],
+   "meaning": "A record that a person must see something before anyone proceeds; heads every journal read and orient until a human appends an acknowledgement; gates nothing mechanically.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/decisions.ts",
+    "RELEASE-NOTES.md#Unreleased — the route to a human",
+    "src/coordination/orient.ts"
+   ],
+   "related": [
+    "acknowledgement",
+    "blocked",
+    "orient heading"
+   ],
+   "overlap_note": "Distinct from `blocked` by who must act: what the agent could not do vs what no agent may decide."
+  },
+  {
+   "name": "acknowledgement",
+   "aliases": [
+    "acknowledge",
+    "kind: acknowledgement",
+    "what the human decided"
+   ],
+   "meaning": "A human's record of having seen an escalation and what they decided — the only thing that clears one; retracting it reopens the escalation.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/decisions.ts"
+   ],
+   "related": [
+    "escalation"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "observed metric",
+   "aliases": [
+    "observed",
+    "tracked metric",
+    "band / threshold",
+    "label (dedupe key)",
+    "outside band / within band / returned-to-band",
+    "--why closes"
+   ],
+   "meaning": "A harness-reported measurement with the project's own band; outside the band and unexplained it opens at most one conjecture per label; coming back inside resolves nothing.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/observed.ts",
+    "README.md#`coherence observed`"
+   ],
+   "related": [
+    "conjecture",
+    "finding key"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "session record",
+   "aliases": [
+    "kind: session",
+    "session envelope",
+    "session-opening record",
+    "SessionStart header"
+   ],
+   "meaning": "The journal row a hook writes when a session opens, attributing later rows; withheld from the Scope journal view but counted.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    ".coherence/decisions/*.jsonl (kind session)",
+    "src/lifecycle/hooks.ts"
+   ],
+   "related": [
+    "session",
+    "decision journal"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "journal id",
+   "aliases": [
+    "d-… id",
+    "content-addressed id",
+    "NUL-joined SHA-256",
+    "supersedes",
+    "def-… / e-… / wrk-… / lnk-… / t-… ids"
+   ],
+   "meaning": "Ids are pointers minted from a record's content (fields joined on NUL), so a retraction or resolution can name a row across files and a retry dedupes; each ledger has its own prefix.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "README.md#Storage: one append-only file per agent session",
+    "src/evidence/decisions.ts"
+   ],
+   "related": [
+    "retraction",
+    "reference (kind:id)"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "session",
+   "aliases": [
+    "session id",
+    "--session",
+    "COHERENCE_SESSION / CODEX_THREAD_ID",
+    "s-<12 hex> (hook-minted)",
+    "<branch>-<agent>-<date> (derived)",
+    "session file",
+    "session hash address",
+    "stream (journal)",
+    "session asset / session filter (Scope)"
+   ],
+   "meaning": "The exact writer identity every ledger write is attributed to and the filename it appends to; random for a hook, derived for a hand-typed command, hashed when names alias.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "README.md#The session id",
+    "src/evidence/decisions.ts",
+    "src/readings/scope/sessions.ts"
+   ],
+   "related": [
+    "agent / job attribution",
+    "decision journal",
+    "attribution ceiling"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "agent / job attribution",
+   "aliases": [
+    "--agent",
+    "--job",
+    "COHERENCE_AGENT / COHERENCE_JOB",
+    "agent label",
+    "job = branch"
+   ],
+   "meaning": "Caller-supplied labels (not authenticated identities) stored on every row: which agent wrote it and which job/branch it belonged to.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/decisions.ts",
+    "README.md#`coherence defect`"
+   ],
+   "related": [
+    "session",
+    "branch / commit provenance"
+   ],
+   "overlap_note": "'job' is used both as the journal attribution field (branch name) and for verify's inference 'jobs' — unrelated."
+  },
+  {
+   "name": "branch / commit provenance",
+   "aliases": [
+    "branch",
+    "commit",
+    "dirty",
+    "repo snapshot",
+    "provenance stamp"
+   ],
+   "meaning": "The git branch, short commit and dirty bit captured on journal rows, status sections, receipts and defects so a reader can date every claim; null means git could not answer.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/decisions.ts",
+    "src/evidence/status.ts",
+    "src/evidence/defects.ts"
+   ],
+   "related": [
+    "freshness",
+    "session"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "decision wire v2 fields",
+   "aliases": [
+    "--work",
+    "--subject",
+    "--authority (local-proposal | orchestrator-accepted | user-directed)",
+    "--scope-component / --scope-file / --scope-symbol / --environment",
+    "structured decision",
+    "swarm-addressable choice"
+   ],
+   "meaning": "Optional structured fields that make a decision addressable by the swarm: the exact question (subject), the authority grade, the work it belongs to and machine-addressable scope. They do not infer each other.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "README.md#Two journal reads, two trust contracts",
+    "src/evidence/decision-position.ts"
+   ],
+   "related": [
+    "decision",
+    "decision position",
+    "work authority",
+    "premise lease"
+   ],
+   "overlap_note": "Decision `scope` (component/file/symbol) is another meaning of 'scope'."
+  },
+  {
+   "name": "decision position",
+   "aliases": [
+    "ratification",
+    "needs-ratification",
+    "contested",
+    "aligned",
+    "decision authority",
+    "policy"
+   ],
+   "meaning": "Derived per subject from explicit fields: differing local proposals need ratification, a stronger authority ratifies, ties at the top stay contested; prose similarity and recency never decide.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/decision-position.ts",
+    "README.md#Agent and swarm quick path"
+   ],
+   "related": [
+    "decision wire v2 fields",
+    "orient heading"
+   ],
+   "overlap_note": "'authority' is split into decision authority (whose choice ratifies) and work authority (who may act) — deliberately, but with one word."
+  },
+  {
+   "name": "trusted projection vs tolerant read",
+   "aliases": [
+    "strict read",
+    "strict merged reader",
+    "verdict-bearing read",
+    "tolerant historical read",
+    "fail closed on damage",
+    "damage / torn / displaced / forged row",
+    "external witness (Git HEAD)"
+   ],
+   "meaning": "Two contracts over every ledger: human renders keep whatever rows survive and show damage; verdict-bearing consumers (signal, orient, regulate) refuse the whole population on one malformed, displaced or conflicting row, and consult Git HEAD when zero rows survive.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "README.md#Two journal reads, two trust contracts",
+    "src/evidence/decisions.ts (readTrustedJournal)",
+    "src/coordination/work.ts"
+   ],
+   "related": [
+    "decision journal",
+    "orient heading",
+    "damage"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "compaction",
+   "aliases": [
+    "decisions --compact",
+    "fold",
+    "(branch, month) file",
+    "byte-identical record"
+   ],
+   "meaning": "Folding committed session files into one per (branch, month) without changing what `decisions` prints; skips uncommitted, recent, or edited files.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "README.md#`coherence decisions --compact`",
+    "src/evidence/decisions.ts"
+   ],
+   "related": [
+    "decision journal",
+    "journal stream"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "journal stream",
+   "aliases": [
+    "coherence journal",
+    "live read",
+    "tail",
+    "--follow / --once",
+    "surf",
+    "stream (one session)",
+    "content-addressed tail"
+   ],
+   "meaning": "The chronological, live, per-stream read of the same record, deduped on record identity so appends and compaction folds neither drop nor duplicate an entry.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/journal.ts",
+    "README.md#Reading it live"
+   ],
+   "related": [
+    "decision journal",
+    "journal feed",
+    "compaction"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "journal feed",
+   "aliases": [
+    "journalFeed",
+    "peer journal updates",
+    "preview / record / pending / announced",
+    "journal cursor (.coherence/journal-cursors)",
+    "journal lock",
+    "deliverJournalUpdates"
+   ],
+   "meaning": "Opt-in delivery of peer journal entries into an agent's context at prompt and tool boundaries as bounded, escaped, attributed data, with per-session cursors that only advance on flushed output and a dead-holder-recoverable lock.",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "src/lifecycle/journal-feed.ts",
+    "src/lifecycle/journal-lock.ts",
+    "README.md (agentInstructions text)"
+   ],
+   "related": [
+    "journal stream",
+    "hook events",
+    "session"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "defect",
+   "aliases": [
+    "defect record",
+    "kind/event: recorded",
+    "agent-assessed",
+    "basis",
+    "def-… id",
+    ".coherence/defects",
+    "defect asset"
+   ],
+   "meaning": "An agent's assessed conclusion that behaviour violated an expectation, with the evidence that made it a defect and affected files; append-only, content-addressed, no repair lifecycle.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/defects.ts",
+    "README.md#`coherence defect`"
+   ],
+   "related": [
+    "conjecture",
+    "consequence",
+    "calibration sample"
+   ],
+   "overlap_note": "Also the calibration outcome label `defect` (clean | defect) — same word, different record."
+  },
+  {
+   "name": "experiment",
+   "aliases": [
+    "plan (alias)",
+    "hypothesis",
+    "predicted context",
+    "action (a1…) / criterion (s1…)",
+    "action status (followed | revised | skipped | unknown)",
+    "criterion status (met | unmet | unknown)",
+    "outcome (success | failure | inconclusive)",
+    "close template",
+    "e-… id",
+    "experiment / experiment-event assets"
+   ],
+   "meaning": "A frozen falsifiable plan (hypothesis, predicted reading surface, inert actions, observable criteria, evidence cursors) closed later with evidence for every id; the outcome is derived, never supplied.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/experiment.ts",
+    "README.md#`coherence experiment`"
+   ],
+   "related": [
+    "telemetry scope",
+    "consequence",
+    "calibration sample"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "telemetry scope",
+   "aliases": [
+    "none | owner-session | parent-session-aggregate | legacy-unscoped",
+    "weakest provable attribution",
+    "trace window / activity window"
+   ],
+   "meaning": "The label an experiment close gives its trace and activity windows naming the strongest attribution the frozen rows actually prove.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/experiment.ts",
+    "README.md#Adopt the lifecycle control (step 6)"
+   ],
+   "related": [
+    "experiment",
+    "attribution ceiling",
+    "read trace",
+    "activity row"
+   ],
+   "overlap_note": "Same vocabulary as calibration's attribution and hook status's parent-fallback."
+  },
+  {
+   "name": "status record",
+   "aliases": [
+    ".coherence/status.json",
+    "run record",
+    "last known truth, honestly dated",
+    "verify / atlas / drift / mass / economy sections",
+    "runs / everFailed / lastFailAt",
+    "instrument asset (Scope)",
+    "record chart (atlas)"
+   ],
+   "meaning": "The persistent report every instrument files instead of only printing: per-claim verdicts with sticky red history, tier grades, trajectories, cost; each section stamped with time, commit and dirty bit. Merge rules: a skip never clobbers a verdict, scoped runs replace only what they touched.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/status.ts",
+    "README.md#The status record and the panel"
+   ],
+   "related": [
+    "verify",
+    "panel",
+    "freshness",
+    "never-red advisory",
+    "due"
+   ],
+   "overlap_note": "Only 5 of 51 commands write it, which is why `due` cannot report the other 46."
+  },
+  {
+   "name": "freshness",
+   "aliases": [
+    "stale",
+    "current",
+    "age",
+    "◐ stale light",
+    "lastFastAt / lastFullAt",
+    "currency (taxonomy, guarantee links)",
+    "expired"
+   ],
+   "meaning": "Whether a recorded reading still describes the tree: a verdict from another commit is stale, a taxonomy assessment whose subject bytes changed is stale, a receipt is current only at the same HEAD with no material change.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/status.ts",
+    "src/readings/panel.ts",
+    "src/coordination/orient.ts (verifyOrientation)",
+    "src/taxonomy/taxonomy.ts"
+   ],
+   "related": [
+    "status record",
+    "receipt",
+    "assessment",
+    "premise lease"
+   ],
+   "overlap_note": "Spelled 'stale', 'expired', 'current', 'currency' across layers for one idea."
+  },
+  {
+   "name": "premise lease",
+   "aliases": [
+    "premise",
+    "structural lease",
+    "files lease",
+    "valid | moved-or-ambiguous | broken",
+    "expired premise"
+   ],
+   "meaning": "The mechanically answerable part of 'is this cached decision still true': do the repository addresses it named still resolve? Authored `files` are gate-grade, prose paths advisory.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/premise.ts"
+   ],
+   "related": [
+    "decision",
+    "freshness",
+    "finding key"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "calibration sample",
+   "aliases": [
+    "calibrate",
+    "--outcome clean | defect",
+    "predicted vs observed reads",
+    "coverage / outside reads",
+    "attribution",
+    "r-… id",
+    ".coherence/calibration"
+   ],
+   "meaning": "A per-session comparison of economy's predicted one-hop context against explicitly traced reads for a patch, labeled later with an outcome; a lower bound, never causal proof.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/calibration.ts",
+    "README.md#In detail (calibrate)"
+   ],
+   "related": [
+    "economy (context closure)",
+    "read trace",
+    "defect",
+    "telemetry scope"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "read trace",
+   "aliases": [
+    "PostToolUse trace",
+    ".coherence/read-traces",
+    "explicit-path lower bound",
+    "mode read | write",
+    "provenance / observation"
+   ],
+   "meaning": "The transient per-session record of explicit read/write paths from tool events, carrying host, transport, bundle hash and attribution; feeds calibration and experiments.",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "src/lifecycle/read-trace.ts",
+    "README.md#Known limits"
+   ],
+   "related": [
+    "calibration sample",
+    "activity row",
+    "attribution ceiling"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "activity row",
+   "aliases": [
+    "lifecycle activity",
+    ".coherence/activity",
+    "heartbeat",
+    "observation identity (host, transport, bundleHash)",
+    "event id",
+    "isActivityRow"
+   ],
+   "meaning": "The per-session append-only record of hook traffic used to answer whether the installed launcher ever reached the body and what a session is doing; internally inconsistent rows count as damage.",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "src/lifecycle/activity.ts"
+   ],
+   "related": [
+    "activation",
+    "read trace",
+    "hook events"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "work order",
+   "aliases": [
+    "work",
+    "wrk-… id",
+    "objective / success criteria / constraints / non-goals / risk / authority / owner / parent / dependencies / read+write scopes",
+    "opening contract",
+    "assignment",
+    "work asset",
+    "swarm work graph",
+    "work ledger"
+   ],
+   "meaning": "An append-only record of intent and authority for coordinated agent work: frozen at open, advanced by predecessor-checked events, owned by one exact session; it coordinates but never spawns or executes.",
+   "layer": "coordination",
+   "defined_in": [
+    "src/coordination/work.ts",
+    "README.md#`coherence work`"
+   ],
+   "related": [
+    "work state",
+    "work event",
+    "handoff",
+    "work authority",
+    "write scope / collision",
+    "synthesis"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "work state",
+   "aliases": [
+    "open | active | blocked | completed | cancelled",
+    "readiness (ready | waiting | active | blocked | done)",
+    "terminal state",
+    "honest exit (cancelled)"
+   ],
+   "meaning": "The lifecycle of a work order and its derived readiness; activation and completion wait on dependencies, cancelled is the terminal non-success that satisfies nothing.",
+   "layer": "coordination",
+   "defined_in": [
+    "src/coordination/work.ts (WorkState, WorkReadiness)"
+   ],
+   "related": [
+    "work order",
+    "blocked",
+    "orient heading"
+   ],
+   "overlap_note": "`blocked` here is live scheduler state; the journal's `blocked` is history."
+  },
+  {
+   "name": "work event",
+   "aliases": [
+    "opened | transitioned | handoff | closed",
+    "wev-… id",
+    "predecessor token",
+    "--expected-previous",
+    "last.id",
+    "compare-and-append"
+   ],
+   "meaning": "One content-addressed event appended to the writer's file, pointing at its predecessor so two writers advancing the same predecessor create competing history that the strict reader refuses.",
+   "layer": "coordination",
+   "defined_in": [
+    "src/coordination/work.ts"
+   ],
+   "related": [
+    "work order",
+    "work state",
+    "trusted projection vs tolerant read"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "handoff",
+   "aliases": [
+    "work handoff",
+    "--owner-session / --owner-agent",
+    "ownership transfer"
+   ],
+   "meaning": "The only way work ownership moves: an event naming the next exact session/agent pair.",
+   "layer": "coordination",
+   "defined_in": [
+    "src/coordination/work.ts",
+    "src/lifecycle/hooks.ts (assignedWorkInstructions)"
+   ],
+   "related": [
+    "work order",
+    "session"
+   ],
+   "overlap_note": "Structure docs use 'handoff' for an architectural relationship arrow — unrelated."
+  },
+  {
+   "name": "work authority",
+   "aliases": [
+    "--authority (orchestrator-delegated …)",
+    "--granted-by",
+    "--boundary (granted scope)",
+    "authority boundary",
+    "who may act"
+   ],
+   "meaning": "Who granted a work order and within what plain-language limit; answers who may act, separately from decision authority (whose choice ratifies).",
+   "layer": "coordination",
+   "defined_in": [
+    "src/coordination/work.ts",
+    "README.md#Agent and swarm quick path"
+   ],
+   "related": [
+    "work order",
+    "decision position",
+    "swarm roles"
+   ],
+   "overlap_note": "'boundary' here is an authority limit, not a boundary claim."
+  },
+  {
+   "name": "write scope / collision",
+   "aliases": [
+    "--read-scope / --write-scope",
+    "repository address scope (exact, /**, **)",
+    "overlap",
+    "live conflict / collision",
+    "potential overlap",
+    "WRITE CONFLICT",
+    "yield"
+   ],
+   "meaning": "Declared path scopes on work orders; two runnable orders with overlapping write scopes are a collision, an overlap serialized behind a dependency stays potential. The ledger reports, it cannot prevent.",
+   "layer": "coordination",
+   "defined_in": [
+    "src/coordination/work.ts (detectWorkScopeOverlaps)",
+    "README.md#`coherence work`"
+   ],
+   "related": [
+    "work order",
+    "orient heading"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "synthesis",
+   "aliases": [
+    "synthesizedChildren",
+    "parent closure",
+    "unsynthesized child",
+    "SYNTHESIZE heading"
+   ],
+   "meaning": "A parent work order closes only when every live child is terminal and names each completed direct child it synthesized; there is no separate checkbox.",
+   "layer": "coordination",
+   "defined_in": [
+    "src/coordination/work.ts",
+    "src/coordination/orient.ts"
+   ],
+   "related": [
+    "work order",
+    "orient heading"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "consequence",
+   "aliases": [
+    "consequence edge",
+    "link",
+    "lnk-… id",
+    ".coherence/consequences",
+    "relation (authorizes | implements | produces | evaluates | verifies | supports | contradicts | reveals | repairs | supersedes | depends-on)",
+    "explicit provenance",
+    "assessed edge",
+    "consequence asset"
+   ],
+   "meaning": "An explicit, attributable, typed link between two durable records with evidence; never inferred from time, paths or Git co-presence; traversed both ways for navigation.",
+   "layer": "coordination",
+   "defined_in": [
+    "src/coordination/consequence.ts",
+    "README.md#`coherence consequence`"
+   ],
+   "related": [
+    "reference (kind:id)",
+    "work order",
+    "receipt",
+    "defect"
+   ],
+   "overlap_note": "Scope also has generic `relations` between assets (contains, anchors, …) which are not consequences."
+  },
+  {
+   "name": "reference (kind:id)",
+   "aliases": [
+    "decision:… | work:… | commit:… | experiment:… | verification:… | defect:…",
+    "record address",
+    "dangling reference",
+    "reference asset",
+    "legacy verification label"
+   ],
+   "meaning": "The addressing form for durable records; commits check against Git, ledger ids against their strict readers; a free-form legacy label remains navigable history but cannot clear work.",
+   "layer": "coordination",
+   "defined_in": [
+    "src/coordination/consequence.ts",
+    "docs/scope.md (reference asset)"
+   ],
+   "related": [
+    "consequence",
+    "journal id",
+    "receipt"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "orient heading",
+   "aliases": [
+    "orient",
+    "gyroscope",
+    "heading",
+    "refuse | await-human | resolve-conflict | repair-navigation | unblock | synthesize | dispatch | continue | verify | steady",
+    "orientation projection"
+   ],
+   "meaning": "One deterministic next action selected in fixed priority over the strict ledgers (work, decisions, consequences, experiments, defects, verification); it never runs the action and grants no authority.",
+   "layer": "coordination",
+   "defined_in": [
+    "src/coordination/orient.ts",
+    "README.md#`coherence orient`"
+   ],
+   "related": [
+    "trusted projection vs tolerant read",
+    "work state",
+    "escalation",
+    "regulator"
+   ],
+   "overlap_note": "Overlaps with `regulate`, which also emits 'exactly one next action' from a different rule set."
+  },
+  {
+   "name": "regulator",
+   "aliases": [
+    "regulate",
+    "anti-entropy doctrine applied",
+    "observe → select → act",
+    "potential (refuse > require-decision > redirect > release)",
+    "release",
+    "withheld obligations",
+    "sensor / selector"
+   ],
+   "meaning": "A narrow control loop over live readings that applies the versioned doctrine and emits at most one executable intervention; release means only that no rule fired.",
+   "layer": "coordination",
+   "defined_in": [
+    "src/coordination/regulate.ts",
+    "README.md#Regulate the field"
+   ],
+   "related": [
+    "doctrine",
+    "orient heading",
+    "host",
+    "signal"
+   ],
+   "overlap_note": "Two 'one next action' machines (orient, regulate) with different inputs and priorities."
+  },
+  {
+   "name": "doctrine",
+   "aliases": [
+    "coherence doctrine",
+    "versioned law",
+    "doctrine v2 rules (canonical-lifecycle-control, swarm-coordination-integrity, completed-work-needs-explicit-verification, significant-growth-needs-address)",
+    "obligation class",
+    "doctrine asset"
+   ],
+   "meaning": "The small versioned registry of rules the regulator may apply, each with a live observation and a remedy; order is API and cannot be configured.",
+   "layer": "coordination",
+   "defined_in": [
+    "src/coordination/doctrine.ts",
+    "README.md#Regulate the field"
+   ],
+   "related": [
+    "regulator"
+   ],
+   "overlap_note": "'doctrine' is also used loosely in prose for the project's philosophy (dissolve > declare > infer)."
+  },
+  {
+   "name": "host",
+   "aliases": [
+    "--host claude | codex",
+    "agent host",
+    "host project root (claudeProjectRoot / codexProjectRoot)",
+    "host parity",
+    "host syntax"
+   ],
+   "meaning": "The agent runtime whose lifecycle files coherence owns (.claude/settings.json or .codex/hooks.json); one lifecycle contract, two host syntaxes, independent controls.",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "src/lifecycle/control.ts",
+    "README.md#Adopt the lifecycle control"
+   ],
+   "related": [
+    "lifecycle control",
+    "activation",
+    "regulator"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "swarm roles",
+   "aliases": [
+    "swarm",
+    "fleet",
+    "orchestrator",
+    "coordinator",
+    "owner",
+    "assessor",
+    "reviewer",
+    "peer",
+    "child / parent session"
+   ],
+   "meaning": "The cast the coordination layer names: orchestrators/coordinators create and hand off work, owners advance exact assignments, assessors author consequence edges and experiment closes, peers' entries are claims to assess.",
+   "layer": "coordination",
+   "defined_in": [
+    "src/lifecycle/hooks.ts (agentInstructions)",
+    "README.md#Agent and swarm quick path"
+   ],
+   "related": [
+    "work order",
+    "work authority",
+    "session"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "live canary / efficacy trial",
+   "aliases": [
+    "canary",
+    "matched efficacy trial",
+    "V2 canary",
+    "field validation"
+   ],
+   "meaning": "README's protocol for validating a swarm: a predeclared canary proves mechanisms (attribution, collision sensing, handoff, synthesis, recovery) in one host; a matched trial asks whether they help.",
+   "layer": "other",
+   "defined_in": [
+    "README.md#Validate a swarm in the field"
+   ],
+   "related": [
+    "experiment",
+    "orient heading"
+   ],
+   "overlap_note": "'canary' also names the serial runner canary and the PostToolUse dependency canary."
+  },
+  {
+   "name": "lifecycle control",
+   "aliases": [
+    "hook bundle",
+    "five-event bundle",
+    "six-event value",
+    "canonical control",
+    "control bit",
+    "coherence-hook launcher",
+    "coherence-root mapping",
+    "hooks install / uninstall / status / print / review / --check",
+    "control asset"
+   ],
+   "meaning": "One immutable, host-selected hook bundle plus stable launcher and root mapping; presence is a single canonical runnable bit (exactly one shared copy, no competing path, runnable target).",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "src/lifecycle/control.ts",
+    "README.md#Adopt the lifecycle control"
+   ],
+   "related": [
+    "host",
+    "hook events",
+    "hook body",
+    "activation"
+   ],
+   "overlap_note": "The spec says 'six-event value', the README 'five event names' — the count itself is spelled two ways."
+  },
+  {
+   "name": "hook events",
+   "aliases": [
+    "SessionStart",
+    "SubagentStart",
+    "PostToolUse",
+    "SubagentStop",
+    "Stop",
+    "lifecycle event",
+    "lifecycle crossing"
+   ],
+   "meaning": "The host events the bundle wires: starts open a session and inject instructions, PostToolUse traces paths and delivers the feed, SubagentStop nudges once, main Stop snapshots calibration silently.",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "src/lifecycle/hooks.ts (runHook)",
+    "README.md#The decision journal"
+   ],
+   "related": [
+    "lifecycle control",
+    "hook body",
+    "project voice",
+    "stop feedback"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "hook body",
+   "aliases": [
+    "coherence hook <event>",
+    "coherence-hook binary",
+    "hook-cli",
+    "HOOK_BODY_PROTOCOL_VERSION",
+    "protocol version",
+    "bundle fingerprint / build id",
+    "wire contract"
+   ],
+   "meaning": "The dependency-light executable the harness invokes per event; its meaning is versioned (protocol 8 today) so an event from an older wire cannot prove the new body ran.",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "src/hook-cli.ts",
+    "src/lifecycle/control.ts",
+    "src/lifecycle/hooks.ts"
+   ],
+   "related": [
+    "hook events",
+    "activation",
+    "lifecycle control"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "activation",
+   "aliases": [
+    "structural presence vs current-session activation vs historical observation",
+    "activation: OBSERVED",
+    "exact installed-bundle evidence",
+    "direct probe",
+    "stale bundle",
+    "hooks status"
+   ],
+   "meaning": "Three different facts the control reports: the bundle is installed; this exact session's activity names this host, launcher transport and bundle fingerprint; hooks fired in the past.",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "src/lifecycle/control.ts",
+    "README.md#Adopt the lifecycle control (step 5)"
+   ],
+   "related": [
+    "lifecycle control",
+    "activity row",
+    "attribution ceiling"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "attribution ceiling",
+   "aliases": [
+    "parent-fallback",
+    "parent-session-aggregate",
+    "owner-session",
+    "legacy-unscoped",
+    "none",
+    "exact vs aggregate",
+    "weakest provable grade"
+   ],
+   "meaning": "Codex PostToolUse carries no agent_id, so descendant activity lands in the parent's file; rows are kept but labeled aggregate and never promoted to exact child evidence.",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "README.md#Adopt the lifecycle control (step 6)",
+    "src/lifecycle/activity.ts",
+    "src/evidence/experiment.ts"
+   ],
+   "related": [
+    "telemetry scope",
+    "calibration sample",
+    "activity row"
+   ],
+   "overlap_note": "Same idea as telemetry scope; spelled at three sites (hooks status, experiment close, calibration)."
+  },
+  {
+   "name": "agent instructions",
+   "aliases": [
+    "canonical startup text",
+    "the nudge",
+    "SessionStart instruction block",
+    "DECISION JOURNAL … SWARM GYROSCOPE …",
+    "instruction contract"
+   ],
+   "meaning": "The byte-testable text injected at every session/subagent start teaching the journal verbs, orient/work loop, guarantee links, conjecture, defect, experiment, escalate; part of the versioned hook protocol.",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "src/lifecycle/hooks.ts (agentInstructions)"
+   ],
+   "related": [
+    "hook events",
+    "assigned work instructions",
+    "due",
+    "project voice"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "assigned work instructions",
+   "aliases": [
+    "CURRENT WORK block",
+    "owner menu (start | block | finish | resume | yield | cancel | handoff)",
+    "exact assignment",
+    "WORK CONTROL unavailable"
+   ],
+   "meaning": "SessionStart's rendering of up to three work orders owned by exactly this session, with only the lifecycle commands valid for their state, each carrying the predecessor token.",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "src/lifecycle/hooks.ts (assignedWorkInstructions)"
+   ],
+   "related": [
+    "work order",
+    "work state",
+    "agent instructions"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "project voice",
+   "aliases": [
+    ".coherence/hooks/<Event>.override.md / .append.md",
+    "hook text customization",
+    "tokens {{session}} {{agent}} {{cli}} {{scope}}",
+    "hooks review",
+    "silenced event"
+   ],
+   "meaning": "Per-event project files that replace or follow the canonical hook emission; damage degrades to canon, and `hooks review` prints effective emissions with provenance.",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "src/lifecycle/hook-text.ts",
+    "README.md#The project's voice in the emissions"
+   ],
+   "related": [
+    "hook events",
+    "agent instructions"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "stop feedback",
+   "aliases": [
+    "SubagentStop nudge",
+    "stop_hook_active",
+    "change signal at stop",
+    "final-report restatement",
+    "main Stop byte-empty"
+   ],
+   "meaning": "SubagentStop restates the report plus journal count and patch signal once; main Stop emits nothing so a shared worktree cannot become one agent's obligation.",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "src/lifecycle/hooks.ts (composeStopFeedback)"
+   ],
+   "related": [
+    "hook events",
+    "signal"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "due",
+   "aliases": [
+    "COHERENCE WORK IS DUE",
+    "instruments the tree has outrun",
+    "commits since run",
+    "neglect"
+   ],
+   "meaning": "A SessionStart section naming which recorded instruments (verify full tier, drift, economy, …) have not run in N commits; reads only, writes nothing, silent when nothing is due.",
+   "layer": "lifecycle-hooks",
+   "defined_in": [
+    "src/diagnostics/due.ts"
+   ],
+   "related": [
+    "status record",
+    "agent instructions"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "reading surface",
+   "aliases": [
+    "generated artifact",
+    "outputDir artifacts",
+    "public/",
+    "reading-surface chart (atlas)",
+    "derived text with no authority",
+    "two-zone file",
+    "owned block / fenced block / marker pair"
+   ],
+   "meaning": "What humans and agents read: HTML renders, AGENTS.md, CLAUDE.md's owned block, README's derived blocks, terminal reports; derived from the graph, it can mislead but cannot turn red green.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "README.md#Generated artifacts",
+    "coherence.config.json (atlas.charts.reading-surface)"
+   ],
+   "related": [
+    "outline",
+    "overview / agent map",
+    "CLAUDE.md block",
+    "index",
+    "contract (promise graph)",
+    "Scope"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "derived spelling",
+   "aliases": [
+    "derive one spelling from the other",
+    "command index",
+    "usage banner",
+    "README commands block",
+    "two spellings of one domain"
+   ],
+   "meaning": "The doctrine and its instances: a registry is the single home and the banner, README index and phrasebook table are pure functions of it, byte-compared by `docs --check`.",
+   "layer": "cli-surface",
+   "defined_in": [
+    "src/commands.ts",
+    "README.md#Commands"
+   ],
+   "related": [
+    "command registry",
+    "redundancy",
+    "freshness gate (--check)"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "freshness gate (--check)",
+   "aliases": [
+    "docs --check",
+    "graph --check",
+    "claude --check",
+    "overview --check",
+    "scope --check",
+    "stale artifact",
+    "normalization holes"
+   ],
+   "meaning": "Regenerate in memory and compare with the committed artifact, normalizing volatile fields (timestamps, absolute path, line numbers) except for pure-function blocks compared byte-for-byte.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/commands.ts",
+    "README.md#Generated artifacts"
+   ],
+   "related": [
+    "reading surface",
+    "derived spelling"
+   ],
+   "overlap_note": "'freshness' here is artifact staleness, unrelated to verdict freshness."
+  },
+  {
+   "name": "outline",
+   "aliases": [
+    "_graph.html",
+    "graph command render",
+    "linear collapsible outline"
+   ],
+   "meaning": "The navigable outline of the derived graph, written by `coherence graph`.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/render-outline.ts"
+   ],
+   "related": [
+    "reading surface",
+    "graph"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "overview / agent map",
+   "aliases": [
+    "AGENTS.md",
+    "_overview.html",
+    "map for agents",
+    "Components / Structure / Dictionary sections"
+   ],
+   "meaning": "The generated component map (intent, why, works when, files) plus folder tree and dictionary, for agents (markdown) and humans (HTML).",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/render-overview.ts",
+    "AGENTS.md"
+   ],
+   "related": [
+    "reading surface",
+    "component",
+    "dictionary word"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "CLAUDE.md block",
+   "aliases": [
+    "<!-- coherence:begin/end -->",
+    "owned fenced block",
+    "invariants → chokepoint → oracle table",
+    "Kind / Refuted? columns",
+    "claudeMdPath"
+   ],
+   "meaning": "The one generated region inside an authored CLAUDE.md: component map and the boundary-derived invariants table; everything outside stays authored.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/render-claude.ts",
+    "README.md#Generated artifacts"
+   ],
+   "related": [
+    "reading surface",
+    "boundary claim",
+    "refutation"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "contract (promise graph)",
+   "aliases": [
+    "coherence contract",
+    "promise graph",
+    "_contract.html",
+    "promise.json",
+    "reliance ledger",
+    "inspection artifact",
+    "balance sheet (metaphor)",
+    "PromiseModel"
+   ],
+   "meaning": "The reading of a project's obligations: components making guarantees at perimeters (gates) and relying on one another's (reliances), graded and placed on declared trust walls; always regenerated, no --check.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/promise-model.ts",
+    "src/readings/promise.ts",
+    "src/readings/render-contract.ts"
+   ],
+   "related": [
+    "gate",
+    "grade",
+    "reliance",
+    "zone",
+    "invariant"
+   ],
+   "overlap_note": "'contract' is also the `contracts` ratchet (producer/consumer), conventions' 'contract vs convention', and the trust-ladder word 'promote conventions to contracts'."
+  },
+  {
+   "name": "gate",
+   "aliases": [
+    "promise-graph gate",
+    "graded gate",
+    "gate chip",
+    "invariant + chokepoint + oracle + crossing + grade",
+    "breach (verdict fail)",
+    "unplaced gate"
+   ],
+   "meaning": "The promise graph's atomic promise: one boundary claim rendered with its grade, crossing and reliants. Also used generically for 'a check that can fail the build'.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/promise-model.ts (axiom 3)",
+    "README.md#In detail (contract)"
+   ],
+   "related": [
+    "invariant",
+    "boundary claim",
+    "grade",
+    "contract (promise graph)"
+   ],
+   "overlap_note": "Duplicate of boundary claim/invariant at the render layer; also 'gate' vs 'advisory' vs 'ratchet' as command classes."
+  },
+  {
+   "name": "grade",
+   "aliases": [
+    "A | B | C | D | U",
+    "evidence grade",
+    "enforced grade",
+    "ordinal confidence",
+    "grade letter (Scope)"
+   ],
+   "meaning": "A total function of a gate's one recorded claim signal and verb: A fresh via-test pass, B stale pass, C via-guard pass, D no effective pass, U dialect-gap skip (rendered ink, never blank).",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/promise.ts (gradeOf)",
+    "src/readings/scope/configuration.ts"
+   ],
+   "related": [
+    "gate",
+    "verdict",
+    "freshness",
+    "tier (enforcement ladder)"
+   ],
+   "overlap_note": "'grade' is also used for evidence grades of instruments ('direct-file grade', 'direct-module grade', catalog example grade) — a different, informal sense."
+  },
+  {
+   "name": "reliance",
+   "aliases": [
+    "cross-component import",
+    "reliant",
+    "covered | naked",
+    "same-zone",
+    "double-entry reliance",
+    "reliance asset",
+    "relied-on tab (Structure)"
+   ],
+   "meaning": "In the promise graph, every cross-component import is a reliance: covered by a gate on the wall it crosses or naked; every gate lists its reliants. Structure instead draws only declared `relies on` links as amber tabs.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/promise-model.ts (axiom 4)",
+    "src/readings/promise.ts",
+    "docs/scope.md"
+   ],
+   "related": [
+    "import edge",
+    "gate",
+    "guarantee link",
+    "zone"
+   ],
+   "overlap_note": "Two 'reliance' populations: derived-from-imports (promise graph, Scope `reliance` asset) and declared (`## relies on`, Scope `guarantee-link`/`relies` relation)."
+  },
+  {
+   "name": "mass",
+   "aliases": [
+    "mass ratchet",
+    "dimensions (lines|total, lines|<component>, files|total, symbols|total, deps|direct/dev/transitive, measure|<key>)",
+    "mass-baseline.json",
+    "how much machine there is",
+    "unaccounted mass (promise graph)",
+    "net-LOC spark",
+    "byte mass vs inference mass"
+   ],
+   "meaning": "How much machine there is, pinned: the growth ratchet over lines, files, symbols, dependencies and project probes whose failure prescribes `coherence decide`; also the promise graph's per-component line denominator.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/mass.ts",
+    "README.md#In detail (mass)",
+    "src/readings/promise-model.ts"
+   ],
+   "related": [
+    "ratchet",
+    "baseline",
+    "measures",
+    "holding cost"
+   ],
+   "overlap_note": "'mass' means both the ratchet's dimensions and the promise graph's accounted/unaccounted lines and Scope's `attributes.mass.total` graph weight."
+  },
+  {
+   "name": "measures",
+   "aliases": [
+    "config.mass.measures",
+    "probe",
+    "measure|<key>",
+    "last numeric token",
+    "UNMEASURABLE"
+   ],
+   "meaning": "Project-declared commands whose last numeric stdout token becomes a mass dimension; a nonzero exit or no number is unmeasurable and fails --check, never 0.",
+   "layer": "config",
+   "defined_in": [
+    "src/types.ts (Config.mass)",
+    "coherence.config.json"
+   ],
+   "related": [
+    "mass",
+    "non-vacuity floor"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "index",
+   "aliases": [
+    "coherence index",
+    "_index.html / index.json",
+    "the returning human's page",
+    "MAP · JOURNAL · TRAJECTORY",
+    "cursor / frame / FIRST LOOK",
+    "trust reading",
+    "Prius energy monitor (metaphor)"
+   ],
+   "meaning": "Three views for a returning human framed against what they last saw: the map (components, zones, gates, crossings, trust), the journal (blocked first, open conjectures, decisions) and the trajectory (invariant-set diff, LOC, mass and drift trends). Derives nothing new.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/index-model.ts",
+    "src/readings/render-index.ts",
+    "README.md#In detail (index)"
+   ],
+   "related": [
+    "four darknesses",
+    "reading surface",
+    "log / structural ledger"
+   ],
+   "overlap_note": "'index' is also the static oracle index and Git's index."
+  },
+  {
+   "name": "four darknesses",
+   "aliases": [
+    "unwitnessed | unclaimed | undocumented | unvisited",
+    "dark region",
+    "trust reading"
+   ],
+   "meaning": "The index's four never-merged measures of what is not known: invariants without refutations, files no claim names, symbols without docblocks, and paths recent work touches that the graph does not own.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/index-model.ts",
+    "README.md#In detail (index)"
+   ],
+   "related": [
+    "index",
+    "refutation",
+    "file stats / claimed files",
+    "undocumented symbol"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "panel",
+   "aliases": [
+    "coherence panel",
+    "operator's instrument panel",
+    "TUI",
+    "masthead / component list / drill-in",
+    "lights",
+    "tier bar",
+    "energy strip",
+    "watch mode"
+   ],
+   "meaning": "A zero-dependency terminal view over the graph and the status record with honesty rules for lights (stale, not run, dialect gap, human-eye); it spawns the CLI rather than re-running anything in-process.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/panel.ts",
+    "README.md#The status record and the panel"
+   ],
+   "related": [
+    "status record",
+    "verdict",
+    "holding cost",
+    "heat"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "context packet",
+   "aliases": [
+    "coherence context",
+    "bounded reading packet",
+    "route-first",
+    "omission accounting",
+    "--max-bytes / --all",
+    "graphOwner: null",
+    "addressing instrument"
+   ],
+   "meaning": "The smallest useful reading for a task: ownership, intent/why, invariants, chokepoints, one-hop imports, relevant tests, repository surfaces, standing decisions and open conjectures, bounded to 12,000 bytes with every withheld item and byte named.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/context.ts",
+    "README.md#In detail (context)"
+   ],
+   "related": [
+    "economy (context closure)",
+    "calibration sample",
+    "ownership"
+   ],
+   "overlap_note": "'context' also means the experiment's predicted context and the claim evaluation ctx."
+  },
+  {
+   "name": "Scope",
+   "aliases": [
+    "coherence scope",
+    "scope.json",
+    "_scope.html",
+    "--serve (loopback, SSE)",
+    "asset catalog",
+    "declarative Scope",
+    "Configure editor",
+    "live updates / Pause"
+   ],
+   "meaning": "The configurable reading surface over the whole asset catalog (structure, specs, guarantees, work, journal, taxonomy, evidence, hooks): offline HTML or a read-only live server; views are data, never code.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "docs/scope.md",
+    "src/readings/scope/catalog.ts",
+    "src/readings/scope/capture.ts",
+    "src/readings/scope/server.ts"
+   ],
+   "related": [
+    "asset",
+    "view",
+    "Structure",
+    "reading surface"
+   ],
+   "overlap_note": "'scope' collides with verify scope, work scopes and decision scope fields."
+  },
+  {
+   "name": "asset",
+   "aliases": [
+    "{id, kind, label, source, attributes}",
+    "asset kind (53 declared)",
+    "ASSET_KINDS",
+    "catalog",
+    "relation",
+    "attribute path",
+    "asset family"
+   ],
+   "meaning": "Scope's transport unit: every canonical record adapted once into an addressable asset with a kind, a reader's label, a source and its full attributes, plus explicit relations between assets.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/scope/catalog.ts",
+    "docs/scope.md#Asset inventory"
+   ],
+   "related": [
+    "Scope",
+    "view",
+    "source availability"
+   ],
+   "overlap_note": "Asset kinds re-spell nearly every concept in this list (`guarantee`, `reliance`, `chart`, `zone`, `instrument`, …) as presentation ids."
+  },
+  {
+   "name": "view",
+   "aliases": [
+    "coherence.scope.json view",
+    "renderer (structure | graph | table | cards)",
+    "kinds / where / sort / fields / groupBy / pageSize",
+    "field format (text | json | count | date | list | prose | session | taxonomy | excerpt | kind | grade)",
+    "extends / removeViews / initialView",
+    "default views (structure, guarantees, specs, work, journal, taxonomy, obligations, evidence, hooks, assets)"
+   ],
+   "meaning": "A declarative selection and presentation of assets; shipped defaults and project views use the same language and refuse unknown keys.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/scope/configuration.ts (DEFAULT_SCOPE)",
+    "docs/scope.md#View vocabulary"
+   ],
+   "related": [
+    "Scope",
+    "asset",
+    "Structure"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "Structure",
+   "aliases": [
+    "structure renderer",
+    "architectural stacks",
+    "project frame / entrances / downtown / periphery",
+    "spec density",
+    "ranking weights",
+    "relationship layer (opening | all | guarantees)",
+    "tileZoom / detailZoom",
+    "Structure model (buildStructureModel)",
+    "story of Coherence (first gate)"
+   ],
+   "meaning": "Scope's first default view: component cards ranked by spec density and declared reliance, connected only by spec-owned architectural relationships and declared guarantee reliance; imports never draw arrows and files never become cards.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "docs/scope-structure-thesis.md",
+    "docs/scope.md#Structure: authored architecture",
+    "src/readings/scope/structure-model.ts"
+   ],
+   "related": [
+    "component",
+    "architectural relationship",
+    "guarantee link",
+    "card",
+    "inspector / reading"
+   ],
+   "overlap_note": "Not the 'Structure graph' of decompose (the import graph) nor the AGENTS.md '## Structure' folder tree — three 'Structure's."
+  },
+  {
+   "name": "card",
+   "aliases": [
+    "component card",
+    "card variant (component stack | guarantee | entrance/boundary | resource)",
+    "tile / summary / detail",
+    "relied-on tab",
+    "card body click"
+   ],
+   "meaning": "Structure's visual unit for a component (and, in the thesis, for guarantees, entrances and resources); zoom changes detail within fixed rectangles.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "docs/scope-structure-thesis.md#9",
+    "docs/scope-extensions.md"
+   ],
+   "related": [
+    "Structure",
+    "stack",
+    "component"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "stack",
+   "aliases": [
+    "component stack",
+    "closed / open stack",
+    "unfurl / fold (retired)",
+    "fan (retired)",
+    "nested stack"
+   ],
+   "meaning": "The thesis's main visual unit: a closed stack outlines a component, opening it reveals architectural cards and local relationships; the shipped Structure retired on-map unfurling as 'chart theatrics'.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "docs/scope-structure-thesis.md#8",
+    "docs/scope.md#Structure",
+    "src/readings/scope/structure-renderer.jsx"
+   ],
+   "related": [
+    "card",
+    "component",
+    "Structure"
+   ],
+   "overlap_note": "A stack is a component at the presentation layer; the word survives in docs after the mechanism was retired."
+  },
+  {
+   "name": "inspector / reading",
+   "aliases": [
+    "sidebar",
+    "selection sidebar",
+    "inspector column",
+    "readings registry",
+    "reading (typed blocks)",
+    "Catalog bindings heading",
+    "explore"
+   ],
+   "meaning": "The Scope column that explains a selected asset or connection: one reading per subject kind (identity, meaning, participants, evidence, rationale, provenance) rendered from data blocks.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/scope/readings.ts",
+    "src/readings/scope/inspector.jsx",
+    "docs/scope-structure-thesis.md#13"
+   ],
+   "related": [
+    "Structure",
+    "asset",
+    "guarantee binding"
+   ],
+   "overlap_note": "'reading' is also every instrument's output ('a reading the graph already took') and the atlas's 'reading-surface' chart."
+  },
+  {
+   "name": "source availability",
+   "aliases": [
+    "unavailable source",
+    "unavailable vs empty",
+    "source asset",
+    "unavailable banner",
+    "source transaction",
+    "damage remains visible"
+   ],
+   "meaning": "Scope's independent report of whether each canonical reader could be read; a failed source loses its whole contribution and stays visible outside filters so absence never reads as health.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "src/readings/scope/capture.ts",
+    "docs/scope.md#Relationships and evidence"
+   ],
+   "related": [
+    "Scope",
+    "trusted projection vs tolerant read",
+    "damage"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "Scope extension",
+   "aliases": [
+    "project module",
+    "named implementation (rankers | layouts | routers | cards | views)",
+    "apiVersion: 1",
+    "extensions: [./module.jsx]",
+    "implementations: {rank, layout, route, card, view}",
+    "extensionOptions",
+    "extension host bundle"
+   ],
+   "meaning": "Versioned project modules bundled at generation time that replace ranking, placement, routing, card content or the whole Structure view while inheriting defaults; executable project code, not configuration.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "docs/scope-extensions.md",
+    "docs/scope-structure-transplant-plan.md",
+    "src/readings/scope/extension-host/bundle.ts"
+   ],
+   "related": [
+    "Structure",
+    "view"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "comparison (planned)",
+   "aliases": [
+    "snapshot comparison",
+    "before/after",
+    "ghosted card",
+    "dashed former connection",
+    "change story",
+    "Scope MCP control"
+   ],
+   "meaning": "Thesis-level requirements not yet implemented: comparing two compatible asset snapshots with retained removals, and an MCP surface for agents to direct Scope.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "docs/scope-structure-thesis.md#14",
+    "docs/scope-structure-thesis.md#16"
+   ],
+   "related": [
+    "Scope",
+    "Structure",
+    "log / structural ledger"
+   ],
+   "overlap_note": "Overlaps the implemented `log` ledger (invariant-set diff) and the index trajectory."
+  },
+  {
+   "name": "advisory",
+   "aliases": [
+    "advisories — they surface, you judge",
+    "exit 0 always",
+    "floor / cap / withheld tail",
+    "precision over recall",
+    "command group: advisory"
+   ],
+   "meaning": "The class of instruments that report ranked, capped findings and never change the exit code (redundancy, prose, why-lint, decompose, drift, economy, premise, calibrate, novelty, never-red).",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/commands.ts (GROUP_TITLE)",
+    "src/diagnostics/raise.ts"
+   ],
+   "related": [
+    "ratchet",
+    "--raise",
+    "finding key"
+   ],
+   "overlap_note": "Contrast class to 'gate' and 'ratchet'."
+  },
+  {
+   "name": "--raise",
+   "aliases": [
+    "raise",
+    "an advisory opens a question",
+    "--raise-cap (default 3)",
+    "round-robin cap",
+    "RAISE — N question(s) opened",
+    "WITHHELD"
+   ],
+   "meaning": "Opt-in flag letting an advisory (verify, redundancy, mass, atlas, economy) open conjectures in the journal keyed on the finding's subject instead of printing them; capped per run and the remainder announced.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/raise.ts",
+    "README.md#`--raise`"
+   ],
+   "related": [
+    "conjecture",
+    "finding key",
+    "advisory"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "finding key",
+   "aliases": [
+    "finding",
+    "subject-derived identity",
+    "never-red:<node>::<claim>",
+    "signal:no-new-invariant:<fingerprint>",
+    "stable finding key"
+   ],
+   "meaning": "The identity a raised or attested finding carries: the addressable subject and nothing volatile (no score, count or line number), so a question is not re-minted every run.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/raise.ts",
+    "src/diagnostics/signal.ts"
+   ],
+   "related": [
+    "--raise",
+    "observed metric",
+    "premise lease"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "ratchet",
+   "aliases": [
+    "command group: ratchet",
+    "--check / --update-baseline",
+    "pin / re-pin",
+    "append-only-with-review",
+    "growth ratchet",
+    "ratchets and gates"
+   ],
+   "meaning": "An instrument that pins a reading to a baseline and fails --check on new or grown entries while shrinkage never fails; the mechanism is the harness's, the data the project's.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/sidecar.ts",
+    "src/diagnostics/conventions.ts",
+    "src/diagnostics/mass.ts"
+   ],
+   "related": [
+    "baseline",
+    "mass",
+    "sink",
+    "convention / guard",
+    "atlas"
+   ],
+   "overlap_note": "README also calls the unanchored-invariant coverage gate 'the ratchet' and the boundary machinery 'the anti-entropy ratchet'."
+  },
+  {
+   "name": "baseline",
+   "aliases": [
+    "<outputDir>/mass-baseline.json / conventions-baseline.json / sinks-baseline.json",
+    "the pin",
+    "cached review",
+    "move-aware reconcile",
+    "count-conserving absorption",
+    "baseline asset"
+   ],
+   "meaning": "A ratchet's memory of a reading it once took; keyed sites are reconciled across renames without absorbing growth or duplication, and an empty reading is refused over a live pin.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/sidecar.ts",
+    "src/diagnostics/lint-sinks.ts (reconcile)",
+    "src/commands.ts (writesBaseline)"
+   ],
+   "related": [
+    "ratchet",
+    "non-vacuity floor"
+   ],
+   "overlap_note": "Also the `--baseline` number in `observed` and 'clean baseline' in the canary protocol."
+  },
+  {
+   "name": "atlas",
+   "aliases": [
+    "coherence atlas",
+    "trust-graded manifold",
+    "atlas.md",
+    "charts / transitions / nonTransition / knownPending",
+    "drift / dangling / over-claim gate",
+    "as-built drawing (metaphor)"
+   ],
+   "meaning": "The project-declared map of trust domains and the chokepoints crossing between them, each crossing graded by tier from live claims plus explicit enshrinement, with heat and inference hazards.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/atlas.ts",
+    "README.md#In detail (atlas)",
+    "coherence.config.json (atlas)"
+   ],
+   "related": [
+    "chart",
+    "transition",
+    "tier (enforcement ladder)",
+    "heat",
+    "inference hazard"
+   ],
+   "overlap_note": "Atlas 'drift' (mapped symbol moved) is unrelated to the `drift` command (architectural direction)."
+  },
+  {
+   "name": "chart",
+   "aliases": [
+    "trust domain",
+    "atlas chart",
+    "project-source | derived-model | shell | record | verdict | reading-surface",
+    "chart asset"
+   ],
+   "meaning": "A trust domain in the atlas (config `atlas.charts`), described in prose; this repo declares six for the harness itself.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "coherence.config.json (atlas.charts)",
+    "src/diagnostics/atlas.ts"
+   ],
+   "related": [
+    "atlas",
+    "zone",
+    "transition"
+   ],
+   "overlap_note": "A chart is a trust region declared in config; a zone is a trust region declared in the entry spec — two homes for one idea."
+  },
+  {
+   "name": "transition",
+   "aliases": [
+    "atlas transition",
+    "transition map",
+    "from / to / translates / security / anchoredBy / enshrined",
+    "crossing (atlas sense)",
+    "transition asset",
+    "nonTransition (cached negative inference)",
+    "knownPending"
+   ],
+   "meaning": "A chokepoint symbol that crosses between two charts and what it translates; `nonTransition` records symbols that hold within a chart, `knownPending` tolerates mapped symbols not yet in source.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/types.ts (Config.atlas)",
+    "coherence.config.json (atlas.transitions)"
+   ],
+   "related": [
+    "atlas",
+    "chart",
+    "chokepoint",
+    "crossing"
+   ],
+   "overlap_note": "Re-spells the claim-level `crossing <zone> -> <zone>` in config with chart names instead of zone names."
+  },
+  {
+   "name": "tier (enforcement ladder)",
+   "aliases": [
+    "tier-1 enshrined | tier-2 totality-checked | tier-3 convention",
+    "enforcement ladder",
+    "price ladder (inferred | read | unaskable)",
+    "structural / checked / convention",
+    "tier bar (panel)",
+    "enshrined: true"
+   ],
+   "meaning": "Where a rule sits: unrepresentable by construction (type system), one home plus a totality oracle (what boundary claims target), or N sites held by memory. The atlas grades every crossing on it; the README reads the same ladder as price and as trust.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "README.md#The mental model: the enforcement ladder",
+    "README.md#The economy of inference",
+    "src/diagnostics/atlas.ts"
+   ],
+   "related": [
+    "atlas",
+    "convention / guard",
+    "totality",
+    "grade",
+    "economy of inference"
+   ],
+   "overlap_note": "Third 'tier' vocabulary (see verify run tier, claim tier)."
+  },
+  {
+   "name": "heat",
+   "aliases": [
+    "churn share",
+    "temperature",
+    "hot crossing",
+    "hot seam",
+    "hot (job ranking)",
+    "heat × tier"
+   ],
+   "meaning": "The share of recent concern-carrying commits touching the file that defines a chokepoint (or symbol); a temperature that grades nothing, used to rank crossings, doc jobs and inference hazards.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/atlas.ts",
+    "src/diagnostics/evolution.ts (fileChurn)",
+    "src/verification/verify.ts"
+   ],
+   "related": [
+    "evolution graph",
+    "atlas",
+    "inference hazard",
+    "drift"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "inference hazard",
+   "aliases": [
+    "undeclared junction with traffic",
+    "tier-3 crossing with heat ≥ 10%",
+    "### Inference hazards (atlas.md)"
+   ],
+   "meaning": "The join of undeclared (tier-3) and busy (hot): a place where every reader re-derives what may legally cross; raised as a conjecture keyed on the symbol.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/atlas.ts"
+   ],
+   "related": [
+    "heat",
+    "tier (enforcement ladder)",
+    "--raise"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "convention / guard",
+   "aliases": [
+    "conventions command",
+    "convention crossing",
+    "load-bearing guard at N sites",
+    "guardVerb / seed / dismissed",
+    "conventions-baseline.json",
+    "guard-vs-contract detector"
+   ],
+   "meaning": "A guard function reached at more than one call site with no enforcing contract (anchored boundary or totality test) — a block-list that fails open; the detector ratchets the unguarded set.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/conventions.ts",
+    "README.md#In detail (conventions)"
+   ],
+   "related": [
+    "tier (enforcement ladder)",
+    "boundary claim",
+    "ratchet"
+   ],
+   "overlap_note": "'guard' here (a function) vs `via guard` (an oracle verb) vs 'gate' — three near-synonyms."
+  },
+  {
+   "name": "sink",
+   "aliases": [
+    "lint-sinks",
+    "interpolation surface",
+    "raw SQL-identifier / HTML sink",
+    "site (context|file|expr)",
+    "safeSql / safeHtml",
+    "sinks-baseline.json",
+    "quote-wrap / text-shape SQL context"
+   ],
+   "meaning": "A raw interpolation into a dangerous context; the ratchet baselines reviewed sites, reconciles moves, and fails --check on a new one; safe-by-construction patterns are project config.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/lint-sinks.ts",
+    "README.md#In detail (lint-sinks)"
+   ],
+   "related": [
+    "ratchet",
+    "baseline",
+    "language adapter"
+   ],
+   "overlap_note": "'site' is also redundancy's unit (a spelled-out domain)."
+  },
+  {
+   "name": "data contract (contracts command)",
+   "aliases": [
+    "coherence contracts",
+    "producer / consumer / type",
+    "cross-artifact contract",
+    "DANGLING / CROSS-ARTIFACT / anchored",
+    "uncovered-surface detector",
+    "shared vocabulary file"
+   ],
+   "meaning": "A declared typed message emitted at one chokepoint and consumed at another across deploy units, resolved against the graph and graded anchored iff a boundary/parity claim names one of its symbols; plus a detector for undeclared shared vocabulary.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/contracts.ts",
+    "docs/novelty-and-parity.md#2a",
+    "src/types.ts (Config.contracts)"
+   ],
+   "related": [
+    "deploy artifact",
+    "parity claim",
+    "chokepoint",
+    "contract (promise graph)"
+   ],
+   "overlap_note": "Second meaning of 'contract' (the first is the promise graph render; conventions.ts uses a third, 'contract vs convention')."
+  },
+  {
+   "name": "deploy artifact",
+   "aliases": [
+    "config.artifacts",
+    "deploy unit",
+    "artifact (path globs)",
+    "worker / browser / shared"
+   ],
+   "meaning": "A named compile/deploy unit declared as path globs so cross-unit contracts can be located; a file may belong to several.",
+   "layer": "config",
+   "defined_in": [
+    "src/types.ts (Config.artifacts)",
+    "src/diagnostics/contracts.ts"
+   ],
+   "related": [
+    "data contract (contracts command)"
+   ],
+   "overlap_note": "'artifact' also means generated reading-surface artifacts (`writesArtifacts`) and receipt artifacts (input manifests)."
+  },
+  {
+   "name": "novelty",
+   "aliases": [
+    "novelty-vs-anchor advisory",
+    "behavioral surface",
+    "surface (net-new exports, union/enum variants, keyed-table keys, LOC)",
+    "anchors added",
+    "churn proviso",
+    "minSurface / minLoc / ratio",
+    "zero-anchor alarm"
+   ],
+   "meaning": "After the structural ledger, contrast behavioral surface added across a ref range with anchors added; significant surface with zero anchors raises the alarm, self-qualified when churn dominates.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/novelty.ts",
+    "docs/novelty-and-parity.md#1"
+   ],
+   "related": [
+    "anchoring",
+    "signal",
+    "log / structural ledger"
+   ],
+   "overlap_note": "The index also uses 'novelty' for 'is this finding news since the cursor' — a different sense."
+  },
+  {
+   "name": "signal",
+   "aliases": [
+    "coherence signal --check",
+    "change signal",
+    "per-change pressure layer",
+    "--attest-no-invariant --because",
+    "patch fingerprint attestation",
+    "needs-decision",
+    "significant behavioral growth"
+   ],
+   "meaning": "The gate over novelty: significant surface with zero new invariant/boundary/parity anchors and no patch-fingerprinted decision reds under --check; the escape hatch is a journal decision, not a config switch.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/signal.ts",
+    "README.md#In detail (signal)"
+   ],
+   "related": [
+    "novelty",
+    "decision",
+    "regulator",
+    "stop feedback"
+   ],
+   "overlap_note": "'signal' is also the taxonomy question namespace (`signal:invocation`) — unrelated."
+  },
+  {
+   "name": "log / structural ledger",
+   "aliases": [
+    "coherence log",
+    "temporal ledger",
+    "structural diff",
+    "added / removed / rewired",
+    "LOSS",
+    "--strict",
+    "diffGraphs",
+    "transaction view"
+   ],
+   "meaning": "The diff of the invariant/boundary/parity/component set between two refs, built from a throwaway worktree at each ref; a loss fails --strict.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/structural.ts",
+    "README.md#In detail (log)"
+   ],
+   "related": [
+    "novelty",
+    "index",
+    "invariant",
+    "boundary claim"
+   ],
+   "overlap_note": "README calls this 'the ledger' as it also calls the journal, the work ledger, the reliance ledger and the maintenance-cost ledger."
+  },
+  {
+   "name": "redundancy",
+   "aliases": [
+    "undeclared parity",
+    "one enumerated domain spelled twice",
+    "site (union | enum | interface members | Record keys | switch cases | === chain | string array | markdown table column | a|b|c alternation)",
+    "IDENTICAL / already drifted",
+    "minShared / containment / minScore / maxDf / top",
+    "typeLink collapse"
+   ],
+   "meaning": "The detector for the same set of tokens written out at two sites with nothing tying them together; compiler-enforced pairs are collapsed, declared parity pairs dropped, and drifted pairs rank first.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/redundancy.ts",
+    "README.md#In detail (redundancy)"
+   ],
+   "related": [
+    "parity claim",
+    "enumeration",
+    "derived spelling",
+    "prose rot"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "prose rot",
+   "aliases": [
+    "prose advisory",
+    "duplicated prose across reading surfaces",
+    "shingle / Jaccard floor",
+    "IDENTICAL | DIVERGED pair"
+   ],
+   "meaning": "Sentences cached in two reading surfaces (README, release notes, specs, module headers) that share six-word shingles; divergence ranks first because it is rot no reader can see from one copy.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/prose.ts"
+   ],
+   "related": [
+    "redundancy",
+    "reading surface"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "why-lint",
+   "aliases": [
+    "## why discipline",
+    "mechanism-restatement",
+    "anchored paragraph / unanchored invariant",
+    "narrative drift / rationale debt",
+    "bold-anchor lead-in"
+   ],
+   "meaning": "Two advisories on rationale: prose that restates a boundary's mechanism, and, in invariant-bearing specs, paragraphs and invariants that do not anchor each other by name.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/why-lint.ts"
+   ],
+   "related": [
+    "why (rationale)",
+    "invariant"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "decompose",
+   "aliases": [
+    "wise-decomposition report",
+    "the thermostat",
+    "three graphs (Intent, Structure, Evolution)",
+    "smells (false-boundary, smeared concern, missing abstraction, structure hub)",
+    "components override (sub-components)"
+   ],
+   "meaning": "Measures agreement between the spec tree, the import graph and git co-change; prints a LOCALITY score plus the smells that lower it; advisory.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/decompose.ts",
+    "README.md#In detail (decompose)"
+   ],
+   "related": [
+    "locality / spread",
+    "evolution graph",
+    "drift",
+    "economy (context closure)"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "locality / spread",
+   "aliases": [
+    "LOCALITY score",
+    "SPREAD",
+    "co-change staying in one component",
+    "distinct components per commit",
+    "economy of writes",
+    "write amplification"
+   ],
+   "meaning": "Locality: the fraction of pairwise co-change that stays inside one component (rising = wiser); spread: distinct components per commit (falling = localizing).",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/decompose.ts",
+    "src/diagnostics/drift.ts",
+    "README.md#The economy of inference"
+   ],
+   "related": [
+    "decompose",
+    "drift"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "drift",
+   "aliases": [
+    "coherence drift",
+    "architectural direction",
+    "decompose's derivative",
+    "converging / decohering",
+    "trajectory",
+    "hot seam",
+    "gesture (● converge / ○ couple / ✕ smear)",
+    "prune",
+    "drift arrows (panel)"
+   ],
+   "meaning": "Projects today's component map over recent history and shows whether the codebase is converging or decohering, with the boundary being churned now and the recent gesture stream; prunes are excluded.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/drift.ts",
+    "README.md#In detail (drift)"
+   ],
+   "related": [
+    "decompose",
+    "locality / spread",
+    "evolution graph",
+    "heat"
+   ],
+   "overlap_note": "Word collision: atlas 'drift' (a mapped symbol moved), docs 'drift' (stale artifact), narrative 'drifted' statement, and 'behavioural drift' in prose."
+  },
+  {
+   "name": "economy (context closure)",
+   "aliases": [
+    "coherence economy",
+    "context closure",
+    "closure(commit)",
+    "read-side hub",
+    "files in most closures",
+    "median / p90 closure",
+    "economy of reads"
+   ],
+   "meaning": "The read side of the work ledger: per commit, the touched graph files plus direct import neighbours in both directions plus their spec files; reported as trend, worst closures and hubs; always exits 0.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/economy.ts",
+    "README.md#In detail (economy)"
+   ],
+   "related": [
+    "context packet",
+    "calibration sample",
+    "import edge",
+    "decompose"
+   ],
+   "overlap_note": "'economy' is also the README's whole doctrine ('the economy of inference')."
+  },
+  {
+   "name": "economy of inference",
+   "aliases": [
+    "inference",
+    "three prices (inferred | read | unaskable)",
+    "dissolve > declare > infer",
+    "Σ reading cost",
+    "tangle inventory",
+    "cached inference",
+    "trust is the license to skip inference"
+   ],
+   "meaning": "The governing model: the expensive resource is inference, paid again by every reader; coherence moves facts down the ladder from inferred to read to unaskable, and the enforcement ladder is the same ladder priced.",
+   "layer": "other",
+   "defined_in": [
+    "README.md#The economy of inference",
+    "README.md#The same ladder, read as trust"
+   ],
+   "related": [
+    "tier (enforcement ladder)",
+    "claim",
+    "--over (rejected alternative)"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "metaphor vocabulary",
+   "aliases": [
+    "electrical panel / breaker / label",
+    "envelope / penetration / flashing",
+    "blower-door test / smoke pencil",
+    "gyroscope",
+    "thermostat",
+    "balance sheet",
+    "Prius energy monitor",
+    "as-built drawing",
+    "signal residue"
+   ],
+   "meaning": "The recurring images the README and module headers use to explain instruments; each is bound to one concept (label=claim, breaker trip=refutation, blower door=totality oracle, gyroscope=orient, thermostat=decompose).",
+   "layer": "other",
+   "defined_in": [
+    "README.md#The same ladder, read as trust",
+    "README.md#The assembly these parts build"
+   ],
+   "related": [
+    "claim",
+    "refutation",
+    "totality",
+    "orient heading",
+    "decompose"
+   ],
+   "overlap_note": "Not concepts themselves, but names a reader meets in prose and must map back."
+  },
+  {
+   "name": "judge ≠ notary",
+   "aliases": [
+    "axiom #5",
+    "human attestation",
+    "the right claims vs passing claims",
+    "green triviality",
+    "coherent and worthless"
+   ],
+   "meaning": "The harness records verdicts mechanically but never judges whether a claim is the right claim; a spec full of green trivialities is coherent and worthless.",
+   "layer": "other",
+   "defined_in": [
+    "README.md#Known limits",
+    "README.md#The narrative evidence chain"
+   ],
+   "related": [
+    "verdicts file",
+    "deterministic claims",
+    "adoption ladder"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "damage",
+   "aliases": [
+    "torn row",
+    "malformed / forged / displaced / conflicting / dangling",
+    "unreadable line",
+    "counted damage",
+    "refuse the whole projection",
+    "N unreadable line(s)"
+   ],
+   "meaning": "Surviving evidence that cannot be trusted; every strict reader treats it as counted damage that makes the population unavailable rather than silently smaller.",
+   "layer": "evidence-journal",
+   "defined_in": [
+    "src/evidence/decisions.ts",
+    "src/coordination/work.ts",
+    "src/lifecycle/activity.ts"
+   ],
+   "related": [
+    "trusted projection vs tolerant read",
+    "source availability",
+    "orient heading"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "taxonomy",
+   "aliases": [
+    "coherence taxonomy",
+    "classification",
+    "catalog v1 / v2 (coherence-taxonomy/v1)",
+    "catalog digest",
+    "pack (core | simulation)",
+    "caller-assessed",
+    "profile / inspect / record / list / show",
+    "taxonomy ledger (.coherence/taxonomy)"
+   ],
+   "meaning": "Evidence-addressed classification of files and symbols into roles and facets by answering signal questions; only `record` writes, every suggestion stays unverified, and history reads against the catalog version it captured.",
+   "layer": "taxonomy-catalog",
+   "defined_in": [
+    "src/taxonomy/taxonomy.ts",
+    "src/taxonomy/taxonomy-catalog.ts",
+    "README.md#Taxonomy"
+   ],
+   "related": [
+    "role",
+    "facet",
+    "signal question",
+    "assessment",
+    "obligation",
+    "subject"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "role",
+   "aliases": [
+    "role:<slug> (25 terminal roles)",
+    "taxonomy-role asset",
+    "composite role",
+    "candidate role",
+    "cues / tensions / requires"
+   ],
+   "meaning": "A responsibility a component can be assessed as fulfilling (cli-orchestrator, registry-authority, parser, validator-type-checker, …); selected only on positive operational signals, never by name cues.",
+   "layer": "taxonomy-catalog",
+   "defined_in": [
+    "src/taxonomy/taxonomy-catalog.ts (roles)"
+   ],
+   "related": [
+    "taxonomy",
+    "signal question",
+    "obligation"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "facet",
+   "aliases": [
+    "facet:<slug> (27 facets)",
+    "taxonomy-facet asset",
+    "independent positive assessment"
+   ],
+   "meaning": "A cross-cutting property (boundary, deterministic, persistence, observability, lifecycle, …) assessed independently of role and never treated as an exhaustive checklist.",
+   "layer": "taxonomy-catalog",
+   "defined_in": [
+    "src/taxonomy/taxonomy-catalog.ts (facets)"
+   ],
+   "related": [
+    "taxonomy",
+    "role"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "signal question",
+   "aliases": [
+    "signal:<slug> (26 questions)",
+    "interview",
+    "--answer signal:x=yes|no|unknown",
+    "operational evidence (parses-syntax, validates-rules, transforms-form, optimizes-form)",
+    "taxonomy-question asset"
+   ],
+   "meaning": "The yes/no/unknown questions whose positive answers propose roles; unanswered or unknown is not a negative observation.",
+   "layer": "taxonomy-catalog",
+   "defined_in": [
+    "src/taxonomy/taxonomy-catalog.ts (questions)",
+    "README.md#Taxonomy"
+   ],
+   "related": [
+    "taxonomy",
+    "role"
+   ],
+   "overlap_note": "Namespace `signal:` collides in prose with the `signal` command."
+  },
+  {
+   "name": "assessment",
+   "aliases": [
+    "assessment record",
+    "t-… id",
+    "predecessor slot (--expected)",
+    "status (unassessed | needs-evidence | no-fit | ambiguous | classified | composite)",
+    "stale / superseded / out-of-evidence",
+    "revision",
+    "assessment asset"
+   ],
+   "meaning": "An immutable, content-addressed, predecessor-addressed record of one caller-assessed classification with its inputs, evidence and freshness snapshot; the current view is rebuilt from them.",
+   "layer": "taxonomy-catalog",
+   "defined_in": [
+    "src/taxonomy/taxonomy-ledger.ts",
+    "src/taxonomy/taxonomy.ts",
+    "README.md#Taxonomy"
+   ],
+   "related": [
+    "taxonomy",
+    "subject",
+    "freshness",
+    "guarantee link"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "subject",
+   "aliases": [
+    "taxonomy subject",
+    "classification subject",
+    "file or file#symbol",
+    "content-digested subject",
+    "freshness scope (whole file, direct imports, evidence, manifests)"
+   ],
+   "meaning": "One graph-resolved file or exported symbol whose bytes and direct dependencies are hashed so an assessment can expire when they change.",
+   "layer": "taxonomy-catalog",
+   "defined_in": [
+    "src/taxonomy/taxonomy.ts (captureTaxonomy)"
+   ],
+   "related": [
+    "assessment",
+    "symbol",
+    "freshness"
+   ],
+   "overlap_note": "'subject' is also a coverage claim's subject, a decision's --subject, a raised finding's subject and Scope's 'subject kind'."
+  },
+  {
+   "name": "command registry",
+   "aliases": [
+    "COMMANDS",
+    "command",
+    "verb",
+    "command group (derive | verify | journal | perceive | ratchet | advisory | bootstrap | reference)",
+    "alias (resolve, plan)",
+    "usage banner",
+    "writesArtifacts / writesBaseline flags",
+    "totality oracle over dispatch"
+   ],
+   "meaning": "The one declarative home of the 51 verbs, their groups, arg shapes and flags; the banner and README index derive from it and a test asserts it equals the live dispatch.",
+   "layer": "cli-surface",
+   "defined_in": [
+    "src/commands.ts",
+    "src/cli.ts"
+   ],
+   "related": [
+    "derived spelling",
+    "command groups",
+    "non-vacuity floor"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "command groups",
+   "aliases": [
+    "Derive the artifacts",
+    "Verify, and diff what is enforced",
+    "Durable agent record",
+    "Perceive the project",
+    "Ratchets and gates",
+    "Advisories",
+    "Bootstrap and scaffold",
+    "Reference and plumbing"
+   ],
+   "meaning": "The eight families the CLI surface is organised into; also the informal classes gate / ratchet / advisory / journal used across prose.",
+   "layer": "cli-surface",
+   "defined_in": [
+    "src/commands.ts (GROUP_TITLE)"
+   ],
+   "related": [
+    "command registry",
+    "advisory",
+    "ratchet"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "scaffold",
+   "aliases": [
+    "gradient-flip generator",
+    "scaffold kind (boundary | component | invariant | parity)",
+    "paste-in fragments",
+    "CODE_TODO"
+   ],
+   "meaning": "Generators that emit the complete anti-entropic anatomy (spec + invariants + boundary claim + oracle skeleton) so the convergent shape is the cheapest thing to ship.",
+   "layer": "cli-surface",
+   "defined_in": [
+    "src/scaffold.ts",
+    "README.md#In detail (scaffold)"
+   ],
+   "related": [
+    "boundary claim",
+    "parity claim",
+    "adoption ladder"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "exit code contract",
+   "aliases": [
+    "exit 0 / 1 / 2",
+    "refusal exits 2",
+    "advisory exits 0",
+    "usage error exits 2",
+    "--check exits 1"
+   ],
+   "meaning": "Across commands: 0 means held/released/advisory, 1 means a gate failed, 2 means the instrument could not answer safely (damaged evidence, invalid config, usage error).",
+   "layer": "cli-surface",
+   "defined_in": [
+    "README.md#Regulate the field",
+    "README.md#Taxonomy (list --check)",
+    "src/verification/run-named-test.ts"
+   ],
+   "related": [
+    "advisory",
+    "ratchet",
+    "damage"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "instrument",
+   "aliases": [
+    "every command is an instrument",
+    "the instrument is wrong",
+    "instrument asset (Scope)",
+    "sensor",
+    "reading"
+   ],
+   "meaning": "The project's word for any measuring command; its output is a 'reading', and 'doubt the instrument before the subject' is the injected first hypothesis of every conjecture.",
+   "layer": "other",
+   "defined_in": [
+    "README.md#The economy of inference",
+    "src/evidence/decisions.ts (withInstrumentCandidate)",
+    "docs/scope.md (instrument asset)"
+   ],
+   "related": [
+    "conjecture",
+    "status record",
+    "advisory"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "the field",
+   "aliases": [
+    "lifecycle field",
+    "swarm field",
+    "durable field",
+    "create a field"
+   ],
+   "meaning": "Prose name for the state a running lifecycle control plus ledgers establish around agents (instructions injected, journal written, work visible); an absent control 'cannot create a field'.",
+   "layer": "other",
+   "defined_in": [
+    "README.md#Install",
+    "src/coordination/coordination.spec.md (regulate why)"
+   ],
+   "related": [
+    "lifecycle control",
+    "decision journal",
+    "work order"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "assay",
+   "aliases": [
+    "docs/assays",
+    "PostHog assay",
+    "curation",
+    "portability trial",
+    "field report",
+    "*-CODEX-TAKE.md"
+   ],
+   "meaning": "Recorded external exercises of the harness against reference projects (PostHog, Mnemion) that produced the guarantee catalog, adoption readiness data and field reports.",
+   "layer": "other",
+   "defined_in": [
+    "docs/assays",
+    "TAXONOMY-COHERENCE-FIELD-REPORT-CODEX-TAKE.md",
+    "README.md#Connecting obligations and guarantees"
+   ],
+   "related": [
+    "guarantee catalog",
+    "taxonomy"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "prune",
+   "aliases": [
+    "net-removal commit",
+    "PRUNE gesture",
+    "shrink"
+   ],
+   "meaning": "A commit with more deletions than insertions; excluded from drift's trajectory and drawn as a negative bar in mass, because deletion must stay free.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/evolution.ts (commitDeltas)",
+    "src/diagnostics/drift.ts"
+   ],
+   "related": [
+    "drift",
+    "mass",
+    "evolution graph"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "artifact ownership",
+   "aliases": [
+    "fully owned | two-zone | authored",
+    "writesArtifacts",
+    "never hand-edit the owned regions",
+    "outputDir"
+   ],
+   "meaning": "Which files coherence owns wholly (graph.json, HTML renders, AGENTS.md, promise.json, atlas.md), which are two-zone (CLAUDE.md, README.md), and which stay authored.",
+   "layer": "readings-artifacts",
+   "defined_in": [
+    "README.md#Generated artifacts",
+    "src/commands.ts (writesArtifacts)"
+   ],
+   "related": [
+    "reading surface",
+    "freshness gate (--check)"
+   ],
+   "overlap_note": ""
+  },
+  {
+   "name": "sidecar scan",
+   "aliases": [
+    "scanSources",
+    "sources",
+    "testDir",
+    "source vs test split",
+    "NOISE_DIRS / ALWAYS_IGNORE"
+   ],
+   "meaning": "The shared file scan the ratchets use, scoped by `config.sources` and split by `testDir`, deliberately not `config.ignore` because the conventions lint needs test files.",
+   "layer": "diagnostics-advisories",
+   "defined_in": [
+    "src/diagnostics/sidecar.ts"
+   ],
+   "related": [
+    "ratchet",
+    "sink",
+    "convention / guard"
+   ],
+   "overlap_note": "Two ignore lists (`ignore` for the graph, NOISE_DIRS for scans and oracle hunting) were themselves a redundancy finding this repo dismissed."
+  }
+ ],
+ "suspected_duplicates": [
+  {
+   "concepts": [
+    "invariant",
+    "boundary claim",
+    "gate",
+    "guarantee reading"
+   ],
+   "why": "One authored invariant anchored by one boundary claim is rendered as a gate by the promise graph, hashed as a g-… guarantee by guarantees.ts/Scope, and titled 'Invariants' in the Scope Guarantees view — four names, one thing, no decision choosing."
+  },
+  {
+   "concepts": [
+    "zone",
+    "chart"
+   ],
+   "why": "Both are declared trust regions between which chokepoints cross; zones live in the entry spec, charts in config, and docs/scope.md has to remind readers they are 'different concepts'."
+  },
+  {
+   "concepts": [
+    "crossing",
+    "transition"
+   ],
+   "why": "A claim's `crossing a -> b` and a config `atlas.transitions[symbol] {from,to}` both say which trust regions a chokepoint separates, spelled twice with different region vocabularies."
+  },
+  {
+   "concepts": [
+    "reliance",
+    "guarantee link",
+    "architectural relationship",
+    "import edge"
+   ],
+   "why": "Four kinds of 'A depends on B' arrows: derived import reliance (promise graph), declared `## relies on` links, spec-owned relationships (Structure handoffs), and raw import edges."
+  },
+  {
+   "concepts": [
+    "orient heading",
+    "regulator"
+   ],
+   "why": "Two machines each promise 'exactly one deterministic next action' over overlapping ledgers with separate rule sets and priority orders."
+  },
+  {
+   "concepts": [
+    "verify run tier",
+    "claim tier",
+    "tier (enforcement ladder)"
+   ],
+   "why": "'tier' names fast/full runs, deterministic/live/executable/hybrid forms, and the enshrined/totality-checked/convention ladder — three unrelated scales under one word."
+  },
+  {
+   "concepts": [
+    "obligation",
+    "obligations section (proposed)",
+    "doctrine"
+   ],
+   "why": "Taxonomy-suggested obligations, a proposed spec section, and regulator obligations (a rule owed an action) all use 'obligation'."
+  },
+  {
+   "concepts": [
+    "guarantee catalog",
+    "obligation"
+   ],
+   "why": "Catalog definitions (`guarantee:scoped-reads`) and taxonomy suggestions (`guarantee:G-…`) share the `guarantee:` id namespace but are declared incompatible populations."
+  },
+  {
+   "concepts": [
+    "contract (promise graph)",
+    "data contract (contracts command)",
+    "convention / guard"
+   ],
+   "why": "'contract' means the promise-graph render, a producer/consumer data contract, and the opposite of a convention in the ladder."
+  },
+  {
+   "concepts": [
+    "coverage claim",
+    "coverage gate"
+   ],
+   "why": "The `coverage` verb (an open-domain claim with a residual) and verify's coverage gate (claims present, invariants anchored, why present) share a name and a report line."
+  },
+  {
+   "concepts": [
+    "blocked",
+    "work state"
+   ],
+   "why": "A journal `blocked` row (history, no close) and a `blocked` work state (live scheduler) look alike and orient had to be taught to treat them differently."
+  },
+  {
+   "concepts": [
+    "status record",
+    "receipt"
+   ],
+   "why": "Both record verify results; receipts exist because the merged status cannot identify one run, leaving two overlapping evidence stores."
+  },
+  {
+   "concepts": [
+    "telemetry scope",
+    "attribution ceiling"
+   ],
+   "why": "The same none/owner-session/parent-session-aggregate/legacy-unscoped vocabulary is spelled at hook status, experiment close and calibration."
+  },
+  {
+   "concepts": [
+    "decision journal",
+    "journal stream",
+    "journal feed",
+    "decisions"
+   ],
+   "why": "'journal' names the record, the live command, the Scope view and the peer feed; 'decisions' names a read command and the folder holding all nine record kinds."
+  },
+  {
+   "concepts": [
+    "drift",
+    "atlas"
+   ],
+   "why": "'drift' is the architectural-direction command, an atlas --check failure class, an artifact staleness word and a narrative statement state."
+  },
+  {
+   "concepts": [
+    "Structure",
+    "decompose",
+    "overview / agent map"
+   ],
+   "why": "'Structure' names the Scope renderer, decompose's import graph, and the AGENTS.md folder-tree section."
+  },
+  {
+   "concepts": [
+    "stack",
+    "card",
+    "component"
+   ],
+   "why": "A component at the presentation layer is called a stack (retired unfurl mechanism), a card (shipped), and an organ (index)."
+  },
+  {
+   "concepts": [
+    "guarantee binding",
+    "platform adapter"
+   ],
+   "why": "'Bindings' is both the Cloudflare infra type (types.ts) and the spec-owned `## guarantee bindings` adoption record."
+  },
+  {
+   "concepts": [
+    "economy (context closure)",
+    "context packet",
+    "calibration sample"
+   ],
+   "why": "Three instruments over the same one-hop import neighbourhood: historical closure, live packet, and the calibration of the prediction."
+  },
+  {
+   "concepts": [
+    "novelty",
+    "signal",
+    "log / structural ledger",
+    "index"
+   ],
+   "why": "Four readings of 'what did this change do to the invariant set and surface': the ledger diff, the advisory, the gate over the advisory, and the index trajectory."
+  },
+  {
+   "concepts": [
+    "refutation",
+    "falsifier",
+    "never-red advisory"
+   ],
+   "why": "An observed break, a planned break, and the absence of any break describe one property (can this check fail) from three layers."
+  },
+  {
+   "concepts": [
+    "meta-oracle",
+    "totality",
+    "static oracle index",
+    "serial canary"
+   ],
+   "why": "Several 'oracles over oracles' with overlapping admission questions (does the test exist, does it iterate a live domain, is the domain concrete, can the runner fail)."
+  },
+  {
+   "concepts": [
+    "derived spelling",
+    "redundancy",
+    "prose rot"
+   ],
+   "why": "One doctrine (derive one spelling from the other) with a code detector, a prose detector and a registry mechanism, each named separately."
+  },
+  {
+   "concepts": [
+    "verify scope",
+    "Scope",
+    "write scope / collision",
+    "decision wire v2 fields"
+   ],
+   "why": "'scope' is a verify selector, a reading surface, a work-order path grant and a decision address field."
+  },
+  {
+   "concepts": [
+    "freshness",
+    "freshness gate (--check)",
+    "premise lease"
+   ],
+   "why": "Verdict staleness, artifact staleness and decision-address staleness are three 'is this still current' checks with different words (stale, current, expired, valid, moved)."
+  },
+  {
+   "concepts": [
+    "session",
+    "agent / job attribution",
+    "branch / commit provenance"
+   ],
+   "why": "Attribution fields are re-derived per ledger (decisions, defects, experiments, work, receipts, activity) with slightly different required sets."
+  }
+ ],
+ "counts": {
+  "concepts": 206,
+  "by_layer": {
+   "cli-surface": 6,
+   "config": 8,
+   "coordination": 13,
+   "derivation": 9,
+   "diagnostics-advisories": 30,
+   "evidence-journal": 29,
+   "guarantee-catalog": 2,
+   "lifecycle-hooks": 14,
+   "other": 7,
+   "readings-artifacts": 24,
+   "spec-grammar": 28,
+   "taxonomy-catalog": 7,
+   "verification": 29
+  }
+ }
+}

@@ -1,0 +1,795 @@
+/**
+ * The Scope check: builds the reading and asserts what the page must hold.
+ *
+ *   npm run scope:check
+ *
+ * The Mnemion assertion reads the first adopter's domain lexicon from its own
+ * repository (COHERENCE_DOMAIN_LEXICON overrides the path) and is skipped,
+ * visibly, when that file is not on this machine.
+ */
+
+import assert from "node:assert/strict";
+import { appendFileSync } from "node:fs";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { after, before, test } from "node:test";
+import { loadRuns } from "../../enforcement/record.ts";
+import { loadJournal } from "../../journal/store.ts";
+import { loadSpecModel } from "../../spec/model.ts";
+import { DEFAULTS, STATE_SLOT, buildScopePage, buildShell, scopeState, snapshotOf, writeScopePage, writeStructurePreview, type BuildOptions } from "./build.ts";
+import { makeFixture, type Fixture } from "./check-fixture.ts";
+import { CITED_WINDOW, windowJournal, allReliance, componentId, defectsOf, flowChokepointId, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, verifiedOf, workId } from "./derive.ts";
+import { escapeHtml } from "./html.ts";
+import type { Lexicon, LexiconCoverage, RecordedSite, ShellState, StructurePreview, WorkOrder } from "./model.ts";
+import { renderShell, renderView } from "./shell.ts";
+import { flowOf } from "./structure-flow.ts";
+
+const options: BuildOptions = {
+  lexiconPath: DEFAULTS.lexiconPath,
+  project: DEFAULTS.project,
+};
+
+const MNEMION_LEXICON =
+  process.env["COHERENCE_DOMAIN_LEXICON"] ?? "/Users/daniloc/Documents/Dev/mnemion/mnemion-js/lexicon.json";
+const MNEMION_ROOT = dirname(MNEMION_LEXICON);
+
+const TWO_MB = 2 * 1024 * 1024;
+const THREE_MB = 3 * 1024 * 1024;
+
+let fixture: Fixture;
+let fixtureState: ShellState;
+
+before(async () => {
+  fixture = makeFixture();
+  ({ state: fixtureState } = await buildScopePage({ root: fixture.root, lexiconPath: DEFAULTS.lexiconPath, project: "Fixture" }));
+});
+
+after(() => fixture.remove());
+
+/** A fresh copy of the fixture state, so a test's filters never leak into another's. */
+function fresh(): ShellState {
+  return JSON.parse(JSON.stringify(fixtureState)) as ShellState;
+}
+
+/** The markup of one card on a view. */
+function card(rendered: string, id: string): string {
+  const start = rendered.indexOf(`id="${id}"`);
+  assert.ok(start !== -1, `card ${id} is on the page`);
+  return rendered.slice(start, rendered.indexOf("</article>", start));
+}
+
+/** Every card id a view renders, in order. */
+function cardIds(rendered: string): string[] {
+  return [...rendered.matchAll(/<article class="entry[^"]*" id="([^"]+)"/g)].map((m) => m[1]!);
+}
+
+function firstLexicon(state: ShellState): Lexicon {
+  const layer = state.lexicon.layers[0];
+  assert.ok(layer !== undefined && layer.kind === "present", "the Coherence layer is present");
+  return layer.lexicon;
+}
+
+function secondLexicon(state: ShellState): Lexicon {
+  const layer = state.lexicon.layers[1];
+  assert.ok(layer !== undefined && layer.kind === "present", "the domain layer is present");
+  return layer.lexicon;
+}
+
+/** The JSON the page embeds, read back out of the file. */
+function embeddedState(html: string): ShellState {
+  const match = /<script type="application\/json" id="scope-state">([\s\S]*?)<\/script>/.exec(html);
+  assert.ok(match !== null && match[1] !== undefined, "the page embeds its state");
+  return JSON.parse(match[1]) as ShellState;
+}
+
+async function exists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test("the page builds to the default path and stays under 3 MB with Coherence's own data", async () => {
+  const { bytes, state } = await writeScopePage(options, DEFAULTS.outPath);
+  const onDisk = await readFile(DEFAULTS.outPath, "utf8");
+  assert.equal(Buffer.byteLength(onDisk, "utf8"), bytes);
+  assert.ok(bytes < THREE_MB, `page is ${bytes} bytes, must be under ${THREE_MB}`);
+  assert.equal(state.spec.components.length, loadSpecModel(process.cwd()).components.length, "every component of Coherence's own tree is in the state");
+  assert.equal(state.runs.records.length + (state.runs.omitted ?? 0), loadRuns(process.cwd()).records.length, "every run record is embedded or counted");
+  assert.equal(state.journal.records.length + (state.journal.omitted ?? 0), loadJournal(process.cwd()).records.length, "every journal record is embedded or counted");
+});
+
+test("a snapshot is the shell with one inline state and loads nothing from outside: no external src, href, url() or @import", async () => {
+  const { html, state } = await buildScopePage(options);
+  const { html: shell } = await buildShell();
+  assert.equal(html.replace(/<script type="application\/json" id="scope-state">[\s\S]*?<\/script>/, STATE_SLOT), shell, "the snapshot is the shell byte for byte, its state slot filled");
+  assert.deepEqual(embeddedState(html), state, "and the state it carries is the state the reading loads");
+  for (const [name, page] of [["snapshot", html], ["shell", shell]] as const) {
+    const attributes = [...page.matchAll(/\b(?:src|href)\s*=\s*["']([^"']*)["']/g)].map((m) => m[1] ?? "");
+    for (const value of attributes) {
+      assert.ok(value.startsWith("#") || value.startsWith("data:"), `${name}: external reference: ${value}`);
+    }
+    const style = /<style>([\s\S]*?)<\/style>/.exec(page)?.[1] ?? "";
+    assert.ok(style.length > 0, `${name}: the styles are inline`);
+    assert.doesNotMatch(style, /url\(\s*["']?(?:https?:)?\/\//, `${name}: no external url() in styles`);
+    assert.doesNotMatch(style, /@import/, `${name}: no @import in styles`);
+    assert.doesNotMatch(page, /^\s*import\s/m, `${name}: the inline module has no import statements left`);
+    // The script asks only its own origin, by path: the live page's API, never another host.
+    const script = /<script type="module">([\s\S]*?)<\/script>/.exec(page)?.[1] ?? "";
+    assert.doesNotMatch(script, /fetch\(\s*["'`]https?:/, `${name}: no fetch leaves the page's own origin`);
+  }
+});
+
+test("the embedded state is the loaded lexicon, unchanged", async () => {
+  const { html, state } = await buildScopePage(options);
+  assert.deepEqual(embeddedState(html), state);
+  const lexicon = firstLexicon(state);
+  const file = JSON.parse(await readFile(DEFAULTS.lexiconPath, "utf8")) as {
+    concepts: { name: string; detail?: object; provenance?: object }[];
+    metaphors: Record<string, string>;
+    shape: object;
+    version: number;
+  };
+  assert.equal(lexicon.concepts.length, file.concepts.length);
+  assert.equal(lexicon.version, file.version);
+  assert.deepEqual(Object.keys(lexicon.metaphors), Object.keys(file.metaphors));
+  assert.deepEqual(lexicon.shape, file.shape, "the file's shape key is kept in the model");
+  assert.equal(lexicon.rejected_names, undefined, "Coherence's lexicon has no top-level rejected names");
+  assert.deepEqual(lexicon.record, {}, "every top-level key of the file has a place in the model");
+  for (const [i, concept] of lexicon.concepts.entries()) {
+    const entry = file.concepts[i]!;
+    assert.deepEqual(concept.detail, entry.detail ?? {}, `${concept.name}: detail is kept whole`);
+    assert.deepEqual(concept.provenance, entry.provenance ?? {}, `${concept.name}: provenance is kept whole`);
+    assert.deepEqual(concept.record, {}, `${concept.name}: every key of the entry has a place in the model`);
+  }
+});
+
+test("the render shows every concept name and every rejected alternative's because", async () => {
+  const { state } = await buildScopePage(options);
+  const rendered = renderView(state, "lexicon").text;
+  const lexicon = firstLexicon(state);
+  for (const concept of lexicon.concepts) {
+    assert.ok(rendered.includes(escapeHtml(concept.name)), `concept ${concept.name} is on the page`);
+    for (const rejected of concept.rejected) {
+      assert.ok(
+        rendered.includes(escapeHtml(rejected.because)),
+        `because for "${rejected.alternative}" (${concept.name}) is on the page`,
+      );
+    }
+  }
+  for (const [name, text] of Object.entries(lexicon.metaphors)) {
+    assert.ok(rendered.includes(escapeHtml(text)), `metaphor ${name} is on the page`);
+  }
+  // The layers are where a shape key would leak; the vocabulary reading above them lists corpus paths, and one of them (docs/retired.md) is also a shape value.
+  const layers = rendered.slice(rendered.indexOf('id="layer-'));
+  for (const value of Object.values(lexicon.shape ?? {})) {
+    if (typeof value === "string") assert.ok(!layers.includes(escapeHtml(value)), "the shape key is rendered in no lexicon layer");
+  }
+  assert.ok(rendered.includes(`${lexicon.concepts.length} concepts`), "concept count is in the masthead");
+  assert.ok(rendered.includes(`lexicon version ${lexicon.version}`), "version is in the masthead");
+  assert.ok(!rendered.includes(">Retired mechanisms</h2>"), "there is no retired-mechanisms section");
+  assert.ok(!rendered.includes('class="entry retirement"'), "there are no retired-mechanism cards");
+});
+
+/** The markup of one concept's card, and the vocabulary part of it: the body above the disclosures. */
+function conceptCard(rendered: string, id: string): { card: string; vocabulary: string } {
+  const start = rendered.indexOf(`id="${id}"`);
+  assert.ok(start !== -1, `card ${id} is on the page`);
+  const card = rendered.slice(start, rendered.indexOf("</article>", start));
+  const from = card.indexOf('data-section="vocabulary"');
+  assert.ok(from !== -1, `card ${id} has a vocabulary section`);
+  const to = card.indexOf("<details", from);
+  return { card, vocabulary: card.slice(from, to === -1 ? undefined : to) };
+}
+
+test("provenance and detail are one click away; no provenance key or value appears in the vocabulary", async () => {
+  const { state } = await buildScopePage(options);
+  const rendered = renderView(state, "lexicon").text;
+  const lexicon = firstLexicon(state);
+  for (const concept of lexicon.concepts) {
+    const id = `coherence-${slug(concept.name)}`;
+    const { card, vocabulary } = conceptCard(rendered, id);
+    assert.ok(!vocabulary.includes("<details"), `${concept.name}: the vocabulary holds no disclosure`);
+    assert.ok(!vocabulary.includes('class="quotation'), `${concept.name}: no quotation in the vocabulary`);
+    for (const [key, value] of Object.entries(concept.provenance)) {
+      assert.ok(!vocabulary.includes(`data-field="${key}"`), `${concept.name}: provenance key ${key} is not a vocabulary field`);
+      assert.ok(!vocabulary.includes(`<dt>${escapeHtml(key.replace(/_/g, " "))}</dt>`), `${concept.name}: ${key} is not labeled in the vocabulary`);
+      for (const text of stringsIn(value)) {
+        assert.ok(!vocabulary.includes(escapeHtml(text)), `${concept.name}: provenance ${key} text is not in the vocabulary`);
+      }
+    }
+    const provenance = card.indexOf('data-section="provenance"');
+    assert.ok(provenance !== -1 && card.includes("<summary>Provenance:"), `${concept.name}: provenance is under its own disclosure`);
+    assert.ok(card.slice(provenance).includes('data-field="defined_by"'), `${concept.name}: defined_by is in provenance`);
+    for (const [key, value] of Object.entries(concept.provenance)) {
+      if (key === "owner_words" && typeof value === "string") {
+        assert.ok(card.includes(`<blockquote class="quotation owner-words"><p>${escapeHtml(value)}</p>`), `${concept.name}: owner's words are a quotation`);
+      }
+      if (key === "metaphor" && typeof value === "string") {
+        assert.ok(card.includes(`<blockquote class="quotation metaphor"><p>${escapeHtml(value)}</p>`), `${concept.name}: metaphor is a quotation`);
+      }
+    }
+    const detailKeys = Object.keys(concept.detail);
+    if (detailKeys.length === 0) {
+      assert.ok(!card.includes('data-section="detail"'), `${concept.name}: no detail, no Detail disclosure`);
+    } else {
+      assert.ok(card.includes("<summary>Detail:"), `${concept.name}: detail is under its own disclosure`);
+      for (const key of detailKeys) {
+        assert.ok(card.includes(`data-field="${key}"`), `${concept.name}: detail ${key} is on the card`);
+      }
+      assert.ok(card.indexOf('data-section="detail"') < provenance, `${concept.name}: Detail comes before Provenance`);
+    }
+    assert.ok(!card.includes("data-section=\"record\""), `${concept.name}: the record is empty, so no record section renders`);
+  }
+});
+
+function slug(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/** Every string inside a value, however nested. */
+function stringsIn(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(stringsIn);
+  if (typeof value === "object" && value !== null) return Object.values(value).flatMap(stringsIn);
+  return [];
+}
+
+test("the render has one view strip with the six views in order", async () => {
+  const { state } = await buildScopePage(options);
+  const rendered = renderShell(state).text;
+  const tabs = [...rendered.matchAll(/role="tab"[^>]*data-view="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(tabs, ["structure", "lexicon", "components", "invariants", "runs", "journal"]);
+  for (const label of ["Structure", "Lexicon", "Components", "Invariants", "Runs", "Journal"]) {
+    assert.ok(rendered.includes(`>${label}</button>`), `${label} tab`);
+  }
+});
+
+test("Structure is the first view: the strip leads with Structure then Lexicon, and a page whose address names no view opens on it", () => {
+  const state = fresh();
+  assert.deepEqual(state.views.map((v) => v.id), ["structure", "lexicon", "components", "invariants", "runs", "journal"], "Structure, then Lexicon, then the rest in their order");
+  assert.equal(state.activeView, state.views[0]!.id, "the state opens on the first view");
+  assert.equal(state.activeView, "structure");
+  const rendered = renderShell(state).text;
+  const first = /<button[^>]*role="tab"[^>]*data-view="([^"]+)"[^>]*aria-selected="([a-z]+)"[^>]*tabindex="(-?\d)"/.exec(rendered);
+  assert.deepEqual(first?.slice(1), ["structure", "true", "0"], "the first tab is the selected one and the one keyboard focus reaches");
+  assert.equal(resolveHash(state, ""), undefined, "an address with no hash names no view, so the state's own view stands");
+  for (const view of state.views) assert.deepEqual(resolveHash(state, `#${view.id}`), { view: view.id, id: undefined }, `#${view.id} still opens ${view.id}`);
+});
+
+/** The page's head on one view, with the only difference a view may make (which tab is selected) taken out. */
+function headOf(rendered: string): string {
+  const head = /<div class="shell">\s*<header class="shell-head">[^]*?<\/header>\s*<main class="[^"]*"/.exec(rendered);
+  assert.ok(head !== null, "the page has one head before its view");
+  return head[0].replace(/aria-selected="(true|false)"/g, "aria-selected").replace(/tabindex="-?\d"/g, "tabindex");
+}
+
+/** Every rule of a style sheet as selector and declarations, @media and @supports blocks flattened. */
+function rulesOf(css: string): { selector: string; body: string }[] {
+  const text = css.replace(/\/\*[^]*?\*\//g, "");
+  return [...text.matchAll(/([^{}@;]+)\{([^{}]*)\}/g)].map((m) => ({ selector: m[1]!.trim(), body: m[2]! }));
+}
+
+test("the masthead does not move between views: its markup is the same on every view but for the selected tab, and no style sizes or places the frame by view", async () => {
+  const state = fresh();
+  const heads = state.views.map((view) => ({ view: view.id, head: headOf(renderView(state, view.id).text) }));
+  for (const { view, head } of heads) assert.equal(head, heads[0]!.head, `the head on ${view} is the head on ${heads[0]!.view}`);
+
+  // The frame is html, body, the shell and everything in its head. A rule that sizes or places any of it must not
+  // depend on the view: no :has() on what a view renders, no view id, and the selected tab paints but never moves.
+  const css = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+  const frame = /(^|[\s>+~,])(html|body|\.shell|\.shell-head|\.masthead|\.views|\.reading-name|\.connection)(?![-\w])/;
+  const byView = /:has\(|#view-|\[data-view|\.flow-|\.view-|\.view(?![-\w])|\.structure-results/;
+  const paint = new Set(["color", "border-color", "border-bottom-color", "background", "background-color", "text-decoration-color", "outline-color"]);
+  let frameRules = 0;
+  for (const rule of rulesOf(css)) {
+    for (const selector of rule.selector.split(",").map((s) => s.trim())) {
+      if (!frame.test(` ${selector}`)) continue;
+      frameRules += 1;
+      assert.doesNotMatch(selector, byView, `the frame rule "${selector}" depends on no view`);
+      if (/aria-selected="true"|\[aria-selected\]/.test(selector)) {
+        const properties = [...rule.body.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]!);
+        for (const property of properties) assert.ok(paint.has(property), `the selected tab only paints: "${selector}" sets ${property}`);
+      }
+    }
+  }
+  assert.ok(frameRules > 10, `the frame's rules were read (${frameRules})`);
+  assert.match(css, /\nhtml \{[^}]*scrollbar-gutter: stable;/, "a view too short to scroll keeps the scrollbar's gutter");
+});
+
+test("the search derives its matches from state and hides the rest", async () => {
+  const { state } = await buildScopePage(options);
+  const total = firstLexicon(state).concepts.length;
+  state.lexicon.query = "chokepoint";
+  const rendered = renderView(state, "lexicon").text;
+  const shown = [...rendered.matchAll(/class="entry concept"/g)].length;
+  assert.ok(shown > 0 && shown < total, `query narrows ${total} concepts to ${shown}`);
+  assert.ok(rendered.includes(`${shown} of ${total} concepts match “chokepoint”.`));
+  state.lexicon.query = "no concept says this sentence";
+  assert.ok(renderView(state, "lexicon").text.includes("No concept matches"));
+});
+
+test("the Scope lexicon reading displays every applicable property meaning without choosing an owner", () => {
+  const state = fresh();
+  const coverage: LexiconCoverage = {
+    version: 1,
+    projectLexicon: "lexicon.json",
+    fingerprint: "ambiguous-meaning",
+    population: { files: [], excluded: [], unreadable: [], extraction: "fixture", limits: [] },
+    totals: { terms: 1, uses: 1, known: 1, rejected: 0, unresolved: 0, unreviewedContexts: 1 },
+    terms: [{
+      term: "unit basis",
+      state: "declared",
+      concept: null,
+      layer: null,
+      definition: null,
+      properties: {},
+      confusables: [],
+      meaningAlternatives: [
+        { concept: "exposure", layer: "project", definition: "The amount subject to loss.", properties: { unit_basis: "percentage" }, confusables: ["allocation"] },
+        { concept: "allocation", layer: "project", definition: "The amount assigned to a strategy.", properties: { unit_basis: "percentage" }, confusables: ["exposure"] },
+      ],
+      fingerprint: "unit-basis",
+      count: 1,
+      contexts: [{ component: "money", fingerprint: "money-unit-basis", disposition: "unreviewed", because: null }],
+      uses: [{ file: "src/money.ts", line: 4, component: "money", text: "unit_basis", kind: "code", fingerprint: "unit-basis-use" }],
+    }],
+  };
+  state.lexicon.coverage = coverage;
+  state.lexicon.query = "unit basis";
+  const rendered = renderView(state, "lexicon").text;
+  assert.match(rendered, /2 applicable property meanings; this spelling alone does not select an owner/);
+  assert.match(rendered, /exposure[\s\S]*The amount subject to loss/);
+  assert.match(rendered, /allocation[\s\S]*The amount assigned to a strategy/);
+  assert.match(rendered, /unit_basis/);
+  assert.doesNotMatch(rendered, /No settled definition/);
+});
+
+test("an absent domain lexicon is rendered as a placeholder, a present one as a second layer", async () => {
+  const absent = await buildScopePage(options);
+  const absentRendered = renderView(absent.state, "lexicon").text;
+  assert.ok(absentRendered.includes("No domain lexicon is present."));
+
+  const present = await buildScopePage({ ...options, domainPath: DEFAULTS.lexiconPath, domainTitle: "Stand-in domain" });
+  const presentRendered = renderView(present.state, "lexicon").text;
+  assert.ok(!presentRendered.includes("No domain lexicon is present."));
+  assert.ok(presentRendered.includes("Stand-in domain"));
+  assert.equal([...presentRendered.matchAll(/class="layer"/g)].length, 2);
+  assert.ok(presentRendered.includes('id="domain-invariant"'), "domain layer cards carry their own ids");
+});
+
+test("related names that resolve become links; the rest are marked unresolved", async () => {
+  const { state } = await buildScopePage(options);
+  const rendered = renderView(state, "lexicon").text;
+  assert.ok(rendered.includes('href="#coherence-invariant"'));
+  assert.ok(rendered.includes('class="unresolved"'), "some related names are not concepts and say so");
+});
+
+test("the shell's bytes are independent of project content; the same state in renders the same page out", async () => {
+  const shell = (await buildShell()).html;
+  assert.equal((await buildShell()).html, shell, "the shell builds identically twice");
+  assert.ok(shell.includes(STATE_SLOT), "the shell carries an empty state slot");
+  assert.doesNotMatch(shell, /<title>[^<]*Coherence/, "the shell's title names no project");
+
+  // Every input the state depends on, named. Appending to any of them changes the state and leaves the shell alone.
+  // Its own copy of the fixture: this test appends to every record store, and the shared one must not move.
+  const own = makeFixture();
+  const fixtureOptions: BuildOptions = { root: own.root, lexiconPath: DEFAULTS.lexiconPath, project: "Fixture" };
+  const same = async (): Promise<ShellState> => {
+    const first = await scopeState(fixtureOptions);
+    const second = await scopeState(fixtureOptions);
+    assert.deepEqual(second, first, "the same inputs load the same state");
+    assert.equal(renderShell(second).text, renderShell(first).text, "the same state renders the same page");
+    assert.equal(snapshotOf(shell, second), snapshotOf(shell, first), "and the same snapshot bytes");
+    return first;
+  };
+  let previous = await same();
+  for (const id of [...own.names.journalIds, own.names.session, own.names.workOrder]) assert.ok(!shell.includes(id), `the shell carries none of the project's records: ${id}`);
+  const inputs: { name: string; write: () => void }[] = [
+    { name: "the journal", write: () => appendFileSync(join(own.root, ".coherence", "journal", `${own.names.session}.jsonl`), JSON.stringify({ id: "d-00009999", kind: "decision", at: "2026-09-12T10:00:00.000Z", session: own.names.session, agent: "fixture", commit: "abc1234", dirty: false, chose: "one more door", over: ["two doors"], because: "a later record must reach the page" }) + "\n") },
+    { name: "the runs", write: () => appendFileSync(join(own.root, ".coherence", "runs", `${own.names.session}.jsonl`), JSON.stringify({ at: "2026-09-12T10:00:00.000Z", session: own.names.session, agent: "fixture", commit: "abc1234", dirty: false, instrument: { language: "typescript", server: "cold" }, latency: 1, invariants: [{ component: "src/store", name: "single writer", form: "chokepoint", grade: "reference-choked", verdict: "pass", refutation: "automatic", bypasses: [], testReferences: 0, files: ["src/store/write.ts"], latency: 1, reason: "clean again" }] }) + "\n") },
+    { name: "the work store", write: () => appendFileSync(join(own.root, ".coherence", "work", `${own.names.session}.jsonl`), JSON.stringify({ id: "wm-00009999", kind: "move", at: "2026-09-12T10:00:00.000Z", session: own.names.session, agent: "fixture", commit: "abc1234", dirty: false, of: own.names.workOrder, state: "waiting", because: "a later record must reach the page" }) + "\n") },
+    { name: "the specs", write: () => appendFileSync(join(own.root, "src", "api", "Api.spec.md"), "- one more: The api keeps one rule of its own.\n  because: a later bullet must reach the page\n") },
+  ];
+  for (const input of inputs) {
+    input.write();
+    const after = await same();
+    assert.notDeepEqual(after, previous, `${input.name} is an input the state depends on`);
+    assert.equal((await buildShell()).html, shell, `${input.name} changed, and the shell did not`);
+    previous = after;
+  }
+  // Another project entirely: the same shell.
+  const other = await scopeState(options);
+  assert.notEqual(other.project, previous.project);
+  assert.equal((await buildShell()).html, shell, "a second project reads through the same shell");
+  own.remove();
+});
+
+test("the state stores no copy of what it derives: the latest verdicts live in the run records and nowhere else", async () => {
+  const { state } = await buildScopePage({ root: fixture.root, lexiconPath: DEFAULTS.lexiconPath, project: "Fixture" });
+  for (const component of state.spec.components) {
+    for (const invariant of component.invariants) {
+      for (const key of ["latest", "verified", "defects"]) {
+        assert.ok(!(key in invariant), `${component.folder}/${invariant.name} carries no stored ${key}: it is derived from state.runs.records at render`);
+      }
+    }
+  }
+  // Derived at render, and the same answer the stored copy used to give.
+  const invariant = state.spec.components.find((c) => c.folder === "src/store")!.invariants.find((i) => i.name === "single writer")!;
+  const latest = latestOf(invariant, state.runs.records);
+  assert.deepEqual(latest.map((l) => [l.form, l.verdict, l.at]), [["chokepoint", "fail", fixture.names.runAts[1]]]);
+  assert.deepEqual(defectsOf(invariant, state.runs.records).map((d) => d.verdict), ["fail"]);
+  assert.deepEqual(verifiedOf(invariant, state.runs.records), []);
+  const kept = state.spec.components.find((c) => c.folder === "src/store")!.invariants.find((i) => i.name === fixture.names.keptName)!;
+  assert.deepEqual(latestOf(kept, state.runs.records).map((l) => [l.form, l.at]), [["totality oracle", fixture.names.runAts[0]]], "an enforcement a later run skipped keeps the verdict of the last run that checked it");
+  assert.deepEqual(verifiedOf(kept, state.runs.records).map((v) => v.verdict), ["pass"]);
+});
+
+test("every view renders from state: every component, invariant, run, and journal record in the fixture is on its view", () => {
+  const state = fresh();
+  const n = fixture.names;
+
+  const components = renderView(state, "components").text;
+  for (const folder of n.components) assert.ok(components.includes(`id="${componentId(folder)}"`), `component ${folder} has a card`);
+  assert.equal([...components.matchAll(/data-slot="mass"/g)].length, n.components.length, "every component reserves its mass slot");
+  assert.ok(components.includes("mass: not measured"));
+  assert.ok(components.includes('data-depth="2"'), "nesting follows the folders");
+  assert.ok(!components.includes("data-selected-invariants"), "no component is selected until the reader selects one");
+  state.components.selected = "src/store";
+  const selected = renderView(state, "components").text;
+  const storeCard = card(selected, componentId("src/store"));
+  assert.ok(storeCard.includes("data-selected-invariants"), "the selected component shows its invariants");
+  for (const { component, name } of n.invariants.filter((i) => i.component === "src/store")) {
+    assert.ok(storeCard.includes(`href="#${invariantId(component, name)}"`), `${name} is listed with a link`);
+  }
+  assert.ok(storeCard.includes('data-count="invariants">1 invariant<') && storeCard.includes('data-count="requirements">1 requirement<'), "counts per state");
+
+  const invariants = renderView(state, "invariants").text;
+  for (const { component, name, state: lifecycle } of n.invariants) {
+    const c = card(invariants, invariantId(component, name));
+    assert.ok(c.includes(`data-state="${lifecycle}"`), `${name} is a ${lifecycle}`);
+  }
+  assert.ok(invariants.includes("enforced by the language itself"), "the ladder's top rung names its enforcer");
+  assert.ok(invariants.includes('data-refutation="witnessed"') && invariants.includes('data-refutation="automatic"') && invariants.includes('data-refutation="missing"'), "all three refutation states render");
+  assert.ok(invariants.includes("outside</span> → <span class=\"level\" title=\"The store&#39;s own code.\">inside"), "a crossing names its trust levels with their meanings");
+  assert.ok(card(invariants, invariantId("src/store", "read shape")).includes("kept from an earlier run"), "a verdict the latest run skipped is marked as kept");
+  assert.ok(card(invariants, invariantId("src/store", "open one")).includes("lacks</span> enforcement, refutation, kinds"), "what a requirement lacks is said");
+  state.invariants.state = "structural defect";
+  assert.deepEqual(cardIds(renderView(state, "invariants").text), [invariantId("src/store", "single writer")], "the state filter narrows to the defect");
+  state.invariants.state = "";
+  state.invariants.component = ".";
+  assert.deepEqual(cardIds(renderView(state, "invariants").text), [invariantId(".", "entry rule")], "the component filter narrows to the root");
+  state.invariants.component = "";
+  state.invariants.query = "row shape";
+  assert.deepEqual(cardIds(renderView(state, "invariants").text), [invariantId("src/store", "read shape")], "the search narrows by sentence");
+  state.invariants.query = "";
+
+  state.structure.selected = flowChokepointId("src/store", "single writer");
+  const reliance = renderView(state, "structure").text;
+  assert.ok(reliance.includes('data-kind="chokepoint"') && reliance.includes("reliance unknown: run carries no sites"), "a legacy run is explicitly incomplete on the chokepoint's selection");
+  assert.ok(reliance.includes('data-field="evidence"'), "the evidence boundary is said on the map");
+  delete state.structure.selected;
+
+  const relied = allReliance(state.spec.components, state.runs.records).find((reading) => reading.invariant.name === "single writer");
+  assert.ok(relied !== undefined && relied.evidence.status === "unknown");
+  assert.match(relied.evidence.reason, /run carries no sites/);
+
+
+  const runs = renderView(state, "runs").text;
+  const runIds = cardIds(runs).filter((id) => id.startsWith("run-"));
+  assert.deepEqual(runIds, [...state.runs.records].reverse().map(runId), "runs are listed latest first");
+  const latest = card(runs, runIds[0]!);
+  assert.ok(latest.includes('data-count="pass">0 pass<') && latest.includes('data-count="fail">1 fail<') && latest.includes('data-count="not-run">0 not run<'));
+  assert.ok(latest.includes("<code>def5678</code>") && latest.includes("data-dirty"), "commit and dirty flag");
+  assert.ok(latest.includes('data-field="verdicts"') && latest.includes("<details"), "verdicts are one click away");
+  assert.ok(latest.includes(`kept from the run at 2026-09-10 10:00`) && latest.includes(n.keptName), "the kept mark names the earlier run");
+  assert.ok(latest.includes("fixture") && latest.includes("s1-fixtu"), "agent and session");
+
+  const journal = renderView(state, "journal").text;
+  for (const id of n.journalIds) assert.ok(journal.includes(`id="journal-${id}"`), `journal record ${id} has a card`);
+  assert.ok(journal.includes(`id="pinned-journal-${n.openEscalation}"`), "the open escalation is pinned at the top");
+  assert.ok(!journal.includes(`id="pinned-journal-${n.acknowledgedEscalation}"`), "an acknowledged escalation is not pinned");
+  assert.ok(journal.indexOf('data-field="escalations"') < journal.indexOf('id="journal-heading"'), "pinned before the timeline");
+  assert.ok(card(journal, `journal-${n.acknowledgedEscalation}`).includes("acknowledged by ak-00000005"), "the answer a later record gives is in the margin");
+  assert.ok(journal.includes(n.decisionOver), "a decision's rejected alternative is shown");
+  assert.ok(journal.includes(n.conjectureCandidate) && journal.includes("log the key at both sites"), "a conjecture's candidates and discriminating test");
+  assert.ok(journal.includes(`id="${workId(n.workOrder)}"`) && journal.includes("make every write pass through one door"), "the work order renders");
+  const active = card(journal, workId(n.workOrder));
+  assert.ok(active.includes('data-state="active"') && active.includes("the chokepoint check passes") && active.includes("src/store"), "the order shows its current state, success, and boundary");
+  assert.ok(active.includes(`<code>${n.workMove}</code>`), "the move is history under the order");
+  assert.ok(!journal.includes(`id="${workId(n.workMove)}"`), "a state-change record is never a card of its own");
+  assert.ok(card(journal, workId(n.completedOrder)).includes('data-state="completed"'), "a closed order shows completed");
+  state.journalView.kind = "decision";
+  assert.deepEqual(cardIds(renderView(state, "journal").text).filter((id) => id.startsWith("journal-")), ["journal-d-00000001"], "the kind filter narrows");
+  state.journalView.kind = "";
+  state.journalView.query = "language server";
+  assert.deepEqual(cardIds(renderView(state, "journal").text).filter((id) => id.startsWith("journal-")), ["journal-u-00000006"], "the search narrows");
+  state.journalView.query = "";
+  const absent = fresh();
+  absent.journal.work = { kind: "absent", because: "nothing here" };
+  assert.ok(renderView(absent, "journal").text.includes("No work orders: nothing here"), "absent work orders are a rendered fact");
+});
+
+test("a structural defect renders its bypass sites and both honest options", () => {
+  const state = fresh();
+  const n = fixture.names;
+  const c = card(renderView(state, "invariants").text, invariantId("src/store", "single writer"));
+  assert.ok(c.includes('data-field="defect"'));
+  assert.ok(c.includes('data-grade="broken"') && c.includes("enforced by nobody"), "the broken rung and its enforcer");
+  const bypasses = c.slice(c.indexOf('data-field="bypasses"'));
+  assert.ok(bypasses.includes(`<code>${n.bypass.file}:${n.bypass.line}</code>`) && bypasses.includes(`<code>${n.bypass.symbol}</code>`), "file, line, symbol");
+  assert.ok(c.includes('data-option="route"') && c.includes("Route through the chokepoint") && c.includes(`<code>${n.chokepoint}</code>`), "option one");
+  assert.ok(c.includes('data-option="retire"') && c.includes("Escalate a retirement") && c.includes(`href="#${relianceId("src/store", "single writer")}"`), "option two links the reliance listing");
+  for (const { component, name, state: lifecycle } of n.invariants) {
+    if (lifecycle === "structural defect") continue;
+    assert.ok(!card(renderView(state, "invariants").text, invariantId(component, name)).includes('data-field="defect"'), `${name} shows no defect section`);
+  }
+});
+
+function setSingleWriterSites(state: ShellState, sites: RecordedSite[] | undefined): void {
+  const entry = state.runs.records.at(-1)?.invariants.find((candidate) => candidate.name === "single writer" && candidate.form === "chokepoint");
+  assert.ok(entry !== undefined);
+  if (sites === undefined) delete entry.sites;
+  else entry.sites = sites;
+}
+
+/** The Structure view with one selection made: the one map's reading of it. */
+function selectedOn(state: ShellState, selected: string): string {
+  return renderView({ ...state, structure: { ...state.structure, selected } }, "structure").text;
+}
+
+test("a scaffold preview is drawn dashed and unverified on its component in the one map", () => {
+  const state = fresh();
+  const preview: StructurePreview = {
+    component: "src/store",
+    name: "preview writer",
+    crossing: { from: "outside", to: "inside" },
+    chokepoints: [{ chokepoint: "write", protects: "writeRow" }],
+  };
+  state.structure.preview = [preview];
+  const proposed = renderView(state, "structure").text;
+  assert.match(proposed, /proposed preview · preview writer/);
+  assert.match(proposed, /data-proposed="true"/);
+  assert.match(proposed, /class="structure-edge structure-proposed"/);
+  assert.match(proposed, /Reliance unknown: a proposal has no run evidence\. This dashed edge exists only in the ephemeral preview\./);
+  assert.equal(proposed, renderView(JSON.parse(JSON.stringify(state)) as ShellState, "structure").text, "the same state renders the same bytes");
+});
+
+test("reliance reads both protected and chokepoint endpoint sites, owner first, without calling a bypass a legal door reference", () => {
+  const state = fresh();
+  setSingleWriterSites(state, [
+    { file: "src/api/door.ts", line: 7, symbol: "save", class: "chokepoint-reference", of: "chokepoint", test: false, form: "import" },
+    { file: "src/api/handler.ts", line: 12, symbol: "handle", class: "bypass", of: "protected", test: false },
+    { file: "src/store/write.ts", line: 4, symbol: "write", class: "inside", of: "protected", test: false },
+    { file: "src/api/door.test.ts", line: 9, symbol: "test save", class: "chokepoint-reference", of: "chokepoint", test: true },
+  ]);
+  const reading = allReliance(state.spec.components, state.runs.records).find((candidate) => candidate.invariant.name === "single writer");
+  assert.ok(reading !== undefined && reading.evidence.status === "complete");
+  assert.deepEqual(reading.evidence.sites.map((site) => site.file), ["src/store/write.ts", "src/api/door.test.ts", "src/api/door.ts", "src/api/handler.ts"], "owner component is first and sites are stable");
+  const rendered = selectedOn(state, flowChokepointId("src/store", "single writer"));
+  assert.match(rendered, /protected thing · inside chokepoint/);
+  assert.match(rendered, /chokepoint · reference \(runtime call not established\)/);
+  assert.match(rendered, /protected thing · bypass \(not a legal chokepoint reference\)/);
+  assert.match(rendered, /data-test="true"/);
+
+  const protectedOnly = fresh();
+  setSingleWriterSites(protectedOnly, [{ file: "src/api/handler.ts", line: 12, symbol: "handle", class: "bypass", of: "protected", test: false }]);
+  assert.match(selectedOn(protectedOnly, flowChokepointId("src/store", "single writer")), /protected thing · bypass/);
+  const doorOnly = fresh();
+  setSingleWriterSites(doorOnly, [{ file: "src/api/door.ts", line: 7, symbol: "save", class: "chokepoint-reference", of: "chokepoint", test: false }]);
+  assert.match(selectedOn(doorOnly, flowChokepointId("src/store", "single writer")), /chokepoint · reference/);
+});
+
+test("legacy site absence stays unknown while a complete empty site list confirms zero", () => {
+  const legacy = fresh();
+  setSingleWriterSites(legacy, undefined);
+  assert.match(selectedOn(legacy, flowChokepointId("src/store", "single writer")), /reliance unknown: run carries no sites; evidence is incomplete/);
+
+  const empty = fresh();
+  setSingleWriterSites(empty, []);
+  assert.match(selectedOn(empty, flowChokepointId("src/store", "single writer")), /Complete run site evidence records 0 references/);
+});
+
+test("the Structure preview bridge validates crossings, selects Structure, and writes deterministic generated pages only", async () => {
+  const preview: StructurePreview = { component: "src/store", name: "preview writer", crossing: { from: "outside", to: "inside" } };
+  const output = await mkdtemp(join(tmpdir(), "coherence-structure-preview-"));
+  try {
+    const one = join(output, "preview-one.html");
+    const two = join(output, "preview-two.html");
+    const first = await writeStructurePreview(fixture.root, preview, one);
+    const second = await writeStructurePreview(fixture.root, preview, two);
+    assert.equal(first.state.activeView, "structure");
+    assert.deepEqual(first.state.structure.preview, [preview]);
+    assert.equal(await readFile(one, "utf8"), await readFile(two, "utf8"));
+    assert.match(await readFile(one, "utf8"), /preview writer/);
+    await assert.rejects(
+      writeStructurePreview(fixture.root, { ...preview, name: "bad level", crossing: { from: "missing", to: "inside" } }, join(output, "bad.html")),
+      /crossing names trust level missing/,
+    );
+    await assert.rejects(writeStructurePreview(fixture.root, preview, join(fixture.root, "preview.html")), /outside the project root/);
+  } finally {
+    await rm(output, { recursive: true, force: true });
+  }
+});
+
+test("the Journal view links citations both ways: each record lists what it cites and what cites it as in-page links, and a work order lists its citations and bound records", () => {
+  const state = fresh();
+  const journal = renderView(state, "journal").text;
+  const decision = card(journal, "journal-d-00000001");
+  const citedBy = decision.slice(decision.indexOf('data-field="cited-by"'));
+  assert.ok(decision.includes('data-field="cited-by"'), "a cited decision lists what cites it");
+  assert.ok(citedBy.includes('href="#journal-e-00000003"'), "the escalation that cites it links to its card");
+  assert.ok(citedBy.includes('data-cited="wc-00000004"') && citedBy.includes('href="#work-w-00000003"'), "a work order's close that cites it links to its order's card");
+  const escalation = card(journal, "journal-e-00000003");
+  const cites = escalation.slice(escalation.indexOf('data-field="cites"'));
+  assert.ok(cites.includes('href="#journal-d-00000001"') && cites.includes("one door for writes"), "the escalation links to the decision it cites, with its subject");
+  assert.ok(cites.includes('href="#work-w-00000001"') && cites.includes("make every write pass through one door"), "and to the work order it cites, with its objective");
+  assert.ok(escalation.includes('data-field="human"') && escalation.includes("the owner asked whether the rule still earns its place") && escalation.includes("as the agent attributes"), "the human's words are shown apart from the because, as the agent's attribution");
+  assert.ok(card(journal, "pinned-journal-e-00000003").includes('href="#journal-d-00000001"'), "the pinned escalation shows what it is about");
+  assert.ok(card(journal, "journal-u-00000006").includes('href="#journal-c-00000002"'), "unable links to the conjecture it cites");
+  assert.ok(card(journal, "journal-c-00000002").includes('href="#journal-u-00000006"'), "and the conjecture links back");
+  assert.ok(!card(journal, "journal-ak-00000005").includes('class="citations"'), "a record that cites nothing and nothing cites shows no citation section");
+  const active = card(journal, workId("w-00000001"));
+  assert.ok(active.includes('data-field="cited-by"') && active.includes('href="#journal-e-00000003"'), "a work order lists the records citing it");
+  assert.ok(active.includes('data-field="bound"') && active.includes('href="#journal-d-00000001"'), "a work order lists the journal records bound to it");
+  const completed = card(journal, workId("w-00000003"));
+  assert.ok(completed.includes('data-field="cites"') && completed.includes('href="#journal-d-00000001"'), "a work order lists what its own records cite");
+  for (const [, target] of journal.matchAll(/href="#((?:journal|work)-[^"]+)"/g)) {
+    assert.ok(journal.includes(`id="${target}"`), `link #${target} lands on a card in the view`);
+    assert.equal(resolveHash(state, `#${target}`)?.view, "journal", `#${target} resolves to the Journal view`);
+  }
+  const trimmed = fresh();
+  trimmed.journal.records = trimmed.journal.records.filter((r) => r.id !== "c-00000002");
+  const absent = card(renderView(trimmed, "journal").text, "journal-u-00000006");
+  assert.ok(absent.includes("data-absent") && absent.includes("journal c-00000002") && !absent.includes('href="#journal-c-00000002"'), "a citation the page does not embed is an id with the command that shows it, never a dead link");
+});
+
+test("the journal window keeps what kept records and work orders cite, one hop, up to a cap", () => {
+  const decision = (i: number, cites?: string[]): ShellState["journal"]["records"][number] => ({
+    id: `d-${i.toString(16).padStart(8, "0")}`, kind: "decision", at: new Date(Date.UTC(2026, 8, 12) + i * 1000).toISOString(), session: "s", agent: "a", commit: null, dirty: false,
+    chose: `choice ${i}`, over: [], because: "b", ...(cites === undefined ? {} : { cites }),
+  });
+  const id = (i: number): string => `d-${i.toString(16).padStart(8, "0")}`;
+  const order: WorkOrder = { id: "w-1", objective: "o", success: "s", boundary: "b", owner: "s", state: "active", at: "2026-09-12T00:00:00.000Z", session: "s", agent: "a", history: [], cites: [id(10)] };
+  const records = Array.from({ length: 400 }, (_, i) => decision(i, i === 399 ? [id(5)] : undefined));
+  const window = windowJournal(records, 150, [order]);
+  const kept = new Set(window.records.map((r) => r.id));
+  assert.ok(kept.has(id(5)), "an old record a kept record cites is kept");
+  assert.ok(kept.has(id(10)), "an old record a work order cites is kept");
+  assert.ok(!kept.has(id(6)), "an old record nothing kept cites is left out");
+  assert.equal(window.omitted, 400 - 152, "what is left out is counted");
+  const dense = Array.from({ length: 400 }, (_, i) => decision(i, i >= 250 ? [id(i - 250)] : undefined));
+  const capped = windowJournal(dense, 150, [], CITED_WINDOW);
+  assert.equal(capped.records.length, 150 + CITED_WINDOW, `citations pull in at most ${CITED_WINDOW} older records`);
+  const cappedIds = new Set(capped.records.map((r) => r.id));
+  assert.ok(cappedIds.has(id(149)) && cappedIds.has(id(150 - CITED_WINDOW)) && !cappedIds.has(id(149 - CITED_WINDOW)), "the latest citers are served first");
+});
+
+test("deep links resolve: every card id on every view resolves to that view", () => {
+  const state = fresh();
+  for (const view of state.views) {
+    const rendered = renderView(state, view.id).text;
+    const ids = view.id === "structure"
+      ? [...rendered.matchAll(/ id="(structure--[^"]+)"/g)].map((match) => match[1]!)
+      : cardIds(rendered).filter((id) => !id.startsWith("pinned-"));
+    assert.ok(ids.length > 0, `${view.id} renders cards`);
+    for (const id of ids) {
+      const target = resolveHash(state, `#${id}`);
+      assert.ok(target !== undefined && target.view === view.id && target.id === id, `#${id} resolves to ${view.id}`);
+    }
+    assert.deepEqual(resolveHash(state, `#${view.id}`), { view: view.id, id: undefined }, `#${view.id} names the view alone`);
+  }
+  assert.equal(resolveHash(state, "#nothing-here"), undefined);
+  assert.equal(resolveHash(state, ""), undefined);
+  const links = [...renderView(state, "invariants").text.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]!);
+  for (const link of links) assert.ok(resolveHash(state, `#${link}`) !== undefined, `link #${link} resolves`);
+});
+
+test("the first adopter's tree builds as a second root: its lexicon is the domain layer and its run records show its structural defects", {
+  skip: (await exists(MNEMION_LEXICON)) ? false : `${MNEMION_LEXICON} is not on this machine`,
+}, async () => {
+  const { html, state } = await buildScopePage({ root: MNEMION_ROOT, lexiconPath: DEFAULTS.lexiconPath, project: "Mnemion" });
+  assert.ok(Buffer.byteLength(html, "utf8") < THREE_MB);
+  assert.ok(state.lexicon.layers[1]?.kind === "present" && state.lexicon.layers[1].title === "Mnemion lexicon", "Mnemion's lexicon.json is located from its root");
+  assert.ok(state.spec.components.length > 1 && state.runs.records.length > 0, "Mnemion's specs and runs are loaded");
+  const invariants = renderView(state, "invariants").text;
+  const defects = state.spec.components.flatMap((c) => c.invariants.filter((i) => i.state === "structural defect"));
+  assert.equal([...invariants.matchAll(/<article class="entry invariant" id="[^"]+" data-state="structural defect"/g)].length, defects.length, "every structural defect the model derives is a defect card");
+  for (const defect of defects) {
+    const c = card(invariants, invariantId(defect.component, defect.name));
+    assert.ok(c.includes('data-option="route"') && c.includes('data-option="retire"'), `${defect.name} shows both options`);
+    for (const site of defectsOf(defect, state.runs.records).flatMap((d) => d.bypasses)) {
+      assert.ok(c.includes(`<code>${escapeHtml(site.file)}:${site.line}</code>`), `${defect.name} shows bypass ${site.file}:${site.line}`);
+    }
+  }
+  const writer = selectedOn(state, flowChokepointId("entities/Hive", "kernel write boundary"));
+  assert.ok(writer.includes('data-kind="chokepoint"') && writer.includes("<code>writeClass</code>"), "Mnemion's kernel write chokepoint is one selection on the map");
+  const map = flowOf(state);
+  assert.equal(map.levels.length, 6, "Mnemion declares six trust levels, each a selection");
+  const hive = map.nodes.find((node) => node.folder === "entities/Hive");
+  assert.ok(hive !== undefined && hive.defects.some((d) => d.name === "kernel write boundary" && d.bypasses === 5 && d.internal === 5), "the kernel write boundary's five bypasses sit inside entities/Hive, on the component");
+  const svg = renderView(state, "structure").text;
+  assert.equal(svg, renderView(JSON.parse(JSON.stringify(state)) as ShellState, "structure").text, "Mnemion's read-only state renders byte-identically");
+  for (const node of map.nodes) assert.ok(svg.includes(`id="${node.id}"`), `${node.folder} is on the map`);
+});
+
+test("the page's run window keeps every latest entry whole and drops reference sites only from superseded entries", async () => {
+  const windowed = (await buildScopePage(options)).state;
+  const whole = (await buildScopePage({ ...options, window: false })).state;
+  for (const invariant of windowed.spec.components.flatMap((c) => c.invariants)) {
+    assert.deepEqual(latestOf(invariant, windowed.runs.records), latestOf(invariant, whole.runs.records), `${invariant.name}: the latest entries, sites included, are the same over the window`);
+  }
+  const holders = new Map<string, number>();
+  windowed.runs.records.forEach((run, index) => { for (const e of run.invariants) holders.set(`${e.component}\u0000${e.name}\u0000${e.form}`, index); });
+  windowed.runs.records.forEach((run, index) => {
+    for (const e of run.invariants) if (holders.get(`${e.component}\u0000${e.name}\u0000${e.form}`) !== index) assert.equal(e.sites, undefined, `${e.name}: a superseded entry carries no sites`);
+  });
+});
+
+test("the Mnemion domain lexicon renders beneath Coherence's with every concept, ruling, rejected name and trust level", {
+  skip: (await exists(MNEMION_LEXICON)) ? false : `${MNEMION_LEXICON} is not on this machine`,
+}, async () => {
+  const { html, state } = await buildScopePage({ ...options, domainPath: MNEMION_LEXICON });
+  assert.ok(Buffer.byteLength(html, "utf8") < TWO_MB);
+  assert.deepEqual(embeddedState(html), state);
+  const mnemion = secondLexicon(state);
+  const rendered = renderView(state, "lexicon").text;
+
+  const layers = [...rendered.matchAll(/id="layer-(\w+)"/g)].map((m) => m[1]);
+  assert.deepEqual(layers, ["coherence", "domain"], "Coherence's layer comes first, the domain layer beneath");
+  assert.ok(rendered.includes("Mnemion lexicon"), "the layer is titled from the file's project name");
+  assert.ok(mnemion.purpose !== undefined && rendered.includes(escapeHtml(mnemion.purpose)));
+
+  assert.ok(mnemion.concepts.length > 0);
+  for (const concept of mnemion.concepts) {
+    assert.ok(rendered.includes(`id="domain-${concept.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}"`), `Mnemion concept ${concept.name} has a card`);
+    assert.ok(rendered.includes(escapeHtml(concept.definition)), `definition of ${concept.name} is on the page`);
+    for (const alias of concept.aliases) {
+      assert.ok(rendered.includes(escapeHtml(alias)), `alias ${alias} of ${concept.name} is on the page`);
+    }
+    for (const distinction of concept.not_to_be_confused_with) {
+      assert.ok(rendered.includes(escapeHtml(distinction)), `distinction for ${concept.name} is on the page`);
+    }
+  }
+  assert.ok(mnemion.rulings !== undefined && mnemion.rulings.length > 0, "Mnemion carries rulings");
+  for (const ruling of mnemion.rulings) {
+    assert.ok(rendered.includes(escapeHtml(ruling.ruling)), `ruling on ${ruling.term} is on the page`);
+  }
+  assert.ok(mnemion.uncertain !== undefined && mnemion.uncertain.length > 0, "Mnemion carries uncertain terms");
+  for (const item of mnemion.uncertain) {
+    assert.ok(rendered.includes(escapeHtml(item.term)), "uncertain term is on the page in full");
+  }
+  assert.ok(mnemion.candidate_overloads !== undefined && mnemion.candidate_overloads.length > 0);
+  for (const overload of mnemion.candidate_overloads) {
+    for (const sense of overload.senses) assert.ok(rendered.includes(escapeHtml(sense)));
+  }
+  assert.ok(mnemion.rejected_names !== undefined && mnemion.rejected_names.length > 0, "Mnemion carries rejected names");
+  for (const rejected of mnemion.rejected_names) {
+    assert.ok(rendered.includes(escapeHtml(rejected.concept)), `rejected name ${rejected.concept} is on the page`);
+    assert.ok(rendered.includes(escapeHtml(rejected.because)));
+    assert.ok(rejected.decided_by !== undefined && rendered.includes(`decided by ${escapeHtml(rejected.decided_by)}`));
+  }
+  assert.ok(rendered.includes(">Rejected names</h2>"), "rejected names have their own section");
+  for (const concept of mnemion.concepts) {
+    for (const text of stringsIn(concept.properties)) {
+      assert.ok(rendered.includes(escapeHtml(text)), `property of ${concept.name} is on the page`);
+    }
+    for (const text of stringsIn(concept.record)) {
+      assert.ok(rendered.includes(escapeHtml(text)), `record of ${concept.name} is on the page`);
+    }
+  }
+  assert.ok(mnemion.trust_levels !== undefined && mnemion.trust_levels.length > 0, "Mnemion declares trust levels");
+  for (const level of mnemion.trust_levels) {
+    assert.ok(rendered.includes(escapeHtml(level.name)) && rendered.includes(escapeHtml(level.meaning)));
+  }
+  assert.ok(
+    rendered.includes('instance of Coherence\'s concept <a class="related-link" href="#coherence-trust-level">trust level</a>'),
+    "trust levels are presented as instances of Coherence's concept, linked to its card",
+  );
+  for (const key of Object.keys(mnemion.record)) {
+    assert.ok(rendered.includes(escapeHtml(key.replace(/_/g, " "))), `top-level field ${key} is on the page`);
+  }
+});

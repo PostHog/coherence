@@ -1,6 +1,0 @@
-# PostHog ingestion worker slice
-
-A bounded source-preserving adoption of admission, processing, result routing and acknowledgment. Not the full ingestion fleet or an end-to-end delivery proof.
-
-## why
-Use existing source seams and original oracles to distinguish canonical graph omissions from canvas problems. Root aliases remain unchanged; missing connections must stay visible as an adoption finding.

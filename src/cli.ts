@@ -1,1387 +1,287 @@
 #!/usr/bin/env node
-import { listReceipts, readReceipt } from "./evidence/receipts.ts";
-// cli.ts — the coherence harness entrypoint. Run from a project root:
-//   node <coherence>/cli.ts <command> [options]     # no args prints every command
-// It loads coherence.config.json from the cwd and operates on that project.
-//
-// THE COMMAND LIST IS NOT SPELLED HERE. Which verbs exist, what each takes and what each
-// is for live in src/commands.ts; the usage banner and README.md's command index are both
-// derived from it, and test/commands.test.ts reads the `cmd === "…"` chain below out of
-// this file's AST and asserts it matches the registry exactly. Adding a branch here without
-// a registry entry (or the reverse) fails the suite.
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
-import { loadConfig } from "./config.ts";
-import { buildGraph } from "./derivation/derive.ts";
-import { renderOutline } from "./readings/render-outline.ts";
-import { renderOverview } from "./readings/render-overview.ts";
-import { renderClaude, spliceBlock, extractBlock, resolveClaudeMdPath, CLAUDE_BEGIN, CLAUDE_END } from "./readings/render-claude.ts";
-import { renderCommandsBlock, renderPhrasebookBlock, usageBanner, commandFor, COMMANDS_BEGIN, COMMANDS_END, PHRASEBOOK_BEGIN, PHRASEBOOK_END } from "./commands.ts";
-import { runVerify, applyVerdicts } from "./verification/verify.ts";
-import { decompose } from "./diagnostics/decompose.ts";
-import { drift } from "./diagnostics/drift.ts";
-import { scaffold } from "./scaffold.ts";
-import { structuralLog, changedFiles, affectedComponents } from "./diagnostics/structural.ts";
-import { lintSinks } from "./diagnostics/lint-sinks.ts";
-import { conventions } from "./diagnostics/conventions.ts";
-import { mass } from "./diagnostics/mass.ts";
-import { atlas } from "./diagnostics/atlas.ts";
-import { contracts } from "./diagnostics/contracts.ts";
-import { whyLint } from "./diagnostics/why-lint.ts";
-import { runPanel } from "./readings/panel.ts";
-import { buildPromiseModel } from "./readings/promise.ts";
-import { renderContract } from "./readings/render-contract.ts";
-import { readStatus } from "./evidence/status.ts";
-import { readSurface, vacuityRefusal, Unrunnable } from "./verification/floor.ts";
-import { CLAIM_FORMS, loadDictionary } from "./verification/phrasebook.ts";
-import {
-  appendDecision, renderJournal, readJournal, resolvableConjecture, compactJournal,
-  acknowledgeableEscalation, EscalationRefusal,
-  type DecisionAuthority, type DecisionScope,
-} from "./evidence/decisions.ts";
-import { runJournal } from "./evidence/journal.ts";
-import { DefectLedgerError, readDefects, recordDefect, renderDefects } from "./evidence/defects.ts";
-import {
-  closeExperiment, createExperiment, experimentStats, readExperiments, renderExperiments,
-  ExperimentLedgerError,
-  type ExperimentActionResult, type ExperimentCriterionResult, type ExperimentLedger,
-} from "./evidence/experiment.ts";
-import { recordObservation, formatObserved } from "./evidence/observed.ts";
-import { printHooks, reviewHooks, reportHooks, checkHooks, installHooks, uninstallHooks, runHook } from "./lifecycle/hooks.ts";
-import type { HookHost } from "./lifecycle/control.ts";
-import { redundancy } from "./diagnostics/redundancy.ts";
-import { prose } from "./diagnostics/prose.ts";
-import { economy } from "./diagnostics/economy.ts";
-import { signal } from "./diagnostics/signal.ts";
-import { regulate } from "./coordination/regulate.ts";
-import { formatDoctrine } from "./coordination/doctrine.ts";
-import { contextFromProject, renderContext } from "./readings/context.ts";
-import { premise } from "./diagnostics/premise.ts";
-import { calibrate, type CalibrationOutcome } from "./diagnostics/calibration.ts";
-import { buildIndexModel, INDEX_HTML, INDEX_JSON } from "./readings/index-model.ts";
-import { renderIndex, formatIndexSummary } from "./readings/render-index.ts";
-import {
-  closeWork, createWork, handoffWork, renderWork, transitionWork, WorkLedgerError,
-  type WorkAuthorityKind, type WorkRisk, type WorkState,
-} from "./coordination/work.ts";
-import {
-  ConsequenceLedgerError, CONSEQUENCE_RELATIONS, parseConsequenceRef,
-  recordConsequence, renderConsequences, type ConsequenceRelation,
-} from "./coordination/consequence.ts";
-import { observeOrientation, renderOrientation } from "./coordination/orient.ts";
-import { buildScopeModel } from "./readings/scope-model.ts";
-import { renderScope } from "./readings/render-scope.ts";
-import { runTaxonomyCommand } from "./taxonomy/taxonomy-cli.ts";
-import { runGuaranteesCommand, readGuaranteeTaxonomy, projectGuarantees } from "./verification/guarantees-cli.ts";
-import { runGuaranteeCatalog } from "./verification/guarantee-catalog-cli.ts";
+/**
+ * The command line: `node src/cli.ts <verb> ...`.
+ *
+ * Each area of the tool exports its verbs; this file dispatches on the first
+ * word. The journal's verbs arrive as a record of synchronous commands over an
+ * `Io`; the lifecycle's verbs are dispatched below them.
+ *
+ *   coherence lexicon                 print the compact lexicon the hook injects
+ *   coherence lexicon --json          print the parsed lexicon model
+ *   coherence lexicon --check [paths] run the lexicon check (--json for the report as JSON)
+ *   coherence spec --check [root]      every component, its invariants with state, every problem
+ *   coherence spec --json [root]       the spec model
+ *   coherence scaffold component | invariant   the complete shape, cheapest to produce
+ *   coherence run [--session --agent]  the chokepoint check and the totality oracle pass, appended as one run
+ *   coherence run --status             the latest verdict per enforcement, a view over every run
+ *   coherence refute <component>/<name> --broke "<what you changed>"   the totality oracle with the break staged; it must fail
+ *   coherence serve                    the warm language server for this project
+ *   coherence query <question> ...     the agent query: what Scope shows a human, as plain text
+ *   coherence scope [--no-open]        open the live Scope reading from the warm server; --snapshot [--out <file>] writes one file
+ *   coherence hook <event>             answer one harness event (event JSON on stdin)
+ *   coherence hooks install --host <claude|codex>   merge one entry per event into the agent host's settings
+ *   coherence hooks uninstall --host <claude|codex> remove exactly those entries; every other hook stays
+ *   coherence hooks --check --host <claude|codex>   exit 1 with each event's drift from what install would write
+ *   coherence hooks status             the wiring per agent host and what each event delivers for this project
+ *   coherence decide | retract | conjecture | ... | journal   (see JOURNAL_USAGE)
+ *   coherence work create | move | close | owner | inspect   (see WORK_USAGE)
+ *
+ * Exit codes: the check exits 1 with findings and 0 without; a hook exits 2
+ * to refuse a stop, with the reason on stderr.
+ */
 
-const cmd = process.argv[2];
-const argv = process.argv.slice(3);
-const check = argv.includes("--check");
-const fast = argv.includes("--fast");
-const strict = argv.includes("--strict");
-const applyIdx = argv.indexOf("--apply");
-const applyPath = applyIdx >= 0 ? argv[applyIdx + 1] : null;
-const sinceIdx = argv.indexOf("--since");
-const since = sinceIdx >= 0 ? argv[sinceIdx + 1] : null;
-// `--over` is REPEATABLE on purpose: a decision with three rejected alternatives is
-// a better record than one with a comma-joined string nobody can split reliably.
-// `--could-be` is repeatable for the same reason as `--over`, and for one more: the
-// count of candidates IS the signal. One candidate is a hunch dressed as an inquiry.
-const VALUED = new Set(["--since", "--apply", "--over", "--because", "--agent", "--job", "--file", "--for", "--session", "--branch",
-  "--could-be", "--discriminated-by", "--as",
-  "--evidence",
-  "--value", "--baseline", "--threshold", "--unit", "--why", "--raise-cap", "--symbol", "--outcome", "--host",
-  "--context", "--action", "--success", "--hypothesis", "--action-result", "--result",
-  "--work", "--subject", "--authority", "--scope-component", "--scope-file", "--scope-symbol", "--environment",
-  "--max-bytes", "--risk", "--granted-by", "--boundary", "--owner-session", "--owner-agent", "--parent", "--depends-on", "--read-scope", "--write-scope", "--constraint", "--non-goal", "--state", "--expected-previous", "--synthesized", "--id"]);
-const many = (flag: string): string[] => argv.reduce<string[]>((acc, a, i) => (a === flag && argv[i + 1] !== undefined ? [...acc, argv[i + 1]] : acc), []);
-const one = (flag: string): string | null => { const v = many(flag); return v.length ? v[v.length - 1] : null; };
-const positional = argv.filter((a, i) => !a.startsWith("--") && !VALUED.has(argv[i - 1] ?? ""));
-export function repeatedSingletonFlags(
-  args: string[],
-  allowed: Iterable<string>,
-  repeatable: ReadonlySet<string> = new Set(),
-): string[] {
-  return [...allowed].filter((flag) =>
-    !repeatable.has(flag) && args.filter((arg) => arg === flag).length > 1);
-}
-// `--raise` lets an ADVISORY open a conjecture instead of printing one. Opt-in, never a
-// default: raising WRITES to the journal, and an advisory that mutates the record as a
-// side effect of a read-only report is a surprise — and a surprising write is how a
-// mechanism gets switched off wholesale instead of tuned. It also keeps the pre-commit
-// path, which runs `verify` for its printed output, from raising anything.
-const raise = argv.includes("--raise");
-const raiseCapArg = one("--raise-cap");
-const raiseCap = raiseCapArg !== null && Number.isFinite(Number(raiseCapArg)) ? Number(raiseCapArg) : undefined;
+import { LEXICON_WORK_USAGE, lexiconWorkCommand } from "./lifecycle/lexicon-cli.ts";
+import { ECONOMY_USAGE, calibrateCommand, economyCommand, massCommand } from "./economy/cli.ts";
+import { ENFORCEMENT_USAGE, refuteCommand, runCommand, serveCommand } from "./enforcement/cli.ts";
+import { JOURNAL_USAGE, journalVerbs, type Io } from "./journal/cli.ts";
+import { formatReport, hasFindings, runCheck } from "./lifecycle/check.ts";
+import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
+import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook } from "./lifecycle/hook.ts";
+import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
+import { check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, status, uninstall } from "./lifecycle/install.ts";
+import { isCoherenceItself, loadProjectLexicons } from "./lifecycle/project.ts";
+import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
+import { SCOPE_USAGE, scopeCommand } from "./readings/scope/cli.ts";
+import { scopeApp } from "./readings/scope/live.ts";
+import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
+import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
 
-// Exit AFTER stdout has drained. `process.exit()` terminates the process before
-// asynchronously-buffered writes flush when stdout is a pipe or file (it only
-// writes synchronously to a TTY) — so `coherence verify > file`, `| cat`, or any
-// CI capture silently lost the entire report AND surfaced a spurious nonzero exit
-// from the interrupted write. Writing an empty chunk and awaiting its callback
-// guarantees the buffer flushed before we exit, identically in every stdout mode.
-const exit = async (code: number): Promise<never> => {
-  await new Promise<void>((res) => process.stdout.write("", () => res()));
+type CommandResult = number | Promise<number>;
+type RootCommand = (argv: string[], io: Io) => CommandResult;
+
+const commands: Record<string, RootCommand> = { ...journalVerbs, spec: specCommand, scaffold: scaffoldCommand };
+
+const USAGE = `usage:
+${LEXICON_WORK_USAGE}
+  coherence lexicon [--json]
+  coherence lexicon --check [--json] [paths...]
+${SPEC_USAGE}
+${SCAFFOLD_USAGE}
+${ENFORCEMENT_USAGE}
+${ECONOMY_USAGE}
+${QUERY_USAGE}
+${SCOPE_USAGE}
+  coherence hook <${HOOK_EVENTS.join("|")}>
+  coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"]
+  coherence hooks uninstall --host <${HOSTS.join("|")}>
+  coherence hooks --check --host <${HOSTS.join("|")}> [--command "<prefix>"]
+  coherence hooks status
+${JOURNAL_USAGE}
+`;
+
+function fail(message: string, code = 64): never {
+  process.stderr.write(message.endsWith("\n") ? message : message + "\n");
   process.exit(code);
-};
-
-// AN INSTRUMENT THAT CANNOT RUN REPORTS; IT DOES NOT CRASH. Every command below is a
-// top-level `await`, so a throw out of any of them reached the operator as a stack trace
-// and a `Node.js vX` banner — measured for `log` and `signal` in a tree that is not a git
-// repository, which is a shallow CI clone or a source export, not an exotic state. A
-// crash is a report that failed to say what was and was not measured; that is the same
-// defect as green-by-absence, so it is answered at the same seam.
-//
-// TOTAL BY CONSTRUCTION: this catches every `Unrunnable` from every command, present and
-// future, instead of one pre-check per caller that the next caller forgets. Exit 2 — the
-// code this CLI already uses for "could not run" (`--check` with no baseline, an unknown
-// verb) as distinct from 1, "ran and failed". Anything NOT an Unrunnable is a genuine
-// defect in the harness and keeps its stack, because that stack is the report.
-const renderUnrunnable = (e: unknown): void => {
-  if (!(e instanceof Unrunnable)) { console.error(e); process.exit(1); }
-  for (const line of e.report) console.error(line);
-  process.exit(2);
-};
-process.on("uncaughtException", renderUnrunnable);
-process.on("unhandledRejection", renderUnrunnable);
-
-if (cmd === "guarantees" && argv[0] === "catalog") {
-  const result = runGuaranteeCatalog(argv.slice(1));
-  (result.code === 2 ? console.error : console.log)(result.output);
-  await exit(result.code);
 }
 
-const cfg = await loadConfig(process.cwd());
-const stamp = new Date().toISOString().slice(0, 16).replace("T", " ") + "Z";
-const out = (p: string) => join(cfg.root, cfg.outputDir, p);
-const normStamp = (s: string) => s.replace(/<span id="stamp">[^<]*<\/span>/, '<span id="stamp"></span>');
-// `_graph.html` also embeds the ABSOLUTE root in `const ABS = "..."` (it powers the
-// local editor:// deep-links). Like the timestamp, that's machine-specific, so blank it
-// for the freshness comparison — otherwise the committed file only ever matches the one
-// machine that generated it and `--check` is perpetually stale across dev ↔ CI.
-// Symbol `data-line` attrs are the third volatile field: any edit that adds/removes
-// lines shifts every symbol below it, so a comment-only or above-the-symbol change
-// would fail the gate despite NOT changing the graph's shape. Line numbers are a
-// navigation aid, never structure, so strip them too — the gate then fails ONLY on
-// real structural drift (nodes/edges/claims/boundaries), and committed graph diffs
-// stop being polluted with line churn. See the same strip in `nj` for graph.json.
-const normGraphHtml = (s: string) => normStamp(s)
-  .replace(/const ABS = "[^"]*"/, 'const ABS = ""')
-  .replace(/ data-line="\d+"/g, '');
-const read = (p: string) => readFile(p, "utf8").catch(() => "");
-
-async function writeOutputs() { await mkdir(join(cfg.root, cfg.outputDir), { recursive: true }); }
-
-async function doGraph(): Promise<string[]> {
-  const graph = await buildGraph(cfg);
-  const json = JSON.stringify(graph, null, 2);
-  const html = renderOutline(graph, cfg, stamp);
-  if (check) {
-    const stale: string[] = [];
-    // Normalize the volatile fields so the gate compares only the derived graph's
-    // SHAPE: generatedAt (clock), absRoot (absolute checkout path), and "line" (a
-    // navigation aid — any line-shifting edit moves every symbol below it without
-    // changing structure; gating on it produces false-positive staleness and noisy
-    // diffs). What remains is nodes/edges/claims/boundaries — the things that matter.
-    const nj = (s: string) => s
-      .replace(/"generatedAt":\s*"[^"]*"/, '"generatedAt":""')
-      .replace(/"absRoot":\s*"[^"]*"/, '"absRoot":""')
-      .replace(/"line":\s*\d+/g, '"line":0');
-    if (nj(json) !== nj(await read(out("graph.json")))) stale.push("graph.json");
-    if (normGraphHtml(html) !== normGraphHtml(await read(out("_graph.html")))) stale.push("_graph.html");
-    return stale;
-  }
-  await writeOutputs();
-  await writeFile(out("graph.json"), json);
-  await writeFile(out("_graph.html"), html);
-  const c = graph.nodes.reduce<Record<string, number>>((a, n) => ((a[n.kind] = (a[n.kind] ?? 0) + 1), a), {});
-  console.log(`graph: ${c.component ?? 0} components, ${c.file ?? 0} files, ${c.symbol ?? 0} symbols`);
-  return [];
+interface Parsed {
+  flags: Map<string, string | true>;
+  positionals: string[];
 }
 
-async function doScope(): Promise<string[]> {
-  const model = await projectGuarantees(cfg);
-  // Scope's model and renderer deliberately read no clock, checkout path, or browser
-  // state. Exact comparison is therefore the determinism oracle: unlike the older graph
-  // artifact, there is no normalization seam through which meaningful drift can vanish.
-  const json = JSON.stringify(model, null, 2) + "\n";
-  const html = renderScope(model);
-  if (check) {
-    const stale: string[] = [];
-    if (json !== await read(out("scope.json"))) stale.push("scope.json");
-    if (html !== await read(out("_scope.html"))) stale.push("_scope.html");
-    return stale;
-  }
-  await writeOutputs();
-  await writeFile(out("scope.json"), json);
-  await writeFile(out("_scope.html"), html);
-  console.log(`scope: ${model.nodes.length} component(s), center ${model.center ?? "none"} → _scope.html`);
-  return [];
-}
-
-async function doOverview(): Promise<string[]> {
-  const graph = await buildGraph(cfg);
-  const { html, md } = renderOverview(graph, stamp, await loadDictionary(cfg, graph));
-  if (check) {
-    const stale: string[] = [];
-    if (normStamp(html) !== normStamp(await read(out("_overview.html")))) stale.push("_overview.html");
-    if (md + "\n" !== (await read(join(cfg.root, "AGENTS.md")))) stale.push("AGENTS.md");
-    return stale;
-  }
-  await writeOutputs();
-  await writeFile(out("_overview.html"), html);
-  await writeFile(join(cfg.root, "AGENTS.md"), md + "\n");
-  console.log("overview: wrote _overview.html + AGENTS.md");
-  return [];
-}
-
-async function doClaude(): Promise<string[]> {
-  const graph = await buildGraph(cfg);
-  const block = renderClaude(graph, stamp);
-  // The authored CLAUDE.md may live OUTSIDE cfg.root (e.g. a repo root above a
-  // sub-package). resolveClaudeMdPath honors cfg.claudeMdPath when set.
-  const path = resolveClaudeMdPath(cfg);
-  const existing = await read(path);
-  const current = extractBlock(existing);
-  // Strip the timestamp line so a re-run isn't reported stale just for the clock.
-  const normBlock = (s: string) => s.replace(/<sub>Generated at [^<]*<\/sub>/, "<sub>Generated at</sub>");
-  if (check) {
-    // Absent markers can't be "stale" — flag them so CI reports the file isn't wired up.
-    if (current === null) return ["CLAUDE.md (no coherence fence markers)"];
-    return normBlock(current) !== normBlock(block) ? ["CLAUDE.md"] : [];
-  }
-  if (!existing) {
-    console.log(`claude: no CLAUDE.md at ${path}. Create one and add a fenced block:\n\n${CLAUDE_BEGIN}\n${CLAUDE_END}\n\nThe generated component map + invariant table go between the markers; your authored prose (why-essays, conventions) goes outside them.`);
-    return [];
-  }
-  const spliced = spliceBlock(existing, block);
-  if (spliced === null) {
-    console.log(`claude: CLAUDE.md has no coherence fence markers. Add this pair where the generated block should live (e.g. just after the project intro):\n\n${CLAUDE_BEGIN}\n${CLAUDE_END}\n\nEverything between them is owned by \`coherence claude\`; everything outside stays authored. File left untouched.`);
-    return [];
-  }
-  await writeFile(path, spliced);
-  console.log("claude: wrote generated block into CLAUDE.md");
-  return [];
-}
-
-// The THIRD owned block: README.md's command index, spliced from the COMMAND registry with
-// the same machinery CLAUDE.md's block uses (one splicer, two marker pairs). Part of `docs`
-// and therefore of `docs --check`, which is the whole point — a generated block nothing
-// verifies is WORSE than a hand-kept one, because it reads as authoritative while being one
-// forgotten regeneration behind. That is the silent-no-op defect this harness hunts, and
-// shipping a fresh instance of it inside the harness would be embarrassing.
-//
-// OPT-IN BY MARKERS, exactly like CLAUDE.md: no README, or a README without the fence pair,
-// means the file is not owned — NOT that it is stale. The difference matters because `docs
-// --check` runs in every consuming project, and a gate that fails on a file the project
-// never opted into is a gate that gets switched off. It is not SILENT about the skip
-// though: the write path says which case it took, so a missing marker pair looks like a
-// missing marker pair rather than like success.
-async function doCommands(): Promise<string[]> {
-  const path = join(cfg.root, "README.md");
-  const existing = await read(path);
-  const block = renderCommandsBlock();
-  const current = extractBlock(existing, { begin: COMMANDS_BEGIN, end: COMMANDS_END });
-  if (check) {
-    // No normalization, and none is needed: the block is a pure function of the registry —
-    // no clock, no absolute path. An exact compare is a gate with no holes in it.
-    if (!existing || current === null) return [];
-    return current !== block ? ["README.md"] : [];
-  }
-  if (!existing) { console.log("commands: no README.md at the project root — nothing to own."); return []; }
-  const spliced = current === null ? null : spliceBlock(existing, block, { begin: COMMANDS_BEGIN, end: COMMANDS_END });
-  if (spliced === null) {
-    console.log(`commands: README.md has no command-index markers. Add this pair where the derived index should live:\n\n${COMMANDS_BEGIN}\n${COMMANDS_END}\n\nEverything between them is owned by \`coherence docs\`; the authored per-command prose stays outside. File left untouched.`);
-    return [];
-  }
-  await writeFile(path, spliced);
-  console.log("commands: wrote the derived command index into README.md");
-  return [];
-}
-
-// The FOURTH owned block: README.md's claim-form table, derived from the CLAIM_FORMS
-// registry with the same machinery as the command index above — one splicer, its own
-// marker pair, opt-in by markers, part of `docs` and `docs --check`. Same defect class,
-// same fix: the hand-kept table was 8 forms while the registry carried 9.
-async function doPhrasebook(): Promise<string[]> {
-  const path = join(cfg.root, "README.md");
-  const existing = await read(path);
-  const block = renderPhrasebookBlock(CLAIM_FORMS);
-  const current = extractBlock(existing, { begin: PHRASEBOOK_BEGIN, end: PHRASEBOOK_END });
-  if (check) {
-    if (!existing || current === null) return [];
-    return current !== block ? ["README.md (phrasebook)"] : [];
-  }
-  if (!existing) return []; // doCommands already reported the missing README
-  const spliced = current === null ? null : spliceBlock(existing, block, { begin: PHRASEBOOK_BEGIN, end: PHRASEBOOK_END });
-  if (spliced === null) {
-    console.log(`phrasebook: README.md has no claim-form markers. Add this pair where the derived table should live:\n\n${PHRASEBOOK_BEGIN}\n${PHRASEBOOK_END}\n\nEverything between them is owned by \`coherence docs\`; the authored per-form notes stay outside. File left untouched.`);
-    return [];
-  }
-  await writeFile(path, spliced);
-  console.log("phrasebook: wrote the derived claim-form table into README.md");
-  return [];
-}
-
-// THE FLOOR GUARDS THE GENERATORS, NOT JUST THE GRADER. `verify` refuses to grade an
-// empty derivation; these commands WRITE the map, and writing a blank one is the same
-// failure with a longer fuse. The incident that forced this: a mutation test gutted
-// buildGraph, `contract` ran against the claimless graph and wrote promise.json with 13
-// gates degraded to "unknown" — then the SOURCE was reverted, which does not re-run the
-// generator, so the artifacts survived the mutation and read to the next reviewer as
-// history silently vanishing (the exact signature of a claim-key erasure bug). It cost a
-// real investigation to prove it was not one. A generator that overwrites a good map with
-// a blank one launders a broken deriver into a committed diff.
-//
-// APPLIED TO `--check` TOO, deliberately, with no exemption to rot: a staleness report is
-// a DIAGNOSIS, and "4 artifacts stale" sends a reader to regenerate when the truth is that
-// derivation is broken. Same reading, same refusal, one less way to be misled.
-//
-// MATCHED THROUGH `commandFor`, which resolves ALIASES too. This read `c.name === cmd`,
-// so a writing command that acquired a second spelling would have walked past the floor
-// under it — no current victim (`resolve`, the only alias, writes nothing), and exactly
-// the shape of thing that is cheap now and a silent hole later.
-if (commandFor(cmd)?.writesArtifacts) {
-  const refusal = vacuityRefusal(readSurface(await buildGraph(cfg), await readStatus(cfg)));
-  if (refusal) { for (const l of refusal) console.log(l); await exit(1); }
-}
-
-if (cmd === "guarantees") {
-  const result = await runGuaranteesCommand(cfg, argv);
-  (result.code === 2 ? console.error : console.log)(result.output);
-  await exit(result.code);
-} else if (cmd === "taxonomy") {
-  const result = await runTaxonomyCommand(cfg, argv);
-  (result.code === 2 ? console.error : console.log)(result.output);
-  await exit(result.code);
-} else if (cmd === "graph") {
-  const stale = await doGraph();
-  if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "graph current"); await exit(stale.length ? 1 : 0); }
-} else if (cmd === "scope") {
-  const stale = await doScope();
-  if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "scope current"); await exit(stale.length ? 1 : 0); }
-} else if (cmd === "overview") {
-  const stale = await doOverview();
-  if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "overview current"); await exit(stale.length ? 1 : 0); }
-} else if (cmd === "docs") {
-  const stale = [...(await doOverview()), ...(await doGraph()), ...(await doCommands()), ...(await doPhrasebook())];
-  if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "docs current"); await exit(stale.length ? 1 : 0); }
-} else if (cmd === "claude") {
-  const stale = await doClaude();
-  if (check) { console.log(stale.length ? `stale: ${stale.join(", ")}` : "CLAUDE.md current"); await exit(stale.length ? 1 : 0); }
-} else if (cmd === "receipts") {
-  try {
-    const result = positional[0] ? readReceipt(cfg, positional[0], true) : listReceipts(cfg);
-    if (argv.includes("--json")) console.log(JSON.stringify(result, null, 2));
-    else if ("receipt" in result) {
-      console.log(result.id);
-      console.log(result.problems.length ? `ineligible: ${result.problems.join("; ")}` : "intact, current local execution evidence; relevance remains assessor-judged");
-      console.log("Retain these files together:");
-      for (const path of result.files) console.log(`  ${path}`);
+/** `--flag`, `--flag value`, `--flag=value`, and positionals, in any order. */
+function parse(args: string[], valued: Set<string>): Parsed {
+  const flags = new Map<string, string | true>();
+  const positionals: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (!arg.startsWith("--")) {
+      positionals.push(arg);
+      continue;
+    }
+    const eq = arg.indexOf("=");
+    if (eq !== -1) {
+      flags.set(arg.slice(2, eq), arg.slice(eq + 1));
+      continue;
+    }
+    const name = arg.slice(2);
+    if (valued.has(name) && i + 1 < args.length) {
+      flags.set(name, args[++i]!);
     } else {
-      for (const id of result.completed) console.log(id);
-      for (const run of result.incomplete) console.log(`incomplete: ${run}`);
-      if (!result.completed.length && !result.incomplete.length) console.log("No verification receipts.");
+      flags.set(name, true);
     }
-    await exit("problems" in result && result.problems.length ? 1 : 0);
-  } catch (error) { console.error(error instanceof Error ? error.message : String(error)); await exit(2); }
-} else if (cmd === "verify") {
-  if (argv.includes("--receipt")) {
-    const repeated = repeatedSingletonFlags(argv, ["--receipt", "--work", "--session", "--agent"]);
-    if (repeated.length || applyPath) { console.error("receipt mode refuses repeated identity flags and --apply"); await exit(2); }
-  } else if (one("--work")) { console.error("verify --work requires --receipt"); await exit(2); }
-
-  if (applyPath) await exit(await applyVerdicts(cfg, applyPath));
-  const graph = await buildGraph(cfg);
-  // Edit-loop scoping: --staged (working changes vs HEAD + untracked) or --since <ref>
-  // restricts verify to the components whose dirs changed — fast reconciliation of just
-  // what you touched, instead of the whole tree.
-  let only: Set<string> | undefined;
-  if (argv.includes("--staged") || since) {
-    only = await affectedComponents(cfg, graph, changedFiles(cfg, since));
-    if (!only.size && !argv.includes("--receipt")) {
-      // THE FLOOR APPLIES HERE TOO: a gutted deriver leaves a graph with no components,
-      // which maps NO changed file to a component — and this early exit would then grade
-      // the evisceration "nothing to check", exit 0. Same reading, same refusal.
-      const refusal = vacuityRefusal(readSurface(graph, await readStatus(cfg)));
-      if (refusal) { for (const l of refusal) console.log(l); await exit(1); }
-      console.log(`verify (scoped): no changed files map to a component — nothing to check.`); await exit(0);
-    }
-    console.log(`verify (scoped to ${only.size} changed component(s)): ${[...only].join(", ")}`);
   }
-  await exit(await runVerify(cfg, graph, {
-    receipt: argv.includes("--receipt"), work: one("--work") ?? undefined,
-    fast, only, raise, raiseCap, session: one("--session") ?? undefined, agent: one("--agent") ?? undefined,
-    // `--from-report <file>`: the executable tier resolves from a report the project already
-    // produced (an outer gate's suite run) instead of coherence running the suite again.
-    fromReport: one("--from-report") ?? undefined,
-    // `--serial-oracles`: demand one full test-pool boot PER CLAIM. Never implicit.
-    serial: argv.includes("--serial-oracles"),
-  }));
-} else if (cmd === "log") {
-  // The temporal ledger: what did refA → refB do to the invariant/boundary set.
-  await exit(await structuralLog(cfg, positional[0] ?? "HEAD", positional[1] ?? null, strict));
-} else if (cmd === "signal") {
-  // Make novelty's zero-anchor alarm part of the CURRENT patch's acceptance function.
-  // The only waiver is an explicit decision bound to a fingerprint of the patch bytes.
-  const attest = argv.includes("--attest-no-invariant");
-  await exit(await signal(cfg, undefined, {
-    since: since ?? undefined,
-    check,
-    attestBecause: attest ? (one("--because") ?? "") : undefined,
-    session: one("--session") ?? undefined,
-    agent: one("--agent") ?? undefined,
-  }));
-} else if (cmd === "regulate") {
-  // The first explicit regulator surface. It only reads; --check changes the exit code,
-  // never the observation or the selected action. Hook delivery is deliberately a later
-  // rollout step, after this selector has earned trust under direct use.
-  const json = argv.includes("--json");
-  const allowed = new Set(["--check", "--since", "--json", "--host"]);
-  const badFlags = argv.filter((arg) => arg.startsWith("--") && !allowed.has(arg));
-  const sinceCount = argv.filter((arg) => arg === "--since").length;
-  const hostCount = argv.filter((arg) => arg === "--host").length;
-  const invalidSince = sinceIdx >= 0 && (!since || since.startsWith("--"));
-  const hostArg = one("--host");
-  const invalidHost = hostCount > 0 && (hostArg !== "claude" && hostArg !== "codex");
-  const badShape = positional.length > 0 || invalidSince || sinceCount > 1 || hostCount > 1 || invalidHost;
-  if (badFlags.length || badShape) {
-    const usage = "usage: coherence regulate [--check] [--since <ref>] [--host <claude|codex>] [--json]";
-    const message = badFlags.length
-      ? `unsupported flag(s) for regulate: ${badFlags.join(", ")}`
-      : "regulate accepts no positional arguments, one --since value, and one claude|codex --host";
-    if (json) console.log(JSON.stringify({ error: message, usage }, null, 2));
-    else { console.error(message); console.error(usage); }
-    await exit(2);
-  }
-  await exit(await regulate(cfg, undefined, {
-    since: since ?? undefined,
-    check,
-    json,
-    host: hostArg === "claude" || hostArg === "codex" ? hostArg : undefined,
-  }));
-} else if (cmd === "decide" || cmd === "blocked") {
-  // The write half of the decision journal. Deliberately the cheapest thing in the
-  // CLI to call: one shell line, no server, no session. Anything an agent has to set
-  // up before it can log is a thing it will skip while it is busy.
-  const chose = positional[0];
-  const because = one("--because");
-  const structuredFlags = new Set(["--work", "--subject", "--authority", "--scope-component", "--scope-file", "--scope-symbol", "--environment"]);
-  const missingStructured = argv.filter((arg, index) => structuredFlags.has(arg)
-    && (argv[index + 1] === undefined || argv[index + 1]!.startsWith("--")));
-  if (missingStructured.length) {
-    console.error(`missing value for: ${[...new Set(missingStructured)].join(", ")}`);
-    await exit(2);
-  }
-  const decisionSingletons = ["--because", "--agent", "--job", "--session", "--work", "--subject", "--authority"];
-  const repeatedDecisionSingletons = repeatedSingletonFlags(argv, decisionSingletons);
-  if (repeatedDecisionSingletons.length) {
-    console.error(`repeated singleton flag(s): ${repeatedDecisionSingletons.join(", ")}`);
-    await exit(2);
-  }
-  const authority = one("--authority");
-  const authorities: DecisionAuthority[] = ["local-proposal", "orchestrator-accepted", "user-directed"];
-  if (authority !== null && !authorities.includes(authority as DecisionAuthority)) {
-    console.error(`--authority must be one of ${authorities.join(", ")}`);
-    await exit(2);
-  }
-  if (!chose || !because) {
-    console.error(cmd === "decide"
-      ? 'usage: coherence decide "<what you chose>" [--over "<alternative>" ...] --because "<why>" [--work W] [--subject S] [--authority <local-proposal|orchestrator-accepted|user-directed>] [--scope-component C] [--scope-file p] [--scope-symbol S] [--environment E] [--session S] [--agent X] [--job Y] [--file p]'
-      : 'usage: coherence blocked "<what you could not do>" --because "<why>" [--agent X] [--job Y]');
-    await exit(2);
-  }
-  const scopeParts: DecisionScope = {
-    ...(many("--scope-component").length ? { components: many("--scope-component") } : {}),
-    ...(many("--scope-file").length ? { files: many("--scope-file") } : {}),
-    ...(many("--scope-symbol").length ? { symbols: many("--scope-symbol") } : {}),
-    ...(many("--environment").length ? { environment: many("--environment") } : {}),
-  };
-  const hasScope = Object.keys(scopeParts).length > 0;
-  const rec = appendDecision(cfg, {
-    kind: cmd === "decide" ? "decision" : "blocked",
-    chose: chose!, over: many("--over"), because: because!,
-    agent: one("--agent") ?? undefined, job: one("--job") ?? undefined,
-    session: one("--session") ?? undefined, files: many("--file"),
-    work: one("--work") ?? undefined,
-    subject: one("--subject") ?? undefined,
-    authority: authority === null ? undefined : authority as DecisionAuthority,
-    scope: hasScope ? scopeParts : undefined,
-  });
-  console.log(`${rec.id}  ${rec.kind}  [${rec.agent} · ${rec.commit ?? "no-commit"}${rec.dirty ? "+dirty" : ""}]`);
-  await exit(0);
-} else if (cmd === "escalate") {
-  // AGENT-TO-HUMAN, NOT AGENT-TO-RECORD. `blocked` records what an agent could not do and
-  // is read by whoever reads the journal next; this records what NO AGENT MAY DECIDE — a
-  // human decision, a secret, a policy question, an infeasible or harmful order — and is
-  // placed where a person sees it first. METR (2026-08-26) measured why the verb has to
-  // exist as a one-liner: 3 to 6 of ~1300 agents considered alerting a human, zero did,
-  // citing "no route" and "not my task", and escalated to the peer board instead. The
-  // route has to exist and be cheap at the moment of the work.
-  //
-  // IT GATES NOTHING MECHANICALLY — see decisions.ts. The one refusal is the hollow
-  // escalation, applied at the write so every path gets it: an empty because, or a because
-  // that only restates the what, spends a person's attention on nothing.
-  const what = positional[0];
-  const because = one("--because");
-  const usage = 'usage: coherence escalate "<what a human must see>" --because "<why a human, not a peer>" [--file p] [--session S] [--agent A] [--job J]';
-  const allowed = new Set(["--because", "--file", "--session", "--agent", "--job"]);
-  const badFlags = argv.filter((arg) => arg.startsWith("--") && !allowed.has(arg));
-  const repeated = repeatedSingletonFlags(argv, ["--because", "--session", "--agent", "--job"]);
-  if (badFlags.length || repeated.length || positional.length !== 1 || !what || because === null) {
-    if (badFlags.length) console.error(`unsupported flag(s) for escalate: ${badFlags.join(", ")}`);
-    else if (repeated.length) console.error(`repeated singleton flag(s): ${repeated.join(", ")}`);
-    console.error(usage);
-    console.error("");
-    console.error("  Not `blocked`. `blocked` is what YOU could not do; this is what NO AGENT may decide —");
-    console.error("  a human decision, a secret, a policy question, an infeasible or harmful order. It gates");
-    console.error("  nothing mechanically: it heads the journal and `orient` until a person acknowledges it with");
-    console.error('  `coherence acknowledge <id> --because "<what they decided>"`.');
-    await exit(2);
-  }
-  try {
-    const rec = appendDecision(cfg, {
-      kind: "escalation", chose: what!, because: because!,
-      agent: one("--agent") ?? undefined, job: one("--job") ?? undefined,
-      session: one("--session") ?? undefined, files: many("--file"),
-    });
-    console.log(`${rec.id}  escalation  [${rec.agent} · ${rec.commit ?? "no-commit"}${rec.dirty ? "+dirty" : ""}]`);
-    console.log("  a human must see this before anyone proceeds. It gates nothing mechanically; it heads");
-    console.log("  `coherence decisions`, `coherence journal` and `coherence orient` until a person runs:");
-    console.log(`  coherence acknowledge ${rec.id} --because "<what you decided>"`);
-    await exit(0);
-  } catch (error) {
-    if (!(error instanceof EscalationRefusal)) throw error;
-    for (const problem of error.problems) console.error(problem);
-    console.error(usage);
-    await exit(2);
-  }
-} else if (cmd === "acknowledge") {
-  // THE HUMAN'S HALF. An acknowledgement is an APPEND that points at the escalation, exactly
-  // as a resolution points at a conjecture — and it is deliberately neither `resolved` nor
-  // `dismiss`, whose meanings are settled. It records WHAT THE HUMAN DECIDED, and it is the
-  // only thing that takes an escalation off the top of the reads.
-  const id = positional[0];
-  const because = one("--because");
-  if (!id || !because) {
-    console.error('usage: coherence acknowledge <id> --because "<what the human decided>" [--session S] [--agent A] [--job J]');
-    console.error("");
-    console.error("  A person's record of having seen an escalation. `--because` carries the decision itself,");
-    console.error("  so the next reader learns what was decided and not merely that someone clicked through.");
-    await exit(2);
-  }
-  const target = acknowledgeableEscalation(readJournal(cfg).records, id!);
-  if ("error" in target) { for (const line of target.error) console.error(line); await exit(2); }
-  const rec = appendDecision(cfg, {
-    kind: "acknowledgement", chose: `(acknowledged: ${id})`, because: because!,
-    supersedes: id!, agent: one("--agent") ?? undefined, job: one("--job") ?? undefined,
-    session: one("--session") ?? undefined,
-  });
-  console.log(`${rec.id}  acknowledges ${id} — a human decided; it no longer heads the journal or orient`);
-  await exit(0);
-} else if (cmd === "conjecture") {
-  // ABDUCTION AS A FIRST-CLASS ENTRY. `decide` records a choice and `blocked` records an
-  // impasse; this records a QUESTION — a number that surprised someone, the explanations
-  // that could account for it, and the test that would tell them apart.
-  //
-  // `--could-be` is OPTIONAL and `--discriminated-by` is NOT, which is the opposite of
-  // what it looks like it should be. Candidates are optional because the one that matters
-  // most gets added for you (see `withInstrumentCandidate`). The discriminating test is
-  // required because without it this is a complaint: a surprising number with no way to
-  // settle it is exactly the entry that sits in a journal forever being re-noticed.
-  // "unknown — no test comes to mind" is a legal and honest value; a missing flag is not.
-  const observation = positional[0];
-  const discriminatedBy = one("--discriminated-by");
-  if (!observation || !discriminatedBy) {
-    console.error('usage: coherence conjecture "<the surprising observation>" \\');
-    console.error('         --could-be "<candidate explanation>" [--could-be ...] \\');
-    console.error('         --discriminated-by "<the test that would separate them>" \\');
-    console.error('         [--because "<why it is surprising>"] [--agent X] [--job Y] [--session S] [--file p]');
-    console.error("");
-    console.error('  --could-be is optional: "the instrument is wrong" is added for you when you do not');
-    console.error("  name it. It is the highest-prior explanation for a surprising measurement and the");
-    console.error("  one people skip — doubt the thing that produced the number before the thing it describes.");
-    console.error('  --discriminated-by is required. "unknown" is a legal answer; leaving it out is not.');
-    await exit(2);
-  }
-  const rec = appendDecision(cfg, {
-    kind: "conjecture", chose: observation!, because: one("--because") ?? "",
-    couldBe: many("--could-be"), discriminatedBy: discriminatedBy!,
-    agent: one("--agent") ?? undefined, job: one("--job") ?? undefined,
-    session: one("--session") ?? undefined, files: many("--file"),
-  });
-  console.log(`${rec.id}  conjecture  [${rec.agent} · ${rec.commit ?? "no-commit"}${rec.dirty ? "+dirty" : ""}]`);
-  for (const c of rec.couldBe ?? []) console.log(`  could be: ${c}`);
-  // Hand back the exact line that closes it. The id is the friction; printing the whole
-  // command removes the excuse for leaving the question open.
-  console.log(`  settle it with:  coherence resolved ${rec.id} --because "<what the test showed>" --as "<which candidate won>"`);
-  await exit(0);
-} else if (cmd === "observed") {
-  // THE TRIGGER. The band lives in the PROJECT — a tracked-metric table that knows what
-  // a notable move is, because that is domain knowledge this harness does not have. What
-  // was missing was what happens NEXT: a crossed threshold printed to a terminal and was
-  // gone, and there was no state at all for "moved, unexplained, not yet chased". One
-  // call per row per run turns that state into an open conjecture that outlives the
-  // session. Mechanism, dedupe and the case analysis are in observed.ts.
-  //
-  // THE EXIT CODE IS 0 FOR EVERY OBSERVATION — outside band, inside band, opened,
-  // deduped, all of it. This gates nothing, exactly like the rest of the journal.
-  // A MALFORMED INVOCATION IS NOT AN OBSERVATION, and it exits 2 with the other usage
-  // errors: `--value banana` is not a metric within its band, and reporting it as one
-  // would be a command that exits 0 and does nothing — the defect this harness hunts.
-  const metric = positional[0];
-  const nums = (["--value", "--baseline", "--threshold"] as const).map((f) => {
-    const raw = one(f);
-    return raw === null ? null : Number(raw);
-  });
-  if (!metric || nums.some((n) => n === null || !Number.isFinite(n))) {
-    console.error('usage: coherence observed "<label>" --value <n> --baseline <n> --threshold <n> \\');
-    console.error('         [--unit "<s>"] [--why "<explanation>"] [--agent A] [--job J] [--session S] [--file p]');
-    console.error("");
-    console.error("  --threshold is the project's own bar: the smallest move in this metric worth saying");
-    console.error("  out loud. It is domain knowledge and it stays on your side of the seam.");
-    console.error("  Outside the band with no --why opens a conjecture. WITH --why, the explanation is");
-    console.error("  recorded instead — and if a question was already open for this label, it closes it.");
-    console.error("  At most ONE open conjecture per label, however many runs report the same excursion.");
-    await exit(2);
-  }
-  const [value, baseline, threshold] = nums as [number, number, number];
-  const v = recordObservation(cfg, {
-    metric: metric!, value, baseline, threshold,
-    unit: one("--unit") ?? undefined, why: one("--why") ?? undefined,
-  }, {
-    agent: one("--agent") ?? undefined, job: one("--job") ?? undefined,
-    session: one("--session") ?? undefined, files: many("--file"),
-  });
-  for (const line of formatObserved(v)) console.log(line);
-  await exit(0);
-} else if (cmd === "resolved" || cmd === "resolve") {
-  // A resolution is an APPEND that points at the conjecture, exactly as a retraction
-  // points at a decision — same mechanism, same cross-file reach, so the agent that
-  // settles a question need not be the one that raised it.
-  const id = positional[0];
-  const because = one("--because");
-  if (!id || !because) {
-    console.error('usage: coherence resolved <id> --because "<what the discriminating test showed>" [--as "<which candidate won>"]');
-    await exit(2);
-  }
-  // The rule (and its two distinct refusals) lives in decisions.ts, not here — see
-  // `resolvableConjecture`. The CLI only prints what it is handed.
-  const target = resolvableConjecture(readJournal(cfg).records, id!);
-  if ("error" in target) { for (const line of target.error) console.error(line); await exit(2); }
-  const rec = appendDecision(cfg, {
-    kind: "resolution", chose: one("--as") ?? `(resolved: ${id})`, because: because!,
-    supersedes: id!, agent: one("--agent") ?? undefined, job: one("--job") ?? undefined,
-    session: one("--session") ?? undefined,
-  });
-  console.log(`${rec.id}  resolves ${id}`);
-  await exit(0);
-} else if (cmd === "dismiss") {
-  // THE ESCAPE VALVE, and it has to be exactly as cheap as `resolved` or it does not work.
-  // Once an advisory can raise, questions arrive faster than anyone answers them; the only
-  // defence against a noisy one is a one-line way to make it go away PERMANENTLY. If that
-  // line is even slightly harder to reach for than the one that answers a question, the
-  // noise stays and the whole `--open` list gets skipped instead.
-  //
-  // IT IS NOT A RESOLUTION. `--because` here carries why this is not worth chasing, which
-  // is a different fact from what a discriminating test showed — and the render keeps them
-  // in different sections so a reader is never told an unanswered question has an answer.
-  const id = positional[0];
-  const because = one("--because");
-  if (!id || !because) {
-    console.error('usage: coherence dismiss <id> --because "<why this is not worth chasing>"');
-    console.error("");
-    console.error("  Not a resolution: it records that nobody intends to find the answer, and it renders");
-    console.error("  in its own section saying so. A dismissed question never raises again — which is the");
-    console.error("  point, and the reason `--because` is required rather than optional.");
-    await exit(2);
-  }
-  const target = resolvableConjecture(readJournal(cfg).records, id!, "dismiss");
-  if ("error" in target) { for (const line of target.error) console.error(line); await exit(2); }
-  const rec = appendDecision(cfg, {
-    kind: "dismissal", chose: `(dismissed: ${id})`, because: because!,
-    supersedes: id!, agent: one("--agent") ?? undefined, job: one("--job") ?? undefined,
-    session: one("--session") ?? undefined,
-  });
-  console.log(`${rec.id}  dismisses ${id} — it will not be raised again`);
-  await exit(0);
-} else if (cmd === "retract") {
-  // A retraction is an APPEND, never an edit. History is refuted here, not rewritten —
-  // an entry that quietly changed its mind is indistinguishable from one that was
-  // always right, and the difference is the whole value of the journal.
-  const id = positional[0];
-  const because = one("--because");
-  if (!id || !because) { console.error('usage: coherence retract <id> --because "<what refuted it>" [--for "<what replaced it>"]'); await exit(2); }
-  const known = readJournal(cfg).records.some((r) => r.id === id);
-  if (!known) { console.error(`no decision ${id} in the journal — run \`coherence decisions\` to see the ids`); await exit(2); }
-  const rec = appendDecision(cfg, {
-    kind: "retraction", chose: one("--for") ?? `(withdrawn: ${id})`, because: because!,
-    supersedes: id!, agent: one("--agent") ?? undefined, job: one("--job") ?? undefined,
-    session: one("--session") ?? undefined,
-  });
-  console.log(`${rec.id}  retracts ${id}`);
-  await exit(0);
-} else if (cmd === "decisions") {
-  // ONE WRITE LIVES UNDER THE READ COMMAND, and it is the write whose entire contract is
-  // that it changes nothing this command prints. `--compact` folds session files git ALREADY
-  // HOLDS into one per (branch, month) — the motivating failure was ~20 new `.jsonl` files in
-  // a single day, which is not a diff anybody reads. It tidies the working tree; it does not
-  // edit the record, because the originals stay in history for `git log --follow`.
-  if (argv.includes("--compact")) {
-    const { code, lines } = compactJournal(cfg);
-    for (const line of lines) (code === 0 ? console.log : console.error)(line);
-    await exit(code);
-  }
-  // The read half — the artifact. Scope it to one job or one agent when five of them
-  // ran; unscoped it is every decision the repo has ever recorded.
-  const { text } = renderJournal(cfg, {
-    job: one("--job"), agent: one("--agent"), session: one("--session"), branch: one("--branch"),
-    sessions: argv.includes("--sessions"), markdown: argv.includes("--md"), brief: argv.includes("--brief"),
-    // `--open` is the standing list of what this project noticed and did not chase.
-    open: argv.includes("--open"),
-  });
-  console.log(text);
-  // A HUMAN at a terminal learns the settled render has a live sibling; a pipe (an
-  // agent, a script, an --md artifact) gets exactly the record and nothing else — a
-  // permanent footer in piped output would be furniture in every consumer's parse.
-  if (process.stdout.isTTY && !argv.includes("--md"))
-    console.log("live: coherence journal — this record as a stream (⏎ drills in, c lists the open conjectures)\n");
-  await exit(0);
-} else if (cmd === "journal") {
-  // The LIVE read over the same record `decisions` settles: entries as they land, and a
-  // surf over the history — the merged timeline, or one session's stream. On a TTY it is
-  // interactive; on a pipe (or --once) it prints a chronological snapshot and exits;
-  // --follow is the line-mode tail. It renders and never writes, so it takes no floor.
-  await exit(await runJournal(cfg, {
-    follow: argv.includes("--follow"), once: argv.includes("--once"),
-    job: one("--job"), agent: one("--agent"), session: one("--session"), branch: one("--branch"),
-  }));
-} else if (cmd === "defect") {
-  // A direct agent assertion, deliberately smaller than an experiment and stronger than
-  // a conjecture. The required evidence says why the agent crossed that epistemic line;
-  // the exact non-placeholder session label makes the assertion attributable and gives
-  // each writer its own append target. A canonical hook supplies its real host id; direct
-  // callers can supply a label but this recorder does not authenticate that claim.
-  const usage = 'usage: coherence defect "<what failed>" --evidence "<what proves it>"'
-    + " [--file p] [--session S] [--agent A] [--job J]";
-  const fail = async (message: string): Promise<never> => {
-    console.error(message);
-    console.error(usage);
-    return await exit(2);
-  };
-  const allowed = new Set(["--evidence", "--file", "--session", "--agent", "--job"]);
-  const badFlags = argv.filter((arg) => arg.startsWith("--") && !allowed.has(arg));
-  const missingValues = argv.filter((arg, index) => allowed.has(arg)
-    && (argv[index + 1] === undefined || argv[index + 1]!.startsWith("--")));
-  const repeatedSingletons = ["--evidence", "--session", "--agent", "--job"].filter((flag) =>
-    argv.filter((arg) => arg === flag).length > 1);
-  if (badFlags.length) await fail(`unsupported flag(s) for defect: ${badFlags.join(", ")}`);
-  if (missingValues.length) await fail(`missing value for: ${[...new Set(missingValues)].join(", ")}`);
-  if (repeatedSingletons.length) await fail(`repeated defect field is ambiguous: ${repeatedSingletons.join(", ")}`);
-  const summary = positional[0];
-  const evidence = one("--evidence");
-  const writerSession = one("--session") ?? process.env.COHERENCE_SESSION ?? process.env.CODEX_THREAD_ID ?? null;
-  if (positional.length !== 1 || !summary) await fail("defect requires exactly one summary");
-  if (!evidence) await fail("defect requires non-empty --evidence");
-  if (!writerSession || writerSession === "unknown") await fail("defect requires an exact non-placeholder writer session");
-  // `fail` exits asynchronously after stdout drains, so TypeScript cannot use it to
-  // narrow the three values even though every absent case has just terminated.
-  const exactSummary = summary as string;
-  const exactEvidence = evidence as string;
-  const exactSession = writerSession as string;
-  const writerAgent = one("--agent") ?? process.env.COHERENCE_AGENT
-    ?? (process.env.CODEX_THREAD_ID ? "codex" : undefined);
-  const writerJob = one("--job") ?? process.env.COHERENCE_JOB ?? undefined;
-  try {
-    const record = recordDefect(cfg, {
-      session: exactSession,
-      summary: exactSummary,
-      evidence: exactEvidence,
-      files: many("--file"),
-      agent: writerAgent,
-      job: writerJob,
-    });
-    console.log(`${record.id}  agent-assessed defect recorded by ${record.session}`);
-    await exit(0);
-  } catch (error) {
-    if (!(error instanceof DefectLedgerError)) throw error;
-    await fail(error.problems.join("; "));
-  }
-} else if (cmd === "defects") {
-  // Read the fleet-wide corpus by default. Ambient session identity attributes WRITES;
-  // only an explicit selector may hide other agents' evidence from this merged view.
-  const json = argv.includes("--json");
-  const usage = "usage: coherence defects [--session S] [--json]";
-  const fail = async (message: string): Promise<never> => {
-    if (json) console.log(JSON.stringify({ error: message, usage }, null, 2));
-    else { console.error(message); console.error(usage); }
-    return await exit(2);
-  };
-  const allowed = new Set(["--session", "--json"]);
-  const badFlags = argv.filter((arg) => arg.startsWith("--") && !allowed.has(arg));
-  const missingSession = argv.some((arg, index) => arg === "--session"
-    && (argv[index + 1] === undefined || argv[index + 1]!.startsWith("--")));
-  const repeatedSession = argv.filter((arg) => arg === "--session").length > 1;
-  if (positional.length) await fail("defects accepts no positional arguments");
-  if (badFlags.length) await fail(`unsupported flag(s) for defects: ${badFlags.join(", ")}`);
-  if (missingSession) await fail("missing value for: --session");
-  if (repeatedSession) await fail("repeated defects selector: --session");
-  const session = one("--session");
-  if (session !== null && (!session.trim() || session.trim() !== session || session === "unknown")) {
-    await fail("--session requires an exact trimmed, non-unknown id");
-  }
-  try {
-    if (json) {
-      const records = readDefects(cfg).records.filter((record) => !session || record.session === session);
-      console.log(JSON.stringify({ defects: records }, null, 2));
-    } else console.log(renderDefects(cfg, { session }).text);
-    await exit(0);
-  } catch (error) {
-    if (!(error instanceof DefectLedgerError)) throw error;
-    await fail(error.problems.join("; "));
-  }
-} else if (cmd === "experiment" || cmd === "plan") {
-  // A plan becomes useful evidence only when its prediction is frozen before the work and
-  // every declared criterion is answered afterward. The ledger derives the outcome; this
-  // parser never accepts a caller-authored success/failure label.
-  const json = argv.includes("--json");
-  const action = positional[0] ?? "inspect";
-  const explicitSession = one("--session");
-  const writerSession = explicitSession ?? process.env.COHERENCE_SESSION ?? process.env.CODEX_THREAD_ID ?? null;
-  const usage = [
-    'usage: coherence experiment create "<hypothesis>" --context <path> --action "<step>" --success "<criterion>" --session S [--json]',
-    "       coherence experiment inspect [<id>] [--open] [--session S] [--json]",
-    "       coherence experiment close <id> --action-result 'a1=followed::EVIDENCE' --result 's1=met::EVIDENCE' --session S [--json]",
-  ];
-  const fail = async (message: string): Promise<never> => {
-    if (json) console.log(JSON.stringify({ error: message, usage }, null, 2));
-    else { console.error(message); for (const line of usage) console.error(line); }
-    return await exit(2);
-  };
-  const allowed = new Map<string, Set<string>>([
-    ["create", new Set(["--context", "--action", "--success", "--session", "--agent", "--job", "--json"])],
-    ["inspect", new Set(["--open", "--session", "--json"])],
-    ["close", new Set(["--action-result", "--result", "--session", "--agent", "--job", "--json"])],
-  ]);
-  if (!allowed.has(action)) await fail(`invalid experiment action: ${action}`);
-  const badFlags = argv.filter((arg) => arg.startsWith("--") && !allowed.get(action)!.has(arg));
-  if (badFlags.length) await fail(`unsupported flag(s) for experiment ${action}: ${badFlags.join(", ")}`);
-  const valuedByAction = new Map<string, Set<string>>([
-    ["create", new Set(["--context", "--action", "--success", "--session", "--agent", "--job"])],
-    ["inspect", new Set(["--session"])],
-    ["close", new Set(["--action-result", "--result", "--session", "--agent", "--job"])],
-  ]);
-  const missingValues = argv.filter((arg, index) => valuedByAction.get(action)!.has(arg)
-    && (argv[index + 1] === undefined || argv[index + 1].startsWith("--")));
-  if (missingValues.length) await fail(`missing value for: ${[...new Set(missingValues)].join(", ")}`);
-  const repeatedSingletons = ["--session", "--agent", "--job"].filter((flag) =>
-    argv.filter((arg) => arg === flag).length > 1);
-  if (repeatedSingletons.length) await fail(`repeatable identity is ambiguous: ${repeatedSingletons.join(", ")}`);
-
-  const parseResult = <T extends string>(raw: string, statuses: readonly T[], label: string): { id: string; status: T; evidence: string } => {
-    const equal = raw.indexOf("=");
-    const evidenceAt = raw.indexOf("::", equal + 1);
-    const id = equal < 1 ? "" : raw.slice(0, equal).trim();
-    const status = evidenceAt < 0 ? "" : raw.slice(equal + 1, evidenceAt).trim();
-    const evidence = evidenceAt < 0 ? "" : raw.slice(evidenceAt + 2).trim();
-    if (!id || !statuses.includes(status as T) || !evidence) {
-      throw new ExperimentLedgerError(`${label} must be id=${statuses.join("|")}::NONEMPTY_EVIDENCE`);
-    }
-    return { id, status: status as T, evidence };
-  };
-
-  try {
-    if (action === "create") {
-      if (positional.length !== 2 || !writerSession) await fail("experiment create requires one hypothesis and an exact host session");
-      const ownerSession = writerSession as string; // guarded above; async `fail` prevents TS control-flow narrowing
-      const opened = createExperiment(cfg, {
-        session: ownerSession,
-        hypothesis: positional[1],
-        predictedContext: many("--context"),
-        actions: many("--action"),
-        criteria: many("--success"),
-        agent: one("--agent") ?? (process.env.CODEX_THREAD_ID ? "codex" : undefined),
-        job: one("--job") ?? undefined,
-      });
-      if (json) console.log(JSON.stringify(opened, null, 2));
-      else {
-        console.log(`OPEN ${opened.id}  owner ${opened.session}`);
-        console.log(`  hypothesis: ${opened.hypothesis}`);
-        for (const item of opened.actions) console.log(`  action ${item.id}: ${item.text}`);
-        for (const item of opened.criteria) console.log(`  success ${item.id}: ${item.text}`);
-        const actionArgs = opened.actions.map((item) => `--action-result '${item.id}=unknown::EVIDENCE'`).join(" ");
-        const criterionArgs = opened.criteria.map((item) => `--result '${item.id}=unknown::EVIDENCE'`).join(" ");
-        console.log(`  close: coherence experiment close ${opened.id} ${actionArgs} ${criterionArgs} --session ${opened.session}`);
-      }
-      await exit(0);
-    }
-
-    if (action === "inspect") {
-      if (positional.length > 2) await fail("experiment inspect accepts at most one experiment id");
-      // Inspection is the merged fleet view unless the caller explicitly narrows it.
-      // Ambient host identity is for attributing writes, not hiding other agents' loops.
-      const opts = { id: positional[1] ?? null, session: explicitSession, openOnly: argv.includes("--open") };
-      if (json) {
-        const ledger = readExperiments(cfg);
-        const selected = ledger.experiments.filter((experiment) =>
-          (!opts.id || experiment.opened.id === opts.id)
-          && (!opts.session || experiment.opened.session === opts.session || experiment.closed?.assessor.session === opts.session)
-          && (!opts.openOnly || !experiment.closed));
-        const scoped: ExperimentLedger = {
-          records: selected.flatMap((experiment) => [experiment.opened, ...(experiment.closed ? [experiment.closed] : [])]),
-          experiments: selected,
-          open: selected.filter((experiment) => !experiment.closed),
-          closed: selected.filter((experiment) => !!experiment.closed),
-        };
-        console.log(JSON.stringify({ experiments: selected, stats: experimentStats(scoped) }, null, 2));
-      } else console.log(renderExperiments(cfg, opts).text);
-      await exit(0);
-    }
-
-    if (positional.length !== 2 || !writerSession) await fail("experiment close requires one id and an exact assessor session");
-    const assessorSession = writerSession as string; // guarded above; async `fail` prevents TS control-flow narrowing
-    const actionResults = many("--action-result").map((raw) =>
-      parseResult(raw, ["followed", "revised", "skipped", "unknown"] as const, "--action-result")) as ExperimentActionResult[];
-    const criterionResults = many("--result").map((raw) =>
-      parseResult(raw, ["met", "unmet", "unknown"] as const, "--result")) as ExperimentCriterionResult[];
-    const closed = closeExperiment(cfg, {
-      experiment: positional[1], session: assessorSession, actionResults, criterionResults,
-      agent: one("--agent") ?? (process.env.CODEX_THREAD_ID ? "codex" : undefined),
-      job: one("--job") ?? undefined,
-    });
-    if (json) console.log(JSON.stringify(closed, null, 2));
-    else console.log(`${closed.outcome.toUpperCase()} ${closed.experiment}  ${closed.id}`);
-    await exit(0);
-  } catch (error) {
-    if (!(error instanceof ExperimentLedgerError)) throw error;
-    await fail(error.problems.join("; "));
-  }
-} else if (cmd === "work") {
-  // Inert, append-only swarm coordination. Every write requires an exact writer session;
-  // the ledger owns state replay, graph validation, handoff, synthesis, and collision
-  // detection so the CLI cannot invent a second lifecycle.
-  const json = argv.includes("--json");
-  const rawAction = positional[0] ?? "inspect";
-  const action = rawAction === "status" ? "inspect" : rawAction;
-  const usage = [
-    'usage: coherence work create "<objective>" --success "<criterion>" --risk <low|medium|high|critical> --authority <user-directed|orchestrator-delegated|agent-local|external-approved> --granted-by <actor> --boundary "<authority boundary>" --session S [--write-scope p] [--json]',
-    '       coherence work transition <id> <open|active|blocked> --because "<reason>" --session S [--evidence E] [--json]',
-    '       coherence work handoff <id> --owner-session S --owner-agent A --because "<reason>" --session S [--json]',
-    '       coherence work close <id> <completed|cancelled> --because "<reason>" --session S [--evidence E] [--synthesized <child>] [--json]',
-    "       coherence work inspect [<id>] [--state <state>] [--json]",
-  ];
-  const fail = async (message: string): Promise<never> => {
-    if (json) console.log(JSON.stringify({ error: message, usage }, null, 2));
-    else { console.error(message); for (const line of usage) console.error(line); }
-    return await exit(2);
-  };
-  const allowed = new Map<string, Set<string>>([
-    ["create", new Set(["--success", "--constraint", "--non-goal", "--risk", "--authority", "--granted-by", "--boundary", "--session", "--agent", "--job", "--id", "--parent", "--owner-session", "--owner-agent", "--depends-on", "--read-scope", "--write-scope", "--json"])],
-    ["transition", new Set(["--because", "--evidence", "--expected-previous", "--session", "--agent", "--job", "--json"])],
-    ["handoff", new Set(["--owner-session", "--owner-agent", "--because", "--expected-previous", "--session", "--agent", "--job", "--json"])],
-    ["close", new Set(["--because", "--evidence", "--synthesized", "--expected-previous", "--session", "--agent", "--job", "--json"])],
-    ["inspect", new Set(["--state", "--json"])],
-  ]);
-  if (!allowed.has(action)) await fail(`invalid work action: ${rawAction}`);
-  const badFlags = argv.filter((arg) => arg.startsWith("--") && !allowed.get(action)!.has(arg));
-  if (badFlags.length) await fail(`unsupported flag(s) for work ${action}: ${badFlags.join(", ")}`);
-  const missingValues = argv.filter((arg, index) => allowed.get(action)!.has(arg) && arg !== "--json"
-    && (argv[index + 1] === undefined || argv[index + 1]!.startsWith("--")));
-  if (missingValues.length) await fail(`missing value for: ${[...new Set(missingValues)].join(", ")}`);
-  const repeatableByAction = new Map<string, Set<string>>([
-    ["create", new Set(["--success", "--constraint", "--non-goal", "--depends-on", "--read-scope", "--write-scope"])],
-    ["transition", new Set(["--evidence"])],
-    ["handoff", new Set()],
-    ["close", new Set(["--evidence", "--synthesized"])],
-    ["inspect", new Set()],
-  ]);
-  const repeatedSingletons = repeatedSingletonFlags(argv, allowed.get(action)!, repeatableByAction.get(action)!);
-  if (repeatedSingletons.length) await fail(`repeated singleton flag(s): ${repeatedSingletons.join(", ")}`);
-  const writerSession = one("--session") ?? process.env.COHERENCE_SESSION ?? process.env.CODEX_THREAD_ID ?? null;
-  const writer = {
-    session: writerSession as string,
-    agent: one("--agent") ?? undefined,
-    job: one("--job") ?? undefined,
-  };
-  try {
-    if (action === "inspect") {
-      if (positional.length > 2) await fail("work inspect accepts at most one work id");
-      const states: WorkState[] = ["open", "active", "blocked", "completed", "cancelled"];
-      const rawState = one("--state");
-      if (rawState !== null && !states.includes(rawState as WorkState)) await fail(`--state must be one of ${states.join(", ")}`);
-      const rendered = renderWork(cfg, { work: positional[1] ?? null, state: rawState as WorkState | null });
-      if (json) console.log(JSON.stringify({ work: rendered.works, stats: rendered.ledger.stats, validation: rendered.ledger.validation, scopeConflicts: rendered.ledger.scopeConflicts, unsynthesized: rendered.ledger.unsynthesized }, null, 2));
-      else console.log(rendered.text);
-      await exit(0);
-    }
-    if (!writerSession || writerSession === "unknown") await fail(`work ${action} requires an exact non-placeholder writer session`);
-
-    if (action === "create") {
-      if (positional.length !== 2) await fail("work create requires exactly one objective");
-      const risks: WorkRisk[] = ["low", "medium", "high", "critical"];
-      const authorities: WorkAuthorityKind[] = ["user-directed", "orchestrator-delegated", "agent-local", "external-approved"];
-      const risk = one("--risk"), authority = one("--authority");
-      const grantedBy = one("--granted-by"), boundary = one("--boundary");
-      if (!risk || !risks.includes(risk as WorkRisk)) await fail(`--risk must be one of ${risks.join(", ")}`);
-      if (!authority || !authorities.includes(authority as WorkAuthorityKind)) await fail(`--authority must be one of ${authorities.join(", ")}`);
-      if (!grantedBy || !boundary) await fail("work create requires --granted-by and --boundary");
-      const exactGrantedBy = grantedBy as string, exactBoundary = boundary as string;
-      const ownerSession = one("--owner-session"), ownerAgent = one("--owner-agent");
-      if ((ownerSession === null) !== (ownerAgent === null)) await fail("--owner-session and --owner-agent must be supplied together");
-      const opened = createWork(cfg, {
-        ...writer,
-        work: one("--id") ?? undefined,
-        parent: one("--parent") ?? undefined,
-        objective: positional[1],
-        criteria: many("--success"),
-        constraints: many("--constraint"),
-        nonGoals: many("--non-goal"),
-        authority: { kind: authority as WorkAuthorityKind, grantedBy: exactGrantedBy, boundary: exactBoundary },
-        owner: ownerSession && ownerAgent ? { session: ownerSession, agent: ownerAgent } : undefined,
-        dependsOn: many("--depends-on"),
-        readScopes: many("--read-scope"),
-        writeScopes: many("--write-scope"),
-        risk: risk as WorkRisk,
-      });
-      if (json) console.log(JSON.stringify(opened, null, 2));
-      else console.log(`OPEN ${opened.work}  ${opened.id}`);
-      await exit(0);
-    }
-
-    const work = positional[1];
-    const reason = one("--because");
-    if (!work || !reason) await fail(`work ${action} requires one work id and --because`);
-    const exactWork = work as string, exactReason = reason as string;
-    if (action === "transition") {
-      const to = positional[2];
-      if (positional.length !== 3 || !["open", "active", "blocked"].includes(to)) await fail("work transition requires one open|active|blocked state");
-      const record = transitionWork(cfg, {
-        ...writer, work: exactWork, to: to as "open" | "active" | "blocked", reason: exactReason,
-        evidence: many("--evidence"), expectedPrevious: one("--expected-previous") ?? undefined,
-      });
-      if (json) console.log(JSON.stringify(record, null, 2)); else console.log(`${record.work} ${record.from} → ${record.to}  ${record.id}`);
-      await exit(0);
-    }
-    if (action === "handoff") {
-      if (positional.length !== 2) await fail("work handoff accepts exactly one work id");
-      const ownerSession = one("--owner-session"), ownerAgent = one("--owner-agent");
-      if (!ownerSession || !ownerAgent) await fail("work handoff requires --owner-session and --owner-agent");
-      const exactOwnerSession = ownerSession as string, exactOwnerAgent = ownerAgent as string;
-      const record = handoffWork(cfg, {
-        ...writer, work: exactWork, reason: exactReason, toOwner: { session: exactOwnerSession, agent: exactOwnerAgent },
-        expectedPrevious: one("--expected-previous") ?? undefined,
-      });
-      if (json) console.log(JSON.stringify(record, null, 2)); else console.log(`${record.work} → ${record.toOwner.session}/${record.toOwner.agent}  ${record.id}`);
-      await exit(0);
-    }
-    const to = positional[2];
-    if (positional.length !== 3 || !["completed", "cancelled"].includes(to)) await fail("work close requires one completed|cancelled state");
-    const record = closeWork(cfg, {
-      ...writer, work: exactWork, to: to as "completed" | "cancelled", reason: exactReason,
-      resultEvidence: many("--evidence"), synthesizedChildren: many("--synthesized"),
-      expectedPrevious: one("--expected-previous") ?? undefined,
-    });
-    if (json) console.log(JSON.stringify(record, null, 2)); else console.log(`${record.work} → ${record.to}  ${record.id}`);
-    await exit(0);
-  } catch (error) {
-    if (!(error instanceof WorkLedgerError)) throw error;
-    await fail(error.problems.join("; "));
-  }
-} else if (cmd === "consequence") {
-  const json = argv.includes("--json");
-  const action = positional[0] ?? "inspect";
-  const usage = [
-    'usage: coherence consequence add <kind:id> <relation> <kind:id> --evidence "<why this edge is warranted>" --session S [--json]',
-    "       coherence consequence inspect [<kind:id>] [--json]",
-  ];
-  const fail = async (message: string): Promise<never> => {
-    if (json) console.log(JSON.stringify({ error: message, usage }, null, 2));
-    else { console.error(message); for (const line of usage) console.error(line); }
-    return await exit(2);
-  };
-  const allowed = action === "add"
-    ? new Set(["--evidence", "--session", "--agent", "--job", "--json"])
-    : action === "inspect" ? new Set(["--json"]) : null;
-  if (!allowed) await fail(`invalid consequence action: ${action}`);
-  const exactAllowed = allowed as Set<string>;
-  const badFlags = argv.filter((arg) => arg.startsWith("--") && !exactAllowed.has(arg));
-  if (badFlags.length) await fail(`unsupported flag(s) for consequence ${action}: ${badFlags.join(", ")}`);
-  const missingValues = argv.filter((arg, index) => exactAllowed.has(arg) && arg !== "--json"
-    && (argv[index + 1] === undefined || argv[index + 1]!.startsWith("--")));
-  if (missingValues.length) await fail(`missing value for: ${[...new Set(missingValues)].join(", ")}`);
-  const repeatedSingletons = repeatedSingletonFlags(argv, exactAllowed);
-  if (repeatedSingletons.length) await fail(`repeated singleton flag(s): ${repeatedSingletons.join(", ")}`);
-  try {
-    if (action === "inspect") {
-      if (positional.length > 2) await fail("consequence inspect accepts at most one reference");
-      const focus = positional[1] ? parseConsequenceRef(positional[1]) : null;
-      const rendered = renderConsequences(cfg, focus);
-      if (json) console.log(JSON.stringify(rendered.trace, null, 2)); else console.log(rendered.text);
-      await exit(0);
-    }
-    if (positional.length !== 4) await fail("consequence add requires from, relation, and to");
-    const relation = positional[2] as ConsequenceRelation;
-    if (!CONSEQUENCE_RELATIONS.includes(relation)) await fail(`relation must be one of ${CONSEQUENCE_RELATIONS.join(", ")}`);
-    const session = one("--session") ?? process.env.COHERENCE_SESSION ?? process.env.CODEX_THREAD_ID ?? null;
-    const evidence = one("--evidence");
-    if (!session || session === "unknown" || !evidence) await fail("consequence add requires exact --session and non-empty --evidence");
-    const exactSession = session as string, exactEvidence = evidence as string;
-    const record = recordConsequence(cfg, {
-      session: exactSession, from: parseConsequenceRef(positional[1] as string), relation,
-      to: parseConsequenceRef(positional[3] as string), evidence: exactEvidence,
-      agent: one("--agent") ?? undefined, job: one("--job") ?? undefined,
-    });
-    if (json) console.log(JSON.stringify(record, null, 2)); else console.log(`${record.id}  ${record.from.kind}:${record.from.id} --${record.relation}--> ${record.to.kind}:${record.to.id}`);
-    await exit(0);
-  } catch (error) {
-    if (!(error instanceof ConsequenceLedgerError)) throw error;
-    await fail(error.problems.join("; "));
-  }
-} else if (cmd === "orient") {
-  const json = argv.includes("--json");
-  const badFlags = argv.filter((arg) => arg.startsWith("--") && arg !== "--json");
-  if (positional.length || badFlags.length) {
-    const usage = "usage: coherence orient [--json]";
-    const message = positional.length ? "orient accepts no positional arguments" : `unsupported flag(s) for orient: ${badFlags.join(", ")}`;
-    if (json) console.log(JSON.stringify({ error: message, usage }, null, 2)); else { console.error(message); console.error(usage); }
-    await exit(2);
-  }
-  const reading = await observeOrientation(cfg);
-  if (json) console.log(JSON.stringify(reading, null, 2)); else console.log(renderOrientation(reading));
-  await exit(reading.action === "refuse" ? 2 : 0);
-} else if (cmd === "hooks") {
-  // The first control interface. `--check` remains the terse gate spelling; status keeps
-  // the installation bit and runtime observation visible without conflating them. A bare
-  // command remains Claude for compatibility; Codex is always an explicit host selection.
-  const json = argv.includes("--json");
-  const action = check ? "check" : (positional[0] ?? "print");
-  const allowed = new Map<string, Set<string>>([
-    ["check", new Set(["--check", "--json", "--host", "--session"])],
-    ["status", new Set(["--json", "--host", "--session"])],
-    ["install", new Set(["--json", "--host", "--session"])],
-    ["uninstall", new Set(["--json", "--host", "--session"])],
-    ["print", new Set(["--host"])],
-    // Review takes NO flags — not even --host, because emission CONTENT is
-    // host-independent; only the delivery envelope differs per host.
-    ["review", new Set<string>([])],
-  ]);
-  const usage = "usage: coherence hooks [status|install|uninstall|print|review] [--check]"
-    + " [--host <claude|codex>] [--session <id>] [--json]";
-  const actionFlags = allowed.get(action);
-  const badFlags = actionFlags
-    ? argv.filter((arg) => arg.startsWith("--") && !actionFlags.has(arg))
-    : [];
-  const missingValues = ["--host", "--session"].filter((flag) =>
-    argv.some((arg, index) => arg === flag
-      && (argv[index + 1] === undefined || argv[index + 1]!.startsWith("--"))));
-  const repeatedValues = ["--host", "--session"].filter((flag) =>
-    argv.filter((arg) => arg === flag).length > 1);
-  const hostArg = one("--host");
-  const session = one("--session");
-  const invalidHost = hostArg !== null && hostArg !== "claude" && hostArg !== "codex";
-  const invalidSession = session === "" || session === "unknown";
-  const badShape = !allowed.has(action)
-    || (action === "check" && !check)
-    || positional.length > 1
-    || (check && positional.length > 0);
-  if (badShape || badFlags.length || missingValues.length || repeatedValues.length || invalidHost || invalidSession) {
-    const message = badShape ? `invalid hooks action: ${positional.join(" ") || action}`
-      : badFlags.length ? `unsupported flag(s) for hooks ${action}: ${badFlags.join(", ")}`
-      : missingValues.length ? `missing value for: ${missingValues.join(", ")}`
-      : repeatedValues.length ? `repeated hooks selector: ${repeatedValues.join(", ")}`
-      : invalidHost ? `invalid hook host: ${hostArg}; expected claude or codex`
-      : "--session requires a non-empty, non-unknown id";
-    if (json) console.log(JSON.stringify({ error: message, usage }, null, 2));
-    else { console.error(message); console.error(usage); }
-    await exit(2);
-  }
-  const host = (hostArg ?? "claude") as HookHost;
-  if (action === "check") await exit(checkHooks(cfg, json, host, session));
-  if (action === "status") await exit(reportHooks(cfg, json, host, session));
-  if (action === "install") await exit(await installHooks(cfg, json, host, session));
-  if (action === "uninstall") await exit(await uninstallHooks(cfg, json, host, session));
-  if (action === "print") { printHooks(cfg, host); await exit(0); }
-  if (action === "review") await exit(reviewHooks(cfg));
-} else if (cmd === "hook") {
-  // The hook BODY, so nothing has to be written to disk or kept in sync with a script.
-  await exit(await runHook(cfg, positional[0] ?? ""));
-} else if (cmd === "decompose") {
-  await exit(await decompose(cfg, await buildGraph(cfg)));
-} else if (cmd === "drift") {
-  await exit(await drift(cfg, await buildGraph(cfg)));
-} else if (cmd === "scaffold") {
-  await exit(await scaffold(cfg, positional[0], positional[1]));
-} else if (cmd === "lint-sinks") {
-  // Interpolation-surface ratchet. Mechanism in the harness; SAFE patterns + scoped
-  // sources in config; baseline in <outputDir>/sinks-baseline.json.
-  const mode = argv.includes("--update-baseline") ? "update" : check ? "check" : "report";
-  await exit(await lintSinks(cfg, mode));
-} else if (cmd === "conventions") {
-  // Guard-vs-contract detector + growth ratchet. Reuses the graph's boundary claims.
-  const mode = argv.includes("--update-baseline") ? "update" : check ? "check" : "report";
-  await exit(await conventions(cfg, await buildGraph(cfg), mode));
-} else if (cmd === "mass") {
-  // How much machine there is, pinned: lines (total + per component), files, symbols,
-  // dependency counts, and the project's own `measures`. Same ratchet mechanics as
-  // conventions; baseline in <outputDir>/mass-baseline.json. `--raise` turns a growth
-  // excursion into an open question instead of a line that scrolls past.
-  const mode = argv.includes("--update-baseline") ? "update" : check ? "check" : "report";
-  await exit(await mass(cfg, await buildGraph(cfg), mode, {
-    raise, raiseCap, session: one("--session") ?? undefined, agent: one("--agent") ?? undefined,
-  }));
-} else if (cmd === "atlas") {
-  // Trust-graded manifold; tiers derived from boundary claims, charts/crossings from config.
-  // `--raise` opens an INFERENCE HAZARD (a tier-3 crossing with change traffic through it)
-  // as a question instead of a line. Hazards never enter the --check verdict either way.
-  await exit(await atlas(cfg, await buildGraph(cfg), check ? "check" : "render", {
-    raise, raiseCap, session: one("--session") ?? undefined, agent: one("--agent") ?? undefined,
-  }));
-} else if (cmd === "index") {
-  // THE INDEX: the one artifact addressed to the HUMAN who has been away. The other three
-  // browser renders are complete dumps of one moment — every component, every claim, every
-  // edge — and they go unread because a complete picture carries no attention budget and no
-  // delta. This is three views and no more (MAP · JOURNAL · TRAJECTORY), each framed
-  // against what the reader last saw, and it derives NOTHING: every figure on the page is a
-  // reading the graph, the promise model, the run record or the journals already took.
-  //
-  // `index.json` is written FIRST-CLASS beside the page, and not as a debugging courtesy:
-  // the render is a pure function of it (so nothing on the page is unverifiable), and its
-  // `head` is the CURSOR the next run frames "since I last looked" against.
-  const graph = await buildGraph(cfg);
-  const model = await buildIndexModel(cfg, graph, { since, stamp });
-  await writeOutputs();
-  await writeFile(out(INDEX_JSON), JSON.stringify(model, null, 2) + "\n");
-  await writeFile(out(INDEX_HTML), renderIndex(model));
-  for (const line of formatIndexSummary(model, join(cfg.outputDir, INDEX_HTML))) console.log(line);
-  await exit(0);
-} else if (cmd === "panel") {
-  // The operator's instrument panel: a live TUI over the graph + the status record
-  // (`.coherence/status.json`). Watch mode re-runs the fast tier on change; --once
-  // prints a static snapshot (also what non-TTY stdout gets).
-  await exit(await runPanel(cfg, { watch: !argv.includes("--no-watch"), once: argv.includes("--once") }));
-} else if (cmd === "contract") {
-  // The PROMISE GRAPH: derive the PromiseModel (declared zones, graded gates, the reliance
-  // double-entry) and render one self-contained _contract.html; also emit promise.json for
-  // agents/tools. It embeds live grades, so it is always regenerated (no --check).
-  const graph = await buildGraph(cfg);
-  const model = await buildPromiseModel(cfg, graph, await readStatus(cfg));
-  await writeOutputs();
-  await writeFile(out("promise.json"), JSON.stringify(model, null, 2));
-  await writeFile(out("_contract.html"), renderContract(model, stamp));
-  console.log(`contract: ${model.components.length} component(s), ${model.zones.length} zone(s) → _contract.html`);
-  await exit(0);
-} else if (cmd === "context") {
-  // A task packet, not a repo dump. Explicit selectors compose with a Git-derived scope.
-  const scope = argv.includes("--staged") ? "staged" : argv.includes("--changed") ? "changed" : undefined;
-  const symbols = many("--symbol");
-  const all = argv.includes("--all");
-  const rawMaxBytes = one("--max-bytes");
-  const badFlags = argv.filter((arg) => arg.startsWith("--")
-    && !["--symbol", "--changed", "--staged", "--max-bytes", "--all"].includes(arg));
-  const invalidBudget = rawMaxBytes !== null
-    && (!/^\d+$/.test(rawMaxBytes) || Number(rawMaxBytes) <= 0 || !Number.isSafeInteger(Number(rawMaxBytes)));
-  const missingValues = argv.filter((arg, index) => ["--symbol", "--max-bytes"].includes(arg)
-    && (argv[index + 1] === undefined || argv[index + 1]!.startsWith("--")));
-  if (badFlags.length || missingValues.length || (argv.includes("--staged") && argv.includes("--changed")) || (all && rawMaxBytes !== null) || invalidBudget) {
-    console.error("usage: coherence context [<file>...] [--symbol <name>] [--changed|--staged] [--max-bytes N | --all]");
-    if (badFlags.length) console.error(`unsupported flag(s): ${badFlags.join(", ")}`);
-    else if (missingValues.length) console.error(`missing value for: ${[...new Set(missingValues)].join(", ")}`);
-    else if (all && rawMaxBytes !== null) console.error("--all and --max-bytes are mutually exclusive");
-    else if (invalidBudget) console.error("--max-bytes must be a positive safe integer");
-    else console.error("--changed and --staged are mutually exclusive");
-    await exit(2);
-  }
-  if (!positional.length && !symbols.length && !scope) {
-    console.error("usage: coherence context [<file>...] [--symbol <name>] [--changed|--staged] [--max-bytes N | --all]");
-    await exit(2);
-  }
-  const packet = contextFromProject(cfg, await buildGraph(cfg), { files: positional, symbols, scope });
-  // 12 KiB is the CLI attention budget. Library callers retain the legacy unbounded
-  // default; terminal callers opt out explicitly with --all.
-  try {
-    console.log(renderContext(packet, all ? { expand: true } : { maxBytes: rawMaxBytes === null ? 12_000 : Number(rawMaxBytes) }));
-  } catch (error) {
-    if (!(error instanceof RangeError)) throw error;
-    console.error(error.message);
-    await exit(2);
-  }
-  await exit(0);
-} else if (cmd === "contracts") {
-  // Producer/consumer contracts across deploy artifacts + the uncovered cross-artifact
-  // surface detector. Charts analog: artifacts/contracts are config data, mechanism here.
-  await exit(await contracts(cfg, await buildGraph(cfg), check ? "check" : "render"));
-} else if (cmd === "redundancy") {
-  // Advisory: the UNDECLARED half of parity — one enumerated domain spelled in two places
-  // with nothing keeping the spellings equal. Ranked, capped, gates nothing (--all uncaps).
-  // `--raise` turns the ranked pairs above the DEFAULT floor into open conjectures — never
-  // the tail `--all` exposes, which is there to be judged, not recorded.
-  await exit(await redundancy(cfg, await buildGraph(cfg), {
-    all: argv.includes("--all"), raise, raiseCap,
-    session: one("--session") ?? undefined, agent: one("--agent") ?? undefined,
-  }));
-} else if (cmd === "prose") {
-  // Advisory: redundancy's argument applied to the surface redundancy does not scan —
-  // duplicated PROSE across reading surfaces, labeled IDENTICAL vs DIVERGED (the rot
-  // signal). Ranked, capped, gates nothing (--all uncaps; --raise uses the default floor).
-  await exit(await prose(cfg, {
-    all: argv.includes("--all"), raise, raiseCap,
-    session: one("--session") ?? undefined, agent: one("--agent") ?? undefined,
-  }));
-} else if (cmd === "economy") {
-  // Advisory: the READ side of the ledger — the context closure of a change, i.e. what a
-  // reader must load to modify one thing safely. decompose/drift/mass all measure the WRITE
-  // side; this is the other axis, and it always exits 0 (a closure is a cost, not a defect).
-  await exit(await economy(cfg, await buildGraph(cfg), {
-    raise, raiseCap, session: one("--session") ?? undefined, agent: one("--agent") ?? undefined,
-  }));
-} else if (cmd === "premise") {
-  await exit(await premise(cfg, await buildGraph(cfg), check ? "check" : "report"));
-} else if (cmd === "calibrate") {
-  const raw = one("--outcome");
-  if (raw !== null && raw !== "clean" && raw !== "defect") {
-    console.error("usage: coherence calibrate [--outcome <clean|defect>] [--session <id>]");
-    await exit(2);
-  }
-  await exit(await calibrate(cfg, {
-    outcome: raw as CalibrationOutcome | undefined,
-    session: one("--session") ?? undefined,
-    graph: raw === null ? undefined : await buildGraph(cfg),
-  }));
-} else if (cmd === "why-lint") {
-  // Advisory: ## why prose restating a mechanism a boundary claim already anchors.
-  await exit(whyLint(await buildGraph(cfg), check ? "check" : "report"));
-} else if (cmd === "doctrine") {
-  const json = argv.includes("--json");
-  const badFlags = argv.filter((arg) => arg.startsWith("--") && arg !== "--json");
-  if (positional.length || badFlags.length) {
-    const usage = "usage: coherence doctrine [--json]";
-    const message = badFlags.length
-      ? `unsupported flag(s) for doctrine: ${badFlags.join(", ")}`
-      : "doctrine accepts no positional arguments";
-    if (json) console.log(JSON.stringify({ error: message, usage }, null, 2));
-    else { console.error(message); console.error(usage); }
-    await exit(2);
-  }
-  for (const line of formatDoctrine(json)) console.log(line);
-  await exit(0);
-} else if (cmd === "phrasebook") {
-  // The claim grammar, rendered straight from the CLAIM_FORMS registry — the generated
-  // authority behind the README's hand-kept table. A line matching no form is SKIPPED
-  // (dialect gap), never red — so a typo'd verb is a silent no-op; check verify's skipped count.
-  console.log("The claim phrasebook — the `## works when` grammar (src/verification/phrasebook.ts).");
-  console.log("First match wins; the order below is the precedence. A line matching none is skipped (dialect gap).\n");
-  for (const f of CLAIM_FORMS) {
-    console.log(`● ${f.name}  [${f.tier}]`);
-    console.log(`    grammar: ${f.grammar}`);
-    console.log(`    example: ${f.example}`);
-  }
-  await exit(0);
-} else {
-  // DERIVED, not spelled. This banner was the list's third home and the source of
-  // v0.14.0's only merge conflict — two branches hand-editing one `<a|b|c>` literal. There
-  // is no command-name string literal left in it: every line comes from the COMMAND
-  // registry (src/commands.ts), which the totality oracle holds equal to the dispatch above.
-  for (const line of usageBanner()) console.error(line);
-  await exit(2);
+  return { flags, positionals };
 }
+
+/**
+ * The command prefix a hook entry uses to reach this CLI. Paths are relative
+ * to the project root, which is where both hosts run hooks; Claude Code also
+ * names it in CLAUDE_PROJECT_DIR, honored when set. The installed bin is
+ * addressed directly rather than through npx, which would fetch a stranger's
+ * package of the same name when the dependency is missing.
+ */
+async function defaultCommand(root: string): Promise<string> {
+  const dir = '$(dir="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$dir" != "/" ] && [ ! -f "$dir/.claude/settings.json" ] && [ ! -f "$dir/.codex/hooks.json" ]; do dir=$(dirname "$dir"); done; printf "%s" "$dir")';
+  return (await isCoherenceItself(root)) ? `node "${dir}/src/cli.ts"` : `"${dir}/node_modules/.bin/coherence"`;
+}
+
+async function lexiconCommand(args: string[], root: string): Promise<number> {
+  const io: Io = {
+    cwd: root,
+    out: (line) => process.stdout.write(line + "\n"),
+    err: (line) => process.stderr.write(line + "\n"),
+  };
+  if (args[0] === "--help") return lexiconWorkCommand(["help"], io);
+  if (args[0] && !args[0].startsWith("--")) return lexiconWorkCommand(args, io);
+  const { flags, positionals } = parse(args, new Set());
+  const unknown = [...flags.keys()].find((flag) => flag !== "check" && flag !== "json");
+  if (unknown !== undefined) {
+    process.stderr.write(`lexicon: unknown flag --${unknown}\n`);
+    return 1;
+  }
+  const { coherence, project } = await loadProjectLexicons(root);
+  if (flags.has("check")) {
+    const report = await runCheck({ root, paths: positionals, coherence, project });
+    process.stdout.write(flags.has("json") ? JSON.stringify(report, null, 2) + "\n" : formatReport(report));
+    return hasFindings(report) ? 1 : 0;
+  }
+  if (flags.has("json")) {
+    process.stdout.write(JSON.stringify({ coherence, project: project ?? null }, null, 2) + "\n");
+    return 0;
+  }
+  const compact = renderCompact(coherence, project);
+  process.stdout.write(compact);
+  const estimate = tokenEstimate(compact);
+  let note = "";
+  if (project !== undefined) {
+    const within = renderCompactWithin(coherence, project, CONTEXT_BUDGET);
+    if (within.detail !== "full") {
+      note = `; the hook injects the project layer at detail "${within.detail}" (~${tokenEstimate(within.text).tokens} tokens) to stay under ${CONTEXT_BUDGET} characters`;
+    }
+  }
+  process.stderr.write(`~${estimate.tokens} tokens (${estimate.bytes} bytes / 4)${note}\n`);
+  return 0;
+}
+
+/** Write to stdout and settle only once the bytes were accepted, so what follows records an effect that happened. */
+function writeStdout(text: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    process.stdout.once("error", reject);
+    process.stdout.write(text, (error) => (error ? reject(error) : resolve()));
+  });
+}
+
+/** The exit code for output the host never received (sysexits EX_IOERR). */
+const OUTPUT_LOST_EXIT = 74;
+
+async function hookCommand(args: string[], root: string): Promise<number> {
+  const event = args[0];
+  if (event === undefined || !isHookEvent(event)) fail(`hook: expected one of ${HOOK_EVENTS.join(", ")}\n${USAGE}`);
+  const input = await readStdinJson(process.stdin);
+  const result = await runHook(event, input, root);
+  if (result.stderr !== "") process.stderr.write(result.stderr);
+  if (result.stdout !== "") {
+    try {
+      await writeStdout(result.stdout);
+    } catch (error) {
+      // The host has nothing, so nothing is committed: an unprinted feed is shown again next time.
+      process.stderr.write(`hook ${event}: the output never reached the host (${error instanceof Error ? error.message : String(error)}); nothing was committed\n`);
+      return OUTPUT_LOST_EXIT;
+    }
+  }
+  result.commit?.();
+  return result.exit;
+}
+
+/** The flags each hooks verb takes; anything else is a usage error rather than silently ignored. */
+const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {
+  install: new Set(["host", "command"]),
+  uninstall: new Set(["host"]),
+  check: new Set(["check", "host", "command"]),
+  status: new Set(),
+};
+
+async function hooksCommand(args: string[], root: string): Promise<number> {
+  const { flags, positionals } = parse(args, new Set(["host", "command"]));
+  // The check is the noun's --check, as lexicon --check and spec --check are; the other actions are verbs.
+  const verb = flags.has("check") && positionals.length === 0 ? "check" : positionals[0];
+  const allowed = verb === undefined ? undefined : HOOKS_FLAGS[verb];
+  if (allowed === undefined || positionals.length > (verb === "check" ? 0 : 1)) fail(USAGE);
+  const unknown = [...flags.keys()].filter((flag) => !allowed.has(flag));
+  if (unknown.length > 0) fail(`hooks ${verb}: unknown flag${unknown.length === 1 ? "" : "s"} ${unknown.map((f) => `--${f}`).join(", ")}\n${USAGE}`);
+  if (verb === "status") {
+    const statuses = await Promise.all(HOSTS.map((host) => status(root, host)));
+    process.stdout.write(formatStatus(statuses) + "\n" + formatDeliveries(await deliveries(root), statuses));
+    return 0;
+  }
+  const host = flags.get("host");
+  const label = verb === "check" ? "hooks --check" : `hooks ${verb}`;
+  if (typeof host !== "string" || !isHost(host)) fail(`${label}: --host must be one of ${HOSTS.join(", ")}\n${USAGE}`);
+  const given = flags.get("command");
+  if (given === true) fail(`${label}: --command needs a value\n${USAGE}`);
+  if (verb === "uninstall") {
+    process.stdout.write(formatUninstall(host, await uninstall(root, host)));
+    return 0;
+  }
+  const command = given ?? (await defaultCommand(root));
+  if (verb === "check") {
+    let result;
+    try {
+      result = await check(root, host, command);
+    } catch (error) {
+      process.stderr.write(`hooks --check: ${error instanceof Error ? error.message : String(error)}\n`);
+      return 2;
+    }
+    process.stdout.write(formatCheck(result));
+    return result.drift.length === 0 ? 0 : 1;
+  }
+  const result = await install({ root, host, command });
+  process.stdout.write(`${result.changed ? "wrote" : "unchanged"} ${result.path}: ${result.events.join(", ")}\n`);
+  return 0;
+}
+
+async function main(argv: string[]): Promise<number> {
+  const [verb, ...rest] = argv;
+  const root = process.cwd();
+  const command = verb === undefined ? undefined : commands[verb];
+  if (command !== undefined) {
+    const io: Io = {
+      cwd: root,
+      out: (line) => process.stdout.write(`${line}\n`),
+      err: (line) => process.stderr.write(`${line}\n`),
+    };
+    return command(rest, io);
+  }
+  const io: Io = {
+    cwd: root,
+    out: (line) => process.stdout.write(`${line}\n`),
+    err: (line) => process.stderr.write(`${line}\n`),
+  };
+  switch (verb) {
+    case "lexicon":
+      return lexiconCommand(rest, root);
+    case "run":
+      return runCommand(rest, io);
+    case "refute":
+      return refuteCommand(rest, io);
+    case "serve":
+      // The warm server answers the live Scope reading over HTTP besides the instrument over its socket.
+      return serveCommand(rest, io, { http: scopeApp() });
+    case "scope":
+      return scopeCommand(rest, io);
+    case "economy":
+      return economyCommand(rest, io);
+    case "calibrate":
+      return calibrateCommand(rest, io);
+    case "mass":
+      return massCommand(rest, io);
+    case "query":
+      return queryCommand(rest, io);
+    case "hook":
+      return hookCommand(rest, root);
+    case "hooks":
+      return hooksCommand(rest, root);
+    default:
+      fail(verb === undefined ? USAGE : `unknown verb "${verb}"\n${USAGE}`);
+  }
+}
+
+main(process.argv.slice(2)).then(
+  (code) => {
+    process.exitCode = code;
+  },
+  (error: unknown) => {
+    fail(error instanceof Error ? error.message : String(error), 70);
+  },
+);

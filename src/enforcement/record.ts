@@ -1,0 +1,273 @@
+/**
+ * The run: the primary record of one verification pass. One JSONL file per
+ * session under .coherence/runs, one line per run, append only. Each run
+ * carries one entry per enforcement checked (component, invariant, form).
+ * The latest verdict per enforcement is a view derived from every run file
+ * when it is asked for; it is never stored, and an enforcement a later run
+ * skipped keeps the verdict of the last run that checked it, dated.
+ *
+ * The same files carry the other durable event of enforcement: a refutation,
+ * written by `refute` while the break is staged, carrying the bullet, what was
+ * broken, and the failing verdict the detector gave. A line with
+ * `kind: "refutation"` is one of those; a line without a kind is a run. A
+ * refutation is witnessed only together with a run at or after it that found
+ * the same enforcement passing: the break was staged, the detector went red,
+ * the code was restored, and the detector went green again.
+ */
+
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+export const RUNS_DIR = join(".coherence", "runs");
+
+export type Form = "chokepoint" | "totality oracle";
+export type Verdict = "pass" | "fail" | "not run";
+/**
+ * The chokepoint grade. The choked rungs are adapter-defined and strongest
+ * first: closure-choked (the interpreter: the thing is never a module
+ * attribute), visibility-choked (the compiler: not exported), checker-choked
+ * (a checker the project runs refuses private usage or a forbidden import),
+ * reference-choked (Coherence's own check: no bypass among resolved
+ * references), convention (a naming or export-list convention alone, enforced
+ * by nobody). Below them: broken, and not chokeable.
+ */
+export type Grade = "closure-choked" | "visibility-choked" | "checker-choked" | "reference-choked" | "convention" | "broken" | "not chokeable";
+/**
+ * How the refutation was witnessed. `automatic`: the check's own
+ * classification called every synthetic site the adapter staged a bypass.
+ * `refused by the language`: the rung's enforcer is the compiler or the
+ * interpreter, and it refused the synthetic outside reference; the diagnostic
+ * is the proof and Coherence's own check never has to be made to fire
+ * (ruling rs-e93ecdd6). `witnessed`: a refutation record for a bullet's
+ * totality oracle, with a later run that found the same enforcement
+ * passing. `missing`: none of these.
+ */
+export type RefutationState = "automatic" | "refused by the language" | "witnessed" | "missing";
+
+export interface Bypass {
+  file: string;
+  line: number;
+  /** The referencing symbol, or "module top level". */
+  symbol: string;
+}
+
+/** What a persisted reference site points at. */
+export type ReferenceTarget = "protected" | "chokepoint";
+
+/**
+ * The check's classification of a persisted site. `chokepoint-reference` makes only the
+ * fact the adapter established: an outside reference to the chokepoint. It
+ * does not claim the site is a runtime call; `form` separately retains an
+ * import or re-export form when the adapter supplied one.
+ */
+export type SiteClass = "inside" | "chokepoint-reference" | "test" | "bypass";
+
+/** The syntactic forms the adapter can establish at a reference site. */
+export type ReferenceForm = "import" | "re-export";
+
+/** The durable, editor-facing part of one classified reference. */
+export interface RecordedSite {
+  file: string;
+  line: number;
+  /** The referencing symbol, or "module top level". */
+  symbol: string;
+  class: SiteClass;
+  of: ReferenceTarget;
+  /** Orthogonal to class: whether this site is under a configured test path. */
+  test: boolean;
+  /** Orthogonal syntax evidence, when the adapter can establish it. */
+  form?: ReferenceForm;
+}
+
+export interface RunEntry {
+  component: string;
+  name: string;
+  form: Form;
+  verdict: Verdict;
+  /** Chokepoint form only. */
+  grade?: Grade;
+  /** Chokepoint form only: who refuses a bypass at the graded rung (the compiler, the interpreter, a checker, Coherence's check, nobody). */
+  enforcer?: string;
+  /** Totality oracle form only: whether the test ran in the one batched invocation or in its own. */
+  mode?: "batched" | "one-at-a-time";
+  refutation: RefutationState;
+  bypasses: Bypass[];
+  /**
+   * Chokepoint form only. Present only when both reference queries completed.
+   * Absence is unavailable or legacy evidence, never a confirmed empty set.
+   */
+  sites?: RecordedSite[];
+  testReferences: number;
+  /** Files the check touched: definitions and every reference site; the edit hook reads them. */
+  files: string[];
+  /** Milliseconds this entry took. */
+  latency: number;
+  /** One line: why the verdict is what it is. */
+  reason: string;
+}
+
+export interface RunRecord {
+  at: string;
+  session: string;
+  agent: string;
+  /** The work order the run binds to, when the session owns exactly one active order or named one. */
+  work?: string;
+  /** How the work order was bound: by flag, inferred, or why none. */
+  binding?: string;
+  commit: string | null;
+  dirty: boolean;
+  /** Which instrument answered and whether it was already warm. */
+  instrument: { language: string; server: "cold" | "warm" | "none" };
+  latency: number;
+  invariants: RunEntry[];
+}
+
+/**
+ * One refutation: the detector was made to go red on purpose, and this is what
+ * was broken and what it said. Appended by `refute` while the break is staged,
+ * never by a run.
+ */
+export interface RefutationRecord {
+  kind: "refutation";
+  at: string;
+  session: string;
+  agent: string;
+  /** The bullet: the component's folder and the invariant's name. */
+  component: string;
+  name: string;
+  form: Form;
+  /** What the agent changed to break the invariant, in its own words. */
+  broke: string;
+  /** The verdict the enforcement gave with the break staged. A refutation is only ever recorded on a fail. */
+  verdict: "fail";
+  /** The detector's own line: why it went red. */
+  reason: string;
+  commit: string | null;
+  dirty: boolean;
+}
+
+export interface Latest extends RunEntry {
+  at: string;
+  commit: string | null;
+  session: string;
+}
+
+export function runsDir(root: string): string {
+  return join(root, RUNS_DIR);
+}
+
+const SESSION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+/** Append one run as one line; the file and folder are created on first write. */
+export function appendRun(root: string, record: RunRecord): string {
+  if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
+  mkdirSync(runsDir(root), { recursive: true });
+  const file = join(runsDir(root), `${record.session}.jsonl`);
+  appendFileSync(file, `${JSON.stringify(record)}\n`, "utf8");
+  return file;
+}
+
+/** Append one refutation as one line, beside the runs of the same session. */
+export function appendRefutation(root: string, record: RefutationRecord): string {
+  if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
+  mkdirSync(runsDir(root), { recursive: true });
+  const file = join(runsDir(root), `${record.session}.jsonl`);
+  appendFileSync(file, `${JSON.stringify(record)}\n`, "utf8");
+  return file;
+}
+
+export interface LoadedRuns {
+  records: RunRecord[];
+  /** The refutation records in the same files, oldest first. */
+  refutations: RefutationRecord[];
+  damaged: { file: string; line: number; reason: string }[];
+}
+
+export function loadRuns(root: string): LoadedRuns {
+  const dir = runsDir(root);
+  const loaded: LoadedRuns = { records: [], refutations: [], damaged: [] };
+  if (!existsSync(dir)) return loaded;
+  for (const name of readdirSync(dir).filter((n) => n.endsWith(".jsonl")).sort()) {
+    const lines = readFileSync(join(dir, name), "utf8").split("\n");
+    lines.forEach((line, index) => {
+      if (line.trim() === "") return;
+      const parsed = parseLine(line);
+      if (typeof parsed === "string") loaded.damaged.push({ file: join(RUNS_DIR, name), line: index + 1, reason: parsed });
+      else if ("kind" in parsed) loaded.refutations.push(parsed);
+      else loaded.records.push(parsed);
+    });
+  }
+  loaded.records.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  loaded.refutations.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  return loaded;
+}
+
+function parseLine(line: string): RunRecord | RefutationRecord | string {
+  let value: unknown;
+  try {
+    value = JSON.parse(line);
+  } catch (error) {
+    return `not JSON (${error instanceof Error ? error.message : String(error)})`;
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return "not a run object";
+  const record = value as Record<string, unknown>;
+  for (const field of ["at", "session", "agent"]) if (typeof record[field] !== "string") return `missing ${field}`;
+  if (Number.isNaN(Date.parse(record["at"] as string))) return `unreadable time "${String(record["at"])}"`;
+  if (record["kind"] === "refutation") {
+    for (const field of ["component", "name", "form", "broke", "reason"]) if (typeof record[field] !== "string") return `refutation missing ${field}`;
+    if (record["verdict"] !== "fail") return "a refutation is only ever recorded on a failing verdict";
+    return value as RefutationRecord;
+  }
+  if (record["kind"] !== undefined) return `unknown record kind "${String(record["kind"])}"`;
+  if (!Array.isArray(record["invariants"])) return "missing invariants";
+  return value as RunRecord;
+}
+
+/**
+ * The enforcements whose refutation is witnessed by the record: a refutation
+ * exists for the bullet and some run at or after it found the same enforcement
+ * passing. The record alone says the detector went red; the later pass says the
+ * code was restored, and together they are the firing the lexicon names.
+ */
+export function witnessedRefutations(runs: readonly RunRecord[], refutations: readonly RefutationRecord[]): Set<string> {
+  const witnessed = new Set<string>();
+  for (const refutation of refutations) {
+    const key = entryKey(refutation.component, refutation.name, refutation.form);
+    if (witnessed.has(key)) continue;
+    const restored = runs.some(
+      (run) =>
+        run.at >= refutation.at &&
+        run.invariants.some((e) => e.component === refutation.component && e.name === refutation.name && e.form === refutation.form && e.verdict === "pass"),
+    );
+    if (restored) witnessed.add(key);
+  }
+  return witnessed;
+}
+
+export function entryKey(component: string, name: string, form: Form): string {
+  return `${component} ${name} ${form}`;
+}
+
+/** The latest entry per enforcement across every run, keyed by component, name, and form. */
+export function latestByEnforcement(runs: readonly RunRecord[]): Map<string, Latest> {
+  const latest = new Map<string, Latest>();
+  for (const run of runs) {
+    for (const entry of run.invariants) {
+      latest.set(entryKey(entry.component, entry.name, entry.form), { ...entry, at: run.at, commit: run.commit, session: run.session });
+    }
+  }
+  return latest;
+}
+
+/** The latest entries for one invariant: its chokepoint pass and its totality oracle pass, either absent. */
+export interface LatestFor {
+  chokepoint: Latest | undefined;
+  totality: Latest | undefined;
+}
+
+export function latestFor(latest: ReadonlyMap<string, Latest>, component: string, name: string): LatestFor {
+  return {
+    chokepoint: latest.get(entryKey(component, name, "chokepoint")),
+    totality: latest.get(entryKey(component, name, "totality oracle")),
+  };
+}

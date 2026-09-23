@@ -1,0 +1,2 @@
+# Python test runner for npm test; install with npm run test:setup.
+pytest==9.1.1

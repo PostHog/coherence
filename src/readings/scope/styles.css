@@ -1,0 +1,2107 @@
+/* Scope: the reading. A lexicon form: identity in the margin, meaning in the body. */
+
+:root {
+  color-scheme: light dark;
+  --paper: #eef1f7;
+  --ink: #141a29;
+  --ink-quiet: #4d566b;
+  --rule: rgb(20 26 41 / 0.16);
+  --rule-soft: rgb(20 26 41 / 0.08);
+  --accent: #2346b0;
+  --quote-bar: #b9b6ad;
+  --landed: #fff2bf;
+  --field: rgb(255 255 255 / 0.55);
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia,
+    "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /*
+   * Glass (the owner's ruling d-a5c6442d): the page's panes are frosted glass over a softly lit field, each with a 1px border, a
+   * lighter inner top edge and a soft drop; their frames take Expanse's cut corners. The glows are the page's own light.
+   */
+  --glow-1: rgb(92 124 214 / 0.16);
+  --glow-2: rgb(132 104 206 / 0.12);
+  --glow-3: rgb(56 150 170 / 0.12);
+  --glass: linear-gradient(180deg, rgb(255 255 255 / 0.82), rgb(255 255 255 / 0.62));
+  --glass-chip: rgb(255 255 255 / 0.7);
+  --glass-border: rgb(20 26 41 / 0.12);
+  --glass-frame: rgb(15 118 110 / 0.34);
+  --glass-edge: inset 0 1px 0 rgb(255 255 255 / 0.9);
+  --glass-drop: 0 14px 32px -16px rgb(30 41 82 / 0.28);
+  --cut: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0a0d16;
+    --ink: #f1f4fb;
+    --ink-quiet: #aeb7ca;
+    --rule: rgb(255 255 255 / 0.14);
+    --rule-soft: rgb(255 255 255 / 0.08);
+    --accent: #a9c1ff;
+    --quote-bar: #4a4c51;
+    --landed: #3b3410;
+    --field: rgb(255 255 255 / 0.05);
+    --glow-1: rgb(70 96 170 / 0.28);
+    --glow-2: rgb(96 70 160 / 0.2);
+    --glow-3: rgb(40 110 140 / 0.18);
+    --glass: linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.03));
+    --glass-chip: rgb(255 255 255 / 0.06);
+    --glass-border: rgb(255 255 255 / 0.14);
+    --glass-frame: rgb(94 214 196 / 0.34);
+    --glass-edge: inset 0 1px 0 rgb(255 255 255 / 0.14), inset 0 0 0 1px rgb(255 255 255 / 0.03);
+    --glass-drop: 0 18px 40px -12px rgb(0 0 0 / 0.55);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  /* A view short enough not to scroll must not widen the page by a classic scrollbar's width: the gutter is always kept. */
+  scrollbar-gutter: stable;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+body {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* The lit field: three soft glows on a layer of its own, fixed, so scrolling never repaints them. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 600px at 12% 8%, var(--glow-1), transparent 60%),
+    radial-gradient(900px 700px at 88% 30%, var(--glow-2), transparent 60%),
+    radial-gradient(1200px 800px at 50% 110%, var(--glow-3), transparent 60%);
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: from-font;
+  text-underline-offset: 0.12em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.quiet {
+  color: var(--ink-quiet);
+}
+
+/*
+ * One width for every view: the masthead and the view strip never move when the view changes. Structure's map needs the
+ * room; the other views keep a readable measure inside it (their prose is capped in ch), so the width is the frame's and
+ * not the text's.
+ */
+.shell {
+  max-width: 100rem;
+  margin: 0 auto;
+  padding: 0 1.25rem 6rem;
+}
+
+/* Masthead and the view strip */
+
+.shell-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  padding: 2.25rem 0 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.masthead {
+  padding-bottom: 1rem;
+}
+
+.reading-name {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--ink-quiet);
+}
+
+/* Where the state comes from: a quiet line while live or a snapshot, amber attention (never the broken red) while disconnected. */
+.connection {
+  --connection-live: #2f7d4f;
+  --connection-lost: #945400;
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.connection-dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  transform: translateY(-0.05rem);
+}
+
+/* The line's words and code wrap as one text beside the dot, never as columns of their own. */
+.connection-text {
+  min-width: 0;
+}
+
+.connection[data-connection="live"] .connection-dot {
+  border-color: var(--connection-live);
+  background: var(--connection-live);
+}
+
+.connection[data-connection="connecting"] .connection-dot {
+  border-style: dashed;
+}
+
+.connection[data-connection="disconnected"] {
+  color: var(--connection-lost);
+  font-weight: 600;
+}
+
+.connection[data-connection="disconnected"] .connection-dot {
+  background: var(--connection-lost);
+}
+
+@media (prefers-color-scheme: dark) {
+  .connection {
+    --connection-live: #6fcf97;
+    --connection-lost: #f0b04a;
+  }
+}
+
+.history-load {
+  margin-left: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.history-load:hover {
+  border-color: var(--accent);
+}
+
+.history-load:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.masthead h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.masthead .counts {
+  margin: 0.35rem 0 0;
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+}
+
+/* The masthead leads with health: one verdict in large type, a link to its set; the counts are demoted beneath it. */
+.masthead .verdict {
+  display: inline-block;
+  margin: 0.5rem 0 0;
+  font-size: clamp(1.375rem, 3vw, 1.75rem);
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.masthead .verdict:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+.masthead .verdict::before {
+  content: "";
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-right: 0.45em;
+  border-radius: 0.15em;
+  vertical-align: 0.02em;
+  background: var(--pass);
+}
+
+.masthead .verdict[data-verdict="broken"] {
+  color: var(--fail);
+}
+
+.masthead .verdict[data-verdict="broken"]::before {
+  background: var(--fail);
+}
+
+.masthead .verdict[data-verdict="nothing"],
+.masthead .verdict[data-verdict="partial"] {
+  color: var(--hold);
+}
+
+.masthead .verdict[data-verdict="nothing"]::before,
+.masthead .verdict[data-verdict="partial"]::before {
+  background: repeating-linear-gradient(45deg, var(--hold) 0 2px, transparent 2px 5px);
+  box-shadow: inset 0 0 0 1.5px var(--hold);
+}
+
+.masthead .verdict[data-verdict="empty"]::before {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--ink-quiet);
+}
+
+.masthead .verdict-detail {
+  margin: 0.125rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--ink-quiet);
+}
+
+.masthead .meta-counts {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+  max-width: 72ch;
+}
+
+.views ul {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.views button {
+  appearance: none;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--ink-quiet);
+  font: inherit;
+  font-size: 1.0625rem;
+  padding: 0.5rem 0.25rem 0.75rem;
+  cursor: pointer;
+}
+
+.views button[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+/* Narrow windows: the view strip wraps rather than clip its last tab. */
+@media (max-width: 40rem) {
+  .views ul {
+    flex-wrap: wrap;
+    column-gap: 0.75rem;
+  }
+
+  .views button {
+    font-size: 0.9375rem;
+    padding: 0.375rem 0.125rem 0.5rem;
+  }
+}
+
+/* The Lexicon view's tools */
+
+.view-tools {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  /* A strip of glass the results scroll beneath: the one small pane besides the inspector that blurs. */
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  padding: 0.875rem 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 40rem;
+}
+
+/* Beside the filters the search takes the room its placeholder needs rather than its input's intrinsic width. */
+.view-tools .search {
+  flex: 1 1 20rem;
+  max-width: 32rem;
+}
+
+/* What the first load left out is prose: it keeps a reading measure in the one wide frame. */
+[data-field="omitted"],
+.lexicon-coverage > p {
+  max-width: 72ch;
+}
+
+.search .label {
+  color: var(--ink-quiet);
+}
+
+.search input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--rule);
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.match-summary {
+  margin: 0 0 0.5rem;
+  font-family: var(--serif);
+}
+
+/* Layers and sections */
+
+.layer-head {
+  padding: 2.5rem 0 0.5rem;
+}
+
+.layer-head h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.layer-head .purpose {
+  margin: 0.5rem 0 0;
+  max-width: 60ch;
+  font-family: var(--serif);
+  font-size: 1.125rem;
+}
+
+.layer-head .counts {
+  margin: 0.25rem 0 0;
+  font-family: var(--serif);
+}
+
+.layer-head .lexicon-status,
+.layer-head .source,
+.layer-head .completed {
+  margin: 0.15rem 0 0;
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.layer.absent .absence {
+  font-family: var(--serif);
+  color: var(--ink-quiet);
+  max-width: 60ch;
+  margin: 0.5rem 0 0;
+  padding: 1rem 1.25rem;
+  border-left: 3px solid var(--rule);
+}
+
+.section-heading {
+  margin: 2.5rem 0 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+}
+
+.section-lead {
+  margin: 0 0 0.5rem;
+  max-width: 66ch;
+  font-family: var(--serif);
+}
+
+/* Entries: the lexicon form */
+
+.entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem 2.5rem;
+  padding: 1.25rem 0 1.5rem;
+  border-top: 1px solid var(--rule);
+  scroll-margin-top: 4.5rem;
+}
+
+@media (min-width: 48rem) {
+  .entry {
+    grid-template-columns: 13rem minmax(0, 1fr);
+  }
+}
+
+.entry:target {
+  background: linear-gradient(to right, var(--landed), transparent 60%);
+}
+
+.margin {
+  min-width: 0;
+}
+
+.headword {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.headword a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.headword a:hover {
+  text-decoration: underline;
+}
+
+.status {
+  margin: 0.25rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--ink-quiet);
+}
+
+.formerly,
+.defined-by {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--ink-quiet);
+  overflow-wrap: anywhere;
+}
+
+.formerly .label {
+  font-style: italic;
+}
+
+.body {
+  min-width: 0;
+  max-width: 66ch;
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.body p {
+  margin: 0;
+}
+
+.body p + p {
+  margin-top: 0.75rem;
+}
+
+.definition {
+  font-size: 1.125rem;
+}
+
+.body .label,
+.because-word {
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  color: var(--ink-quiet);
+}
+
+.because-word {
+  font-style: italic;
+}
+
+.quotation {
+  margin: 1rem 0 0;
+  padding: 0.125rem 0 0.125rem 1rem;
+  border-left: 3px solid var(--quote-bar);
+}
+
+.quotation p {
+  margin: 0;
+  font-style: italic;
+}
+
+.quotation footer {
+  margin-top: 0.25rem;
+  font-family: var(--sans);
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.question {
+  font-style: italic;
+}
+
+.question + .definition {
+  margin-top: 0.75rem;
+}
+
+.senses {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.senses li + li {
+  margin-top: 0.25rem;
+}
+
+.senses + p {
+  margin-top: 0.75rem;
+}
+
+.distinctions,
+.properties,
+.open-questions {
+  margin-top: 1.25rem;
+}
+
+.distinctions h4,
+.properties h4,
+.open-questions h4,
+.rejected h4 {
+  margin: 0 0 0.375rem;
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+}
+
+.distinctions ul,
+.open-questions ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.distinctions li + li,
+.open-questions li + li {
+  margin-top: 0.25rem;
+}
+
+.properties .record-fields {
+  margin-top: 0;
+}
+
+.properties .record-field {
+  margin-top: 0.5rem;
+}
+
+.properties .record-field dt {
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+}
+
+.rejected {
+  margin-top: 1.25rem;
+}
+
+.rejected h4 {
+  margin: 0 0 0.375rem;
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+}
+
+.rejected ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rejected li {
+  display: grid;
+  gap: 0.125rem;
+  padding: 0.5rem 0 0.5rem 1rem;
+  border-left: 3px solid var(--rule-soft);
+}
+
+.rejected li + li {
+  margin-top: 0.375rem;
+}
+
+.rejected .alternative {
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.rejected .because {
+  color: var(--ink);
+}
+
+.related {
+  margin-top: 1.25rem;
+}
+
+.related .unresolved {
+  color: var(--ink-quiet);
+  text-decoration: underline dotted;
+  text-underline-offset: 0.15em;
+  cursor: help;
+}
+
+/* Detail, provenance, and the rest of the record: one click away, each named in full */
+
+.record {
+  margin-top: 1.25rem;
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+}
+
+.record + .record {
+  margin-top: 0.5rem;
+}
+
+.record summary {
+  color: var(--ink-quiet);
+  cursor: pointer;
+}
+
+.record[open] summary {
+  color: var(--ink);
+}
+
+.record-fields {
+  margin: 0.75rem 0 0;
+}
+
+.record-field {
+  margin-top: 0.75rem;
+}
+
+.record-field dt {
+  font-weight: 600;
+}
+
+.record-field dd {
+  margin: 0.125rem 0 0;
+  font-family: var(--serif);
+  font-size: 1rem;
+}
+
+.record-field .record-fields {
+  margin-top: 0.25rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--rule-soft);
+}
+
+.record-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.record-list li + li {
+  margin-top: 0.375rem;
+}
+
+.record .quotation {
+  margin-top: 0.5rem;
+}
+
+/* The model views: components, invariants, reliance, runs, journal */
+
+:root {
+  --pass: #1f7a3a;
+  --fail: #b3261e;
+  --hold: #8a6d00;
+  --pass-wash: #e6f4ea;
+  --fail-wash: #fbe9e7;
+  --hold-wash: #fff6d6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pass: #7fd39a;
+    --fail: #ff8a80;
+    --hold: #e6c35c;
+    --pass-wash: #17301f;
+    --fail-wash: #3a1a18;
+    --hold-wash: #35300f;
+  }
+}
+
+.masthead .model-counts {
+  font-size: 0.9375rem;
+  color: var(--ink-quiet);
+  max-width: 60ch;
+}
+
+.view-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 2rem;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-quiet);
+}
+
+.filter select {
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--rule);
+  border-radius: 0.375rem;
+  padding: 0.35rem 0.5rem;
+  max-width: 14rem;
+}
+
+.absence {
+  font-family: var(--serif);
+  color: var(--ink-quiet);
+  max-width: 60ch;
+  margin: 0.5rem 0 0;
+  padding: 1rem 1.25rem;
+  border-left: 3px solid var(--rule);
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.875em;
+  overflow-wrap: anywhere;
+}
+
+/* State marks and verdicts */
+
+.state-mark,
+.verdict-word,
+.owner-mark,
+.kept,
+.dirty {
+  display: inline-block;
+  font-family: var(--sans);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  padding: 0.05rem 0.45rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--rule);
+  color: var(--ink-quiet);
+  background: var(--field);
+  vertical-align: 0.1em;
+}
+
+.state-mark[data-state="invariant"],
+.verdict[data-verdict="pass"] .verdict-word,
+.verdict-word[data-verdict="pass"] {
+  color: var(--pass);
+  border-color: var(--pass);
+  background: var(--pass-wash);
+}
+
+.state-mark[data-state="structural defect"],
+.verdict[data-verdict="fail"] .verdict-word,
+.verdict-word[data-verdict="fail"] {
+  color: var(--fail);
+  border-color: var(--fail);
+  background: var(--fail-wash);
+}
+
+.state-mark[data-state="requirement"],
+.verdict[data-verdict="not run"] .verdict-word,
+.verdict-word[data-verdict="not run"],
+.kept {
+  color: var(--hold);
+  border-color: var(--hold);
+  background: var(--hold-wash);
+}
+
+.dirty {
+  color: var(--hold);
+  border-color: var(--hold);
+}
+
+.owner-mark {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: none;
+}
+
+.entry[data-state="structural defect"] > .margin .headword,
+.defect-count,
+.count.failing {
+  color: var(--fail);
+}
+
+.grade {
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.enforced-by {
+  font-family: var(--sans);
+  font-size: 0.875rem;
+}
+
+.verdict {
+  margin-top: 0.25rem;
+}
+
+.reason {
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* Components */
+
+.component[data-depth="1"] {
+  margin-left: 1.25rem;
+}
+
+.component[data-depth="2"] {
+  margin-left: 2.5rem;
+}
+
+.component[data-depth="3"] {
+  margin-left: 3.75rem;
+}
+
+.component[aria-current="true"] {
+  background: linear-gradient(to right, var(--field), transparent 70%);
+}
+
+.counts-line {
+  margin-top: 0.75rem;
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+}
+
+.counts-line .count + .count::before,
+.definition .count + .count::before {
+  content: " · ";
+  color: var(--ink-quiet);
+}
+
+.mass {
+  margin-top: 0.5rem;
+  font-family: var(--sans);
+  font-size: 0.875rem;
+}
+
+.select-line {
+  margin-top: 0.75rem;
+}
+
+.select {
+  appearance: none;
+  font: inherit;
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 0.375rem;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+}
+
+.select:hover {
+  border-color: var(--accent);
+}
+
+.invariant-lines {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invariant-lines li {
+  padding: 0.35rem 0 0.35rem 1rem;
+  border-left: 3px solid var(--rule-soft);
+}
+
+.invariant-lines li[data-state="structural defect"] {
+  border-left-color: var(--fail);
+}
+
+.invariant-lines li + li {
+  margin-top: 0.25rem;
+}
+
+/* Invariants */
+
+.crossing {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.crossing .level {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  border-bottom: 1px dotted var(--rule);
+  cursor: help;
+}
+
+.because {
+  margin-top: 0.75rem;
+}
+
+.enforcements,
+.refutations,
+.checklist,
+.defect {
+  margin-top: 1.25rem;
+}
+
+.enforcements h4,
+.refutations h4,
+.checklist h4,
+.defect h4,
+.candidates h4,
+.steps h4,
+.damaged h4 {
+  margin: 0 0 0.375rem;
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+}
+
+.enforcements ul,
+.refutations ul,
+.checklist ul,
+.bypasses,
+.reliance-entries,
+.run-entries,
+.results,
+.candidates ul,
+.files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.enforcements li,
+.refutations li,
+.checklist li,
+.bypasses li {
+  padding: 0.5rem 0 0.5rem 1rem;
+  border-left: 3px solid var(--rule-soft);
+}
+
+.enforcements li + li,
+.refutations li + li,
+.checklist li + li,
+.bypasses li + li {
+  margin-top: 0.375rem;
+}
+
+.refutation-word {
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.refutation[data-refutation="witnessed"] .refutation-word,
+.refutation[data-refutation="automatic"] .refutation-word {
+  color: var(--pass);
+}
+
+.refutation[data-refutation="missing"] .refutation-word {
+  color: var(--hold);
+}
+
+.refutation .arrow {
+  color: var(--ink-quiet);
+}
+
+.checklist .shape {
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.checklist li[data-outcome="missing"] {
+  border-left-color: var(--hold);
+}
+
+.lacks {
+  margin-top: 1rem;
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+  color: var(--hold);
+}
+
+.defect {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--fail);
+  border-radius: 0.375rem;
+  background: var(--fail-wash);
+}
+
+.defect h4 {
+  color: var(--fail);
+}
+
+.defect h5 {
+  margin: 1rem 0 0.375rem;
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.defect .bypasses li {
+  border-left-color: var(--fail);
+}
+
+.options {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.options li + li {
+  margin-top: 0.5rem;
+}
+
+.ladder {
+  margin-top: 0.75rem;
+}
+
+/* Structure */
+
+/* Structure: one map */
+
+/*
+ * Type scale for the Structure view: product UI, one system family.
+ * Page: 20 semibold (the view heading), 17 semibold (the inspector heading),
+ * 15 regular (the lede), 14 regular (inspector body and picks), 13 (labels,
+ * meta, section heads semibold, key). Canvas: 13 / 12 / 11, set in the map.
+ * Sentence case throughout; weight marks hierarchy; color marks state and
+ * what can be selected, never decoration. Monospace only for code
+ * identifiers and paths.
+ */
+
+.flow {
+  --flow-key-rail: #5f6b7a;
+  --flow-key-quiet: #9aa5bd;
+  --flow-key-verified: #1f3a5f;
+  /* Broken is filled dark enough that white text on it reaches 4.5:1. */
+  --flow-key-broken: #c32836;
+  /* Attention that is not breakage (nothing enforced, no control, not covered): amber, never red. */
+  --flow-key-attention: #945400;
+  --flow-key-halo: rgb(23 32 51 / 0.2);
+  /* The map's pane, opaque: what the fade at its scrolling edge fades to. */
+  --flow-pane: #f4f6fb;
+  /* An inspector opened as a sheet over the map: nearly opaque, so its text never sits on the map's colors. */
+  --flow-sheet: rgb(246 248 252 / 0.92);
+}
+
+/* Numbers that line up down a column of rows are tabular; identifiers are not. */
+.flow-row-count .flow-meta,
+.flow-facts dd {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-color-scheme: dark) {
+  .flow {
+    --flow-key-rail: #9aa6b6;
+    --flow-key-quiet: #6f7c96;
+    --flow-key-verified: #c9d6f2;
+    --flow-key-broken: #c4262e;
+    --flow-key-attention: #f0b04a;
+    --flow-key-halo: rgb(243 246 255 / 0.26);
+    --flow-pane: #121a2c;
+    --flow-sheet: rgb(16 21 34 / 0.92);
+  }
+}
+
+/* The health strip: every count a selection, each drawn in the state the map draws it. */
+.flow-map {
+  min-width: 0;
+}
+
+.flow-health {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.5rem;
+  margin: 0 0 0.75rem;
+  padding: 0.625rem 0.75rem 0.75rem;
+}
+
+/*
+ * The glass panes: the health strip with its trust key, the map's frame, and the inspector. Each is a frosted pane
+ * with a hairline frame, a lighter inner top edge and a soft drop. Only the inspector blurs what is behind it (it opens
+ * as a sheet over the map); the others sit on the lit field, where a blur would cost the GPU and show nothing.
+ */
+.flow-health,
+.flow-canvas,
+.flow-inspector {
+  background: var(--glass);
+  border: 1px solid var(--glass-frame);
+  border-radius: 0.75rem;
+  box-shadow: var(--glass-edge), var(--glass-drop);
+}
+
+/* Expanse's cut corners on the panes and chips where the browser draws them; rounded glass elsewhere. */
+@supports (corner-shape: bevel) {
+  .flow-health,
+  .flow-inspector {
+    border-radius: var(--cut) 0;
+    corner-shape: bevel;
+  }
+
+  .flow-canvas {
+    border-radius: 18px 0;
+    corner-shape: bevel;
+  }
+
+  .flow-fade {
+    border-radius: 0 0 17px 0;
+    corner-shape: bevel;
+  }
+
+  .flow-health-count,
+  .flow-trust-level,
+  .flow-close,
+  .flow-action {
+    border-radius: 7px 0;
+    corner-shape: bevel;
+  }
+}
+
+.flow-health-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--ink);
+  background: var(--glass-chip);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  box-shadow: var(--glass-edge);
+  padding: 0.25rem 0.75rem 0.25rem 0.55rem;
+  cursor: pointer;
+}
+
+.flow-health-count strong {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.flow-health-count[aria-pressed="true"] {
+  border-color: var(--ink);
+  box-shadow: var(--glass-edge), 0 0 0 3px var(--flow-key-halo);
+}
+
+.flow-health-swatch,
+.flow-verdict-swatch {
+  display: inline-block;
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 0.2rem;
+  border: 1.5px solid var(--flow-key-verified);
+  background: var(--flow-key-verified);
+}
+
+.flow-health-count[data-health="requirements"] .flow-health-swatch,
+[data-verdict-state="requirement"] > .flow-verdict-swatch {
+  background: repeating-linear-gradient(45deg, var(--flow-key-verified) 0 1.5px, transparent 1.5px 4px);
+  border-style: dashed;
+}
+
+.flow-health-count[data-health="defects"] .flow-health-swatch,
+.flow-health-count[data-health="bypassed"] .flow-health-swatch,
+[data-verdict-state="broken"] > .flow-verdict-swatch {
+  background: var(--flow-key-broken);
+  border-color: var(--flow-key-broken);
+}
+
+.flow-health-count[data-health="escalations"] .flow-health-swatch {
+  background: none;
+  border-color: var(--flow-key-attention);
+  border-radius: 50%;
+}
+
+.flow-health-count[data-health="uncovered"] .flow-health-swatch {
+  background: none;
+  border-color: var(--flow-key-attention);
+}
+
+.flow-health-count[data-health="defects"][data-count="0"] .flow-health-swatch {
+  background: none;
+}
+
+/* Nothing enforced is attention, not breakage: amber with a bar, never red. */
+.flow-health-note {
+  flex-basis: 100%;
+  margin: 0.125rem 0 0;
+  padding: 0.125rem 0 0.125rem 0.625rem;
+  border-left: 3px solid var(--flow-key-attention);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--flow-key-attention);
+}
+
+.flow-attention {
+  color: var(--flow-key-attention);
+}
+
+.flow-verdict-line {
+  margin: 0.5rem 0 0;
+  font-weight: 600;
+}
+
+/* The trust-level key beside the health counts: each level a selection, defined in one line. */
+.flow-trust-key {
+  flex-basis: 100%;
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+}
+
+.flow-trust-key-title {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+}
+
+.flow-trust-key-title .flow-meta {
+  font-weight: 400;
+}
+
+.flow-trust-key ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow-trust-key li {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: baseline;
+  color: var(--ink-quiet);
+}
+
+.flow-trust-level {
+  flex: none;
+  font: inherit;
+  color: var(--ink);
+  background: var(--glass-chip);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  box-shadow: var(--glass-edge);
+  padding: 0 0.5rem;
+  cursor: pointer;
+}
+
+.flow-trust-level[aria-pressed="true"] {
+  border-color: var(--ink);
+  box-shadow: var(--glass-edge), 0 0 0 3px var(--flow-key-halo);
+}
+
+/* Unknown and no control read in the key as they read on the map: the tag beneath a token, words alone. */
+.flow-trust-tag {
+  flex: none;
+  color: var(--ink-quiet);
+}
+
+.flow-trust-tag.flow-trust-nocontrol {
+  color: var(--flow-key-attention);
+}
+
+.flow-trust-level code,
+.flow-trust-tag code {
+  font-size: 0.75rem;
+}
+
+.flow-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.flow-verdict[data-verdict-state="broken"] {
+  color: var(--fail);
+  font-weight: 600;
+}
+
+.flow-ident[data-verdict-state="verified"] {
+  background: var(--flow-key-verified);
+  border-color: var(--flow-key-verified);
+  color: var(--paper);
+}
+
+.flow-ident[data-verdict-state="requirement"] {
+  border-color: var(--ink-quiet);
+  background: repeating-linear-gradient(45deg, var(--rule) 0 1px, var(--paper) 1px 4px);
+}
+
+.flow-ident[data-verdict-state="broken"] {
+  background: var(--flow-key-broken);
+  border-color: var(--flow-key-broken);
+  color: #ffffff;
+}
+
+.flow-term {
+  color: inherit;
+  font-style: normal;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+
+a.flow-term {
+  cursor: pointer;
+}
+
+.flow-defect {
+  margin-top: 0.75rem;
+}
+
+.flow-defect h4 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.flow-head {
+  margin: 1.5rem 0 0;
+}
+
+.flow-head h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.flow-lede {
+  margin: 0.25rem 0 0;
+  font-size: 0.9375rem;
+  max-width: 72ch;
+}
+
+.flow-evidence {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+  max-width: 96ch;
+}
+
+/* A partial map says so before anything else is read: the attention color, not the quiet one. */
+.flow-evidence.flow-partial {
+  color: var(--flow-key-attention);
+  font-weight: 600;
+}
+
+.flow-stage {
+  margin: 1rem 0;
+}
+
+.flow-canvas {
+  max-width: 100%;
+  overflow-x: auto;
+  scroll-timeline: --flow-x inline;
+}
+
+/*
+ * When the map is wider than its room, a hint above it and a fade at the edge it continues past say that it scrolls. The
+ * page writes the container query from the map's own width; the fade clears once the map is scrolled to its end.
+ */
+.flow-canvas-wrap {
+  container: flow-canvas / inline-size;
+  timeline-scope: --flow-x;
+}
+
+.flow-canvas-frame {
+  position: relative;
+}
+
+.flow-scroll-hint {
+  display: none;
+  margin: 0 0 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+}
+
+.flow-fade {
+  display: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3rem;
+  pointer-events: none;
+  border-radius: 0 0.75rem 0.75rem 0;
+}
+
+.flow-fade-end {
+  right: 1px;
+  top: 1px;
+  bottom: 1px;
+  background: linear-gradient(to right, transparent, var(--flow-pane) 85%);
+  animation: flow-fade-end linear both;
+  animation-timeline: --flow-x;
+}
+
+@keyframes flow-fade-end {
+  0%, 92% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* The map fills its canvas and never shrinks below its own size (text never shrinks below what was measured). */
+.flow-canvas svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.flow-inspector {
+  padding: 1rem 1.125rem 1.125rem;
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  margin-top: 1rem;
+}
+
+.flow-close {
+  float: right;
+  margin: -0.25rem -0.25rem 0.25rem 0.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  font: inherit;
+  font-size: 1.125rem;
+  line-height: 1;
+  color: var(--ink-quiet);
+  background: var(--glass-chip);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  box-shadow: var(--glass-edge);
+  cursor: pointer;
+}
+
+.flow-close:hover {
+  color: var(--ink);
+}
+
+/* Desktop: the inspector stands beside the canvas in its own column, never over it; the canvas keeps its full height. */
+@media (min-width: 64rem) {
+  .flow-stage {
+    display: grid;
+    /* The map takes the room; the inspector is a fixed, modest column beside it. */
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .flow-map {
+    grid-column: 1;
+  }
+
+  .flow-inspector {
+    grid-column: 2;
+    margin-top: 0;
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+}
+
+/*
+ * Below desktop width: an inspector the reader opened is a sheet over the bottom of the screen, dismissed by its close
+ * button or Escape. The default story's inspector (the reader chose nothing) never covers the map: it stays in the
+ * page's flow beneath it.
+ */
+@media (max-width: 63.99rem) {
+  .flow-inspector[data-open="true"]:not([data-default="true"]) {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    max-height: 55vh;
+    overflow-y: auto;
+    margin: 0;
+    border-radius: 0.75rem 0.75rem 0 0;
+    corner-shape: round;
+    background: var(--flow-sheet);
+    box-shadow: var(--glass-edge), 0 -0.5rem 1.5rem rgb(0 0 0 / 0.22);
+  }
+
+  .flow-stage:has(.flow-inspector[data-open="true"]:not([data-default="true"])) {
+    padding-bottom: 55vh;
+  }
+}
+
+/* The inspector: kind, heading, one-line summary, facts, then rows. */
+
+.flow-kind {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.flow-inspector h3 {
+  margin: 0.125rem 0 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.flow-inspector h3 a {
+  color: inherit;
+  text-decoration-color: var(--rule);
+}
+
+.flow-sub {
+  margin: 0.375rem 0 0;
+}
+
+.flow-inspector h4 {
+  margin: 1.125rem 0 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+}
+
+.flow-inspector h5 {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.flow-inspector p {
+  margin: 0.375rem 0;
+}
+
+.flow-inspector code {
+  font-size: 0.8125rem;
+}
+
+.flow-count {
+  font-weight: 400;
+  color: var(--ink-quiet);
+}
+
+.flow-count {
+  margin-left: 0.25rem;
+}
+
+.flow-note {
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.flow-facts,
+.flow-levels {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.25rem 0.75rem;
+  margin: 0.75rem 0 0;
+  padding: 0.625rem 0 0;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.flow-facts dt,
+.flow-levels dt {
+  color: var(--ink-quiet);
+}
+
+.flow-facts dd,
+.flow-levels dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.flow-levels {
+  font-size: 0.8125rem;
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0.375rem;
+}
+
+.flow-levels dt {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+
+.flow-facts .crossing {
+  margin: 0;
+  font-size: inherit;
+}
+
+.flow-bad {
+  color: var(--fail);
+  font-weight: 600;
+}
+
+.flow-rows,
+.flow-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow-list li {
+  position: relative;
+  padding-left: 0.875rem;
+  margin: 0.25rem 0;
+}
+
+.flow-list li::before {
+  content: "";
+  position: absolute;
+  left: 0.125rem;
+  top: 0.6em;
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 50%;
+  background: var(--ink-quiet);
+}
+
+.flow-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.5rem;
+  padding: 0.3rem 0;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.flow-rows > .flow-row:first-child {
+  border-top: 0;
+}
+
+.flow-row .flow-meta {
+  flex-basis: 100%;
+}
+
+.flow-row-count .flow-meta {
+  flex-basis: auto;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.flow-meta {
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.flow-pick {
+  font: inherit;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  border-radius: 0.25rem;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.flow-pick:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.flow-action {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-chip);
+  box-shadow: var(--glass-edge);
+}
+
+.flow-ident {
+  display: inline-block;
+  min-width: 2.25rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: center;
+  padding: 0 0.3rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.25rem;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.flow-kind .flow-ident {
+  min-width: 0;
+  margin-left: 0.125rem;
+}
+
+.flow-swatch {
+  display: inline-block;
+  flex: none;
+  width: 1.25rem;
+  height: 0.375rem;
+  border-radius: 1rem;
+  vertical-align: middle;
+  align-self: center;
+}
+
+.flow-swatch-derived {
+  opacity: 0.7;
+}
+
+.flow-inspector details {
+  margin-top: 1rem;
+}
+
+.flow-inspector details > summary,
+.flow-key details > summary {
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+}
+
+.flow-inspector details[open] > summary {
+  margin-bottom: 0.25rem;
+}
+
+.flow-inspector details .flow-rows {
+  margin-top: 0.25rem;
+}
+
+/* The shared enforcement and refutation blocks, compacted for the column. */
+.flow-inspector .enforcements,
+.flow-inspector .refutations {
+  margin-top: 0.25rem;
+}
+
+.flow-inspector .refutations h4 {
+  display: none;
+}
+
+.flow-inspector .enforcements li,
+.flow-inspector .refutations li {
+  padding: 0.25rem 0 0.25rem 0.625rem;
+  border-left-width: 2px;
+}
+
+.flow-inspector .enforcement p {
+  margin: 0.125rem 0;
+}
+
+.flow-inspector .reason,
+.flow-inspector .enforced-by,
+.flow-inspector .refutation .quiet {
+  font-size: 0.8125rem;
+}
+
+.flow-inspector .label {
+  color: var(--ink-quiet);
+}
+
+.flow-inspector .defect {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+}
+
+/* The key below the map: each mark and what it means. */
+
+.flow-key {
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.flow-key > ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.375rem 1.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow-key > ul > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.flow-key-glyph {
+  flex: none;
+  margin-top: 0.1rem;
+  color: var(--ink-quiet);
+}
+
+.flow-key details {
+  margin-top: 0.75rem;
+  max-width: 80ch;
+}
+
+.flow-key details .flow-list {
+  margin-top: 0.375rem;
+}
+
+/* Reference sites, on the Structure inspector */
+
+.site-list {
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-list li {
+  padding: 0.3rem 0;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.site-list li:first-child {
+  border-top: 0;
+}
+
+.site-role {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.site-list li[data-target="protected"][data-class="bypass"] .site-role {
+  color: var(--fail);
+  font-weight: 600;
+}
+
+/* Runs */
+
+.run-facts {
+  margin-top: 0.5rem;
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+}
+
+.run-facts .label {
+  margin-right: 0.25rem;
+}
+
+.run-facts .label:not(:first-child) {
+  margin-left: 0.75rem;
+}
+
+.run-entries li {
+  padding: 0.5rem 0 0.5rem 1rem;
+  border-left: 3px solid var(--rule-soft);
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+}
+
+.run-entries li + li {
+  margin-top: 0.25rem;
+}
+
+.run-entries li[data-verdict="fail"] {
+  border-left-color: var(--fail);
+}
+
+.run-entries li[data-verdict="pass"] {
+  border-left-color: var(--pass);
+}
+
+.verdict-glyph {
+  display: inline-block;
+  width: 1.25rem;
+  color: var(--ink-quiet);
+}
+
+.run-entry[data-verdict="fail"] .verdict-glyph {
+  color: var(--fail);
+}
+
+.run-entry[data-verdict="pass"] .verdict-glyph {
+  color: var(--pass);
+}
+
+.run[data-defects="true"] > .margin .headword {
+  color: var(--fail);
+}
+
+/* Journal */
+
+.journal-record .glyph {
+  display: inline-block;
+  width: 1.25rem;
+  color: var(--ink-quiet);
+}
+
+.journal-record[data-kind="escalation"] .glyph,
+.journal-record[data-kind="defect"] .glyph,
+.journal-record[data-kind="unable"] .glyph {
+  color: var(--fail);
+}
+
+.journal-record[data-kind="decision"] .glyph {
+  color: var(--accent);
+}
+
+.journal-record[data-kind="resolution"] .glyph,
+.journal-record[data-kind="acknowledgement"] .glyph {
+  color: var(--pass);
+}
+
+.record-status {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  color: var(--pass);
+}
+
+.escalations .entry {
+  background: linear-gradient(to right, var(--fail-wash), transparent 70%);
+}
+
+.candidates {
+  margin-top: 1rem;
+}
+
+.candidates li {
+  padding: 0.35rem 0 0.35rem 1rem;
+  border-left: 3px solid var(--rule-soft);
+}
+
+.candidates li + li {
+  margin-top: 0.25rem;
+}
+
+.discriminated {
+  margin-top: 0.75rem;
+}
+
+.citations {
+  margin-top: 1rem;
+}
+
+.citations h4 {
+  margin: 0 0 0.375rem;
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+}
+
+.citations ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.citations li {
+  padding: 0.3rem 0 0.3rem 1rem;
+  border-left: 3px solid var(--rule-soft);
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.citations li + li {
+  margin-top: 0.2rem;
+}
+
+.citations .glyph {
+  margin-left: 0.25rem;
+}
+
+.citations .label {
+  margin: 0 0.35rem 0 0.15rem;
+}
+
+.human-words {
+  margin-top: 0.75rem;
+  padding-left: 1rem;
+  border-left: 3px solid var(--ink-quiet);
+}
+
+.human-words .label {
+  margin-right: 0.35rem;
+}
+
+.steps {
+  margin-top: 1rem;
+}
+
+.steps ol {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.results li {
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+}
+
+.work-order[data-state="active"] > .margin .status {
+  color: var(--pass);
+}
+
+.damaged {
+  margin-top: 2rem;
+}
+
+.damaged ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+  color: var(--fail);
+}
+
+@media (max-width: 30rem) {
+  .views ul {
+    flex-wrap: wrap;
+  }
+
+  .views button {
+    font-size: 0.9375rem;
+    padding: 0.4rem 0.2rem 0.6rem;
+  }
+
+  .component[data-depth="1"],
+  .component[data-depth="2"],
+  .component[data-depth="3"] {
+    margin-left: 0.75rem;
+  }
+}

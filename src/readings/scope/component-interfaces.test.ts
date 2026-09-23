@@ -1,0 +1,285 @@
+/**
+ * The component interface reading at scale: bounded to the declared
+ * components, prefiltered by one word index, and bounded in time and in the
+ * language server's memory.
+ *
+ * Three kinds of evidence. A text-level stub server, which reports a
+ * reference wherever a file spells the name (a real server reports no more),
+ * counts every references question, so what is never asked is proved never
+ * asked. Real servers over small projects that carry every escape hatch the
+ * word index must not cut (a star import, an alias written in another file,
+ * a renamed re-export, a wildcard re-export, a default export) prove the
+ * prefiltered reading and the exhaustive one are the same. And Coherence's
+ * own tree, read both ways through one warm server, is the whole-project
+ * sameness check.
+ */
+
+import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { test } from "node:test";
+import type { Definition, LanguageAdapter, ReferenceSite, Resolved } from "../../adapters/adapter.ts";
+import { PythonAdapter } from "../../adapters/python.ts";
+import { TypeScriptAdapter } from "../../adapters/typescript.ts";
+import { projectFiles } from "../../adapters/project-files.ts";
+import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
+import { answerStructure } from "../query/query.ts";
+import { buildScopePage } from "./build.ts";
+import { readComponentInterfaces } from "./component-interfaces.ts";
+import type { InterfaceReading } from "./model.ts";
+import { renderView } from "./shell.ts";
+
+const COHERENCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+
+function project(files: Record<string, string>): { root: string; remove: () => void } {
+  const root = mkdtempSync(join(tmpdir(), "coherence-bounded-"));
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  }
+  return { root, remove: () => rmSync(root, { recursive: true, force: true }) };
+}
+
+const DECLARATION = /^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function|const|class|def)\s+([A-Za-z_$][\w$]*)/;
+
+/**
+ * A server that answers from the text alone: a name is resolved where a file
+ * declares it at top level, and every whole-word spelling of it in any file,
+ * the declaration aside, is a reference, enclosed by the nearest top-level
+ * declaration above it. It never reports a site the text does not spell,
+ * which is exactly what the word index relies on of a real server.
+ */
+class TextServer implements LanguageAdapter {
+  readonly language = "typescript";
+  readonly ladder = { top: "reference-choked" as const, because: "stub", rungs: [] };
+  readonly asked: string[] = [];
+  readonly stall = new Set<string>();
+  private readonly root: string;
+  constructor(root: string) {
+    this.root = root;
+  }
+  async ready(): Promise<{ ok: true }> {
+    return { ok: true };
+  }
+  private lines(file: string): string[] {
+    return readFileSync(join(this.root, file), "utf8").split("\n");
+  }
+  async resolve(name: string): Promise<Resolved> {
+    const [symbol, file] = name.split(/\s+in\s+/) as [string, string];
+    const line = this.lines(file).findIndex((l) => DECLARATION.exec(l)?.[1] === symbol);
+    if (line === -1) return { ok: false, reason: `no ${symbol} in ${file}` };
+    const character = this.lines(file)[line]!.indexOf(symbol);
+    const at = { line, character };
+    return { ok: true, definition: { name: symbol, kind: "symbol", file, range: { start: at, end: at }, selection: at } };
+  }
+  async references(definition: Definition): Promise<ReferenceSite[]> {
+    this.asked.push(definition.name);
+    if (this.stall.has(definition.name)) return new Promise(() => {});
+    const sites: ReferenceSite[] = [];
+    for (const file of projectFiles(this.root).filter((f) => /\.(ts|py)$/.test(f))) {
+      let enclosing: string | undefined;
+      this.lines(file).forEach((text, line) => {
+        const declared = DECLARATION.exec(text)?.[1];
+        if (declared !== undefined) enclosing = declared;
+        for (const m of text.matchAll(new RegExp(`\\b${definition.name}\\b`, "g"))) {
+          if (file === definition.file && line === definition.selection.line) continue;
+          sites.push({ file, line: line + 1, character: m.index!, symbol: declared === definition.name && file === definition.file ? undefined : enclosing });
+        }
+      });
+    }
+    return sites;
+  }
+  async visibility(): Promise<never> {
+    throw new Error("not asked");
+  }
+  testFilter(via: string): string {
+    return via;
+  }
+  async refute(): Promise<never> {
+    throw new Error("not asked");
+  }
+  async forget(): Promise<void> {}
+  async close(): Promise<void> {}
+}
+
+/**
+ * The bounded project: two components under src, an entrance, a folder the
+ * config's ignore list bounds away (vendor), and a folder no spec owns
+ * (loose). `lonely` is named nowhere else, `onlyVendor` only past the
+ * bounds, `onlyLoose` only in code no component owns.
+ */
+const BOUNDED: Record<string, string> = {
+  "coherence.config.json": JSON.stringify({ name: "bounded", entryDir: "src", language: "typescript", ignore: ["vendor"] }),
+  "src/api/Api.spec.md": "# Api\n\nAsks the store.\n\n## entrances\n- go: work arrives\n  handler: go in src/api/api.ts\n\n## invariants\n",
+  "src/store/Store.spec.md": "# Store\n\nHolds rows.\n\n## invariants\n",
+  "src/store/rows.ts": "export function write(v: string): string {\n  return shape(v);\n}\nfunction shape(v: string): string {\n  return v;\n}\nexport function lonely(): void {}\nexport function onlyVendor(): void {}\nexport function onlyLoose(): void {}\n",
+  "src/api/api.ts": "import { write } from \"../store/rows.ts\";\nexport function go(): string {\n  return write(\"a\");\n}\n",
+  "src/api/api.test.ts": "import { lonely } from \"../store/rows.ts\";\nlonely();\n",
+  "vendor/use.ts": "import { write, onlyVendor } from \"../src/store/rows.ts\";\nexport function vend(): void {\n  write(\"v\");\n  onlyVendor();\n}\n",
+  "loose/use.ts": "import { write, onlyLoose } from \"../src/store/rows.ts\";\nexport function roam(): void {\n  write(\"l\");\n  onlyLoose();\n}\n",
+};
+
+test("interfaces read only within the declared components", async () => {
+  const { root, remove } = project(BOUNDED);
+  try {
+    const server = new TextServer(root);
+    const read = await readComponentInterfaces(root, server);
+    assert.equal(read.kind, "read");
+    if (read.kind !== "read") return;
+    assert.deepEqual(read.symbols.map((s) => `${s.from} -> ${s.to} ${s.symbol} ${s.sites}`), ["src/api -> src/store write 2"], "the interface between the declared components, import and call");
+    assert.ok(!server.asked.some((name) => ["vend", "roam"].includes(name)), `a declaration outside every declared component is never asked: ${server.asked.join(", ")}`);
+    assert.deepEqual(read.bounds, { components: 2, files: 2, candidates: 1, asked: server.asked.length }, "two components, two files of component code (the test is not one), one candidate");
+    assert.deepEqual(read.unowned, { files: 1, lines: 6 }, "loose/use.ts is code no component owns; vendor is past the bounds");
+    // write is asked (src/api names it); its sites in loose/ (inside the bounds, no component) are outside; vendor/ is past the bounds and never counted.
+    assert.deepEqual(read.outside, { sites: 2, files: 1, into: [{ component: "src/store", sites: 2 }] }, "an import and a call in loose/use.ts, counted into the store; none from vendor/");
+    assert.ok(read.symbols.every((s) => s.from.startsWith("src/")), "no outside caller is drawn as a component");
+    const { state } = await buildScopePage({ root, lexiconPath: COHERENCE_LEXICON, project: "Bounded", componentInterfaces: read });
+    const evidence = /data-field="evidence">([^<]*)</.exec(renderView(state, "structure").text)?.[1] ?? "";
+    assert.match(evidence, /read only within the 2 declared components/);
+    assert.match(evidence, /2 reference sites from 1 file in no declared component counted, not drawn: 2 into src\/store; a declaration only such code names is not asked, and code past the config&#39;s bounds is not read/);
+    assert.match(answerStructure(state).text, /^evidence: .*read only within the 2 declared components.*2 reference sites from 1 file in no declared component counted, not drawn/m, "query structure says the same");
+  } finally {
+    remove();
+  }
+});
+
+test("a name no other component spells is never asked for its references", async () => {
+  const { root, remove } = project(BOUNDED);
+  try {
+    const server = new TextServer(root);
+    const read = await readComponentInterfaces(root, server);
+    assert.equal(read.kind, "read");
+    for (const name of ["lonely", "onlyVendor", "onlyLoose"]) assert.ok(!server.asked.includes(name), `${name} is spelled by no other component's code, so it is never asked (asked: ${server.asked.join(", ")})`);
+    // The handler's reach still reads the component's own code: go -> write -> shape.
+    assert.deepEqual(server.asked, ["write", "shape"], "write is spelled in src/api; the reach reads what its entered files spell beyond a declaration, so write's call to shape; go, the handler, is referenced nowhere");
+  } finally {
+    remove();
+  }
+});
+
+/** Read a project exhaustively and through the prefilter on one server; both readings, and the server closed. */
+async function bothWays(adapter: LanguageAdapter, root: string): Promise<{ exhaustive: InterfaceReading; filtered: InterfaceReading }> {
+  try {
+    const exhaustive = await readComponentInterfaces(root, adapter, { exhaustive: true });
+    const filtered = await readComponentInterfaces(root, adapter);
+    return { exhaustive, filtered };
+  } finally {
+    await adapter.close();
+  }
+}
+
+function sameMap(exhaustive: InterfaceReading, filtered: InterfaceReading, what: string): void {
+  assert.equal(filtered.kind, "read", what);
+  assert.equal(exhaustive.kind, "read", what);
+  if (filtered.kind !== "read" || exhaustive.kind !== "read") return;
+  assert.deepEqual(filtered.symbols, exhaustive.symbols, `${what}: the same component interfaces, symbols and site counts`);
+  assert.deepEqual(filtered.entrances, exhaustive.entrances, `${what}: the same entrances and reaches`);
+  assert.equal(filtered.declarations, exhaustive.declarations, what);
+  assert.deepEqual(filtered.unowned, exhaustive.unowned, what);
+}
+
+const TS_CONFIG = JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["**/*.ts"] });
+
+test("the prefilter never hides a cross-component reference", { timeout: 600_000 }, async (t) => {
+  // The bounded fixture through the text server.
+  const bounded = project(BOUNDED);
+  try {
+    sameMap(await readComponentInterfaces(bounded.root, new TextServer(bounded.root), { exhaustive: true }), await readComponentInterfaces(bounded.root, new TextServer(bounded.root)), "the bounded fixture");
+  } finally {
+    bounded.remove();
+  }
+  // TypeScript: a wildcard re-export, a renamed re-export used under its new name only, an alias on import, and a default export imported under another name.
+  const ts = project({
+    "coherence.config.json": JSON.stringify({ name: "hatches", entryDir: ".", language: "typescript" }),
+    "tsconfig.json": TS_CONFIG,
+    "src/lib/Lib.spec.md": "# Lib\n\nThe library.\n\n## invariants\n",
+    "src/app/App.spec.md": "# App\n\nUses the library.\n\n## entrances\n- start: work arrives\n  handler: start in src/app/main.ts\n\n## invariants\n",
+    "src/relay/Relay.spec.md": "# Relay\n\nRe-exports the library wholesale.\n\n## invariants\n",
+    "src/lib/core.ts": "export function renamed(): number {\n  return 1;\n}\nexport function aliased(): number {\n  return 2;\n}\nexport function starred(): number {\n  return 3;\n}\nexport default function defaulted(): number {\n  return 4;\n}\n",
+    "src/lib/index.ts": "export { renamed as outward } from \"./core.ts\";\n",
+    "src/relay/all.ts": "export * from \"../lib/core.ts\";\n",
+    "src/app/main.ts": "import { outward } from \"../lib/index.ts\";\nimport { aliased as other } from \"../lib/core.ts\";\nimport anything from \"../lib/core.ts\";\nexport function start(): number {\n  return outward() + other() + anything();\n}\n",
+  });
+  // Python: a star import, an alias on import, and a name only an __all__ string and a getattr spell.
+  const py = project({
+    "coherence.config.json": JSON.stringify({ name: "hatches", entryDir: ".", language: "python" }),
+    "lib/Lib.spec.md": "# Lib\n\nThe library.\n\n## invariants\n",
+    "app/App.spec.md": "# App\n\nUses the library.\n\n## entrances\n- start: work arrives\n  handler: start in app/main.py\n\n## invariants\n",
+    "lib/__init__.py": "",
+    "app/__init__.py": "",
+    "lib/core.py": "def starred():\n    return 1\n\n\ndef aliased():\n    return 2\n\n\ndef stringly():\n    return 3\n",
+    "app/main.py": "from lib.core import *\nfrom lib.core import aliased as other\nimport lib.core\n\n__all__ = [\"start\"]\n\n\ndef start():\n    return starred() + other() + getattr(lib.core, \"stringly\")()\n",
+  });
+  try {
+    const tsReadings = await bothWays(new TypeScriptAdapter(ts.root), ts.root);
+    if (tsReadings.filtered.kind === "unread") t.diagnostic(`no TypeScript instrument: ${tsReadings.filtered.because}`);
+    else {
+      sameMap(tsReadings.exhaustive, tsReadings.filtered, "the TypeScript escape hatches");
+      const edges = tsReadings.filtered.kind === "read" ? tsReadings.filtered.symbols.map((s) => `${s.from} -> ${s.to} ${s.symbol}`) : [];
+      for (const edge of ["src/relay -> src/lib starred", "src/app -> src/lib aliased", "src/app -> src/lib defaulted"]) assert.ok(edges.includes(edge), `${edge} survives the prefilter: ${edges.join("; ")}`);
+    }
+    const pyReadings = await bothWays(new PythonAdapter(py.root), py.root);
+    if (pyReadings.filtered.kind === "unread") t.diagnostic(`no Python instrument: ${pyReadings.filtered.because}`);
+    else {
+      sameMap(pyReadings.exhaustive, pyReadings.filtered, "the Python escape hatches");
+      const edges = pyReadings.filtered.kind === "read" ? pyReadings.filtered.symbols.map((s) => `${s.from} -> ${s.to} ${s.symbol}`) : [];
+      for (const edge of ["app -> lib starred", "app -> lib aliased"]) assert.ok(edges.includes(edge), `${edge} survives the prefilter: ${edges.join("; ")}`);
+    }
+  } finally {
+    ts.remove();
+    py.remove();
+  }
+  // Coherence's own tree, read both ways through one warm server.
+  const own = await bothWays(new TypeScriptAdapter(COHERENCE_ROOT), COHERENCE_ROOT);
+  if (own.filtered.kind === "unread") t.diagnostic(`no TypeScript instrument for Coherence's tree: ${own.filtered.because}`);
+  else {
+    sameMap(own.exhaustive, own.filtered, "Coherence's own tree");
+    assert.ok(own.filtered.kind === "read" && own.filtered.symbols.length > 100, "a real map, not an empty one");
+  }
+});
+
+test("the interface reading is bounded in time and says when it is partial", { timeout: 30_000 }, async () => {
+  const { root, remove } = project(BOUNDED);
+  try {
+    const server = new TextServer(root);
+    server.stall.add("write");
+    const started = Date.now();
+    const read = await readComponentInterfaces(root, server, { budget: { seconds: 1 } });
+    const took = Date.now() - started;
+    assert.ok(took < 3_000, `a stalled server never holds the reading past its budget: ${took} ms`);
+    assert.equal(read.kind, "read");
+    if (read.kind !== "read") return;
+    assert.equal(read.partial?.limit, "time");
+    assert.equal(read.partial?.budget, "1 s");
+    assert.deepEqual(read.partial?.unread, ["src/api", "src/store"], "the store's write was never answered, and the api's entrance reach was never read");
+    assert.match(read.entrances[0]?.reason ?? "", /^not read: the interface reading stopped at its time budget \(1 s\)/);
+    const { state } = await buildScopePage({ root, lexiconPath: COHERENCE_LEXICON, project: "Bounded", componentInterfaces: read });
+    const page = renderView(state, "structure").text;
+    assert.match(page, /data-field="partial" data-partial="time">Partial map: the interface reading stopped at its time budget \(1 s\)[^<]*src\/api, src\/store were not all read/);
+    assert.match(answerStructure(state).text, /^partial map: the interface reading stopped at its time budget \(1 s\)/, "query structure leads with it");
+    // Memory: a server over its ceiling stops the reading before the next question.
+    const heavy = await readComponentInterfaces(root, new TextServer(root), { budget: { memoryMB: 100 }, memory: async () => 250 });
+    assert.equal(heavy.kind === "read" && heavy.partial?.limit, "memory");
+    assert.equal(heavy.kind === "read" && heavy.partial?.observed, "250 MB");
+    const complete = await readComponentInterfaces(root, new TextServer(root), { budget: { seconds: 60 } });
+    assert.equal(complete.kind === "read" && complete.partial, undefined, "a reading that finished says nothing of the kind");
+    const { state: whole } = await buildScopePage({ root, lexiconPath: COHERENCE_LEXICON, project: "Bounded", componentInterfaces: complete });
+    assert.doesNotMatch(renderView(whole, "structure").text, /data-field="partial"/);
+  } finally {
+    remove();
+  }
+  // The budget from the config's interfaceBudget, and a flag's outranking it.
+  const configured = project({ ...BOUNDED, "coherence.config.json": JSON.stringify({ name: "bounded", entryDir: "src", language: "typescript", ignore: ["vendor"], interfaceBudget: { seconds: 1, memoryMB: 100 } }) });
+  try {
+    const stalled = new TextServer(configured.root);
+    stalled.stall.add("write");
+    const byConfig = await readComponentInterfaces(configured.root, stalled);
+    assert.equal(byConfig.kind === "read" && byConfig.partial?.budget, "1 s", "the config's seconds");
+    const byFlag = await readComponentInterfaces(configured.root, new TextServer(configured.root), { budget: { memoryMB: 50 }, memory: async () => 75 });
+    assert.equal(byFlag.kind === "read" && byFlag.partial?.budget, "50 MB", "the flag's memory ceiling outranks the config's");
+  } finally {
+    configured.remove();
+  }
+});
