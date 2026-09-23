@@ -627,16 +627,14 @@ function trustTagTitle(route: FlowRoute, levels: readonly FlowLevel[]): string {
   const outside = route.trust.filter((name) => levels.find((level) => level.name === name)?.outside === true);
   if (route.noControl) {
     const why = route.trust.length === 0
-      ? "the trust its entrances carry in is unknown (they declare none, and no crossing's chokepoint is their handler), so the map treats it as untrusted"
+      ? "its trust is unknown, so it is treated as untrusted"
       : outside.length > 0
-        ? `its entrances carry ${outside.join(", ")} in, from outside the system's control`
-        : `its entrances carry ${route.trust.join(", ")} in, which no entry spec declares`;
-    return `No control: no chokepoint or crossing stands where this route's work enters or on any interface it takes, and ${why}.`;
+        ? `${outside.join(", ")} comes from outside the system's control`
+        : `${route.trust.join(", ")} is no declared trust level`;
+    return `No control: nothing stands on this route, and ${why}.`;
   }
-  if (route.trust.length === 0) return "Trust in: unknown. Its entrances declare no trust level and no crossing's chokepoint is their handler; the map treats it as untrusted.";
-  return route.trustSource === "declared"
-    ? `Trust in: ${route.trust.join(", ")}, declared by its entrances' trust: line.`
-    : `Trust in: ${route.trust.join(", ")} (derived): its entrances declare none, so it is the entering side of the crossing whose chokepoint is their handler.`;
+  if (route.trust.length === 0) return "Trust in: unknown, neither declared nor derived; treated as untrusted.";
+  return route.trustSource === "declared" ? `Trust in: ${route.trust.join(", ")} (declared).` : `Trust in: ${route.trust.join(", ")} (derived), from the crossing on its handler.`;
 }
 
 /** The length of a polyline. */
@@ -2038,7 +2036,7 @@ function renderHealthStrip(model: FlowModel, selected: string | undefined): Mark
     ${nothingEnforced ? html`<p class="flow-health-note" data-field="nothing-enforced">Nothing is enforced yet: every declared invariant is still a requirement, so no identifier on this map is a working control.</p>` : null}
     ${model.levels.length === 0 ? null : html`<div class="flow-trust-key" data-field="trust-key">
       <p class="flow-trust-key-title">Trust levels <span class="flow-meta">the tag beneath each entrance route's token says which it carries in; select one to see where its crossings stand</span></p>
-      <ul>${model.levels.map((level) => html`<li><button type="button" class="flow-trust-level" data-structure-select="${level.id}" aria-pressed="${selected === level.id ? "true" : "false"}" title="${level.meaning}"><code>${level.name}</code></button> <span>${levelLine(level.meaning)}</span>${level.outside ? html` <span class="flow-meta" data-outside="true">outside the system's control</span>` : null}</li>`)}${derived ? html`<li data-level="derived"><span class="flow-trust-tag"><code>(derived)</code></span> <span>not declared on the entrance; read from the crossing on its handler</span></li><li data-level="unknown"><span class="flow-trust-tag flow-trust-unknown"><code>unknown</code></span> <span>neither declared nor derived, treated as untrusted</span></li><li data-level="no-control"><span class="flow-trust-tag flow-trust-nocontrol"><code>no control</code></span> <span>untrusted (unknown, or from outside the system's control), and nothing on the route controls it</span></li>` : null}</ul>
+      <ul>${model.levels.map((level) => html`<li><button type="button" class="flow-trust-level" data-structure-select="${level.id}" aria-pressed="${selected === level.id ? "true" : "false"}" title="${level.meaning}"><code>${level.name}</code></button> <span>${levelLine(level.meaning)}</span>${level.outside ? html` <span class="flow-meta" data-outside="true">outside the system's control</span>` : null}</li>`)}${derived ? html`<li data-level="derived"><span class="flow-trust-tag"><code>(derived)</code></span> <span>read from the crossing on its handler</span></li><li data-level="unknown"><span class="flow-trust-tag flow-trust-unknown"><code>unknown</code></span> <span>neither declared nor derived: untrusted</span></li><li data-level="no-control"><span class="flow-trust-tag flow-trust-nocontrol"><code>no control</code></span> <span>untrusted, and nothing on the route controls it</span></li>` : null}</ul>
     </div>`}
   </div>`;
 }
