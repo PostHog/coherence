@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/src/cli.ts\" hook SessionStart",
+            "command": "node \"$(dir=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/.claude/settings.json\" ] && [ ! -f \"$dir/.codex/hooks.json\" ]; do dir=$(dirname \"$dir\"); done; printf \"%s\" \"$dir\")/src/cli.ts\" hook SessionStart",
             "timeout": 60,
             "additionalContextLimit": 4000
           }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/src/cli.ts\" hook SubagentStart",
+            "command": "node \"$(dir=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/.claude/settings.json\" ] && [ ! -f \"$dir/.codex/hooks.json\" ]; do dir=$(dirname \"$dir\"); done; printf \"%s\" \"$dir\")/src/cli.ts\" hook SubagentStart",
             "timeout": 60,
             "additionalContextLimit": 4000
           }
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/src/cli.ts\" hook UserPromptSubmit",
+            "command": "node \"$(dir=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/.claude/settings.json\" ] && [ ! -f \"$dir/.codex/hooks.json\" ]; do dir=$(dirname \"$dir\"); done; printf \"%s\" \"$dir\")/src/cli.ts\" hook UserPromptSubmit",
             "timeout": 60
           }
         ]
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/src/cli.ts\" hook PostToolUse",
+            "command": "node \"$(dir=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/.claude/settings.json\" ] && [ ! -f \"$dir/.codex/hooks.json\" ]; do dir=$(dirname \"$dir\"); done; printf \"%s\" \"$dir\")/src/cli.ts\" hook PostToolUse",
             "timeout": 60
           }
         ]
@@ -51,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/src/cli.ts\" hook Stop",
+            "command": "node \"$(dir=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/.claude/settings.json\" ] && [ ! -f \"$dir/.codex/hooks.json\" ]; do dir=$(dirname \"$dir\"); done; printf \"%s\" \"$dir\")/src/cli.ts\" hook Stop",
             "timeout": 60
           }
         ]
@@ -62,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/src/cli.ts\" hook SubagentStop",
+            "command": "node \"$(dir=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/.claude/settings.json\" ] && [ ! -f \"$dir/.codex/hooks.json\" ]; do dir=$(dirname \"$dir\"); done; printf \"%s\" \"$dir\")/src/cli.ts\" hook SubagentStop",
             "timeout": 60
           }
         ]
