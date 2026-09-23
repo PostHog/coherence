@@ -1582,7 +1582,8 @@ test("no control marks only an untrusted route with nothing on it: unknown trust
   assert.match(svg, new RegExp(`id="${route.id}"[^]*?data-trust-tag="inside" data-no-control="false"`), "the trusted route's tag shows its level, neutral");
   const page = renderView({ ...state, structure: { selected: route.id, preview: [] } } as ShellState, "structure").text;
   assert.match(page, /data-field="controls">none<\/span>/, "its inspector says nothing stands on it");
-  assert.doesNotMatch(/<aside class="flow-inspector"[^>]*>([^]*?)<\/aside>/.exec(page)![1]!, /no control/, "and never says no control");
+  // What the inspector says, not the definitions its term links carry in their titles.
+  assert.doesNotMatch(/<aside class="flow-inspector"[^>]*>([^]*?)<\/aside>/.exec(page)![1]!.replace(/ title="[^"]*"/g, ""), /no control/, "and never says no control");
   assert.doesNotMatch(answerStructure(state).text, /look {2}[^\n]*no control/, "nor does the query");
   // The key says which levels come from outside the system's control.
   const marked = noControlState();
