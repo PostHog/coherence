@@ -18,7 +18,7 @@ import { parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type Latest } from "../enforcement/record.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
-import { projectFiles } from "../adapters/project-files.ts";
+import { projectFiles, underIgnored } from "../adapters/project-files.ts";
 
 export const SPEC_SUFFIX = ".spec.md";
 export const CONFIG_FILE = "coherence.config.json";
@@ -122,11 +122,7 @@ export function findSpecs(root: string, ignore: readonly string[] = []): string[
 function walkedFiles(root: string, folder: string, ignore: readonly string[]): string[] {
   const skip = new Set([...EXCLUDED_FOLDERS, ...ignore]);
   const prefix = folder === "." || folder === "" ? "" : folder.replace(/\/+$/, "") + "/";
-  return projectFiles(root).filter((rel) => {
-    if (!rel.startsWith(prefix)) return false;
-    const folders = rel.split("/").slice(0, -1);
-    return folders.every((name, i) => !skip.has(name) && !skip.has(folders.slice(0, i + 1).join("/")));
-  });
+  return projectFiles(root).filter((rel) => rel.startsWith(prefix) && !underIgnored(rel, skip));
 }
 
 function folderOf(root: string, specPath: string): string {

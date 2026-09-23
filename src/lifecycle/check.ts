@@ -24,7 +24,10 @@
  * The corpus is every text file kind a project holds, the journal's records
  * included, and never the files written in another vocabulary on purpose:
  * the glossaries themselves, the retired inventories, docs/reference, and
- * the adversarial reviews, which quote the names they report. A path the
+ * the adversarial reviews, which quote the names they report. It stays inside
+ * the config's bounds: a folder the ignore list names is never entered, by
+ * the same rule every other walk applies, so an adoption bounded to one
+ * subsystem of a monorepo reads that subsystem and its records. A path the
  * check cannot read is reported as unreadable and skipped; it never aborts
  * the walk. Every path given is confined to the project root.
  */
@@ -34,7 +37,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { acceptedNames, rejectedNames, type Glossary, type RejectedName } from "./glossary.ts";
 import { STOPLIST } from "./stoplist.ts";
-import { projectFiles } from "../adapters/project-files.ts";
+import { configIgnore, projectFiles, underIgnored } from "../adapters/project-files.ts";
 import { vocabularyFacts } from "./project.ts";
 import { wellKnown } from "./well-known.ts";
 
@@ -142,6 +145,24 @@ function relPath(root: string, path: string): string {
   return relative(root, path).split(sep).join("/");
 }
 
+/**
+ * Whether a project-relative path lies outside the config's bounds: under a
+ * folder the ignore list names, by the one rule every walk applies
+ * (underIgnored). Coherence's own record store is never outside them: an
+ * adopter that ignores .coherence keeps its code walks out of the tool's
+ * output, and the journal's records are still the project's words.
+ */
+function outsideBounds(rel: string, ignore: ReadonlySet<string>): boolean {
+  if (rel === COHERENCE_DIR || rel.startsWith(COHERENCE_DIR + "/")) return false;
+  return underIgnored(rel, ignore);
+}
+
+/** Whether a path under .coherence lies outside its record folders: the tool's own output, never the project's words. */
+function machineWritten(rel: string): boolean {
+  const parts = rel.split("/");
+  return parts[0] === COHERENCE_DIR && parts.length >= 2 && !RECORD_FOLDERS.includes(parts[1]!);
+}
+
 /** A journal or work record file: one JSONL line per record, under .coherence. */
 function isRecordFile(rel: string): boolean {
   const parts = rel.split("/");
@@ -166,8 +187,12 @@ function kindOf(root: string, path: string): FileKind | undefined {
   return undefined;
 }
 
+const OUTSIDE_BOUNDS = "outside the config's bounds: under a folder its ignore list names";
+
 interface Walk {
   root: string;
+  /** The config's ignore list: folders outside the adoption's bounds, never entered. */
+  ignore: ReadonlySet<string>;
   found: string[];
   unreadable: UnreadablePath[];
   excluded: UnreadablePath[];
@@ -194,8 +219,11 @@ async function walk(dir: string, walker: Walk): Promise<void> {
   entries.sort((a, b) => a.name.localeCompare(b.name));
   for (const entry of entries) {
     const path = resolve(dir, entry.name);
+    // Coherence's own machine-written output (runs, traces, a warm server's files) is neither read nor reported: it churns on every run, and a reading whose population moved with it would never build the same page twice.
+    if (machineWritten(relPath(walker.root, path))) continue;
     if (entry.isDirectory()) {
       if (EXCLUDED_FOLDERS.has(entry.name)) { walker.excluded.push({ file: relPath(walker.root, path), reason: "dependency, generated, host, or environment folder" }); continue; }
+      if (outsideBounds(relPath(walker.root, path) + "/", walker.ignore)) { walker.excluded.push({ file: relPath(walker.root, path), reason: OUTSIDE_BOUNDS }); continue; }
       if (existsSync(resolve(path, ".git"))) { walker.excluded.push({ file: relPath(walker.root, path), reason: "a nested checkout: another repository or worktree, not the project's files" }); continue; }
       await walk(path, walker);
     } else if (entry.isFile() && kindOf(walker.root, path) !== undefined) {
@@ -228,7 +256,7 @@ export async function collectFiles(options: CheckOptions): Promise<{ files: stri
   const excluded = new Set<string>([resolve(options.coherence.path), resolve(root, "docs", "retired.md"), resolve(root, "src", "spec", "retired-sections.json")]);
   const foreignDocs = [resolve(root, "docs", "reference"), resolve(root, "docs", "reviews")];
   if (options.project !== undefined) excluded.add(resolve(options.project.path));
-  const walker: Walk = { root, found: [], unreadable: [], excluded: [] };
+  const walker: Walk = { root, ignore: new Set(configIgnore(root)), found: [], unreadable: [], excluded: [] };
   const roots = options.paths === undefined || options.paths.length === 0 ? [root] : options.paths.map((given) => confine(root, given));
   for (const path of roots) {
     let info;
@@ -246,6 +274,7 @@ export async function collectFiles(options: CheckOptions): Promise<{ files: stri
   const files = [...new Set(walker.found)].filter((p) => {
     if (excluded.has(p)) return false;
     if (!own.has(relPath(root, p))) return false;
+    if (outsideBounds(relPath(root, p), walker.ignore)) return false;
     if (foreignDocs.some((d) => p === d || p.startsWith(d + sep))) return false;
     const rel = relPath(root, p);
     if (rel.split("/")[0] === COHERENCE_DIR && !isRecordFile(rel)) return false;
@@ -254,7 +283,7 @@ export async function collectFiles(options: CheckOptions): Promise<{ files: stri
   for (const path of walker.found) {
     if (files.includes(path)) continue;
     const rel = relPath(root, path);
-    walker.excluded.push({ file: rel, reason: own.has(rel) ? "glossary, reference vocabulary, generated state, or excluded folder" : "not one of the project's files: ignored, or inside a nested checkout" });
+    walker.excluded.push({ file: rel, reason: outsideBounds(rel, walker.ignore) ? OUTSIDE_BOUNDS : own.has(rel) ? "glossary, reference vocabulary, generated state, or excluded folder" : "not one of the project's files: ignored, or inside a nested checkout" });
   }
   return { files, unreadable: walker.unreadable, excluded: walker.excluded };
 }

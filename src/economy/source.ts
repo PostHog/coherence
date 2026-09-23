@@ -9,7 +9,7 @@
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { isTestPath } from "../adapters/adapter.ts";
-import { projectFiles } from "../adapters/project-files.ts";
+import { projectFiles, underIgnored } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
 import type { Component, SpecModel } from "../spec/model.ts";
 
@@ -35,8 +35,7 @@ export function sourceFiles(root: string, language: Language, ignore: readonly s
   const skip = new Set([...EXCLUDED_FOLDERS, ...ignore]);
   return projectFiles(resolve(root)).filter((rel) => {
     if (!isSourceFile(rel, language)) return false;
-    const folders = rel.split("/").slice(0, -1);
-    return folders.every((name, i) => !name.startsWith(".") && !skip.has(name) && !skip.has(folders.slice(0, i + 1).join("/")));
+    return !rel.split("/").slice(0, -1).some((name) => name.startsWith(".")) && !underIgnored(rel, skip);
   });
 }
 

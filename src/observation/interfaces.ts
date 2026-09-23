@@ -16,7 +16,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { LanguageAdapter, Range, SiteForm } from "../adapters/adapter.ts";
-import { projectSites } from "../adapters/project-files.ts";
+import { configIgnore, projectSites } from "../adapters/project-files.ts";
 import { componentOf, declarationsOf, isTest, sourceFiles } from "../economy/source.ts";
 import type { EnforcementConfig } from "../enforcement/config.ts";
 import type { SpecModel } from "../spec/model.ts";
@@ -83,15 +83,6 @@ export function declares(line: string, language: string): InterfaceSymbol["decla
   return "body";
 }
 
-function ignoredFolders(root: string): string[] {
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(join(root, "coherence.config.json"), "utf8"));
-    const ignore = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>)["ignore"] : undefined;
-    return Array.isArray(ignore) ? ignore.filter((value): value is string => typeof value === "string") : [];
-  } catch {
-    return [];
-  }
-}
 
 /** Entrances, where the spec model carries them (the Structure line adds `## entrances`); none otherwise. */
 function entrancesOf(model: SpecModel): { component: string; name: string; handler: string | undefined; file: string | undefined }[] {
@@ -104,7 +95,7 @@ function entrancesOf(model: SpecModel): { component: string; name: string; handl
 /** Read every component interface with its positions, and every entrance's handler, through the adapter. */
 export async function readInterfaceMap(root: string, adapter: LanguageAdapter, model: SpecModel, config: EnforcementConfig): Promise<InterfaceMap> {
   const testFolders = config.testFolders;
-  const files = sourceFiles(root, config.language, ignoredFolders(root)).filter((file) => !isTest(file, testFolders));
+  const files = sourceFiles(root, config.language, configIgnore(root)).filter((file) => !isTest(file, testFolders));
   const tally = new Map<string, InterfaceSymbol>();
   for (const file of files) {
     const owner = componentOf(model, file)?.folder;

@@ -325,10 +325,8 @@ export function answerGlossary(report: GlossaryCoverage | undefined, args: strin
   const terms = report.terms.filter((t) =>
     t.term === term || t.concept?.toLowerCase() === term || t.meaningAlternatives?.some((meaning) => meaning.concept.toLowerCase() === term));
   const fullReading = glossaryReviewCommand(args[0]!.trim());
-  const lines = report.projection ? [
-    `Bounded page evidence: ${report.terms.length} of ${report.totals.terms} terms embedded; ${report.totals.terms - report.terms.length} terms omitted. Matching terms, contexts or uses may be omitted.`,
-    `Full reading from the project's root: ${fullReading}`,
-  ] : ["Full observed candidate reading (not exhaustive semantic coverage)."];
+  // The term's reading leads: its recurrence, then each context with its risk. What the page left out follows it.
+  const lines: string[] = [];
   if (terms.length === 0) {
     lines.push(report.projection
       ? "No matching term in the page selection; this does not establish absence from the full corpus."
@@ -336,20 +334,25 @@ export function answerGlossary(report: GlossaryCoverage | undefined, args: strin
   }
   for (const t of terms) {
     const contexts = t.contextCount ?? t.contexts.length;
+    const recurrence = t.recurrence ? `; recurs on ${t.recurrence.prose} prose line${t.recurrence.prose === 1 ? "" : "s"} across ${t.recurrence.components} component${t.recurrence.components === 1 ? "" : "s"}` : "";
     const meaning = t.meaningAlternatives !== undefined && t.meaningAlternatives.length > 0
-      ? [`${t.term} [${t.state}] — ${t.meaningAlternatives.length} applicable property meanings; spelling alone does not select an owner`,
+      ? [`${t.term} [${t.state}]${recurrence} — ${t.meaningAlternatives.length} applicable property meanings; spelling alone does not select an owner`,
           ...t.meaningAlternatives.map((item) => `  applicable property meaning: ${item.concept} (${item.layer}) — ${item.definition}; properties ${JSON.stringify(item.properties)}; confusables ${item.confusables.join("; ") || "none declared"}`)]
-      : [`${t.term} [${t.state}] — ${t.definition ?? "No settled definition"}`,
+      : [`${t.term} [${t.state}]${recurrence} — ${t.definition ?? "No settled definition"}`,
           `Properties: ${JSON.stringify(t.properties)}; confusables: ${t.confusables.join("; ") || "none declared"}`];
     lines.push(
       ...meaning,
+      ...t.contexts.map((c) => `  ${c.component}: ${c.disposition}${c.risk ? `; sense at risk: ${c.risk}` : "; no risk to its sense"}${c.because ? " — " + c.because : ""} (${c.fingerprint})`),
       `${t.contexts.length} of ${contexts} contexts shown; ${contexts - t.contexts.length} contexts omitted.`,
-      ...t.contexts.map((c) => `  ${c.component}: ${c.disposition}${c.because ? " — " + c.because : ""} (${c.fingerprint})`),
       ...t.uses.map((u) => `  ${u.file}:${u.line} ${u.text}`),
       `${t.uses.length} of ${t.count} uses shown; ${t.count - t.uses.length} uses omitted.`,
       `Full JSON reading: ${glossaryReviewCommand(t.term)}`,
     );
   }
+  lines.push(...(report.projection ? [
+    `Bounded page evidence: ${report.terms.length} of ${report.totals.terms} terms embedded; ${report.totals.terms - report.terms.length} terms omitted. Matching terms, contexts or uses may be omitted.`,
+    `Full reading from the project's root: ${fullReading}`,
+  ] : ["Full observed candidate reading (not exhaustive semantic coverage)."]));
   return { text: lines.join("\n"), code: 0 };
 }
 

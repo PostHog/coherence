@@ -191,8 +191,10 @@ test("the render shows every concept name and every rejected alternative's becau
   for (const [name, text] of Object.entries(glossary.metaphors)) {
     assert.ok(rendered.includes(escapeHtml(text)), `metaphor ${name} is on the page`);
   }
+  // The layers are where a shape key would leak; the vocabulary reading above them lists corpus paths, and one of them (docs/retired.md) is also a shape value.
+  const layers = rendered.slice(rendered.indexOf('id="layer-'));
   for (const value of Object.values(glossary.shape ?? {})) {
-    if (typeof value === "string") assert.ok(!rendered.includes(escapeHtml(value)), "the shape key is rendered nowhere");
+    if (typeof value === "string") assert.ok(!layers.includes(escapeHtml(value)), "the shape key is rendered in no glossary layer");
   }
   assert.ok(rendered.includes(`${glossary.concepts.length} concepts`), "concept count is in the masthead");
   assert.ok(rendered.includes(`glossary version ${glossary.version}`), "version is in the masthead");

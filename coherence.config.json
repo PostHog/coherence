@@ -1,7 +1,7 @@
 {
   "name": "coherence",
   "entryDir": ".",
-  "ignore": ["docs", "node_modules"],
+  "ignore": ["node_modules"],
   "language": "typescript",
   "platform": "apple silicon",
   "wellKnown": ["Mnemion", "Sol"],

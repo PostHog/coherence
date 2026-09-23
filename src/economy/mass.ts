@@ -23,6 +23,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseName } from "../adapters/adapter.ts";
+import { configIgnore } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
@@ -119,7 +120,7 @@ export function computeMass(rootGiven: string, options: MassOptions = {}): MassR
   const config = readEnforcementConfig(root);
   const language: Language = config.language;
   const model = options.model ?? loadSpecModel(root);
-  const ignore = readIgnore(root);
+  const ignore = configIgnore(root);
   const all = sourceFiles(root, language, ignore);
   const tests = all.filter((f) => isTest(f, config.testFolders));
   const code = all.filter((f) => !isTest(f, config.testFolders));
@@ -174,14 +175,6 @@ export function computeMass(rootGiven: string, options: MassOptions = {}): MassR
   };
 }
 
-function readIgnore(root: string): string[] {
-  try {
-    const parsed = JSON.parse(readFileSync(resolve(root, "coherence.config.json"), "utf8")) as Record<string, unknown>;
-    return Array.isArray(parsed["ignore"]) ? parsed["ignore"].filter((v): v is string => typeof v === "string") : [];
-  } catch {
-    return [];
-  }
-}
 
 function numbers(n: Numbers): string {
   return `${n.lines} lines, ${n.files} file${n.files === 1 ? "" : "s"}, ${n.symbols} symbol${n.symbols === 1 ? "" : "s"}`;

@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { attention, attentionText, glossaryCoverage, type Coverage } from "./glossary-coverage.ts";
 import { runHook } from "./hook.ts";
+import { FUNCTION_WORDS, STOPLIST } from "./stoplist.ts";
 
 const COMPONENTS = ["books", "sales", "stock", "staff"];
 
@@ -202,6 +203,91 @@ test("the per-tool line is silent on an ordinary edit and names only the candida
     introduced.commit?.();
     const again = await runHook("PostToolUse", tool, root);
     assert.doesNotMatch(injected(again.stdout), /Glossary/, "a candidate already named is not named again");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+/** The closed classes' core, written here independently of the stoplist, so a word dropped from it is caught. */
+const CLOSED_CLASS_CORE = `
+about above across after against along among around as at before behind below beneath beside between beyond by
+despite down during except for from in inside into like near of off on onto out outside over past per since
+through throughout till to toward towards under underneath unlike until up upon via with within without
+and but or nor so yet although because if unless whereas whether while though once than
+a an the this that these those my your his her its our their each every either neither some any no all both
+i me you he him she it we us they them myself yourself itself ourselves themselves who whom whose which what
+anyone everyone someone nobody nothing everything something
+am is are was were be been being have has had do does did can could may might must shall should will would ought
+`.split(/\s+/).filter((w) => w !== "");
+
+test("function words are never candidates: every preposition, conjunction, determiner, pronoun and auxiliary is refused however prose writes it", async () => {
+  const closed = [...new Set(Object.values(FUNCTION_WORDS).flat())].sort();
+  for (const w of CLOSED_CLASS_CORE) assert.ok(closed.includes(w), `the closed-class list lacks "${w}"`);
+  for (const w of closed) assert.ok(STOPLIST.has(w), `"${w}" is a function word the stoplist does not hold`);
+  const root = project();
+  try {
+    // Every function word written as a name three ways, on a line in every component: backticked, Title Case mid-sentence, and as a heading word.
+    const cap = (w: string): string => w[0]!.toUpperCase() + w.slice(1);
+    for (const c of COMPONENTS)
+      writeFileSync(
+        join(root, c, "notes.md"),
+        [
+          ...closed.flatMap((w) => [`## ${cap(w)}`, `We wrote \`${w}\` there, and then ${cap(w)} again.`, `Later \`${w}\` came back.`]),
+          "The `premium` is new.",
+          "Every `premium` is billed.",
+          "",
+        ].join("\n"),
+      );
+    const found = candidates(await glossaryCoverage(root));
+    const offered = found.filter((t) => t.split(" ").every((w) => closed.includes(w)));
+    assert.deepEqual(offered, [], `function words were offered as candidates: ${offered.join(", ")}`);
+    assert.ok(found.includes("premium"), `a name written the same way still surfaces: ${found.join(", ")}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Coherence's machine-written output never moves the reading: a new run record or a warm server's file leaves the fingerprint unchanged", async () => {
+  const root = project();
+  try {
+    writeFileSync(join(root, "books/notes.md"), "The `premium` is new.\nEvery `premium` is billed.\n");
+    mkdirSync(join(root, ".coherence", "runs"), { recursive: true });
+    const before = await glossaryCoverage(root);
+    writeFileSync(join(root, ".coherence", "runs", "s.jsonl"), JSON.stringify({ at: "2026-09-23T00:00:00.000Z", invariants: [] }) + "\n");
+    mkdirSync(join(root, ".coherence", "run"), { recursive: true });
+    writeFileSync(join(root, ".coherence", "run", "server.json"), JSON.stringify({ pid: 1 }) + "\n");
+    const after = await glossaryCoverage(root);
+    assert.equal(after.fingerprint, before.fingerprint, "a run or a server file changed the reading's fingerprint");
+    assert.ok(!after.population.excluded.some((e) => e.file.startsWith(".coherence/")), "machine-written output is not the project's and is not reported");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("coverage reads only inside the config's bounds: a folder the ignore list names is never entered, and the journal's records still are", async () => {
+  // The adoption is bounded away from stock (by name), staff/archive (by path), and .coherence.
+  const root = project({ ignore: ["stock", "staff/archive", ".coherence"] });
+  try {
+    for (const c of ["books", "sales"]) writeFileSync(join(root, c, "notes.md"), "The `premium` is new.\nEvery `premium` is billed.\n");
+    // A large ignored folder: hundreds of files that would nominate their own term if read.
+    mkdirSync(join(root, "stock", "vendor"), { recursive: true });
+    for (let i = 0; i < 300; i++) writeFileSync(join(root, "stock", "vendor", `page${i}.md`), "The `Frobnicator` runs.\nEach `Frobnicator` stops.\nA `Frobnicator` waits.\n");
+    mkdirSync(join(root, "staff", "archive"), { recursive: true });
+    writeFileSync(join(root, "staff", "archive", "old.md"), "The `Gizmotron` runs.\nEach `Gizmotron` stops.\nA `Gizmotron` waits.\n");
+    writeFileSync(join(root, "staff", "notes.md"), "Staff notes: the `premium` is paid.\n");
+    mkdirSync(join(root, ".coherence", "journal"), { recursive: true });
+    const record = { id: "d-00000001", kind: "decision", at: "2026-09-23T00:00:00.000Z", session: "s", agent: "a", chose: "bill the `premium` monthly", over: [], because: "the `premium` is monthly" };
+    writeFileSync(join(root, ".coherence", "journal", "s.jsonl"), JSON.stringify(record) + "\n");
+    const report = await glossaryCoverage(root);
+    const read = report.population.files.map((f) => f.file);
+    assert.ok(!read.some((f) => f.startsWith("stock/")), `an ignored folder was read: ${read.filter((f) => f.startsWith("stock/")).length} files`);
+    assert.ok(!read.some((f) => f.startsWith("staff/archive/")), "a folder ignored by its path was read");
+    assert.ok(read.includes("staff/notes.md"), "a sibling of an ignored path is still inside the bounds");
+    assert.ok(read.includes(".coherence/journal/s.jsonl"), "the journal's records are read even when the config ignores .coherence");
+    assert.ok(report.population.excluded.some((e) => e.file === "stock" && /bounds/.test(e.reason)), "the ignored folder is reported as outside the bounds, never entered");
+    const found = terms(report);
+    assert.ok(!found.includes("frobnicator") && !found.includes("gizmotron"), `a term only an ignored folder uses was observed: ${found.join(", ")}`);
+    assert.ok(found.includes("premium"), `a term inside the bounds is still observed: ${found.join(", ")}`);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

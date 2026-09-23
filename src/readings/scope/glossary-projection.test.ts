@@ -24,7 +24,7 @@ function term(
     fingerprint: `term-fingerprint-${name}`,
     count,
     contexts: [
-      { component: "review-me", fingerprint: `context-review-${name}`, disposition: "unreviewed", because: "sense <unclear>" },
+      { component: "review-me", fingerprint: `context-review-${name}`, disposition: "unreviewed", because: "sense <unclear>", risk: "a rejected name <beside> the use" },
       { component: "settled", fingerprint: `context-settled-${name}`, disposition: "confirmed", because: null },
     ],
     uses: [
@@ -76,18 +76,27 @@ test("projection uses the builder's exact escaped JSON byte count and never weak
   assert.equal(GLOSSARY_PAGE_LIMITS.bytes, 256 * 1024, "the production ceiling remains 256 KiB");
 });
 
-test("projection is deterministic, prioritizes review evidence, and caps population records across all categories", () => {
+test("projection is deterministic, leads with the ranked signal, counts only at-risk contexts as awaiting review, and caps population records across all categories", () => {
+  const unreviewed = (name: string) => [{ component: "anywhere", fingerprint: `plain-${name}`, disposition: "unreviewed", because: null }];
   const source = coverage([
     { ...term("reviewed", "concept", 99), contexts: [{ component: "settled", fingerprint: "reviewed-context", disposition: "confirmed", because: null }] },
-    { ...term("unresolved", "unresolved", 50), contexts: [] },
+    { ...term("no-risk", "alias", 60), contexts: unreviewed("no-risk") },
+    { ...term("unresolved", "unresolved", 50), contexts: unreviewed("unresolved") },
+    { ...term("ranked-low", "unresolved", 1), contexts: unreviewed("ranked-low"), recurrence: { prose: 3, components: 1 } },
+    { ...term("ranked-high", "unresolved", 1), contexts: unreviewed("ranked-high"), recurrence: { prose: 5, components: 3 } },
     term("awaiting", "declared", 2),
-    term("rejected", "rejected", 1),
-    term("another-awaiting", "alias", 7),
+    { ...term("rejected", "rejected", 1), contexts: unreviewed("rejected") },
   ]);
-  const first = projectGlossaryCoverage(source, compact);
-  const second = projectGlossaryCoverage(source, compact);
+  const limits = { ...compact, terms: 7 };
+  const first = projectGlossaryCoverage(source, limits);
+  const second = projectGlossaryCoverage(source, limits);
   assert.deepEqual(first, second);
-  assert.deepEqual(first.terms.map((item) => item.term), ["rejected", "another-awaiting", "awaiting", "unresolved"]);
+  assert.deepEqual(first.terms.map((item) => item.term), ["ranked-high", "ranked-low", "awaiting", "rejected", "unresolved", "reviewed", "no-risk"],
+    "recurring undefined terms by recurrence, then at-risk senses, rejected spellings, other unresolved terms, and the rest");
+  assert.deepEqual(first.attention?.undefinedTerms.map((t) => t.term), ["ranked-high", "ranked-low"]);
+  assert.deepEqual(first.attention?.senses.map((s) => s.term), ["awaiting"]);
+  assert.equal(first.terms.find((t) => t.term === "no-risk")?.unreviewedContextCount, 0, "an unreviewed context with nothing at risk awaits no review");
+  assert.equal(first.terms.find((t) => t.term === "awaiting")?.unreviewedContextCount, 1);
   assert.equal(first.population.files.length + first.population.excluded.length + first.population.unreadable.length, 3);
   assert.deepEqual([first.population.files.length, first.population.excluded.length, first.population.unreadable.length], [1, 1, 1], "each populated category remains represented");
 });

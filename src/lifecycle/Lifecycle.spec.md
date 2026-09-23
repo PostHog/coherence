@@ -275,3 +275,19 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: commit-ordered-effects declared as cursor advances after the print
   checklist: circuit-breaker-policy dismissed: the reading is local files; no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
+- coverage honors the config's bounds: The vocabulary corpus never enters a folder the config's ignore list names, by name or by path, through the same rule every other walk applies (underIgnored in project-files.ts); the journal's and work's records are read even when the config ignores .coherence.
+  over: every file and folder the corpus walk meets, in a project whose config ignores a large folder by name, a nested folder by path, and .coherence
+  via: coverage reads only inside the config's bounds: a folder the ignore list names is never entered, and the journal's records still are
+  because: on a PostHog subsystem adoption whose config bounds the reading to one subsystem, coverage read 6,004 files of the whole monorepo in about 32 seconds and once crashed there on an over-long string, while the spec walker, mass and the interface readings all stayed inside the bounds; a vocabulary reading of code the adoption excluded offers the monorepo's names as the subsystem's. The records stay in because they are the project's own words about its work, whatever the code walks skip
+  crossing: project-source -> reading
+  refuted: made outsideBounds in check.ts answer false for every path, so the corpus walk entered every folder the config's ignore list names -> "coverage reads only inside the config's bounds: a folder the ignore list names is never entered, and the journal's records still are" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
+  kinds: read
+  checklist: scoped-reads dismissed: this invariant is the scope of the read itself; the corpus is the project's files inside the config's bounds, plus the records
+  checklist: redaction dismissed: an ignored folder is reported by its path alone, and nothing under it is read
+- function words are never candidates: A preposition, conjunction, determiner, pronoun, auxiliary, particle or contraction fragment of English is never a vocabulary candidate, however prose writes it (backticked, as a heading word, or capitalized mid-sentence), and the stoplist holds every one of those closed classes.
+  over: every word of every closed class in FUNCTION_WORDS and an independently written core of each, each written three ways on lines in every component
+  via: function words are never candidates: every preposition, conjunction, determiner, pronoun and auxiliary is refused however prose writes it
+  because: "via" surfaced as the third recurring undefined term on this repository, from every spec's via: line; a word that carries grammar has no sense a project could define, so offering it spends the reader's attention on a list it learns to skip
+  crossing: project-source -> reading
+  refuted: dropped the function-word refusal from nominate in glossary-coverage.ts, so a function word written capitalized mid-sentence was nominated as a proper noun -> "function words are never candidates: every preposition, conjunction, determiner, pronoun and auxiliary is refused however prose writes it" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
+  kinds: none

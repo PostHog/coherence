@@ -1,5 +1,5 @@
 /** Node-only evidence projection. Definitions stay whole; oversized entries are omitted, not rewritten. */
-import type { Coverage, VocabularyTerm } from "../../lifecycle/glossary-coverage.ts";
+import { attention, awaitsReview, type Coverage, type VocabularyTerm } from "../../lifecycle/glossary-coverage.ts";
 import type { GlossaryCoverage, GlossaryEvidenceTerm } from "./model.ts";
 
 export const GLOSSARY_PAGE_LIMITS = {
@@ -8,6 +8,8 @@ export const GLOSSARY_PAGE_LIMITS = {
   contextsPerTerm: 6,
   usesPerTerm: 8,
   populationEntries: 30,
+  /** Entries of each attention list the page leads with; the rest are one command away. */
+  attentionEntries: 12,
 } as const;
 
 export interface GlossaryProjectionLimits {
@@ -16,17 +18,23 @@ export interface GlossaryProjectionLimits {
   contextsPerTerm: number;
   usesPerTerm: number;
   populationEntries: number;
+  attentionEntries?: number;
 }
 
-function needsReview(disposition: string): boolean {
-  return disposition !== "confirmed" && disposition !== "not-domain";
-}
-
-function reviewPriority(term: VocabularyTerm): number {
-  if (term.state === "rejected") return 0;
-  if (term.contexts.some((c) => needsReview(c.disposition))) return 1;
-  if (term.state === "unresolved") return 2;
-  return 3;
+/**
+ * Where a term stands in the page's selection: the recurring terms that lack
+ * a definition first, in the attention order (most recurring first), then
+ * terms with a context whose sense is at risk and unreviewed, then rejected
+ * spellings, then every other unresolved term, then the rest.
+ */
+function reviewPriority(term: VocabularyTerm, ranked: ReadonlyMap<string, number>): number {
+  const rank = ranked.get(term.term);
+  if (rank !== undefined) return rank;
+  const after = ranked.size;
+  if (term.contexts.some(awaitsReview)) return after;
+  if (term.state === "rejected") return after + 1;
+  if (term.state === "unresolved") return after + 2;
+  return after + 3;
 }
 
 function compareText(a: string, b: string): number {
@@ -35,7 +43,7 @@ function compareText(a: string, b: string): number {
 
 function termEvidence(term: VocabularyTerm, limits: GlossaryProjectionLimits): GlossaryEvidenceTerm {
   const contexts = [...term.contexts]
-    .sort((a, b) => Number(needsReview(b.disposition)) - Number(needsReview(a.disposition)))
+    .sort((a, b) => Number(awaitsReview(b)) - Number(awaitsReview(a)))
     .slice(0, limits.contextsPerTerm);
   // Show at least one use of each sampled component, then fill the remaining excerpt slots.
   const uses = contexts.flatMap((c) => {
@@ -49,7 +57,7 @@ function termEvidence(term: VocabularyTerm, limits: GlossaryProjectionLimits): G
   return {
     ...term,
     contextCount: term.contexts.length,
-    unreviewedContextCount: term.contexts.filter((c) => needsReview(c.disposition)).length,
+    unreviewedContextCount: term.contexts.filter(awaitsReview).length,
     contexts,
     uses,
   };
@@ -64,9 +72,16 @@ export function projectGlossaryCoverage(
   report: Coverage,
   limits: GlossaryProjectionLimits = GLOSSARY_PAGE_LIMITS,
 ): GlossaryCoverage {
+  const signal = attention(report);
+  const head = limits.attentionEntries ?? GLOSSARY_PAGE_LIMITS.attentionEntries;
   const projected: GlossaryCoverage = {
     ...report,
     totals: { ...report.totals },
+    attention: {
+      undefinedTerms: signal.undefinedTerms.slice(0, head),
+      senses: signal.senses.slice(0, head),
+      more: { undefinedTerms: signal.undefinedTerms.length > head, senses: signal.senses.length > head },
+    },
     population: {
       ...report.population,
       files: [],
@@ -77,7 +92,7 @@ export function projectGlossaryCoverage(
     terms: [],
     projection: {
       byteLimit: limits.bytes,
-      selection: "Rejected spellings, then terms with contexts awaiting sense review, unresolved terms, and reviewed terms; ties by use count and code-point name order. Awaiting-review contexts come first. Oversized entries are omitted whole.",
+      selection: "Recurring terms that lack a definition, most recurring first; then terms with a context whose sense is at risk and unreviewed; then rejected spellings, other unresolved terms, and the rest; ties by use count and code-point name order. Contexts awaiting review come first. Oversized entries are omitted whole.",
       contexts: report.terms.reduce((n, t) => n + t.contexts.length, 0),
       population: {
         files: report.population.files.length,
@@ -107,8 +122,9 @@ export function projectGlossaryCoverage(
       if (entry !== undefined && append(projected.population[kind], entry, limits.populationEntries)) populationEntries += 1;
     }
   }
+  const ranked = new Map(signal.undefinedTerms.map((t, i) => [t.term, i]));
   const ordered = [...report.terms].sort((a, b) =>
-    reviewPriority(a) - reviewPriority(b) || b.count - a.count || compareText(a.term, b.term));
+    reviewPriority(a, ranked) - reviewPriority(b, ranked) || b.count - a.count || compareText(a.term, b.term));
   for (const term of ordered) {
     if (projected.terms.length >= limits.terms) break;
     append(projected.terms, termEvidence(term, limits), limits.terms);

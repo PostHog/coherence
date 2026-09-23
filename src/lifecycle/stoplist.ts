@@ -86,7 +86,64 @@ exists exist allow allows allowed deny denies ok true false yes maybe verbose qu
 raw full partial total whole single multiple many few same other own primary secondary applicable dirty clean
 `;
 
-export const STOPLIST: ReadonlySet<string> = new Set(`${WORDS}\n${PROGRAMMING}\n${STATES}`.split(/\s+/).filter((w) => w !== ""));
+/**
+ * English's closed classes, complete: the function words no project can give
+ * a sense, because they carry grammar and never name a thing. A candidate
+ * made only of these is never offered, whatever the prose does with it
+ * ("via" in a spec's via: line, "and" in a heading). Each class is listed
+ * whole, including words the lists above already hold, so the class can be
+ * checked for completeness on its own. The fragments English contractions
+ * leave once the apostrophe splits them (don, isn, ll, ve) are here too.
+ * Words that are also ordinary nouns a project names things with (bar,
+ * round, save as a noun) are left out: a function word only.
+ */
+export const FUNCTION_WORDS: Readonly<Record<string, readonly string[]>> = {
+  prepositions: `
+aboard about above absent according across after against ahead along alongside amid amidst among amongst
+apart around as aside astride at atop barring because before behind below beneath beside besides
+between beyond but by circa concerning considering despite down due during except excepting excluding
+following for from given in including inside instead into less like minus near nearby next
+notwithstanding of off on onto opposite out outside over past pending per plus prior pursuant qua
+regarding regardless respecting sans since than through throughout thru till to toward towards
+under underneath unlike until unto up upon versus via vis vs with within without
+`.split(/\s+/).filter((w) => w !== ""),
+  conjunctions: `
+after albeit also although and as because before both but either else even hence however if inasmuch
+insofar lest meanwhile moreover furthermore neither nevertheless nonetheless nor now once only or
+otherwise provided providing since so still than that then thence therefore though thus till unless
+until when whence whenever where whereas whereby wherein whereupon wherever whether while whilst yet
+`.split(/\s+/).filter((w) => w !== ""),
+  determiners: `
+a all an another any both certain each either enough every few fewer fewest half last least less little
+many more most much my neither next no none our own several some such that the their these this those
+various what whatever which whichever whose your his her its
+`.split(/\s+/).filter((w) => w !== ""),
+  pronouns: `
+anybody anyone anything each everybody everyone everything he her hers herself him himself his i it
+its itself me mine myself nobody none nothing one ones oneself other others ours ourselves she somebody
+someone something that theirs them themselves these they this those thou thee us we what whatever
+which whichever who whoever whom whomever whose ye you yours yourself yourselves
+`.split(/\s+/).filter((w) => w !== ""),
+  auxiliaries: `
+am are be been being can cannot could dare did do does doing done had has have having is may might
+must need ought shall should used was were will would
+`.split(/\s+/).filter((w) => w !== ""),
+  particles: `
+not no yes nay aye too very just only even ever never already almost quite rather somewhat there here
+etc eg ie
+`.split(/\s+/).filter((w) => w !== ""),
+  contractions: `
+aren couldn didn doesn don hadn hasn haven isn ll mightn mustn needn re shan shouldn ve wasn weren won
+wouldn
+`.split(/\s+/).filter((w) => w !== ""),
+};
+
+/** Every function word, of every closed class: never a candidate, even written as a proper noun. */
+export const FUNCTION_WORD_SET: ReadonlySet<string> = new Set(Object.values(FUNCTION_WORDS).flat());
+
+export const STOPLIST: ReadonlySet<string> = new Set(
+  [...`${WORDS}\n${PROGRAMMING}\n${STATES}`.split(/\s+/), ...Object.values(FUNCTION_WORDS).flat()].filter((w) => w !== ""),
+);
 
 /** Words English capitalizes in any sentence: a capital letter on them never marks a project's proper noun. */
 export const ALWAYS_CAPITALIZED: ReadonlySet<string> = new Set(

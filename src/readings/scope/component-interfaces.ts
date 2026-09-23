@@ -22,23 +22,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
-import { projectSites } from "../../adapters/project-files.ts";
+import { configIgnore, projectSites } from "../../adapters/project-files.ts";
 import { adapterFor } from "../../adapters/index.ts";
 import { componentOf, declarationsOf, isTest, sourceFiles } from "../../economy/source.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { loadSpecModel } from "../../spec/model.ts";
 import type { EntranceResolution, InterfaceReading, InterfaceSymbol, ReachReference } from "./model.ts";
 
-/** The config's ignore list: folders the spec walk skips are not read for declarations either. */
-function ignoredFolders(root: string): string[] {
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(join(root, "coherence.config.json"), "utf8"));
-    const ignore = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>)["ignore"] : undefined;
-    return Array.isArray(ignore) ? ignore.filter((value): value is string => typeof value === "string") : [];
-  } catch {
-    return [];
-  }
-}
 
 /** Whether a declaration line declares a type only (an interface or a type alias): a route never follows one. */
 export function isTypeDeclaration(line: string, language: string): boolean {
@@ -91,7 +81,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
     const ready = await adapter.ready();
     if (!ready.ok) return { kind: "unread", because: `the ${config.language} instrument did not answer: ${ready.reason}` };
     const testFolders = config.testFolders;
-    const files = sourceFiles(root, config.language, ignoredFolders(root)).filter((file) => !isTest(file, testFolders));
+    const files = sourceFiles(root, config.language, configIgnore(root)).filter((file) => !isTest(file, testFolders));
     const tally = new Map<string, InterfaceSymbol>();
     const unowned = { files: 0, lines: 0 };
     let declarations = 0;

@@ -308,3 +308,10 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   crossing: record -> reading
   refuted: reversed every pulse's points in flowPulses, so the pulse ran callee to caller -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
+- the glossary leads with the signal: The Glossary view's vocabulary section leads with the attention signal, the recurring terms that lack a definition ranked most recurring first and then the senses at risk, and keeps every population and page total inside its Population and limits disclosure; a context awaits review only when its sense is at risk and no review has settled it, and the agent query answers a term with its recurrence and each context's risk before what the page left out.
+  over: the rendered vocabulary section and the query answer for a projected reading holding two recurring undefined terms, a sense at risk, and an ordinary unreviewed use of a defined word
+  via: Scope leads its glossary with the ranked signal and keeps totals in the population disclosure; query shows recurrence and each context's risk
+  because: the page and the query still opened on the old reading's counts (candidate terms, uses, contexts awaiting review) after the hooks had stopped injecting them, and counted every unconfirmed context as awaiting review, so an ordinary use of a defined word read as work; a count nobody can act on trains a reader to skip the section, and the ranked names are what a reader can act on (decisions d-7b070fc6, d-a77be28f)
+  crossing: record -> reading
+  refuted: put the old Full observed population totals line back at the head of the vocabulary section in glossary-view.ts, ahead of the ranked signal -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none

@@ -19,7 +19,8 @@
  * own name), names the glossary declares (concepts, aliases, instances,
  * properties, and its "not:" confusables), and general English and
  * programming words are never candidates. A common word written as a
- * project's proper noun still is.
+ * project's proper noun still is; a function word (a preposition,
+ * conjunction, determiner, pronoun, or auxiliary) never is, however written.
  *
  * Sense review is asked only where meaning is at risk: a name with more than
  * one recorded sense, a use on or beside a prose line carrying a name
@@ -43,7 +44,7 @@ import {
   type Glossary,
 } from "./glossary.ts";
 import { loadProjectGlossaries, vocabularyFacts } from "./project.ts";
-import { ALWAYS_CAPITALIZED, STOPLIST } from "./stoplist.ts";
+import { ALWAYS_CAPITALIZED, FUNCTION_WORD_SET, STOPLIST } from "./stoplist.ts";
 import { isWellKnown, wellKnown, type WellKnown } from "./well-known.ts";
 
 export interface VocabularyUse {
@@ -481,6 +482,8 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
       return;
     }
     if (confusables.has(term) || isWellKnown(famous, term, n.spelling)) return;
+    // Grammar, never a name: a phrase made only of function words is refused even capitalized ("Via", "And Or").
+    if (term.split(" ").every((w) => FUNCTION_WORD_SET.has(w))) return;
     // A proper noun is a name even when the word is common; any other source must not be common words alone.
     if (!n.proper && allCommon(term)) return;
     // A participle is a state, not a thing: a declared "missing" or "resolved" is never a candidate.
@@ -753,7 +756,6 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
       "Totals are population facts about this reading, not a to-do count.",
     ],
   };
-  const settled = (c: VocabularyContext): boolean => c.disposition === "confirmed" || c.disposition === "not-domain";
   return {
     version: 1,
     projectGlossary:
@@ -769,7 +771,7 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
         .length,
       rejected: terms.filter((t) => t.state === "rejected").length,
       unresolved: terms.filter((t) => t.state === "unresolved").length,
-      unreviewedContexts: terms.reduce((n, t) => n + t.contexts.filter((c) => c.risk !== undefined && !settled(c)).length, 0),
+      unreviewedContexts: terms.reduce((n, t) => n + t.contexts.filter(awaitsReview).length, 0),
     },
   };
 }
@@ -783,7 +785,20 @@ export interface Attention {
   senses: { term: string; component: string; reason: string; evidence: string; state: string }[];
 }
 
-const isSettled = (disposition: string): boolean => disposition === "confirmed" || disposition === "not-domain";
+/** Whether a review has settled a context: confirmed in the concept's sense, or dismissed as not the domain's word. */
+export function isSettled(disposition: string): boolean {
+  return disposition === "confirmed" || disposition === "not-domain";
+}
+
+/**
+ * Whether a context awaits sense review: its sense is at risk and no review
+ * has confirmed or dismissed it. An ordinary use of a defined word carries no
+ * risk and awaits nothing, whatever its disposition says. The one rule
+ * coverage, Scope and the agent query count a review by.
+ */
+export function awaitsReview(context: VocabularyContext): boolean {
+  return context.risk !== undefined && !isSettled(context.disposition);
+}
 
 /** The short ranked signal a reader can act on: which names to define, and which uses to check. */
 export function attention(report: Coverage): Attention {
@@ -800,7 +815,7 @@ export function attention(report: Coverage): Attention {
   const senses = report.terms
     .flatMap((t) =>
       t.contexts
-        .filter((c) => c.risk !== undefined && !isSettled(c.disposition))
+        .filter(awaitsReview)
         .map((c) => ({ term: t.term, component: c.component, reason: c.risk!, evidence: c.fingerprint, state: t.state })),
     )
     .sort((a, b) => a.term.localeCompare(b.term) || a.component.localeCompare(b.component));

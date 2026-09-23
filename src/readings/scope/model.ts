@@ -1,4 +1,4 @@
-import type { Coverage, VocabularyTerm } from "../../lifecycle/glossary-coverage.ts";
+import type { Attention, Coverage, VocabularyTerm } from "../../lifecycle/glossary-coverage.ts";
 /**
  * The model for the Scope reading: the shape of everything the page handles.
  *
@@ -139,6 +139,14 @@ export interface GlossaryEvidenceTerm extends VocabularyTerm {
 /** A page projection keeps the authoritative totals and fingerprint, never recasts a sample as a corpus. */
 export interface GlossaryCoverage extends Coverage {
   terms: GlossaryEvidenceTerm[];
+  /**
+   * The ranked signal the view leads with, computed from the full reading by
+   * coverage's own attention rule and cut to its head: the recurring terms
+   * that lack a definition, most recurring first, then the senses at risk.
+   * `more` says a list was cut, never by how much. Absent only on a full,
+   * unprojected reading.
+   */
+  attention?: Attention & { more: { undefinedTerms: boolean; senses: boolean } };
   /** Absent only on a full, unprojected reading. */
   projection?: {
     byteLimit: number;

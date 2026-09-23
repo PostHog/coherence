@@ -20,7 +20,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, readdirSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 /** The most bytes one git listing may carry; a larger project is a failure worth reporting, not a truncated answer. */
@@ -128,6 +128,55 @@ export function projectFiles(root: string): string[] {
   const memo = new Map<string, boolean>();
   const listed = inRepository(base) ? gitList(base, []) : walkUnversioned(base, memo);
   return [...new Set(listed)].filter((rel) => !insideNested(base, rel, memo) && isFileOnDisk(base, rel)).sort();
+}
+
+/** The config file whose ignore list bounds every walk. */
+const CONFIG_FILE = "coherence.config.json";
+
+/** A folder as the ignore list compares it: project-relative, forward slashes, no leading "./" and no trailing "/". */
+function folderKey(folder: string): string {
+  return folder.split(sep).join("/").replace(/^(\.\/)+/, "").replace(/\/+$/, "");
+}
+
+/**
+ * The config's ignore list: the folders, by name or by project-relative
+ * path, the adoption bounds the project away from. An absent or unreadable
+ * config ignores nothing here; the spec walker is the reader that refuses a
+ * malformed config.
+ */
+export function configIgnore(root: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(join(resolve(root), CONFIG_FILE), "utf8"));
+    const ignore = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>)["ignore"] : undefined;
+    return Array.isArray(ignore) ? ignore.filter((value): value is string => typeof value === "string").map(folderKey).filter((f) => f !== "") : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Whether a project-relative path lies under a folder the list names: some
+ * folder on its way down is named by its own name ("node_modules", anywhere)
+ * or by its path from the root ("posthog/api"). The path's last segment is a
+ * file and is never matched; pass a folder with a trailing "/" to ask about
+ * the folder itself. The one rule every walk applies to the config's ignore
+ * list.
+ */
+export function underIgnored(rel: string, ignore: Iterable<string>): boolean {
+  const skip = ignore instanceof Set ? (ignore as Set<string>) : new Set([...ignore].map(folderKey));
+  if (skip.size === 0) return false;
+  const folders = rel.split("/").slice(0, -1);
+  return folders.some((name, i) => skip.has(name) || skip.has(folders.slice(0, i + 1).join("/")));
+}
+
+/**
+ * The project's files inside the config's bounds: projectFiles, less every
+ * file under a folder the config's ignore list names. What an adoption
+ * bounded to one subsystem reads, and nothing past it.
+ */
+export function boundedProjectFiles(root: string, ignore: readonly string[] = configIgnore(root)): string[] {
+  const skip = new Set(ignore.map(folderKey));
+  return projectFiles(root).filter((rel) => !underIgnored(rel, skip));
 }
 
 /**
