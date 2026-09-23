@@ -626,6 +626,19 @@ test("the first adopter's tree builds as a second root: its glossary is the doma
   for (const node of map.nodes) assert.ok(svg.includes(`id="${node.id}"`), `${node.folder} is on the map`);
 });
 
+test("the page's run window keeps every latest entry whole and drops reference sites only from superseded entries", async () => {
+  const windowed = (await buildScopePage(options)).state;
+  const whole = (await buildScopePage({ ...options, window: false })).state;
+  for (const invariant of windowed.spec.components.flatMap((c) => c.invariants)) {
+    assert.deepEqual(latestOf(invariant, windowed.runs.records), latestOf(invariant, whole.runs.records), `${invariant.name}: the latest entries, sites included, are the same over the window`);
+  }
+  const holders = new Map<string, number>();
+  windowed.runs.records.forEach((run, index) => { for (const e of run.invariants) holders.set(`${e.component}\u0000${e.name}\u0000${e.form}`, index); });
+  windowed.runs.records.forEach((run, index) => {
+    for (const e of run.invariants) if (holders.get(`${e.component}\u0000${e.name}\u0000${e.form}`) !== index) assert.equal(e.sites, undefined, `${e.name}: a superseded entry carries no sites`);
+  });
+});
+
 test("the Mnemion domain glossary renders beneath Coherence's with every concept, ruling, rejected name and trust level", {
   skip: (await exists(MNEMION_GLOSSARY)) ? false : `${MNEMION_GLOSSARY} is not on this machine`,
 }, async () => {

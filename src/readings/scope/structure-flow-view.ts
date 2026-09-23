@@ -25,12 +25,12 @@
  * (nothing enforced, no control, not covered) is amber.
  *
  * Motion (the owner's rule): only the direction of work moves, and only on
- * what is selected. A selected route sends a short bright pulse from its
- * entrance to its end, caller to callee, at a constant speed; a selected
- * component's lines pulse into it from its callers and out of it to its
- * callees, one hop after it lights; an identifier the pulse passes ticks.
- * Every animation plays a fixed number of times and stops; a hover replays
- * it once; broken marks never move. With reduced motion nothing animates and
+ * what is selected. A selected route carries a slow, faint procession of
+ * dashes from its entrance to its end, caller to callee, at one constant
+ * speed, for as long as the selection holds; a selected component's lines
+ * flow into it from its callers and out of it to its callees, one hop after
+ * it lights; an identifier ticks each time a dash passes it. Clearing the
+ * selection stops everything; broken marks never move. With reduced motion nothing animates and
  * small chevrons along the selected lines point caller to callee instead.
  *
  * Every piece of text has a priority and is placed only where it overlaps no
@@ -114,10 +114,15 @@ const FLOW_ROLE_LINES = 3;
 /** The width a component's role wraps at, unless its name or folder is wider; widened toward FLOW_ROLE_MAX_W only when the role would otherwise be cut mid-phrase. */
 const FLOW_ROLE_W = 140;
 const FLOW_ROLE_MAX_W = 220;
-/** The pulse: its speed along a line, the length of its bright segment, and how many times it plays before it rests. */
-export const FLOW_PULSE_SPEED = 520;
-const FLOW_PULSE_SEG = 30;
-export const FLOW_PULSE_PLAYS = 2;
+/**
+ * The flow: its speed along a line, the length of each faint dash, and the
+ * distance from one dash to the next. Slow enough to follow with the eye and
+ * constant while the selection holds, so the reader has time to reason about
+ * direction; one cycle is FLOW_PULSE_PERIOD / FLOW_PULSE_SPEED seconds.
+ */
+export const FLOW_PULSE_SPEED = 48;
+const FLOW_PULSE_SEG = 12;
+export const FLOW_PULSE_PERIOD = 96;
 /** The delay per hop of a component's ripple, by the number of component interfaces from it. */
 export const FLOW_HOP_DELAY = 0.1;
 /** The fixed offset between parallel tracks. */
@@ -277,14 +282,12 @@ const FLOW_SVG_STYLE = `
 .flow-svg .flow-station.is-dim text, .flow-svg .flow-station.is-dim .flow-state-bar { opacity: 0.25; }
 .flow-svg .flow-tag.is-dim { opacity: 0.3; }
 .flow-svg .flow-tag.flow-tag-tick .flow-tag-shape { fill: transparent; stroke: none; }
-.flow-svg .flow-pulse { fill: none; stroke-linecap: round; stroke-width: 3; pointer-events: none; animation-name: flow-pulse; animation-timing-function: linear; animation-fill-mode: none; }
-.flow-svg .flow-pulse-replay { animation-name: none; }
-.flow-svg:has(.is-pulse-source:hover) .flow-pulse-replay { animation-name: flow-pulse; animation-iteration-count: 1 !important; animation-delay: 0s !important; }
-.flow-svg .flow-tick { animation-name: flow-tick; animation-timing-function: linear; }
+.flow-svg .flow-pulse { fill: none; stroke-linecap: round; stroke-width: 2.5; opacity: 0.7; pointer-events: none; animation-name: flow-pulse; animation-timing-function: linear; animation-iteration-count: infinite; animation-fill-mode: backwards; }
+.flow-svg .flow-tick { animation-name: flow-tick; animation-timing-function: ease-out; animation-iteration-count: infinite; }
 .flow-svg .flow-station.is-reach rect.flow-box { animation: flow-reach 0.35s ease-out both; }
 .flow-svg .flow-chevron { display: none; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 @keyframes flow-pulse { from { stroke-dashoffset: 0; } to { stroke-dashoffset: var(--pulse-end); } }
-@keyframes flow-tick { 0% { filter: brightness(1.7) drop-shadow(0 0 2px var(--flow-halo)); } 14%, 100% { filter: none; } }
+@keyframes flow-tick { 0% { filter: brightness(1.35) drop-shadow(0 0 2px var(--flow-halo)); } 18%, 100% { filter: none; } }
 @keyframes flow-reach { from { stroke-opacity: 0.2; } to { stroke-opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .flow-svg .flow-pulse { display: none; animation: none; }
@@ -1334,7 +1337,7 @@ export interface FlowPulse {
   on: string;
   points: Point[];
   color: string;
-  /** Its length in px, and its duration: the length over FLOW_PULSE_SPEED, so every pulse moves at one speed. */
+  /** Its length in px, and its cycle: FLOW_PULSE_PERIOD over FLOW_PULSE_SPEED, the same on every line, so every dash moves at one speed. */
   length: number;
   duration: number;
   delay: number;
@@ -1351,7 +1354,7 @@ export function flowPulses(model: FlowModel, selection: FlowSelection, layout: F
   const pulse = (on: string, points: Point[], color: string, delay: number): FlowPulse => {
     const clean = dedupe(points);
     const length = r1(polylineLength(clean));
-    return { on, points: clean, color, length, duration: Math.round((length / FLOW_PULSE_SPEED) * 1000) / 1000, delay };
+    return { on, points: clean, color, length, duration: Math.round((FLOW_PULSE_PERIOD / FLOW_PULSE_SPEED) * 1000) / 1000, delay };
   };
   if (selection.kind === "route" || selection.kind === "entrance") {
     return layout.routes.filter((draw) => selection.routes.has(draw.route.id)).map((draw) => pulse(draw.route.id, draw.path, draw.color, 0));
@@ -1376,9 +1379,9 @@ function pulseTint(color: string): string {
 }
 
 function renderPulse(p: FlowPulse): Markup {
-  const style = (plays: boolean): string => `stroke-dasharray: ${FLOW_PULSE_SEG} ${r1(p.length + FLOW_PULSE_SEG)}; stroke-dashoffset: -${p.length}px; --pulse-end: -${p.length}px; animation-duration: ${p.duration}s; animation-delay: ${p.delay}s${plays ? `; animation-iteration-count: ${FLOW_PULSE_PLAYS}` : ""}`;
-  const d = pathD(p.points);
-  return html`<path class="flow-pulse" data-pulse="${p.on}" data-pulse-length="${String(p.length)}" data-pulse-duration="${String(p.duration)}" data-pulse-plays="${String(FLOW_PULSE_PLAYS)}" d="${d}" stroke="${pulseTint(p.color)}" style="${style(true)}"/><path class="flow-pulse flow-pulse-replay" data-pulse-replay="${p.on}" d="${d}" stroke="${pulseTint(p.color)}" style="${style(false)}"/>`;
+  // Dashes one period apart, shifted forward one period per cycle: a seamless procession caller to callee.
+  const style = `stroke-dasharray: ${FLOW_PULSE_SEG} ${FLOW_PULSE_PERIOD - FLOW_PULSE_SEG}; stroke-dashoffset: 0; --pulse-end: -${FLOW_PULSE_PERIOD}px; animation-duration: ${p.duration}s; animation-delay: ${p.delay}s`;
+  return html`<path class="flow-pulse" data-pulse="${p.on}" data-pulse-length="${String(p.length)}" data-pulse-duration="${String(p.duration)}" data-pulse-period="${String(FLOW_PULSE_PERIOD)}" d="${pathD(p.points)}" stroke="${pulseTint(p.color)}" style="${style}"/>`;
 }
 
 /** Small static chevrons along a pulse's line, pointing caller to callee: what reduced motion shows instead of the pulse. */
@@ -1443,7 +1446,8 @@ export function renderFlowSvg(model: FlowModel, selected: string | undefined, pr
       if (!on) continue;
       const along = alongPolyline(p.points, center);
       if (along.distance > 12) continue;
-      ticks.set(tag, { duration: p.duration, delay: Math.round((p.delay + along.at / FLOW_PULSE_SPEED) * 1000) / 1000 });
+      // A dash reaches this point once per cycle, at its distance along the line modulo one period.
+      ticks.set(tag, { duration: p.duration, delay: Math.round((p.delay + (along.at % FLOW_PULSE_PERIOD) / FLOW_PULSE_SPEED) * 1000) / 1000 });
       break;
     }
   }
@@ -1532,7 +1536,7 @@ export function renderFlowSvg(model: FlowModel, selected: string | undefined, pr
               : tag.kind === "uncovered" ? `${on} is not covered: no chokepoint stands on an interface it exposes or where work enters it, and none of its invariants is verified by a totality oracle`
                 : `${tag.edge!.identifiers.join(", ")} on ${on}`;
       const tick = ticks.get(tag);
-      const style = tick === undefined ? null : raw(` style="animation-duration: ${tick.duration}s; animation-delay: ${tick.delay}s; animation-iteration-count: ${FLOW_PULSE_PLAYS}"`);
+      const style = tick === undefined ? null : raw(` style="animation-duration: ${tick.duration}s; animation-delay: ${tick.delay}s"`);
       const selectedTag = tagClass(tag).includes("is-selected");
       return html`<g class="${tagClass(tag)}"${where}${what}${style}>
         <title>${title}</title>
@@ -2094,7 +2098,7 @@ function renderFlowKey(state: ShellState): Markup {
       ${keyItem('<path d="M1 4 H27" stroke="currentColor" stroke-width="1.8"/><path d="M1 10 H27" stroke="currentColor" stroke-width="1.6" stroke-dasharray="5 3"/>', "With a component selected: solid, a caller that depends on it; dashed, a callee it uses")}
       ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-quiet)" stroke-width="1.6"/>', "Load-bearing interface on no route")}
       ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-quiet)" stroke-width="1.4" stroke-dasharray="5 4"/>', "Interface a selection reached")}
-      ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-quiet)" stroke-width="2"/><path d="M11 3 L15 7 L11 11" fill="none" stroke="currentColor" stroke-width="1.6"/>', "Motion: selecting a route or a component sends a short pulse along its lines, caller to callee, twice, then it rests; hover replays it. With reduced motion, chevrons point the same way")}
+      ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-quiet)" stroke-width="2"/><path d="M11 3 L15 7 L11 11" fill="none" stroke="currentColor" stroke-width="1.6"/>', "Motion: while a route or a component is selected, faint dashes flow slowly along its lines, caller to callee; clear the selection to stop them. With reduced motion, chevrons point the same way")}
     </ul>
     <details class="flow-more flow-terms"><summary>Terms</summary>
       <dl class="flow-levels">${Object.entries(LOCAL_TERMS).map(([name, meaning]) => html`<dt><dfn id="structure--term-${slug(name)}">${name}</dfn></dt><dd>${meaning}</dd>`)}</dl>

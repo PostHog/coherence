@@ -30,7 +30,7 @@ import { allInvariants, flowChokepointId, flowLevelId, invariantVerdict, relianc
 import type { InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, RunEntry, ShellState, SpecComponent, SpecEntrance, SpecInvariant } from "./model.ts";
 import { renderView } from "./shell.ts";
 import { CORE_RULE, FLOW_CHANGE_ID, FLOW_HEALTH_KINDS, FLOW_NONE_ID, compareFlows, flowBrokenId, flowHealthId, flowHealthMembers, flowDefaultSelection, flowEdgeId, flowEntranceId, flowKeyAction, flowLabelLines, flowNodeId, flowOf, flowSelected, flowSelection, type FlowModel } from "./structure-flow.ts";
-import { FLOW_HOP_DELAY, FLOW_NEUTRAL_ROUTE, FLOW_PULSE_PLAYS, FLOW_PULSE_SPEED, FLOW_RAIL_COLORS, FLOW_ROUTE_COLORS, flowLayout, flowPulses, polylineLength, renderFlowSvg, whiteContrast } from "./structure-flow-view.ts";
+import { FLOW_HOP_DELAY, FLOW_NEUTRAL_ROUTE, FLOW_PULSE_PERIOD, FLOW_PULSE_SPEED, FLOW_RAIL_COLORS, FLOW_ROUTE_COLORS, flowLayout, flowPulses, polylineLength, renderFlowSvg, whiteContrast } from "./structure-flow-view.ts";
 import { measureSvg, textWidth } from "./structure-measure.ts";
 
 let fixture: Fixture;
@@ -1380,7 +1380,7 @@ function motionSelections(model: FlowModel): (string | undefined)[] {
   return [undefined, ...model.routes.map((r) => r.id), ...model.entrances.map((e) => e.id), ...model.nodes.map((n) => n.id), ...model.levels.map((l) => l.id), ...model.chokepoints.map((c) => c.id), ...model.edges.map((e) => e.id)];
 }
 
-test("motion runs caller to callee and stops: every drawn line runs from caller to callee, only a selected route or component moves, every pulse's duration is its length over one speed, plays a fixed number of times, and reduced motion shows chevrons instead", () => {
+test("motion runs caller to callee while selected: every drawn line runs from caller to callee, only a selected route or component moves, every line flows at one slow speed for as long as the selection holds, and reduced motion shows chevrons instead", () => {
   const near = (p: readonly number[], box: { x: number; y: number; w: number; h: number }): boolean => p[0]! >= box.x - 1 && p[0]! <= box.x + box.w + 1 && p[1]! >= box.y - 1 && p[1]! <= box.y + box.h + 1;
   for (const state of [projectState(), crowdedState(), healthState(), trustState()]) {
     const model = flowOf(state);
@@ -1417,7 +1417,7 @@ test("motion runs caller to callee and stops: every drawn line runs from caller 
         continue;
       }
       for (const p of pulses) {
-        assert.ok(Math.abs(p.duration * FLOW_PULSE_SPEED - p.length) <= 0.6, `${p.on}: its duration ${p.duration}s is its length ${p.length}px over ${FLOW_PULSE_SPEED}px/s`);
+        assert.ok(Math.abs(p.duration * FLOW_PULSE_SPEED - FLOW_PULSE_PERIOD) <= 0.1, `${p.on}: its cycle ${p.duration}s is one period ${FLOW_PULSE_PERIOD}px over ${FLOW_PULSE_SPEED}px/s, the same on every line`);
         assert.ok(Math.abs(p.length - polylineLength(p.points)) <= 0.1);
         const onRoute = layout.routes.find((d) => d.route.id === p.on);
         if (onRoute !== undefined) assert.deepEqual(p.points, onRoute.path, `${p.on}: the pulse runs the route's own path, origin to end`);
@@ -1427,7 +1427,7 @@ test("motion runs caller to callee and stops: every drawn line runs from caller 
           assert.deepEqual(p.points, drawn.filter((pt, i) => i === 0 || Math.abs(pt[0] - drawn[i - 1]![0]) > 0.01 || Math.abs(pt[1] - drawn[i - 1]![1]) > 0.01), `${p.on}: the pulse runs its line's own points, caller to callee`);
           assert.equal(p.delay, FLOW_HOP_DELAY, "one hop after the component lights");
         }
-        assert.match(svg, new RegExp(`<path class="flow-pulse" data-pulse="${p.on}" data-pulse-length="${p.length}" data-pulse-duration="${p.duration}" data-pulse-plays="${FLOW_PULSE_PLAYS}"[^>]*stroke="color-mix\\(in srgb, [^,]+ 45%, #ffffff\\)" style="[^"]*animation-duration: ${p.duration}s; animation-delay: ${p.delay}s; animation-iteration-count: ${FLOW_PULSE_PLAYS}"`), `${p.on}: drawn in a lighter tint of its line, playing ${FLOW_PULSE_PLAYS} times`);
+        assert.match(svg, new RegExp(`<path class="flow-pulse" data-pulse="${p.on}" data-pulse-length="${p.length}" data-pulse-duration="${p.duration}" data-pulse-period="${FLOW_PULSE_PERIOD}"[^>]*stroke="color-mix\\(in srgb, [^,]+ 45%, #ffffff\\)" style="stroke-dasharray: \\d+ \\d+; stroke-dashoffset: 0; --pulse-end: -${FLOW_PULSE_PERIOD}px; animation-duration: ${p.duration}s; animation-delay: ${p.delay}s"`), `${p.on}: faint dashes in a lighter tint of its line, one period apart`);
         assert.match(svg, new RegExp(`<path class="flow-chevron" data-chevrons="${p.on}"`), `${p.on}: chevrons for reduced motion`);
       }
       assert.ok(pulses.length > 0 || selection.kind === "component" || selection.routes.size === 0, `${selected}: a selected route moves`);
@@ -1442,9 +1442,10 @@ test("motion runs caller to callee and stops: every drawn line runs from caller 
   assert.match(renderFlowSvg(flowOf(projectState()), run.id).text, /class="flow-tag flow-tag-verified[^"]*\bflow-tick\b"/, "a control on the route ticks as the pulse passes");
   const look = flowOf(noControlState()).routes.find((r) => r.names.includes("look"))!;
   assert.doesNotMatch(renderFlowSvg(flowOf(noControlState()), look.id).text, /class="[^"]*flow-tick/, "a route with no control shows no tick at all");
-  assert.ok(FLOW_PULSE_PLAYS >= 2 && FLOW_PULSE_PLAYS <= 3, "it plays two or three times, then rests");
+  assert.ok(FLOW_PULSE_SPEED <= 60 && FLOW_PULSE_PERIOD / FLOW_PULSE_SPEED >= 1.5, "slow enough to follow: at most 60 px/s, a cycle of at least 1.5 s");
   const style = /<style>([^]*?)<\/style>/.exec(renderFlowSvg(flowOf(projectState()), run.id).text)![1]!;
-  assert.doesNotMatch(style + readFileSync(new URL("./styles.css", import.meta.url), "utf8"), /infinite/, "no animation loops (WCAG 2.2.2)");
+  assert.match(style, /\.flow-svg \.flow-pulse \{[^}]*animation-iteration-count: infinite;/, "the flow continues while the selection holds");
+  assert.doesNotMatch(renderFlowSvg(flowOf(projectState()), undefined).text, /class="flow-pulse|class="[^"]*flow-tick/, "clearing the selection stops all motion");
+  assert.doesNotMatch(readFileSync(new URL("./styles.css", import.meta.url), "utf8"), /infinite/, "nothing on the page outside a selection loops");
   assert.match(style, /@media \(prefers-reduced-motion: reduce\) \{\s*\.flow-svg \.flow-pulse \{ display: none; animation: none; \}\s*\.flow-svg \.flow-tick, \.flow-svg \.flow-station\.is-reach rect\.flow-box \{ animation: none; \}\s*\.flow-svg \.flow-chevron \{ display: inline; \}/, "with reduced motion nothing animates and the chevrons show");
-  assert.match(style, /\.flow-svg:has\(\.is-pulse-source:hover\) \.flow-pulse-replay \{ animation-name: flow-pulse; animation-iteration-count: 1 !important;/, "hovering what is selected replays it once, in CSS alone");
 });
