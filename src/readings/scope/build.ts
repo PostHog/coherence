@@ -1,7 +1,7 @@
 /**
  * The Scope reading's two halves: the state, and the fixed shell that shows it.
  *
- * The state: Coherence's glossary (and the project's domain glossary of the
+ * The state: Coherence's lexicon (and the project's domain lexicon of the
  * same shape, when it has one), the spec model, the run records, the journal
  * records and the work orders, loaded into the model once by scopeState, the
  * one function every reader of the state goes through (the snapshot here,
@@ -15,8 +15,8 @@
  * either with the same pure render.
  *
  * With --root the state is read over another project: its spec tree, its
- * .coherence/runs, .coherence/journal and .coherence/work, and its glossary
- * (named in coherence.config.json under `glossary`, else glossary.json at
+ * .coherence/runs, .coherence/journal and .coherence/work, and its lexicon
+ * (named in coherence.config.json under `lexicon`, else lexicon.json at
  * its root) as the domain layer beneath Coherence's own. The command line is
  * cli.ts.
  */
@@ -32,12 +32,12 @@ import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { WORK_DIR, foldOrders, loadWork as loadWorkRecords, workDir } from "../../journal/work.ts";
-import { glossaryCoverage } from "../../lifecycle/glossary-coverage.ts";
-import { COHERENCE_GLOSSARY, projectGlossaryPath } from "../../lifecycle/project.ts";
+import { lexiconCoverage } from "../../lifecycle/lexicon-coverage.ts";
+import { COHERENCE_LEXICON, projectLexiconPath } from "../../lifecycle/project.ts";
 import { loadSpecModel } from "../../spec/model.ts";
-import { projectGlossaryCoverage } from "./glossary-projection.ts";
+import { projectLexiconCoverage } from "./lexicon-projection.ts";
 import { windowJournal, windowRuns } from "./derive.ts";
-import { parseGlossary, type Glossary, type InterfaceReading, type Ladder, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
+import { parseLexicon, type Lexicon, type InterfaceReading, type Ladder, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
 import { VIEWS } from "./shell.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -52,7 +52,7 @@ const BROWSER_SOURCES = [
   "model.ts",
   "derive.ts",
   "structure-flow.ts",
-  "glossary-view.ts",
+  "lexicon-view.ts",
   "components-view.ts",
   "structure-measure.ts",
   "structure-flow-view.ts",
@@ -68,9 +68,9 @@ const BROWSER_SOURCES = [
 export interface BuildOptions {
   /** The project root whose specs, runs, journal and work are read. The working directory when absent. */
   root?: string;
-  /** Path to Coherence's own glossary. */
-  glossaryPath: string;
-  /** Path to a project domain glossary of the same shape. Located from the root's config when absent. */
+  /** Path to Coherence's own lexicon. */
+  lexiconPath: string;
+  /** Path to a project domain lexicon of the same shape. Located from the root's config when absent. */
   domainPath?: string;
   /** Heading for the domain layer. Derived from the file's project name when not given. */
   domainTitle?: string;
@@ -85,13 +85,13 @@ export interface BuildOptions {
 }
 
 export const DEFAULTS = {
-  glossaryPath: "docs/glossary.json",
+  lexiconPath: "docs/lexicon.json",
   outPath: "public/_scope.html",
-  domainTitle: "Domain glossary",
+  domainTitle: "Domain lexicon",
   project: "Coherence",
 } as const;
 
-async function readGlossary(path: string): Promise<Glossary> {
+async function readLexicon(path: string): Promise<Lexicon> {
   const text = await readFile(path, "utf8");
   let parsed: unknown;
   try {
@@ -99,7 +99,7 @@ async function readGlossary(path: string): Promise<Glossary> {
   } catch (error) {
     throw new Error(`${path}: not valid JSON (${(error as Error).message})`);
   }
-  return parseGlossary(parsed, path);
+  return parseLexicon(parsed, path);
 }
 
 function capitalize(text: string): string {
@@ -107,9 +107,9 @@ function capitalize(text: string): string {
 }
 
 /** The domain layer's heading: as given, else from the file's project name, else the default. */
-function domainTitle(options: BuildOptions, glossary: Glossary | undefined): string {
+function domainTitle(options: BuildOptions, lexicon: Lexicon | undefined): string {
   if (options.domainTitle !== undefined) return options.domainTitle;
-  if (glossary?.project !== undefined) return `${capitalize(glossary.project)} glossary`;
+  if (lexicon?.project !== undefined) return `${capitalize(lexicon.project)} lexicon`;
   return DEFAULTS.domainTitle;
 }
 
@@ -187,12 +187,12 @@ export function loadWork(root: string): WorkData {
   return { kind: "present", orders: foldOrders(loaded), damaged: loaded.damaged };
 }
 
-/** The domain glossary path: as given, else the root's own when it is not Coherence's glossary itself. */
+/** The domain lexicon path: as given, else the root's own when it is not Coherence's lexicon itself. */
 async function domainPathFor(options: BuildOptions, root: string): Promise<string | undefined> {
   if (options.domainPath !== undefined) return options.domainPath;
-  const located = await projectGlossaryPath(root);
+  const located = await projectLexiconPath(root);
   if (located === undefined) return undefined;
-  if (resolve(located) === resolve(options.glossaryPath) || resolve(located) === COHERENCE_GLOSSARY) return undefined;
+  if (resolve(located) === resolve(options.lexiconPath) || resolve(located) === COHERENCE_LEXICON) return undefined;
   return located;
 }
 
@@ -202,25 +202,25 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
   const coherence: Layer = {
     kind: "present",
     id: "coherence",
-    title: `${options.project} glossary`,
-    glossary: await readGlossary(options.glossaryPath),
+    title: `${options.project} lexicon`,
+    lexicon: await readLexicon(options.lexiconPath),
   };
   const domainPath = await domainPathFor(options, root);
-  const domainGlossary = domainPath === undefined ? undefined : await readGlossary(domainPath);
+  const domainLexicon = domainPath === undefined ? undefined : await readLexicon(domainPath);
   const domain: Layer =
-    domainGlossary === undefined
+    domainLexicon === undefined
       ? {
           kind: "absent",
           id: "domain",
           title: domainTitle(options, undefined),
           because:
-            "No domain glossary is present. Supply a second glossary file of the same shape to read the project's own vocabulary beneath Coherence's.",
+            "No domain lexicon is present. Supply a second lexicon file of the same shape to read the project's own vocabulary beneath Coherence's.",
         }
       : {
           kind: "present",
           id: "domain",
-          title: domainTitle(options, domainGlossary),
-          glossary: domainGlossary,
+          title: domainTitle(options, domainLexicon),
+          lexicon: domainLexicon,
         };
   const runs = loadRuns(root);
   const journal = loadJournal(root);
@@ -241,8 +241,8 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
   return {
     project: options.project,
     views: VIEWS.map((v) => ({ id: v.id, label: v.label })),
-    activeView: options.structurePreview === undefined || options.structurePreview.length === 0 ? "glossary" : "structure",
-    glossary: { layers: [coherence, domain], query: "", coverage: projectGlossaryCoverage(await glossaryCoverage(root)) },
+    activeView: options.structurePreview === undefined || options.structurePreview.length === 0 ? "lexicon" : "structure",
+    lexicon: { layers: [coherence, domain], query: "", coverage: projectLexiconCoverage(await lexiconCoverage(root)) },
     spec,
     runs: { records: runs.records, damaged: runs.damaged },
     journal: { records: journal.records, damaged: journal.damaged, work: loadWork(root) },
@@ -319,7 +319,7 @@ const PLEX_LATIN = "U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02D
  * base64 woff2 so the page stays self-contained: the regular weight of the
  * Latin subset the package ships (17.5 KB, 23.4 KB as base64), the only
  * weight the map and the page set mono text in; the medium weight would push
- * the page with a domain glossary past its 2 MB budget. Without the package
+ * the page with a domain lexicon past its 2 MB budget. Without the package
  * the page falls back to the monospace stack it names after Plex.
  */
 async function plexMono(): Promise<string> {
@@ -421,7 +421,7 @@ export async function writeStructurePreview(root: string, preview: StructurePrev
     throw new Error("Structure preview: write the generated page outside the project root so it cannot perturb the project's inputs");
   }
   return writeScopePage(
-    { root: projectRoot, glossaryPath: COHERENCE_GLOSSARY, project: projectNameOf(projectRoot), structurePreview: [preview] },
+    { root: projectRoot, lexiconPath: COHERENCE_LEXICON, project: projectNameOf(projectRoot), structurePreview: [preview] },
     output,
   );
 }
@@ -440,9 +440,9 @@ export function projectNameOf(root: string): string {
   return capitalize(basename(root));
 }
 
-/** The options a reading of `root` builds with when nothing more is given: Coherence's glossary, the project's own name. */
+/** The options a reading of `root` builds with when nothing more is given: Coherence's lexicon, the project's own name. */
 export function rootOptions(root: string): BuildOptions {
-  return { root: resolve(root), glossaryPath: COHERENCE_GLOSSARY, project: projectNameOf(root) };
+  return { root: resolve(root), lexiconPath: COHERENCE_LEXICON, project: projectNameOf(root) };
 }
 
 // Run directly, this file is the scope command (cli.ts), kept so an older invocation still writes its snapshot.

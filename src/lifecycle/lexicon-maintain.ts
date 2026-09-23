@@ -15,14 +15,16 @@ import { randomUUID } from "node:crypto";
 import { decide } from "../journal/verbs.ts";
 import { loadJournal, sessionFile } from "../journal/store.ts";
 import { workBinding } from "../journal/work.ts";
-import { digest, glossaryCoverage } from "./glossary-coverage.ts";
-import { parseGlossary, rejectedNames } from "./glossary.ts";
-import { isCoherenceItself, projectGlossaryPath } from "./project.ts";
+import { digest, lexiconCoverage } from "./lexicon-coverage.ts";
+import { parseLexicon, rejectedNames } from "./lexicon.ts";
+import { isCoherenceItself, projectLexiconPath } from "./project.ts";
 
 export interface Who {
   session: string;
   agent: string;
   work?: string;
+  /** Earlier records the ruling rests on, passed through to the decision as --cite. */
+  cite?: string[];
 }
 export interface Change {
   action: "declare" | "define" | "alias" | "reject" | "rename" | "retire";
@@ -49,19 +51,26 @@ interface Transaction {
   over: string[];
   human?: string;
 }
-const STATE = ".coherence/glossary";
+const STATE = ".coherence/lexicon";
+/**
+ * The shape of an applied-proposal decision: the vocabulary verb, "apply",
+ * the proposal id. The verb is matched by shape, not by name, so a record
+ * written before the concept was renamed (under the name it now rejects)
+ * still counts as applied: the journal is append-only and is read as written.
+ */
+const APPLIED = /^[a-z]+ apply [a-z]p-[a-f0-9]{24} /;
 
-/** Confine even through existing symlinked parents; a configured glossary cannot write outside its project. */
+/** Confine even through existing symlinked parents; a configured lexicon cannot write outside its project. */
 export function confined(root: string, name: string): string {
   const path = resolve(root, name);
   const rel = relative(resolve(root), path);
   if (isAbsolute(rel) || rel === ".." || rel.startsWith("../"))
-    throw new Error("glossary path is outside the project root");
+    throw new Error("lexicon path is outside the project root");
   let existing = path;
   while (!existsSync(existing)) existing = dirname(existing);
   const actual = relative(realpathSync(root), realpathSync(existing));
   if (isAbsolute(actual) || actual === ".." || actual.startsWith("../"))
-    throw new Error("glossary path follows a link outside the project root");
+    throw new Error("lexicon path follows a link outside the project root");
   return path;
 }
 function atomic(path: string, text: string): void {
@@ -78,7 +87,7 @@ function body(path: string): string {
   return existsSync(path) ? readFileSync(path, "utf8") : "";
 }
 function validate(value: Record<string, unknown>, path: string): void {
-  const parsed = parseGlossary(value, path);
+  const parsed = parseLexicon(value, path);
   const names = new Set<string>();
   for (const entry of value["concepts"] as Record<string, unknown>[]) {
     for (const key of [
@@ -107,7 +116,7 @@ function validate(value: Record<string, unknown>, path: string): void {
     for (const n of [c.name, ...c.aliases, ...(c.instances ?? [])]) {
       const key = n.toLowerCase().trim();
       if (names.has(key))
-        throw new Error(`ambiguous or duplicate glossary name: ${n}`);
+        throw new Error(`ambiguous or duplicate lexicon name: ${n}`);
       names.add(key);
     }
   }
@@ -117,13 +126,13 @@ function validate(value: Record<string, unknown>, path: string): void {
         `a name cannot be both accepted and rejected: ${rejected.name}`,
       );
 }
-export async function glossaryTarget(root: string): Promise<string> {
+export async function lexiconTarget(root: string): Promise<string> {
   return confined(
     root,
-    (await projectGlossaryPath(root)) ??
+    (await projectLexiconPath(root)) ??
       ((await isCoherenceItself(root))
-        ? "docs/glossary.json"
-        : "glossary.json"),
+        ? "docs/lexicon.json"
+        : "lexicon.json"),
   );
 }
 export async function propose(root: string, change: Change): Promise<Proposal> {
@@ -152,10 +161,10 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
       ].some((k) => k in change.entry!)
     )
       throw new Error(
-        "live usage/code addresses belong to the reading, not a glossary entry",
+        "live usage/code addresses belong to the reading, not a lexicon entry",
       );
   }
-  const target = await glossaryTarget(root);
+  const target = await lexiconTarget(root);
   const raw = body(target);
   const value = (
     raw
@@ -163,7 +172,7 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
       : { version: 1, project: root.split("/").at(-1), concepts: [] }
   ) as Record<string, unknown>;
   if (!Array.isArray(value["concepts"]))
-    throw new Error("glossary concepts must be a list");
+    throw new Error("lexicon concepts must be a list");
   const concepts = value["concepts"] as Record<string, unknown>[];
   const existing = concepts.find(
     (c) => String(c["name"]).toLowerCase() === change.name.toLowerCase(),
@@ -284,7 +293,7 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
     humanRequired,
   };
   const proposal: Proposal = {
-    id: "gp-" + digest(draft).slice(0, 24),
+    id: "lp-" + digest(draft).slice(0, 24),
     ...draft,
   };
   const path = confined(root, `${STATE}/proposals/${proposal.id}.json`);
@@ -292,30 +301,31 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
   return proposal;
 }
 function readProposal(root: string, id: string): Proposal {
-  if (!/^gp-[a-f0-9]{24}$/.test(id))
-    throw new Error("invalid glossary proposal id");
+  if (!/^lp-[a-f0-9]{24}$/.test(id))
+    throw new Error("invalid lexicon proposal id");
   const p = JSON.parse(
     readFileSync(confined(root, `${STATE}/proposals/${id}.json`), "utf8"),
   ) as Proposal;
   const { id: stored, ...draft } = p;
-  if (stored !== id || "gp-" + digest(draft).slice(0, 24) !== id)
+  if (stored !== id || "lp-" + digest(draft).slice(0, 24) !== id)
     throw new Error("proposal content was changed; prepare a new preview");
   return p;
 }
 function writingFlags(who: Who): string[] {
   if (!who.session || !who.agent)
-    throw new Error("every glossary ruling needs --session and --agent");
+    throw new Error("every lexicon ruling needs --session and --agent");
   return [
     "--session",
     who.session,
     "--agent",
     who.agent,
     ...(who.work ? ["--work", who.work] : []),
+    ...(who.cite ?? []).flatMap((id) => ["--cite", id]),
   ];
 }
 function appliedDecision(root: string, id: string): string | undefined {
   return loadJournal(root).records.find(
-    (r) => r.kind === "decision" && r.chose.startsWith(`glossary apply ${id} `),
+    (r) => r.kind === "decision" && APPLIED.test(r.chose) && r.chose.includes(` apply ${id} `),
   )?.id;
 }
 /** The same path finishes a fresh application and an interrupted one; it never overwrites concurrent edits. */
@@ -325,7 +335,7 @@ function finish(root: string, tx: Transaction): string {
   if (current !== tx.proposal.after) {
     if (digest(current) !== tx.proposal.before)
       throw new Error(
-        "glossary changed since preview; pending application cannot overwrite it",
+        "lexicon changed since preview; pending application cannot overwrite it",
       );
     atomic(target, tx.proposal.after);
   }
@@ -334,7 +344,7 @@ function finish(root: string, tx: Transaction): string {
     existing ??
     decide(
       [
-        `glossary apply ${tx.proposal.id} ${JSON.stringify({ change: tx.proposal.change, human: tx.human ?? null })}`,
+        `lexicon apply ${tx.proposal.id} ${JSON.stringify({ change: tx.proposal.change, human: tx.human ?? null })}`,
         "--because",
         tx.because,
         ...tx.over.flatMap((s) => ["--over", s]),
@@ -353,7 +363,7 @@ function locked<T>(root: string, run: () => T): T {
     fd = openSync(path, "wx");
   } catch {
     throw new Error(
-      "another glossary apply/recover holds the lock; inspect it before removing a stale lock",
+      "another lexicon apply/recover holds the lock; inspect it before removing a stale lock",
     );
   }
   try {
@@ -386,14 +396,14 @@ export function applyProposal(
       );
     if (existsSync(confined(root, `${STATE}/pending.json`)))
       throw new Error(
-        "an application is pending: run glossary recover before another apply",
+        "an application is pending: run lexicon recover before another apply",
       );
     if (appliedDecision(root, id))
       throw new Error(
         "proposal already applied; prepare a new preview for further changes",
       );
     if (digest(body(confined(root, p.target))) !== p.before)
-      throw new Error("glossary changed since preview; prepare a new proposal");
+      throw new Error("lexicon changed since preview; prepare a new proposal");
     const tx: Transaction = {
       proposal: p,
       who,
@@ -405,10 +415,10 @@ export function applyProposal(
     return finish(root, tx);
   });
 }
-export function recoverGlossary(root: string): string {
+export function recoverLexicon(root: string): string {
   return locked(root, () => {
     const path = confined(root, `${STATE}/pending.json`);
-    if (!existsSync(path)) return "no pending glossary application";
+    if (!existsSync(path)) return "no pending lexicon application";
     const tx = JSON.parse(readFileSync(path, "utf8")) as Transaction;
     const p = readProposal(root, tx.proposal.id);
     if (digest(p) !== digest(tx.proposal))
@@ -419,7 +429,7 @@ export function recoverGlossary(root: string): string {
     return finish(root, tx);
   });
 }
-export async function reviewGlossary(
+export async function reviewLexicon(
   root: string,
   term: string,
   component: string,
@@ -440,7 +450,7 @@ export async function reviewGlossary(
     throw new Error(
       "a settled sense review needs --human acknowledgement; use deferred or defect without a ruling",
     );
-  const report = await glossaryCoverage(root);
+  const report = await lexiconCoverage(root);
   const found = report.terms.find(
     (t) => t.term.toLowerCase() === term.toLowerCase(),
   );
@@ -454,13 +464,13 @@ export async function reviewGlossary(
   const context = found?.contexts.find((c) => c.component === component);
   if (!context || context.fingerprint !== evidence)
     throw new Error(
-      "stale or absent review evidence; read glossary review again",
+      "stale or absent review evidence; read lexicon review again",
     );
   if (!because.trim() || !over.length)
     throw new Error("a review needs --because and --over");
   return decide(
     [
-      "glossary review " +
+      "lexicon review " +
         JSON.stringify({
           term,
           component,

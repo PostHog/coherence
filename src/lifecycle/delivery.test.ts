@@ -29,7 +29,7 @@ test("status says what each event delivers: orient at the starts, the peer feed 
     ]);
     const start = list[0]!.carries.join("\n");
     assert.match(start, /escalations awaiting a human: 1 /, "measured from this project's journal");
-    assert.match(start, /no project glossary, delivered at detail "full"/);
+    assert.match(start, /no project lexicon, delivered at detail "full"/);
     assert.match(start, new RegExp(`size now: ${(await startContext(dir, {})).length.toLocaleString("en-US")} of 9,500 characters`), "the size is the injection's own");
     assert.match(list[3]!.carries.join("\n"), /never whole records[\s\S]*revelation at the edit/);
     assert.match(list[4]!.carries.join("\n"), /never refuses/);

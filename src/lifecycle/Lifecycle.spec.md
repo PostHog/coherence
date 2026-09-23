@@ -1,6 +1,6 @@
 # Lifecycle
 
-The gyroscope delivered through harness events: orient at start, regulate at stop, the glossary injected and checked.
+The gyroscope delivered through harness events: orient at start, regulate at stop, the lexicon injected and checked.
 
 ## entrances
 - SessionStart: the agent host starts a session; orient injects the vocabulary, the project's standing, and the session's work order
@@ -18,19 +18,19 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
 
 ## invariants
 - compact injection: The injection at session start carries the vocabulary only: nothing from detail, provenance, or metaphors.
-  over: every concept of both glossary layers
+  over: every concept of both lexicon layers
   via: renderCompact: header, one line per concept, rejected in brackets, nothing from detail, provenance or metaphors
   because: the injection rides in a context budget shared with the session's work; detail and provenance are for a human in Scope, and a metaphor in the injection would be read as a definition
   crossing: project-source -> reading
-  refuted: made renderCompact print each concept's whole entry beside its line -> "renderCompact: header, one line per concept, rejected in brackets, nothing from detail, provenance or metaphors" went red in glossary.test.ts; restored, green (2026-09-17)
+  refuted: made renderCompact print each concept's whole entry beside its line -> "renderCompact: header, one line per concept, rejected in brackets, nothing from detail, provenance or metaphors" went red in lexicon.test.ts; restored, green (2026-09-17)
   kinds: output
   checklist: destination-confinement dismissed: the injection goes to one destination, the host's additionalContext, and follows no redirect
   checklist: redaction declared as compact injection
   checklist: commit-ordered-effects dismissed: nothing is committed before the injection and it has no external effect
   checklist: circuit-breaker-policy dismissed: no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
-- injection within budget: The start injection stays under the host budget: the project layer steps down in detail until the whole fits; when what must be shown whole (escalations are never shortened) leaves no room, Coherence's layer steps down to names and then to one line that points at the glossary command.
-  over: every start injection, with both glossary layers at every level and any number of open escalations ahead of them
+- injection within budget: The start injection stays under the host budget: the project layer steps down in detail until the whole fits; when what must be shown whole (escalations are never shortened) leaves no room, Coherence's layer steps down to names and then to one line that points at the lexicon command.
+  over: every start injection, with both lexicon layers at every level and any number of open escalations ahead of them
   via: the start injection stays under the budget with escalations present: the vocabulary steps down to names and then to a pointer, and no escalation is shortened
   because: a host replaces an over-long injection with a file preview or spills it, so an injection that overran the budget would be read by nobody, and the one record that exists for a human would be the thing that hid itself; the vocabulary can shrink because its full entries are one command away, the escalations cannot
   crossing: project-source -> reading
@@ -43,23 +43,23 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: execution-budget dismissed: no steps are counted
   checklist: circuit-breaker-policy dismissed: no dependency failures are observed
 - rejected names refused: A rejected name is a finding as a whole word or phrase in prose and as an identifier token in code, each with its concept and because.
-  over: every rejected name of both glossary layers, across every prose and code file in the corpus
+  over: every rejected name of both lexicon layers, across every prose and code file in the corpus
   via: rejected names are found as whole words in prose, with concept and because
-  because: a rejected name is drift the glossary already refused once; finding it as a whole word with its concept and the reason turns the second refusal into one edit instead of a discussion
+  because: a rejected name is drift the lexicon already refused once; finding it as a whole word with its concept and the reason turns the second refusal into one edit instead of a discussion
   crossing: project-source -> reading
   refuted: removed the prose pass from rejectedInProse -> "rejected names are found as whole words in prose, with concept and because" went red in check.test.ts; restored, green (2026-09-17)
   kinds: none
-- both layers reach identifiers: Both glossary layers' rejected names are matched in identifiers as well as in prose; only a name the project declares as its own concept or alias is silent there.
-  over: every rejected name of both layers against every identifier token in the corpus, in a project with its own glossary and in one without
+- both layers reach identifiers: Both lexicon layers' rejected names are matched in identifiers as well as in prose; only a name the project declares as its own concept or alias is silent there.
+  over: every rejected name of both layers against every identifier token in the corpus, in a project with its own lexicon and in one without
   via: in code, both layers' rejected names match identifier tokens, Coherence's too in an adopter, unless the project declares the name as its own; language globals and module specifiers never match
-  because: the cross-glossary rule is about sense, not about where a word sits: a project that means something of its own by a word declares it and is left alone, and a project that has not declared it is drifting whether the word is in a sentence or in a symbol. Holding Coherence's names against prose only let an adopter's code carry them untouched, which is where naming drift actually lives
+  because: the cross-lexicon rule is about sense, not about where a word sits: a project that means something of its own by a word declares it and is left alone, and a project that has not declared it is drifting whether the word is in a sentence or in a symbol. Holding Coherence's names against prose only let an adopter's code carry them untouched, which is where naming drift actually lives
   crossing: project-source -> reading
   refuted: held Coherence's rejected names against an adopter's prose only, so the name in an adopter identifier went unreported -> "in code, both layers' rejected names match identifier tokens, Coherence's too in an adopter, unless the project declares the name as its own; language globals and module specifiers never match" went red in check.test.ts, the identifier hit missing from the expected list; restored, green (2026-09-18)
   kinds: none
 - the corpus is every text kind: The check reads every text file kind the project holds, the journal's and work's own records included, and leaves out what is written in another vocabulary on purpose, what no rename can repair, and what is not text.
   over: every file under the project root, by kind: prose, code, data, dotfiles, records, lockfiles, binaries, the retired inventories, the reference docs and the reviews
   via: the corpus reads every text kind the project holds, the journal's records included, and leaves out lockfiles, binaries, runs, and the reviews
-  because: a check that reads two extensions reports zero over a project whose drift is in its configuration, its scripts and its records, and a zero that means "not looked at" is worse than no check; the exclusions are the files that must name what they refuse (the glossaries and the retired inventories), the files a rename cannot reach (a dependency lockfile), and the files that are not the project's own words (the reference docs and the adversarial reviews, which quote the names they report)
+  because: a check that reads two extensions reports zero over a project whose drift is in its configuration, its scripts and its records, and a zero that means "not looked at" is worse than no check; the exclusions are the files that must name what they refuse (the lexicons and the retired inventories), the files a rename cannot reach (a dependency lockfile), and the files that are not the project's own words (the reference docs and the adversarial reviews, which quote the names they report)
   crossing: project-source -> reading
   refuted: read only .md and .ts, so eleven files of nine other kinds went unread and only the review the check should skip was read -> "the corpus reads every text kind the project holds, the journal's records included, and leaves out lockfiles, binaries, runs, and the reviews" went red in check.test.ts with every expected file missing; restored, green (2026-09-18)
   kinds: read
@@ -98,9 +98,9 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
 - an unknown noun never refuses: An unknown noun in a changed file is reported at the stop with its three answers and never refuses a subagent stop.
   over: every stop event whose changed files carry an unknown noun and no rejected name
   via: an unknown noun in a changed file is advisory: Stop reports it and SubagentStop never refuses on it
-  because: the nomination is a heuristic, precision over recall, and the glossary allows a refusal only for what the tool can prove: a rejected name, a spec problem, a structural defect; holding a subagent on a guess would teach it to strip capitalized phrases rather than declare names
+  because: the nomination is a heuristic, precision over recall, and the lexicon allows a refusal only for what the tool can prove: a rejected name, a spec problem, a structural defect; holding a subagent on a guess would teach it to strip capitalized phrases rather than declare names
   crossing: harness -> reading
-  refuted: refused the subagent stop on any glossary finding, unknown nouns included -> "an unknown noun in a changed file is advisory: Stop reports it and SubagentStop never refuses on it" went red in hook.test.ts, exit 2 where 0 was asserted; restored, green (2026-09-17)
+  refuted: refused the subagent stop on any lexicon finding, unknown nouns included -> "an unknown noun in a changed file is advisory: Stop reports it and SubagentStop never refuses on it" went red in hook.test.ts, exit 2 where 0 was asserted; restored, green (2026-09-17)
   kinds: none
 - a recorded wall makes the debt advisory: A debt the session has recorded as unable, naming the file, the rejected name, or the invariant, is reported with that record's id and does not refuse the subagent stop; another session's unable clears nothing.
   over: every rejected name, spec problem, and structural defect a subagent stop would refuse on, against every unable record of the stopping session
@@ -109,7 +109,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: record -> reading
   refuted: refused the subagent stop with the unable record on file, reading no wall -> "an unable record from the session turns the debt it names advisory: SubagentStop reports it and exits 0, and another session is still refused" went red in hook.test.ts, exit 2 where 0 was asserted; restored, green (2026-09-17)
   kinds: none
-- a git failure is not a clean tree: When git cannot list the changed files, the stop says so and that the glossary check ran over nothing; outside a repository the answer is no files, and a failure never refuses.
+- a git failure is not a clean tree: When git cannot list the changed files, the stop says so and that the lexicon check ran over nothing; outside a repository the answer is no files, and a failure never refuses.
   over: every stop event, in a repository git can read, one it cannot, and no repository at all
   via: changedFiles reports a git failure instead of answering a clean tree; outside git the answer is no files
   because: a listing that failed reads exactly like a tree with nothing changed unless the failure is carried; regulate would then report clean over files it never saw, which is the one lie the stop exists to prevent
@@ -205,7 +205,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
 - feed carries two kinds: The feed injects a peer's decisions and a peer's escalations, and no other verb.
   over: every record kind a peer can write, at every boundary event
   via: the peer feed injects a peer's decisions and escalations and no other kind
-  because: the glossary names decision subjects, and an escalation heads every read: a question standing before a human changes what a peer should do next, so a session that met one only at its own start would act past it for a whole cycle. Every other verb is the journal, one command away, and injecting all eleven at every tool use spends the session's budget on what nobody asked for
+  because: the lexicon names decision subjects, and an escalation heads every read: a question standing before a human changes what a peer should do next, so a session that met one only at its own start would act past it for a whole cycle. Every other verb is the journal, one command away, and injecting all eleven at every tool use spends the session's budget on what nobody asked for
   crossing: record -> reading
   refuted: injected the subject of every record kind, so a peer's conjecture, defect, unable, retraction and resolution rode into the context too -> "the peer feed injects a peer's decisions and escalations and no other kind" went red in hook.test.ts, seven records where two were asserted; restored, green (2026-09-18)
   kinds: output
@@ -244,15 +244,29 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: counted any identifier assigned on a code line as declared, so the local tallyMarks became a candidate from its split words -> "a code identifier is never a candidate unless it is declared and prose recurs it; ids, paths and fragments never are" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
   kinds: none
-- well-known names need no definition: A well-known name (the curated list, the config's wellKnown, the project's own name) and a name the glossary already declares or lists under not: is never a candidate, while a common word written as a project's proper noun, or a capitalized-only well-known word used lowercase in a project sense, still is.
+- well-known names need no definition: A well-known name (the curated list, the config's wellKnown, the project's own name) and a name the lexicon already declares or lists under not: is never a candidate, while a common word written as a project's proper noun, or a capitalized-only well-known word used lowercase in a project sense, still is.
   over: every candidate the corpus nominates, against the shipped list, the config, the project's name, every concept, alias, instance, property and not: entry of both layers
-  via: well-known names, the project's own name and the glossary's not: names are never candidates, while a common word written as a project's proper noun still is
+  via: well-known names, the project's own name and the lexicon's not: names are never candidates, while a common word written as a project's proper noun still is
   because: Python, Pyright, Chrome and the project's own name carried the old list's top and no definition could make them less ambiguous; but the fear of ambiguity lives exactly where a common word takes a project sense (Mnemion's hive; Coherence's scope, core, run, session), so the skip must never reach those
   crossing: project-source -> reading
-  refuted: dropped the well-known check from nomination, so Kubernetes, Postgres, the config's Zanzibar and the project's own name were offered as candidates -> "well-known names, the project's own name and the glossary's not: names are never candidates, while a common word written as a project's proper noun still is" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
+  refuted: dropped the well-known check from nomination, so Kubernetes, Postgres, the config's Zanzibar and the project's own name were offered as candidates -> "well-known names, the project's own name and the lexicon's not: names are never candidates, while a common word written as a project's proper noun still is" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
+  kinds: none
+- the retired lexicon file is refused with its migration: A project whose lexicon file or config key still carries the concept's retired name fails every command that loads it, with the one-line migration; the retired name is never read as a fallback, and Coherence's lexicon supplies the retired name as data.
+  over: every retired single-word name Coherence's lexicon records for the lexicon concept, as a root file with no lexicon.json and as a coherence.config.json key
+  via: a project carrying its lexicon under the retired name is refused with the one-line migration, and the old name is never read
+  because: the owner ruled the rename once, everywhere (d-cb376a86); an adopter left on the old file name would otherwise read no domain lexicon at all and pass every check silently, and a fallback that kept reading the old name would leave two names for one file standing forever
+  crossing: project-source -> reading
+  refuted: dropped the retired-file refusal from projectLexiconPath, so a project on the old file name read no domain lexicon -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none
+- rulings recorded under the retired verb still count: A sense review or an applied proposal recorded before the rename, under the retired verb, keeps its ruling and still counts as applied; the verb is matched by the ruling's shape, not by name.
+  over: every structured review and apply decision in the journal, whichever verb it was written under
+  via: rulings recorded under the retired verb still count: the journal is read as written
+  because: the journal is append-only, so the records written before the rename cannot be edited to the new verb; a reader that matched only the new verb would silently reopen every settled sense and let an applied proposal be applied twice
+  crossing: record -> reading
+  refuted: matched sense reviews by the new verb's name only in lexicon-coverage.ts, so a review recorded under the retired verb lost its ruling -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
 - sense review only where meaning is at risk: A known word's use asks a sense review only when its meaning is at risk: the name has more than one recorded sense, a name rejected for that concept sits on or beside the line, or a Coherence concept is declared in an adopter's code; an ordinary use of a defined word asks nothing.
-  over: every context of every known term, across prose, code and records, in a project with its own glossary and in Coherence itself
+  over: every context of every known term, across prose, code and records, in a project with its own lexicon and in Coherence itself
   via: sense review is asked only where meaning is at risk: more than one recorded sense, a rejected name beside the use, or a Coherence concept an adopter's code declares
   because: the old reading asked a review of every new or changed line that used a known word, 8,330 contexts on this repository, so every edit mentioning run or work order grew a pile nobody could settle; a review is worth asking only where two meanings can meet
   crossing: project-source -> reading
@@ -263,7 +277,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   via: no hook injection carries a total: orient names the ranked terms or says nothing
   because: a number nobody can act on trains an agent to skip the line it sits in, and the vocabulary line had become the one every session skipped; a short named list is something to do, and silence when nothing is owed keeps the line worth reading
   crossing: project-source -> reading
-  refuted: put the old Glossary coverage totals line back at the head of orient's vocabulary signal -> "no hook injection carries a total: orient names the ranked terms or says nothing" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
+  refuted: put the old Lexicon coverage totals line back at the head of orient's vocabulary signal -> "no hook injection carries a total: orient names the ranked terms or says nothing" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
   kinds: output
   checklist: destination-confinement dismissed: one destination, the host's additionalContext or systemMessage, and no redirect
   checklist: redaction dismissed: only terms and component names are printed, never a use's text
@@ -296,5 +310,5 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   via: function words are never candidates: every preposition, conjunction, determiner, pronoun and auxiliary is refused however prose writes it
   because: "via" surfaced as the third recurring undefined term on this repository, from every spec's via: line; a word that carries grammar has no sense a project could define, so offering it spends the reader's attention on a list it learns to skip
   crossing: project-source -> reading
-  refuted: dropped the function-word refusal from nominate in glossary-coverage.ts, so a function word written capitalized mid-sentence was nominated as a proper noun -> "function words are never candidates: every preposition, conjunction, determiner, pronoun and auxiliary is refused however prose writes it" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
+  refuted: dropped the function-word refusal from nominate in lexicon-coverage.ts, so a function word written capitalized mid-sentence was nominated as a proper noun -> "function words are never candidates: every preposition, conjunction, determiner, pronoun and auxiliary is refused however prose writes it" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
   kinds: none

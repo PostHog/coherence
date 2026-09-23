@@ -2,7 +2,7 @@
  * The agent query: CLI access for the agent to what Scope shows a human, as
  * a small fixed set of questions with plain-text answers. Every answer is a
  * pure function of the shared readings; nothing here reads a file. The
- * glossary CLI supplies full coverage, while a page supplies bounded evidence.
+ * lexicon CLI supplies full coverage, while a page supplies bounded evidence.
  *
  *   invariants <path...>   which invariants touch these files
  *   relies-on <chokepoint> who references this chokepoint
@@ -35,10 +35,10 @@ import {
 } from "../scope/derive.ts";
 import { CORE_RULE, DEFAULT_RULE, ROUTE_RULE, flowDefaultSelection, flowLabelLines, flowOf, routeName } from "../scope/structure-flow.ts";
 import { renderOrder } from "../../journal/workVerbs.ts";
-import { glossaryReviewCommand } from "../scope/model.ts";
-import type { GlossaryCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
+import { lexiconReviewCommand } from "../scope/model.ts";
+import type { LexiconCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
 
-export const QUESTIONS = ["invariants", "relies-on", "spine", "structure", "status", "component", "order", "economy", "glossary", "observed"] as const;
+export const QUESTIONS = ["invariants", "relies-on", "spine", "structure", "status", "component", "order", "economy", "lexicon", "observed"] as const;
 export type Question = (typeof QUESTIONS)[number];
 
 export function isQuestion(value: string): value is Question {
@@ -46,7 +46,7 @@ export function isQuestion(value: string): value is Question {
 }
 
 export const QUERY_USAGE = [
-  "  query glossary <term>         full live definition, all contexts and uses behind Scope's evidence summary",
+  "  query lexicon <term>         full live definition, all contexts and uses behind Scope's evidence summary",
   "  query invariants <path...>     which invariants touch these files, by component and by reference site",
   "  query relies-on <chokepoint>   who references this chokepoint, from the latest run",
   "  query spine                    trust levels and every crossing-bearing invariant, in Structure order",
@@ -330,13 +330,13 @@ export interface QueryOptions {
 }
 
 /** Render either the full authoritative reading or an explicitly labelled page selection. */
-export function answerGlossary(report: GlossaryCoverage | undefined, args: string[]): Answer {
-  if (args.length !== 1 || args[0]!.trim() === "") return { text: "query glossary needs one term", code: 64 };
+export function answerLexicon(report: LexiconCoverage | undefined, args: string[]): Answer {
+  if (args.length !== 1 || args[0]!.trim() === "") return { text: "query lexicon needs one term", code: 64 };
   if (!report) return { text: "No vocabulary usage reading is available in this page state.", code: 64 };
   const term = args[0]!.trim().toLowerCase();
   const terms = report.terms.filter((t) =>
     t.term === term || t.concept?.toLowerCase() === term || t.meaningAlternatives?.some((meaning) => meaning.concept.toLowerCase() === term));
-  const fullReading = glossaryReviewCommand(args[0]!.trim());
+  const fullReading = lexiconReviewCommand(args[0]!.trim());
   // The term's reading leads: its recurrence, then each context with its risk. What the page left out follows it.
   const lines: string[] = [];
   if (terms.length === 0) {
@@ -358,7 +358,7 @@ export function answerGlossary(report: GlossaryCoverage | undefined, args: strin
       `${t.contexts.length} of ${contexts} contexts shown; ${contexts - t.contexts.length} contexts omitted.`,
       ...t.uses.map((u) => `  ${u.file}:${u.line} ${u.text}`),
       `${t.uses.length} of ${t.count} uses shown; ${t.count - t.uses.length} uses omitted.`,
-      `Full JSON reading: ${glossaryReviewCommand(t.term)}`,
+      `Full JSON reading: ${lexiconReviewCommand(t.term)}`,
     );
   }
   lines.push(...(report.projection ? [
@@ -371,8 +371,8 @@ export function answerGlossary(report: GlossaryCoverage | undefined, args: strin
 /** Answer one question from the state. */
 export function answer(state: ShellState, question: string, args: string[], options: QueryOptions = {}): Answer {
   switch (question) {
-    case "glossary":
-      return answerGlossary(state.glossary.coverage, args);
+    case "lexicon":
+      return answerLexicon(state.lexicon.coverage, args);
     case "invariants":
       return answerInvariants(state, args);
     case "relies-on":

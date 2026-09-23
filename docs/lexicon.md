@@ -1,7 +1,7 @@
-# The glossary is first-class
+# The lexicon is first-class
 
 Coherence needs first-class support for building, maintaining, and validating a
-project's glossary. This is a standing requirement of the tool, not a preliminary
+project's lexicon. This is a standing requirement of the tool, not a preliminary
 to the spine. The evidence is one day old.
 
 ## Why
@@ -28,12 +28,12 @@ the mechanism against it can find a name that has drifted from what the code doe
 
 ## The three activities
 
-**Building.** A project's glossary is drafted from its specs, docs, component
+**Building.** A project's lexicon is drafted from its specs, docs, component
 names, and tool surface, then settled by the owner one collision at a time:
 declare, map, or fix. Mnemion's draft had 88 concepts, 25 candidate overloads, and
 16 uncertain terms; every one needed a human ruling. First-class support means the
 tool drafts, sorts collisions by how a word is used, and records each ruling with
-its reason, so the rulings are the glossary's history rather than a chat transcript.
+its reason, so the rulings are the lexicon's history rather than a chat transcript.
 
 **Maintaining.** Vocabulary grows with the work. A new noun in a spec, a journal
 record, or an identifier is caught at regulate and must be declared as a concept,
@@ -53,30 +53,30 @@ question.
 
 ## What exists and what is owed
 
-Exists: the glossary shape (vocabulary injected; detail and provenance shown in
+Exists: the lexicon shape (vocabulary injected; detail and provenance shown in
 Scope only), the compact injection at session start, the vocabulary check at
-regulate, the Scope glossary view with two layers, and the ruling records in
-Mnemion's glossary.
+regulate, the Scope lexicon view with two layers, and the ruling records in
+Mnemion's lexicon.
 
 Owed: drafting as a command rather than an agent prompt; collision sorting by
 usage; overload detection through the similarity seam; and a sense-review reading
-that a human can run per concept in minutes. These are the glossary slice's second
+that a human can run per concept in minutes. These are the lexicon slice's second
 half, and they rank ahead of any spine work that would reintroduce the class they
 catch.
 
-Anti-rot holds throughout: the glossary names things and never points at code.
+Anti-rot holds throughout: the lexicon names things and never points at code.
 
 ## Coverage-first work orders
 
 The maintenance loop, transcript evidence, implementation orders, and readiness
 checkpoint for the next feature-parity slice are recorded in
-[Glossary coverage before feature-parity work](glossary-work.md). A green name
+[Lexicon coverage before feature-parity work](lexicon-work.md). A green name
 check alone does not establish vocabulary coverage or correct sense.
 
 ## Implemented command loop
 
 The command workflow and its limitations are documented in
-[Glossary operations](glossary-operations.md). The earlier owed list records the
+[Lexicon operations](lexicon-operations.md). The earlier owed list records the
 requirements that motivated it; tests, measurements, and work-order closure must
 show which parts now hold. Human sense rulings and live host delivery are not
 implied by the existence of commands.

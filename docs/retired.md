@@ -1,6 +1,6 @@
 # Retired mechanisms of the reference implementation
 
-Decided during the glossary pass of 2026-09-17. These are rejected designs, not rejected words; the words that must not return are recorded as rejected names on the concepts that replaced them. Journal record: d-05165276. The reference implementation is preserved on branch feat/totality-enumeration-gate at commit 645d928.
+Decided during the lexicon pass of 2026-09-17. These are rejected designs, not rejected words; the words that must not return are recorded as rejected names on the concepts that replaced them. Journal record: d-05165276. The reference implementation is preserved on branch feat/totality-enumeration-gate at commit 645d928.
 
 ## atlas (charts, transitions, atlas gate)
 

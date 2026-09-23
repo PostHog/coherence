@@ -1,21 +1,21 @@
-# Building, maintaining, and reviewing a glossary
+# Building, maintaining, and reviewing a lexicon
 
-The glossary commands now form a loop: observe usage, propose a change, record its
+The lexicon commands now form a loop: observe usage, propose a change, record its
 reason, apply it, and read the new evidence. Similarity is optional advice. No
 command certifies that every word in a project has the right meaning.
 
 Use `node src/cli.ts` in this checkout or `node_modules/.bin/coherence` in a linked
-adopter, from the project root. A domain glossary can be used before specs, runs,
-or Scope exist. `coherence.config.json` may name its `glossary`; otherwise the
-project uses `glossary.json`. This checkout uses `docs/glossary.json`.
+adopter, from the project root. A domain lexicon can be used before specs, runs,
+or Scope exist. `coherence.config.json` may name its `lexicon`; otherwise the
+project uses `lexicon.json`. This checkout uses `docs/lexicon.json`.
 
 ## Observe coverage and inspect a meaning
 
 ```sh
-node src/cli.ts glossary coverage
-node src/cli.ts glossary coverage --json
-node src/cli.ts glossary review exposure
-node src/cli.ts query glossary exposure
+node src/cli.ts lexicon coverage
+node src/cli.ts lexicon coverage --json
+node src/cli.ts lexicon review exposure
+node src/cli.ts query lexicon exposure
 npm run scope
 ```
 
@@ -29,24 +29,24 @@ are computed readings, never addresses stored in canonical concept entries.
 
 A known spelling in a new component is still an unanswered sense question. Review
 shows the definition, confusables, properties (including units), current contexts,
-and an evidence key. Scope renders that same evidence in its Glossary view and
+and an evidence key. Scope renders that same evidence in its Lexicon view and
 writes nothing. The fixed agent query reads the same page state.
 
 ## Propose and apply a change
 
 ```sh
-node src/cli.ts glossary propose declare premium \
+node src/cli.ts lexicon propose declare premium \
   --definition "The price paid for risk cover." --because "Distinct from exposure."
-node src/cli.ts glossary propose alias exposure "amount at risk" \
+node src/cli.ts lexicon propose alias exposure "amount at risk" \
   --because "The same monetary meaning."
 ```
 
-A proposal prints its `gp-…` identifier, target, expected prior content, full proposed
+A proposal prints its `lp-…` identifier, target, expected prior content, full proposed
 content, and whether a human acknowledgement is required. It writes only a preview
-under ignored `.coherence/glossary/`. Nothing changes in the canonical glossary yet.
+under ignored `.coherence/lexicon/`. Nothing changes in the canonical lexicon yet.
 
 ```sh
-node src/cli.ts glossary apply <proposal-id> \
+node src/cli.ts lexicon apply <proposal-id> \
   --session <session> --agent <name> --work <work-order> \
   --because "Why this meaning or name was chosen." --over "The rejected alternative."
 ```
@@ -65,13 +65,13 @@ A concept rename or retirement also needs `--human "the explicit acknowledgement
 This is an auditable assertion of a human ruling, **not identity authentication**.
 Agents must not invent it. Likewise, a preview is not human approval by itself.
 
-The application refuses an intervening glossary edit, a target outside the project,
+The application refuses an intervening lexicon edit, a target outside the project,
 a duplicate name, missing reasons/alternatives, or a second concurrent application.
-The glossary replacement happens before the decision claiming it happened. If the
+The lexicon replacement happens before the decision claiming it happened. If the
 process stops between that write and its journal decision:
 
 ```sh
-node src/cli.ts glossary recover
+node src/cli.ts lexicon recover
 ```
 
 Recovery uses the saved proposal and original attribution, refuses intervening edits,
@@ -83,7 +83,7 @@ before manual removal; the tool does not guess that a lock is stale.
 Read the current context and copy its evidence key first. For example:
 
 ```sh
-node src/cli.ts glossary review exposure --component money --evidence <key> \
+node src/cli.ts lexicon review exposure --component money --evidence <key> \
   --disposition confirmed --human "Owner confirmed the USD meaning." \
   --because "The implementation uses the declared monetary unit." --over "Time exposed." \
   --session <session> --agent <name> --work <work-order>
@@ -98,9 +98,9 @@ definition changes reopen it. Old decisions remain readable history.
 ## Incremental work
 
 ```sh
-node src/cli.ts glossary baseline --session <session>
-node src/cli.ts glossary changes --session <session>
-node src/cli.ts glossary changes --session <session> --json
+node src/cli.ts lexicon baseline --session <session>
+node src/cli.ts lexicon changes --session <session>
+node src/cli.ts lexicon changes --session <session> --json
 ```
 
 A baseline suppresses repeated change notifications; it **does not confirm meaning**.
@@ -116,16 +116,16 @@ native child event missing that identity does not charge the parent's work. Both
 host-shaped fixture delivery and the actual CLI launcher are tested; that is not a
 claim that a fresh live host session has been observed.
 
-## Drafting a new glossary
+## Drafting a new lexicon
 
 ```sh
-node src/cli.ts glossary draft
-node src/cli.ts glossary draft --out .coherence/glossary/draft.json
+node src/cli.ts lexicon draft
+node src/cli.ts lexicon draft --out .coherence/lexicon/draft.json
 ```
 
 A draft lists candidates, usage-based collision questions, existing vocabulary, and
 uncertainty. Definitions are left unsettled rather than invented as facts. It is not
-a canonical glossary and cannot overwrite one. Use the maintenance workflow to settle
+a canonical lexicon and cannot overwrite one. Use the maintenance workflow to settle
 individual entries. Repeated drafting reads current rulings and source evidence.
 
 ## Local similarity
@@ -135,12 +135,12 @@ its Metal prebuilt, zero GPU layers, fixed batch/thread settings, and a small lo
 English model. The package is optional; no model downloads occur during checking.
 
 ```sh
-node src/cli.ts glossary model --download
-node src/cli.ts glossary similar "terminology drift" --json
+node src/cli.ts lexicon model --download
+node src/cli.ts lexicon similar "terminology drift" --json
 ```
 
 The explicit setup downloads the pinned 36,806,944-byte BGE small Q8 model and checks
-its SHA-256 before configuring it. Alternatively use `glossary model --file <gguf>
+its SHA-256 before configuring it. Alternatively use `lexicon model --file <gguf>
 --sha256 <full-hash>`. Configuration and cached vectors live under ignored
 `.coherence/`, never in concept entries. Cached vectors are separated by model hash
 and fixed backend settings. Ordinary similarity reads are offline; missing package,
@@ -157,7 +157,7 @@ survey are not performance claims about current end-to-end command latency.
 ## Readiness for a selected feature slice
 
 ```sh
-node src/cli.ts glossary ready --terms "glossary,hook,attribution" --json
+node src/cli.ts lexicon ready --terms "lexicon,hook,attribution" --json
 ```
 
 This checks current review evidence for the specified observed terms, not every
@@ -168,9 +168,9 @@ be observed separately. A vocabulary reading must never stand in for those facts
 
 ## Help, inflections, and property meanings
 
-`glossary --help` lists the read, review, proposal, baseline, similarity, and
-recovery workflows without loading a project glossary. Every workflow also accepts
-`--help`; for example, `glossary changes --help` describes that workflow without
+`lexicon --help` lists the read, review, proposal, baseline, similarity, and
+recovery workflows without loading a project lexicon. Every workflow also accepts
+`--help`; for example, `lexicon changes --help` describes that workflow without
 creating or reading a baseline. Other unknown flags remain errors rather than being
 interpreted as help.
 

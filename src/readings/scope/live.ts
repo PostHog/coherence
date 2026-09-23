@@ -15,7 +15,7 @@
  * The state is loaded once through scopeState, whole, and kept current: the
  * journal, runs and work folders are watched, and an append is read back
  * from its store and sent as the records that are new (by id, or a run's time
- * and session); a spec, a glossary or the config changing reloads the state
+ * and session); a spec, a lexicon or the config changing reloads the state
  * and sends it as a snapshot with a new version. The component interfaces
  * are read through the server's own instrument when the reading is first
  * asked for and again when a run lands, never on every file save.
@@ -53,7 +53,7 @@ export interface LiveOptions {
   interfaces?: boolean;
   /** How long a burst of changes to one store settles before it is read (default 100 ms). */
   debounceMs?: number;
-  /** Build options beyond the root's defaults (Coherence's glossary, the project's name). */
+  /** Build options beyond the root's defaults (Coherence's lexicon, the project's name). */
   build?: Partial<BuildOptions>;
 }
 
@@ -89,13 +89,13 @@ function json(response: ServerResponse, request: IncomingMessage, status: number
 }
 
 /** Which store a changed path belongs to, or undefined when it is nothing the reading shows. */
-export function storeOf(path: string, glossaries: readonly string[]): Store | undefined {
+export function storeOf(path: string, lexicons: readonly string[]): Store | undefined {
   const name = path.split(sep).join("/");
   if (name.startsWith(".coherence/journal/")) return "journal";
   if (name.startsWith(".coherence/runs/")) return "runs";
   if (name.startsWith(".coherence/work/")) return "work";
   if (name.startsWith(".git/") || name.startsWith(".coherence/") || name.startsWith("node_modules/") || name.includes("/node_modules/")) return undefined;
-  if (name.endsWith(".spec.md") || name === "coherence.config.json" || glossaries.includes(name)) return "model";
+  if (name.endsWith(".spec.md") || name === "coherence.config.json" || lexicons.includes(name)) return "model";
   return undefined;
 }
 
@@ -155,17 +155,17 @@ class LiveReading implements HttpApp {
     this.workIds = new Set(state.journal.work.kind === "present" ? state.journal.work.orders.flatMap((order) => [order.id, ...order.history.map((h) => h.id)]) : []);
   }
 
-  private glossaryPaths(): string[] {
-    const inside = [this.build.glossaryPath, this.build.domainPath].filter((p): p is string => p !== undefined).map((p) => relative(this.root, resolve(this.root, p)));
-    return [...inside.filter((p) => !p.startsWith("..")), "glossary.json", "docs/glossary.json"];
+  private lexiconPaths(): string[] {
+    const inside = [this.build.lexiconPath, this.build.domainPath].filter((p): p is string => p !== undefined).map((p) => relative(this.root, resolve(this.root, p)));
+    return [...inside.filter((p) => !p.startsWith("..")), "lexicon.json", "docs/lexicon.json"];
   }
 
   private watch(): void {
-    const glossaries = this.glossaryPaths();
+    const lexicons = this.lexiconPaths();
     try {
       const watcher = watch(this.root, { recursive: true }, (_event, name) => {
         if (name === null) return;
-        const store = storeOf(String(name), glossaries);
+        const store = storeOf(String(name), lexicons);
         if (store !== undefined) this.changed(store);
       });
       watcher.on("error", (error) => this.context.log(`scope: the watch on ${this.root} failed: ${error.message}`));
@@ -173,8 +173,8 @@ class LiveReading implements HttpApp {
     } catch (error) {
       this.context.log(`scope: could not watch ${this.root}: ${error instanceof Error ? error.message : String(error)}`);
     }
-    // Coherence's own glossary lives outside a root that is another project.
-    const own = resolve(this.build.glossaryPath);
+    // Coherence's own lexicon lives outside a root that is another project.
+    const own = resolve(this.build.lexiconPath);
     if (relative(this.root, own).startsWith("..")) {
       try {
         const watcher = watch(dirname(own), (_event, name) => {
@@ -183,7 +183,7 @@ class LiveReading implements HttpApp {
         watcher.on("error", () => {});
         this.watchers.push(watcher);
       } catch {
-        // Unwatchable: the glossary still loads with every model change in the root.
+        // Unwatchable: the lexicon still loads with every model change in the root.
       }
     }
   }

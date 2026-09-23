@@ -1,5 +1,5 @@
 /**
- * The glossary check: two questions asked of a corpus of prose, code, data,
+ * The lexicon check: two questions asked of a corpus of prose, code, data,
  * and the journal's own records.
  *
  * REJECTED NAME: a name some concept refused, appearing as a whole word or
@@ -8,7 +8,7 @@
  * the concept and its because.
  *
  * UNKNOWN NOUN: a term prose uses as a name (backticked, Title Case away from
- * a sentence start, or the name of a component folder) that no glossary
+ * a sentence start, or the name of a component folder) that no lexicon
  * declares, is not a common word, and appears at least twice. Precision over
  * recall: every finding is meant to be acted on with one of three answers,
  * declare it, map it, or fix it.
@@ -19,11 +19,11 @@
  * happens to contain a rejected word) is not a hit. Names, though, are held
  * against everything the project writes: both layers' rejected names are
  * matched in prose and in identifiers alike, because a rejected name in an
- * identifier is the drift the glossary exists to catch.
+ * identifier is the drift the lexicon exists to catch.
  *
  * The corpus is every text file kind a project holds, the journal's records
  * included, and never the files written in another vocabulary on purpose:
- * the glossaries themselves, the retired inventories, docs/reference, and
+ * the lexicons themselves, the retired inventories, docs/reference, and
  * the adversarial reviews, which quote the names they report. It stays inside
  * the config's bounds: a folder the ignore list names is never entered, by
  * the same rule every other walk applies, so an adoption bounded to one
@@ -35,7 +35,7 @@
 import { existsSync } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
-import { acceptedNames, rejectedNames, type Glossary, type RejectedName } from "./glossary.ts";
+import { acceptedNames, rejectedNames, type Lexicon, type RejectedName } from "./lexicon.ts";
 import { STOPLIST } from "./stoplist.ts";
 import { configIgnore, projectFiles, underIgnored } from "../adapters/project-files.ts";
 import { vocabularyFacts } from "./project.ts";
@@ -45,8 +45,8 @@ export interface CheckOptions {
   root: string;
   /** Files or folders to check; the whole project when empty. */
   paths?: string[];
-  coherence: Glossary;
-  project?: Glossary | undefined;
+  coherence: Lexicon;
+  project?: Lexicon | undefined;
 }
 
 export interface Location {
@@ -239,20 +239,20 @@ function confine(root: string, given: string): string {
   const path = resolve(root, given);
   const rel = relative(resolve(root), path);
   if (rel !== "" && (rel === ".." || rel.startsWith(".." + sep) || isAbsolute(rel))) {
-    throw new Error(`glossary check: "${given}" is outside the project root`);
+    throw new Error(`lexicon check: "${given}" is outside the project root`);
   }
   return path;
 }
 
 /**
  * Every file the check reads, with the paths it could not. Excluded: the
- * glossary files themselves, the two retired inventories, docs/reference
+ * lexicon files themselves, the two retired inventories, docs/reference
  * and docs/reviews (all written in another vocabulary on purpose),
  * dependency lockfiles, and everything under .coherence that is not a record.
  */
 export async function collectFiles(options: CheckOptions): Promise<{ files: string[]; unreadable: UnreadablePath[]; excluded: UnreadablePath[] }> {
   const root = resolve(options.root);
-  // The inventories of what the project retired must name what they refuse, exactly as the glossary does; reading them would report the refusal as the drift.
+  // The inventories of what the project retired must name what they refuse, exactly as the lexicon does; reading them would report the refusal as the drift.
   const excluded = new Set<string>([resolve(options.coherence.path), resolve(root, "docs", "retired.md"), resolve(root, "src", "spec", "retired-sections.json")]);
   const foreignDocs = [resolve(root, "docs", "reference"), resolve(root, "docs", "reviews")];
   if (options.project !== undefined) excluded.add(resolve(options.project.path));
@@ -283,7 +283,7 @@ export async function collectFiles(options: CheckOptions): Promise<{ files: stri
   for (const path of walker.found) {
     if (files.includes(path)) continue;
     const rel = relPath(root, path);
-    walker.excluded.push({ file: rel, reason: outsideBounds(rel, walker.ignore) ? OUTSIDE_BOUNDS : own.has(rel) ? "glossary, reference vocabulary, generated state, or excluded folder" : "not one of the project's files: ignored, or inside a nested checkout" });
+    walker.excluded.push({ file: rel, reason: outsideBounds(rel, walker.ignore) ? OUTSIDE_BOUNDS : own.has(rel) ? "lexicon, reference vocabulary, generated state, or excluded folder" : "not one of the project's files: ignored, or inside a nested checkout" });
   }
   return { files, unreadable: walker.unreadable, excluded: walker.excluded };
 }
@@ -729,7 +729,7 @@ function unknownNouns(files: CorpusFile[], options: CheckOptions, accepted: Set<
       count: candidate.locations.length,
       locations: candidate.locations.slice(0, 3),
       options: {
-        declare: `add "${candidate.term}" to the glossary as a concept`,
+        declare: `add "${candidate.term}" to the lexicon as a concept`,
         map: `add "${candidate.term}" as an alias of an existing concept`,
         fix: `it is a rejected name or a mistake; replace it`,
       },
@@ -742,7 +742,7 @@ function unknownNouns(files: CorpusFile[], options: CheckOptions, accepted: Set<
 /* ------------------------------------------------------------- report */
 
 /** The rejected names in force for a project: both layers, minus Coherence names the project accepts. */
-export function rejectedNamesInForce(coherence: Glossary, project: Glossary | undefined): { coherence: RejectedName[]; project: RejectedName[] } {
+export function rejectedNamesInForce(coherence: Lexicon, project: Lexicon | undefined): { coherence: RejectedName[]; project: RejectedName[] } {
   const names = rejectedNames(coherence);
   if (project === undefined) return { coherence: names, project: [] };
   const projectAccepts = new Set([...acceptedNames(project)].map(normalizeTerm));

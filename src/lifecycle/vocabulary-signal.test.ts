@@ -8,17 +8,17 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync, appendFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { attention, attentionText, glossaryCoverage, type Coverage } from "./glossary-coverage.ts";
+import { attention, attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { runHook } from "./hook.ts";
 import { FUNCTION_WORDS, STOPLIST } from "./stoplist.ts";
 
 const COMPONENTS = ["books", "sales", "stock", "staff"];
 
-/** A project whose glossary knows "exposure" (with a rejected name) and "unit basis" as a property of two concepts. */
+/** A project whose lexicon knows "exposure" (with a rejected name) and "unit basis" as a property of two concepts. */
 function project(config: Record<string, unknown> = {}): string {
   const root = mkdtempSync(join(tmpdir(), "coherence-vocabulary-"));
   writeFileSync(
-    join(root, "glossary.json"),
+    join(root, "lexicon.json"),
     JSON.stringify({
       version: 1,
       project: "ledgerly",
@@ -85,7 +85,7 @@ test("a code identifier is never a candidate unless it is declared and prose rec
           "",
         ].join("\n"),
       );
-    const report = await glossaryCoverage(root);
+    const report = await lexiconCoverage(root);
     const found = candidates(report);
     assert.ok(found.includes("roster"), `a declared name recurring in prose is a candidate: ${found.join(", ")}`);
     assert.ok(found.includes("owner"), `a declared field recurring in prose is a candidate: ${found.join(", ")}`);
@@ -100,7 +100,7 @@ test("a code identifier is never a candidate unless it is declared and prose rec
   }
 });
 
-test("well-known names, the project's own name and the glossary's not: names are never candidates, while a common word written as a project's proper noun still is", async () => {
+test("well-known names, the project's own name and the lexicon's not: names are never candidates, while a common word written as a project's proper noun still is", async () => {
   const root = project({ wellKnown: ["Zanzibar"] });
   try {
     for (const c of COMPONENTS)
@@ -115,7 +115,7 @@ test("well-known names, the project's own name and the glossary's not: names are
           "",
         ].join("\n"),
       );
-    const found = candidates(await glossaryCoverage(root));
+    const found = candidates(await lexiconCoverage(root));
     for (const never of ["python", "pyright", "chrome on", "macos", "github", "kubernetes", "postgres", "type script", "ledgerly", "zanzibar", "quuxdb", "claude code", "claude"])
       assert.ok(!found.includes(never), `"${never}" needs no definition, yet it was offered: ${found.join(", ")}`);
     assert.ok(found.includes("hive"), `a common word written as the project's proper noun still surfaces: ${found.join(", ")}`);
@@ -133,7 +133,7 @@ test("sense review is asked only where meaning is at risk: more than one recorde
     writeFileSync(join(root, "stock/notes.md"), "Each row states its unit basis.\n");
     writeFileSync(join(root, "staff/model.ts"), "export function scope(): string {\n  return 'staff';\n}\n");
     writeFileSync(join(root, "staff/notes.md"), "The scope of a shift is one day.\n");
-    const report = await glossaryCoverage(root);
+    const report = await lexiconCoverage(root);
     const risk = (term: string, component: string): string | undefined =>
       report.terms.find((t) => t.term === term)?.contexts.find((c) => c.component === component)?.risk;
     assert.equal(risk("exposure", "books"), undefined, "an ordinary use of a defined word asks no review");
@@ -150,7 +150,7 @@ test("sense review is asked only where meaning is at risk: more than one recorde
 
 /** Whether a text carries a count of the population rather than names. */
 function carriesTotal(text: string): boolean {
-  return /\b\d+ (?:unresolved|unsettled|new\/changed|observed|contexts?|candidate)/i.test(text) || /Glossary coverage:/.test(text);
+  return /\b\d+ (?:unresolved|unsettled|new\/changed|observed|contexts?|candidate)/i.test(text) || /Lexicon coverage:/.test(text);
 }
 
 function injected(stdout: string): string {
@@ -178,7 +178,7 @@ test("no hook injection carries a total: orient names the ranked terms or says n
     const stop = await runHook("Stop", input, root);
     assert.ok(!carriesTotal(injected(stop.stdout)), injected(stop.stdout));
     assert.match(injected(stop.stdout), /this session left "surcharge" recurring without a definition/);
-    assert.ok(!carriesTotal(attentionText(await glossaryCoverage(root))), "the shared signal never counts");
+    assert.ok(!carriesTotal(attentionText(await lexiconCoverage(root))), "the shared signal never counts");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -195,14 +195,14 @@ test("the per-tool line is silent on an ordinary edit and names only the candida
     // An ordinary edit: a new line that uses a defined word, and a new line of plain prose.
     appendFileSync(join(root, "books/notes.md"), "The exposure is settled nightly.\nRows are appended at the end of the day.\n");
     const ordinary = await runHook("PostToolUse", tool, root);
-    assert.doesNotMatch(injected(ordinary.stdout), /Glossary/, "an ordinary edit says nothing about vocabulary");
+    assert.doesNotMatch(injected(ordinary.stdout), /Lexicon/, "an ordinary edit says nothing about vocabulary");
     // An edit that makes a new name recur: named, once.
     appendFileSync(join(root, "books/notes.md"), "The `rebate` is new.\nEach `rebate` is paid.\nA `rebate` is clawed back.\n");
     const introduced = await runHook("PostToolUse", tool, root);
     assert.match(injected(introduced.stdout), /this edit made "rebate" recur without a definition/);
     introduced.commit?.();
     const again = await runHook("PostToolUse", tool, root);
-    assert.doesNotMatch(injected(again.stdout), /Glossary/, "a candidate already named is not named again");
+    assert.doesNotMatch(injected(again.stdout), /Lexicon/, "a candidate already named is not named again");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -238,7 +238,7 @@ test("function words are never candidates: every preposition, conjunction, deter
           "",
         ].join("\n"),
       );
-    const found = candidates(await glossaryCoverage(root));
+    const found = candidates(await lexiconCoverage(root));
     const offered = found.filter((t) => t.split(" ").every((w) => closed.includes(w)));
     assert.deepEqual(offered, [], `function words were offered as candidates: ${offered.join(", ")}`);
     assert.ok(found.includes("premium"), `a name written the same way still surfaces: ${found.join(", ")}`);
@@ -252,11 +252,11 @@ test("Coherence's machine-written output never moves the reading: a new run reco
   try {
     writeFileSync(join(root, "books/notes.md"), "The `premium` is new.\nEvery `premium` is billed.\n");
     mkdirSync(join(root, ".coherence", "runs"), { recursive: true });
-    const before = await glossaryCoverage(root);
+    const before = await lexiconCoverage(root);
     writeFileSync(join(root, ".coherence", "runs", "s.jsonl"), JSON.stringify({ at: "2026-09-23T00:00:00.000Z", invariants: [] }) + "\n");
     mkdirSync(join(root, ".coherence", "run"), { recursive: true });
     writeFileSync(join(root, ".coherence", "run", "server.json"), JSON.stringify({ pid: 1 }) + "\n");
-    const after = await glossaryCoverage(root);
+    const after = await lexiconCoverage(root);
     assert.equal(after.fingerprint, before.fingerprint, "a run or a server file changed the reading's fingerprint");
     assert.ok(!after.population.excluded.some((e) => e.file.startsWith(".coherence/")), "machine-written output is not the project's and is not reported");
   } finally {
@@ -278,7 +278,7 @@ test("coverage reads only inside the config's bounds: a folder the ignore list n
     mkdirSync(join(root, ".coherence", "journal"), { recursive: true });
     const record = { id: "d-00000001", kind: "decision", at: "2026-09-23T00:00:00.000Z", session: "s", agent: "a", chose: "bill the `premium` monthly", over: [], because: "the `premium` is monthly" };
     writeFileSync(join(root, ".coherence", "journal", "s.jsonl"), JSON.stringify(record) + "\n");
-    const report = await glossaryCoverage(root);
+    const report = await lexiconCoverage(root);
     const read = report.population.files.map((f) => f.file);
     assert.ok(!read.some((f) => f.startsWith("stock/")), `an ignored folder was read: ${read.filter((f) => f.startsWith("stock/")).length} files`);
     assert.ok(!read.some((f) => f.startsWith("staff/archive/")), "a folder ignored by its path was read");

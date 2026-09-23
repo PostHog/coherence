@@ -6,7 +6,7 @@
  * status` prints it beneath the wiring, so the person reading it sees what a
  * session will actually be told, not only which commands are installed.
  *
- * There is no per-project override of the hook's text: the glossary makes the
+ * There is no per-project override of the hook's text: the lexicon makes the
  * instruction a fixed document the hook points at, and what varies between
  * projects is state (escalations, the spec, work orders, the vocabulary),
  * which is what this reading reports.
@@ -18,8 +18,8 @@ import { loadOrders } from "../journal/work.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { CONTEXT_BUDGET, HOOK_EVENTS, changedFiles, startReading, type HookEvent } from "./hook.ts";
 import type { HostStatus } from "./install.ts";
-import { loadProjectGlossaries } from "./project.ts";
-import { attention, type Coverage } from "./glossary-coverage.ts";
+import { loadProjectLexicons } from "./project.ts";
+import { attention, type Coverage } from "./lexicon-coverage.ts";
 
 export type Reading = "orient" | "peer feed" | "regulate";
 
@@ -74,7 +74,7 @@ export async function deliveries(root: string): Promise<Delivery[]> {
   const escalations = openEscalations(records).length;
   const orders = loadOrders(root).filter((o) => o.state === "open" || o.state === "active").length;
   const spec = specFigures(root);
-  const { coherence, project } = await loadProjectGlossaries(root);
+  const { coherence, project } = await loadProjectLexicons(root);
   const start = await startReading(root, {});
   const changed = await changedFiles(root);
 
@@ -82,7 +82,7 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     ? `spec: not readable (${spec.error})`
     : `spec: ${plural(spec.problems, "problem")}, ${plural(spec.open, "open requirement")}`;
   const vocabulary = project === undefined
-    ? `vocabulary: Coherence's ${plural(coherence.concepts.length, "concept")}, no project glossary`
+    ? `vocabulary: Coherence's ${plural(coherence.concepts.length, "concept")}, no project lexicon`
     : `vocabulary: Coherence's ${plural(coherence.concepts.length, "concept")} and the project's ${plural(project.concepts.length, "concept")}`;
   const orient = [
     `escalations awaiting a human: ${escalations} (shown whole, never shortened)`,
@@ -101,8 +101,8 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     ? "revelation at the edit: none (the spec is not readable)"
     : `revelation at the edit: a written file re-checks those of ${plural(spec.chokepoints, "chokepoint invariant")} it may involve`;
   const changedLine = changed.failure === undefined
-    ? `the glossary check over the changed files (${changed.files.length} now)`
-    : `the glossary check over the changed files (not known now: ${changed.failure})`;
+    ? `the lexicon check over the changed files (${changed.files.length} now)`
+    : `the lexicon check over the changed files (not known now: ${changed.failure})`;
   const debt = "error" in spec ? specLine : `spec: ${plural(spec.problems, "problem")}, ${plural(spec.defects, "structural defect")}, ${plural(spec.open, "open requirement")}`;
   const regulate = [changedLine, debt, "the reminder that an active work order is closed with work close", "the read trace snapshotted for calibrate"];
 

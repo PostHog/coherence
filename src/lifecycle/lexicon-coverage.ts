@@ -16,7 +16,7 @@
  * words (never inside an identifier's spelling) on ten lines across four
  * components.
  * Well-known names (well-known.json, the config's wellKnown, the project's
- * own name), names the glossary declares (concepts, aliases, instances,
+ * own name), names the lexicon declares (concepts, aliases, instances,
  * properties, and its "not:" confusables), and general English and
  * programming words are never candidates. A common word written as a
  * project's proper noun still is; a function word (a preposition,
@@ -41,9 +41,9 @@ import {
   aliasNames,
   rejectedNames,
   type Concept,
-  type Glossary,
-} from "./glossary.ts";
-import { loadProjectGlossaries, vocabularyFacts } from "./project.ts";
+  type Lexicon,
+} from "./lexicon.ts";
+import { loadProjectLexicons, vocabularyFacts } from "./project.ts";
 import { ALWAYS_CAPITALIZED, FUNCTION_WORD_SET, STOPLIST } from "./stoplist.ts";
 import { isWellKnown, wellKnown, type WellKnown } from "./well-known.ts";
 
@@ -94,7 +94,7 @@ export interface VocabularyTerm {
 }
 export interface Coverage {
   version: 1;
-  projectGlossary: string | null;
+  projectLexicon: string | null;
   fingerprint: string;
   population: {
     files: { file: string; kind: string; lines: number }[];
@@ -131,18 +131,27 @@ const clean = (s: string): string =>
   );
 const HEADING_WORD = /[A-Za-z][A-Za-z'-]*/g;
 
-/** Recover only glossary review decisions with a matching current evidence key. Old answers are history. */
+/**
+ * A structured sense review as a decision's text: the vocabulary verb,
+ * "review", then its JSON. The verb is matched by shape, not by name, so a
+ * review recorded before the concept was renamed (under the name it now
+ * rejects) keeps its ruling: the journal is append-only and is read as written.
+ */
+const REVIEW = /^[a-z]+ review (\{.*\})$/s;
+/** The same for an applied proposal: the verb, "apply", the proposal id. */
+const APPLY = /^[a-z]+ apply [a-z]p-[a-f0-9]{24} /;
+
+/** Recover only lexicon review decisions with a matching current evidence key. Old answers are history. */
 function rulings(
   root: string,
 ): Map<string, { disposition: string; because: string }> {
   const result = new Map<string, { disposition: string; because: string }>();
   for (const r of loadJournal(root).records) {
-    if (r.kind !== "decision" || !r.chose.startsWith("glossary review "))
-      continue;
+    if (r.kind !== "decision") continue;
+    const review = REVIEW.exec(r.chose);
+    if (!review) continue;
     try {
-      const data = JSON.parse(
-        r.chose.slice("glossary review ".length),
-      ) as Record<string, unknown>;
+      const data = JSON.parse(review[1]!) as Record<string, unknown>;
       if (
         typeof data["evidence"] === "string" &&
         typeof data["disposition"] === "string"
@@ -165,7 +174,7 @@ interface KnownMeaning {
 }
 
 function table(
-  glossary: Glossary,
+  lexicon: Lexicon,
   layer: "coherence" | "project",
   into: Map<string, KnownMeaning>,
   properties: Map<string, { concept: Concept; layer: "coherence" | "project" }[]>,
@@ -178,9 +187,9 @@ function table(
     senses.set(name, set);
   };
   // Project/trust-level declarations have no owning concept; property declarations are attached below.
-  for (const name of acceptedNames(glossary))
+  for (const name of acceptedNames(lexicon))
     if (!into.has(clean(name))) into.set(clean(name), { state: "declared", concept: null, layer });
-  for (const c of glossary.concepts) {
+  for (const c of lexicon.concepts) {
     into.set(clean(c.name), { state: "concept", concept: c, layer });
     sense(clean(c.name), c);
     for (const name of c.instances ?? []) {
@@ -222,13 +231,13 @@ function knownMeaning(term: string, known: Map<string, KnownMeaning>): KnownMean
   return undefined;
 }
 
-function isGlossaryDecision(line: string): boolean {
+function isLexiconDecision(line: string): boolean {
   try {
     const record = JSON.parse(line) as Record<string, unknown>;
     return (
       record["kind"] === "decision" &&
       typeof record["chose"] === "string" &&
-      /^(?:glossary review |glossary apply )/.test(record["chose"])
+      (REVIEW.test(record["chose"]) || APPLY.test(record["chose"]))
     );
   } catch {
     return false;
@@ -402,8 +411,8 @@ interface ProseLine {
   runs: Word[][];
 }
 
-export async function glossaryCoverage(root: string): Promise<Coverage> {
-  const { coherence, project } = await loadProjectGlossaries(root);
+export async function lexiconCoverage(root: string): Promise<Coverage> {
+  const { coherence, project } = await loadProjectLexicons(root);
   const rawEntries = new Map<string, Record<string, unknown>>();
   for (const g of [coherence, ...(project ? [project] : [])]) {
     const raw = JSON.parse(await readFile(g.path, "utf8")) as {
@@ -439,7 +448,7 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
     ? new Set([...acceptedNames(project)].map(clean))
     : new Set<string>();
   for (const name of projectNames) rejected.delete(name);
-  // The glossary's "not:" entries name things it already knows are something else (Pyright, Python): never candidates.
+  // The lexicon's "not:" entries name things it already knows are something else (Pyright, Python): never candidates.
   const confusables = new Set<string>();
   for (const g of [coherence, project])
     for (const c of g?.concepts ?? [])
@@ -498,7 +507,7 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
   for (const f of corpus.files) {
     const fileFingerprint = digest(
       f.lines.filter(
-        (line) => !(f.kind === "record" && isGlossaryDecision(line)),
+        (line) => !(f.kind === "record" && isLexiconDecision(line)),
       ),
     );
     let fenced = false;
@@ -507,7 +516,7 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
     for (let n = 0; n < f.lines.length; n++) {
       const source = f.lines[n]!;
       // Review/maintenance decisions are outcomes, not fresh source-language observations of themselves.
-      if (f.kind === "record" && isGlossaryDecision(source)) continue;
+      if (f.kind === "record" && isLexiconDecision(source)) continue;
       const secret = /(^|\/)\.env(?:$|\.)/.test(f.rel);
       const observed = secret ? source.replace(/=.*/, "") : source;
       const normalized =
@@ -747,7 +756,7 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
     excluded: corpus.excluded.sort((a, b) => a.file.localeCompare(b.file)),
     unreadable: corpus.unreadable,
     extraction:
-      `Exact declared phrases in every kind. Candidates: from code, declared and exported names and the fields of exported types only; from prose and records, Title Case away from a sentence start, heading words, and single backticked words; declared component folders. A candidate stands only when prose writes it as a name on three lines, or on two across two components, or, for a name code declares (fields of exported types included), when prose writes it as words on ten lines across four components. Never candidates: ids, paths, fragments, punctuation-bearing tokens, general English and programming words, well-known names (list version ${famous.version}, the config's wellKnown, the project's own name), and names the glossary declares or lists under "not:".`,
+      `Exact declared phrases in every kind. Candidates: from code, declared and exported names and the fields of exported types only; from prose and records, Title Case away from a sentence start, heading words, and single backticked words; declared component folders. A candidate stands only when prose writes it as a name on three lines, or on two across two components, or, for a name code declares (fields of exported types included), when prose writes it as words on ten lines across four components. Never candidates: ids, paths, fragments, punctuation-bearing tokens, general English and programming words, well-known names (list version ${famous.version}, the config's wellKnown, the project's own name), and names the lexicon declares or lists under "not:".`,
     limits: [
       "No exhaustive extraction or automatic proof of meaning.",
       "SQL/data/notebook bodies are text, not resolved language symbols; unsupported/binary files and symlinks are reported as excluded.",
@@ -758,7 +767,7 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
   };
   return {
     version: 1,
-    projectGlossary:
+    projectLexicon:
       project?.path ??
       (coherence.path.startsWith(root + "/") ? coherence.path : null),
     fingerprint: digestAll([population.extraction, ...population.limits, ...population.files, ...population.excluded, ...population.unreadable, ...terms]),
@@ -839,8 +848,8 @@ export function attentionText(report: Coverage, cli = "coherence", limit = 5): s
     const head =
       undefinedTerms.length <= limit
         ? `${undefinedTerms.length === 1 ? "A recurring term lacks" : `${undefinedTerms.length} recurring terms lack`} a definition: ${listed(shown)}.`
-        : `Recurring terms that lack a definition, most recurring first: ${shown.join(", ")}; the rest: ${cli} glossary coverage.`;
-    lines.push(`${head} Declare each (${cli} glossary propose declare <term> --definition "<text>" --because "<why>") or map it as an alias of an existing concept.`);
+        : `Recurring terms that lack a definition, most recurring first: ${shown.join(", ")}; the rest: ${cli} lexicon coverage.`;
+    lines.push(`${head} Declare each (${cli} lexicon propose declare <term> --definition "<text>" --because "<why>") or map it as an alias of an existing concept.`);
   }
   if (senses.length > 0) {
     // One entry per term: the same risk in five components is one thing to check, named once.
@@ -851,7 +860,7 @@ export function attentionText(report: Coverage, cli = "coherence", limit = 5): s
       byTerm.set(s.term, entry);
     }
     const shown = [...byTerm].slice(0, 3).map(([term, e]) => `${term} in ${e.components.slice(0, 2).join(", ")}${e.components.length > 2 ? " and elsewhere" : ""} (${e.reason})`);
-    lines.push(`Sense at risk: ${shown.join("; ")}${byTerm.size > 3 ? `; the rest: ${cli} glossary coverage` : ""}. Check each use against the definition: ${cli} glossary review <term>.`);
+    lines.push(`Sense at risk: ${shown.join("; ")}${byTerm.size > 3 ? `; the rest: ${cli} lexicon coverage` : ""}. Check each use against the definition: ${cli} lexicon review <term>.`);
   }
   return lines.join("\n");
 }
@@ -887,12 +896,12 @@ export function coverageText(report: Coverage, term?: string): string {
           ...(undefinedTerms.length > 40 ? ["  More in --json."] : [])]
       : []),
     ...(senses.length
-      ? ["", "Senses at risk (term in component: why; evidence key for glossary review):",
+      ? ["", "Senses at risk (term in component: why; evidence key for lexicon review):",
           ...senses.slice(0, 40).map((s) => `  ${s.term} in ${s.component}: ${s.reason}; evidence ${s.evidence}`),
           ...(senses.length > 40 ? ["  More in --json."] : [])]
       : []),
     "",
-    "Every observed term, use and population fact: glossary coverage --json; one term whole: glossary review <term>.",
+    "Every observed term, use and population fact: lexicon coverage --json; one term whole: lexicon review <term>.",
     ...report.population.limits,
   ].join("\n");
 }

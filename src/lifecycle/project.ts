@@ -1,25 +1,25 @@
 /**
- * Where a project keeps its glossary, where Coherence keeps its own, and
+ * Where a project keeps its lexicon, where Coherence keeps its own, and
  * where each host keeps the settings file that carries the hook.
  *
- * `coherence.config.json` at the project root may name the project glossary
- * under `glossary`; otherwise `glossary.json` at the root is used when it
- * exists. Coherence's own glossary travels with this package.
+ * `coherence.config.json` at the project root may name the project lexicon
+ * under `lexicon`; otherwise `lexicon.json` at the root is used when it
+ * exists. Coherence's own lexicon travels with this package.
  */
 
 import { existsSync, realpathSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadGlossary, type Glossary } from "./glossary.ts";
+import { loadLexicon, rejectedNames, type Lexicon } from "./lexicon.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-/** Coherence's own glossary, relative to this source tree. */
-export const COHERENCE_GLOSSARY = resolve(here, "..", "..", "docs", "glossary.json");
+/** Coherence's own lexicon, relative to this source tree. */
+export const COHERENCE_LEXICON = resolve(here, "..", "..", "docs", "lexicon.json");
 
 export const CONFIG_FILE = "coherence.config.json";
-export const DEFAULT_PROJECT_GLOSSARY = "glossary.json";
+export const DEFAULT_PROJECT_LEXICON = "lexicon.json";
 
 export const HOSTS = ["claude", "codex"] as const;
 export type Host = (typeof HOSTS)[number];
@@ -77,11 +77,11 @@ export function installedRoot(fallback: string, env: NodeJS.ProcessEnv = process
   }
 }
 
-export interface ProjectGlossaries {
+export interface ProjectLexicons {
   root: string;
-  coherence: Glossary;
+  coherence: Lexicon;
   /** Absent when the project declares none; identical to `coherence` is folded away. */
-  project: Glossary | undefined;
+  project: Lexicon | undefined;
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -93,8 +93,8 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-/** The project glossary path the config names, or the default when present, or undefined. */
-export async function projectGlossaryPath(root: string): Promise<string | undefined> {
+/** The project lexicon path the config names, or the default when present, or undefined. */
+export async function projectLexiconPath(root: string): Promise<string | undefined> {
   const configPath = resolve(root, CONFIG_FILE);
   if (await exists(configPath)) {
     let config: unknown;
@@ -104,12 +104,37 @@ export async function projectGlossaryPath(root: string): Promise<string | undefi
       throw new Error(`${configPath}: not valid JSON (${(error as Error).message})`);
     }
     if (typeof config === "object" && config !== null && !Array.isArray(config)) {
-      const named = (config as Record<string, unknown>)["glossary"];
+      const record = config as Record<string, unknown>;
+      for (const old of await retiredLexiconNames()) {
+        if (old in record) throw new Error(`${configPath}: the key "${old}" names the project lexicon under its retired name; rename the key to "lexicon"`);
+      }
+      const named = record["lexicon"];
       if (typeof named === "string") return resolve(root, named);
     }
   }
-  const fallback = resolve(root, DEFAULT_PROJECT_GLOSSARY);
-  return (await exists(fallback)) ? fallback : undefined;
+  const fallback = resolve(root, DEFAULT_PROJECT_LEXICON);
+  if (await exists(fallback)) return fallback;
+  for (const old of await retiredLexiconNames()) {
+    const file = `${old}.json`;
+    if (await exists(resolve(root, file))) {
+      throw new Error(`${resolve(root, file)}: the project lexicon is now ${DEFAULT_PROJECT_LEXICON}; migrate with: git mv ${file} ${DEFAULT_PROJECT_LEXICON}`);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The names the lexicon concept was known by before it was renamed, read from
+ * Coherence's own lexicon (its rejected single-word names), so the old
+ * spelling lives only as data. A project still carrying its file or config key
+ * under one of them is told the one-line migration; the old name is never read
+ * as a fallback.
+ */
+export async function retiredLexiconNames(): Promise<string[]> {
+  const own = await loadLexicon(COHERENCE_LEXICON);
+  return rejectedNames(own)
+    .filter((r) => r.concept === "lexicon" && /^[a-z]+$/.test(r.name))
+    .map((r) => r.name);
 }
 
 /**
@@ -151,10 +176,10 @@ export async function isCoherenceItself(root: string): Promise<boolean> {
 }
 
 /** Both layers for a project root. */
-export async function loadProjectGlossaries(root: string): Promise<ProjectGlossaries> {
-  const coherence = await loadGlossary(COHERENCE_GLOSSARY);
+export async function loadProjectLexicons(root: string): Promise<ProjectLexicons> {
+  const coherence = await loadLexicon(COHERENCE_LEXICON);
   coherence.project ??= "coherence";
-  const path = await projectGlossaryPath(root);
-  const project = path === undefined || path === COHERENCE_GLOSSARY ? undefined : await loadGlossary(path);
+  const path = await projectLexiconPath(root);
+  const project = path === undefined || path === COHERENCE_LEXICON ? undefined : await loadLexicon(path);
   return { root, coherence, project };
 }

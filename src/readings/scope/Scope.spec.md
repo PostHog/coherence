@@ -1,6 +1,6 @@
 # Scope
 
-The reading: one surface projecting the model for a human, in six views: Glossary, Components, Structure, Invariants, Runs, Journal; a fixed shell that loads its state from the warm server and follows the stores live, or carries one state as a snapshot file; and the agent query, the same state as plain text.
+The reading: one surface projecting the model for a human, in six views: Lexicon, Components, Structure, Invariants, Runs, Journal; a fixed shell that loads its state from the warm server and follows the stores live, or carries one state as a snapshot file; and the agent query, the same state as plain text.
 
 ## entrances
 - scope: a human opens the live reading from the root's warm server, or an agent writes a snapshot of this project or another root
@@ -9,7 +9,7 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   handler: scopeApp in live.ts
 
 ## invariants
-- fixed shell: The shell's bytes (its HTML, script, styles and embedded font) depend on no project content, and the same state in gives the same render and the same snapshot bytes out; the state is a function of all its inputs: both glossaries, the spec tree, the run records, the journal, the work store, and the component interface reading when one is given.
+- fixed shell: The shell's bytes (its HTML, script, styles and embedded font) depend on no project content, and the same state in gives the same render and the same snapshot bytes out; the state is a function of all its inputs: both lexicons, the spec tree, the run records, the journal, the work store, and the component interface reading when one is given.
   protects: loadState
   chokepoint: scopeState
   over: every byte of the shell, built over two projects and after appending to each store the state reads, and every render and snapshot of the same state
@@ -31,7 +31,7 @@ The reading: one surface projecting the model for a human, in six views: Glossar
 - reliance comes from complete endpoint sites: Structure's chokepoint selection and query relies-on list actual file, line, symbol, endpoint, classification, syntax form when known, and test mark for references to either the chokepoint or protected thing; absent sites stay incomplete and only a present empty list confirms zero.
   over: every chokepoint invariant with no run, a legacy run, complete empty sites, protected-only sites, chokepoint-only sites, and both endpoints together
   via: reliance reads both protected and chokepoint endpoint sites, owner first, without calling a bypass a legal door reference
-  because: the glossary defines reliance from references to either endpoint. Dropping protected references hides direct consumers, while calling a protected bypass a legal chokepoint reference erases the structural defect. The run's optional sites field preserves the evidence boundary: absence is legacy or unavailable, and presence means both endpoint queries completed
+  because: the lexicon defines reliance from references to either endpoint. Dropping protected references hides direct consumers, while calling a protected bypass a legal chokepoint reference erases the structural defect. The run's optional sites field preserves the evidence boundary: absence is legacy or unavailable, and presence means both endpoint queries completed
   crossing: record -> reading
   refuted: filtered the site list to chokepoint references alone -> the protected-only reliance assertion went red in check.test.ts; included both endpoints with their role and classification, green (2026-09-18)
   kinds: none
@@ -50,16 +50,16 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   refuted: linked an external stylesheet from the shell's head in buildShell -> the totality oracle went red; restored, green (2026-09-23)
   kinds: output
   checklist: destination-confinement declared as self-contained snapshot
-  checklist: redaction dismissed: nothing in the glossary is sensitive; provenance is separated, not removed
+  checklist: redaction dismissed: nothing in the lexicon is sensitive; provenance is separated, not removed
   checklist: commit-ordered-effects dismissed: the page has no effect
   checklist: circuit-breaker-policy dismissed: the page has no dependency to sample
   checklist: declared-target-coverage dismissed: one file is written
-- embedded state unchanged: The state a snapshot embeds is the loaded glossary, unchanged.
-  over: every field of the loaded glossary
-  via: the embedded state is the loaded glossary, unchanged
-  because: the browser renders from the embedded state; a build that reshaped the glossary on the way in would show a human something other than the settled vocabulary
+- embedded state unchanged: The state a snapshot embeds is the loaded lexicon, unchanged.
+  over: every field of the loaded lexicon
+  via: the embedded state is the loaded lexicon, unchanged
+  because: the browser renders from the embedded state; a build that reshaped the lexicon on the way in would show a human something other than the settled vocabulary
   crossing: project-source -> reading
-  refuted: embedded an extra field beside the state in buildScopePage -> "the embedded state is the loaded glossary, unchanged" went red in check.test.ts; restored, green (2026-09-17)
+  refuted: embedded an extra field beside the state in buildScopePage -> "the embedded state is the loaded lexicon, unchanged" went red in check.test.ts; restored, green (2026-09-17)
   kinds: encoding
   checklist: semantic-preservation declared as embedded state unchanged
   checklist: canonical-encoding declared as fixed shell
@@ -100,9 +100,9 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   crossing: reading -> reading
   refuted: gave run cards a prefix no view claims in runId -> "deep links resolve: every card id on every view resolves to that view" went red in check.test.ts; restored, green (2026-09-17)
   kinds: none
-- second root: With --root the page is built over another project: its spec tree, runs, journal, and glossary become the domain layer beneath Coherence's own, and its run records show its structural defects.
+- second root: With --root the page is built over another project: its spec tree, runs, journal, and lexicon become the domain layer beneath Coherence's own, and its run records show its structural defects.
   over: every structural defect the first adopter's model derives from its run records, and every bypass site each carries
-  via: the first adopter's tree builds as a second root: its glossary is the domain layer and its run records show its structural defects
+  via: the first adopter's tree builds as a second root: its lexicon is the domain layer and its run records show its structural defects
   because: a reading that rendered only Coherence's own tree would never have shown the two broken chokepoints the first adopter's runs recorded
   crossing: record -> reading
   refuted: made the build ignore --root, so the first adopter's tree could not be a second root -> the totality oracle went red, then green once restored (2026-09-18)
@@ -117,7 +117,7 @@ The reading: one surface projecting the model for a human, in six views: Glossar
 - component interfaces reveal their invariants: A component interface is annotated from the invariants and never authored: the chokepoint that stands on it when a chokepoint symbol is among its symbols, that invariant's crossing, and the classes of data its crossings carry; its label reads them in that order, else names its most-referenced symbols, and never a verb.
   over: every interface of the flow fixture, load-bearing and plain, and every line of every label
   via: a component interface is annotated from the invariants: its chokepoint, its crossing, the data that passes; a plain one by its most-referenced symbols, never a verb
-  because: the glossary says what an interface reveals comes from the invariants; an authored relationship label rots, and the topology prototype's every arrow said consumes, which told nobody anything. Deriving the annotation from the chokepoint symbols the interface actually carries keeps load-bearing and plain honestly apart
+  because: the lexicon says what an interface reveals comes from the invariants; an authored relationship label rots, and the topology prototype's every arrow said consumes, which told nobody anything. Deriving the annotation from the chokepoint symbols the interface actually carries keeps load-bearing and plain honestly apart
   crossing: record -> reading
   refuted: stopped finding the chokepoints that stand on an interface in flowOf -> the totality oracle went red; restored, green (2026-09-22)
   kinds: none
@@ -173,14 +173,14 @@ The reading: one surface projecting the model for a human, in six views: Glossar
 - structure preview is ephemeral evidence: writeStructurePreview validates a proposed crossing, selects Structure, renders it dashed and unverified, and writes only outside the project root without changing specs, runs, or the inputs that determine the page.
   over: every generated preview page and proposed crossing endpoint
   via: the Structure preview bridge validates crossings, selects Structure, and writes deterministic generated pages only
-  because: a preview is a view of a proposed change, not evidence that it happened. Writing it under the project would alter glossary population and make otherwise identical previews differ; accepting grade, verdict, or reliance from the caller would invent run evidence
+  because: a preview is a view of a proposed change, not evidence that it happened. Writing it under the project would alter lexicon population and make otherwise identical previews differ; accepting grade, verdict, or reliance from the caller would invent run evidence
   crossing: project-source -> reading
   refuted: allowed the generated preview page inside the project root -> the in-root refusal assertion went red in check.test.ts; restored outside-root confinement and generated both previews byte-identically (2026-09-18)
   kinds: none
-- ambiguous property meanings stay plural: When one observed property spelling is owned by multiple concepts, Scope and query glossary display every meaning alternative with its owner, layer, definition, properties, and confusables; neither selects one owner nor calls the scalar absence an unsettled definition.
+- ambiguous property meanings stay plural: When one observed property spelling is owned by multiple concepts, Scope and query lexicon display every meaning alternative with its owner, layer, definition, properties, and confusables; neither selects one owner nor calls the scalar absence an unsettled definition.
   over: every projected VocabularyTerm carrying meaningAlternatives, including a spelling shared by two concepts while scalar concept, definition, and properties are intentionally unset
-  via: Scope and query glossary readings display every applicable property meaning instead of a false missing-definition line
-  because: selecting one property owner would silently change the glossary meaning, while saying no definition would discard definitions the authoritative coverage already carries. The ambiguity is evidence to display, not a choice for the reading to settle
+  via: Scope and query lexicon readings display every applicable property meaning instead of a false missing-definition line
+  because: selecting one property owner would silently change the lexicon meaning, while saying no definition would discard definitions the authoritative coverage already carries. The ambiguity is evidence to display, not a choice for the reading to settle
   crossing: record -> reading
   refuted: ignored meaningAlternatives and formatted the unset scalar definition as missing -> the shared Scope/query reading test went red; restored every alternative, green (2026-09-18)
   kinds: none
@@ -261,10 +261,10 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   crossing: record -> reading
   refuted: gave the eighth route the old hook route's red (#df2c2b) in FLOW_ROUTE_COLORS -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
-- the masthead leads with health: The page's masthead leads with one verdict in large type (every invariant verified, nothing enforced yet, or how many are broken) that links to its set on the Structure map, and demotes the component, invariant, run, journal and glossary counts beneath it.
+- the masthead leads with health: The page's masthead leads with one verdict in large type (every invariant verified, nothing enforced yet, or how many are broken) that links to its set on the Structure map, and demotes the component, invariant, run, journal and lexicon counts beneath it.
   over: the masthead of a healthy fixture, one with nothing enforced, and one with a broken component, and the type sizes the page gives the verdict and the counts
   via: the masthead leads with health: one verdict in large type that links to its set, with the counts demoted beneath it
-  because: the owner and security readers found the verdict too quiet: Coherence's 114 of 114 sat in small type under a masthead that led with the glossary's size and a count of bullets (docs/reviews/2026-09-23-structure-map-synthesis.md, item 3)
+  because: the owner and security readers found the verdict too quiet: Coherence's 114 of 114 sat in small type under a masthead that led with the lexicon's size and a count of bullets (docs/reviews/2026-09-23-structure-map-synthesis.md, item 3)
   crossing: record -> reading
   refuted: skipped the broken branch of flowVerdict, so a broken project's masthead read as verified -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
@@ -310,12 +310,12 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   crossing: record -> reading
   refuted: reversed every pulse's points in flowPulses, so the pulse ran callee to caller -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
-- the glossary leads with the signal: The Glossary view's vocabulary section leads with the attention signal, the recurring terms that lack a definition ranked most recurring first and then the senses at risk, and keeps every population and page total inside its Population and limits disclosure; a context awaits review only when its sense is at risk and no review has settled it, and the agent query answers a term with its recurrence and each context's risk before what the page left out.
+- the lexicon leads with the signal: The Lexicon view's vocabulary section leads with the attention signal, the recurring terms that lack a definition ranked most recurring first and then the senses at risk, and keeps every population and page total inside its Population and limits disclosure; a context awaits review only when its sense is at risk and no review has settled it, and the agent query answers a term with its recurrence and each context's risk before what the page left out.
   over: the rendered vocabulary section and the query answer for a projected reading holding two recurring undefined terms, a sense at risk, and an ordinary unreviewed use of a defined word
-  via: Scope leads its glossary with the ranked signal and keeps totals in the population disclosure; query shows recurrence and each context's risk
+  via: Scope leads its lexicon with the ranked signal and keeps totals in the population disclosure; query shows recurrence and each context's risk
   because: the page and the query still opened on the old reading's counts (candidate terms, uses, contexts awaiting review) after the hooks had stopped injecting them, and counted every unconfirmed context as awaiting review, so an ordinary use of a defined word read as work; a count nobody can act on trains a reader to skip the section, and the ranked names are what a reader can act on (decisions d-7b070fc6, d-a77be28f)
   crossing: record -> reading
-  refuted: put the old Full observed population totals line back at the head of the vocabulary section in glossary-view.ts, ahead of the ranked signal -> the totality oracle went red; restored, green (2026-09-23)
+  refuted: put the old Full observed population totals line back at the head of the vocabulary section in lexicon-view.ts, ahead of the ranked signal -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
 - citations linked in the Journal view: Each journal record on the page lists what it cites and what cites it as in-page links to those records' cards, with kind and subject; each work order lists what its records cite, what cites it, and the journal records bound to it; a cited record the page does not embed is an id with the command that shows it, never a dead link.
   over: every journal record and work order of the fixture, a record citing a work order, a work order's close citing a decision, a pinned escalation, and a state that leaves a cited record out

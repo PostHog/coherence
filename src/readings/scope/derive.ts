@@ -101,9 +101,9 @@ const ID_PREFIXES: [string, string][] = [
   ["run-", "runs"],
   ["journal-", "journal"],
   ["work-", "journal"],
-  ["coherence-", "glossary"],
-  ["domain-", "glossary"],
-  ["layer-", "glossary"],
+  ["coherence-", "lexicon"],
+  ["domain-", "lexicon"],
+  ["layer-", "lexicon"],
 ];
 
 export interface HashTarget {

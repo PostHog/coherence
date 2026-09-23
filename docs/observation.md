@@ -1,10 +1,10 @@
 # Observation
 
-An observation (glossary: observation) is a record of runtime behavior
+An observation (lexicon: observation) is a record of runtime behavior
 captured from a named source, bound to a commit and a session. The first
 source is the test pass: the batched totality pass the run already makes,
 observed with per-test coverage. Observed behavior is its own labeled layer
-of evidence beside Structure's static reading (glossary: structure,
+of evidence beside Structure's static reading (lexicon: structure,
 evidence_tier); it is never blended into it unlabeled.
 
 ```sh
@@ -49,7 +49,7 @@ file); a suite that runs a file's tests concurrently blurs them.
 
 Executed code maps to the component whose folder is its nearest ancestor;
 test files never count. The component interfaces are Structure's
-(glossary: component interface): every exported top-level declaration,
+(lexicon: component interface): every exported top-level declaration,
 resolved through the language adapter, with its references from non-test
 code of another component. The observation keeps what the comparison needs:
 each declaration's range and each reference site's position and form

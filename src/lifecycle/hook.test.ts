@@ -26,10 +26,10 @@ function git(...args: string[]): string {
 
 before(async () => {
   root = await mkdtemp(join(tmpdir(), "coherence-hook-"));
-  await writeFile(join(root, "coherence.config.json"), JSON.stringify({ glossary: "vocab/glossary.json" }));
+  await writeFile(join(root, "coherence.config.json"), JSON.stringify({ lexicon: "vocab/lexicon.json" }));
   await mkdir(join(root, "vocab"));
   await writeFile(
-    join(root, "vocab", "glossary.json"),
+    join(root, "vocab", "lexicon.json"),
     JSON.stringify({
       project: "widgetry",
       version: 0,
@@ -47,7 +47,7 @@ after(async () => {
   if (root !== undefined) await rm(root, { recursive: true, force: true });
 });
 
-test("the block after the glossary is under 120 words: session, decide template, and the rule", async () => {
+test("the block after the lexicon is under 120 words: session, decide template, and the rule", async () => {
   const block = await sessionBlock(root, { session_id: "abc123", agent_type: "Explore" });
   assert.ok(block.split(/\s+/).filter((w) => w !== "").length < 120, block);
   assert.match(block, /^Session: abc123\n/);
@@ -65,7 +65,7 @@ test("the block after the glossary is under 120 words: session, decide template,
   assert.match(main, /--session <the id your harness shows> --agent main/);
 });
 
-test("SessionStart and SubagentStart inject both glossaries and the instruction as additionalContext", async () => {
+test("SessionStart and SubagentStart inject both lexicons and the instruction as additionalContext", async () => {
   for (const event of ["SessionStart", "SubagentStart"] as const) {
     const result = await runHook(event, { cwd: root, session_id: "s1" }, tmpdir());
     assert.equal(result.exit, 0);
@@ -73,7 +73,7 @@ test("SessionStart and SubagentStart inject both glossaries and the instruction 
     const parsed = JSON.parse(result.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
     assert.equal(parsed.hookSpecificOutput.hookEventName, event);
     const context = parsed.hookSpecificOutput.additionalContext;
-    assert.match(context, /^Coherence vocabulary \(\d+ concepts/, "no escalation: the glossary comes first");
+    assert.match(context, /^Coherence vocabulary \(\d+ concepts/, "no escalation: the lexicon comes first");
     assert.match(context, /\n\nSession: s1\nEvery journal write needs --session s1 --agent main\./);
     assert.match(context, /\nWidgetry vocabulary \(1 concept/);
     assert.match(context, /- widget: A thing with a knob\. \(also: gadget\)/);
@@ -186,15 +186,15 @@ test("changedFiles reports a git failure instead of answering a clean tree; outs
   try {
     assert.deepEqual(await changedFiles(outside), { files: [] }, "no repository: nothing is changed and nothing failed");
     await writeFile(join(broken, ".git"), "this is not a gitfile\n");
-    await writeFile(join(broken, "coherence.config.json"), JSON.stringify({ glossary: "glossary.json" }));
-    await writeFile(join(broken, "glossary.json"), JSON.stringify({ project: "widgetry", version: 0, concepts: [], rejected: [] }));
+    await writeFile(join(broken, "coherence.config.json"), JSON.stringify({ lexicon: "lexicon.json" }));
+    await writeFile(join(broken, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, concepts: [], rejected: [] }));
     const failed = await changedFiles(broken);
     assert.deepEqual(failed.files, []);
     assert.match(failed.failure ?? "", /git diff --name-only HEAD failed: .*gitfile/, "the failure names the command and git's reason");
     const stop = await runHook("Stop", { cwd: broken, session_id: "s-git" }, broken);
     assert.equal(stop.exit, 0);
     const message = (JSON.parse(stop.stdout) as { systemMessage: string }).systemMessage;
-    assert.match(message, /Changed files: not known \(git diff --name-only HEAD failed: .*\); the glossary check ran over nothing/);
+    assert.match(message, /Changed files: not known \(git diff --name-only HEAD failed: .*\); the lexicon check ran over nothing/);
     const subagent = await runHook("SubagentStop", { cwd: broken, session_id: "s-git", stop_hook_active: false }, broken);
     assert.equal(subagent.exit, 0, "what the tool cannot see it cannot prove owed, so it reports and never refuses");
   } finally {
@@ -261,10 +261,10 @@ test("the start injection stays under the budget with escalations present: the v
     assert.ok(context.length <= CONTEXT_BUDGET, `${context.length} characters against a budget of ${CONTEXT_BUDGET}`);
     for (let n = 0; n < 8; n += 1) assert.ok(context.includes(`▲ ${ids[n]}  scope  ${what(n)} — only the owner can retire a vertebra, and this is the ${n}th`), `escalation ${n} is shown whole`);
     assert.doesNotMatch(context, /^- invariant: /m, "the vocabulary stepped down: no full concept line");
-    assert.match(context, /^Coherence vocabulary \(\d+ concepts; names only here, rejected names are defects; full entries: coherence glossary\):\n/m, "Coherence's layer at names only");
+    assert.match(context, /^Coherence vocabulary \(\d+ concepts; names only here, rejected names are defects; full entries: coherence lexicon\):\n/m, "Coherence's layer at names only");
     assert.match(context, /\nSession: s-budget\n/, "the session block still rides along");
 
-    // More escalations, until even the names do not fit: the vocabulary gives way to one line that points at the glossary command.
+    // More escalations, until even the names do not fit: the vocabulary gives way to one line that points at the lexicon command.
     let pointed = context;
     for (let n = 8; n < 40 && /^Coherence vocabulary/m.test(pointed); n += 1) {
       const printed: string[] = [];
@@ -274,7 +274,7 @@ test("the start injection stays under the budget with escalations present: the v
     }
     assert.doesNotMatch(pointed, /^Coherence vocabulary/m, "the names no longer fit");
     assert.match(pointed, /\n  node_modules\/\.bin\/coherence journal\n/, "the journal command survives the reduced vocabulary");
-    assert.match(pointed, /^Vocabulary omitted to stay under the host budget; full entries: node_modules\/\.bin\/coherence glossary$/m, "one line points at the glossary command instead");
+    assert.match(pointed, /^Vocabulary omitted to stay under the host budget; full entries: node_modules\/\.bin\/coherence lexicon$/m, "one line points at the lexicon command instead");
     assert.ok(pointed.length <= CONTEXT_BUDGET, `${pointed.length} characters against a budget of ${CONTEXT_BUDGET}`);
     ids.forEach((id, n) => assert.ok(pointed.includes(`▲ ${id}  scope  ${what(n)} — only the owner`), `escalation ${n} is still shown whole`));
 
@@ -415,8 +415,8 @@ test("orient lists open requirements and regulate reports them; only spec proble
 /** A project of its own for the work and feed tests, so the shared root's journal stays as the earlier tests left it. */
 async function freshRoot(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "coherence-hook-work-"));
-  await writeFile(join(dir, "coherence.config.json"), JSON.stringify({ glossary: "glossary.json" }));
-  await writeFile(join(dir, "glossary.json"), JSON.stringify({ project: "widgetry", version: 0, concepts: [], rejected: [] }));
+  await writeFile(join(dir, "coherence.config.json"), JSON.stringify({ lexicon: "lexicon.json" }));
+  await writeFile(join(dir, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, concepts: [], rejected: [] }));
   return dir;
 }
 

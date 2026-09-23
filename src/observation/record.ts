@@ -1,5 +1,5 @@
 /**
- * The observation record (glossary: observation): one line per observed pass
+ * The observation record (lexicon: observation): one line per observed pass
  * in .coherence/observations/<session>.jsonl, append only. It carries who
  * captured it and at which commit, the source (a test pass, with its runner
  * and whether coverage was attributed per test or per run), and per test the

@@ -660,7 +660,7 @@
             "completed": "closed by the one closing verb against its success criterion",
             "cancelled": "ended without completion"
           },
-          "rule": "Five states. The fifth was first spelled blocked; that spelling is refused for the unable verb (an agent's wall, not an order's) so it cannot stand as a second spelling of two different things, and the state is named waiting: the order waits on something outside its owner. Decided 2026-09-17 with the glossary in view; the owner may rename it.",
+          "rule": "Five states. The fifth was first spelled blocked; that spelling is refused for the unable verb (an agent's wall, not an order's) so it cannot stand as a second spelling of two different things, and the state is named waiting: the order waits on something outside its owner. Decided 2026-09-17 with the lexicon in view; the owner may rename it.",
           "owner_words": "states can stay, and blocked is a valid state for either object class."
         },
         "boundary_note": "A session bound to an order must not be nagged about maintenance outside the order's boundary; 14 of 33 reference blocked entries were that nag."
@@ -1081,7 +1081,7 @@
             "decision",
             "escalation"
           ],
-          "rule": "Two kinds, and no other. Decisions are what this concept was defined for. Escalations ride with them because an escalation heads every read: a question standing before a human changes what a peer should do next, and a session that learns of one only at its own start would act past it for a whole cycle. Every other verb stays in the journal, one command away, where a reader who wants it goes. Decided 2026-09-18 with the glossary in view; the owner may narrow it back to decisions alone.",
+          "rule": "Two kinds, and no other. Decisions are what this concept was defined for. Escalations ride with them because an escalation heads every read: a question standing before a human changes what a peer should do next, and a session that learns of one only at its own start would act past it for a whole cycle. Every other verb stays in the journal, one command away, where a reader who wants it goes. Decided 2026-09-18 with the lexicon in view; the owner may narrow it back to decisions alone.",
           "open": "A retraction of a decision a peer may already have acted on is the strongest candidate for a third kind; it was left out because the feed carries subjects and a retraction's subject is an id, which reads as noise until the reader fetches the record anyway."
         }
       },
@@ -1112,9 +1112,9 @@
       }
     },
     {
-      "name": "glossary",
+      "name": "lexicon",
       "status": "settled",
-      "definition": "A required component of every Coherence project: glossary.json, the settled vocabulary with, for each concept, its definition, its aliases, and the names rejected for it and why. Injected into context the way a project's standing instructions to agents are; no run can miss it.",
+      "definition": "A required component of every Coherence project: lexicon.json, the settled vocabulary with, for each concept, its definition, its aliases, and the names rejected for it and why. Injected into context the way a project's standing instructions to agents are; no run can miss it.",
       "related": [
         "hook",
         "spec",
@@ -1122,9 +1122,9 @@
         "decision"
       ],
       "properties": {
-        "anti_rot": "The glossary names things and never points at where they live in code. No addresses, so a rename or move cannot stale it.",
-        "anti_fragile": "Every attempt to introduce a name makes the glossary stronger: a new noun in a spec, journal entry, or identifier is caught at regulate and must be declared as a new concept, mapped as an alias, or fixed if it is a rejected name. Rejected names accumulate as the record of what drift was refused.",
-        "two_layers": "Coherence's own glossary (the tool vocabulary) and each project's domain glossary share one shape and one mechanism; scaffold for a new project begins by asking for the domain glossary.",
+        "anti_rot": "The lexicon names things and never points at where they live in code. No addresses, so a rename or move cannot stale it.",
+        "anti_fragile": "Every attempt to introduce a name makes the lexicon stronger: a new noun in a spec, journal entry, or identifier is caught at regulate and must be declared as a new concept, mapped as an alias, or fixed if it is a rejected name. Rejected names accumulate as the record of what drift was refused.",
+        "two_layers": "Coherence's own lexicon (the tool vocabulary) and each project's domain lexicon share one shape and one mechanism; scaffold for a new project begins by asking for the domain lexicon.",
         "growth": "Asymmetric, like invariants: agents propose and announce new concepts; only a human retires or renames one. Each definition change is a decision with a rejected alternative.",
         "injection": "Compact: name, one-line definition, rejected names. Full entries through agent query.",
         "naming_check": "Identifiers are checked against rejected names and misused concept names by word, not by address."
@@ -1133,11 +1133,15 @@
         {
           "alternative": "concept addressing (each concept lists where it is implemented in code)",
           "because": "invites drift; an address is a claim about code that rots when the code moves"
+        },
+        {
+          "alternative": "glossary",
+          "because": "Owner ruled 2026-09-23 (d-cb376a86): glossary reads as a passive appendix, while the thing settles, rejects and is enforced; lexicon names the project's own words without the appendix connotation"
         }
       ],
       "detail": {
         "similarity_seam": "The drift check matches exact strings first (new noun, rejected name). A similarity seam is left open so an embedding pass can later suggest candidate mappings for near-synonyms and flag overloads by clustering the contexts of a term across components. Similarity only improves the closed question (declare, map, or fix); it never decides. Planned as a local service: the supported platform is Apple Silicon only, so an on-device model needs no API key and no network. Backend under survey 2026-09-17.",
-        "first_class": "Coherence needs first-class support for building, maintaining, and validating the glossary. Building: draft from specs, docs, component names, and tool surface; settle collisions by ruling. Maintaining: the vocabulary check at regulate; only a human retires or renames. Validating: sense, not names; a periodic per-concept review the tool makes cheap, approximated mechanically by the similarity seam. See docs/glossary.md."
+        "first_class": "Coherence needs first-class support for building, maintaining, and validating the lexicon. Building: draft from specs, docs, component names, and tool surface; settle collisions by ruling. Maintaining: the vocabulary check at regulate; only a human retires or renames. Validating: sense, not names; a periodic per-concept review the tool makes cheap, approximated mechanically by the similarity seam. See docs/lexicon.md."
       },
       "provenance": {
         "owner_words": "glossary.json. Injected into context same as AGENTS.md. no run can miss it. glossary must be anti-rot, anti-fragile. Coherence will need first class support for building, maintaining and validating the glossary.",
@@ -1154,7 +1158,7 @@
         "metal"
       ],
       "related": [
-        "glossary",
+        "lexicon",
         "language adapter"
       ],
       "provenance": {
@@ -1258,13 +1262,13 @@
       "definition": "A name with so much gravity in training data that no project definition could make it less ambiguous: the proper name of a widely used technology, language, platform, vendor, standard, or format (Python, Pyright, GitHub), the names a project vouches for in its config, and the project's own name. A well-known name is never a vocabulary candidate. A common word a project gives its own sense (hive, scope, core, run, session) is never one, even written as a proper noun; a name whose lowercase is an ordinary word (Node, Chrome) is well known only in its capitalized spelling.",
       "status": "proposed",
       "related": [
-        "glossary",
+        "lexicon",
         "config"
       ],
       "properties": {
         "curated_list": "Shipped with the tool beside vocabulary coverage, versioned, with its rule for inclusion written at its top.",
         "capitalized_only": "A name whose lowercase spelling is an ordinary word is well known only in its capitalized spelling; its lowercase use in a project sense stays a candidate.",
-        "not_entries": "A name a concept lists as not to be confused with is already known to the glossary and is not listed again."
+        "not_entries": "A name a concept lists as not to be confused with is already known to the lexicon and is not listed again."
       },
       "provenance": {
         "defined_by": "agent proposal during the vocabulary coverage redesign, 2026-09-23 (journal d-c8f34e4b)",

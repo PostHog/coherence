@@ -21,8 +21,8 @@ import { readEnforcementConfig } from "../enforcement/config.ts";
 import { computeMass } from "../economy/mass.ts";
 import { sourceFiles } from "../economy/source.ts";
 import { collectFiles } from "../lifecycle/check.ts";
-import { loadGlossary } from "../lifecycle/glossary.ts";
-import { COHERENCE_GLOSSARY } from "../lifecycle/project.ts";
+import { loadLexicon } from "../lifecycle/lexicon.ts";
+import { COHERENCE_LEXICON } from "../lifecycle/project.ts";
 import { editContext } from "../lifecycle/hook.ts";
 
 const TSCONFIG = `{ "compilerOptions": { "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true, "noEmit": true, "allowImportingTsExtensions": true }, "include": ["src/**/*.ts"] }\n`;
@@ -139,7 +139,7 @@ test("only the project's own files are ever evidence: a nested checkout and an i
   assert.equal(ignoredEdit, "", "an edit to an ignored file reveals nothing about this project");
 
   // The vocabulary check's corpus.
-  const corpus = await collectFiles({ root, coherence: await loadGlossary(COHERENCE_GLOSSARY) });
+  const corpus = await collectFiles({ root, coherence: await loadLexicon(COHERENCE_LEXICON) });
   const read = corpus.files.map((f) => f.slice(root.length + 1));
   assert.ok(read.includes("src/api/render.ts"), read.join(", "));
   assert.ok(!read.some((f) => f.startsWith(`${NESTED}/`) || f === IGNORED_FILE), `the corpus holds only the project's files: ${read.join(", ")}`);

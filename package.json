@@ -12,11 +12,11 @@
     "scope": "node --disable-warning=ExperimentalWarning src/cli.ts scope",
     "scope:check": "node --disable-warning=ExperimentalWarning --test src/readings/scope/check.test.ts",
     "journal:check": "node --disable-warning=ExperimentalWarning --test src/journal/journal.test.ts",
-    "glossary:check": "node --disable-warning=ExperimentalWarning src/cli.ts glossary --check",
+    "lexicon:check": "node --disable-warning=ExperimentalWarning src/cli.ts lexicon --check",
     "spec:check": "node --disable-warning=ExperimentalWarning src/cli.ts spec --check",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test:unit": "node --disable-warning=ExperimentalWarning --test \"src/**/*.test.ts\"",
-    "test": "npm run typecheck && npm run test:unit && npm run glossary:check && npm run spec:check",
+    "test": "npm run typecheck && npm run test:unit && npm run lexicon:check && npm run spec:check",
     "test:setup": "\"${COHERENCE_PYTHON:-python3}\" -m venv .venv && .venv/bin/python -m pip install --requirement requirements-test.txt",
     "test:python": "node --disable-warning=ExperimentalWarning --test src/adapters/python.test.ts"
   },

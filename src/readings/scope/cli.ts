@@ -4,7 +4,7 @@
  *   coherence scope [--root <project>] [--no-open]
  *       start or attach to the root's warm server, have it answer HTTP, print
  *       the tokened address and open it in the browser (not with --no-open)
- *   coherence scope --snapshot [--out <file>] [--root <project>] [--glossary <path>] [--domain <path>]
+ *   coherence scope --snapshot [--out <file>] [--root <project>] [--lexicon <path>] [--domain <path>]
  *                   [--domain-title "<title>"] [--project <name>] [--no-interfaces]
  *       write one self-contained file: the shell with the state inline
  *
@@ -16,17 +16,17 @@ import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { withWarmAdapter } from "../../enforcement/run.ts";
 import type { Io } from "../../journal/cli.ts";
-import { COHERENCE_GLOSSARY } from "../../lifecycle/project.ts";
+import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { DEFAULTS, projectNameOf, writeScopePage, type BuildOptions } from "./build.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
 
 export const SCOPE_USAGE = [
   "  scope [--root <dir>] [--no-open]   open the live Scope reading from the warm server (prints its address)",
-  "  scope --snapshot [--out <file>] [--root <dir>] [--glossary <path>] [--domain <path>] [--domain-title <title>] [--project <name>] [--no-interfaces]",
+  "  scope --snapshot [--out <file>] [--root <dir>] [--lexicon <path>] [--domain <path>] [--domain-title <title>] [--project <name>] [--no-interfaces]",
   "                                     write one self-contained file: the shell with the state inline (--out alone does the same)",
 ].join("\n");
 
-const VALUED = new Set(["root", "out", "glossary", "domain", "domain-title", "project"]);
+const VALUED = new Set(["root", "out", "lexicon", "domain", "domain-title", "project"]);
 const SWITCHES = new Set(["snapshot", "no-open", "no-interfaces"]);
 
 function parse(argv: string[]): { values: Map<string, string>; switches: Set<string> } | string {
@@ -66,7 +66,7 @@ async function snapshot(root: string, rootGiven: boolean, values: Map<string, st
   const out = values.get("out") ?? DEFAULTS.outPath;
   const options: BuildOptions = {
     root,
-    glossaryPath: values.get("glossary") ?? (rootGiven ? COHERENCE_GLOSSARY : resolve(io.cwd, DEFAULTS.glossaryPath)),
+    lexiconPath: values.get("lexicon") ?? (rootGiven ? COHERENCE_LEXICON : resolve(io.cwd, DEFAULTS.lexiconPath)),
     project: values.get("project") ?? (rootGiven ? projectNameOf(root) : DEFAULTS.project),
   };
   // Structure reads every component interface through the language adapter; --no-interfaces writes without the instrument.
@@ -76,9 +76,9 @@ async function snapshot(root: string, rootGiven: boolean, values: Map<string, st
   const title = values.get("domain-title");
   if (title !== undefined) options.domainTitle = title;
   const { bytes, state } = await writeScopePage(options, resolve(io.cwd, out));
-  const first = state.glossary.layers[0];
-  const count = first?.kind === "present" ? first.glossary.concepts.length : 0;
-  const layer = state.glossary.layers[1]?.kind === "present" ? "with a domain glossary" : "no domain glossary";
+  const first = state.lexicon.layers[0];
+  const count = first?.kind === "present" ? first.lexicon.concepts.length : 0;
+  const layer = state.lexicon.layers[1]?.kind === "present" ? "with a domain lexicon" : "no domain lexicon";
   const c = state.spec.counts;
   io.out(`Scope: wrote ${out} (${bytes} bytes, ${count} concepts, ${layer}, ${c.components} components, ${c.bullets} bullets, ${state.runs.records.length} runs, ${state.journal.records.length} journal records).`);
   return 0;

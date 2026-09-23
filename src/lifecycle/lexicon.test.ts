@@ -5,16 +5,16 @@ import {
   acceptedNames,
   firstSentence,
   namesOfAlternative,
-  parseGlossary,
+  parseLexicon,
   rejectedNames,
   renderCompact,
   renderCompactWithin,
   tokenEstimate,
-  loadGlossary,
-} from "./glossary.ts";
-import { COHERENCE_GLOSSARY } from "./project.ts";
+  loadLexicon,
+} from "./lexicon.ts";
+import { COHERENCE_LEXICON } from "./project.ts";
 
-const coherence = parseGlossary(
+const coherence = parseLexicon(
   {
     version: 2,
     concepts: [
@@ -40,7 +40,7 @@ const coherence = parseGlossary(
   "coherence.json",
 );
 
-const project = parseGlossary(
+const project = parseLexicon(
   {
     project: "widgetry",
     version: 0,
@@ -124,7 +124,7 @@ test("renderCompact: header, one line per concept, rejected in brackets, nothing
   assert.doesNotMatch(text, /never injected|spine|owner_words|revelation/);
 });
 
-test("renderCompact: the project glossary renders beneath with its own header, aliases, a not: clause and top-level rejected names", () => {
+test("renderCompact: the project lexicon renders beneath with its own header, aliases, a not: clause and top-level rejected names", () => {
   const text = renderCompact(coherence, project);
   const lines = text.trimEnd().split("\n");
   assert.equal(lines[3], "");
@@ -141,7 +141,7 @@ test("renderCompact: the project glossary renders beneath with its own header, a
 });
 
 test("renderCompactWithin steps the project layer down, then Coherence's layer to names, then to a one-line pointer, until the text fits", () => {
-  const big = parseGlossary(
+  const big = parseLexicon(
     {
       project: "biggish",
       version: 0,
@@ -169,20 +169,20 @@ test("renderCompactWithin steps the project layer down, then Coherence's layer t
 
   const names = renderCompactWithin(coherence, big, definitions.text.length - 1);
   assert.equal(names.detail, "names");
-  assert.match(names.text, /Biggish vocabulary \(40 concepts; names only here; full entries: coherence glossary\):\nthing0, thing1, /);
+  assert.match(names.text, /Biggish vocabulary \(40 concepts; names only here; full entries: coherence lexicon\):\nthing0, thing1, /);
   assert.match(names.text, /^- invariant: The abstract behavioral requirement\. \[rejected: zorp\]$/m, "Coherence's layer is untouched while the project layer can still step down");
   assert.ok(names.text.length < definitions.text.length);
 
   const coherenceNames = renderCompactWithin(coherence, big, names.text.length - 1);
   assert.equal(coherenceNames.detail, "coherence-names", "below the project's names, Coherence's own layer steps down to names");
-  assert.match(coherenceNames.text, /^Coherence vocabulary \(2 concepts; names only here, rejected names are defects; full entries: coherence glossary\):\ninvariant, journal\n/);
+  assert.match(coherenceNames.text, /^Coherence vocabulary \(2 concepts; names only here, rejected names are defects; full entries: coherence lexicon\):\ninvariant, journal\n/);
   assert.doesNotMatch(coherenceNames.text, /rejected: zorp/);
   assert.ok(coherenceNames.text.length < names.text.length);
 
   const tooSmall = renderCompactWithin(coherence, big, 10);
-  assert.equal(tooSmall.detail, "pointer", "when even the names do not fit, one line points at the glossary command");
-  assert.equal(tooSmall.text, "Vocabulary omitted to stay under the host budget; full entries: coherence glossary\n");
-  assert.equal(renderCompactWithin(coherence, undefined, 10, "node src/cli.ts").text, "Vocabulary omitted to stay under the host budget; full entries: node src/cli.ts glossary\n", "the pointer names the command the session has");
+  assert.equal(tooSmall.detail, "pointer", "when even the names do not fit, one line points at the lexicon command");
+  assert.equal(tooSmall.text, "Vocabulary omitted to stay under the host budget; full entries: coherence lexicon\n");
+  assert.equal(renderCompactWithin(coherence, undefined, 10, "node src/cli.ts").text, "Vocabulary omitted to stay under the host budget; full entries: node src/cli.ts lexicon\n", "the pointer names the command the session has");
   assert.equal(renderCompactWithin(coherence, undefined, 1_000_000).detail, "full", "without a project and with room, the full form");
 });
 
@@ -190,10 +190,10 @@ test("tokenEstimate is bytes over four, rounded up", () => {
   assert.deepEqual(tokenEstimate("abcde"), { bytes: 5, tokens: 2 });
 });
 
-test("the compact Coherence glossary stays under 2,000 tokens", async () => {
-  const glossary = await loadGlossary(COHERENCE_GLOSSARY);
-  const { tokens } = tokenEstimate(renderCompact(glossary));
-  assert.ok(tokens < 2000, `compact glossary is ${tokens} tokens`);
-  const onDisk = JSON.parse(readFileSync(COHERENCE_GLOSSARY, "utf8")) as { concepts: unknown[] };
-  assert.equal(glossary.concepts.length, onDisk.concepts.length, "every concept in the file is loaded");
+test("the compact Coherence lexicon stays under 2,000 tokens", async () => {
+  const lexicon = await loadLexicon(COHERENCE_LEXICON);
+  const { tokens } = tokenEstimate(renderCompact(lexicon));
+  assert.ok(tokens < 2000, `compact lexicon is ${tokens} tokens`);
+  const onDisk = JSON.parse(readFileSync(COHERENCE_LEXICON, "utf8")) as { concepts: unknown[] };
+  assert.equal(lexicon.concepts.length, onDisk.concepts.length, "every concept in the file is loaded");
 });

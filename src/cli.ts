@@ -6,9 +6,9 @@
  * word. The journal's verbs arrive as a record of synchronous commands over an
  * `Io`; the lifecycle's verbs are dispatched below them.
  *
- *   coherence glossary                 print the compact glossary the hook injects
- *   coherence glossary --json          print the parsed glossary model
- *   coherence glossary --check [paths] run the glossary check (--json for the report as JSON)
+ *   coherence lexicon                 print the compact lexicon the hook injects
+ *   coherence lexicon --json          print the parsed lexicon model
+ *   coherence lexicon --check [paths] run the lexicon check (--json for the report as JSON)
  *   coherence spec --check [root]      every component, its invariants with state, every problem
  *   coherence spec --json [root]       the spec model
  *   coherence scaffold component | invariant   the complete shape, cheapest to produce
@@ -30,16 +30,16 @@
  * to refuse a stop, with the reason on stderr.
  */
 
-import { GLOSSARY_WORK_USAGE, glossaryWorkCommand } from "./lifecycle/glossary-cli.ts";
+import { LEXICON_WORK_USAGE, lexiconWorkCommand } from "./lifecycle/lexicon-cli.ts";
 import { ECONOMY_USAGE, calibrateCommand, economyCommand, massCommand } from "./economy/cli.ts";
 import { ENFORCEMENT_USAGE, refuteCommand, runCommand, serveCommand } from "./enforcement/cli.ts";
 import { JOURNAL_USAGE, journalVerbs, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, runCheck } from "./lifecycle/check.ts";
-import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/glossary.ts";
+import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
 import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
 import { check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, status, uninstall } from "./lifecycle/install.ts";
-import { isCoherenceItself, loadProjectGlossaries } from "./lifecycle/project.ts";
+import { isCoherenceItself, loadProjectLexicons } from "./lifecycle/project.ts";
 import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
 import { SCOPE_USAGE, scopeCommand } from "./readings/scope/cli.ts";
 import { scopeApp } from "./readings/scope/live.ts";
@@ -52,9 +52,9 @@ type RootCommand = (argv: string[], io: Io) => CommandResult;
 const commands: Record<string, RootCommand> = { ...journalVerbs, spec: specCommand, scaffold: scaffoldCommand };
 
 const USAGE = `usage:
-${GLOSSARY_WORK_USAGE}
-  coherence glossary [--json]
-  coherence glossary --check [--json] [paths...]
+${LEXICON_WORK_USAGE}
+  coherence lexicon [--json]
+  coherence lexicon --check [--json] [paths...]
 ${SPEC_USAGE}
 ${SCAFFOLD_USAGE}
 ${ENFORCEMENT_USAGE}
@@ -116,21 +116,21 @@ async function defaultCommand(root: string): Promise<string> {
   return (await isCoherenceItself(root)) ? `node "${dir}/src/cli.ts"` : `"${dir}/node_modules/.bin/coherence"`;
 }
 
-async function glossaryCommand(args: string[], root: string): Promise<number> {
+async function lexiconCommand(args: string[], root: string): Promise<number> {
   const io: Io = {
     cwd: root,
     out: (line) => process.stdout.write(line + "\n"),
     err: (line) => process.stderr.write(line + "\n"),
   };
-  if (args[0] === "--help") return glossaryWorkCommand(["help"], io);
-  if (args[0] && !args[0].startsWith("--")) return glossaryWorkCommand(args, io);
+  if (args[0] === "--help") return lexiconWorkCommand(["help"], io);
+  if (args[0] && !args[0].startsWith("--")) return lexiconWorkCommand(args, io);
   const { flags, positionals } = parse(args, new Set());
   const unknown = [...flags.keys()].find((flag) => flag !== "check" && flag !== "json");
   if (unknown !== undefined) {
-    process.stderr.write(`glossary: unknown flag --${unknown}\n`);
+    process.stderr.write(`lexicon: unknown flag --${unknown}\n`);
     return 1;
   }
-  const { coherence, project } = await loadProjectGlossaries(root);
+  const { coherence, project } = await loadProjectLexicons(root);
   if (flags.has("check")) {
     const report = await runCheck({ root, paths: positionals, coherence, project });
     process.stdout.write(flags.has("json") ? JSON.stringify(report, null, 2) + "\n" : formatReport(report));
@@ -194,7 +194,7 @@ const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {
 
 async function hooksCommand(args: string[], root: string): Promise<number> {
   const { flags, positionals } = parse(args, new Set(["host", "command"]));
-  // The check is the noun's --check, as glossary --check and spec --check are; the other actions are verbs.
+  // The check is the noun's --check, as lexicon --check and spec --check are; the other actions are verbs.
   const verb = flags.has("check") && positionals.length === 0 ? "check" : positionals[0];
   const allowed = verb === undefined ? undefined : HOOKS_FLAGS[verb];
   if (allowed === undefined || positionals.length > (verb === "check" ? 0 : 1)) fail(USAGE);
@@ -249,8 +249,8 @@ async function main(argv: string[]): Promise<number> {
     err: (line) => process.stderr.write(`${line}\n`),
   };
   switch (verb) {
-    case "glossary":
-      return glossaryCommand(rest, root);
+    case "lexicon":
+      return lexiconCommand(rest, root);
     case "run":
       return runCommand(rest, io);
     case "refute":

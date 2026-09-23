@@ -11,7 +11,7 @@ import { test } from "node:test";
 import { loadRuns } from "../../enforcement/record.ts";
 import { connectAdapter, serve, type Serving } from "../../enforcement/server.ts";
 import { loadJournal } from "../../journal/store.ts";
-import { COHERENCE_GLOSSARY } from "../../lifecycle/project.ts";
+import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { scopeState } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { latestOf } from "./derive.ts";
@@ -228,7 +228,7 @@ test("the first load stays flat as the journal and the runs grow, every derived 
       assert.equal(state.journal.records.length + (state.journal.omitted ?? 0), allJournal.length, "every journal record is loaded or counted");
       assert.equal(state.runs.records.length + (state.runs.omitted ?? 0), allRuns.length, "every run is loaded or counted");
       assert.ok(state.journal.records.some((r) => r.id === grown.names.openEscalation), "an open escalation is in the first load however old");
-      const whole = await scopeState({ root: grown.root, glossaryPath: COHERENCE_GLOSSARY, project: "Fixture", window: false });
+      const whole = await scopeState({ root: grown.root, lexiconPath: COHERENCE_LEXICON, project: "Fixture", window: false });
       for (const invariant of whole.spec.components.flatMap((c) => c.invariants)) {
         assert.deepEqual(latestOf(invariant, state.runs.records), latestOf(invariant, whole.runs.records), `${invariant.name}: the first load derives the same latest verdicts`);
       }

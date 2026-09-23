@@ -1,6 +1,6 @@
 /**
  * The component interfaces an observation maps onto, with the positions the
- * mapping needs. The definition is Structure's (glossary: component
+ * mapping needs. The definition is Structure's (lexicon: component
  * interface; src/readings/scope/component-interfaces.ts on the Structure
  * line): every top-level declaration a non-test source file exports is
  * resolved as `name in file` and asked for its references; each reference

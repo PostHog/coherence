@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Coverage, VocabularyTerm } from "../../lifecycle/glossary-coverage.ts";
+import type { Coverage, VocabularyTerm } from "../../lifecycle/lexicon-coverage.ts";
 import {
-  embeddedGlossaryBytes,
-  GLOSSARY_PAGE_LIMITS,
-  projectGlossaryCoverage,
-  type GlossaryProjectionLimits,
-} from "./glossary-projection.ts";
+  embeddedLexiconBytes,
+  LEXICON_PAGE_LIMITS,
+  projectLexiconCoverage,
+  type LexiconProjectionLimits,
+} from "./lexicon-projection.ts";
 
 function term(
   name: string,
@@ -37,7 +37,7 @@ function term(
 function coverage(terms: VocabularyTerm[]): Coverage {
   return {
     version: 1,
-    projectGlossary: "glossary.json",
+    projectLexicon: "lexicon.json",
     fingerprint: "authoritative-fingerprint",
     population: {
       files: Array.from({ length: 20 }, (_, i) => ({ file: `src/file-${i}<x>.ts`, kind: "code", lines: i + 1 })),
@@ -58,7 +58,7 @@ function coverage(terms: VocabularyTerm[]): Coverage {
   };
 }
 
-const compact: GlossaryProjectionLimits = {
+const compact: LexiconProjectionLimits = {
   bytes: 32 * 1024,
   terms: 4,
   contextsPerTerm: 1,
@@ -68,12 +68,12 @@ const compact: GlossaryProjectionLimits = {
 
 test("projection uses the builder's exact escaped JSON byte count and never weakens the budget", () => {
   const source = coverage([term("<script>"), term("ordinary")]);
-  const projected = projectGlossaryCoverage(source, compact);
+  const projected = projectLexiconCoverage(source, compact);
   const escaped = JSON.stringify(projected).replace(/</g, "\\u003c");
-  assert.equal(embeddedGlossaryBytes(projected), Buffer.byteLength(escaped, "utf8"));
-  assert.ok(embeddedGlossaryBytes(projected) <= compact.bytes);
+  assert.equal(embeddedLexiconBytes(projected), Buffer.byteLength(escaped, "utf8"));
+  assert.ok(embeddedLexiconBytes(projected) <= compact.bytes);
   assert.equal(projected.projection?.byteLimit, compact.bytes);
-  assert.equal(GLOSSARY_PAGE_LIMITS.bytes, 256 * 1024, "the production ceiling remains 256 KiB");
+  assert.equal(LEXICON_PAGE_LIMITS.bytes, 256 * 1024, "the production ceiling remains 256 KiB");
 });
 
 test("projection is deterministic, leads with the ranked signal, counts only at-risk contexts as awaiting review, and caps population records across all categories", () => {
@@ -88,8 +88,8 @@ test("projection is deterministic, leads with the ranked signal, counts only at-
     { ...term("rejected", "rejected", 1), contexts: unreviewed("rejected") },
   ]);
   const limits = { ...compact, terms: 7 };
-  const first = projectGlossaryCoverage(source, limits);
-  const second = projectGlossaryCoverage(source, limits);
+  const first = projectLexiconCoverage(source, limits);
+  const second = projectLexiconCoverage(source, limits);
   assert.deepEqual(first, second);
   assert.deepEqual(first.terms.map((item) => item.term), ["ranked-high", "ranked-low", "awaiting", "rejected", "unresolved", "reviewed", "no-risk"],
     "recurring undefined terms by recurrence, then at-risk senses, rejected spellings, other unresolved terms, and the rest");
@@ -104,7 +104,7 @@ test("projection is deterministic, leads with the ranked signal, counts only at-
 test("authoritative totals and fingerprint remain whole and the source reading is never mutated", () => {
   const source = coverage(Array.from({ length: 8 }, (_, i) => term(`term-${i}`)));
   const before = structuredClone(source);
-  const projected = projectGlossaryCoverage(source, compact);
+  const projected = projectLexiconCoverage(source, compact);
   assert.deepEqual(source, before);
   assert.deepEqual(projected.totals, source.totals);
   assert.notEqual(projected.totals, source.totals, "the projected state cannot mutate authoritative totals by alias");
@@ -117,7 +117,7 @@ test("authoritative totals and fingerprint remain whole and the source reading i
 test("selected entries preserve definitions, properties, confusables, instance identity, and evidence fingerprints while labeling omitted evidence", () => {
   const instance = term("instance-name", "instance", 9);
   const source = coverage([instance]);
-  const projected = projectGlossaryCoverage(source, compact);
+  const projected = projectLexiconCoverage(source, compact);
   const selected = projected.terms[0]!;
   assert.equal(selected.state, "instance");
   assert.equal(selected.definition, instance.definition);
@@ -145,7 +145,7 @@ test("projection preserves every applicable property meaning for an ambiguous sp
       { concept: "allocation", layer: "project", definition: "The amount assigned to a strategy.", properties: { unit_basis: "percentage" }, confusables: ["exposure"] },
     ],
   };
-  const projected = projectGlossaryCoverage(coverage([ambiguous]), compact);
+  const projected = projectLexiconCoverage(coverage([ambiguous]), compact);
   assert.deepEqual(projected.terms[0]?.meaningAlternatives, ambiguous.meaningAlternatives);
   assert.equal(projected.terms[0]?.concept, null);
   assert.equal(projected.terms[0]?.definition, null);
@@ -156,15 +156,15 @@ test("an entry that would cross the exact escaped-byte ceiling is omitted whole"
   const first = term("small");
   const huge = { ...term("huge"), definition: `<${"x".repeat(20_000)}>` };
   const source = coverage([first, huge]);
-  const metadataOnly = projectGlossaryCoverage(source, { ...compact, bytes: 8 * 1024, terms: 0, populationEntries: 0 });
-  const limit = embeddedGlossaryBytes(metadataOnly) + embeddedGlossaryBytes({
+  const metadataOnly = projectLexiconCoverage(source, { ...compact, bytes: 8 * 1024, terms: 0, populationEntries: 0 });
+  const limit = embeddedLexiconBytes(metadataOnly) + embeddedLexiconBytes({
     ...first,
     contextCount: 2,
     unreviewedContextCount: 1,
     contexts: [first.contexts[0]],
     uses: [first.uses[0]],
   });
-  const projected = projectGlossaryCoverage(source, { ...compact, bytes: limit, populationEntries: 0 });
+  const projected = projectLexiconCoverage(source, { ...compact, bytes: limit, populationEntries: 0 });
   assert.deepEqual(projected.terms.map((item) => item.term), ["small"]);
-  assert.equal(embeddedGlossaryBytes(projected), limit, "the projection may fill the exact escaped-byte ceiling");
+  assert.equal(embeddedLexiconBytes(projected), limit, "the projection may fill the exact escaped-byte ceiling");
 });

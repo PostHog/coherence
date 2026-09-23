@@ -1,8 +1,8 @@
 /** Node-only evidence projection. Definitions stay whole; oversized entries are omitted, not rewritten. */
-import { attention, awaitsReview, type Coverage, type VocabularyTerm } from "../../lifecycle/glossary-coverage.ts";
-import type { GlossaryCoverage, GlossaryEvidenceTerm } from "./model.ts";
+import { attention, awaitsReview, type Coverage, type VocabularyTerm } from "../../lifecycle/lexicon-coverage.ts";
+import type { LexiconCoverage, LexiconEvidenceTerm } from "./model.ts";
 
-export const GLOSSARY_PAGE_LIMITS = {
+export const LEXICON_PAGE_LIMITS = {
   bytes: 256 * 1024,
   terms: 120,
   contextsPerTerm: 6,
@@ -12,7 +12,7 @@ export const GLOSSARY_PAGE_LIMITS = {
   attentionEntries: 12,
 } as const;
 
-export interface GlossaryProjectionLimits {
+export interface LexiconProjectionLimits {
   bytes: number;
   terms: number;
   contextsPerTerm: number;
@@ -41,7 +41,7 @@ function compareText(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-function termEvidence(term: VocabularyTerm, limits: GlossaryProjectionLimits): GlossaryEvidenceTerm {
+function termEvidence(term: VocabularyTerm, limits: LexiconProjectionLimits): LexiconEvidenceTerm {
   const contexts = [...term.contexts]
     .sort((a, b) => Number(awaitsReview(b)) - Number(awaitsReview(a)))
     .slice(0, limits.contextsPerTerm);
@@ -64,17 +64,17 @@ function termEvidence(term: VocabularyTerm, limits: GlossaryProjectionLimits): G
 }
 
 /** Exact UTF-8 bytes used by the builder's escaped application/json payload. */
-export function embeddedGlossaryBytes(value: unknown): number {
+export function embeddedLexiconBytes(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value).replace(/</g, "\\u003c"), "utf8");
 }
 
-export function projectGlossaryCoverage(
+export function projectLexiconCoverage(
   report: Coverage,
-  limits: GlossaryProjectionLimits = GLOSSARY_PAGE_LIMITS,
-): GlossaryCoverage {
+  limits: LexiconProjectionLimits = LEXICON_PAGE_LIMITS,
+): LexiconCoverage {
   const signal = attention(report);
-  const head = limits.attentionEntries ?? GLOSSARY_PAGE_LIMITS.attentionEntries;
-  const projected: GlossaryCoverage = {
+  const head = limits.attentionEntries ?? LEXICON_PAGE_LIMITS.attentionEntries;
+  const projected: LexiconCoverage = {
     ...report,
     totals: { ...report.totals },
     attention: {
@@ -101,11 +101,11 @@ export function projectGlossaryCoverage(
       },
     },
   };
-  let bytes = embeddedGlossaryBytes(projected);
-  if (bytes > limits.bytes) throw new Error("Scope: glossary reading metadata exceeds the page evidence budget");
+  let bytes = embeddedLexiconBytes(projected);
+  if (bytes > limits.bytes) throw new Error("Scope: lexicon reading metadata exceeds the page evidence budget");
   function append<T>(into: T[], entry: T, limit: number): boolean {
     if (into.length >= limit) return false;
-    const extra = embeddedGlossaryBytes(entry) + (into.length === 0 ? 0 : 1);
+    const extra = embeddedLexiconBytes(entry) + (into.length === 0 ? 0 : 1);
     if (bytes + extra > limits.bytes) return false;
     into.push(entry);
     bytes += extra;
@@ -129,8 +129,8 @@ export function projectGlossaryCoverage(
     if (projected.terms.length >= limits.terms) break;
     append(projected.terms, termEvidence(term, limits), limits.terms);
   }
-  const actual = embeddedGlossaryBytes(projected);
-  if (actual !== bytes) throw new Error(`Scope: glossary projection byte accounting drifted (${bytes} counted, ${actual} embedded)`);
-  if (actual > limits.bytes) throw new Error(`Scope: glossary projection is ${actual} bytes, over its ${limits.bytes}-byte budget`);
+  const actual = embeddedLexiconBytes(projected);
+  if (actual !== bytes) throw new Error(`Scope: lexicon projection byte accounting drifted (${bytes} counted, ${actual} embedded)`);
+  if (actual > limits.bytes) throw new Error(`Scope: lexicon projection is ${actual} bytes, over its ${limits.bytes}-byte budget`);
   return projected;
 }

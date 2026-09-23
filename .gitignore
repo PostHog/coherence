@@ -16,5 +16,5 @@ dist/
 # agent worktrees
 .claude/worktrees/
 
-# The Scope reading is derived from docs/glossary.json by `npm run scope`; derived output is computed, not stored.
+# The Scope reading is derived from docs/lexicon.json by `npm run scope`; derived output is computed, not stored.
 public/_scope.html

@@ -29,7 +29,7 @@ Each entry says why it is there. The token estimate is bytes divided by
 four. With no instrument the hops are skipped, invariants come from the
 files the latest run touched, and the closure says so. The same tree yields
 the same closure: entries sort by path, why lines within an entry. No
-address lives in a glossary or a spec.
+address lives in a lexicon or a spec.
 
 `economyFor` reaches the language server through enforcement's one door,
 `withWarmAdapter`: the same warm per-project server the run uses, spawned

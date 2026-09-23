@@ -227,7 +227,7 @@ function parseLine(line: string): RunRecord | RefutationRecord | string {
  * The enforcements whose refutation is witnessed by the record: a refutation
  * exists for the bullet and some run at or after it found the same enforcement
  * passing. The record alone says the detector went red; the later pass says the
- * code was restored, and together they are the firing the glossary names.
+ * code was restored, and together they are the firing the lexicon names.
  */
 export function witnessedRefutations(runs: readonly RunRecord[], refutations: readonly RefutationRecord[]): Set<string> {
   const witnessed = new Set<string>();

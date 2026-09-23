@@ -291,7 +291,7 @@ a {
   }
 }
 
-/* The Glossary view's tools */
+/* The Lexicon view's tools */
 
 .view-tools {
   position: sticky;
@@ -355,7 +355,7 @@ a {
   font-family: var(--serif);
 }
 
-.layer-head .glossary-status,
+.layer-head .lexicon-status,
 .layer-head .source,
 .layer-head .completed {
   margin: 0.15rem 0 0;

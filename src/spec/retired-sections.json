@@ -1,5 +1,5 @@
 {
-  "purpose": "The spec sections the reference implementation used and the rebuild retired (docs/retired.md). The parser refuses each by name and says what replaced it. Kept as data, like the glossary's rejected names, so the refused names appear nowhere in code or prose.",
+  "purpose": "The spec sections the reference implementation used and the rebuild retired (docs/retired.md). The parser refuses each by name and says what replaced it. Kept as data, like the lexicon's rejected names, so the refused names appear nowhere in code or prose.",
   "sections": [
     {
       "section": "works when",

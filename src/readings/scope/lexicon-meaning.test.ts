@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { answerGlossary } from "../query/query.ts";
-import { renderGlossaryView } from "./glossary-view.ts";
-import type { Coverage } from "../../lifecycle/glossary-coverage.ts";
-import { projectGlossaryCoverage } from "./glossary-projection.ts";
-import type { GlossaryCoverage, GlossaryViewState } from "./model.ts";
+import { answerLexicon } from "../query/query.ts";
+import { renderLexiconView } from "./lexicon-view.ts";
+import type { Coverage } from "../../lifecycle/lexicon-coverage.ts";
+import { projectLexiconCoverage } from "./lexicon-projection.ts";
+import type { LexiconCoverage, LexiconViewState } from "./model.ts";
 
-function ambiguousMeaningCoverage(): GlossaryCoverage {
+function ambiguousMeaningCoverage(): LexiconCoverage {
   return {
     version: 1,
-    projectGlossary: "glossary.json",
+    projectLexicon: "lexicon.json",
     fingerprint: "ambiguous-meaning",
     population: { files: [], excluded: [], unreadable: [], extraction: "fixture", limits: [] },
     totals: { terms: 1, uses: 1, known: 1, rejected: 0, unresolved: 0, unreviewedContexts: 1 },
@@ -40,7 +40,7 @@ function signalCoverage(): Coverage {
   const base = { concept: null, layer: null, definition: null, properties: {}, confusables: [], count: 3 };
   return {
     version: 1,
-    projectGlossary: "glossary.json",
+    projectLexicon: "lexicon.json",
     fingerprint: "signal",
     population: { files: [{ file: "books/notes.md", kind: "prose", lines: 9 }], excluded: [], unreadable: [], extraction: "fixture", limits: [] },
     totals: { terms: 4, uses: 12, known: 2, rejected: 0, unresolved: 2, unreviewedContexts: 1 },
@@ -54,9 +54,9 @@ function signalCoverage(): Coverage {
   };
 }
 
-test("Scope leads its glossary with the ranked signal and keeps totals in the population disclosure; query shows recurrence and each context's risk", () => {
-  const coverage = projectGlossaryCoverage(signalCoverage());
-  const rendered = renderGlossaryView({ coverage, layers: [], query: "" }).text;
+test("Scope leads its lexicon with the ranked signal and keeps totals in the population disclosure; query shows recurrence and each context's risk", () => {
+  const coverage = projectLexiconCoverage(signalCoverage());
+  const rendered = renderLexiconView({ coverage, layers: [], query: "" }).text;
   const at = (needle: string | RegExp): number => {
     const index = typeof needle === "string" ? rendered.indexOf(needle) : rendered.search(needle);
     assert.ok(index >= 0, `the view shows ${String(needle)}`);
@@ -72,29 +72,29 @@ test("Scope leads its glossary with the ranked signal and keeps totals in the po
   assert.ok(!/<summary>allocation/.test(rendered), "an ordinary use of a defined word awaits no review and is not listed");
   assert.equal(coverage.terms.find((t) => t.term === "allocation")?.unreviewedContextCount, 0);
 
-  const premium = answerGlossary(coverage, ["premium"]).text;
+  const premium = answerLexicon(coverage, ["premium"]).text;
   assert.match(premium, /^premium \[unresolved\]; recurs on 6 prose lines across 3 components/);
-  const exposure = answerGlossary(coverage, ["exposure"]).text;
+  const exposure = answerLexicon(coverage, ["exposure"]).text;
   assert.match(exposure, /sales: unreviewed; sense at risk: the rejected name hazard is beside this use/);
-  const allocation = answerGlossary(coverage, ["allocation"]).text;
+  const allocation = answerLexicon(coverage, ["allocation"]).text;
   assert.match(allocation, /books: unreviewed; no risk to its sense/);
   assert.ok(exposure.indexOf("Bounded page evidence") > exposure.indexOf("sense at risk"), "the term's reading leads the answer");
 });
 
-test("Scope and query glossary readings display every applicable property meaning instead of a false missing-definition line", () => {
+test("Scope and query lexicon readings display every applicable property meaning instead of a false missing-definition line", () => {
   const coverage = ambiguousMeaningCoverage();
-  const query = answerGlossary(coverage, ["unit basis"]).text;
+  const query = answerLexicon(coverage, ["unit basis"]).text;
   assert.match(query, /2 applicable property meanings; spelling alone does not select an owner/);
   assert.match(query, /applicable property meaning: exposure \(project\) — The amount subject to loss/);
   assert.match(query, /applicable property meaning: allocation \(project\) — The amount assigned to a strategy/);
   assert.doesNotMatch(query, /No settled definition/);
 
-  const state: GlossaryViewState = {
+  const state: LexiconViewState = {
     coverage,
     layers: [],
     query: "unit basis",
   };
-  const rendered = renderGlossaryView(state).text;
+  const rendered = renderLexiconView(state).text;
   assert.match(rendered, /2 applicable property meanings; this spelling alone does not select an owner/);
   assert.match(rendered, /exposure[\s\S]*The amount subject to loss/);
   assert.match(rendered, /allocation[\s\S]*The amount assigned to a strategy/);

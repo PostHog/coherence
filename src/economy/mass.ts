@@ -7,7 +7,7 @@
  *              a component that no invariant's chokepoint or totality oracle
  *              reaches
  *
- * Reach is at file level, and by either form of enforcement, as the glossary
+ * Reach is at file level, and by either form of enforcement, as the lexicon
  * says. An invariant reaches the files the latest run says its check touched
  * (a chokepoint's definitions and reference sites, a totality oracle's test coverage)
  * when a run exists; without one, the files that declare the spec's named

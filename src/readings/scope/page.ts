@@ -48,8 +48,8 @@ interface LiveAccess {
 /** The query field of the active view. */
 function setQuery(state: ShellState, value: string): void {
   switch (state.activeView) {
-    case "glossary":
-      state.glossary.query = value;
+    case "lexicon":
+      state.lexicon.query = value;
       return;
     case "components":
       state.components.query = value;

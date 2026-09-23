@@ -4,30 +4,30 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { formatReport, hasFindings, identifierWords, normalizeTerm, runCheck, type CheckReport } from "./check.ts";
-import { loadGlossary, parseGlossary, rejectedNames, type Glossary } from "./glossary.ts";
-import { COHERENCE_GLOSSARY } from "./project.ts";
+import { loadLexicon, parseLexicon, rejectedNames, type Lexicon } from "./lexicon.ts";
+import { COHERENCE_LEXICON } from "./project.ts";
 
 let root: string;
-let coherence: Glossary;
-let project: Glossary;
+let coherence: Lexicon;
+let project: Lexicon;
 let report: CheckReport;
-/** A single-word name Coherence rejects for "invariant", read from the glossary so this file never spells it. */
+/** A single-word name Coherence rejects for "invariant", read from the lexicon so this file never spells it. */
 let REJ: string;
 let Rej: string;
 /** Another single-word name Coherence rejects, used here as a project concept name the project's sense wins for. */
 let ALT: string;
 
-function projectGlossaryWith(rej: string, alt: string): unknown {
+function projectLexiconWith(rej: string, alt: string): unknown {
   return {
-    ...projectGlossary,
+    ...projectLexicon,
     concepts: [
-      ...projectGlossary.concepts.map((c) => (c.name === "widget" ? { ...c, not_to_be_confused_with: [`sprocket ${rej}: a toothed wheel`] } : c)),
+      ...projectLexicon.concepts.map((c) => (c.name === "widget" ? { ...c, not_to_be_confused_with: [`sprocket ${rej}: a toothed wheel`] } : c)),
       { name: alt, definition: "The widget catalogue.", aliases: [] },
     ],
   };
 }
 
-const projectGlossary = {
+const projectLexicon = {
   project: "widgetry",
   version: 0,
   concepts: [
@@ -49,13 +49,13 @@ async function write(rel: string, text: string): Promise<void> {
 }
 
 before(async () => {
-  coherence = await loadGlossary(COHERENCE_GLOSSARY);
+  coherence = await loadLexicon(COHERENCE_LEXICON);
   coherence.project = "coherence";
   REJ = rejectedNames(coherence).find((n) => n.concept === "invariant" && !n.name.includes(" "))!.name;
   Rej = REJ[0]!.toUpperCase() + REJ.slice(1);
   ALT = rejectedNames(coherence).find((n) => !n.name.includes(" ") && !n.identifierOnly && n.concept !== "invariant")!.name;
   root = await mkdtemp(join(tmpdir(), "coherence-check-"));
-  await write("glossary.json", JSON.stringify(projectGlossaryWith(REJ, ALT)));
+  await write("lexicon.json", JSON.stringify(projectLexiconWith(REJ, ALT)));
   await write("docs/retired.md", `The ${REJ} and the doohickey both retired here, and this file is never read.\n`);
   await write(
     "notes.md",
@@ -84,7 +84,7 @@ before(async () => {
       "const conventions = 4; // identifier-only project name",
     ].join("\n") + "\n",
   );
-  project = await loadGlossary(join(root, "glossary.json"));
+  project = await loadLexicon(join(root, "lexicon.json"));
   report = await runCheck({ root, coherence, project });
 });
 
@@ -92,7 +92,7 @@ after(async () => {
   if (root !== undefined) await rm(root, { recursive: true, force: true });
 });
 
-test("the corpus excludes the glossary files and docs/retired.md", () => {
+test("the corpus excludes the lexicon files and docs/retired.md", () => {
   assert.equal(report.files, 3);
   assert.ok(!report.rejected.some((f) => f.file.includes("retired")));
 });
@@ -241,7 +241,7 @@ test("paths restrict the corpus", async () => {
   assert.equal(only.unknown.length, 0);
 });
 
-test("without a project glossary, nothing guards the project's phrases, so Coherence's names hit every identifier they are in", async () => {
+test("without a project lexicon, nothing guards the project's phrases, so Coherence's names hit every identifier they are in", async () => {
   const alone = await runCheck({ root, coherence, paths: ["src/a.ts"] });
   assert.deepEqual(alone.rejected.map((f) => f.text.toLowerCase()), [REJ, REJ]);
   assert.deepEqual(alone.rejected.map((f) => f.line), [3, 4]);
@@ -254,7 +254,7 @@ test("identifier and term helpers", () => {
   assert.equal(normalizeTerm("Auth-Code_form"), "auth code form");
 });
 
-test("parseGlossary refuses a shape it does not understand", () => {
-  assert.throws(() => parseGlossary({ concepts: [{ definition: "no name" }] }, "x.json"), /needs a name/);
-  assert.throws(() => parseGlossary([], "x.json"), /must be an object/);
+test("parseLexicon refuses a shape it does not understand", () => {
+  assert.throws(() => parseLexicon({ concepts: [{ definition: "no name" }] }, "x.json"), /needs a name/);
+  assert.throws(() => parseLexicon([], "x.json"), /must be an object/);
 });

@@ -1,4 +1,4 @@
-/** Fixed glossary workflows: observe, propose, record a ruling, and read the changed evidence back. */
+/** Fixed lexicon workflows: observe, propose, record a ruling, and read the changed evidence back. */
 import {
   existsSync,
   mkdirSync,
@@ -9,51 +9,51 @@ import {
 import { dirname, relative } from "node:path";
 import { parseFlags, type Parsed } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
-import { loadProjectGlossaries } from "./project.ts";
+import { loadProjectLexicons } from "./project.ts";
 import {
   attention,
   coverageText,
   digest,
-  glossaryCoverage,
+  lexiconCoverage,
   type Coverage,
-} from "./glossary-coverage.ts";
+} from "./lexicon-coverage.ts";
 import {
   applyProposal,
   confined,
-  glossaryTarget,
+  lexiconTarget,
   propose,
-  recoverGlossary,
-  reviewGlossary,
+  recoverLexicon,
+  reviewLexicon,
   type Change,
   type Who,
-} from "./glossary-maintain.ts";
+} from "./lexicon-maintain.ts";
 
-export const GLOSSARY_WORK_USAGE = `  glossary coverage [--json]              recurring terms without a definition and senses at risk, ranked; --json: every observed use and population fact
-  glossary review <term> [--json]          definition, live contexts, evidence keys and prior rulings
-  glossary review <term> --component <folder> --evidence <key> --disposition confirmed|not-domain|deferred|defect --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>]
-  glossary propose declare|define|alias|reject|rename|retire <concept> [value] [--definition <text>] [--entry <file.json>] [--qualify] --because <reason>
+export const LEXICON_WORK_USAGE = `  lexicon coverage [--json]              recurring terms without a definition and senses at risk, ranked; --json: every observed use and population fact
+  lexicon review <term> [--json]          definition, live contexts, evidence keys and prior rulings
+  lexicon review <term> --component <folder> --evidence <key> --disposition confirmed|not-domain|deferred|defect --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>] [--cite <id>]
+  lexicon propose declare|define|alias|reject|rename|retire <concept> [value] [--definition <text>] [--entry <file.json>] [--qualify] --because <reason>
                                           rename --qualify: the old name keeps its other senses and is not rejected
-  glossary apply <proposal-id> --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>] [--work <id>]
-  glossary recover                        finish an interrupted application without overwriting intervening edits
-  glossary draft [--out <file>]            unsettled candidates, collisions and review questions; never overwrites
-  glossary baseline --session <id>         remember observed uses for this session; no meaning is marked covered
-  glossary changes [--session <id>] [--json] new undefined terms and senses at risk relative to that session's baseline
-  glossary ready --terms <a,b,...> [--json] explicit vocabulary prerequisites for a named slice; not host-delivery proof
-  glossary similar <text> [--json]         optional offline suggestions; model absence leaves exact checks available
-  glossary model --download                 explicitly download and verify the pinned 37 MB model
-  glossary model --file <local.gguf> --sha256 <hash>  explicitly configure a local model`;
+  lexicon apply <proposal-id> --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>] [--work <id>] [--cite <id>]
+  lexicon recover                        finish an interrupted application without overwriting intervening edits
+  lexicon draft [--out <file>]            unsettled candidates, collisions and review questions; never overwrites
+  lexicon baseline --session <id>         remember observed uses for this session; no meaning is marked covered
+  lexicon changes [--session <id>] [--json] new undefined terms and senses at risk relative to that session's baseline
+  lexicon ready --terms <a,b,...> [--json] explicit vocabulary prerequisites for a named slice; not host-delivery proof
+  lexicon similar <text> [--json]         optional offline suggestions; model absence leaves exact checks available
+  lexicon model --download                 explicitly download and verify the pinned 37 MB model
+  lexicon model --file <local.gguf> --sha256 <hash>  explicitly configure a local model`;
 const WORKFLOWS = ["coverage", "review", "propose", "apply", "recover", "draft", "baseline", "changes", "ready", "similar", "model"] as const;
 
-export function glossaryHelp(verb?: string): string {
+export function lexiconHelp(verb?: string): string {
   if (verb === undefined || verb === "help") return `usage:
-${GLOSSARY_WORK_USAGE}`;
-  const lines = GLOSSARY_WORK_USAGE.split("\n").filter((line) => line.trimStart().startsWith(`glossary ${verb}`));
+${LEXICON_WORK_USAGE}`;
+  const lines = LEXICON_WORK_USAGE.split("\n").filter((line) => line.trimStart().startsWith(`lexicon ${verb}`));
   return lines.length > 0
     ? `usage:
 ${lines.join("\n")}
 
-Run glossary help for every workflow.`
-    : `unknown glossary workflow: ${verb}; run glossary help`;
+Run lexicon help for every workflow.`
+    : `unknown lexicon workflow: ${verb}; run lexicon help`;
 }
 
 const get = (p: Parsed, name: string): string | undefined => p.one.get(name);
@@ -67,6 +67,7 @@ function who(p: Parsed): Who {
     session: need(p, "session"),
     agent: need(p, "agent"),
     ...(get(p, "work") ? { work: get(p, "work")! } : {}),
+    ...(p.many.get("cite")?.length ? { cite: p.many.get("cite")! } : {}),
   };
 }
 function cleanWrite(path: string, value: unknown): void {
@@ -78,7 +79,7 @@ function cleanWrite(path: string, value: unknown): void {
 export function baselinePath(root: string, session: string): string {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(session))
     throw new Error("invalid session token");
-  return confined(root, `.coherence/glossary/sessions/${session}.json`);
+  return confined(root, `.coherence/lexicon/sessions/${session}.json`);
 }
 /** The baseline key that remembers a candidate: never a term's own key, which always holds a component after the newline. */
 const CANDIDATE = "?candidate\n";
@@ -167,10 +168,10 @@ export function priorBaseline(
     Array.isArray(value) ||
     Object.values(value).some((v) => typeof v !== "string")
   )
-    throw new Error("glossary baseline is unreadable; recreate it explicitly");
+    throw new Error("lexicon baseline is unreadable; recreate it explicitly");
   return value as Record<string, string>;
 }
-export async function glossaryWorkCommand(
+export async function lexiconWorkCommand(
   argv: string[],
   io: Io,
 ): Promise<number> {
@@ -187,6 +188,7 @@ export async function glossaryWorkCommand(
       session: "one",
       agent: "one",
       work: "one",
+      cite: "many",
       component: "one",
       evidence: "one",
       disposition: "one",
@@ -198,7 +200,7 @@ export async function glossaryWorkCommand(
       help: "switch",
     });
     if (p.switches.has("help")) {
-      io.out(glossaryHelp(verb));
+      io.out(lexiconHelp(verb));
       return WORKFLOWS.includes(verb as (typeof WORKFLOWS)[number]) ||
           verb === "help"
         ? 0
@@ -209,7 +211,7 @@ export async function glossaryWorkCommand(
       p.positionals.length >
         (["review", "apply", "similar"].includes(verb ?? "") ? 1 : 0)
     )
-      throw new Error("unexpected positional argument; run glossary help");
+      throw new Error("unexpected positional argument; run lexicon help");
     const term = p.positionals[0];
     const json = p.switches.has("json");
     const print = (x: unknown) => io.out(JSON.stringify(x, null, 2));
@@ -224,7 +226,7 @@ export async function glossaryWorkCommand(
         )
       )
         throw new Error(
-          "propose needs an action and concept; see glossary help",
+          "propose needs an action and concept; see lexicon help",
         );
       const entry = get(p, "entry")
         ? (JSON.parse(
@@ -261,16 +263,16 @@ export async function glossaryWorkCommand(
       return 0;
     }
     if (verb === "recover") {
-      io.out(recoverGlossary(io.cwd));
+      io.out(recoverLexicon(io.cwd));
       return 0;
     }
     if (verb === "help") {
-      io.out(glossaryHelp());
+      io.out(lexiconHelp());
       return 0;
     }
     if (verb === "model" || verb === "similar") {
       const { configureModel, downloadModel, similarTerms } = await import(
-        "./glossary-similarity.ts"
+        "./lexicon-similarity.ts"
       );
       if (verb === "model") {
         print(
@@ -291,12 +293,12 @@ export async function glossaryWorkCommand(
         verb ?? "",
       )
     )
-      throw new Error(`unknown glossary workflow: ${verb}; run glossary help`);
-    const report = await glossaryCoverage(io.cwd);
+      throw new Error(`unknown lexicon workflow: ${verb}; run lexicon help`);
+    const report = await lexiconCoverage(io.cwd);
     if (verb === "review" && get(p, "disposition")) {
       if (!term) throw new Error("review needs a term");
       io.out(
-        await reviewGlossary(
+        await reviewLexicon(
           io.cwd,
           term,
           need(p, "component"),
@@ -311,14 +313,14 @@ export async function glossaryWorkCommand(
       return 0;
     }
     if (verb === "draft") {
-      const { coherence, project } = await loadProjectGlossaries(io.cwd);
+      const { coherence, project } = await loadProjectLexicons(io.cwd);
       const draft = {
         status: "proposed; nothing here is a settled definition",
         source: report.fingerprint,
         existing:
           (
             project ??
-            (report.projectGlossary === coherence.path ? coherence : undefined)
+            (report.projectLexicon === coherence.path ? coherence : undefined)
           )?.concepts ?? [],
         candidates: report.terms
           .filter((t) => t.state === "unresolved")
@@ -347,9 +349,9 @@ export async function glossaryWorkCommand(
       const out = get(p, "out");
       if (out) {
         const path = confined(io.cwd, out);
-        if (path === (await glossaryTarget(io.cwd)))
+        if (path === (await lexiconTarget(io.cwd)))
           throw new Error(
-            "an unsettled draft cannot be written as the canonical glossary",
+            "an unsettled draft cannot be written as the canonical lexicon",
           );
         mkdirSync(dirname(path), { recursive: true });
         writeFileSync(path, JSON.stringify(draft, null, 2) + "\n", {
@@ -446,7 +448,7 @@ export async function glossaryWorkCommand(
     else io.out(coverageText(report, verb === "review" ? term : undefined));
     return 0;
   } catch (e) {
-    io.err(`glossary: ${e instanceof Error ? e.message : String(e)}`);
+    io.err(`lexicon: ${e instanceof Error ? e.message : String(e)}`);
     return 1;
   }
 }

@@ -32,23 +32,23 @@ A prosthetic for proprioception: specs, invariants, and the readings that keep a
   handler: massCommand in src/economy/cli.ts
 - query: an agent asks one of the fixed questions Scope answers for a human
   handler: queryCommand in src/readings/query/cli.ts
-- glossary: an agent reads, reviews, or maintains the settled vocabulary, or checks text against it
-  handler: glossaryCommand in src/cli.ts
+- lexicon: an agent reads, reviews, or maintains the settled vocabulary, or checks text against it
+  handler: lexiconCommand in src/cli.ts
 - hooks install: a human installs, removes, checks, or inspects Coherence's hooks for an agent host
   handler: hooksCommand in src/cli.ts
 
 ## invariants
 - grammar carries no rejected name: A spec written in Coherence's grammar with every shape name carries no rejected name.
-  over: every key of the grammar, every shape of the checklist seed, and every rejected name of Coherence's glossary
+  over: every key of the grammar, every shape of the checklist seed, and every rejected name of Coherence's lexicon
   via: a spec written in the grammar with every shape name carries no rejected name
-  because: the grammar, the seed, and the glossary are three files that can drift apart; if a key or a shape were spelled with a name the glossary refuses, every honest spec would fail the vocabulary check and the agent would learn to route around the check instead of fixing the spec
+  because: the grammar, the seed, and the lexicon are three files that can drift apart; if a key or a shape were spelled with a name the lexicon refuses, every honest spec would fail the vocabulary check and the agent would learn to route around the check instead of fixing the spec
   crossing: project-source -> reading
-  refuted: renamed a checklist shape to a name the glossary rejects for invariant -> the totality oracle went red, then green once restored (2026-09-18)
+  refuted: renamed a checklist shape to a name the lexicon rejects for invariant -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
 - a structural defect was an invariant: A failing verdict in the latest run makes a bullet a structural defect only when the bullet was otherwise complete; a requirement with a failing check stays a requirement and is reported with its failing check, never promoted, and an automatic refutation satisfies a chokepoint enforcement's refutation.
   over: every bullet with an entry in the latest run that checked it
   via: a structural defect is an invariant whose satisfaction has been removed; a requirement with a failing check stays a requirement
-  because: the glossary defines a structural defect as an invariant whose satisfaction has been removed, and a bullet that never reached invariant has no satisfaction to remove; calling it one both overstates what the tree had and hides the ordinary case, a requirement whose detector is red because the work is not done. A bullet still shown as an invariant after its chokepoint broke is the other half of the same failure, and an automatic refutation counts because the check itself proved it would report the break
+  because: the lexicon defines a structural defect as an invariant whose satisfaction has been removed, and a bullet that never reached invariant has no satisfaction to remove; calling it one both overstates what the tree had and hides the ordinary case, a requirement whose detector is red because the work is not done. A bullet still shown as an invariant after its chokepoint broke is the other half of the same failure, and an automatic refutation counts because the check itself proved it would report the break
   crossing: record -> reading
   refuted: let a failing verdict force the structural defect state whatever else the bullet lacked -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none

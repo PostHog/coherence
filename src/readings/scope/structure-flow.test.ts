@@ -20,7 +20,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { COHERENCE_GLOSSARY } from "../../lifecycle/project.ts";
+import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { loadSpecModel } from "../../spec/model.ts";
 import { answer, answerStructure } from "../query/query.ts";
 import { buildScopePage } from "./build.ts";
@@ -38,7 +38,7 @@ let base: ShellState;
 
 before(async () => {
   fixture = makeFixture();
-  ({ state: base } = await buildScopePage({ root: fixture.root, glossaryPath: COHERENCE_GLOSSARY, project: "Flow" }));
+  ({ state: base } = await buildScopePage({ root: fixture.root, lexiconPath: COHERENCE_LEXICON, project: "Flow" }));
 });
 
 after(() => fixture.remove());
@@ -822,7 +822,7 @@ test("the comparison seam measures what a change did: entrance, interface added,
 });
 
 test("each reviewer question is answered by one selection on the built page", async () => {
-  const { state } = await buildScopePage({ root: fixture.root, glossaryPath: COHERENCE_GLOSSARY, project: "Fixture", componentInterfaces: { kind: "read", language: "typescript", declarations: 3, symbols: [sym("src/api", "src/store", "write", "src/store/write.ts", 2), sym("src/api", "src/store", "writeRow", "src/store/rows.ts")], entrances: [], unowned: { files: 0, lines: 0 } } });
+  const { state } = await buildScopePage({ root: fixture.root, lexiconPath: COHERENCE_LEXICON, project: "Fixture", componentInterfaces: { kind: "read", language: "typescript", declarations: 3, symbols: [sym("src/api", "src/store", "write", "src/store/write.ts", 2), sym("src/api", "src/store", "writeRow", "src/store/rows.ts")], entrances: [], unowned: { files: 0, lines: 0 } } });
   state.activeView = "structure";
   const model = flowOf(state);
   const ask = (selected: string): string => renderView({ ...state, structure: { ...state.structure, selected } }, "structure").text;
@@ -892,7 +892,7 @@ function healthState(): ShellState {
 }
 
 test("the health strip counts are the spec model's, each a selection whose inspector lists its set", async () => {
-  const { state } = await buildScopePage({ root: fixture.root, glossaryPath: COHERENCE_GLOSSARY, project: "Fixture" });
+  const { state } = await buildScopePage({ root: fixture.root, lexiconPath: COHERENCE_LEXICON, project: "Fixture" });
   state.activeView = "structure";
   const model = flowOf(state);
   const page = renderView(state, "structure").text;
@@ -1142,7 +1142,7 @@ test("jargon links to its definition where the key and the inspector first show 
   const state = projectState();
   const page = renderView(state, "structure").text;
   const key = /data-field="key"[^]*/.exec(page)![0]!;
-  for (const term of ["chokepoint", "crossing", "core-dependency", "requirement"]) assert.match(key, new RegExp(`<a class="flow-term" href="#coherence-${term}" title="[^"]+">`), `${term} links to the glossary`);
+  for (const term of ["chokepoint", "crossing", "core-dependency", "requirement"]) assert.match(key, new RegExp(`<a class="flow-term" href="#coherence-${term}" title="[^"]+">`), `${term} links to the lexicon`);
   for (const term of ["bypass", "derived"]) assert.match(key, new RegExp(`<dfn class="flow-term" title="[^"]+">`), `${term} is defined in place`);
 });
 
@@ -1205,7 +1205,7 @@ test("red means broken: no route or rail color reads as red, orange or amber, th
 
 test("the masthead leads with health: one verdict in large type that links to its set, with the counts demoted beneath it", () => {
   const verdictOf = (state: ShellState): { kind: string; href: string; text: string; page: string } => {
-    const page = renderView(state, "glossary").text;
+    const page = renderView(state, "lexicon").text;
     const m = /<a class="verdict" data-field="verdict" data-verdict="([a-z]+)" href="#([^"]+)">([^<]+)<\/a>/.exec(page);
     assert.ok(m !== null, "the masthead carries a verdict");
     return { kind: m[1]!, href: m[2]!, text: m[3]!, page };

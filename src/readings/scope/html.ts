@@ -1,7 +1,7 @@
 /**
  * A minimal HTML string helper shared by the Node builder and the browser
  * script. Every interpolated value is escaped unless it was produced by `html`
- * itself or wrapped in `raw`, so glossary text can never become markup.
+ * itself or wrapped in `raw`, so lexicon text can never become markup.
  */
 
 const ESCAPES: Record<string, string> = {

@@ -5,17 +5,17 @@ reference: it is preserved at commit 645d928 on the reference branch named in
 `docs/retired.md`, and it is used as a check against the new work and a source of
 rejected alternatives, never as a source of code.
 
-The vocabulary is settled in `docs/glossary.json`. Every concept there carries its
+The vocabulary is settled in `docs/lexicon.json`. Every concept there carries its
 definition, the names rejected for it and why, and the reference mechanisms it
-replaces. Nothing in this tree may introduce a name the glossary rejected.
+replaces. Nothing in this tree may introduce a name the lexicon rejected.
 
 Guiding artifacts kept from the reference:
 
-- `docs/glossary.json` — the settled vocabulary (40 concepts). Vocabulary fields are injected; `detail` and `provenance` are shown in Scope only.
-- `docs/glossary.md` — why the glossary is first-class: building, maintaining, and validating it, with the evidence.
-- `docs/retired.md` — the reference mechanisms retired during the glossary pass, with reasons, and the reference branch name.
+- `docs/lexicon.json` — the settled vocabulary (40 concepts). Vocabulary fields are injected; `detail` and `provenance` are shown in Scope only.
+- `docs/lexicon.md` — why the lexicon is first-class: building, maintaining, and validating it, with the evidence.
+- `docs/retired.md` — the reference mechanisms retired during the lexicon pass, with reasons, and the reference branch name.
 - `docs/reference/` — documents written in the reference's vocabulary; the vocabulary check does not read them.
-- `docs/reference/glossary-inventory.json` — the raw 206-concept sweep the glossary was distilled from.
+- `docs/reference/lexicon-inventory.json` — the raw 206-concept sweep the lexicon was distilled from.
 - `docs/checklist-seed.json` — the 36 invariant shapes for the decomposition checklist.
 - `Coherence.spec.md` — the entry spec: the five trust levels and the project-wide invariants, in Coherence's own grammar.
 - `src/journal/Journal.spec.md`, `src/lifecycle/Lifecycle.spec.md`, `src/spec/Spec.spec.md`, `src/scaffold/Scaffold.spec.md`, `src/enforcement/Enforcement.spec.md`, `src/adapters/Adapters.spec.md`, `src/readings/scope/Scope.spec.md` — one component spec per unit; every bullet names a real test as its totality oracle and, where the structure holds, a real chokepoint.
@@ -24,7 +24,7 @@ Guiding artifacts kept from the reference:
 - `docs/reference/scope-structure-thesis.md` — design thesis for the Scope reading, in the reference's vocabulary.
 - `docs/reference/data-is-destiny.md` — "Data is destiny" (Danilo Campos, CC BY-SA 4.0), the essential input for the Scope shell.
 
-First slice: the glossary, the hook that injects it, and the drift check at
+First slice: the lexicon, the hook that injects it, and the drift check at
 regulate. Second slice: the spec grammar and the spine (`docs/spec.md`), with
 the scaffold that makes the complete shape the cheapest thing to produce.
 Third slice: enforcement (`docs/enforcement.md`): the language adapter seam
@@ -36,8 +36,8 @@ Mnemion is the first adopter.
 ```sh
 node src/cli.ts journal                   # merged project history across every session
 node src/cli.ts journal --subjects        # subjects and a cursor; --since <cursorOrIso> reads what followed
-node src/cli.ts glossary                  # the compact form the hook injects; token estimate on stderr
-node src/cli.ts glossary --check [paths]  # rejected names and unknown nouns; exit 1 with findings
+node src/cli.ts lexicon                  # the compact form the hook injects; token estimate on stderr
+node src/cli.ts lexicon --check [paths]  # rejected names and unknown nouns; exit 1 with findings
 node src/cli.ts spec --check [root]       # components, invariants with state, problems; exit 1 on problems
 node src/cli.ts spec --json [root]        # the spec model
 node src/cli.ts scaffold component <folder> "<intent>"
@@ -54,8 +54,10 @@ npm run spec:check                        # the spec check alone
 npm test                                  # typecheck, tests, vocabulary check, spec check; any one failing fails the tree
 ```
 
-A project names its own glossary under `glossary` in `coherence.config.json`
-(default: `glossary.json` at the root). SessionStart and SubagentStart inject
+A project names its own lexicon under `lexicon` in `coherence.config.json`
+(default: `lexicon.json` at the root). A project still carrying the file under
+the concept's retired name is refused with the one-line `git mv` that migrates
+it; the old name is never read. SessionStart and SubagentStart inject
 both layers with a short instruction, the journal read command, and a decision
 write template. This checkout carries hooks for both Claude Code and Codex;
 `node src/cli.ts hooks status` reports their installation and what each event
@@ -63,11 +65,11 @@ carries here (orient at the starts, the peer feed at prompt and tool boundaries,
 regulate at the stops), and `hooks --check` is the CI form. Stop reports the check
 over changed files; SubagentStop refuses the stop (exit 2, reason on stderr) while findings remain.
 
-## Glossary workflow
+## Lexicon workflow
 
 Coverage, preview/apply maintenance, sense review, drafting, incremental checks,
-and optional local similarity are described in [Glossary operations](docs/glossary-operations.md).
-Run `node src/cli.ts glossary help` for the command surface. Coverage counts
+and optional local similarity are described in [Lexicon operations](docs/lexicon-operations.md).
+Run `node src/cli.ts lexicon help` for the command surface. Coverage counts
 observations and unresolved questions; it is not a semantic-completeness score.
 
 ## Test setup
@@ -102,4 +104,4 @@ During `test:setup`, the same variable selects the Python that creates `.venv`.
 - The drift check matches exact strings first. A similarity seam stays open for a
   local embedding pass (alias suggestion, overload detection); similarity improves
   the question, never decides it. Backend options are under survey.
-- Mnemion is the first adopter; its domain glossary lives in its own repository.
+- Mnemion is the first adopter; its domain lexicon lives in its own repository.

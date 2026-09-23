@@ -1,12 +1,12 @@
-import type { Attention, Coverage, VocabularyTerm } from "../../lifecycle/glossary-coverage.ts";
+import type { Attention, Coverage, VocabularyTerm } from "../../lifecycle/lexicon-coverage.ts";
 /**
  * The model for the Scope reading: the shape of everything the page handles.
  *
- * The model is a layer of indirection between a glossary file and the render.
- * Fields can be added to a concept, a glossary, a layer, or the shell without
+ * The model is a layer of indirection between a lexicon file and the render.
+ * Fields can be added to a concept, a lexicon, a layer, or the shell without
  * restructuring the code that carries them; every render takes a model value,
  * never a bare string or number pulled out of one. Fields the page does not
- * show still belong here: a concept's record and a glossary's record keep
+ * show still belong here: a concept's record and a lexicon's record keep
  * every key the file said, so nothing is lost between the file and the page.
  *
  * A concept is split three ways. Its vocabulary is what a definition needs:
@@ -42,14 +42,14 @@ export type Fields = Record<string, RecordValue>;
 /**
  * One concept. The vocabulary keys are the ones the card renders in the open;
  * `detail` and `provenance` are the file's own sub-objects, kept whole; every
- * other key on the JSON object is kept in `record`. Coherence's glossary and
- * a project domain glossary both parse into this: a project glossary in an
+ * other key on the JSON object is kept in `record`. Coherence's lexicon and
+ * a project domain lexicon both parse into this: a project lexicon in an
  * older shape has no detail or provenance, and its extra keys land in record.
  */
 export interface Concept {
   name: string;
   definition: string;
-  /** Absent when the glossary records no status for the concept. */
+  /** Absent when the lexicon records no status for the concept. */
   status?: string;
   /** Names the concept also goes by. */
   aliases: string[];
@@ -71,7 +71,7 @@ export interface Concept {
 /** Named metaphors that several concepts lean on, keyed by their short name. */
 export type Metaphors = Record<string, string>;
 
-/** One name a project glossary refuses at the top level, with why. Distinct from a concept's rejected alternatives. */
+/** One name a project lexicon refuses at the top level, with why. Distinct from a concept's rejected alternatives. */
 export interface RejectedName {
   concept: string;
   because: string;
@@ -99,8 +99,8 @@ export interface Overload {
   ruling?: string;
 }
 
-/** One glossary file, parsed. Coherence's own and a project's share this shape. */
-export interface Glossary {
+/** One lexicon file, parsed. Coherence's own and a project's share this shape. */
+export interface Lexicon {
   version: number;
   project?: string;
   status?: string;
@@ -122,23 +122,23 @@ export interface Glossary {
 }
 
 /**
- * One layer of the two-layer glossary. A layer is either present with its
- * glossary, or absent with the reason, so absence is a rendered fact rather
+ * One layer of the two-layer lexicon. A layer is either present with its
+ * lexicon, or absent with the reason, so absence is a rendered fact rather
  * than a missing element.
  */
 export type Layer =
-  | { kind: "present"; id: string; title: string; glossary: Glossary }
+  | { kind: "present"; id: string; title: string; lexicon: Lexicon }
   | { kind: "absent"; id: string; title: string; because: string };
 
 /** A term's evidence may be sampled, but these counts always describe its full reading. */
-export interface GlossaryEvidenceTerm extends VocabularyTerm {
+export interface LexiconEvidenceTerm extends VocabularyTerm {
   contextCount?: number;
   unreviewedContextCount?: number;
 }
 
 /** A page projection keeps the authoritative totals and fingerprint, never recasts a sample as a corpus. */
-export interface GlossaryCoverage extends Coverage {
-  terms: GlossaryEvidenceTerm[];
+export interface LexiconCoverage extends Coverage {
+  terms: LexiconEvidenceTerm[];
   /**
    * The ranked signal the view leads with, computed from the full reading by
    * coverage's own attention rule and cut to its head: the recurring terms
@@ -157,13 +157,13 @@ export interface GlossaryCoverage extends Coverage {
 }
 
 /** A copyable full-reading command; quoting keeps corpus text from becoming shell syntax. */
-export function glossaryReviewCommand(term: string): string {
-  return `coherence glossary review '${term.replace(/'/g, "'\\''")}' --json`;
+export function lexiconReviewCommand(term: string): string {
+  return `coherence lexicon review '${term.replace(/'/g, "'\\''")}' --json`;
 }
 
-/** The state of the Glossary view: the layers it reads and the reader's query. */
-export interface GlossaryViewState {
-  coverage?: GlossaryCoverage;
+/** The state of the Lexicon view: the layers it reads and the reader's query. */
+export interface LexiconViewState {
+  coverage?: LexiconCoverage;
   layers: Layer[];
   query: string;
 }
@@ -511,7 +511,7 @@ export interface ShellState {
   project: string;
   views: ViewIdentity[];
   activeView: string;
-  glossary: GlossaryViewState;
+  lexicon: LexiconViewState;
   spec: SpecData;
   runs: RunsData;
   journal: JournalData;
@@ -560,8 +560,8 @@ const CONCEPT_KEYS = new Set([
   "provenance",
 ]);
 
-/** The top-level keys of a glossary file that the model has a place for. */
-const GLOSSARY_KEYS = new Set([
+/** The top-level keys of a lexicon file that the model has a place for. */
+const LEXICON_KEYS = new Set([
   "version",
   "project",
   "status",
@@ -578,10 +578,10 @@ const GLOSSARY_KEYS = new Set([
   "uncertain",
 ]);
 
-class GlossaryShapeError extends Error {
+class LexiconShapeError extends Error {
   constructor(where: string, message: string) {
     super(`${where}: ${message}`);
-    this.name = "GlossaryShapeError";
+    this.name = "LexiconShapeError";
   }
 }
 
@@ -591,7 +591,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function stringAt(record: Record<string, unknown>, key: string, where: string): string {
   const value = record[key];
-  if (typeof value !== "string") throw new GlossaryShapeError(where, `${key} must be a string`);
+  if (typeof value !== "string") throw new LexiconShapeError(where, `${key} must be a string`);
   return value;
 }
 
@@ -602,7 +602,7 @@ function optionalStringAt(
 ): string | undefined {
   const value = record[key];
   if (value === undefined) return undefined;
-  if (typeof value !== "string") throw new GlossaryShapeError(where, `${key} must be a string`);
+  if (typeof value !== "string") throw new LexiconShapeError(where, `${key} must be a string`);
   return value;
 }
 
@@ -610,7 +610,7 @@ function stringListAt(record: Record<string, unknown>, key: string, where: strin
   const value = record[key];
   if (value === undefined) return [];
   if (!Array.isArray(value) || !value.every((v) => typeof v === "string")) {
-    throw new GlossaryShapeError(where, `${key} must be a list of strings`);
+    throw new LexiconShapeError(where, `${key} must be a list of strings`);
   }
   return value;
 }
@@ -623,7 +623,7 @@ function optionalListAt<T>(
 ): T[] | undefined {
   const value = record[key];
   if (value === undefined) return undefined;
-  if (!Array.isArray(value)) throw new GlossaryShapeError(where, `${key} must be a list`);
+  if (!Array.isArray(value)) throw new LexiconShapeError(where, `${key} must be a list`);
   return value.map((item, i) => parse(item, `${where} ${key}[${i}]`));
 }
 
@@ -638,14 +638,14 @@ function asRecordValue(value: unknown, where: string): RecordValue {
     for (const [k, v] of Object.entries(value)) out[k] = asRecordValue(v, `${where}.${k}`);
     return out;
   }
-  throw new GlossaryShapeError(where, "unsupported value");
+  throw new LexiconShapeError(where, "unsupported value");
 }
 
 /** An object-valued key kept whole, in file order. Empty when the key is absent. */
 function fieldsAt(record: Record<string, unknown>, key: string, where: string): Fields {
   const value = record[key];
   if (value === undefined) return {};
-  if (!isRecord(value)) throw new GlossaryShapeError(where, `${key} must be an object`);
+  if (!isRecord(value)) throw new LexiconShapeError(where, `${key} must be an object`);
   const fields: Fields = {};
   for (const [k, v] of Object.entries(value)) fields[k] = asRecordValue(v, `${where}.${key}.${k}`);
   return fields;
@@ -666,10 +666,10 @@ function restOf(
 
 function parseRejected(value: unknown, where: string): RejectedAlternative[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value)) throw new GlossaryShapeError(where, "rejected must be a list");
+  if (!Array.isArray(value)) throw new LexiconShapeError(where, "rejected must be a list");
   return value.map((entry, i) => {
     const at = `${where}.rejected[${i}]`;
-    if (!isRecord(entry)) throw new GlossaryShapeError(at, "must be an object");
+    if (!isRecord(entry)) throw new LexiconShapeError(at, "must be an object");
     return {
       alternative: stringAt(entry, "alternative", at),
       because: stringAt(entry, "because", at),
@@ -678,7 +678,7 @@ function parseRejected(value: unknown, where: string): RejectedAlternative[] {
 }
 
 function parseConcept(value: unknown, where: string): Concept {
-  if (!isRecord(value)) throw new GlossaryShapeError(where, "must be an object");
+  if (!isRecord(value)) throw new LexiconShapeError(where, "must be an object");
   const name = stringAt(value, "name", where);
   const at = `${where} (${name})`;
   const concept: Concept = {
@@ -701,7 +701,7 @@ function parseConcept(value: unknown, where: string): Concept {
 }
 
 function parseRejectedName(value: unknown, where: string): RejectedName {
-  if (!isRecord(value)) throw new GlossaryShapeError(where, "must be an object");
+  if (!isRecord(value)) throw new LexiconShapeError(where, "must be an object");
   const rejected: RejectedName = {
     concept: stringAt(value, "concept", where),
     because: stringAt(value, "because", where),
@@ -712,12 +712,12 @@ function parseRejectedName(value: unknown, where: string): RejectedName {
 }
 
 function parseTrustLevel(value: unknown, where: string): TrustLevel {
-  if (!isRecord(value)) throw new GlossaryShapeError(where, "must be an object");
+  if (!isRecord(value)) throw new LexiconShapeError(where, "must be an object");
   return { name: stringAt(value, "name", where), meaning: stringAt(value, "meaning", where) };
 }
 
 function parseRuling(value: unknown, where: string): Ruling {
-  if (!isRecord(value)) throw new GlossaryShapeError(where, "must be an object");
+  if (!isRecord(value)) throw new LexiconShapeError(where, "must be an object");
   const ruling: Ruling = { term: stringAt(value, "term", where), ruling: stringAt(value, "ruling", where) };
   const decidedBy = optionalStringAt(value, "decided_by", where);
   if (decidedBy !== undefined) ruling.decided_by = decidedBy;
@@ -725,7 +725,7 @@ function parseRuling(value: unknown, where: string): Ruling {
 }
 
 function parseOverload(value: unknown, where: string): Overload {
-  if (!isRecord(value)) throw new GlossaryShapeError(where, "must be an object");
+  if (!isRecord(value)) throw new LexiconShapeError(where, "must be an object");
   const overload: Overload = {
     term: stringAt(value, "term", where),
     senses: stringListAt(value, "senses", where),
@@ -738,42 +738,42 @@ function parseOverload(value: unknown, where: string): Overload {
 }
 
 /**
- * Parse one glossary file into the model. Refuses with a located message
+ * Parse one lexicon file into the model. Refuses with a located message
  * rather than rendering a shape it does not understand.
  */
-export function parseGlossary(input: unknown, where: string): Glossary {
-  if (!isRecord(input)) throw new GlossaryShapeError(where, "glossary must be an object");
+export function parseLexicon(input: unknown, where: string): Lexicon {
+  if (!isRecord(input)) throw new LexiconShapeError(where, "lexicon must be an object");
   const version = input["version"];
-  if (typeof version !== "number") throw new GlossaryShapeError(where, "version must be a number");
+  if (typeof version !== "number") throw new LexiconShapeError(where, "version must be a number");
   const conceptsRaw = input["concepts"];
-  if (!Array.isArray(conceptsRaw)) throw new GlossaryShapeError(where, "concepts must be a list");
+  if (!Array.isArray(conceptsRaw)) throw new LexiconShapeError(where, "concepts must be a list");
   const metaphorsRaw = input["metaphors"] ?? {};
-  if (!isRecord(metaphorsRaw)) throw new GlossaryShapeError(where, "metaphors must be an object");
+  if (!isRecord(metaphorsRaw)) throw new LexiconShapeError(where, "metaphors must be an object");
   const metaphors: Metaphors = {};
   for (const [k, v] of Object.entries(metaphorsRaw)) {
-    if (typeof v !== "string") throw new GlossaryShapeError(where, `metaphors.${k} must be a string`);
+    if (typeof v !== "string") throw new LexiconShapeError(where, `metaphors.${k} must be a string`);
     metaphors[k] = v;
   }
-  const glossary: Glossary = {
+  const lexicon: Lexicon = {
     version,
     concepts: conceptsRaw.map((c, i) => parseConcept(c, `${where} concepts[${i}]`)),
     metaphors,
-    record: restOf(input, GLOSSARY_KEYS, where),
+    record: restOf(input, LEXICON_KEYS, where),
   };
   for (const key of ["project", "status", "purpose", "source", "completed"] as const) {
     const v = optionalStringAt(input, key, where);
-    if (v !== undefined) glossary[key] = v;
+    if (v !== undefined) lexicon[key] = v;
   }
-  if (input["shape"] !== undefined) glossary.shape = fieldsAt(input, "shape", where);
+  if (input["shape"] !== undefined) lexicon.shape = fieldsAt(input, "shape", where);
   const rejectedNames = optionalListAt(input, "rejected", where, parseRejectedName);
-  if (rejectedNames !== undefined) glossary.rejected_names = rejectedNames;
+  if (rejectedNames !== undefined) lexicon.rejected_names = rejectedNames;
   const trustLevels = optionalListAt(input, "trust_levels", where, parseTrustLevel);
-  if (trustLevels !== undefined) glossary.trust_levels = trustLevels;
+  if (trustLevels !== undefined) lexicon.trust_levels = trustLevels;
   const rulings = optionalListAt(input, "rulings", where, parseRuling);
-  if (rulings !== undefined) glossary.rulings = rulings;
+  if (rulings !== undefined) lexicon.rulings = rulings;
   const overloads = optionalListAt(input, "candidate_overloads", where, parseOverload);
-  if (overloads !== undefined) glossary.candidate_overloads = overloads;
+  if (overloads !== undefined) lexicon.candidate_overloads = overloads;
   const uncertain = optionalListAt(input, "uncertain", where, parseRuling);
-  if (uncertain !== undefined) glossary.uncertain = uncertain;
-  return glossary;
+  if (uncertain !== undefined) lexicon.uncertain = uncertain;
+  return lexicon;
 }

@@ -3,7 +3,7 @@
  *
  * The server sends a first load (a windowed state), then updates on an event
  * stream: journal, runs and work appends as the records that are new, a
- * recomputed snapshot when a spec, a glossary or the config changes, and the
+ * recomputed snapshot when a spec, a lexicon or the config changes, and the
  * component interfaces when the language server has read them again. Every
  * update is merged into the state the page already holds and the page
  * renders again; nothing is kept beside the state.
@@ -126,7 +126,7 @@ export function mergeWork(state: ShellState, orders: readonly WorkOrder[], damag
 }
 
 /**
- * Take a recomputed snapshot: the model (glossaries, specs, interfaces, work)
+ * Take a recomputed snapshot: the model (lexicons, specs, interfaces, work)
  * is replaced, the records the page already holds are kept beside the
  * snapshot's, and the count of what is left out is the snapshot's total less
  * what the page now holds. What the reader chose (the view, queries, filters,
@@ -137,7 +137,7 @@ export function mergeSnapshot(state: ShellState, incoming: ShellState): void {
   const runsTotal = incoming.runs.records.length + (incoming.runs.omitted ?? 0);
   state.project = incoming.project;
   state.views = incoming.views;
-  state.glossary = { ...incoming.glossary, query: state.glossary.query };
+  state.lexicon = { ...incoming.lexicon, query: state.lexicon.query };
   state.spec = incoming.spec;
   state.componentInterfaces = incoming.componentInterfaces;
   state.structure = { ...state.structure, preview: incoming.structure.preview };

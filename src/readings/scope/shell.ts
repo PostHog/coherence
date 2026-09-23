@@ -8,7 +8,7 @@
 
 import { renderComponentsResults, renderComponentsTools } from "./components-view.ts";
 import { openEscalations, plural } from "./derive.ts";
-import { glossaryCounts, renderGlossaryView } from "./glossary-view.ts";
+import { lexiconCounts, renderLexiconView } from "./lexicon-view.ts";
 import { html, type Markup } from "./html.ts";
 import { renderInvariantsResults, renderInvariantsTools } from "./invariants-view.ts";
 import { renderJournalResults, renderJournalTools } from "./journal-view.ts";
@@ -19,7 +19,7 @@ import { renderStructureResults, renderStructureTools } from "./structure-view.t
 
 /** The views in strip order. The builder embeds this list; the page reads it from state. */
 export const VIEWS = [
-  { id: "glossary", label: "Glossary" },
+  { id: "lexicon", label: "Lexicon" },
   { id: "components", label: "Components" },
   { id: "structure", label: "Structure" },
   { id: "invariants", label: "Invariants" },
@@ -65,14 +65,14 @@ export function renderConnection(state: ShellState): Markup | null {
  * The masthead leads with health: one verdict in large type, the link to its
  * set on the Structure map (the broken component's mark when one component
  * holds everything broken), and what else the verdict leaves out beneath it.
- * The glossary and the record counts are demoted to one small line.
+ * The lexicon and the record counts are demoted to one small line.
  */
 export function renderMasthead(state: ShellState): Markup {
-  const first = state.glossary.layers[0];
+  const first = state.lexicon.layers[0];
   const counts =
     first !== undefined && first.kind === "present"
-      ? glossaryCounts(first.glossary)
-      : "No glossary is loaded.";
+      ? lexiconCounts(first.lexicon)
+      : "No lexicon is loaded.";
   const model = flowOf(state);
   const verdict = flowVerdict(model);
   const requirements = model.health.requirements.length;
@@ -107,15 +107,15 @@ function renderViewStrip(state: ShellState): Markup {
 }
 
 /** The region the browser re-renders when the query changes. */
-export function renderGlossaryResults(state: ShellState): Markup {
-  return renderGlossaryView(state.glossary);
+export function renderLexiconResults(state: ShellState): Markup {
+  return renderLexiconView(state.lexicon);
 }
 
 /** The active view's results region alone: what a query or filter change re-renders. */
 export function renderViewResults(state: ShellState): Markup {
   switch (state.activeView) {
-    case "glossary":
-      return renderGlossaryResults(state);
+    case "lexicon":
+      return renderLexiconResults(state);
     case "components":
       return renderComponentsResults(state);
     case "structure":
@@ -133,11 +133,11 @@ export function renderViewResults(state: ShellState): Markup {
 
 function renderViewTools(state: ShellState): Markup | null {
   switch (state.activeView) {
-    case "glossary":
+    case "lexicon":
       return html`<div class="view-tools">
         <label class="search">
           <span class="label">Search</span>
-          <input type="search" data-search value="${state.glossary.query}" placeholder="name, other name, definition, or rejected name" autocomplete="off" spellcheck="false">
+          <input type="search" data-search value="${state.lexicon.query}" placeholder="name, other name, definition, or rejected name" autocomplete="off" spellcheck="false">
         </label>
       </div>`;
     case "components":

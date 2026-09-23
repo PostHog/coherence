@@ -3,11 +3,11 @@
  *
  * SessionStart and SubagentStart carry orient's first slice: any escalation
  * awaiting a human first (an escalation heads every read), then the compact
- * glossary, then the session id as the exact --session value every journal
+ * lexicon, then the session id as the exact --session value every journal
  * write must carry, a decide template, the journal read command, and a short
  * fixed instruction. Both hosts read it from
  * `hookSpecificOutput.additionalContext`.
- * Stop and SubagentStop run the glossary check over the files changed in the
+ * Stop and SubagentStop run the lexicon check over the files changed in the
  * working tree. On Stop the findings are shown to the human and the session
  * ends. On SubagentStop a rejected name in a changed file, a spec problem, or
  * a structural defect refuses the stop: exit 2 with the reason on stderr,
@@ -56,11 +56,11 @@ import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
-import { renderCompactWithin, type InjectionLevel } from "./glossary.ts";
-import { installedRoot, isCoherenceItself, loadProjectGlossaries, within } from "./project.ts";
+import { renderCompactWithin, type InjectionLevel } from "./lexicon.ts";
+import { installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
 
-import { attentionText, glossaryCoverage, type Coverage } from "./glossary-coverage.ts";
-import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./glossary-cli.ts";
+import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
+import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
 
 const run = promisify(execFile);
 
@@ -101,7 +101,7 @@ export const CONTEXT_BUDGET = 9_500;
 /** The rule; with the session block above it the whole tail stays under 120 words. */
 export const INSTRUCTION = [
   "Use these names. A rejected name in prose, a spec, a journal record, or an",
-  "identifier is a defect: replace it. A new noun the glossary lacks must be",
+  "identifier is a defect: replace it. A new noun the lexicon lacks must be",
   "declared there as a concept, or mapped as an alias of an existing concept,",
   "before this session ends. Coherence's names describe the tool; the",
   "project's names describe its domain, and inside the project its sense wins.",
@@ -350,12 +350,12 @@ export function specStopText(root: string, changed: readonly string[] = [], wall
 }
 
 /**
- * The glossary check over the changed files at stop, as text, and what of it
+ * The lexicon check over the changed files at stop, as text, and what of it
  * is owed: a rejected name refuses a subagent stop unless the session
  * recorded unable naming the file or the name; an unknown noun is a
  * nomination the tool cannot prove, so it is reported and never refused.
  */
-export function glossaryStopText(report: CheckReport | undefined, walls: readonly Unable[] = []): { text: string; owed: number } {
+export function lexiconStopText(report: CheckReport | undefined, walls: readonly Unable[] = []): { text: string; owed: number } {
   if (report === undefined || !hasFindings(report)) return { text: "", owed: 0 };
   const lines = formatReport(report).trimEnd().split("\n");
   let owed = 0;
@@ -447,7 +447,7 @@ export async function editContext(root: string, input: HookInput, options: HookO
  * work orders owe, the vocabulary at the richest level that leaves the whole
  * under the budget, and the session block. When the escalations alone crowd
  * the budget, the vocabulary steps down to names and then to one line that
- * points at the glossary command.
+ * points at the lexicon command.
  */
 export async function startContext(root: string, input: HookInput = {}, report?: Coverage): Promise<string> {
   return (await startReading(root, input, report)).text;
@@ -455,9 +455,9 @@ export async function startContext(root: string, input: HookInput = {}, report?:
 
 /** The start injection with the level the vocabulary was delivered at, so a reading of the hook can say what orient carries. */
 export async function startReading(root: string, input: HookInput = {}, report?: Coverage): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
-  const { coherence, project } = await loadProjectGlossaries(root);
+  const { coherence, project } = await loadProjectLexicons(root);
   const head = escalationBlock(root) + specBlock(root) + workBlock(root, input);
-  const reading=report ?? await glossaryCoverage(root);
+  const reading=report ?? await lexiconCoverage(root);
   const commands=await cliName(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
   const signal=attentionText(reading, commands);
@@ -477,8 +477,8 @@ async function vocabularyAtEdit(root: string, changes: ReturnType<typeof coverag
   const fresh = changes.filter((c) => c.state === "unresolved").slice(0, 5);
   const risky = changes.filter((c) => c.state !== "unresolved").slice(0, 3);
   const lines: string[] = [];
-  if (fresh.length) lines.push(`Glossary: this edit made ${fresh.map((c) => `"${c.term}"`).join(", ")} recur without a definition; declare it (${cli} glossary propose declare <term> --definition "<text>" --because "<why>") or map it as an alias of an existing concept.`);
-  if (risky.length) lines.push(`Glossary: sense at risk at this edit: ${risky.map((c) => `${c.term} in ${c.component} (${c.reason.replace(/^sense at risk: /, "")})`).join("; ")}; check it against the definition: ${cli} glossary review <term>.`);
+  if (fresh.length) lines.push(`Lexicon: this edit made ${fresh.map((c) => `"${c.term}"`).join(", ")} recur without a definition; declare it (${cli} lexicon propose declare <term> --definition "<text>" --because "<why>") or map it as an alias of an existing concept.`);
+  if (risky.length) lines.push(`Lexicon: sense at risk at this edit: ${risky.map((c) => `${c.term} in ${c.component} (${c.reason.replace(/^sense at risk: /, "")})`).join("; ")}; check it against the definition: ${cli} lexicon review <term>.`);
   return lines.join("\n") + "\n";
 }
 
@@ -488,8 +488,8 @@ async function vocabularyAtStop(root: string, reading: Coverage, prior: Record<s
   const introduced = introducedCandidates(reading, prior).slice(0, 5);
   const risky = coverageChanges(reading, prior).filter((c) => c.state !== "unresolved").slice(0, 3);
   const lines: string[] = [];
-  if (introduced.length) lines.push(`Glossary: this session left ${introduced.map((t) => `"${t}"`).join(", ")} recurring without a definition; declare or map each (${cli} glossary propose declare <term> ...).`);
-  if (risky.length) lines.push(`Glossary: sense at risk: ${risky.map((c) => `${c.term} in ${c.component} (${c.reason.replace(/^sense at risk: /, "")})`).join("; ")}; ${cli} glossary review <term>.`);
+  if (introduced.length) lines.push(`Lexicon: this session left ${introduced.map((t) => `"${t}"`).join(", ")} recurring without a definition; declare or map each (${cli} lexicon propose declare <term> ...).`);
+  if (risky.length) lines.push(`Lexicon: sense at risk: ${risky.map((c) => `${c.term} in ${c.component} (${c.reason.replace(/^sense at risk: /, "")})`).join("; ")}; ${cli} lexicon review <term>.`);
   return lines.join("\n");
 }
 
@@ -502,7 +502,7 @@ export function feedContext(root: string, input: HookInput): { text: string; com
 
 async function checkChanged(root: string, paths: readonly string[]): Promise<CheckReport | undefined> {
   if (paths.length === 0) return undefined;
-  const { coherence, project } = await loadProjectGlossaries(root);
+  const { coherence, project } = await loadProjectLexicons(root);
   return runCheck({ root, paths: [...paths], coherence, project });
 }
 
@@ -550,7 +550,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
   switch (event) {
     case "SessionStart":
     case "SubagentStart": {
-      const reading=await glossaryCoverage(root);
+      const reading=await lexiconCoverage(root);
       const context = await startContext(root, input, reading);
       const session = sessionOf(input);
       if (session !== undefined) openFeed(root, session);
@@ -563,7 +563,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const session=sessionOf(input);
       if (event === "PostToolUse" && session) recordReadTrace(root, session, input);
       const edit = event === "PostToolUse" ? await editContext(root, input, options) : "";
-      const reading=session && existsSync(baselinePath(root,session)) ? await glossaryCoverage(root) : undefined;
+      const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
       const changes=reading && session ? coverageChanges(reading,priorBaseline(root,session)) : [];
       const vocabulary=changes.length ? await vocabularyAtEdit(root, changes) : "";
       const context = [feed.text,edit,vocabulary].filter(Boolean).join("\n");
@@ -580,21 +580,21 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       if (session) await snapshotAtStop(root, session, changed.files, options);
       const walls = unableWalls(root, input);
       const spec = specStopText(root, changed.files, walls);
-      const glossary = glossaryStopText(report, walls);
+      const lexicon = lexiconStopText(report, walls);
       const workText = workStopText(root, input);
-      const reading=session && existsSync(baselinePath(root,session)) ? await glossaryCoverage(root) : undefined;
+      const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
       const coverageText=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : "";
-      const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the glossary check ran over nothing`;
-      if (glossary.text === "" && spec.text === "" && workText === "" && changedText === "" && coverageText === "") return { stdout: "", stderr: "", exit: 0 };
+      const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the lexicon check ran over nothing`;
+      if (lexicon.text === "" && spec.text === "" && workText === "" && changedText === "" && coverageText === "") return { stdout: "", stderr: "", exit: 0 };
       const parts: string[] = [];
       if (changedText !== "") parts.push(changedText);
-      if (glossary.text !== "") parts.push(`Glossary check:\n${glossary.text}`);
+      if (lexicon.text !== "") parts.push(`Lexicon check:\n${lexicon.text}`);
       if (spec.text !== "") parts.push(`Spec:\n${spec.text}`);
       if (workText !== "") parts.push(`Work:\n${workText}`);
       if (coverageText) parts.push(coverageText);
       const text = parts.join("\n");
       // A refusal is spent only on what the tool can prove is owed and no recorded wall excuses: a rejected name in a changed file, a spec problem, a structural defect.
-      const refuse = event === "SubagentStop" && input.stop_hook_active !== true && glossary.owed + spec.owed > 0;
+      const refuse = event === "SubagentStop" && input.stop_hook_active !== true && lexicon.owed + spec.owed > 0;
       if (refuse) {
         return { stdout: "", stderr: `Regulate found what this session owes; settle it before stopping.\n${text}`, exit: REFUSE_EXIT };
       }

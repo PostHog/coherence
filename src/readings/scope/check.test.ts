@@ -3,8 +3,8 @@
  *
  *   npm run scope:check
  *
- * The Mnemion assertion reads the first adopter's domain glossary from its own
- * repository (COHERENCE_DOMAIN_GLOSSARY overrides the path) and is skipped,
+ * The Mnemion assertion reads the first adopter's domain lexicon from its own
+ * repository (COHERENCE_DOMAIN_LEXICON overrides the path) and is skipped,
  * visibly, when that file is not on this machine.
  */
 
@@ -21,18 +21,18 @@ import { DEFAULTS, STATE_SLOT, buildScopePage, buildShell, scopeState, snapshotO
 import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { CITED_WINDOW, windowJournal, allReliance, componentId, defectsOf, flowChokepointId, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, verifiedOf, workId } from "./derive.ts";
 import { escapeHtml } from "./html.ts";
-import type { Glossary, GlossaryCoverage, RecordedSite, ShellState, StructurePreview, WorkOrder } from "./model.ts";
+import type { Lexicon, LexiconCoverage, RecordedSite, ShellState, StructurePreview, WorkOrder } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
 import { flowOf } from "./structure-flow.ts";
 
 const options: BuildOptions = {
-  glossaryPath: DEFAULTS.glossaryPath,
+  lexiconPath: DEFAULTS.lexiconPath,
   project: DEFAULTS.project,
 };
 
-const MNEMION_GLOSSARY =
-  process.env["COHERENCE_DOMAIN_GLOSSARY"] ?? "/Users/daniloc/Documents/Dev/mnemion/mnemion-js/glossary.json";
-const MNEMION_ROOT = dirname(MNEMION_GLOSSARY);
+const MNEMION_LEXICON =
+  process.env["COHERENCE_DOMAIN_LEXICON"] ?? "/Users/daniloc/Documents/Dev/mnemion/mnemion-js/lexicon.json";
+const MNEMION_ROOT = dirname(MNEMION_LEXICON);
 
 const TWO_MB = 2 * 1024 * 1024;
 const THREE_MB = 3 * 1024 * 1024;
@@ -42,7 +42,7 @@ let fixtureState: ShellState;
 
 before(async () => {
   fixture = makeFixture();
-  ({ state: fixtureState } = await buildScopePage({ root: fixture.root, glossaryPath: DEFAULTS.glossaryPath, project: "Fixture" }));
+  ({ state: fixtureState } = await buildScopePage({ root: fixture.root, lexiconPath: DEFAULTS.lexiconPath, project: "Fixture" }));
 });
 
 after(() => fixture.remove());
@@ -64,16 +64,16 @@ function cardIds(rendered: string): string[] {
   return [...rendered.matchAll(/<article class="entry[^"]*" id="([^"]+)"/g)].map((m) => m[1]!);
 }
 
-function firstGlossary(state: ShellState): Glossary {
-  const layer = state.glossary.layers[0];
+function firstLexicon(state: ShellState): Lexicon {
+  const layer = state.lexicon.layers[0];
   assert.ok(layer !== undefined && layer.kind === "present", "the Coherence layer is present");
-  return layer.glossary;
+  return layer.lexicon;
 }
 
-function secondGlossary(state: ShellState): Glossary {
-  const layer = state.glossary.layers[1];
+function secondLexicon(state: ShellState): Lexicon {
+  const layer = state.lexicon.layers[1];
   assert.ok(layer !== undefined && layer.kind === "present", "the domain layer is present");
-  return layer.glossary;
+  return layer.lexicon;
 }
 
 /** The JSON the page embeds, read back out of the file. */
@@ -123,23 +123,23 @@ test("a snapshot is the shell with one inline state and loads nothing from outsi
   }
 });
 
-test("the embedded state is the loaded glossary, unchanged", async () => {
+test("the embedded state is the loaded lexicon, unchanged", async () => {
   const { html, state } = await buildScopePage(options);
   assert.deepEqual(embeddedState(html), state);
-  const glossary = firstGlossary(state);
-  const file = JSON.parse(await readFile(DEFAULTS.glossaryPath, "utf8")) as {
+  const lexicon = firstLexicon(state);
+  const file = JSON.parse(await readFile(DEFAULTS.lexiconPath, "utf8")) as {
     concepts: { name: string; detail?: object; provenance?: object }[];
     metaphors: Record<string, string>;
     shape: object;
     version: number;
   };
-  assert.equal(glossary.concepts.length, file.concepts.length);
-  assert.equal(glossary.version, file.version);
-  assert.deepEqual(Object.keys(glossary.metaphors), Object.keys(file.metaphors));
-  assert.deepEqual(glossary.shape, file.shape, "the file's shape key is kept in the model");
-  assert.equal(glossary.rejected_names, undefined, "Coherence's glossary has no top-level rejected names");
-  assert.deepEqual(glossary.record, {}, "every top-level key of the file has a place in the model");
-  for (const [i, concept] of glossary.concepts.entries()) {
+  assert.equal(lexicon.concepts.length, file.concepts.length);
+  assert.equal(lexicon.version, file.version);
+  assert.deepEqual(Object.keys(lexicon.metaphors), Object.keys(file.metaphors));
+  assert.deepEqual(lexicon.shape, file.shape, "the file's shape key is kept in the model");
+  assert.equal(lexicon.rejected_names, undefined, "Coherence's lexicon has no top-level rejected names");
+  assert.deepEqual(lexicon.record, {}, "every top-level key of the file has a place in the model");
+  for (const [i, concept] of lexicon.concepts.entries()) {
     const entry = file.concepts[i]!;
     assert.deepEqual(concept.detail, entry.detail ?? {}, `${concept.name}: detail is kept whole`);
     assert.deepEqual(concept.provenance, entry.provenance ?? {}, `${concept.name}: provenance is kept whole`);
@@ -150,8 +150,8 @@ test("the embedded state is the loaded glossary, unchanged", async () => {
 test("the render shows every concept name and every rejected alternative's because", async () => {
   const { state } = await buildScopePage(options);
   const rendered = renderShell(state).text;
-  const glossary = firstGlossary(state);
-  for (const concept of glossary.concepts) {
+  const lexicon = firstLexicon(state);
+  for (const concept of lexicon.concepts) {
     assert.ok(rendered.includes(escapeHtml(concept.name)), `concept ${concept.name} is on the page`);
     for (const rejected of concept.rejected) {
       assert.ok(
@@ -160,16 +160,16 @@ test("the render shows every concept name and every rejected alternative's becau
       );
     }
   }
-  for (const [name, text] of Object.entries(glossary.metaphors)) {
+  for (const [name, text] of Object.entries(lexicon.metaphors)) {
     assert.ok(rendered.includes(escapeHtml(text)), `metaphor ${name} is on the page`);
   }
   // The layers are where a shape key would leak; the vocabulary reading above them lists corpus paths, and one of them (docs/retired.md) is also a shape value.
   const layers = rendered.slice(rendered.indexOf('id="layer-'));
-  for (const value of Object.values(glossary.shape ?? {})) {
-    if (typeof value === "string") assert.ok(!layers.includes(escapeHtml(value)), "the shape key is rendered in no glossary layer");
+  for (const value of Object.values(lexicon.shape ?? {})) {
+    if (typeof value === "string") assert.ok(!layers.includes(escapeHtml(value)), "the shape key is rendered in no lexicon layer");
   }
-  assert.ok(rendered.includes(`${glossary.concepts.length} concepts`), "concept count is in the masthead");
-  assert.ok(rendered.includes(`glossary version ${glossary.version}`), "version is in the masthead");
+  assert.ok(rendered.includes(`${lexicon.concepts.length} concepts`), "concept count is in the masthead");
+  assert.ok(rendered.includes(`lexicon version ${lexicon.version}`), "version is in the masthead");
   assert.ok(!rendered.includes(">Retired mechanisms</h2>"), "there is no retired-mechanisms section");
   assert.ok(!rendered.includes('class="entry retirement"'), "there are no retired-mechanism cards");
 });
@@ -188,8 +188,8 @@ function conceptCard(rendered: string, id: string): { card: string; vocabulary: 
 test("provenance and detail are one click away; no provenance key or value appears in the vocabulary", async () => {
   const { state } = await buildScopePage(options);
   const rendered = renderShell(state).text;
-  const glossary = firstGlossary(state);
-  for (const concept of glossary.concepts) {
+  const lexicon = firstLexicon(state);
+  for (const concept of lexicon.concepts) {
     const id = `coherence-${slug(concept.name)}`;
     const { card, vocabulary } = conceptCard(rendered, id);
     assert.ok(!vocabulary.includes("<details"), `${concept.name}: the vocabulary holds no disclosure`);
@@ -242,29 +242,29 @@ test("the render has one view strip with the six views in order", async () => {
   const { state } = await buildScopePage(options);
   const rendered = renderShell(state).text;
   const tabs = [...rendered.matchAll(/role="tab"[^>]*data-view="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs, ["glossary", "components", "structure", "invariants", "runs", "journal"]);
-  for (const label of ["Glossary", "Components", "Structure", "Invariants", "Runs", "Journal"]) {
+  assert.deepEqual(tabs, ["lexicon", "components", "structure", "invariants", "runs", "journal"]);
+  for (const label of ["Lexicon", "Components", "Structure", "Invariants", "Runs", "Journal"]) {
     assert.ok(rendered.includes(`>${label}</button>`), `${label} tab`);
   }
 });
 
 test("the search derives its matches from state and hides the rest", async () => {
   const { state } = await buildScopePage(options);
-  const total = firstGlossary(state).concepts.length;
-  state.glossary.query = "chokepoint";
+  const total = firstLexicon(state).concepts.length;
+  state.lexicon.query = "chokepoint";
   const rendered = renderShell(state).text;
   const shown = [...rendered.matchAll(/class="entry concept"/g)].length;
   assert.ok(shown > 0 && shown < total, `query narrows ${total} concepts to ${shown}`);
   assert.ok(rendered.includes(`${shown} of ${total} concepts match “chokepoint”.`));
-  state.glossary.query = "no concept says this sentence";
+  state.lexicon.query = "no concept says this sentence";
   assert.ok(renderShell(state).text.includes("No concept matches"));
 });
 
-test("the Scope glossary reading displays every applicable property meaning without choosing an owner", () => {
+test("the Scope lexicon reading displays every applicable property meaning without choosing an owner", () => {
   const state = fresh();
-  const coverage: GlossaryCoverage = {
+  const coverage: LexiconCoverage = {
     version: 1,
-    projectGlossary: "glossary.json",
+    projectLexicon: "lexicon.json",
     fingerprint: "ambiguous-meaning",
     population: { files: [], excluded: [], unreadable: [], extraction: "fixture", limits: [] },
     totals: { terms: 1, uses: 1, known: 1, rejected: 0, unresolved: 0, unreviewedContexts: 1 },
@@ -286,9 +286,9 @@ test("the Scope glossary reading displays every applicable property meaning with
       uses: [{ file: "src/money.ts", line: 4, component: "money", text: "unit_basis", kind: "code", fingerprint: "unit-basis-use" }],
     }],
   };
-  state.glossary.coverage = coverage;
-  state.glossary.query = "unit basis";
-  const rendered = renderView(state, "glossary").text;
+  state.lexicon.coverage = coverage;
+  state.lexicon.query = "unit basis";
+  const rendered = renderView(state, "lexicon").text;
   assert.match(rendered, /2 applicable property meanings; this spelling alone does not select an owner/);
   assert.match(rendered, /exposure[\s\S]*The amount subject to loss/);
   assert.match(rendered, /allocation[\s\S]*The amount assigned to a strategy/);
@@ -296,14 +296,14 @@ test("the Scope glossary reading displays every applicable property meaning with
   assert.doesNotMatch(rendered, /No settled definition/);
 });
 
-test("an absent domain glossary is rendered as a placeholder, a present one as a second layer", async () => {
+test("an absent domain lexicon is rendered as a placeholder, a present one as a second layer", async () => {
   const absent = await buildScopePage(options);
   const absentRendered = renderShell(absent.state).text;
-  assert.ok(absentRendered.includes("No domain glossary is present."));
+  assert.ok(absentRendered.includes("No domain lexicon is present."));
 
-  const present = await buildScopePage({ ...options, domainPath: DEFAULTS.glossaryPath, domainTitle: "Stand-in domain" });
+  const present = await buildScopePage({ ...options, domainPath: DEFAULTS.lexiconPath, domainTitle: "Stand-in domain" });
   const presentRendered = renderShell(present.state).text;
-  assert.ok(!presentRendered.includes("No domain glossary is present."));
+  assert.ok(!presentRendered.includes("No domain lexicon is present."));
   assert.ok(presentRendered.includes("Stand-in domain"));
   assert.equal([...presentRendered.matchAll(/class="layer"/g)].length, 2);
   assert.ok(presentRendered.includes('id="domain-invariant"'), "domain layer cards carry their own ids");
@@ -325,7 +325,7 @@ test("the shell's bytes are independent of project content; the same state in re
   // Every input the state depends on, named. Appending to any of them changes the state and leaves the shell alone.
   // Its own copy of the fixture: this test appends to every record store, and the shared one must not move.
   const own = makeFixture();
-  const fixtureOptions: BuildOptions = { root: own.root, glossaryPath: DEFAULTS.glossaryPath, project: "Fixture" };
+  const fixtureOptions: BuildOptions = { root: own.root, lexiconPath: DEFAULTS.lexiconPath, project: "Fixture" };
   const same = async (): Promise<ShellState> => {
     const first = await scopeState(fixtureOptions);
     const second = await scopeState(fixtureOptions);
@@ -357,7 +357,7 @@ test("the shell's bytes are independent of project content; the same state in re
 });
 
 test("the state stores no copy of what it derives: the latest verdicts live in the run records and nowhere else", async () => {
-  const { state } = await buildScopePage({ root: fixture.root, glossaryPath: DEFAULTS.glossaryPath, project: "Fixture" });
+  const { state } = await buildScopePage({ root: fixture.root, lexiconPath: DEFAULTS.lexiconPath, project: "Fixture" });
   for (const component of state.spec.components) {
     for (const invariant of component.invariants) {
       for (const key of ["latest", "verified", "defects"]) {
@@ -636,12 +636,12 @@ test("deep links resolve: every card id on every view resolves to that view", ()
   for (const link of links) assert.ok(resolveHash(state, `#${link}`) !== undefined, `link #${link} resolves`);
 });
 
-test("the first adopter's tree builds as a second root: its glossary is the domain layer and its run records show its structural defects", {
-  skip: (await exists(MNEMION_GLOSSARY)) ? false : `${MNEMION_GLOSSARY} is not on this machine`,
+test("the first adopter's tree builds as a second root: its lexicon is the domain layer and its run records show its structural defects", {
+  skip: (await exists(MNEMION_LEXICON)) ? false : `${MNEMION_LEXICON} is not on this machine`,
 }, async () => {
-  const { html, state } = await buildScopePage({ root: MNEMION_ROOT, glossaryPath: DEFAULTS.glossaryPath, project: "Mnemion" });
+  const { html, state } = await buildScopePage({ root: MNEMION_ROOT, lexiconPath: DEFAULTS.lexiconPath, project: "Mnemion" });
   assert.ok(Buffer.byteLength(html, "utf8") < THREE_MB);
-  assert.ok(state.glossary.layers[1]?.kind === "present" && state.glossary.layers[1].title === "Mnemion glossary", "Mnemion's glossary.json is located from its root");
+  assert.ok(state.lexicon.layers[1]?.kind === "present" && state.lexicon.layers[1].title === "Mnemion lexicon", "Mnemion's lexicon.json is located from its root");
   assert.ok(state.spec.components.length > 1 && state.runs.records.length > 0, "Mnemion's specs and runs are loaded");
   const invariants = renderView(state, "invariants").text;
   const defects = state.spec.components.flatMap((c) => c.invariants.filter((i) => i.state === "structural defect"));
@@ -677,18 +677,18 @@ test("the page's run window keeps every latest entry whole and drops reference s
   });
 });
 
-test("the Mnemion domain glossary renders beneath Coherence's with every concept, ruling, rejected name and trust level", {
-  skip: (await exists(MNEMION_GLOSSARY)) ? false : `${MNEMION_GLOSSARY} is not on this machine`,
+test("the Mnemion domain lexicon renders beneath Coherence's with every concept, ruling, rejected name and trust level", {
+  skip: (await exists(MNEMION_LEXICON)) ? false : `${MNEMION_LEXICON} is not on this machine`,
 }, async () => {
-  const { html, state } = await buildScopePage({ ...options, domainPath: MNEMION_GLOSSARY });
+  const { html, state } = await buildScopePage({ ...options, domainPath: MNEMION_LEXICON });
   assert.ok(Buffer.byteLength(html, "utf8") < TWO_MB);
   assert.deepEqual(embeddedState(html), state);
-  const mnemion = secondGlossary(state);
+  const mnemion = secondLexicon(state);
   const rendered = renderShell(state).text;
 
   const layers = [...rendered.matchAll(/id="layer-(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(layers, ["coherence", "domain"], "Coherence's layer comes first, the domain layer beneath");
-  assert.ok(rendered.includes("Mnemion glossary"), "the layer is titled from the file's project name");
+  assert.ok(rendered.includes("Mnemion lexicon"), "the layer is titled from the file's project name");
   assert.ok(mnemion.purpose !== undefined && rendered.includes(escapeHtml(mnemion.purpose)));
 
   assert.ok(mnemion.concepts.length > 0);

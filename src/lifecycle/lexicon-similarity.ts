@@ -15,9 +15,9 @@ import {
 } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
-import { confined } from "./glossary-maintain.ts";
-import { digest, glossaryCoverage } from "./glossary-coverage.ts";
-import { loadProjectGlossaries } from "./project.ts";
+import { confined } from "./lexicon-maintain.ts";
+import { digest, lexiconCoverage } from "./lexicon-coverage.ts";
+import { loadProjectLexicons } from "./project.ts";
 
 export const MODEL_SHA =
   "ec38e8da142596baa913124ae50550de284b6916bf59577ef2f0cb9660c2f514";
@@ -76,7 +76,7 @@ export async function configureModel(
   if (!/^[a-f0-9]{64}$/i.test(sha))
     throw new Error("model needs its complete SHA-256");
   if (statSync(path).size > 512 * 1024 * 1024)
-    throw new Error("local glossary models are bounded to 512 MiB");
+    throw new Error("local lexicon models are bounded to 512 MiB");
   if ((await shaFile(path)) !== sha.toLowerCase())
     throw new Error("model SHA-256 does not match; configuration is unchanged");
   const config: ModelConfig = {
@@ -84,7 +84,7 @@ export async function configureModel(
     sha256: sha.toLowerCase(),
     settings: SETTINGS,
   };
-  put(confined(root, ".coherence/glossary/model.json"), config);
+  put(confined(root, ".coherence/lexicon/model.json"), config);
   return config;
 }
 /** The only network operation, explicitly requested; suggestions themselves never download anything. */
@@ -148,12 +148,12 @@ export async function similarTerms(
     model: LocalModel | undefined,
     context: LocalContext | undefined;
   try {
-    const path = confined(root, ".coherence/glossary/model.json");
+    const path = confined(root, ".coherence/lexicon/model.json");
     if (!existsSync(path))
       return {
         available: false,
         reason:
-          "No local model configured. Run glossary model --download explicitly; exact coverage remains available.",
+          "No local model configured. Run lexicon model --download explicitly; exact coverage remains available.",
         suggestions: [],
       };
     if (process.platform !== "darwin" || process.arch !== "arm64")
@@ -169,7 +169,7 @@ export async function similarTerms(
       throw new Error(
         "configured model changed; old vectors will not be reused",
       );
-    const { coherence, project } = await loadProjectGlossaries(root);
+    const { coherence, project } = await loadProjectLexicons(root);
     const concepts = [
       ...new Map(
         [...coherence.concepts, ...(project?.concepts ?? [])].map((c) => [
@@ -178,7 +178,7 @@ export async function similarTerms(
         ]),
       ).values(),
     ];
-    const report = await glossaryCoverage(root);
+    const report = await lexiconCoverage(root);
     const term = report.terms.find((t) => t.term === text.toLowerCase());
     const examples = (term?.contexts ?? []).slice(0, 12).map((c) => ({
       component: c.component,
@@ -194,7 +194,7 @@ export async function similarTerms(
     const texts = [text, ...descriptions, ...examples.map((e) => e.text)];
     const cachePath = confined(
       root,
-      `.coherence/glossary/vectors/${digest({ sha: config.sha256, settings: SETTINGS })}.json`,
+      `.coherence/lexicon/vectors/${digest({ sha: config.sha256, settings: SETTINGS })}.json`,
     );
     let cache: Record<string, number[]> = {};
     if (existsSync(cachePath)) {
@@ -282,7 +282,7 @@ export async function similarTerms(
       suggestions,
       contextComparisons: contexts,
       limits: [
-        "Similarity nominates questions; it never settles meaning, changes glossary entries or affects enforcement verdicts.",
+        "Similarity nominates questions; it never settles meaning, changes lexicon entries or affects enforcement verdicts.",
         "Context comparisons sample at most two excerpts from each of twelve contexts; low similarity is not proof of overload.",
         "Pinned small English model; other languages and long inputs need separate evaluation.",
       ],

@@ -1,15 +1,15 @@
 # The Scope shell
 
 Scope is the reading: one surface that projects the model for a human, in
-views. Six views ship: Glossary, Components, Structure, Invariants, Runs, and
+views. Six views ship: Lexicon, Components, Structure, Invariants, Runs, and
 Journal.
 
 ## Structure
 
 The shell is a function of one state value. `src/readings/scope/model.ts`
-holds the model: a glossary (concepts, metaphors, and, per project, rejected
+holds the model: a lexicon (concepts, metaphors, and, per project, rejected
 names, trust levels, rulings, candidate overloads, uncertain terms), a layer
-(a glossary present, or an absence with its reason), the spec model as
+(a lexicon present, or an absence with its reason), the spec model as
 `loadSpecModel` returns it (components with their entrances, invariants with
 their lifecycle state, counts, and the adapter's grade ladder), the run
 records, the journal records with the work orders (folded by the journal's
@@ -20,8 +20,8 @@ read them, and per view the reader's query, filters, and selection.
 `build.ts` loads those truths once and embeds the state as JSON in
 `public/_scope.html` with the styles and one inline script. Same inputs in,
 byte-identical page out. With `--root <project>` it builds over another
-project: that root's specs, runs, journal, and glossary (named under
-`glossary` in `coherence.config.json`, else `glossary.json`) become the
+project: that root's specs, runs, journal, and lexicon (named under
+`lexicon` in `coherence.config.json`, else `lexicon.json`) become the
 domain layer beneath Coherence's own.
 
 The page embeds a bounded window of the two stores that grow every session:
@@ -224,7 +224,7 @@ Filters by kind, agent, and session.
 ## Deep links
 
 Every card or map id carries its view as a prefix (`component-`,
-`structure-`, `invariant-`, `run-`, `journal-`, `work-`, and the glossary's
+`structure-`, `invariant-`, `run-`, `journal-`, `work-`, and the lexicon's
 `coherence-` and `domain-`). A hash resolves to its view by that prefix, or
 names a view alone (`#runs`). Links into the retired Reliance view
 (`#reliance-…`) and the retired security-spine section (`#structure-<component>-<invariant>`)
@@ -261,7 +261,7 @@ chokepoint/protected-thing pairs. The bridge validates the component,
 duplicate name, and crossing trust levels, selects Structure initially, and
 writes a deterministic page with the proposal drawn dashed on its component,
 unverified. It refuses an output path inside the project root so the
-generated artifact cannot change the glossary or spec population between
+generated artifact cannot change the lexicon or spec population between
 otherwise identical previews. It changes no spec or run store, and the caller
 cannot supply a grade, verdict, bypass count, lifecycle state, or reliance
 evidence.
@@ -270,7 +270,7 @@ evidence.
 
 1. Give the view a state type in `model.ts` and a field on `ShellState`.
 2. Populate it in `loadState` in `build.ts`.
-3. Write a pure render pair (tools and results) beside `glossary-view.ts`,
+3. Write a pure render pair (tools and results) beside `lexicon-view.ts`,
    with card ids under a new prefix registered in `resolveHash`.
 4. List it in `VIEWS` in `shell.ts` and add its cases to `renderViewTools`
    and `renderViewResults`; add the file to `BROWSER_SOURCES` in order.

@@ -1,10 +1,10 @@
 /**
- * The glossary as the hook and the check see it.
+ * The lexicon as the hook and the check see it.
  *
- * Two files share this reader: Coherence's own glossary (the tool vocabulary,
+ * Two files share this reader: Coherence's own lexicon (the tool vocabulary,
  * whose rejected entries sit on each concept as `{alternative, because}`) and a
- * project's domain glossary (the same concept shape, plus a top-level
- * `rejected` list of `{concept, because}`). Both parse into one `Glossary`.
+ * project's domain lexicon (the same concept shape, plus a top-level
+ * `rejected` list of `{concept, because}`). Both parse into one `Lexicon`.
  *
  * Only the vocabulary fields are read: name, definition, aliases, rejected,
  * not_to_be_confused_with, properties, related. `detail` and `provenance` are
@@ -30,7 +30,7 @@ export interface Concept {
   related: string[];
 }
 
-export interface Glossary {
+export interface Lexicon {
   /** Where it was read from; used to keep the file itself out of the check. */
   path: string;
   /** The project name the file declares, if any. */
@@ -108,8 +108,8 @@ function parseConcept(value: unknown, where: string): Concept {
   };
 }
 
-export function parseGlossary(input: unknown, path: string): Glossary {
-  if (!isRecord(input)) throw new Error(`${path}: a glossary must be an object`);
+export function parseLexicon(input: unknown, path: string): Lexicon {
+  if (!isRecord(input)) throw new Error(`${path}: a lexicon must be an object`);
   const concepts = input["concepts"];
   if (!Array.isArray(concepts)) throw new Error(`${path}: concepts must be a list`);
   const project = input["project"];
@@ -125,7 +125,7 @@ export function parseGlossary(input: unknown, path: string): Glossary {
   };
 }
 
-export async function loadGlossary(path: string): Promise<Glossary> {
+export async function loadLexicon(path: string): Promise<Lexicon> {
   const text = await readFile(path, "utf8");
   let parsed: unknown;
   try {
@@ -133,7 +133,7 @@ export async function loadGlossary(path: string): Promise<Glossary> {
   } catch (error) {
     throw new Error(`${path}: not valid JSON (${(error as Error).message})`);
   }
-  return parseGlossary(parsed, path);
+  return parseLexicon(parsed, path);
 }
 
 /* ---------------------------------------------------------------- names */
@@ -209,8 +209,8 @@ export function namesOfAlternative(alternative: string): AlternativeName[] {
   return names;
 }
 
-/** Every rejected name of a glossary, with its concept and because. Top-level rejections carry the file's project as their concept. */
-export function rejectedNames(glossary: Glossary): RejectedName[] {
+/** Every rejected name of a lexicon, with its concept and because. Top-level rejections carry the file's project as their concept. */
+export function rejectedNames(lexicon: Lexicon): RejectedName[] {
   const out: RejectedName[] = [];
   const seen = new Set<string>();
   const add = (alternative: string, concept: string, because: string): void => {
@@ -221,15 +221,15 @@ export function rejectedNames(glossary: Glossary): RejectedName[] {
       out.push({ name, concept, because, identifierOnly });
     }
   };
-  for (const concept of glossary.concepts) {
+  for (const concept of lexicon.concepts) {
     for (const r of concept.rejected) add(r.alternative, concept.name, r.because);
   }
-  const owner = glossary.project ?? "the glossary";
-  for (const r of glossary.rejected) add(r.alternative, owner, r.because);
+  const owner = lexicon.project ?? "the lexicon";
+  for (const r of lexicon.rejected) add(r.alternative, owner, r.because);
   return out;
 }
 
-/** An alias as written in a project glossary, without its explanatory parenthetical. "record (code term)" -> "record". */
+/** An alias as written in a project lexicon, without its explanatory parenthetical. "record (code term)" -> "record". */
 export function aliasNames(alias: string): string[] {
   return stripParenthetical(alias)
     .split(/\s+\/\s+/)
@@ -237,12 +237,12 @@ export function aliasNames(alias: string): string[] {
     .filter((a) => a !== "");
 }
 
-/** The names a glossary accepts: the project's name, every concept name, alias, and trust level, lowercased. */
-export function acceptedNames(glossary: Glossary): Set<string> {
+/** The names a lexicon accepts: the project's name, every concept name, alias, and trust level, lowercased. */
+export function acceptedNames(lexicon: Lexicon): Set<string> {
   const out = new Set<string>();
-  if (glossary.project !== undefined) out.add(glossary.project.toLowerCase());
-  for (const level of glossary.trustLevels) out.add(level.toLowerCase());
-  for (const concept of glossary.concepts) {
+  if (lexicon.project !== undefined) out.add(lexicon.project.toLowerCase());
+  for (const level of lexicon.trustLevels) out.add(level.toLowerCase());
+  for (const concept of lexicon.concepts) {
     out.add(concept.name.toLowerCase());
     for (const instance of concept.instances ?? []) out.add(instance.toLowerCase());
     for (const alias of concept.aliases) for (const name of aliasNames(alias)) out.add(name.toLowerCase());
@@ -290,13 +290,13 @@ export type DetailLevel = (typeof DETAIL_LEVELS)[number];
  * Below the project levels, two more the injection as a whole can fall to
  * when what must be shown whole (escalations are never shortened) leaves no
  * room: Coherence's own layer at names only, and then a one-line pointer to
- * the glossary command in place of any vocabulary.
+ * the lexicon command in place of any vocabulary.
  */
 export type InjectionLevel = DetailLevel | "coherence-names" | "pointer";
 
 /** The one line that stands in for the vocabulary when nothing else fits. */
 export function renderPointer(cli = "coherence"): string {
-  return `Vocabulary omitted to stay under the host budget; full entries: ${cli} glossary\n`;
+  return `Vocabulary omitted to stay under the host budget; full entries: ${cli} lexicon\n`;
 }
 
 function renderConcept(concept: Concept, detail: DetailLevel = "full"): string {
@@ -322,13 +322,13 @@ function capitalize(text: string): string {
 /**
  * The compact form the hook injects: one header line, one line per concept
  * with name, first sentence, accepted aliases and rejected names, and beneath
- * it the project glossary under its own header. Detail, provenance and
+ * it the project lexicon under its own header. Detail, provenance and
  * metaphors never appear.
  */
-export function renderCompact(coherence: Glossary, project?: Glossary, detail: DetailLevel = "full", coherenceDetail: "full" | "names" = "full"): string {
+export function renderCompact(coherence: Lexicon, project?: Lexicon, detail: DetailLevel = "full", coherenceDetail: "full" | "names" = "full"): string {
   const lines: string[] = [];
   if (coherenceDetail === "names") {
-    lines.push(`Coherence vocabulary (${coherence.concepts.length} concepts; names only here, rejected names are defects; full entries: coherence glossary):`);
+    lines.push(`Coherence vocabulary (${coherence.concepts.length} concepts; names only here, rejected names are defects; full entries: coherence lexicon):`);
     lines.push(coherence.concepts.map((c) => renderConcept(c, "names")).join(", "));
   } else {
     lines.push(`Coherence vocabulary (${coherence.concepts.length} concepts; rejected names are defects):`);
@@ -337,7 +337,7 @@ export function renderCompact(coherence: Glossary, project?: Glossary, detail: D
   if (project !== undefined) {
     const title = capitalize(project.project ?? "Project");
     lines.push("");
-    const note = detail === "names" ? "names only here; full entries: coherence glossary" : "inside the project its sense of a name wins";
+    const note = detail === "names" ? "names only here; full entries: coherence lexicon" : "inside the project its sense of a name wins";
     lines.push(`${title} vocabulary (${project.concepts.length} concepts; ${note}):`);
     if (detail === "names") {
       lines.push(project.concepts.map((c) => renderConcept(c, detail)).join(", "));
@@ -353,13 +353,13 @@ export function renderCompact(coherence: Glossary, project?: Glossary, detail: D
 /**
  * The compact form at the richest level that fits `maxChars`, with the level
  * chosen: the project layer steps down first, then Coherence's layer to
- * names, then the vocabulary gives way to a one-line pointer at the glossary
+ * names, then the vocabulary gives way to a one-line pointer at the lexicon
  * command (`cli` names it). The pointer is returned even when it does not
  * fit, so the caller always has something to inject.
  */
 export function renderCompactWithin(
-  coherence: Glossary,
-  project: Glossary | undefined,
+  coherence: Lexicon,
+  project: Lexicon | undefined,
   maxChars: number,
   cli = "coherence",
 ): { text: string; detail: InjectionLevel } {

@@ -39,7 +39,7 @@ The command that makes the complete shape the cheapest thing to produce: a compo
 - preview is a proposal, not evidence: A scaffold preview writes a self-contained Scope page outside the project tree whose Structure view adds the declared crossing as a dashed, unverified proposal; it changes no spec unless write is explicit, and identical inputs produce identical page bytes.
   over: every scaffold invariant invocation with preview, with and without write, including invalid components, crossing syntax, trust levels, and markup-bearing names
   via: scaffold invariant --preview writes only an ephemeral proposed, dashed, unverified Structure edge
-  because: a human needs to see the proposed vertebra in the existing security spine before accepting it, but rendering a possibility must not claim that the requirement was written, run, graded, or evidenced; keeping generated output outside the adopter tree also prevents the reading from changing the glossary population it reads
+  because: a human needs to see the proposed vertebra in the existing security spine before accepting it, but rendering a possibility must not claim that the requirement was written, run, graded, or evidenced; keeping generated output outside the adopter tree also prevents the reading from changing the lexicon population it reads
   crossing: project-source -> reading
   refuted: inverted the preview branch so a preview request only printed the bullet and wrote no page -> the focused scaffold preview detector failed because no preview path was printed; restored, green (2026-09-18)
   kinds: none

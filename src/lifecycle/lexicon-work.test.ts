@@ -11,26 +11,26 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { glossaryCoverage } from "./glossary-coverage.ts";
+import { lexiconCoverage } from "./lexicon-coverage.ts";
 import {
   applyProposal,
   propose,
-  recoverGlossary,
-  reviewGlossary,
-} from "./glossary-maintain.ts";
+  recoverLexicon,
+  reviewLexicon,
+} from "./lexicon-maintain.ts";
 import {
   coverageChanges,
-  glossaryWorkCommand,
+  lexiconWorkCommand,
   priorBaseline,
   saveBaseline,
-} from "./glossary-cli.ts";
+} from "./lexicon-cli.ts";
 import { loadJournal } from "../journal/store.ts";
 
-const who = { session: "glossary-test", agent: "test" };
+const who = { session: "lexicon-test", agent: "test" };
 function fixture(): string {
-  const root = mkdtempSync(join(tmpdir(), "coherence-glossary-work-"));
+  const root = mkdtempSync(join(tmpdir(), "coherence-lexicon-work-"));
   writeFileSync(
-    join(root, "glossary.json"),
+    join(root, "lexicon.json"),
     JSON.stringify({
       version: 1,
       project: "risk",
@@ -75,14 +75,14 @@ async function run(
 ): Promise<{ code: number; out: string; err: string }> {
   const out: string[] = [];
   const err: string[] = [];
-  const code = await glossaryWorkCommand(args, {
+  const code = await lexiconWorkCommand(args, {
     cwd: root,
     out: (s) => out.push(s),
     err: (s) => err.push(s),
   });
   return { code, out: out.join("\n"), err: err.join("\n") };
 }
-test("glossary coverage states its observed population and leaves known words in new contexts open to sense review", async () => {
+test("lexicon coverage states its observed population and leaves known words in new contexts open to sense review", async () => {
   const root = fixture();
   try {
     writeFileSync(join(root, "opaque.ipynb"), "{}");
@@ -92,8 +92,8 @@ test("glossary coverage states its observed population and leaves known words in
       "The `badCandidate` is not ours.",
     );
     writeFileSync(join(root, ".env"), "API_SECRET=never-print-this-value\n");
-    const a = await glossaryCoverage(root);
-    const b = await glossaryCoverage(root);
+    const a = await lexiconCoverage(root);
+    const b = await lexiconCoverage(root);
     assert.deepEqual(a, b);
     assert.ok(a.population.excluded.some((x) => x.file === "opaque.ipynb"));
     assert.ok(a.population.excluded.some((x) => x.file === "node_modules"));
@@ -119,7 +119,7 @@ test("glossary coverage states its observed population and leaves known words in
     rmSync(root, { recursive: true, force: true });
   }
 });
-test("glossary maintenance preserves full entries, records actual effects, and refuses stale previews and unacknowledged retirement", async () => {
+test("lexicon maintenance preserves full entries, records actual effects, and refuses stale previews and unacknowledged retirement", async () => {
   const root = fixture();
   try {
     const preview = await propose(root, {
@@ -129,7 +129,7 @@ test("glossary maintenance preserves full entries, records actual effects, and r
       because: "same monetary sense",
     });
     assert.ok(
-      !readFileSync(join(root, "glossary.json"), "utf8").includes(
+      !readFileSync(join(root, "lexicon.json"), "utf8").includes(
         "financial exposure",
       ),
     );
@@ -142,7 +142,7 @@ test("glossary maintenance preserves full entries, records actual effects, and r
     );
     assert.match(appliedDecision, /^d-/);
     const changed = JSON.parse(
-      readFileSync(join(root, "glossary.json"), "utf8"),
+      readFileSync(join(root, "lexicon.json"), "utf8"),
     );
     assert.deepEqual(changed.concepts[0].detail, { explanation: "retained" });
     assert.deepEqual(changed.concepts[0].properties, { unit: "USD" });
@@ -163,9 +163,9 @@ test("glossary maintenance preserves full entries, records actual effects, and r
       () => applyProposal(root, rename.id, who, "disambiguation", ["overload"]),
       /human/,
     );
-    assert.ok(!existsSync(join(root, ".coherence/glossary/pending.json")));
+    assert.ok(!existsSync(join(root, ".coherence/lexicon/pending.json")));
     writeFileSync(
-      join(root, "glossary.json"),
+      join(root, "lexicon.json"),
       JSON.stringify({ ...changed, extra: "concurrent change" }),
     );
     assert.throws(
@@ -185,7 +185,7 @@ test("glossary maintenance preserves full entries, records actual effects, and r
     rmSync(root, { recursive: true, force: true });
   }
 });
-test("glossary application recovers a journal failure without lying about an unapplied change or duplicating its decision", async () => {
+test("lexicon application recovers a journal failure without lying about an unapplied change or duplicating its decision", async () => {
   const root = fixture();
   try {
     const preview = await propose(root, {
@@ -194,22 +194,22 @@ test("glossary application recovers a journal failure without lying about an una
       definition: "Price paid for risk cover.",
       because: "a distinct meaning",
     });
-    const unwritablePath = join(root, ".coherence/journal/glossary-test.jsonl");
+    const unwritablePath = join(root, ".coherence/journal/lexicon-test.jsonl");
     mkdirSync(unwritablePath, { recursive: true });
     assert.throws(() =>
       applyProposal(root, preview.id, who, "distinct meaning", ["alias"]),
     );
     assert.ok(
-      !existsSync(join(root, ".coherence/glossary/pending.json")),
+      !existsSync(join(root, ".coherence/lexicon/pending.json")),
       "unreadable journal fails before writing",
     );
     assert.ok(
-      !readFileSync(join(root, "glossary.json"), "utf8").includes("Price paid"),
+      !readFileSync(join(root, "lexicon.json"), "utf8").includes("Price paid"),
     );
     rmSync(unwritablePath, { recursive: true });
-    // Simulate interruption at the durable boundary between the glossary replacement and its decision.
+    // Simulate interruption at the durable boundary between the lexicon replacement and its decision.
     writeFileSync(
-      join(root, ".coherence/glossary/pending.json"),
+      join(root, ".coherence/lexicon/pending.json"),
       JSON.stringify({
         proposal: preview,
         who,
@@ -217,28 +217,28 @@ test("glossary application recovers a journal failure without lying about an una
         over: ["alias"],
       }),
     );
-    writeFileSync(join(root, "glossary.json"), preview.after);
-    assert.match(recoverGlossary(root), /^d-/);
+    writeFileSync(join(root, "lexicon.json"), preview.after);
+    assert.match(recoverLexicon(root), /^d-/);
     assert.equal(loadJournal(root).records.length, 1);
-    assert.equal(recoverGlossary(root), "no pending glossary application");
+    assert.equal(recoverLexicon(root), "no pending lexicon application");
     assert.equal(loadJournal(root).records.length, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
-test("glossary maintenance refuses an outside target and preserves the original on invalid proposals", async () => {
+test("lexicon maintenance refuses an outside target and preserves the original on invalid proposals", async () => {
   const root = fixture();
   const outside = fixture();
   try {
-    const before = readFileSync(join(root, "glossary.json"), "utf8");
+    const before = readFileSync(join(root, "lexicon.json"), "utf8");
     await assert.rejects(
       propose(root, { action: "declare", name: "broken", because: "test" }),
       /definition/,
     );
-    assert.equal(readFileSync(join(root, "glossary.json"), "utf8"), before);
+    assert.equal(readFileSync(join(root, "lexicon.json"), "utf8"), before);
     writeFileSync(
       join(root, "coherence.config.json"),
-      JSON.stringify({ glossary: join(outside, "glossary.json") }),
+      JSON.stringify({ lexicon: join(outside, "lexicon.json") }),
     );
     await assert.rejects(
       propose(root, {
@@ -252,7 +252,7 @@ test("glossary maintenance refuses an outside target and preserves the original 
     symlinkSync(outside, join(root, "link"));
     writeFileSync(
       join(root, "coherence.config.json"),
-      JSON.stringify({ glossary: "link/glossary.json" }),
+      JSON.stringify({ lexicon: "link/lexicon.json" }),
     );
     await assert.rejects(
       propose(root, {
@@ -272,11 +272,11 @@ test("sense rulings require current evidence and reopen after source or definiti
   const root = fixture();
   try {
     // A name refused for exposure, written beside a use of it, puts that context at risk, so review is asked.
-    const g = JSON.parse(readFileSync(join(root, "glossary.json"), "utf8"));
+    const g = JSON.parse(readFileSync(join(root, "lexicon.json"), "utf8"));
     g.concepts[0].rejected = [{ alternative: "hazard", because: "a hazard is a cause, not money at risk" }];
-    writeFileSync(join(root, "glossary.json"), JSON.stringify(g));
+    writeFileSync(join(root, "lexicon.json"), JSON.stringify(g));
     writeFileSync(join(root, "money/notes.md"), "The exposure is counted in USD.\nIt is not the hazard.\n");
-    const a = await glossaryCoverage(root);
+    const a = await lexiconCoverage(root);
     const term = a.terms.find((t) => t.term === "exposure")!;
     const context = term.contexts.find((c) => c.component === "money")!;
     saveBaseline(root, who.session, a);
@@ -286,7 +286,7 @@ test("sense rulings require current evidence and reopen after source or definiti
     );
     assert.ok(a.totals.unreviewedContexts > 0);
     await assert.rejects(
-      reviewGlossary(
+      reviewLexicon(
         root,
         "exposure",
         "money",
@@ -298,7 +298,7 @@ test("sense rulings require current evidence and reopen after source or definiti
       ),
       /human/,
     );
-    await reviewGlossary(
+    await reviewLexicon(
       root,
       "exposure",
       "money",
@@ -309,7 +309,7 @@ test("sense rulings require current evidence and reopen after source or definiti
       ["time"],
       "owner: USD is correct",
     );
-    const b = await glossaryCoverage(root);
+    const b = await lexiconCoverage(root);
     assert.equal(
       b.terms
         .find((t) => t.term === "exposure")!
@@ -320,7 +320,7 @@ test("sense rulings require current evidence and reopen after source or definiti
       join(root, "money/model.ts"),
       "export const exposure = 100; // percent, not USD\n",
     );
-    const c = await glossaryCoverage(root);
+    const c = await lexiconCoverage(root);
     assert.equal(
       c.terms
         .find((t) => t.term === "exposure")!
@@ -333,7 +333,7 @@ test("sense rulings require current evidence and reopen after source or definiti
       ),
     );
     await assert.rejects(
-      reviewGlossary(
+      reviewLexicon(
         root,
         "exposure",
         "money",
@@ -354,7 +354,7 @@ test("sense rulings require current evidence and reopen after source or definiti
     });
     applyProposal(root, change.id, who, "clarified unit", ["USD"]);
     assert.notEqual(
-      (await glossaryCoverage(root)).terms.find((t) => t.term === "exposure")!
+      (await lexiconCoverage(root)).terms.find((t) => t.term === "exposure")!
         .fingerprint,
       term.fingerprint,
     );
@@ -362,8 +362,8 @@ test("sense rulings require current evidence and reopen after source or definiti
     rmSync(root, { recursive: true, force: true });
   }
 });
-test("glossary draft and fixed queries work without specs or an existing domain glossary and never overwrite a draft", async () => {
-  const root = mkdtempSync(join(tmpdir(), "coherence-glossary-new-"));
+test("lexicon draft and fixed queries work without specs or an existing domain lexicon and never overwrite a draft", async () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-lexicon-new-"));
   try {
     writeFileSync(
       join(root, "notes.md"),
@@ -371,7 +371,7 @@ test("glossary draft and fixed queries work without specs or an existing domain 
     );
     const coverage = await run(root, ["coverage", "--json"]);
     assert.equal(coverage.code, 0, coverage.err);
-    assert.equal(JSON.parse(coverage.out).projectGlossary, null);
+    assert.equal(JSON.parse(coverage.out).projectLexicon, null);
     const draft = await run(root, ["draft", "--out", "draft.json"]);
     assert.equal(draft.code, 0, draft.err);
     assert.equal((await run(root, ["draft", "--out", "draft.json"])).code, 1);
@@ -390,7 +390,7 @@ test("glossary draft and fixed queries work without specs or an existing domain 
   }
 });
 
-test("glossary lifecycle uses child identities and installed roots, and advances changed contexts only after delivery", async () => {
+test("lexicon lifecycle uses child identities and installed roots, and advances changed contexts only after delivery", async () => {
   const { runHook, writtenFiles } = await import("./hook.ts");
   const root = fixture();
   try {
@@ -410,15 +410,15 @@ test("glossary lifecycle uses child identities and installed roots, and advances
     assert.match(context, /Risk vocabulary/);
     assert.match(context, /A recurring term lacks a definition: premium\./);
     assert.ok(
-      !existsSync(join(root, ".coherence/glossary/sessions/child.json")),
+      !existsSync(join(root, ".coherence/lexicon/sessions/child.json")),
     );
     start.commit?.();
     assert.ok(
-      existsSync(join(root, ".coherence/glossary/sessions/child.json")),
+      existsSync(join(root, ".coherence/lexicon/sessions/child.json")),
     );
     assert.ok(!existsSync(join(root, "money/.coherence")));
     assert.ok(
-      !existsSync(join(root, ".coherence/glossary/sessions/parent.json")),
+      !existsSync(join(root, ".coherence/lexicon/sessions/parent.json")),
     );
     writeFileSync(
       join(root, "money/model.ts"),
@@ -473,13 +473,13 @@ test("glossary lifecycle uses child identities and installed roots, and advances
   }
 });
 
-test("Scope and the fixed glossary query expose the same live sense evidence and escape source text", async () => {
+test("Scope and the fixed lexicon query expose the same live sense evidence and escape source text", async () => {
   const { loadState } = await import("../readings/scope/build.ts");
-  const { renderGlossaryView } = await import(
-    "../readings/scope/glossary-view.ts"
+  const { renderLexiconView } = await import(
+    "../readings/scope/lexicon-view.ts"
   );
   const { answer } = await import("../readings/query/query.ts");
-  const { COHERENCE_GLOSSARY } = await import("./project.ts");
+  const { COHERENCE_LEXICON } = await import("./project.ts");
   const root = fixture();
   try {
     writeFileSync(
@@ -488,22 +488,22 @@ test("Scope and the fixed glossary query expose the same live sense evidence and
     );
     const state = await loadState({
       root,
-      glossaryPath: COHERENCE_GLOSSARY,
+      lexiconPath: COHERENCE_LEXICON,
       project: "risk",
     });
-    state.glossary.query = "exposure";
-    const html = renderGlossaryView(state.glossary).text;
+    state.lexicon.query = "exposure";
+    const html = renderLexiconView(state.lexicon).text;
     assert.match(html, /Vocabulary coverage and sense review/);
     assert.match(html, /money\/model.ts/);
     assert.match(html, /time\/model.ts/);
     assert.ok(!html.includes('<script>alert("unsafe")</script>'));
-    const read = answer(state, "glossary", ["exposure"]);
+    const read = answer(state, "lexicon", ["exposure"]);
     assert.equal(read.code, 0);
     assert.match(read.text, /Money at risk/);
     assert.match(read.text, /USD/);
     assert.match(read.text, /calendar days/);
     assert.ok(
-      state.glossary
+      state.lexicon
         .coverage!.terms.find((t) => t.term === "exposure")!
         .contexts.every(
           (c) =>
@@ -568,7 +568,7 @@ test("an installed hook command locates its project from a non-git subdirectory 
       );
       assert.ok(
         existsSync(
-          join(root, ".coherence/glossary/sessions/native-fixture.json"),
+          join(root, ".coherence/lexicon/sessions/native-fixture.json"),
         ),
       );
     }
@@ -579,14 +579,14 @@ test("an installed hook command locates its project from a non-git subdirectory 
 
 test("local similarity is optional, validates vectors and never changes exact coverage when unavailable", async () => {
   const { cosine, normalized, similarTerms } = await import(
-    "./glossary-similarity.ts"
+    "./lexicon-similarity.ts"
   );
   const root = fixture();
   try {
-    const before = await glossaryCoverage(root);
+    const before = await lexiconCoverage(root);
     const suggestions = await similarTerms(root, "financial risk");
     assert.equal(suggestions["available"], false);
-    assert.deepEqual(await glossaryCoverage(root), before);
+    assert.deepEqual(await lexiconCoverage(root), before);
     assert.equal(cosine(normalized([3, 4]), normalized([3, 4])), 1);
     assert.throws(() => normalized([0, 0]), /zero/);
     assert.throws(() => normalized([Number.NaN]), /invalid/);
@@ -611,19 +611,19 @@ test("named instances are distinct from aliases and become known without pretend
       "alias of hook",
     ]);
     writeFileSync(join(root, "host.md"), "Example Host runs the session.\n");
-    const report = await glossaryCoverage(root);
+    const report = await lexiconCoverage(root);
     const term = report.terms.find((t) => t.term === "example host")!;
     assert.equal(term.state, "instance");
     assert.equal(term.concept, "agent host");
     const { runCheck } = await import("./check.ts");
-    const { loadProjectGlossaries } = await import("./project.ts");
-    const glossary = await loadProjectGlossaries(root);
+    const { loadProjectLexicons } = await import("./project.ts");
+    const lexicon = await loadProjectLexicons(root);
     assert.ok(
       !(
         await runCheck({
           root,
-          coherence: glossary.coherence,
-          project: glossary.project,
+          coherence: lexicon.coherence,
+          project: lexicon.project,
         })
       ).unknown.some((n) => n.term === "example host"),
     );
@@ -638,7 +638,7 @@ test("named instances are distinct from aliases and become known without pretend
     ]);
     assert.deepEqual(
       JSON.parse(
-        readFileSync(join(root, "glossary.json"), "utf8"),
+        readFileSync(join(root, "lexicon.json"), "utf8"),
       ).concepts.find((c: { name: string }) => c.name === "agent host")
         .instances,
       ["Example Host"],
@@ -671,13 +671,67 @@ test("rename --qualify gives the concept a qualified name and leaves the old nam
   const { mkdtempSync, writeFileSync: write, readFileSync: read } = await import("node:fs");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
-  const { propose } = await import("./glossary-maintain.ts");
+  const { propose } = await import("./lexicon-maintain.ts");
   const root = mkdtempSync(join(tmpdir(), "coherence-qualify-"));
-  write(join(root, "glossary.json"), JSON.stringify({ version: 1, project: "p", concepts: [{ name: "interface", definition: "d", rejected: [] }] }));
+  write(join(root, "lexicon.json"), JSON.stringify({ version: 1, project: "p", concepts: [{ name: "interface", definition: "d", rejected: [] }] }));
   const plain = await propose(root, { action: "rename", name: "interface", value: "component interface", because: "b" });
   assert.match(plain.after, /"alternative": "interface"/, "a plain rename rejects the old name");
   const qualified = await propose(root, { action: "rename", name: "interface", value: "component interface", qualify: true, because: "b" });
   assert.doesNotMatch(qualified.after, /"alternative": "interface"/, "a qualifying rename leaves the old name free");
   assert.match(qualified.after, /"name": "component interface"/);
   void read;
+});
+
+test("a project carrying its lexicon under the retired name is refused with the one-line migration, and the old name is never read", async () => {
+  const { renameSync } = await import("node:fs");
+  const { loadProjectLexicons, retiredLexiconNames } = await import("./project.ts");
+  const [old] = await retiredLexiconNames();
+  assert.ok(old !== undefined, "Coherence's lexicon records the name the concept was renamed from");
+  const root = fixture();
+  try {
+    renameSync(join(root, "lexicon.json"), join(root, `${old}.json`));
+    const migration = new RegExp(`git mv ${old}\\.json lexicon\\.json`);
+    await assert.rejects(loadProjectLexicons(root), migration);
+    const coverage = await run(root, ["coverage"]);
+    assert.equal(coverage.code, 1, "the command fails rather than reading nothing");
+    assert.match(coverage.err, migration);
+    renameSync(join(root, `${old}.json`), join(root, "lexicon.json"));
+    writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ [old]: "lexicon.json" }));
+    await assert.rejects(loadProjectLexicons(root), /rename the key to "lexicon"/);
+    writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ lexicon: "lexicon.json" }));
+    assert.equal((await loadProjectLexicons(root)).project?.project, "risk");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("rulings recorded under the retired verb still count: the journal is read as written", async () => {
+  const { sessionFile } = await import("../journal/store.ts");
+  const { retiredLexiconNames } = await import("./project.ts");
+  const [old] = await retiredLexiconNames();
+  assert.ok(old !== undefined);
+  const root = fixture();
+  const rewrite = (verb: string): void => {
+    const path = sessionFile(root, who.session);
+    writeFileSync(path, readFileSync(path, "utf8").replaceAll(`"chose":"lexicon ${verb} `, `"chose":"${old} ${verb} `));
+  };
+  try {
+    const g = JSON.parse(readFileSync(join(root, "lexicon.json"), "utf8"));
+    g.concepts[0].rejected = [{ alternative: "hazard", because: "a hazard is a cause, not money at risk" }];
+    writeFileSync(join(root, "lexicon.json"), JSON.stringify(g));
+    writeFileSync(join(root, "money/notes.md"), "The exposure is counted in USD.\nIt is not the hazard.\n");
+    const context = (await lexiconCoverage(root)).terms.find((t) => t.term === "exposure")!.contexts.find((c) => c.component === "money")!;
+    await reviewLexicon(root, "exposure", "money", context.fingerprint, "confirmed", who, "correct unit", ["time"], "owner: USD is correct");
+    rewrite("review");
+    assert.match(readFileSync(sessionFile(root, who.session), "utf8"), new RegExp(`"chose":"${old} review `), "the fixture holds a review under the retired verb");
+    const after = (await lexiconCoverage(root)).terms.find((t) => t.term === "exposure")!.contexts.find((c) => c.component === "money")!;
+    assert.equal(after.disposition, "confirmed", "a review recorded before the rename keeps its ruling");
+    const change = await propose(root, { action: "define", name: "exposure", definition: "Money at risk, in USD.", because: "clarified" });
+    applyProposal(root, change.id, who, "clarified", ["none"]);
+    rewrite("apply");
+    assert.match(readFileSync(sessionFile(root, who.session), "utf8"), new RegExp(`"chose":"${old} apply `));
+    assert.throws(() => applyProposal(root, change.id, who, "clarified", ["none"]), /already applied/, "an application recorded before the rename still counts as applied");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

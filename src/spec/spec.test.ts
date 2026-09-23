@@ -8,9 +8,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { loadGlossary } from "../lifecycle/glossary.ts";
+import { loadLexicon } from "../lifecycle/lexicon.ts";
 import { runCheck } from "../lifecycle/check.ts";
-import { COHERENCE_GLOSSARY } from "../lifecycle/project.ts";
+import { COHERENCE_LEXICON } from "../lifecycle/project.ts";
 import { RETIRED_SECTIONS, isCalendarDate, parseSpec, type Invariant } from "./grammar.ts";
 import { loadSpecModel, type SpecModel } from "./model.ts";
 import { formatReport } from "./report.ts";
@@ -365,7 +365,7 @@ test("a spec written in the grammar with every shape name carries no rejected na
   for (const kind of Object.keys(seed.kinds)) lines.push(`- kind ${kind}: A sentence.\n  kinds: ${kind}\n`);
   const root = scratch({ "Widgetry.spec.md": lines.join("") });
   try {
-    const coherence = await loadGlossary(COHERENCE_GLOSSARY);
+    const coherence = await loadLexicon(COHERENCE_LEXICON);
     const report = await runCheck({ root, coherence });
     assert.deepEqual(report.rejected, []);
   } finally {

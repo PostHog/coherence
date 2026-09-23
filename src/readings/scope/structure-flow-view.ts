@@ -1575,17 +1575,17 @@ function renderFlowProposals(model: FlowModel, layout: FlowLayout, previews: rea
  * paths; counts in tabular numerals; long explanations fold.
  */
 
-/** Terms the map uses that the glossary does not define: defined here, in the key, and on hover where they appear. */
+/** Terms the map uses that the lexicon does not define: defined here, in the key, and on hover where they appear. */
 const LOCAL_TERMS: Record<string, string> = {
   bypass: "a reference to a chokepoint's protected thing from outside the chokepoint: one is enough to break it",
   derived: "a route drawn by reference weight from the root component's interfaces because no entrance is declared: not the path work takes",
   "reference weight": "how many reference sites a component interface carries: what a derived route follows, which is not flow",
 };
 
-/** A term linked to its glossary definition (its title carries the definition), or defined in place when the glossary has none. */
+/** A term linked to its lexicon definition (its title carries the definition), or defined in place when the lexicon has none. */
 function termLink(state: ShellState, name: string, text: string = name): Markup {
-  const layer = state.glossary.layers.find((l) => l.kind === "present" && l.id === "coherence");
-  const concept = layer?.kind === "present" ? layer.glossary.concepts.find((c) => c.name === name) : undefined;
+  const layer = state.lexicon.layers.find((l) => l.kind === "present" && l.id === "coherence");
+  const concept = layer?.kind === "present" ? layer.lexicon.concepts.find((c) => c.name === name) : undefined;
   if (concept !== undefined) return html`<a class="flow-term" href="#coherence-${slug(name)}" title="${concept.definition}">${text}</a>`;
   return html`<dfn class="flow-term" title="${LOCAL_TERMS[name] ?? name}">${text}</dfn>`;
 }

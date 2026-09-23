@@ -1,20 +1,20 @@
 /**
- * The Glossary view: a pure function from `GlossaryViewState` to markup.
+ * The Lexicon view: a pure function from `LexiconViewState` to markup.
  *
  * Nothing here is stored. The filtered lists, the match counts, the targets
  * of related links, and the two-layer composition are all derived from the
  * state on every call, so the page can never disagree with itself.
  */
 
-import { glossaryReviewCommand } from "./model.ts";
+import { lexiconReviewCommand } from "./model.ts";
 import { plural } from "./derive.ts";
 import { html, join, raw, slug, type Markup } from "./html.ts";
 import type {
   Concept,
   Fields,
-  Glossary,
-  GlossaryCoverage,
-  GlossaryViewState,
+  Lexicon,
+  LexiconCoverage,
+  LexiconViewState,
   Layer,
   Overload,
   RecordValue,
@@ -37,7 +37,7 @@ function indexConcepts(layers: Layer[]): ConceptIndex {
   for (const layer of layers) {
     if (layer.kind !== "present") continue;
     const names = new Map<string, string>();
-    for (const concept of layer.glossary.concepts) {
+    for (const concept of layer.lexicon.concepts) {
       if (!names.has(concept.name)) names.set(concept.name, conceptId(layer, concept.name));
     }
     index.set(layer.id, names);
@@ -83,9 +83,9 @@ function humanize(key: string): string {
   return key.replace(/_/g, " ");
 }
 
-/** The sentence that says how large a glossary is. Shared by the shell masthead. */
-export function glossaryCounts(glossary: Glossary): string {
-  return `${plural(glossary.concepts.length, "concept", "concepts")}, glossary version ${glossary.version}.`;
+/** The sentence that says how large a lexicon is. Shared by the shell masthead. */
+export function lexiconCounts(lexicon: Lexicon): string {
+  return `${plural(lexicon.concepts.length, "concept", "concepts")}, lexicon version ${lexicon.version}.`;
 }
 
 function renderQuotation(text: string, kind: "metaphor" | "owner-words"): Markup {
@@ -179,7 +179,7 @@ function renderRelated(layer: Layer, concept: Concept, index: ConceptIndex): Mar
   const links = concept.related.map((name) => {
     const target = resolveConcept(index, layer, name);
     return target === undefined
-      ? html`<span class="unresolved" title="Named as related, but not a concept in any glossary on this page">${name}</span>`
+      ? html`<span class="unresolved" title="Named as related, but not a concept in any lexicon on this page">${name}</span>`
       : html`<a class="related-link" href="#${target}">${name}</a>`;
   });
   return html`<p class="related"><span class="label">Related</span> ${join(
@@ -302,7 +302,7 @@ function renderMatchSummary(
   return html`<p class="match-summary">${shown} of ${plural(total, noun[0], noun[1])} match “${query}”.</p>`;
 }
 
-/** A section over a list the glossary speaks of. Omitted entirely when the file has no such key. */
+/** A section over a list the lexicon speaks of. Omitted entirely when the file has no such key. */
 function renderListSection<T>(
   layer: Layer,
   key: string,
@@ -320,25 +320,25 @@ function renderListSection<T>(
     <h2 class="section-heading" id="${layer.id}-${key}-heading">${heading}</h2>
     ${lead}
     ${items.length === 0
-      ? html`<p class="quiet">This glossary lists no ${noun[1]}.</p>`
+      ? html`<p class="quiet">This lexicon lists no ${noun[1]}.</p>`
       : renderMatchSummary(query, shown.length, items.length, noun)}
     ${shown.map(([item, i]) => renderItem(item, i))}
   </section>`;
 }
 
-function renderGlossaryRecord(glossary: Glossary): Markup | null {
-  const entries = Object.entries(glossary.record);
+function renderLexiconRecord(lexicon: Lexicon): Markup | null {
+  const entries = Object.entries(lexicon.record);
   if (entries.length === 0) return null;
-  return html`<section class="glossary-record">
+  return html`<section class="lexicon-record">
     <h2 class="section-heading">Also on record</h2>
     <div class="entry"><div class="margin"><p class="status">${plural(entries.length, "field", "fields")} the reading has no special form for</p></div><div class="body">${renderRecordFields(entries)}</div></div>
   </section>`;
 }
 
-function renderPresentLayer(layer: PresentLayer, state: GlossaryViewState, index: ConceptIndex): Markup {
+function renderPresentLayer(layer: PresentLayer, state: LexiconViewState, index: ConceptIndex): Markup {
   const rawQuery = state.query;
   const query = rawQuery.trim().toLowerCase();
-  const glossary = layer.glossary;
+  const lexicon = layer.lexicon;
   const trustLevelConcept = resolveConcept(index, layer, "trust level");
   const trustLead =
     trustLevelConcept !== undefined
@@ -347,46 +347,46 @@ function renderPresentLayer(layer: PresentLayer, state: GlossaryViewState, index
   return html`<section class="layer" id="layer-${layer.id}">
     <header class="layer-head">
       <h2>${layer.title}</h2>
-      ${glossary.purpose ? html`<p class="purpose">${glossary.purpose}</p>` : null}
-      <p class="counts">${glossaryCounts(glossary)}</p>
-      ${glossary.status ? html`<p class="glossary-status quiet">Status: ${glossary.status}</p>` : null}
-      ${glossary.source ? html`<p class="source quiet">Source: ${glossary.source}</p>` : null}
-      ${glossary.completed ? html`<p class="completed quiet">Completed: ${glossary.completed}</p>` : null}
+      ${lexicon.purpose ? html`<p class="purpose">${lexicon.purpose}</p>` : null}
+      <p class="counts">${lexiconCounts(lexicon)}</p>
+      ${lexicon.status ? html`<p class="lexicon-status quiet">Status: ${lexicon.status}</p>` : null}
+      ${lexicon.source ? html`<p class="source quiet">Source: ${lexicon.source}</p>` : null}
+      ${lexicon.completed ? html`<p class="completed quiet">Completed: ${lexicon.completed}</p>` : null}
     </header>
 
-    ${renderListSection(layer, "concepts", "Concepts", ["concept", "concepts"], glossary.concepts, rawQuery,
+    ${renderListSection(layer, "concepts", "Concepts", ["concept", "concepts"], lexicon.concepts, rawQuery,
       (c) => conceptMatches(c, query),
       (c) => renderConcept(layer, c, index))}
 
-    ${renderListSection(layer, "trust-levels", "Trust levels", ["trust level", "trust levels"], glossary.trust_levels, rawQuery,
+    ${renderListSection(layer, "trust-levels", "Trust levels", ["trust level", "trust levels"], lexicon.trust_levels, rawQuery,
       (t) => matches(query, t.name, t.meaning),
       (t) => renderTrustLevel(layer, t),
       trustLead)}
 
-    ${renderListSection(layer, "rulings", "Rulings", ["ruling", "rulings"], glossary.rulings, rawQuery,
+    ${renderListSection(layer, "rulings", "Rulings", ["ruling", "rulings"], lexicon.rulings, rawQuery,
       (r) => matches(query, r.term, r.ruling),
       (r, i) => renderRuling(layer, "ruling", r, i))}
 
-    ${renderListSection(layer, "overloads", "Candidate overloads", ["candidate overload", "candidate overloads"], glossary.candidate_overloads, rawQuery,
+    ${renderListSection(layer, "overloads", "Candidate overloads", ["candidate overload", "candidate overloads"], lexicon.candidate_overloads, rawQuery,
       (o) => matches(query, o.term, o.senses, o.where, o.ruling),
       (o, i) => renderOverload(layer, o, i),
       html`<p class="section-lead">Terms found carrying more than one sense.</p>`)}
 
-    ${renderListSection(layer, "uncertain", "Uncertain", ["uncertain term", "uncertain terms"], glossary.uncertain, rawQuery,
+    ${renderListSection(layer, "uncertain", "Uncertain", ["uncertain term", "uncertain terms"], lexicon.uncertain, rawQuery,
       (r) => matches(query, r.term, r.ruling),
       (r, i) => renderRuling(layer, "uncertain", r, i),
-      html`<p class="section-lead">Questions the glossary raised about its own names, with the ruling where one was made.</p>`)}
+      html`<p class="section-lead">Questions the lexicon raised about its own names, with the ruling where one was made.</p>`)}
 
-    ${renderListSection(layer, "rejected-names", "Rejected names", ["rejected name", "rejected names"], glossary.rejected_names, rawQuery,
+    ${renderListSection(layer, "rejected-names", "Rejected names", ["rejected name", "rejected names"], lexicon.rejected_names, rawQuery,
       (r) => matches(query, r.concept, r.because),
       (r) => renderRejectedName(layer, r),
-      html`<p class="section-lead">Names this glossary refuses at the top level, each with its because.</p>`)}
+      html`<p class="section-lead">Names this lexicon refuses at the top level, each with its because.</p>`)}
 
-    ${renderListSection(layer, "metaphors", "Metaphors", ["metaphor", "metaphors"], Object.entries(glossary.metaphors), rawQuery,
+    ${renderListSection(layer, "metaphors", "Metaphors", ["metaphor", "metaphors"], Object.entries(lexicon.metaphors), rawQuery,
       ([n, t]) => matches(query, n, t),
       ([n, t]) => renderMetaphor(n, t))}
 
-    ${renderGlossaryRecord(glossary)}
+    ${renderLexiconRecord(lexicon)}
   </section>`;
 }
 
@@ -402,25 +402,25 @@ function renderAbsentLayer(layer: Layer & { kind: "absent" }): Markup {
  * definition, most recurring first, then the uses whose sense is at risk. Names
  * only, never a total; the population's numbers wait in its disclosure.
  */
-function renderAttention(coverage: GlossaryCoverage): Markup {
+function renderAttention(coverage: LexiconCoverage): Markup {
   const signal = coverage.attention;
-  if (!signal) return html`<p class="section-lead">This reading carries no ranked signal; the full one: <code>coherence glossary coverage</code>.</p>`;
+  if (!signal) return html`<p class="section-lead">This reading carries no ranked signal; the full one: <code>coherence lexicon coverage</code>.</p>`;
   if (signal.undefinedTerms.length === 0 && signal.senses.length === 0)
     return html`<p class="section-lead attention-clear">No recurring term lacks a definition, and no use's sense is at risk.</p>`;
   return html`${signal.undefinedTerms.length > 0 ? html`<h3>Recurring terms that lack a definition, most recurring first</h3>
     <ol class="attention-terms">${signal.undefinedTerms.map((t) => html`<li><strong>${t.term}</strong>
       <span class="quiet">— on ${plural(t.prose, "prose line", "prose lines")} across ${plural(t.components, "component", "components")}; first at <code>${t.first}</code></span></li>`)}</ol>
-    ${signal.more.undefinedTerms ? html`<p class="quiet">More recur; the rest: <code>coherence glossary coverage</code>.</p>` : null}
-    <p class="quiet">Declare each (<code>coherence glossary propose declare &lt;term&gt;</code>) or map it as an alias of an existing concept.</p>` : null}
+    ${signal.more.undefinedTerms ? html`<p class="quiet">More recur; the rest: <code>coherence lexicon coverage</code>.</p>` : null}
+    <p class="quiet">Declare each (<code>coherence lexicon propose declare &lt;term&gt;</code>) or map it as an alias of an existing concept.</p>` : null}
     ${signal.senses.length > 0 ? html`<h3>Senses at risk</h3>
     <ul class="attention-senses">${signal.senses.map((s) => html`<li><strong>${s.term}</strong> in ${s.component}
       <span class="quiet">— ${s.reason}; evidence <code>${s.evidence}</code></span></li>`)}</ul>
-    ${signal.more.senses ? html`<p class="quiet">More are at risk; the rest: <code>coherence glossary coverage</code>.</p>` : null}
-    <p class="quiet">Check each use against the definition: <code>coherence glossary review &lt;term&gt;</code>.</p>` : html`<p class="quiet">No use's sense is at risk.</p>`}`;
+    ${signal.more.senses ? html`<p class="quiet">More are at risk; the rest: <code>coherence lexicon coverage</code>.</p>` : null}
+    <p class="quiet">Check each use against the definition: <code>coherence lexicon review &lt;term&gt;</code>.</p>` : html`<p class="quiet">No use's sense is at risk.</p>`}`;
 }
 
-/** Live evidence is a reading beside the glossary, never an address stored in a concept. */
-function renderVocabularyCoverage(state: GlossaryViewState): Markup | null {
+/** Live evidence is a reading beside the lexicon, never an address stored in a concept. */
+function renderVocabularyCoverage(state: LexiconViewState): Markup | null {
   const coverage = state.coverage;
   if (!coverage) return null;
   const query = state.query.trim().toLowerCase();
@@ -438,13 +438,13 @@ function renderVocabularyCoverage(state: GlossaryViewState): Markup | null {
         t.meaningAlternatives?.flatMap((meaning) => [meaning.concept, meaning.layer, meaning.definition, JSON.stringify(meaning.properties), ...meaning.confusables]),
         t.contexts.map((c) => `${c.component} ${c.disposition} ${c.risk ?? ""} ${c.because ?? ""}`), t.uses.map((u) => `${u.file} ${u.text}`))
     : ranked.has(t.term) || (t.unreviewedContextCount ?? 0) > 0);
-  return html`<section class="glossary-coverage"><h2>Vocabulary coverage and sense review</h2>
+  return html`<section class="lexicon-coverage"><h2>Vocabulary coverage and sense review</h2>
     ${renderAttention(coverage)}
-    <p class="quiet">Record a ruling with <code>coherence glossary review</code>; this page writes nothing. Full reading from this project's root:
-      <code>coherence glossary coverage --json</code>; one term: <code>coherence query glossary &lt;term&gt;</code>.</p>
+    <p class="quiet">Record a ruling with <code>coherence lexicon review</code>; this page writes nothing. Full reading from this project's root:
+      <code>coherence lexicon coverage --json</code>; one term: <code>coherence query lexicon &lt;term&gt;</code>.</p>
     ${query ? html`<p>Search is limited to embedded terms, contexts and use excerpts; refine it or use the full CLI reading.</p>` : null}
     ${query && terms.length === 0 ? html`<p>No matching evidence in this page selection; this is not a corpus absence claim.
-      Full term reading: <code>${glossaryReviewCommand(state.query.trim())}</code>.</p>` : null}
+      Full term reading: <code>${lexiconReviewCommand(state.query.trim())}</code>.</p>` : null}
     ${terms.slice(0, 30).map((t) => html`<details><summary>${t.term} — ${t.state}${t.recurrence ? html`; recurs on ${plural(t.recurrence.prose, "prose line", "prose lines")} across ${plural(t.recurrence.components, "component", "components")}` : null}</summary>
       ${t.meaningAlternatives !== undefined && t.meaningAlternatives.length > 0
         ? html`<p>${plural(t.meaningAlternatives.length, "applicable property meaning", "applicable property meanings")}; this spelling alone does not select an owner.</p>
@@ -457,7 +457,7 @@ function renderVocabularyCoverage(state: GlossaryViewState): Markup | null {
       ${t.contexts.map((c) => html`<p>${c.component}: ${c.disposition}${c.risk ? html`; <strong>sense at risk</strong>: ${c.risk}` : null}${c.because ? " — " + c.because : ""}<br><code>${c.fingerprint}</code></p>`)}
       <ul>${t.uses.slice(0, 8).map((u) => html`<li><code>${u.file}:${u.line}</code> ${u.text}</li>`)}</ul>
       <p class="quiet">${t.contexts.length} of ${t.contextCount ?? t.contexts.length} contexts and ${Math.min(t.uses.length, 8)} of ${t.count} uses shown.
-        Full definition, contexts, evidence keys and uses: <code>${glossaryReviewCommand(t.term)}</code>.</p>
+        Full definition, contexts, evidence keys and uses: <code>${lexiconReviewCommand(t.term)}</code>.</p>
     </details>`)}
     ${terms.length > 30 ? html`<p class="quiet">More terms match; refine the search or use the full CLI reading.</p>` : null}
     <details><summary>Population and limits</summary>
@@ -483,8 +483,8 @@ function renderVocabularyCoverage(state: GlossaryViewState): Markup | null {
   </section>`;
 }
 
-/** The Glossary view body: every layer, in order, filtered by the query. */
-export function renderGlossaryView(state: GlossaryViewState): Markup {
+/** The Lexicon view body: every layer, in order, filtered by the query. */
+export function renderLexiconView(state: LexiconViewState): Markup {
   const index = indexConcepts(state.layers);
   return raw(
     (renderVocabularyCoverage(state)?.text ?? "") + state.layers

@@ -1,7 +1,7 @@
 /**
  * The peer feed: what other sessions recorded since this session last looked.
  *
- * Two kinds only: a peer's decisions, which is what the glossary names, and a
+ * Two kinds only: a peer's decisions, which is what the lexicon names, and a
  * peer's escalations, because an escalation heads every read and a question
  * standing before a human changes what this session should do next. Every
  * other verb is the journal, one command away.
@@ -31,7 +31,7 @@ export const FEED_DIR = join(".coherence", "feed");
 /** The most subject lines one injection carries. */
 export const FEED_CAP = 12;
 
-/** The record kinds a boundary injects: the glossary's decisions, and the escalations that head every read. */
+/** The record kinds a boundary injects: the lexicon's decisions, and the escalations that head every read. */
 export const FEED_KINDS: ReadonlySet<string> = new Set(["decision", "escalation"]);
 
 export function cursorFile(root: string, session: string): string | undefined {

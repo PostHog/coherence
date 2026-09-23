@@ -10,22 +10,22 @@ import { after, before, test } from "node:test";
 import { predictClosure } from "../../economy/closure.ts";
 import { economyFor } from "../../economy/cli.ts";
 import type { Io } from "../../journal/cli.ts";
-import { COHERENCE_GLOSSARY } from "../../lifecycle/project.ts";
+import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { buildScopePage } from "../scope/build.ts";
 import { makeFixture, type Fixture } from "../scope/check-fixture.ts";
-import type { Coverage } from "../../lifecycle/glossary-coverage.ts";
-import { projectGlossaryCoverage } from "../scope/glossary-projection.ts";
+import type { Coverage } from "../../lifecycle/lexicon-coverage.ts";
+import { projectLexiconCoverage } from "../scope/lexicon-projection.ts";
 import { structureOf } from "../scope/derive.ts";
-import type { GlossaryCoverage, RecordedSite, ShellState } from "../scope/model.ts";
+import type { LexiconCoverage, RecordedSite, ShellState } from "../scope/model.ts";
 import { QUERY_DEPENDENCIES, queryCommand } from "./cli.ts";
-import { answer, answerGlossary, answerSpine, QUESTIONS } from "./query.ts";
+import { answer, answerLexicon, answerSpine, QUESTIONS } from "./query.ts";
 
 let fixture: Fixture;
 let state: ShellState;
 
 /** A few hundred tokens: four characters each, so 1600 characters. */
 const FEW_HUNDRED_TOKENS = 1600;
-const MNEMION_GLOSSARY = process.env["COHERENCE_DOMAIN_GLOSSARY"] ?? "/Users/daniloc/Documents/Dev/mnemion/mnemion-js/glossary.json";
+const MNEMION_LEXICON = process.env["COHERENCE_DOMAIN_LEXICON"] ?? "/Users/daniloc/Documents/Dev/mnemion/mnemion-js/lexicon.json";
 
 async function queryPathExists(path: string): Promise<boolean> {
   try {
@@ -38,7 +38,7 @@ async function queryPathExists(path: string): Promise<boolean> {
 
 before(async () => {
   fixture = makeFixture();
-  ({ state } = await buildScopePage({ root: fixture.root, glossaryPath: COHERENCE_GLOSSARY, project: "Fixture" }));
+  ({ state } = await buildScopePage({ root: fixture.root, lexiconPath: COHERENCE_LEXICON, project: "Fixture" }));
 });
 
 after(() => {
@@ -103,9 +103,9 @@ test("query spine uses the same ordered crossing model as Structure", () => {
 });
 
 test("query spine reads all six Mnemion trust levels and every crossing when the read-only adopter is available", {
-  skip: (await queryPathExists(MNEMION_GLOSSARY)) ? false : `${MNEMION_GLOSSARY} is not on this machine`,
+  skip: (await queryPathExists(MNEMION_LEXICON)) ? false : `${MNEMION_LEXICON} is not on this machine`,
 }, async () => {
-  const { state: mnemion } = await buildScopePage({ root: dirname(MNEMION_GLOSSARY), glossaryPath: COHERENCE_GLOSSARY, project: "Mnemion" });
+  const { state: mnemion } = await buildScopePage({ root: dirname(MNEMION_LEXICON), lexiconPath: COHERENCE_LEXICON, project: "Mnemion" });
   const model = structureOf(mnemion);
   const text = answerSpine(mnemion).text;
   assert.equal(model.levels.length, 6);
@@ -181,7 +181,7 @@ test("query economy answers what must be loaded to change the given files safely
 });
 
 
-test("bounded glossary answers make no false absence claim, while the CLI reads omitted terms and every use from full coverage", async () => {
+test("bounded lexicon answers make no false absence claim, while the CLI reads omitted terms and every use from full coverage", async () => {
   const omitted = {
     term: "omitted<term>", state: "instance" as const, concept: "kept concept", layer: "project" as const,
     definition: "definition <whole>", properties: { evidence: "<property>" }, confusables: ["other<term>"],
@@ -193,22 +193,22 @@ test("bounded glossary answers make no false absence claim, while the CLI reads 
     ],
   };
   const full: Coverage = {
-    version: 1, projectGlossary: "glossary.json", fingerprint: "coverage-fingerprint",
+    version: 1, projectLexicon: "lexicon.json", fingerprint: "coverage-fingerprint",
     population: { files: [], excluded: [], unreadable: [], extraction: "fixture", limits: [] },
     terms: [omitted],
     totals: { terms: 1, uses: 2, known: 1, rejected: 0, unresolved: 0, unreviewedContexts: 1 },
   };
-  const bounded = projectGlossaryCoverage(full, { bytes: 4096, terms: 0, contextsPerTerm: 0, usesPerTerm: 0, populationEntries: 0 });
-  const page = answerGlossary(bounded, ["omitted<term>"]);
+  const bounded = projectLexiconCoverage(full, { bytes: 4096, terms: 0, contextsPerTerm: 0, usesPerTerm: 0, populationEntries: 0 });
+  const page = answerLexicon(bounded, ["omitted<term>"]);
   assert.equal(page.code, 0);
   assert.match(page.text, /does not establish absence from the full corpus/);
-  assert.match(page.text, /glossary review 'omitted<term>' --json/);
+  assert.match(page.text, /lexicon review 'omitted<term>' --json/);
 
   const printed: string[] = [];
   const io: Io = { cwd: fixture.root, out: (line) => printed.push(line), err: (line) => printed.push(line) };
-  const code = await queryCommand(["glossary", "omitted<term>"], io, {
+  const code = await queryCommand(["lexicon", "omitted<term>"], io, {
     economy: QUERY_DEPENDENCIES.economy,
-    glossary: async () => full,
+    lexicon: async () => full,
   });
   assert.equal(code, 0);
   const text = printed.join("\n");
@@ -221,20 +221,20 @@ test("bounded glossary answers make no false absence claim, while the CLI reads 
   assert.match(text, /2 of 2 uses shown; 0 uses omitted/);
 });
 
-test("glossary review commands shell-quote apostrophes in page omission guidance", () => {
-  const report: GlossaryCoverage = {
-    version: 1, projectGlossary: null, fingerprint: "f",
+test("lexicon review commands shell-quote apostrophes in page omission guidance", () => {
+  const report: LexiconCoverage = {
+    version: 1, projectLexicon: null, fingerprint: "f",
     population: { files: [], excluded: [], unreadable: [], extraction: "fixture", limits: [] },
     terms: [], totals: { terms: 1, uses: 0, known: 0, rejected: 0, unresolved: 1, unreviewedContexts: 0 },
     projection: { byteLimit: 100, selection: "fixture", contexts: 0, population: { files: 0, excluded: 0, unreadable: 0 } },
   };
-  assert.match(answerGlossary(report, ["owner's term"]).text, /'owner'\\''s term'/);
+  assert.match(answerLexicon(report, ["owner's term"]).text, /'owner'\\''s term'/);
 });
 
-test("query glossary displays every applicable property meaning instead of a false missing-definition line", () => {
-  const report: GlossaryCoverage = {
+test("query lexicon displays every applicable property meaning instead of a false missing-definition line", () => {
+  const report: LexiconCoverage = {
     version: 1,
-    projectGlossary: "glossary.json",
+    projectLexicon: "lexicon.json",
     fingerprint: "ambiguous-meaning",
     population: { files: [], excluded: [], unreadable: [], extraction: "fixture", limits: [] },
     totals: { terms: 1, uses: 1, known: 1, rejected: 0, unresolved: 0, unreviewedContexts: 1 },
@@ -249,12 +249,12 @@ test("query glossary displays every applicable property meaning instead of a fal
       uses: [{ file: "src/money.ts", line: 4, component: "money", text: "unit_basis", kind: "code", fingerprint: "unit-basis-use" }],
     }],
   };
-  const result = answerGlossary(report, ["unit basis"]);
+  const result = answerLexicon(report, ["unit basis"]);
   assert.match(result.text, /2 applicable property meanings; spelling alone does not select an owner/);
   assert.match(result.text, /applicable property meaning: exposure \(project\) — The amount subject to loss/);
   assert.match(result.text, /applicable property meaning: allocation \(project\) — The amount assigned to a strategy/);
   assert.doesNotMatch(result.text, /No settled definition/);
-  assert.match(answerGlossary(report, ["allocation"]).text, /applicable property meaning: exposure/);
+  assert.match(answerLexicon(report, ["allocation"]).text, /applicable property meaning: exposure/);
 });
 
 test("an unknown question is refused with the fixed set", () => {
