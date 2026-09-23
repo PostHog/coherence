@@ -35,6 +35,8 @@ import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "
 import { acceptedNames, rejectedNames, type Glossary, type RejectedName } from "./glossary.ts";
 import { STOPLIST } from "./stoplist.ts";
 import { projectFiles } from "../adapters/project-files.ts";
+import { vocabularyFacts } from "./project.ts";
+import { wellKnown } from "./well-known.ts";
 
 export interface CheckOptions {
   root: string;
@@ -733,7 +735,9 @@ export async function runCheck(options: CheckOptions): Promise<CheckReport> {
     else if (file.kind === "data") rejected.push(...rejectedInData(file, names, guard));
     else rejected.push(...rejectedInRecord(file, names, guard));
   }
-  const unknown = unknownNouns(files, options, accepted, new Set(names.byPhrase.keys()));
+  // A well-known name (Python, Pyright, the project's own name) needs no definition, so it is never an unknown noun.
+  const famous = wellKnown(await vocabularyFacts(options.root), [options.coherence.project, options.project?.project].filter((n): n is string => n !== undefined));
+  const unknown = unknownNouns(files, options, new Set([...accepted, ...famous.any, ...famous.cased.keys()]), new Set(names.byPhrase.keys()));
   return { files: files.length, rejected, unknown, unreadable };
 }
 

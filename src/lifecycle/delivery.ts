@@ -19,6 +19,7 @@ import { loadSpecModel } from "../spec/model.ts";
 import { CONTEXT_BUDGET, HOOK_EVENTS, changedFiles, startReading, type HookEvent } from "./hook.ts";
 import type { HostStatus } from "./install.ts";
 import { loadProjectGlossaries } from "./project.ts";
+import { attention, type Coverage } from "./glossary-coverage.ts";
 
 export type Reading = "orient" | "peer feed" | "regulate";
 
@@ -58,6 +59,15 @@ function specFigures(root: string): { problems: number; open: number; defects: n
   }
 }
 
+/** What orient says of the vocabulary: the terms it would name now, never a count; nothing is said when nothing is owed. */
+function vocabularySignal(coverage: Coverage): string {
+  const { undefinedTerms, senses } = attention(coverage);
+  const terms = undefinedTerms.slice(0, 5).map((t) => t.term);
+  const risky = [...new Set(senses.map((s) => s.term))].slice(0, 3);
+  if (terms.length === 0 && risky.length === 0) return "vocabulary signal: nothing now (no recurring term lacks a definition and no sense is at risk), so nothing is injected";
+  return `vocabulary signal, named and ranked: ${terms.length ? `undefined ${terms.join(", ")}` : "no undefined term"}; ${risky.length ? `sense at risk ${risky.join(", ")}` : "no sense at risk"}`;
+}
+
 /** Every event's delivery for the project at `root`, measured now. */
 export async function deliveries(root: string): Promise<Delivery[]> {
   const records = loadJournal(root).records;
@@ -79,13 +89,13 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     specLine,
     `the session's own work order, when it owns one (${plural(orders, "order")} open or active in the project)`,
     `${vocabulary}, delivered at detail "${start.detail}"`,
-    `glossary coverage: ${start.coverage.totals.unresolved} unresolved candidate terms, ${start.coverage.totals.unreviewedContexts} contexts to review`,
+    vocabularySignal(start.coverage),
     "the session id with the decide and journal commands, and the rule",
     `size now: ${start.text.length.toLocaleString("en-US")} of ${CONTEXT_BUDGET.toLocaleString("en-US")} characters`,
   ];
   const feed = [
     "subjects of the decisions and escalations other sessions recorded since this session's cursor, twelve at most; never whole records",
-    "vocabulary contexts new or changed since the session started (advisory)",
+    "only what an edit introduced: a term that now recurs without a definition, or a use whose sense is at risk, named; silent otherwise",
   ];
   const edit = "error" in spec
     ? "revelation at the edit: none (the spec is not readable)"

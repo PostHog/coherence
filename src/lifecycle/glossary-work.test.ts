@@ -65,7 +65,7 @@ function fixture(): string {
   );
   writeFileSync(
     join(root, "notes.md"),
-    "The `premium` is new. `exposure` is used twice.\n",
+    "The `premium` is new. `exposure` is used twice.\nEvery `premium` is charged per policy.\nA `premium` is billed monthly.\n",
   );
   return root;
 }
@@ -271,6 +271,11 @@ test("glossary maintenance refuses an outside target and preserves the original 
 test("sense rulings require current evidence and reopen after source or definition changes; baselines never settle meaning", async () => {
   const root = fixture();
   try {
+    // A name refused for exposure, written beside a use of it, puts that context at risk, so review is asked.
+    const g = JSON.parse(readFileSync(join(root, "glossary.json"), "utf8"));
+    g.concepts[0].rejected = [{ alternative: "hazard", because: "a hazard is a cause, not money at risk" }];
+    writeFileSync(join(root, "glossary.json"), JSON.stringify(g));
+    writeFileSync(join(root, "money/notes.md"), "The exposure is counted in USD.\nIt is not the hazard.\n");
     const a = await glossaryCoverage(root);
     const term = a.terms.find((t) => t.term === "exposure")!;
     const context = term.contexts.find((c) => c.component === "money")!;
@@ -362,7 +367,7 @@ test("glossary draft and fixed queries work without specs or an existing domain 
   try {
     writeFileSync(
       join(root, "notes.md"),
-      "The `premium` has an unsettled meaning.\n",
+      "The `premium` has an unsettled meaning.\nA `premium` is charged per policy.\nEvery `premium` is billed monthly.\n",
     );
     const coverage = await run(root, ["coverage", "--json"]);
     assert.equal(coverage.code, 0, coverage.err);
@@ -403,7 +408,7 @@ test("glossary lifecycle uses child identities and installed roots, and advances
       .additionalContext as string;
     assert.match(context, /Session: child/);
     assert.match(context, /Risk vocabulary/);
-    assert.match(context, /glossary coverage/);
+    assert.match(context, /A recurring term lacks a definition: premium\./);
     assert.ok(
       !existsSync(join(root, ".coherence/glossary/sessions/child.json")),
     );
@@ -418,6 +423,11 @@ test("glossary lifecycle uses child identities and installed roots, and advances
     writeFileSync(
       join(root, "money/model.ts"),
       "export const riskcharge = 12;\n",
+    );
+    // The edit makes a new name recur in prose: that, and only that, is worth a line at the edit.
+    writeFileSync(
+      join(root, "money/charges.md"),
+      "The `riskcharge` is new.\nEach `riskcharge` is billed.\nA `riskcharge` is refunded on cancel.\n",
     );
     const patch = {
       ...input,
@@ -554,7 +564,7 @@ test("an installed hook command locates its project from a non-git subdirectory 
       assert.equal(result.status, 0, result.stderr);
       assert.match(
         JSON.parse(result.stdout).hookSpecificOutput.additionalContext,
-        /glossary coverage/,
+        /lacks a definition: premium/,
       );
       assert.ok(
         existsSync(

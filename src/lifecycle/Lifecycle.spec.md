@@ -230,3 +230,48 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   kinds: read
   checklist: scoped-reads declared as the order rides with orient and regulate
   checklist: redaction dismissed: the order is shown whole; objective, success, and boundary are the point
+- candidates come from names: A vocabulary candidate comes only from a name: from code, a declared or exported name, and only when prose writes it as words or it spans components; from prose, a name written as a name that recurs. A local identifier, the words and n-grams of a split identifier, a string, a regular-expression fragment, a path, an id, and a punctuation-bearing token are never candidates.
+  over: every code and prose line of the corpus, with declared names, locals, split identifiers, fragments, paths, work-order and decision ids, hashes and UUIDs
+  via: a code identifier is never a candidate unless it is declared and prose recurs it; ids, paths and fragments never are
+  because: the old reading split every identifier into words and n-grams and offered 4,807 candidates, most of them the language's words (root, sync, map, deep equal) and fragments (a z, .venv/bin/python); a count that size is skipped, so the few real undefined concepts were never read. Code and prose are different populations: code names things for the machine, prose names them for the reader, and only a name both share is vocabulary
+  crossing: project-source -> reading
+  refuted: counted any identifier assigned on a code line as declared, so the local tallyMarks became a candidate from its split words -> "a code identifier is never a candidate unless it is declared and prose recurs it; ids, paths and fragments never are" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
+  kinds: none
+- well-known names need no definition: A well-known name (the curated list, the config's wellKnown, the project's own name) and a name the glossary already declares or lists under not: is never a candidate, while a common word written as a project's proper noun, or a capitalized-only well-known word used lowercase in a project sense, still is.
+  over: every candidate the corpus nominates, against the shipped list, the config, the project's name, every concept, alias, instance, property and not: entry of both layers
+  via: well-known names, the project's own name and the glossary's not: names are never candidates, while a common word written as a project's proper noun still is
+  because: Python, Pyright, Chrome and the project's own name carried the old list's top and no definition could make them less ambiguous; but the fear of ambiguity lives exactly where a common word takes a project sense (Mnemion's hive; Coherence's scope, core, run, session), so the skip must never reach those
+  crossing: project-source -> reading
+  refuted: dropped the well-known check from nomination, so Kubernetes, Postgres, the config's Zanzibar and the project's own name were offered as candidates -> "well-known names, the project's own name and the glossary's not: names are never candidates, while a common word written as a project's proper noun still is" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
+  kinds: none
+- sense review only where meaning is at risk: A known word's use asks a sense review only when its meaning is at risk: the name has more than one recorded sense, a name rejected for that concept sits on or beside the line, or a Coherence concept is declared in an adopter's code; an ordinary use of a defined word asks nothing.
+  over: every context of every known term, across prose, code and records, in a project with its own glossary and in Coherence itself
+  via: sense review is asked only where meaning is at risk: more than one recorded sense, a rejected name beside the use, or a Coherence concept an adopter's code declares
+  because: the old reading asked a review of every new or changed line that used a known word, 8,330 contexts on this repository, so every edit mentioning run or work order grew a pile nobody could settle; a review is worth asking only where two meanings can meet
+  crossing: project-source -> reading
+  refuted: asked a review of every context of every known word again, so an ordinary use of exposure awaited review -> "sense review is asked only where meaning is at risk: more than one recorded sense, a rejected name beside the use, or a Coherence concept an adopter's code declares" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
+  kinds: none
+- no totals are injected: No hook injection carries a total: orient names the ranked recurring terms that lack a definition and the senses at risk, a handful at most, or says nothing; regulate names only what this session introduced.
+  over: every SessionStart, SubagentStart, PostToolUse and Stop injection, with nothing owed, something owed at the start, and something introduced during the session
+  via: no hook injection carries a total: orient names the ranked terms or says nothing
+  because: a number nobody can act on trains an agent to skip the line it sits in, and the vocabulary line had become the one every session skipped; a short named list is something to do, and silence when nothing is owed keeps the line worth reading
+  crossing: project-source -> reading
+  refuted: put the old Glossary coverage totals line back at the head of orient's vocabulary signal -> "no hook injection carries a total: orient names the ranked terms or says nothing" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
+  kinds: output
+  checklist: destination-confinement dismissed: one destination, the host's additionalContext or systemMessage, and no redirect
+  checklist: redaction dismissed: only terms and component names are printed, never a use's text
+  checklist: commit-ordered-effects declared as cursor advances after the print
+  checklist: circuit-breaker-policy dismissed: the reading is local files; no dependency is sampled
+  checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
+- the edit line names what the edit introduced: The per-tool vocabulary line fires only when an edit makes a new term recur without a definition or puts a sense at risk, and names it; an ordinary edit that uses a known word says nothing, and a term once named is not named again.
+  over: every PostToolUse after a session's baseline: an ordinary edit, an edit using a defined word, an edit that introduces a recurring undefined term, and the next edit after it was delivered
+  via: the per-tool line is silent on an ordinary edit and names only the candidate an edit introduces
+  because: the old line reported every new or changed context, so every edit that mentioned a known word added to it and the line was noise at every tool use; the moment to name a new term is the edit that made it recur, once
+  crossing: project-source -> reading
+  refuted: named every recurring undefined term at every edit instead of only the one the edit introduced, as the old per-tool line did -> "the per-tool line is silent on an ordinary edit and names only the candidate an edit introduces" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
+  kinds: output
+  checklist: destination-confinement dismissed: one destination, the host's additionalContext, and no redirect
+  checklist: redaction dismissed: only terms and component names are printed, never a use's text
+  checklist: commit-ordered-effects declared as cursor advances after the print
+  checklist: circuit-breaker-policy dismissed: the reading is local files; no dependency is sampled
+  checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets

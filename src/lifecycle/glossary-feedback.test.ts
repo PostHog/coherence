@@ -104,7 +104,8 @@ test("coverage maps only conservative inflections to known meanings and preserve
     assert.equal(categories?.concept, "category", "-ies is recognized only because category is declared");
     assert.equal(report.terms.find((term) => term.term === "mass")?.concept, "mass");
     assert.equal(report.terms.find((term) => term.term === "status")?.concept, "status");
-    assert.equal(report.terms.find((term) => term.term === "exposure bucket")?.state, "unresolved", "a compound is not inferred from one known word");
+    const bucket = report.terms.find((term) => term.term === "exposure bucket");
+    assert.ok(bucket === undefined || (bucket.state === "unresolved" && bucket.concept === null), "a compound is not inferred from one known word");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

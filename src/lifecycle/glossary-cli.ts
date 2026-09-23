@@ -11,6 +11,7 @@ import { parseFlags, type Parsed } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
 import { loadProjectGlossaries } from "./project.ts";
 import {
+  attention,
   coverageText,
   digest,
   glossaryCoverage,
@@ -27,7 +28,7 @@ import {
   type Who,
 } from "./glossary-maintain.ts";
 
-export const GLOSSARY_WORK_USAGE = `  glossary coverage [--json]              observed vocabulary, uses, exclusions and uncertainty
+export const GLOSSARY_WORK_USAGE = `  glossary coverage [--json]              recurring terms without a definition and senses at risk, ranked; --json: every observed use and population fact
   glossary review <term> [--json]          definition, live contexts, evidence keys and prior rulings
   glossary review <term> --component <folder> --evidence <key> --disposition confirmed|not-domain|deferred|defect --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>]
   glossary propose declare|define|alias|reject|rename|retire <concept> [value] [--definition <text>] [--entry <file.json>] [--qualify] --because <reason>
@@ -36,7 +37,7 @@ export const GLOSSARY_WORK_USAGE = `  glossary coverage [--json]              ob
   glossary recover                        finish an interrupted application without overwriting intervening edits
   glossary draft [--out <file>]            unsettled candidates, collisions and review questions; never overwrites
   glossary baseline --session <id>         remember observed uses for this session; no meaning is marked covered
-  glossary changes [--session <id>] [--json] pending new/changed contexts relative to that session's baseline
+  glossary changes [--session <id>] [--json] new undefined terms and senses at risk relative to that session's baseline
   glossary ready --terms <a,b,...> [--json] explicit vocabulary prerequisites for a named slice; not host-delivery proof
   glossary similar <text> [--json]         optional offline suggestions; model absence leaves exact checks available
   glossary model --download                 explicitly download and verify the pinned 37 MB model
@@ -79,6 +80,15 @@ export function baselinePath(root: string, session: string): string {
     throw new Error("invalid session token");
   return confined(root, `.coherence/glossary/sessions/${session}.json`);
 }
+/** The baseline key that remembers a candidate: never a term's own key, which always holds a component after the newline. */
+const CANDIDATE = "?candidate\n";
+
+/**
+ * What changed since a session's baseline that a reader can act on: a term
+ * that now recurs without a definition and was not a candidate before, and a
+ * use whose sense is at risk in a context that is new or changed. A known word
+ * in an ordinary new line is not a change worth a word.
+ */
 export function coverageChanges(
   report: Coverage,
   prior: Record<string, string> = {},
@@ -89,39 +99,59 @@ export function coverageChanges(
   state: string;
   reason: string;
 }[] {
-  return report.terms.flatMap((t) =>
-    t.contexts
-      .filter(
-        (c) =>
-          !["confirmed", "not-domain"].includes(c.disposition) &&
-          prior[t.term + "\n" + c.component] !== c.fingerprint,
-      )
-      .map((c) => ({
+  const { undefinedTerms, senses } = attention(report);
+  return [
+    ...undefinedTerms
+      .filter((t) => prior[CANDIDATE + t.term] === undefined)
+      .map((t) => ({
         term: t.term,
-        component: c.component,
-        evidence: c.fingerprint,
-        state: t.state,
-        reason:
-          c.disposition === "unreviewed"
-            ? t.state === "unresolved"
-              ? "undeclared use"
-              : "new or changed context; is this the defined sense?"
-            : c.disposition,
+        component: t.first,
+        evidence: t.fingerprint,
+        state: "unresolved",
+        reason: `recurs without a definition (${t.prose} prose lines, ${t.components} components)`,
       })),
-  );
+    ...senses
+      .filter((s) => prior[s.term + "\n" + s.component] !== s.evidence)
+      .map((s) => ({
+        term: s.term,
+        component: s.component,
+        evidence: s.evidence,
+        state: s.state,
+        reason: `sense at risk: ${s.reason}`,
+      })),
+  ];
 }
+
+/**
+ * The candidates this session introduced and still leaves without a
+ * definition: recurring now, and either marked introduced in the baseline or
+ * not in it at all. A candidate the session found at its start is not its debt.
+ */
+export function introducedCandidates(report: Coverage, prior: Record<string, string>): string[] {
+  return attention(report)
+    .undefinedTerms.map((t) => t.term)
+    .filter((term) => prior[CANDIDATE + term] !== "start");
+}
+
 export function saveBaseline(
   root: string,
   session: string,
   report: Coverage,
 ): void {
+  const path = baselinePath(root, session);
+  const previous = existsSync(path) ? priorBaseline(root, session) : undefined;
   cleanWrite(
-    baselinePath(root, session),
-    Object.fromEntries(
-      report.terms.flatMap((t) =>
+    path,
+    Object.fromEntries([
+      ...report.terms.flatMap((t) =>
         t.contexts.map((c) => [t.term + "\n" + c.component, c.fingerprint]),
       ),
-    ),
+      // A candidate present when the session's baseline was first taken is the session's inheritance; one that appears later is its own.
+      ...attention(report).undefinedTerms.map((t) => [
+        CANDIDATE + t.term,
+        previous?.[CANDIDATE + t.term] ?? (previous === undefined ? "start" : "introduced"),
+      ]),
+    ]),
   );
 }
 export function priorBaseline(
@@ -334,7 +364,7 @@ export async function glossaryWorkCommand(
     if (verb === "baseline") {
       saveBaseline(io.cwd, need(p, "session"), report);
       io.out(
-        `Baseline saved for ${need(p, "session")}; no sense ruling was created. ${report.totals.unresolved} unresolved terms remain.`,
+        `Baseline saved for ${need(p, "session")}; no sense ruling was created.`,
       );
       return 0;
     }
@@ -343,17 +373,18 @@ export async function glossaryWorkCommand(
         report,
         get(p, "session") ? priorBaseline(io.cwd, get(p, "session")!) : {},
       );
-      if (json) print({ changes, totals: report.totals });
+      if (json) print({ changes, population: report.totals });
       else
         io.out(
-          `${changes.length} new/changed contexts; ${report.totals.unreviewedContexts} contexts remain unsettled in all.\n` +
-            changes
-              .slice(0, 30)
-              .map((c) => `${c.term} in ${c.component}: ${c.reason}`)
-              .join("\n") +
-            (changes.length > 30
-              ? "\nUse --json for every changed context."
-              : ""),
+          changes.length === 0
+            ? "Nothing new: no term newly recurs without a definition, and no new use puts a sense at risk."
+            : changes
+                .slice(0, 30)
+                .map((c) => `${c.term} in ${c.component}: ${c.reason}`)
+                .join("\n") +
+                (changes.length > 30
+                  ? "\nUse --json for every change."
+                  : ""),
         );
       return 0;
     }

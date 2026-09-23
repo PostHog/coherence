@@ -943,7 +943,7 @@
     {
       "name": "config",
       "status": "settled",
-      "definition": "The list of project facts the tool cannot derive: name, entry dir, output dir, ignore patterns, language, platform, how to typecheck, how to run tests and match their names, where tests live. Every key that configures a mechanism leaves with the mechanism.",
+      "definition": "The list of project facts the tool cannot derive: name, entry dir, output dir, ignore patterns, language, platform, how to typecheck, how to run tests and match their names, where tests live, and the well-known names the project vouches for (wellKnown). Every key that configures a mechanism leaves with the mechanism.",
       "rejected": [
         {
           "alternative": "mass, conventions, sinks, atlas keys",
@@ -1250,6 +1250,24 @@
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-08478016)",
         "owner_words": "not tag. interface identifier"
+      }
+    },
+    {
+      "name": "well-known name",
+      "definition": "A name with so much gravity in training data that no project definition could make it less ambiguous: the proper name of a widely used technology, language, platform, vendor, standard, or format (Python, Pyright, GitHub), the names a project vouches for in its config, and the project's own name. A well-known name is never a vocabulary candidate. A common word a project gives its own sense (hive, scope, core, run, session) is never one, even written as a proper noun; a name whose lowercase is an ordinary word (Node, Chrome) is well known only in its capitalized spelling.",
+      "status": "proposed",
+      "related": [
+        "glossary",
+        "config"
+      ],
+      "properties": {
+        "curated_list": "Shipped with the tool beside vocabulary coverage, versioned, with its rule for inclusion written at its top.",
+        "capitalized_only": "A name whose lowercase spelling is an ordinary word is well known only in its capitalized spelling; its lowercase use in a project sense stays a candidate.",
+        "not_entries": "A name a concept lists as not to be confused with is already known to the glossary and is not listed again."
+      },
+      "provenance": {
+        "defined_by": "agent proposal during the vocabulary coverage redesign, 2026-09-23 (journal d-c8f34e4b)",
+        "because": "The owner ruled that names with so much gravity there is no fear of ambiguity need no definition, while a common word in a project sense still does."
       }
     }
   ],

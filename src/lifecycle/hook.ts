@@ -59,8 +59,8 @@ import { loadOrders, ownedIn, type WorkOrder } from "../journal/work.ts";
 import { renderCompactWithin, type InjectionLevel } from "./glossary.ts";
 import { installedRoot, isCoherenceItself, loadProjectGlossaries, within } from "./project.ts";
 
-import { glossaryCoverage, type Coverage } from "./glossary-coverage.ts";
-import { baselinePath, coverageChanges, priorBaseline, saveBaseline } from "./glossary-cli.ts";
+import { attentionText, glossaryCoverage, type Coverage } from "./glossary-coverage.ts";
+import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./glossary-cli.ts";
 
 const run = promisify(execFile);
 
@@ -444,10 +444,38 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   const head = escalationBlock(root) + specBlock(root) + workBlock(root, input);
   const reading=report ?? await glossaryCoverage(root);
   const commands=await cliName(root);
-  const coverage=`\nGlossary coverage: ${reading.totals.unresolved} unresolved candidate terms; ${reading.totals.unreviewedContexts} contexts need sense review. No semantic completeness is implied. Read: ${commands} glossary coverage; maintain: ${commands} glossary help.\n`;
+  // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
+  const signal=attentionText(reading, commands);
+  const coverage=signal ? `\n${signal}\n` : "";
   const tail = coverage + `\n${await sessionBlock(root, input)}`;
   const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root));
   return { text: head + text + tail, detail, coverage: reading };
+}
+
+/**
+ * The vocabulary line at an edit: only what this edit introduced, named. A
+ * term that newly recurs without a definition, or a use whose sense is now at
+ * risk; an ordinary edit that uses a known word says nothing.
+ */
+async function vocabularyAtEdit(root: string, changes: ReturnType<typeof coverageChanges>): Promise<string> {
+  const cli = await cliName(root);
+  const fresh = changes.filter((c) => c.state === "unresolved").slice(0, 5);
+  const risky = changes.filter((c) => c.state !== "unresolved").slice(0, 3);
+  const lines: string[] = [];
+  if (fresh.length) lines.push(`Glossary: this edit made ${fresh.map((c) => `"${c.term}"`).join(", ")} recur without a definition; declare it (${cli} glossary propose declare <term> --definition "<text>" --because "<why>") or map it as an alias of an existing concept.`);
+  if (risky.length) lines.push(`Glossary: sense at risk at this edit: ${risky.map((c) => `${c.term} in ${c.component} (${c.reason.replace(/^sense at risk: /, "")})`).join("; ")}; check it against the definition: ${cli} glossary review <term>.`);
+  return lines.join("\n") + "\n";
+}
+
+/** Regulate's vocabulary line: the undefined terms this session introduced and the risks no edit has shown yet, named; nothing otherwise. */
+async function vocabularyAtStop(root: string, reading: Coverage, prior: Record<string, string>): Promise<string> {
+  const cli = await cliName(root);
+  const introduced = introducedCandidates(reading, prior).slice(0, 5);
+  const risky = coverageChanges(reading, prior).filter((c) => c.state !== "unresolved").slice(0, 3);
+  const lines: string[] = [];
+  if (introduced.length) lines.push(`Glossary: this session left ${introduced.map((t) => `"${t}"`).join(", ")} recurring without a definition; declare or map each (${cli} glossary propose declare <term> ...).`);
+  if (risky.length) lines.push(`Glossary: sense at risk: ${risky.map((c) => `${c.term} in ${c.component} (${c.reason.replace(/^sense at risk: /, "")})`).join("; ")}; ${cli} glossary review <term>.`);
+  return lines.join("\n");
 }
 
 /** The feed for a boundary event: the text to inject and the advance to commit once it is in the host's hands. */
@@ -522,7 +550,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const edit = event === "PostToolUse" ? await editContext(root, input, options) : "";
       const reading=session && existsSync(baselinePath(root,session)) ? await glossaryCoverage(root) : undefined;
       const changes=reading && session ? coverageChanges(reading,priorBaseline(root,session)) : [];
-      const vocabulary=changes.length ? `Glossary: ${changes.length} new/changed contexts (advisory; spelling is not sense).\n${changes.slice(0,6).map(c=>`  ${c.term} in ${c.component}: ${c.reason}`).join("\n")}\nRead the full pending state: ${await cliName(root)} glossary coverage --json; settle through glossary review or propose/apply.\n` : "";
+      const vocabulary=changes.length ? await vocabularyAtEdit(root, changes) : "";
       const context = [feed.text,edit,vocabulary].filter(Boolean).join("\n");
       if (context === "") return { stdout: "", stderr: "", exit: 0 };
       const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
@@ -540,7 +568,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const glossary = glossaryStopText(report, walls);
       const workText = workStopText(root, input);
       const reading=session && existsSync(baselinePath(root,session)) ? await glossaryCoverage(root) : undefined;
-      const coverageText=reading && reading.totals.unreviewedContexts ? `Glossary coverage: ${reading.totals.unresolved} unresolved candidates, ${reading.totals.unreviewedContexts} unsettled contexts (advisory). Read: ${await cliName(root)} glossary coverage.` : "";
+      const coverageText=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : "";
       const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the glossary check ran over nothing`;
       if (glossary.text === "" && spec.text === "" && workText === "" && changedText === "" && coverageText === "") return { stdout: "", stderr: "", exit: 0 };
       const parts: string[] = [];

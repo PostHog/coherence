@@ -112,6 +112,34 @@ export async function projectGlossaryPath(root: string): Promise<string | undefi
   return (await exists(fallback)) ? fallback : undefined;
 }
 
+/**
+ * The project facts vocabulary coverage reads from the config: the project's
+ * own name (`name`) and the names it vouches for as well known (`wellKnown`),
+ * which no tool could derive. A missing or partial config is no facts.
+ */
+export interface VocabularyFacts {
+  name: string | undefined;
+  wellKnown: string[];
+}
+
+export async function vocabularyFacts(root: string): Promise<VocabularyFacts> {
+  const facts: VocabularyFacts = { name: undefined, wellKnown: [] };
+  const configPath = resolve(root, CONFIG_FILE);
+  if (!(await exists(configPath))) return facts;
+  let config: unknown;
+  try {
+    config = JSON.parse(await readFile(configPath, "utf8"));
+  } catch (error) {
+    throw new Error(`${configPath}: not valid JSON (${(error as Error).message})`);
+  }
+  if (typeof config !== "object" || config === null || Array.isArray(config)) return facts;
+  const record = config as Record<string, unknown>;
+  if (typeof record["name"] === "string" && record["name"].trim() !== "") facts.name = record["name"].trim();
+  const named = record["wellKnown"];
+  if (Array.isArray(named)) facts.wellKnown = named.filter((n): n is string => typeof n === "string" && n.trim() !== "").map((n) => n.trim());
+  return facts;
+}
+
 /** Whether the project at `root` is Coherence itself, whose CLI is its own source tree rather than an installed bin. */
 export async function isCoherenceItself(root: string): Promise<boolean> {
   try {

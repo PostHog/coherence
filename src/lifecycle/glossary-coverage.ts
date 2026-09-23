@@ -1,10 +1,36 @@
+/**
+ * Vocabulary coverage: a reproducible reading of observed uses, not a claim
+ * about every word's meaning, and never a count to act on. What it hands a
+ * reader is a short ranked signal: the recurring terms that lack a definition
+ * and the uses whose sense is at risk.
+ *
+ * Code and prose are different populations. From code, only declared and
+ * exported names (and the fields of exported types) are candidate sources;
+ * local identifiers, the words and
+ * n-grams of split identifiers, strings, regular-expression fragments, paths,
+ * ids, and punctuation-bearing tokens never are. From prose (docs, specs, and
+ * the journal's and work's records), a candidate is a name written as a name:
+ * Title Case away from a sentence start, a heading word, a single backticked
+ * word. A candidate stands only when it recurs: a prose name on three lines,
+ * or two across two components; a declared name where prose writes it as
+ * words (never inside an identifier's spelling) on ten lines across four
+ * components.
+ * Well-known names (well-known.json, the config's wellKnown, the project's
+ * own name), names the glossary declares (concepts, aliases, instances,
+ * properties, and its "not:" confusables), and general English and
+ * programming words are never candidates. A common word written as a
+ * project's proper noun still is.
+ *
+ * Sense review is asked only where meaning is at risk: a name with more than
+ * one recorded sense, a use on or beside a prose line carrying a name
+ * rejected for that same concept, or a Coherence concept an adopter's code
+ * declares with its own sense.
+ */
 import { readFile } from "node:fs/promises";
-/** Vocabulary coverage is a reproducible reading of observed uses, not a claim about every word's meaning. */
-import { createHash } from "node:crypto";
+import { createHash, type Hash } from "node:crypto";
 import { dirname } from "node:path";
 import { loadJournal } from "../journal/store.ts";
 import {
-  identifierWords,
   normalizeTerm,
   readCorpus,
   type UnreadablePath,
@@ -16,8 +42,9 @@ import {
   type Concept,
   type Glossary,
 } from "./glossary.ts";
-import { loadProjectGlossaries } from "./project.ts";
-import { STOPLIST } from "./stoplist.ts";
+import { loadProjectGlossaries, vocabularyFacts } from "./project.ts";
+import { ALWAYS_CAPITALIZED, STOPLIST } from "./stoplist.ts";
+import { isWellKnown, wellKnown, type WellKnown } from "./well-known.ts";
 
 export interface VocabularyUse {
   file: string;
@@ -26,6 +53,14 @@ export interface VocabularyUse {
   text: string;
   kind: string;
   fingerprint: string;
+}
+export interface VocabularyContext {
+  component: string;
+  fingerprint: string;
+  disposition: string;
+  because: string | null;
+  /** Why this context's sense is at risk; absent when nothing puts it at risk, and then no review is asked. */
+  risk?: string;
 }
 export interface VocabularyTerm {
   term: string;
@@ -49,15 +84,12 @@ export interface VocabularyTerm {
     properties: Record<string, unknown>;
     confusables: string[];
   }[];
+  /** For a candidate (state unresolved): the prose lines it recurs on and the components it spans. */
+  recurrence?: { prose: number; components: number };
   fingerprint: string;
   count: number;
   uses: VocabularyUse[];
-  contexts: {
-    component: string;
-    fingerprint: string;
-    disposition: string;
-    because: string | null;
-  }[];
+  contexts: VocabularyContext[];
 }
 export interface Coverage {
   version: 1;
@@ -71,24 +103,32 @@ export interface Coverage {
     limits: string[];
   };
   terms: VocabularyTerm[];
+  /** Population facts about the observed reading, for tools; never a to-do count, and never injected. */
   totals: {
     terms: number;
     uses: number;
     known: number;
     rejected: number;
     unresolved: number;
+    /** Contexts whose sense is at risk and not yet settled by a review. */
     unreviewedContexts: number;
   };
 }
 export const digest = (value: unknown): string =>
   createHash("sha256").update(JSON.stringify(value)).digest("hex");
+/** A digest over many parts without building one string of them all: a large corpus must not exceed a string's length. */
+function digestAll(parts: Iterable<unknown>): string {
+  const hash: Hash = createHash("sha256");
+  for (const part of parts) hash.update(JSON.stringify(part) ?? "null").update("\n");
+  return hash.digest("hex");
+}
 const clean = (s: string): string =>
   normalizeTerm(
     s
       .replace(/([a-z\d])([A-Z])/g, "$1 $2")
       .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2"),
   );
-const WORD = /[A-Za-z][A-Za-z0-9_-]*/g;
+const HEADING_WORD = /[A-Za-z][A-Za-z'-]*/g;
 
 /** Recover only glossary review decisions with a matching current evidence key. Old answers are history. */
 function rulings(
@@ -128,15 +168,29 @@ function table(
   layer: "coherence" | "project",
   into: Map<string, KnownMeaning>,
   properties: Map<string, { concept: Concept; layer: "coherence" | "project" }[]>,
+  senses: Map<string, Set<string>>,
 ): void {
+  const sense = (name: string, c: Concept): void => {
+    const set = senses.get(name) ?? new Set<string>();
+    // The same concept name in both layers is the project restating the tool's concept, one sense; a different concept is another.
+    set.add(c.name);
+    senses.set(name, set);
+  };
   // Project/trust-level declarations have no owning concept; property declarations are attached below.
   for (const name of acceptedNames(glossary))
     if (!into.has(clean(name))) into.set(clean(name), { state: "declared", concept: null, layer });
   for (const c of glossary.concepts) {
     into.set(clean(c.name), { state: "concept", concept: c, layer });
-    for (const name of c.instances ?? []) into.set(clean(name), { state: "instance", concept: c, layer });
+    sense(clean(c.name), c);
+    for (const name of c.instances ?? []) {
+      into.set(clean(name), { state: "instance", concept: c, layer });
+      sense(clean(name), c);
+    }
     for (const alias of c.aliases)
-      for (const name of aliasNames(alias)) into.set(clean(name), { state: "alias", concept: c, layer });
+      for (const name of aliasNames(alias)) {
+        into.set(clean(name), { state: "alias", concept: c, layer });
+        sense(clean(name), c);
+      }
     for (const key of Object.keys(c.properties))
       for (const name of aliasNames(key)) {
         const normalized = clean(name);
@@ -147,19 +201,21 @@ function table(
   }
 }
 
+function singular(word: string): string[] {
+  const out: string[] = [];
+  if (word.endsWith("ies") && word.length > 4) out.push(word.slice(0, -3) + "y");
+  if (/(?:ss|sh|ch|x|z)es$/.test(word)) out.push(word.slice(0, -2));
+  if (word.endsWith("s") && !word.endsWith("ss") && word.length > 3) out.push(word.slice(0, -1));
+  return out;
+}
+
 /** Inflection is accepted only when its conservative singular is an already-known complete name. */
 function knownMeaning(term: string, known: Map<string, KnownMeaning>): KnownMeaning | undefined {
   const exact = known.get(term);
   if (exact) return exact;
   const words = term.split(" ");
-  const last = words.at(-1)!;
-  const singulars: string[] = [];
-  if (last.endsWith("ies") && last.length > 4) singulars.push(last.slice(0, -3) + "y");
-  if (/(?:ss|sh|ch|x|z)es$/.test(last)) singulars.push(last.slice(0, -2));
-  if (last.endsWith("s") && !last.endsWith("ss") && last.length > 3) singulars.push(last.slice(0, -1));
-  for (const singular of singulars) {
-    const candidate = [...words.slice(0, -1), singular].join(" ");
-    const meaning = known.get(candidate);
+  for (const one of singular(words.at(-1)!)) {
+    const meaning = known.get([...words.slice(0, -1), one].join(" "));
     if (meaning) return { ...meaning, state: "declared" };
   }
   return undefined;
@@ -178,16 +234,171 @@ function isGlossaryDecision(line: string): boolean {
   }
 }
 
-function candidate(s: string): boolean {
-  return (
-    s.length >= 3 &&
-    s.length <= 80 &&
-    !STOPLIST.has(s) &&
-    !/^(?:https?|www|true|false|null|undefined|const|let|return|function|import|export|from|async|await|class|type|interface|public|private|readonly|void|string|number|boolean|assert|test)$/.test(
-      s,
-    ) &&
-    !/^[a-f0-9]{8,}$/i.test(s)
-  );
+/* ------------------------------------------------------------ candidates */
+
+/**
+ * A spelling that could name a concept at all: one to three words of letters,
+ * each at least two long. Anything carrying a digit (a hash, a work-order or
+ * decision id, a UUID, a version), a path, a dot, or other punctuation never
+ * reaches here as a candidate.
+ */
+const ELIGIBLE = /^[a-z]{2,}(?: [a-z]{2,}){0,2}$/;
+
+function allCommon(term: string): boolean {
+  return term.split(" ").every((w) => STOPLIST.has(w) || singular(w).some((s) => STOPLIST.has(s)));
+}
+
+/** The names a code line declares or exports: the only code a candidate may come from. */
+const DECLARATIONS: RegExp[] = [
+  // TypeScript and JavaScript exports.
+  /^\s*export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:const|let|var|function\*?|class|interface|type|enum|namespace)\s+([A-Za-z$][\w$]*)/,
+  // Python top-level definitions; a leading underscore is private by convention and never matches.
+  /^(?:async\s+)?def\s+([A-Za-z]\w*)/,
+  /^class\s+([A-Za-z]\w*)/,
+  // Go exports are capitalized.
+  /^func\s+(?:\([^)]*\)\s*)?([A-Z]\w*)/,
+  /^type\s+([A-Z]\w*)/,
+  // Rust, Swift, Kotlin, Java public declarations.
+  /^\s*pub(?:\([^)]*\))?\s+(?:async\s+)?(?:fn|struct|enum|trait|type|const|mod)\s+([A-Za-z]\w*)/,
+  /^\s*(?:public|open)\s+(?:final\s+)?(?:static\s+)?(?:class|struct|enum|protocol|interface|func|fun)\s+([A-Za-z]\w*)/,
+];
+
+function declaredName(line: string): string | undefined {
+  for (const pattern of DECLARATIONS) {
+    const match = pattern.exec(line);
+    if (match?.[1] !== undefined) return match[1];
+  }
+  return undefined;
+}
+
+/**
+ * A field an exported type declares: a member of an exported TypeScript
+ * interface, type or class, or an annotated field of a top-level Python
+ * class. The file's own locals never match.
+ */
+function memberName(line: string, inside: boolean, python: boolean): string | undefined {
+  if (!inside) return undefined;
+  const match = python ? /^ {4}([a-z][A-Za-z0-9_]*)\s*:\s*[A-Za-z"'[]/.exec(line) : /^\s+(?:readonly\s+)?([a-z][A-Za-z0-9]*)\??:\s*[^=]/.exec(line);
+  return match?.[1];
+}
+
+interface Word {
+  lower: string;
+  original: string;
+}
+
+/**
+ * The runs of plain words in a prose text: an identifier's spelling
+ * (camelCase, snake_case), a path, a dotted name, a token with a digit or
+ * other punctuation breaks the run, and so does sentence punctuation. A
+ * declared name recurs in prose only where prose writes it as words.
+ */
+function wordRuns(text: string): Word[][] {
+  const runs: Word[][] = [];
+  let run: Word[] = [];
+  const cut = (): void => {
+    if (run.length) runs.push(run);
+    run = [];
+  };
+  for (const raw of text.split(/\s+/)) {
+    const core = raw.replace(/^[("'`*_[{<]+/, "").replace(/[)"'`*_\]}>,.;:!?]+$/, "").replace(/'s$/, "");
+    const breakAfter = /[,.;:!?)\]]$/.test(raw.replace(/["'`*_]+$/, ""));
+    const plain = /^[A-Za-z]+(?:-[A-Za-z]+)*$/.test(core) && !/[a-z][A-Z]/.test(core);
+    if (!plain) {
+      cut();
+      continue;
+    }
+    for (const part of core.split("-")) run.push({ lower: part.toLowerCase(), original: part });
+    if (breakAfter) cut();
+  }
+  cut();
+  return runs;
+}
+
+/** Whether the text before a match on a line puts the match at the start of a sentence. */
+function atSentenceStart(prefix: string): boolean {
+  const lead = prefix.replace(/^[\s>*\-+|#]*(?:\d+[.)]\s*)?/, "");
+  if (lead.trim() === "") return true;
+  const trimmed = lead.replace(/[\s"'*_)\]]+$/, "");
+  return /[.!?:|]$/.test(trimmed) || trimmed === "";
+}
+
+interface Nomination {
+  term: string;
+  /** The name as written, for a well-known name skipped only in its capitalized spelling. */
+  spelling: string;
+  /** Title Case away from a sentence start: a proper noun, so a common word stays a candidate. */
+  proper: boolean;
+}
+
+/** Names prose writes as names: Title Case away from a sentence start, heading words, a single backticked word. */
+export function proseNominations(text: string, heading: boolean): Nomination[] {
+  const out: Nomination[] = [];
+  let blanked = text;
+  for (const match of text.matchAll(/`([^`\n]+)`/g)) {
+    const inner = match[1]!.trim();
+    // One plain word only: a backticked identifier (flowOf, work_order) is a code reference, not a word.
+    if (/^[A-Za-z][a-z]+$/.test(inner)) out.push({ term: clean(inner), spelling: inner, proper: false });
+    blanked = blanked.slice(0, match.index) + " ".repeat(match[0].length) + blanked.slice(match.index + match[0].length);
+  }
+  blanked = blanked.replace(/\[([^\]]*)\]\([^)]*\)/g, (m, label: string) => label.padEnd(m.length));
+  if (heading) {
+    for (const m of blanked.replace(/^#+\s*/, "").matchAll(HEADING_WORD)) out.push({ term: clean(m[0]), spelling: m[0], proper: false });
+    return out;
+  }
+  for (const match of blanked.matchAll(/(?<![A-Za-z0-9_'./-])[A-Z][a-z]+(?:[ -][A-Z][a-z]+){0,2}(?![A-Za-z0-9_/-]|\.[A-Za-z0-9])/g)) {
+    // A capitalized common word opening the phrase ("Every Durable Object") is the sentence's, not the name's.
+    let phrase = match[0];
+    let start = match.index;
+    for (;;) {
+      const lead = /^([A-Za-z]+)[\s-]+/.exec(phrase);
+      if (lead === null || !STOPLIST.has(lead[1]!.toLowerCase())) break;
+      phrase = phrase.slice(lead[0].length);
+      start += lead[0].length;
+    }
+    if (atSentenceStart(blanked.slice(0, start))) continue;
+    // A capitalized word after an acronym or a model number ("M4 Pro", "SF Pro") is the tail of that product's name.
+    if (/(?:^|\s)(?:[A-Z]{2,}|\S*\d\S*)\s+$/.test(blanked.slice(0, start))) continue;
+    // Months, weekdays and language names are capitalized in any sentence; that is English, not a proper noun of the project's.
+    if (ALWAYS_CAPITALIZED.has(clean(phrase))) continue;
+    out.push({ term: clean(phrase), spelling: phrase, proper: true });
+  }
+  return out;
+}
+
+/** The fields of a journal or work record that are written prose; ids, sessions, commits and flags are not words. */
+const RECORD_METADATA = new Set(["id", "at", "session", "agent", "commit", "dirty", "binding", "kind", "work", "files", "file", "evidence", "cursor", "target", "owner", "state"]);
+
+export function recordProse(line: string): string[] {
+  let value: unknown;
+  try {
+    value = JSON.parse(line);
+  } catch {
+    return [line];
+  }
+  const out: string[] = [];
+  const walk = (v: unknown, key: string | undefined): void => {
+    if (key !== undefined && RECORD_METADATA.has(key)) return;
+    if (typeof v === "string") out.push(v);
+    else if (Array.isArray(v)) for (const item of v) walk(item, undefined);
+    else if (v !== null && typeof v === "object") for (const [k, item] of Object.entries(v)) walk(item, k);
+  };
+  walk(value, undefined);
+  return out;
+}
+
+interface Pool {
+  proper: boolean;
+  /** Declared or exported in code: its recurrence is counted wherever prose writes it as words. */
+  declared: boolean;
+  spellings: Set<string>;
+  sites: VocabularyUse[];
+  words: VocabularyUse[];
+}
+
+interface ProseLine {
+  use: VocabularyUse;
+  runs: Word[][];
 }
 
 export async function glossaryCoverage(root: string): Promise<Coverage> {
@@ -205,13 +416,14 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
   }
   const corpus = await readCorpus({ root, coherence, project });
   const known = new Map<string, KnownMeaning>();
+  const senses = new Map<string, Set<string>>();
   const propertyOwners = new Map<string, { concept: Concept; layer: "coherence" | "project" }[]>();
-  table(coherence, "coherence", known, propertyOwners);
+  table(coherence, "coherence", known, propertyOwners, senses);
   const rejected = new Map(
     rejectedNames(coherence).map((r) => [clean(r.name), r]),
   );
   if (project) {
-    table(project, "project", known, propertyOwners);
+    table(project, "project", known, propertyOwners, senses);
     for (const r of rejectedNames(project)) rejected.set(clean(r.name), r);
   }
   for (const [name, owners] of propertyOwners) {
@@ -226,6 +438,16 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
     ? new Set([...acceptedNames(project)].map(clean))
     : new Set<string>();
   for (const name of projectNames) rejected.delete(name);
+  // The glossary's "not:" entries name things it already knows are something else (Pyright, Python): never candidates.
+  const confusables = new Set<string>();
+  for (const g of [coherence, project])
+    for (const c of g?.concepts ?? [])
+      for (const entry of c.notToBeConfusedWith) {
+        const lead = clean(entry.split(":")[0] ?? "");
+        if (lead !== "") confusables.add(lead);
+      }
+  const facts = await vocabularyFacts(root);
+  const famous: WellKnown = wellKnown(facts, [coherence.project, project?.project].filter((n): n is string => n !== undefined));
   const phrases = [...new Set([...known.keys(), ...rejected.keys()])].sort(
     (a, b) => b.length - a.length || a.localeCompare(b),
   );
@@ -244,29 +466,54 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
       list.push(use);
     uses.set(term, list);
   };
+  /** Rejected names on each line, keyed by file then line: sense is at risk beside them. */
+  const rejectedLines = new Map<string, Map<number, string[]>>();
+  /** Names code declares, by their words: a Coherence concept an adopter declares carries the adopter's sense there. */
+  const declarations = new Map<string, VocabularyUse[]>();
+  const pool = new Map<string, Pool>();
+  const proseLines: ProseLine[] = [];
+  const nominate = (n: Nomination, site: VocabularyUse | undefined, declared = false): void => {
+    const term = n.term;
+    if (!ELIGIBLE.test(term) || term.length > 40) return;
+    if (knownMeaning(term, known) || rejected.has(term)) {
+      // An inflection of a known name is observed under its own spelling; an exact name already has its uses.
+      if (site && !known.has(term) && !rejected.has(term)) add(term, site);
+      return;
+    }
+    if (confusables.has(term) || isWellKnown(famous, term, n.spelling)) return;
+    // A proper noun is a name even when the word is common; any other source must not be common words alone.
+    if (!n.proper && allCommon(term)) return;
+    // A participle is a state, not a thing: a declared "missing" or "resolved" is never a candidate.
+    if (declared && /^[a-z]+[^e]ed$/.test(term)) return;
+    const entry = pool.get(term) ?? { proper: false, declared: false, spellings: new Set<string>(), sites: [], words: [] };
+    entry.proper ||= n.proper;
+    entry.declared ||= declared;
+    entry.spellings.add(n.spelling);
+    if (site && !entry.sites.some((u) => u.file === site.file && u.line === site.line)) entry.sites.push(site);
+    pool.set(term, entry);
+  };
   for (const f of corpus.files) {
     const fileFingerprint = digest(
       f.lines.filter(
         (line) => !(f.kind === "record" && isGlossaryDecision(line)),
       ),
     );
+    let fenced = false;
+    let exported = false;
+    const python = f.rel.endsWith(".py");
     for (let n = 0; n < f.lines.length; n++) {
       const source = f.lines[n]!;
       // Review/maintenance decisions are outcomes, not fresh source-language observations of themselves.
       if (f.kind === "record" && isGlossaryDecision(source)) continue;
-      const observed = /(^|\/)\.env(?:$|\.)/.test(f.rel)
-        ? source.replace(/=.*/, "")
-        : source;
+      const secret = /(^|\/)\.env(?:$|\.)/.test(f.rel);
+      const observed = secret ? source.replace(/=.*/, "") : source;
       const normalized =
         " " + clean(observed).replace(/[^a-z0-9 ]/g, " ") + " ";
       const use: VocabularyUse = {
         file: f.rel,
         line: n + 1,
         component: componentFor(f.rel),
-        text: (/(^|\/)\.env(?:$|\.)/.test(f.rel)
-          ? source.replace(/=.*/, "=<redacted>")
-          : source
-        )
+        text: (secret ? source.replace(/=.*/, "=<redacted>") : source)
           .trim()
           .slice(0, 360),
         kind: f.kind,
@@ -278,55 +525,144 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
           add(phrase, use);
           spans.push(phrase);
         }
-      const tokens = new Set<string>();
-      if (f.kind === "code" || f.kind === "data") {
-        for (const m of observed.matchAll(WORD)) {
-          if (
-            /[A-Z_-]/.test(m[0]) ||
-            /^\s*(?:def|class|function|const|let|export|public)\b/.test(
-              observed,
-            )
-          ) {
-            tokens.add(clean(m[0]));
-            for (const w of identifierWords(m[0])) tokens.add(clean(w));
-          }
+      const refused = spans.filter((p) => rejected.has(p));
+      // Only prose a person can still edit puts a sense at risk: code shares words with the language (Promise), and a record is history.
+      if (refused.length && f.kind === "prose") {
+        // A rejected word inside a longer known name on the same line is that name, not the refusal.
+        const masked = spans
+          .filter((p) => !rejected.has(p))
+          .reduce((line, p) => line.split(" " + p + " ").join("   "), normalized);
+        const standing = refused.filter((p) => masked.includes(" " + p + " "));
+        if (standing.length) {
+          const byLine = rejectedLines.get(f.rel) ?? new Map<number, string[]>();
+          byLine.set(n + 1, standing);
+          rejectedLines.set(f.rel, byLine);
         }
-      } else {
-        for (const m of observed.matchAll(
-          /`([^`\n]+)`|\b([A-Z][a-z]+(?:[A-Z][a-z]+)*)\b/g,
-        ))
-          tokens.add(clean(m[1] ?? m[2] ?? ""));
-        if (/^#{1,6}\s/.test(observed))
-          for (const m of observed.matchAll(WORD)) tokens.add(clean(m[0]));
       }
-      for (const token of tokens)
-        if (
-          candidate(token) &&
-          !spans.some((p) => p !== token && p.split(" ").includes(token))
-        )
-          add(token, use);
+      if (f.kind === "code") {
+        const name = declaredName(observed);
+        if (name !== undefined && !name.startsWith("_")) {
+          const term = clean(name);
+          const sites = declarations.get(term) ?? [];
+          sites.push(use);
+          declarations.set(term, sites);
+          nominate({ term, spelling: name, proper: false }, use, true);
+        }
+        const member = memberName(observed, exported, python);
+        if (member !== undefined) nominate({ term: clean(member), spelling: member, proper: false }, use, true);
+        // A body opened by an exported type (or a top-level Python class) holds declared fields until it closes at the margin.
+        if (python ? /^class\s/.test(observed) : /^export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:interface|type|class)\s.*\{\s*$/.test(observed)) exported = true;
+        else if (python ? /^\S/.test(observed) : /^[}\]]/.test(observed)) exported = false;
+        continue;
+      }
+      if (f.kind === "data") continue;
+      if (f.kind === "prose" && /^\s*(```|~~~)/.test(observed)) {
+        fenced = !fenced;
+        continue;
+      }
+      if (fenced) continue;
+      const texts = f.kind === "record" ? recordProse(observed) : [observed];
+      // Words inside a known multi-word name on this line are that name's ("order" in "work order"), not another candidate's.
+      const inside = new Set(
+        phrases
+          .filter((p) => p.includes(" ") && (normalized.includes(" " + p + " ") || normalized.includes(" " + p + "s ") || normalized.includes(" " + p + "es ")))
+          .flatMap((p) => p.split(" ").flatMap((w) => [w, w + "s", w + "es"])),
+      );
+      const runs: Word[][] = [];
+      for (const text of texts) {
+        const heading = f.kind === "prose" && /^#{1,6}\s/.test(text);
+        for (const nomination of proseNominations(text, heading))
+          if (!(heading && inside.has(nomination.term))) nominate(nomination, use);
+        runs.push(...wordRuns(text));
+      }
+      for (const run of runs)
+        for (let i = 0; i < run.length; i++)
+          if (inside.has(run[i]!.lower)) run[i] = { lower: "", original: "" };
+      proseLines.push({ use, runs });
     }
   }
   for (const c of components)
     if (c !== ".") {
-      const term = clean(c.split("/").at(-1)!);
-      if (candidate(term))
-        add(term, {
-          file: c,
-          line: 0,
-          component: c,
-          text: "Declared component folder",
-          kind: "component",
-          fingerprint: digest(c),
-        });
+      const folder = c.split("/").at(-1)!;
+      nominate({ term: clean(folder), spelling: folder, proper: false }, {
+        file: c,
+        line: 0,
+        component: c,
+        text: "Declared component folder",
+        kind: "component",
+        fingerprint: digest(c),
+      });
     }
+  // A plural nominated beside its singular is the singular's.
+  const canonical = new Map<string, string>();
+  for (const term of pool.keys()) {
+    const words = term.split(" ");
+    const one = singular(words.at(-1)!).map((s) => [...words.slice(0, -1), s].join(" ")).find((s) => pool.has(s));
+    canonical.set(term, one ?? term);
+  }
+  for (const [term, into] of canonical)
+    if (into !== term) {
+      const from = pool.get(term)!;
+      const to = pool.get(into)!;
+      to.proper ||= from.proper;
+      to.declared ||= from.declared;
+      for (const s of from.spellings) to.spellings.add(s);
+      for (const site of from.sites) if (!to.sites.some((u) => u.file === site.file && u.line === site.line)) to.sites.push(site);
+      pool.delete(term);
+    }
+  // A declared name recurs wherever prose writes it as words, plural included; a well-known capitalized spelling is not a use.
+  for (const line of proseLines) {
+    const seen = new Set<string>();
+    for (const run of line.runs)
+      for (let i = 0; i < run.length; i++)
+        for (let size = 1; size <= 3 && i + size <= run.length; size++) {
+          const words = run.slice(i, i + size);
+          if (words.some((w) => w.lower === "")) break;
+          const last = words.at(-1)!.lower;
+          const head = words.slice(0, -1).map((w) => w.lower);
+          const key = [last, ...singular(last)].map((w) => [...head, w].join(" ")).find((k) => pool.get(k)?.declared);
+          if (key === undefined || seen.has(key)) continue;
+          if (isWellKnown(famous, key, words.map((w) => w.original).join(" "))) continue;
+          seen.add(key);
+          pool.get(key)!.words.push(line.use);
+        }
+  }
+  const candidates = new Map<string, { uses: VocabularyUse[]; prose: number; components: number }>();
+  for (const [term, entry] of pool) {
+    // Written as a name (backticked, Title Case, a heading): the unknown-noun check's sense of a use.
+    const named = entry.sites.filter((u) => u.kind === "prose" || u.kind === "record");
+    const namedSpread = new Set(entry.sites.map((u) => u.component)).size;
+    // Declared in code and written as words in prose: the vocabulary the code and the documents share.
+    const wordSpread = new Set([...entry.words, ...entry.sites.filter((u) => u.kind === "code")].map((u) => u.component)).size;
+    const byName = named.length >= 3 || (named.length >= 2 && namedSpread >= 2);
+    const byWord = entry.declared && entry.words.length >= 10 && wordSpread >= 4;
+    if (!byName && !byWord) continue;
+    const all = [...entry.sites];
+    for (const u of entry.words) if (!all.some((s) => s.file === u.file && s.line === u.line)) all.push(u);
+    const prose = all.filter((u) => u.kind === "prose" || u.kind === "record").length;
+    candidates.set(term, { uses: all, prose, components: new Set(all.map((u) => u.component)).size });
+  }
+  for (const [term, found] of candidates) for (const u of found.uses) add(term, u);
   const decisions = rulings(root);
+  // A name refused for this very concept, written on or beside a line that uses the concept: the writer may be mixing the two.
+  const near = (list: VocabularyUse[], concept: string): string | undefined => {
+    for (const u of list) {
+      const byLine = rejectedLines.get(u.file);
+      if (!byLine) continue;
+      for (let d = -1; d <= 1; d++) {
+        const name = byLine.get(u.line + d)?.find((r) => rejected.get(r)?.concept === concept);
+        if (name) return `beside "${name}", a name rejected for ${concept}, at ${u.file}:${u.line + d}`;
+      }
+    }
+    return undefined;
+  };
   const terms: VocabularyTerm[] = [...uses]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([term, locations]) => {
       locations.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
-      const item = knownMeaning(term, known);
-      const refused = rejected.get(term);
+      const candidate = candidates.get(term);
+      const item = candidate ? undefined : knownMeaning(term, known);
+      const refused = candidate ? undefined : rejected.get(term);
       const original = item?.concept
         ? rawEntries.get(item.layer + ":" + item.concept.name)
         : undefined;
@@ -344,32 +680,47 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
         propertyOwners: alternatives ?? null,
         rejected: refused ?? null,
       });
+      const recorded = senses.get(term);
+      const multiple =
+        alternatives && alternatives.length > 1
+          ? `more than one recorded sense: ${alternatives.map((a) => `${a.concept} (${a.layer})`).join(", ")}`
+          : recorded && recorded.size > 1
+            ? `more than one recorded sense: ${[...recorded].join(", ")}`
+            : undefined;
+      const atRisk = (component: string, here: VocabularyUse[]): string | undefined => {
+        if (candidate || refused || !item || (!item.concept && !alternatives?.length)) return undefined;
+        if (multiple) return multiple;
+        const beside = item.concept ? near(here, item.concept.name) : undefined;
+        if (beside) return beside;
+        if (project && item.layer === "coherence") {
+          const declared = (declarations.get(term) ?? []).find((u) => u.component === component);
+          if (declared) return `declared in this project's code (${declared.file}:${declared.line}) with its own sense, while the definition is Coherence's`;
+        }
+        return undefined;
+      };
       const contexts = [...new Set(locations.map((u) => u.component))]
         .sort()
         .map((component) => {
+          const here = locations.filter((u) => u.component === component);
           // Content, not line numbers, identifies a context; moving a line does not erase a human's answer.
           const evidence = digest({
             fingerprint,
             component,
-            uses: [
-              ...new Set(
-                locations
-                  .filter((u) => u.component === component)
-                  .map((u) => u.fingerprint + ":" + u.text),
-              ),
-            ].sort(),
+            uses: [...new Set(here.map((u) => u.fingerprint + ":" + u.text))].sort(),
           });
           const ruling = decisions.get(evidence);
+          const risk = atRisk(component, here);
           return {
             component,
             fingerprint: evidence,
             disposition: ruling?.disposition ?? "unreviewed",
             because: ruling?.because ?? null,
+            ...(risk ? { risk } : {}),
           };
         });
       return {
         term,
-        state: refused ? "rejected" : (item?.state ?? "unresolved"),
+        state: candidate ? "unresolved" : refused ? "rejected" : (item?.state ?? "unresolved"),
         concept: item?.concept?.name ?? refused?.concept ?? null,
         layer: item?.layer ?? null,
         definition: item?.concept?.definition ?? null,
@@ -379,6 +730,7 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
           {},
         confusables: item?.concept?.notToBeConfusedWith ?? [],
         ...(alternatives && alternatives.length > 1 ? { meaningAlternatives: alternatives } : {}),
+        ...(candidate ? { recurrence: { prose: candidate.prose, components: candidate.components } } : {}),
         fingerprint,
         count: locations.length,
         uses: locations,
@@ -392,20 +744,22 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
     excluded: corpus.excluded.sort((a, b) => a.file.localeCompare(b.file)),
     unreadable: corpus.unreadable,
     extraction:
-      "Exact declared phrases plus heuristic Latin-alphabet code identifiers, keys, backticked names, title-case prose, headings and declared component names. Counts refer only to these observed candidates.",
+      `Exact declared phrases in every kind. Candidates: from code, declared and exported names and the fields of exported types only; from prose and records, Title Case away from a sentence start, heading words, and single backticked words; declared component folders. A candidate stands only when prose writes it as a name on three lines, or on two across two components, or, for a name code declares (fields of exported types included), when prose writes it as words on ten lines across four components. Never candidates: ids, paths, fragments, punctuation-bearing tokens, general English and programming words, well-known names (list version ${famous.version}, the config's wellKnown, the project's own name), and names the glossary declares or lists under "not:".`,
     limits: [
       "No exhaustive extraction or automatic proof of meaning.",
       "SQL/data/notebook bodies are text, not resolved language symbols; unsupported/binary files and symlinks are reported as excluded.",
-      "Known words in a new component require sense review; a matched spelling is not a confirmed meaning.",
+      "Sense review is asked only where meaning is at risk: more than one recorded sense, a use on or beside a line with a name rejected for that concept, or a Coherence concept the project's code declares with its own sense. A matched spelling elsewhere is not a confirmed meaning either.",
       "Unknowns and deferred reviews are not covered. Journal review decisions do not nominate themselves.",
+      "Totals are population facts about this reading, not a to-do count.",
     ],
   };
+  const settled = (c: VocabularyContext): boolean => c.disposition === "confirmed" || c.disposition === "not-domain";
   return {
     version: 1,
     projectGlossary:
       project?.path ??
       (coherence.path.startsWith(root + "/") ? coherence.path : null),
-    fingerprint: digest({ population, terms }),
+    fingerprint: digestAll([population.extraction, ...population.limits, ...population.files, ...population.excluded, ...population.unreadable, ...terms]),
     population,
     terms,
     totals: {
@@ -415,57 +769,115 @@ export async function glossaryCoverage(root: string): Promise<Coverage> {
         .length,
       rejected: terms.filter((t) => t.state === "rejected").length,
       unresolved: terms.filter((t) => t.state === "unresolved").length,
-      unreviewedContexts: terms.reduce(
-        (n, t) =>
-          n +
-          t.contexts.filter(
-            (c) =>
-              c.disposition !== "confirmed" && c.disposition !== "not-domain",
-          ).length,
-        0,
-      ),
+      unreviewedContexts: terms.reduce((n, t) => n + t.contexts.filter((c) => c.risk !== undefined && !settled(c)).length, 0),
     },
   };
 }
+
+/* -------------------------------------------------------------- attention */
+
+export interface Attention {
+  /** Recurring terms that lack a definition, most recurring first; a term every context dismissed is gone. */
+  undefinedTerms: { term: string; prose: number; components: number; first: string; fingerprint: string }[];
+  /** Uses whose sense is at risk and no review has settled. */
+  senses: { term: string; component: string; reason: string; evidence: string; state: string }[];
+}
+
+const isSettled = (disposition: string): boolean => disposition === "confirmed" || disposition === "not-domain";
+
+/** The short ranked signal a reader can act on: which names to define, and which uses to check. */
+export function attention(report: Coverage): Attention {
+  const undefinedTerms = report.terms
+    .filter((t) => t.state === "unresolved" && t.recurrence !== undefined && !t.contexts.every((c) => isSettled(c.disposition)))
+    .map((t) => ({
+      term: t.term,
+      prose: t.recurrence!.prose,
+      components: t.recurrence!.components,
+      first: ((u) => (u ? `${u.file}:${u.line}` : ""))(t.uses.find((u) => u.kind === "prose" || u.kind === "record") ?? t.uses[0]),
+      fingerprint: t.fingerprint,
+    }))
+    .sort((a, b) => b.prose * b.components - a.prose * a.components || b.prose - a.prose || a.term.localeCompare(b.term));
+  const senses = report.terms
+    .flatMap((t) =>
+      t.contexts
+        .filter((c) => c.risk !== undefined && !isSettled(c.disposition))
+        .map((c) => ({ term: t.term, component: c.component, reason: c.risk!, evidence: c.fingerprint, state: t.state })),
+    )
+    .sort((a, b) => a.term.localeCompare(b.term) || a.component.localeCompare(b.component));
+  return { undefinedTerms, senses };
+}
+
+function listed(names: string[]): string {
+  return names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/**
+ * The ranked short list as one or two lines, or nothing at all when nothing
+ * is owed. Never a total: a number nobody can act on trains a reader to skip
+ * the line.
+ */
+export function attentionText(report: Coverage, cli = "coherence", limit = 5): string {
+  const { undefinedTerms, senses } = attention(report);
+  const lines: string[] = [];
+  if (undefinedTerms.length > 0) {
+    const shown = undefinedTerms.slice(0, limit).map((t) => t.term);
+    const head =
+      undefinedTerms.length <= limit
+        ? `${undefinedTerms.length === 1 ? "A recurring term lacks" : `${undefinedTerms.length} recurring terms lack`} a definition: ${listed(shown)}.`
+        : `Recurring terms that lack a definition, most recurring first: ${shown.join(", ")}; the rest: ${cli} glossary coverage.`;
+    lines.push(`${head} Declare each (${cli} glossary propose declare <term> --definition "<text>" --because "<why>") or map it as an alias of an existing concept.`);
+  }
+  if (senses.length > 0) {
+    // One entry per term: the same risk in five components is one thing to check, named once.
+    const byTerm = new Map<string, { reason: string; components: string[] }>();
+    for (const s of senses) {
+      const entry = byTerm.get(s.term) ?? { reason: s.reason, components: [] };
+      entry.components.push(s.component);
+      byTerm.set(s.term, entry);
+    }
+    const shown = [...byTerm].slice(0, 3).map(([term, e]) => `${term} in ${e.components.slice(0, 2).join(", ")}${e.components.length > 2 ? " and elsewhere" : ""} (${e.reason})`);
+    lines.push(`Sense at risk: ${shown.join("; ")}${byTerm.size > 3 ? `; the rest: ${cli} glossary coverage` : ""}. Check each use against the definition: ${cli} glossary review <term>.`);
+  }
+  return lines.join("\n");
+}
+
 export function coverageText(report: Coverage, term?: string): string {
-  const entries = term
-    ? report.terms.filter(
-        (t) => t.term === clean(term) || clean(t.concept ?? "") === clean(term),
-      )
-    : [...report.terms].sort(
-        (a, b) =>
-          Number(b.state === "unresolved") - Number(a.state === "unresolved") ||
-          b.contexts.length - a.contexts.length ||
-          b.count - a.count ||
-          a.term.localeCompare(b.term),
-      );
-  return [
-    `Glossary coverage: ${report.population.files.length} files; ${report.totals.terms} observed candidate terms; ${report.totals.known} declared, ${report.totals.rejected} rejected, ${report.totals.unresolved} unresolved.`,
-    `${report.totals.unreviewedContexts} contexts need review; ${report.population.excluded.length} exclusions; ${report.population.unreadable.length} unreadable. This is not a semantic coverage percentage.`,
-    ...entries
-      .slice(0, term ? entries.length : 40)
-      .flatMap((t) => [
-        `${t.term} [${t.state}${t.concept ? "; " + t.concept : ""}] ${t.count} uses`,
-        ...(term
-          ? [
-              t.definition ?? "No settled definition.",
-              `  properties: ${JSON.stringify(t.properties)}; confusables: ${t.confusables.join("; ") || "none declared"}`,
-              ...(t.meaningAlternatives ? t.meaningAlternatives.map((meaning) => `  applicable property meaning: ${meaning.concept} (${meaning.layer}) — ${meaning.definition}; properties ${JSON.stringify(meaning.properties)}`) : []),
-              ...t.contexts.map(
-                (c) =>
-                  `  ${c.component}: ${c.disposition}; evidence ${c.fingerprint}`,
-              ),
-              ...t.uses.map((u) => `  ${u.file}:${u.line} ${u.text}`),
-            ]
-          : [
-              `  ${t.uses[0]?.file}:${t.uses[0]?.line}; ${t.contexts.length} context(s)`,
-            ]),
+  if (term) {
+    const entries = report.terms.filter(
+      (t) => t.term === clean(term) || clean(t.concept ?? "") === clean(term),
+    );
+    return [
+      ...(entries.length ? [] : [`No observed use of "${term}" in this reading.`]),
+      ...entries.flatMap((t) => [
+        `${t.term} [${t.state}${t.concept ? "; " + t.concept : ""}] ${t.count} uses${t.recurrence ? `; recurs on ${t.recurrence.prose} prose lines across ${t.recurrence.components} components` : ""}`,
+        t.definition ?? "No settled definition.",
+        `  properties: ${JSON.stringify(t.properties)}; confusables: ${t.confusables.join("; ") || "none declared"}`,
+        ...(t.meaningAlternatives ? t.meaningAlternatives.map((meaning) => `  applicable property meaning: ${meaning.concept} (${meaning.layer}) — ${meaning.definition}; properties ${JSON.stringify(meaning.properties)}`) : []),
+        ...t.contexts.map(
+          (c) =>
+            `  ${c.component}: ${c.disposition}${c.risk ? `; sense at risk: ${c.risk}` : ""}; evidence ${c.fingerprint}`,
+        ),
+        ...t.uses.map((u) => `  ${u.file}:${u.line} ${u.text}`),
       ]),
-    ...(!term && entries.length > 40
-      ? [
-          `${entries.length - 40} more terms; use --json or review <term> for the full reading.`,
-        ]
+      ...report.population.limits,
+    ].join("\n");
+  }
+  const { undefinedTerms, senses } = attention(report);
+  const lead = attentionText(report, "coherence", 5);
+  return [
+    lead === "" ? "No recurring term lacks a definition, and no use's sense is at risk." : lead,
+    ...(undefinedTerms.length
+      ? ["", "Recurring terms without a definition (prose lines, components, first prose use):",
+          ...undefinedTerms.slice(0, 40).map((t) => `  ${t.term}: ${t.prose} prose lines, ${t.components} components; ${t.first}`),
+          ...(undefinedTerms.length > 40 ? ["  More in --json."] : [])]
       : []),
+    ...(senses.length
+      ? ["", "Senses at risk (term in component: why; evidence key for glossary review):",
+          ...senses.slice(0, 40).map((s) => `  ${s.term} in ${s.component}: ${s.reason}; evidence ${s.evidence}`),
+          ...(senses.length > 40 ? ["  More in --json."] : [])]
+      : []),
+    "",
+    "Every observed term, use and population fact: glossary coverage --json; one term whole: glossary review <term>.",
     ...report.population.limits,
   ].join("\n");
 }

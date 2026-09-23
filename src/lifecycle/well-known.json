@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "rule": "A name belongs here only when all three hold. (1) It is the proper name of a widely used technology, programming language, runtime, platform, operating system, vendor, product, protocol, standard, or file format. (2) A model has met it so often, in one meaning, that no project definition could make it less ambiguous. (3) It is not an ordinary English word or a general programming noun a project could give its own sense. A name that fails only (3), because its lowercase spelling is an ordinary word (Node, Chrome, Swift), goes under cased: only its capitalized spelling is skipped, and a lowercase use in a project sense stays a candidate. Never list a common word a project could give its own sense (hive, scope, core, run, session, store, owner, slice): that is where ambiguity lives, and such a word stays a candidate even written as a proper noun. Names are listed as written; matching under names ignores case and hyphens. The project's own name comes from its config and glossary, never from this file; a project adds names only it can vouch for under wellKnown in coherence.config.json. Bump version when an entry is added or removed.",
+  "names": [
+    "Airflow", "Amazon", "Android", "Anthropic", "Apple Silicon", "ASCII", "AWS", "BigQuery", "Chromium",
+    "ChatGPT", "Claude", "ClickHouse", "Cloudflare", "Clojure", "CommonJS", "CSS", "CSV", "Dagster", "Datadog",
+    "Debian", "Deno", "Django", "Docker", "ECMAScript", "Elasticsearch", "Erlang", "esbuild", "ESLint", "FastAPI",
+    "Figma", "Firebase", "Firefox", "GCP", "GitHub", "GitLab", "Golang", "Google", "GPT", "Grafana",
+    "GraphQL", "gRPC", "Haskell", "Helvetica", "Heroku", "Homebrew", "HTML", "HTTP", "HTTPS", "Hugging Face", "iOS",
+    "iPadOS", "iPhone", "iPad", "Javascript", "Jest", "Jira", "JSDoc", "JSON", "JSONL", "JWT",
+    "Kafka", "Kotlin", "Kubernetes", "LaTeX", "Linux", "LLM", "LSP", "macOS", "Microsoft", "MCP",
+    "Mocha", "mypy", "MySQL", "Netlify", "Nginx", "npm", "npx", "NumPy", "Nuxt", "OAuth",
+    "Ollama", "OpenAI", "OpenAPI", "oxlint", "PDF", "Perl", "PHP", "pnpm", "PNG",
+    "POSIX", "PostgreSQL", "Postgres", "PostHog", "Pydantic", "Pyright", "pytest", "Python", "PyTorch", "RabbitMQ",
+    "Redis", "Ruff", "Scala", "SDK", "SQL", "SQLAlchemy", "SQLite", "SSH", "SSL", "Stylelint",
+    "Supabase", "Svelte", "SvelteKit", "SVG", "SwiftUI", "Tailwind", "TCP", "TensorFlow", "Terraform", "TLS",
+    "TOML", "TypeScript", "tvOS", "Ubuntu", "UDP", "Unicode", "Unix", "URI", "URL", "UTF",
+    "UUID", "Vercel", "Visual Studio", "visionOS", "Vite", "Vitest", "VSCode", "Vue", "watchOS", "WebAssembly",
+    "Webpack", "WebGL", "WebGPU", "WebKit", "WebSocket", "Wasm", "Xcode", "XML", "YAML", "Zsh"
+  ],
+  "cased": [
+    "Angular", "Apple", "Babel", "Bash", "Bun", "Celery", "Chrome", "Codex", "Copilot", "Cursor",
+    "Elixir", "Flask", "Gemini", "Helm", "Java", "Linear", "Llama", "Mac", "Mermaid", "Metal",
+    "Node", "Notion", "Pandas", "Prettier", "Prometheus", "Rails", "React", "Ruby", "Rust", "Safari",
+    "Sentry", "Slack", "Snowflake", "Stripe", "Swift", "Temporal", "Windows", "Wrangler", "Yarn"
+  ]
+}
