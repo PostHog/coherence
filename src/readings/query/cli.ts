@@ -14,8 +14,7 @@
 
 import { basename, resolve } from "node:path";
 import type { Io } from "../../journal/cli.ts";
-import { economyFor } from "../../economy/cli.ts";
-import { formatClosure, type Closure } from "../../economy/closure.ts";
+import { economyFor, queryEconomyCommand, type EconomyOf } from "../../economy/cli.ts";
 import { glossaryCoverage } from "../../lifecycle/glossary-coverage.ts";
 import { COHERENCE_GLOSSARY } from "../../lifecycle/project.ts";
 import { buildScopePage } from "../scope/build.ts";
@@ -27,7 +26,7 @@ export { QUERY_USAGE };
 
 /** What the command line reaches beyond the page state; a test hands in a closure that needs no instrument. */
 export interface QueryDependencies {
-  economy: (root: string, paths: readonly string[]) => Promise<Closure>;
+  economy: EconomyOf;
   /** Injectable so the full-reading route can be proved without constructing a giant fixture tree. */
   glossary?: typeof glossaryCoverage;
   /** Injectable so the Structure question can be answered without an instrument. */
@@ -63,6 +62,8 @@ function parse(argv: string[]): Parsed {
 export async function queryCommand(argv: string[], io: Io, deps: QueryDependencies = QUERY_DEPENDENCIES): Promise<number> {
   // The observed question reads the observation store, never the page state, and takes its own flags.
   if (argv[0] === "observed") return observedCommand(io.cwd, argv.slice(1), io);
+  // The economy question reads the instrument and git, never the page state, and takes its own flags (--changed, --since).
+  if (argv[0] === "economy") return queryEconomyCommand(argv.slice(1), io, deps.economy);
   let parsed: Parsed;
   try {
     parsed = parse(argv);
@@ -76,14 +77,8 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
     return 64;
   }
   const root = resolve(parsed.root ?? io.cwd);
-  if (question === "economy") {
-    if (args.length === 0) {
-      io.err(`query economy: give at least one path\n${QUERY_USAGE}`);
-      return 64;
-    }
-    io.out(formatClosure(await deps.economy(root, args)));
-    return 0;
-  }
+  // Reached when --root or --session came before the question; the economy's own flags must follow it.
+  if (question === "economy") return queryEconomyCommand([...args, "--root", root], io, deps.economy);
   if (question === "glossary") {
     // Never go through buildScopePage: an omitted page term still needs full CLI access.
     const result = args.length !== 1 || args[0]!.trim() === ""

@@ -33,3 +33,17 @@ The context closure of a change, the read traces that record what sessions actua
   crossing: project-source -> reading
   refuted: printed the total line before the unreached line -> "mass: a file in no component and a file in a component that no invariant reaches count as unreached; unreached prints first; deterministic" went red in economy.test.ts on the first printed line; restored, green (2026-09-17)
   kinds: none
+- working change is the project's change: The economy of the working change starts from exactly the project files git reports as changed, each with how git reported it: staged, unstaged, and untracked files not ignored against HEAD, and with --since everything from the merge base of the ref and HEAD; a deletion is reported and never given, a rename is its new path noting the old, and no ignored file or nested checkout ever counts.
+  over: every path git reports for the working change of one tree, with and without --since
+  via: working change: staged, unstaged, and untracked project files against HEAD, deletions reported and renames as the new path, never an ignored file or a nested checkout; --since adds everything from the merge base; sorted and deterministic
+  because: an agent asking what its change must load should not have to list what it changed, and the list git gives is wider than the project: an agent's worktree copy, a nested clone, or an ignored build file named as changed would pull someone else's working state into the closure and inflate every token estimate calibrate compares; --since against a branch tip instead of the merge base would count what the branch never touched
+  crossing: project-source -> reading
+  refuted: let every path through without keepProjectFiles for paths on disk -> "working change: staged, unstaged, and untracked project files against HEAD, ..." went red in change.test.ts with an agent's worktree copy (.claude/worktrees/agent-x/src/api/render.ts) listed as added; restored, green (2026-09-23)
+  kinds: none
+- removal keeps its dependents: The files still importing a path the working change deleted, or the old path of a rename, enter the closure as that removal's dependents, and the spec of the component that held a deleted file enters with them.
+  over: every deleted or renamed-away path of a working change, against every project source file importing it
+  via: economy of the working change: the files still importing a deleted path or a renamed-away path enter the closure as its dependents, with the spec that held the deleted file
+  because: a deleted file cannot be loaded or resolved, so hops through references find nothing for it, yet the files still naming it are exactly what the change broke; leaving them out would predict the smallest closure for the change most likely to need a wider one
+  crossing: project-source -> reading
+  refuted: skipped the scan for files importing a deleted or renamed-away path -> "economy of the working change: the files still importing a deleted path ..." went red in change.test.ts with src/api/uses-gone.ts missing from the closure; restored, green (2026-09-23)
+  kinds: none

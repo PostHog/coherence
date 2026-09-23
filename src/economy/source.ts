@@ -93,6 +93,8 @@ export interface Import {
   module: string;
 }
 
+const NONE: ReadonlySet<string> = new Set();
+
 const TS_NAMED = /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["']([^"']+)["']/g;
 const TS_DEFAULT = /import\s+(?:type\s+)?([A-Za-z_$][\w$]*)\s*(?:,\s*\{[^}]*\})?\s*from\s*["']([^"']+)["']/g;
 const TS_NAMESPACE = /import\s+(?:type\s+)?\*\s+as\s+[A-Za-z_$][\w$]*\s+from\s*["']([^"']+)["']/g;
@@ -100,8 +102,13 @@ const TS_SIDE = /(?:^|\n)\s*import\s*["']([^"']+)["']/g;
 const PY_FROM = /^from\s+([\w.]+)\s+import\s+([^\n]+)$/gm;
 const PY_IMPORT = /^import\s+([\w.]+)/gm;
 
-/** Resolve a module specifier from a file to a project-relative source file, or undefined for a package or a file not under the root. */
-export function resolveModule(root: string, from: string, specifier: string, language: Language): string | undefined {
+/**
+ * Resolve a module specifier from a file to a project-relative source file,
+ * or undefined for a package or a file not under the root. A path in
+ * `vanished` (a file the working change deleted or renamed away) resolves as
+ * though it were still on disk, so its importers can be found.
+ */
+export function resolveModule(root: string, from: string, specifier: string, language: Language, vanished: ReadonlySet<string> = NONE): string | undefined {
   if (language === "python") {
     const dots = /^(\.*)(.*)$/.exec(specifier)!;
     const up = dots[1]!.length;
@@ -109,7 +116,7 @@ export function resolveModule(root: string, from: string, specifier: string, lan
     let base = posix.dirname(from);
     for (let i = 1; i < up; i++) base = posix.dirname(base);
     const candidates = up === 0 ? [posix.join(...parts) + ".py", posix.join(...parts, "__init__.py")] : [posix.join(base, ...parts) + ".py", posix.join(base, ...parts, "__init__.py")];
-    return candidates.find((c) => existsSync(resolve(root, c)));
+    return candidates.find((c) => vanished.has(c) || existsSync(resolve(root, c)));
   }
   if (!specifier.startsWith(".")) return undefined;
   const joined = posix.normalize(posix.join(posix.dirname(from), specifier));
@@ -117,6 +124,7 @@ export function resolveModule(root: string, from: string, specifier: string, lan
   for (const candidate of candidates) {
     const rel = toRelative(root, resolve(root, candidate));
     if (rel === undefined) continue;
+    if (vanished.has(rel) && isSourceFile(rel, language)) return rel;
     try {
       if (statSync(resolve(root, rel)).isFile() && isSourceFile(rel, language)) return rel;
     } catch {
@@ -126,11 +134,11 @@ export function resolveModule(root: string, from: string, specifier: string, lan
   return undefined;
 }
 
-/** The names a file imports from files under the root, with the module each comes from. */
-export function importsOf(root: string, file: string, text: string, language: Language): Import[] {
+/** The names a file imports from files under the root, with the module each comes from; `vanished` as for resolveModule. */
+export function importsOf(root: string, file: string, text: string, language: Language, vanished: ReadonlySet<string> = NONE): Import[] {
   const found: Import[] = [];
   const add = (name: string | undefined, specifier: string): void => {
-    const module = resolveModule(root, file, specifier, language);
+    const module = resolveModule(root, file, specifier, language, vanished);
     if (module === undefined || module === file) return;
     found.push({ name, module });
   };

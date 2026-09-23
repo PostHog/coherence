@@ -16,6 +16,11 @@
  *   invariant   every invariant whose protected thing or chokepoint lives in
  *               a given file: its spec, and the other side's file
  *
+ * A working change read from git (change.ts) adds its paths to the given
+ * files. A deleted file cannot be loaded or resolved, so it is reported, not
+ * given; the files still importing it, or still importing the old path of a
+ * rename, are its dependents and enter the closure, found by the plain scan.
+ *
  * Nothing is stored; the closure is a reading over references. With no
  * instrument the hops are skipped and invariants come from the files the
  * latest run touched, and the closure says so. Deterministic for one tree:
@@ -29,7 +34,8 @@ import { projectSites } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
-import { componentOf, declarationsOf, importsOf, isTest, toRelative } from "./source.ts";
+import { describeChanged, type WorkingChange } from "./change.ts";
+import { componentOf, declarationsOf, importsOf, isTest, sourceFiles, toRelative } from "./source.ts";
 
 export interface ClosureEntry {
   file: string;
@@ -54,6 +60,8 @@ export interface Closure {
   instrument: Instrument;
   /** Whether the hops were computed through references or skipped. */
   hops: "references" | "skipped";
+  /** When the paths came from git as well: the paths the caller named, and the working change with how git reported each path. */
+  change?: { named: string[]; working: WorkingChange };
 }
 
 export interface ClosureOptions {
@@ -63,6 +71,16 @@ export interface ClosureOptions {
   /** Why no adapter is available, when none is. */
   instrumentReason?: string | undefined;
   model?: SpecModel | undefined;
+  /** The working change read from git, whose present paths join the given files. */
+  change?: WorkingChange | undefined;
+}
+
+function readableFile(absolute: string): boolean {
+  try {
+    return statSync(absolute).isFile();
+  } catch {
+    return false;
+  }
 }
 
 export function tokenEstimate(bytes: number): number {
@@ -113,7 +131,11 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
   const config = readEnforcementConfig(root);
   const language: Language = config.language;
   const model = options.model ?? loadSpecModel(root);
-  const given = [...new Set(paths.map((p) => toRelative(root, p)).filter((p): p is string => p !== undefined))].sort();
+  const named = [...new Set(paths.map((p) => toRelative(root, p)).filter((p): p is string => p !== undefined))].sort();
+  const working = options.change;
+  // A changed path joins the given files when it can be read as a file; a link to a folder, or a broken link, is reported, never loaded.
+  const changedPresent = (working?.paths ?? []).filter((c) => c.state !== "deleted" && readableFile(resolve(root, c.path))).map((c) => c.path);
+  const given = [...new Set([...named, ...changedPresent])].sort();
   for (const file of given) {
     const absolute = resolve(root, file);
     if (!existsSync(absolute) || !statSync(absolute).isFile()) throw new Error(`${file}: not a file under ${root}`);
@@ -192,6 +214,29 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
     }
   }
 
+  // Dependents of what the change removed: files still importing a deleted path, or the old path of a rename.
+  const vanished = new Map<string, string>();
+  for (const c of working?.paths ?? []) {
+    if (c.state === "deleted") vanished.set(c.path, `deleted ${c.path}`);
+    else if (c.state === "renamed" && c.from !== undefined) vanished.set(c.from, `${c.from}, renamed to ${c.path}`);
+  }
+  if (vanished.size > 0) {
+    const gone = new Set(vanished.keys());
+    for (const file of sourceFiles(root, language)) {
+      if (gone.has(file)) continue;
+      const text = texts.get(file) ?? readFileSync(resolve(root, file), "utf8");
+      for (const imported of importsOf(root, file, text, language, gone)) {
+        const what = vanished.get(imported.module);
+        if (what !== undefined) out.add(file, `imports ${imported.name ?? "the module"} from ${what}`);
+      }
+    }
+    for (const c of working?.paths ?? []) {
+      if (c.state !== "deleted") continue;
+      const component = componentOf(model, c.path);
+      if (component !== undefined && component.specPath !== c.path) out.add(component.specPath, `spec of ${component.folder === "." ? "the entry component" : component.folder}, which held deleted ${c.path}`);
+    }
+  }
+
   // The spec of every component a closure file lies in.
   for (const file of out.files()) {
     if (file.endsWith(".spec.md")) continue;
@@ -202,7 +247,9 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
 
   const entries = out.build();
   const bytes = entries.reduce((sum, e) => sum + e.bytes, 0);
-  return { given, entries, bytes, tokens: tokenEstimate(bytes), instrument, hops: adapter === undefined ? "skipped" : "references" };
+  const closure: Closure = { given, entries, bytes, tokens: tokenEstimate(bytes), instrument, hops: adapter === undefined ? "skipped" : "references" };
+  if (working !== undefined) closure.change = { named, working };
+  return closure;
 }
 
 export interface FormatOptions {
@@ -215,7 +262,21 @@ export const DEFAULT_LIMIT = 40;
 export function formatClosure(closure: Closure, options: FormatOptions = {}): string {
   const limit = options.limit ?? DEFAULT_LIMIT;
   const lines: string[] = [];
-  lines.push(`economy of a change to ${closure.given.join(", ")}: ${closure.entries.length} file${closure.entries.length === 1 ? "" : "s"}, ~${closure.tokens} tokens (${closure.bytes} bytes / 4)`);
+  const size = `${closure.entries.length} file${closure.entries.length === 1 ? "" : "s"}, ~${closure.tokens} tokens (${closure.bytes} bytes / 4)`;
+  const change = closure.change;
+  if (change === undefined) {
+    lines.push(`economy of a change to ${closure.given.join(", ")}: ${size}`);
+  } else {
+    const since = change.working.since;
+    const against = since === null ? "HEAD" : `HEAD and since ${since.ref} (merge base ${since.base.slice(0, 12)})`;
+    const count = change.working.paths.length;
+    if (count === 0 && change.named.length === 0) {
+      return `the working change is empty: nothing staged, unstaged, or untracked against ${against}; the closure is empty`;
+    }
+    const also = change.named.length === 0 ? "" : `, with ${change.named.join(", ")} named`;
+    lines.push(`economy of the working change against ${against}: ${count} changed path${count === 1 ? "" : "s"}${also}: ${size}`);
+    for (const path of change.working.paths) lines.push(`  ${describeChanged(path)}`);
+  }
   for (const entry of closure.entries.slice(0, limit)) {
     lines.push(`${entry.file}  (~${tokenEstimate(entry.bytes)} tokens)`);
     for (const why of entry.why) lines.push(`    ${why}`);
