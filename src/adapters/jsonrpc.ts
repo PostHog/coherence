@@ -53,8 +53,8 @@ export class JsonRpcClient {
     });
   }
 
-  static spawn(command: string, args: string[], cwd: string): JsonRpcClient {
-    const child = spawn(command, args, { cwd, stdio: ["pipe", "pipe", "ignore"] });
+  static spawn(command: string, args: string[], cwd: string, env?: Record<string, string>): JsonRpcClient {
+    const child = spawn(command, args, { cwd, stdio: ["pipe", "pipe", "ignore"], ...(env === undefined ? {} : { env: { ...process.env, ...env } }) });
     return new JsonRpcClient(child);
   }
 

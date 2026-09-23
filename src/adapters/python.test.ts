@@ -526,3 +526,23 @@ test("a run over the Python fixture records the grade, the enforcer, and the ref
   assert.equal(outcome.record.instrument.language, "python");
   rmSync(join(root, ".coherence"), { recursive: true, force: true });
 });
+
+test("a bounded Python server gets the heap its reading asks for; an unbounded one keeps Node's default", async () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-python-heap-"));
+  writeFileSync(join(root, "a.py"), "X = 1\n", "utf8");
+  const seen: (Record<string, string> | undefined)[] = [];
+  const factory = (_command: string, _args: string[], _cwd: string, env?: Record<string, string>): PythonLanguageClient => {
+    seen.push(env);
+    throw new Error("stopped after the spawn arguments were seen");
+  };
+  try {
+    for (const adapter of [new PythonAdapter(root, factory, { exclude: ["vendor"], heapMB: 14336 }), new PythonAdapter(root, factory)]) {
+      await adapter.ready().catch(() => undefined);
+    }
+    assert.equal(seen.length, 2, "both adapters reached the spawn");
+    assert.match(seen[0]?.["NODE_OPTIONS"] ?? "", /--max-old-space-size=14336\b/, "the bounded server's heap is raised");
+    assert.equal(seen[1], undefined, "the whole-workspace server keeps the environment it inherits");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

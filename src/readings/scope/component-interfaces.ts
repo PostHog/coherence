@@ -147,9 +147,13 @@ export function withinBounds(file: string, skip: Set<string>): boolean {
 }
 
 /** The adapter the reading starts for itself: bounded to the config's ignore list, when it names one and the language's server can be bounded. */
-function boundedAdapter(language: Language, root: string, ignore: readonly string[]): LanguageAdapter {
-  return ignore.length === 0 ? adapterFor(language, root) : adapterFor(language, root, { exclude: ignore });
+function boundedAdapter(language: Language, root: string, ignore: readonly string[], memoryMB: number): LanguageAdapter {
+  // The server's heap sits above the reading's memory budget, so the budget stops the reading before the heap limit ends the server.
+  return ignore.length === 0 ? adapterFor(language, root) : adapterFor(language, root, { exclude: ignore, heapMB: memoryMB + HEAP_HEADROOM_MB });
 }
+
+/** How far the bounded server's heap ceiling sits above the reading's memory budget. */
+export const HEAP_HEADROOM_MB = 2048;
 
 /**
  * A server of its own for a reader that keeps one warm (the live Scope
@@ -163,7 +167,7 @@ export function interfaceAdapter(root: string): { adapter: LanguageAdapter; boun
   const language = readEnforcementConfig(root).language;
   const ignore = configIgnore(root);
   if (language !== "python" || ignore.length === 0) return undefined;
-  return { adapter: boundedAdapter(language, root, ignore), bounds: ignore.join("\n") };
+  return { adapter: boundedAdapter(language, root, ignore, configuredBudget(root).memoryMB), bounds: ignore.join("\n") };
 }
 
 /** The bounds interfaceAdapter would build for the root now, to tell when a kept one is stale. */
@@ -335,15 +339,17 @@ export interface InterfaceBudget {
 /**
  * The default budget. Ten minutes is the totality oracle's own ceiling
  * (TOTALITY_TIMEOUT_MS) and some forty times what Coherence's own reading
- * takes warm; a bounded reading of a PostHog subsystem finishes well inside
- * it, so a reading that has not finished by then is stuck, not slow. Three
- * gigabytes is under the four a language server's Node heap is capped at by
- * default, so the reading stops before the server thrashes or dies, and
- * well over what an adoption the size of a PostHog subsystem needs.
+ * takes warm, so a reading that has not finished by then is stuck, not slow.
+ * Twelve gigabytes: on a full PostHog checkout Pyright type-checks the real
+ * imports and sat pinned at its default ~4 GB Node heap, so the owner
+ * ruled (2026-09-23) a bigger heap over a sparse view of the bounded files;
+ * the bounded server's heap is raised to the budget plus HEAP_HEADROOM_MB so
+ * the budget, not the heap limit, stops the reading. The development
+ * machines are Apple Silicon with 48 GB.
  */
-export const DEFAULT_INTERFACE_BUDGET: InterfaceBudget = { seconds: 600, memoryMB: 3072 };
+export const DEFAULT_INTERFACE_BUDGET: InterfaceBudget = { seconds: 600, memoryMB: 12288 };
 
-/** The config key that overrides the budget: `"interfaceBudget": { "seconds": 600, "memoryMB": 3072 }`. */
+/** The config key that overrides the budget: `"interfaceBudget": { "seconds": 600, "memoryMB": 12288 }`. */
 export const BUDGET_KEY = "interfaceBudget";
 
 /** The budget the config sets, each part falling back to the default. */
@@ -449,7 +455,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
   // Started here, the server reads only the config's bounds: nothing past them is ever counted, and a monorepo's
   // server that scans every file spelling a name would spend its memory on code the reading never draws.
   const ignore = configIgnore(root);
-  const adapter = given ?? boundedAdapter(config.language, root, ignore);
+  const adapter = given ?? boundedAdapter(config.language, root, ignore, budget.memoryMB);
   let stop: { limit: "time" | "memory"; observed?: number } | undefined;
   let memory: number | undefined;
   const measure = options.memory ?? (() => languageServerMemory(adapter.serverPid?.()));

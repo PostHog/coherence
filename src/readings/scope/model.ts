@@ -469,7 +469,7 @@ export interface EntranceResolution {
 export interface InterfacePartial {
   /** The budget that was spent. */
   limit: "time" | "memory";
-  /** The budget, as a reader reads it: "600 s", "3072 MB". */
+  /** The budget, as a reader reads it: "600 s", "12288 MB". */
   budget: string;
   /** The memory the language server held when the memory budget stopped the reading. */
   observed?: string;

@@ -196,6 +196,8 @@ export interface LanguageAdapter {
  */
 export interface AdapterBounds {
   exclude: readonly string[];
+  /** The language server's JavaScript heap ceiling in megabytes, for a server whose default heap is too small for the project. */
+  heapMB?: number;
 }
 
 export interface ResolveHint {

@@ -87,7 +87,7 @@ export interface PythonLanguageClient {
   kill(): void;
 }
 
-export type PythonClientFactory = (command: string, args: string[], cwd: string) => PythonLanguageClient;
+export type PythonClientFactory = (command: string, args: string[], cwd: string, env?: Record<string, string>) => PythonLanguageClient;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..");
@@ -594,7 +594,10 @@ export class PythonAdapter implements LanguageAdapter {
       return { ok: false, reason: `${SERVER_BIN} not found; looked in the project's node_modules, Coherence's, and PATH. Install it: npm install --save-dev pyright (or pip install pyright)` };
     }
     const workspace = this.workspaceFolder();
-    const client = this.clientFactory(server.path, ["--stdio"], this.root);
+    // Pyright is a Node program: a bounded reading of a large project raises its heap past Node's default of about 4 GB.
+    const heap = this.bounds?.heapMB;
+    const env = heap === undefined ? undefined : { NODE_OPTIONS: `${process.env["NODE_OPTIONS"] ?? ""} --max-old-space-size=${Math.round(heap)}`.trim() };
+    const client = this.clientFactory(server.path, ["--stdio"], this.root, env);
     this.client = client;
     const started = Date.now();
     let found: (count: number) => void = () => {};
