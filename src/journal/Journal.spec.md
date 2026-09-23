@@ -95,3 +95,29 @@ Compression: one append-only file per session of attributed, durable outcomes, r
   checklist: worker-fencing dismissed: no lease or fence exists; ownership is a field a reader uses to find records
   checklist: commit-ordered-effects dismissed: the append is the only effect
   checklist: resumption-coverage dismissed: nothing resumes from a checkpoint; the state is recomputed from every record at each read
+- citations resolve at the write: A write that cites an id no journal or work record has is refused whole and appends nothing; a citation of a record of any kind in either store is accepted; a record that cites nothing carries no cites field, so records written before citations load and read unchanged.
+  over: every verb that takes --cite: decide, conjecture, defect, experiment create, unable, escalate, work create, work move, work close; and a store holding a record written before citations existed
+  via: citations resolve at the write: an unknown id refuses the write, a record of any kind in either store is accepted, and records without citations still load
+  because: a relationship between records is worth reading back only if its far end exists; a decision id written into a because was never resolved, so a typo or a record from another checkout read as a link to nothing. Checking at the one site that accepts a citation (citations in verbs.ts) keeps every stored citation resolvable without editing any record, and leaving the field out when empty keeps the append-only store's old lines valid as they are
+  crossing: project-source -> record
+  refuted: made citations in verbs.ts accept an id no record has -> "citations resolve at the write: an unknown id refuses the write, a record of any kind in either store is accepted, and records without citations still load" went red in journal.test.ts; restored, green (2026-09-23)
+  kinds: identity
+  checklist: capability-authorization dismissed: a citation names a record; it grants nothing and no permission is checked
+  checklist: canonical-encoding dismissed: an id is stored exactly as minted; there is no second spelling to normalize
+  checklist: identity-continuity dismissed: a record's id never changes, so a citation stays resolvable for as long as the store keeps the record
+- citations read both ways: Every reader that shows a record shows what it cites and what cites it, from both stores: the timeline, the JSON envelope, journal <id>, and a work order's inspection; the subjects feed stays subjects only.
+  over: the timeline, journal --json, journal given one id for a journal record and for a work record, work inspect, and the subjects feed, over a store where decisions, an escalation and a work order cite one another
+  via: citations read both ways: the timeline, the JSON envelope, journal <id>, and work inspect show what a record cites and what cites it
+  because: the work order concept rejected typed links because nobody read one back; a citation that only its writer's record carried would repeat that. The reverse direction is derived at every read and stored nowhere, so an old record gains its citers without an edit, and the feed stays subjects only so a boundary injection does not grow with the citations
+  crossing: record -> reading
+  refuted: dropped the cited by line from relationLines in read.ts, so the timeline showed only what a record cites -> the totality oracle went red in journal.test.ts; restored, green (2026-09-23)
+  kinds: read
+  checklist: scoped-reads dismissed: every reader sees every citation; filters narrow the view, not the population
+  checklist: redaction dismissed: a citation shows ids and subjects already readable in the journal
+- human words kept apart: Words the agent attributes to a human are stored in their own field on a decision, an escalation or an acknowledgement, never folded into the agent's because, refused when blank, and shown labeled as the agent's attribution.
+  over: decide, escalate and acknowledge with --human, a blank value, a verb that does not take it, and the timeline
+  via: --human records the words an agent attributes to a human, apart from its because
+  because: a because is the agent's reason; a ruling in the owner's words read as an agent's paraphrase loses its weight, and a paraphrase read as the owner's words gains weight it never had. The field records who the agent says spoke, not proof that a human wrote it; proving authorship is out of scope, and the label says so wherever the words are shown
+  crossing: project-source -> record
+  refuted: folded --human into the decision's because in decide instead of its own field -> the totality oracle went red in journal.test.ts; restored, green (2026-09-23)
+  kinds: none

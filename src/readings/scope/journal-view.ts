@@ -5,11 +5,23 @@
  * candidates and discriminating test; and the work orders, folded by the
  * journal from their records, when the work orders folder exists. Filtered by kind, agent, and session; searched by text. A
  * pure function from the shell state to markup.
+ *
+ * Citations read both ways: each record lists what it cites and what cites
+ * it, each as an in-page link to that record's card with its kind and
+ * subject; a work order lists what its records cite, what cites it, and the
+ * journal records bound to it. A cited record the page does not embed shows
+ * its id and the command that shows it. Words an agent attributes to a human
+ * are shown apart from the agent's because, labeled as the agent's
+ * attribution.
  */
 
 import {
   GLYPH,
   JOURNAL_KINDS,
+  citations,
+  citesOf,
+  type Citations,
+  workCites,
   distinct,
   journalId,
   journalStatuses,
@@ -24,6 +36,59 @@ import {
 } from "./derive.ts";
 import { html, type Markup } from "./html.ts";
 import type { JournalRecord, ShellState, WorkOrder } from "./model.ts";
+
+/** How many bound records a work order card lists, latest first; the rest are counted. */
+export const BOUND_SHOWN = 12;
+
+/** The longest subject a citation line carries before it is cut. */
+const CITED_SUBJECT = 110;
+
+/** What a page can resolve a citation against: the embedded records by id, and the citation index both ways. */
+interface Links extends Citations {
+  records: Map<string, JournalRecord>;
+}
+
+function linksOf(state: ShellState): Links {
+  const orders = state.journal.work.kind === "present" ? state.journal.work.orders : [];
+  return { ...citations(state.journal.records, orders), records: new Map(state.journal.records.map((r) => [r.id, r])) };
+}
+
+function cut(text: string): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length <= CITED_SUBJECT ? flat : `${flat.slice(0, CITED_SUBJECT - 1)}…`;
+}
+
+/** One cited or citing id as an in-page link to its card, with its kind and subject; an id the page does not embed says how to read it. */
+function renderCitation(id: string, links: Links): Markup {
+  const record = links.records.get(id);
+  if (record !== undefined) {
+    return html`<li data-cited="${id}"><a class="related-link" href="#${journalId(record)}">${id}</a> <span class="glyph" aria-hidden="true">${GLYPH[record.kind]}</span> <span class="label">${record.kind}</span> <span class="cited-subject">${cut(subjectOf(record))}</span></li>`;
+  }
+  const order = links.orderOf.get(id);
+  if (order !== undefined) {
+    const event = order.history.find((e) => e.id === id);
+    const what = event === undefined ? "work order" : event.kind === "completion" ? "work order close" : event.kind === "owner" ? "work order owner change" : "work order move";
+    const subject = event === undefined ? order.objective : `${order.id} ${event.kind === "owner" ? `owner → ${shortSession(event.owner)}` : `→ ${event.state}`}: ${event.because}`;
+    return html`<li data-cited="${id}"><a class="related-link" href="#${workId(order.id)}">${id}</a> <span class="label">${what}</span> <span class="cited-subject">${cut(subject)}</span></li>`;
+  }
+  return html`<li data-cited="${id}" data-absent><code>${id}</code> <span class="quiet">not embedded in this page; <code>journal ${id}</code> shows it</span></li>`;
+}
+
+/** The two directions of a record's citations, each a list of links, or nothing when both are empty. */
+function renderCitations(cites: readonly string[], citedBy: readonly string[], links: Links): Markup {
+  return html`${cites.length > 0
+    ? html`<section class="citations" data-field="cites"><h4>Cites</h4><ul>${cites.map((id) => renderCitation(id, links))}</ul></section>`
+    : null}${citedBy.length > 0
+    ? html`<section class="citations" data-field="cited-by"><h4>Cited by</h4><ul>${citedBy.map((id) => renderCitation(id, links))}</ul></section>`
+    : null}`;
+}
+
+/** Words the agent attributes to a human, apart from its because. */
+function renderHuman(record: JournalRecord): Markup | null {
+  return record.human === undefined
+    ? null
+    : html`<p class="human-words" data-field="human"><span class="label">human, as the agent attributes</span> ${record.human}</p>`;
+}
 
 function renderBecause(text: string): Markup {
   return html`<p class="because" data-field="because"><span class="because-word">because</span> ${text}</p>`;
@@ -74,8 +139,9 @@ function renderBody(record: JournalRecord): Markup {
   }
 }
 
-function renderRecord(record: JournalRecord, status: string | undefined, pinned = false): Markup {
+function renderRecord(record: JournalRecord, status: string | undefined, links: Links, pinned = false): Markup {
   const id = journalId(record);
+  const citedBy = (links.citedBy.get(record.id) ?? []).map((c) => c.id);
   return html`<article class="entry journal-record" id="${pinned ? `pinned-${id}` : id}" data-kind="${record.kind}"${pinned ? html` data-pinned` : null}>
     <div class="margin">
       <h3 class="headword"><span class="glyph" aria-hidden="true">${GLYPH[record.kind]}</span> <a href="#${id}">${record.kind}</a></h3>
@@ -85,7 +151,7 @@ function renderRecord(record: JournalRecord, status: string | undefined, pinned 
       ${record.work !== undefined ? html`<p class="defined-by">work order <a class="related-link" href="#${workId(record.work)}">${record.work}</a></p>` : null}
       ${status !== undefined ? html`<p class="record-status" data-status>${status}</p>` : null}
     </div>
-    <div class="body">${renderBody(record)}</div>
+    <div class="body">${renderBody(record)}${renderHuman(record)}${renderCitations(citesOf(record), citedBy, links)}</div>
   </article>`;
 }
 
@@ -95,8 +161,20 @@ function renderWorkEvent(event: WorkOrder["history"][number]): Markup {
   return html`<li class="work-event" data-kind="${event.kind}"><code>${event.id}</code> ${stamp(event.at)} ${what} <span class="quiet">${event.agent}: ${event.because}</span></li>`;
 }
 
-/** A work order as the journal folds it: content in the body, owner and state in the margin, its history beneath. */
-function renderWorkOrder(order: WorkOrder): Markup {
+/** The journal records bound to an order that the page embeds, latest first, capped, with the count of the rest. */
+function renderBound(order: WorkOrder, links: Links, records: readonly JournalRecord[]): Markup | null {
+  const bound = records.filter((r) => r.work === order.id).reverse();
+  if (bound.length === 0) return null;
+  const shown = bound.slice(0, BOUND_SHOWN);
+  return html`<section class="citations" data-field="bound"><h4>Bound records (${bound.length})</h4><ul>${shown.map((r) => renderCitation(r.id, links))}</ul>${bound.length > shown.length
+    ? html`<p class="quiet">and ${bound.length - shown.length} more; <code>work inspect ${order.id}</code> lists every one.</p>`
+    : null}</section>`;
+}
+
+/** A work order as the journal folds it: content in the body, owner and state in the margin, its history beneath, then its citations and bound records. */
+function renderWorkOrder(order: WorkOrder, links: Links, records: readonly JournalRecord[]): Markup {
+  const own = new Set([order.id, ...order.history.map((e) => e.id)]);
+  const citedBy = [...new Set([...own].flatMap((id) => (links.citedBy.get(id) ?? []).map((c) => c.id)).filter((id) => !own.has(id)))];
   return html`<article class="entry work-order" id="${workId(order.id)}" data-state="${order.state}">
     <div class="margin">
       <h3 class="headword"><a href="#${workId(order.id)}">${order.id}</a></h3>
@@ -113,11 +191,13 @@ function renderWorkOrder(order: WorkOrder): Markup {
       ${order.history.length > 0
         ? html`<section class="work-history" data-field="history"><h4>History</h4><ul>${order.history.map(renderWorkEvent)}</ul></section>`
         : html`<p class="quiet" data-field="history">No record has moved it since it was created.</p>`}
+      ${renderCitations([...new Set(workCites(order))], citedBy, links)}
+      ${renderBound(order, links, records)}
     </div>
   </article>`;
 }
 
-function renderWork(state: ShellState): Markup {
+function renderWork(state: ShellState, links: Links): Markup {
   const work = state.journal.work;
   return html`<section class="work-orders" aria-labelledby="work-heading">
     <h2 class="section-heading" id="work-heading">Work orders</h2>
@@ -125,7 +205,7 @@ function renderWork(state: ShellState): Markup {
       ? html`<p class="absence" data-field="work-absent">No work orders: ${work.because}</p>`
       : work.orders.length === 0
         ? html`<p class="absence" data-field="work-absent">No work orders: the work orders folder exists and is empty.</p>`
-        : html`<p class="match-summary quiet">${plural(work.orders.length, "work order", "work orders")}.</p>${work.orders.map(renderWorkOrder)}`}
+        : html`<p class="match-summary quiet">${plural(work.orders.length, "work order", "work orders")}.</p>${work.orders.map((order) => renderWorkOrder(order, links, state.journal.records))}`}
     ${work.kind === "present" && work.damaged.length > 0
       ? html`<ul class="damaged">${work.damaged.map((d) => html`<li><code>${d.file}:${d.line}</code> ${d.reason}</li>`)}</ul>`
       : null}
@@ -167,6 +247,7 @@ export function renderJournalResults(state: ShellState): Markup {
   const records = state.journal.records;
   const status = journalStatuses(records);
   const open = openEscalations(records);
+  const links = linksOf(state);
   const shown = [...records]
     .reverse()
     .filter(
@@ -181,12 +262,12 @@ export function renderJournalResults(state: ShellState): Markup {
     ? html`<section class="escalations" aria-labelledby="escalations-heading" data-field="escalations">
       <h2 class="section-heading" id="escalations-heading">Awaiting a human (${open.length})</h2>
       <p class="section-lead">Escalations no acknowledgement points at. Each heads every read until a human answers it.</p>
-      ${open.map((r) => renderRecord(r, status.get(r.id), true))}
+      ${open.map((r) => renderRecord(r, status.get(r.id), links, true))}
     </section>`
     : html`<p class="quiet" data-field="escalations">No escalation awaits a human.</p>`}
   <section class="timeline" aria-labelledby="journal-heading">
     <h2 class="section-heading" id="journal-heading">Timeline</h2>
-    <p class="section-lead">Every record across every session, latest first. A record answered by a later one (retracted, resolved, dismissed, closed, acknowledged) carries that answer in its margin; nothing on disk changes.</p>
+    <p class="section-lead">Every record across every session, latest first. A record answered by a later one (retracted, resolved, dismissed, closed, acknowledged) carries that answer in its margin; what a record cites and what cites it are linked beneath it; nothing on disk changes.</p>
     ${records.length === 0
       ? html`<p class="absence">Nothing recorded.</p>`
       : !filtered
@@ -197,12 +278,12 @@ export function renderJournalResults(state: ShellState): Markup {
     ${state.journal.omitted === undefined
       ? null
       : html`<p class="quiet" data-field="omitted">${plural(state.journal.omitted, "earlier record is", "earlier records are")} not embedded in this page; the whole journal is one command away: <code>journal</code>.</p>`}
-    ${shown.map((r) => renderRecord(r, status.get(r.id)))}
+    ${shown.map((r) => renderRecord(r, status.get(r.id), links))}
     ${state.journal.damaged.length > 0
       ? html`<section class="damaged"><h4>Unreadable lines</h4><ul>${state.journal.damaged.map((d) => html`<li><code>${d.file}:${d.line}</code> ${d.reason}</li>`)}</ul></section>`
       : null}
   </section>
-  ${renderWork(state)}`;
+  ${renderWork(state, links)}`;
 }
 
 /** The one line that stands for a record, for the masthead's count of what awaits a human. */

@@ -90,6 +90,25 @@ export interface Stamp<K extends string> {
   dirty: boolean;
 }
 
+/**
+ * A citation: the ids of earlier records, in either store and of any kind,
+ * that a record rests on or is about. Checked at the write (an id that names
+ * no record is refused), never typed, and read back in both directions: what
+ * a record cites and what cites it. Absent on records that cite nothing and
+ * on every record written before citations existed.
+ */
+export interface Citing {
+  cites?: string[];
+}
+
+/**
+ * Words the writing agent attributes to a human, kept apart from the agent's
+ * own because. It records the attribution, not proof that a human wrote them.
+ */
+export interface HumanWords {
+  human?: string;
+}
+
 export interface Head extends Stamp<Kind> {
   /** The work order this record binds to, when it binds to one. */
   work?: string;
@@ -101,7 +120,7 @@ export interface Head extends Stamp<Kind> {
   binding?: string;
 }
 
-export interface Decision extends Head {
+export interface Decision extends Head, Citing, HumanWords {
   kind: "decision";
   chose: string;
   /**
@@ -120,7 +139,7 @@ export interface Retraction extends Head {
   because: string;
 }
 
-export interface Conjecture extends Head {
+export interface Conjecture extends Head, Citing {
   kind: "conjecture";
   observation: string;
   couldBe: string[];
@@ -141,7 +160,7 @@ export interface Dismissal extends Head {
   because: string;
 }
 
-export interface Defect extends Head {
+export interface Defect extends Head, Citing {
   kind: "defect";
   what: string;
   evidence: string;
@@ -154,7 +173,7 @@ export interface Step {
   text: string;
 }
 
-export interface Experiment extends Head {
+export interface Experiment extends Head, Citing {
   kind: "experiment";
   expectation: string;
   context: string[];
@@ -172,19 +191,19 @@ export interface Close extends Head {
   outcome: Outcome;
 }
 
-export interface Unable extends Head {
+export interface Unable extends Head, Citing {
   kind: "unable";
   what: string;
   because: string;
 }
 
-export interface Escalation extends Head {
+export interface Escalation extends Head, Citing, HumanWords {
   kind: "escalation";
   what: string;
   because: string;
 }
 
-export interface Acknowledgement extends Head {
+export interface Acknowledgement extends Head, HumanWords {
   kind: "acknowledgement";
   of: string;
   because: string;
@@ -258,7 +277,7 @@ export function isWorkState(value: string): value is WorkState {
 }
 
 /** The order itself: its content and the owner session it starts with. */
-export interface WorkOrderRecord extends Stamp<"order"> {
+export interface WorkOrderRecord extends Stamp<"order">, Citing {
   objective: string;
   success: string;
   boundary: string;
@@ -267,7 +286,7 @@ export interface WorkOrderRecord extends Stamp<"order"> {
 }
 
 /** A move to another state; never to completed, which only close records. */
-export interface WorkMove extends Stamp<"move"> {
+export interface WorkMove extends Stamp<"move">, Citing {
   of: string;
   state: Exclude<WorkState, "completed">;
   because: string;
@@ -281,7 +300,7 @@ export interface WorkOwner extends Stamp<"owner"> {
 }
 
 /** The close: the only path to completed. */
-export interface WorkCompletion extends Stamp<"completion"> {
+export interface WorkCompletion extends Stamp<"completion">, Citing {
   of: string;
   state: "completed";
   because: string;
@@ -301,4 +320,65 @@ export function pointsAt(record: JournalRecord): string | null {
     default:
       return null;
   }
+}
+
+/** A record from either store. */
+export type AnyRecord = JournalRecord | WorkRecord;
+
+/** The ids a record cites; empty for a kind that cannot cite and for a record written before citations. */
+export function citesOf(record: AnyRecord): readonly string[] {
+  const cites = (record as Citing).cites;
+  return Array.isArray(cites) ? cites : [];
+}
+
+/** The one line that stands for a work record. */
+export function workSubjectOf(record: WorkRecord): string {
+  switch (record.kind) {
+    case "order":
+      return record.objective;
+    case "move":
+      return `${record.of} -> ${record.state}: ${record.because}`;
+    case "owner":
+      return `${record.of} owner -> ${record.owner}: ${record.because}`;
+    case "completion":
+      return `${record.of} -> completed: ${record.because}`;
+  }
+}
+
+/** What a record from either store is called in a line that names it: the journal kind, or the work kind as a work order phrase. */
+export function kindLabel(record: AnyRecord): string {
+  if (isKind(record.kind)) return record.kind;
+  switch (record.kind) {
+    case "order":
+      return "work order";
+    case "move":
+      return "work order move";
+    case "owner":
+      return "work order owner change";
+    case "completion":
+      return "work order close";
+  }
+}
+
+/** The subject of a record from either store. */
+export function anySubjectOf(record: AnyRecord): string {
+  return isKind(record.kind) ? subjectOf(record as JournalRecord) : workSubjectOf(record as WorkRecord);
+}
+
+/**
+ * What cites each id, across both stores, oldest citer first (time, then
+ * id). Computed at every read and stored nowhere, so an old record gains a
+ * citer without anything on disk changing.
+ */
+export function citedBy(records: readonly AnyRecord[]): Map<string, AnyRecord[]> {
+  const index = new Map<string, AnyRecord[]>();
+  const ordered = [...records].sort((a, b) => (a.at !== b.at ? (a.at < b.at ? -1 : 1) : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  for (const record of ordered) {
+    for (const id of citesOf(record)) {
+      const list = index.get(id) ?? [];
+      list.push(record);
+      index.set(id, list);
+    }
+  }
+  return index;
 }

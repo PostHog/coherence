@@ -124,6 +124,7 @@ test("query status lists structural defects, open requirements, and escalations,
   assert.ok(defects < requirements && requirements < escalations, "in that order");
   assert.ok(result.text.includes(`bypass ${fixture.names.bypass.file}:${fixture.names.bypass.line} in ${fixture.names.bypass.symbol}`));
   assert.ok(result.text.includes(fixture.names.openEscalation) && !result.text.includes(fixture.names.acknowledgedEscalation), "only the open escalation");
+  assert.ok(result.text.includes(`      about d-00000001 decision: one door for writes\n      about w-00000001 work order: make every write pass through one door`), "an open escalation names the decision and the work order it cites, with their subjects");
   assert.ok(result.text.length < FEW_HUNDRED_TOKENS);
 });
 
@@ -148,7 +149,9 @@ test("query order answers with the order the journal folds from the store: its c
   assert.ok(mine.text.includes(`${n.workMove}  -> active  fixture: taking it up`), "the move is history under the order");
   assert.ok(!mine.text.startsWith(n.workMove), "a move record is never answered as an order");
   assert.ok(!mine.text.includes(`${n.completedOrder}  active`) && !mine.text.includes("retire the cache"), "a completed order is not active");
-  assert.ok(mine.text.includes("journal records bound: 0") && mine.text.includes("runs bound: 0"), "what binds to the order is said");
+  assert.ok(mine.text.includes("journal records bound: 1\n") && mine.text.includes("◆ d-00000001  fixture  one door for writes") && mine.text.includes("runs bound: 0"), "what binds to the order is said");
+  assert.ok(mine.text.includes("  cites: 0\n"), "what the order's records cite is said, even when nothing");
+  assert.ok(mine.text.includes("  cited by: 1\n") && mine.text.includes("e-00000003  escalation  fixture  retire the read shape rule  [cites w-00000001]"), "the records citing the order are listed, apart from those bound to it");
   const other = answer(state, "order", [], { session: "someone-else" });
   assert.equal(other.text, "no active work order for session someone-else (2 on record, 1 active)");
   const absent = answer({ ...state, journal: { ...state.journal, work: { kind: "absent", because: "no folder" } } }, "order", []);

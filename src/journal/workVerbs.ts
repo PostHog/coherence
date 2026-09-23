@@ -1,9 +1,9 @@
 /**
  * The work verbs: one command, five subcommands, each an appended record or a read.
  *
- *   work create "<objective>" --success "<criterion>" --boundary "<files>" [--owner-session <id>]
- *   work move <id> <open|active|waiting|cancelled> --because "<why>"
- *   work close <id> --because "<what was done>"
+ *   work create "<objective>" --success "<criterion>" --boundary "<files>" [--owner-session <id>] [--cite <id>]...
+ *   work move <id> <open|active|waiting|cancelled> --because "<why>" [--cite <id>]...
+ *   work close <id> --because "<what was done>" [--cite <id>]...
  *   work owner <id> --owner-session <id> --because "<why>"
  *   work inspect [<id>]
  *
@@ -12,13 +12,17 @@
  * says who did. Content is what a reader wants: the objective, the
  * observable success criterion, the boundary, and everything the owner
  * session wrote while it held the order.
+ *
+ * A create, move or close may cite earlier records with --cite, checked as
+ * every journal citation is; a decision id written into a because stays
+ * text, and --cite is how it becomes a citation a reader can follow.
  */
 
 import { loadRuns, type RunRecord } from "../enforcement/record.ts";
 import { JournalError, onePositional, parseFlags, required } from "./args.ts";
-import { GLYPH, isWorkState, subjectOf, type JournalRecord, type WorkCompletion, type WorkOrderRecord, type WorkOwner, type WorkMove } from "./record.ts";
+import { GLYPH, anySubjectOf, citedBy, citesOf, isWorkState, subjectOf, kindLabel, type AnyRecord, type JournalRecord, type WorkCompletion, type WorkOrderRecord, type WorkOwner, type WorkMove } from "./record.ts";
 import { loadJournal } from "./store.ts";
-import { attribution, head, withCommon, type Context, type Written } from "./verbs.ts";
+import { CITE, attribution, citations, head, withCommon, type Context, type Written } from "./verbs.ts";
 import { WORK_DIR, appendWork, isTerminal, loadOrders, type WorkOrder } from "./work.ts";
 
 /** What a work verb prints on success; the first line starts with the record id. */
@@ -37,25 +41,26 @@ function refuseTerminal(order: WorkOrder, verb: string): void {
 }
 
 function create(argv: string[], ctx: Context): WorkWritten {
-  const parsed = parseFlags(argv, withCommon({ success: "one", boundary: "one", "owner-session": "one" }));
+  const parsed = parseFlags(argv, withCommon({ success: "one", boundary: "one", "owner-session": "one", ...CITE }));
   const who = attribution(parsed);
   if (who.work !== undefined) throw new JournalError("work create: --work names a journal record's order, not a new order's");
   const objective = onePositional(parsed, "objective");
   const success = required(parsed, "success", "an order names the observable criterion that completes it");
   const boundary = required(parsed, "boundary", "an order names the folders or files its owner may write");
   const owner = parsed.one.get("owner-session") ?? who.session;
-  const record: WorkOrderRecord = { ...head("order", who, ctx, objective), objective, success, boundary, owner };
+  const record: WorkOrderRecord = { ...head("order", who, ctx, objective), objective, success, boundary, owner, ...citations(parsed, ctx.cwd) };
   appendWork(ctx.cwd, record);
   return {
     lines: [
       `${record.id}  work order recorded in ${WORK_DIR}/${record.session}.jsonl; owner ${owner}; state open`,
+      ...citeLines(record),
       `  nothing binds to it until its owner activates it: work move ${record.id} active --because "<taking it up>" --session ${owner} --agent <name>`,
     ],
   };
 }
 
 function move(argv: string[], ctx: Context): WorkWritten {
-  const parsed = parseFlags(argv, withCommon({ because: "one" }));
+  const parsed = parseFlags(argv, withCommon({ because: "one", ...CITE }));
   const who = attribution(parsed);
   const [id, state, ...rest] = parsed.positionals;
   if (id === undefined || state === undefined) throw new JournalError("work move takes <id> <state>");
@@ -66,21 +71,21 @@ function move(argv: string[], ctx: Context): WorkWritten {
   const order = orderOrRefuse(ctx.cwd, id, "move");
   refuseTerminal(order, "move");
   if (order.state === state) throw new JournalError(`work move: ${id} is already ${state}`);
-  const record: WorkMove = { ...head("move", who, ctx, `${id}\n${state}\n${because}`), of: id, state, because };
+  const record: WorkMove = { ...head("move", who, ctx, `${id}\n${state}\n${because}`), of: id, state, because, ...citations(parsed, ctx.cwd) };
   appendWork(ctx.cwd, record);
-  return { lines: [`${record.id}  ${id} ${order.state} -> ${state} recorded in ${WORK_DIR}/${record.session}.jsonl`] };
+  return { lines: [`${record.id}  ${id} ${order.state} -> ${state} recorded in ${WORK_DIR}/${record.session}.jsonl`, ...citeLines(record)] };
 }
 
 function close(argv: string[], ctx: Context): WorkWritten {
-  const parsed = parseFlags(argv, withCommon({ because: "one" }));
+  const parsed = parseFlags(argv, withCommon({ because: "one", ...CITE }));
   const who = attribution(parsed);
   const id = onePositional(parsed, "work order id");
   const because = required(parsed, "because", "a close records what was done against the success criterion");
   const order = orderOrRefuse(ctx.cwd, id, "close");
   refuseTerminal(order, "close");
-  const record: WorkCompletion = { ...head("completion", who, ctx, `${id}\n${because}`), of: id, state: "completed", because };
+  const record: WorkCompletion = { ...head("completion", who, ctx, `${id}\n${because}`), of: id, state: "completed", because, ...citations(parsed, ctx.cwd) };
   appendWork(ctx.cwd, record);
-  return { lines: [`${record.id}  ${id} ${order.state} -> completed recorded in ${WORK_DIR}/${record.session}.jsonl`] };
+  return { lines: [`${record.id}  ${id} ${order.state} -> completed recorded in ${WORK_DIR}/${record.session}.jsonl`, ...citeLines(record)] };
 }
 
 function owner(argv: string[], ctx: Context): WorkWritten {
@@ -97,12 +102,48 @@ function owner(argv: string[], ctx: Context): WorkWritten {
   return { lines: [`${record.id}  ${id} owner ${order.owner} -> ${next} recorded in ${WORK_DIR}/${record.session}.jsonl`] };
 }
 
+function citeLines(record: AnyRecord): string[] {
+  return citesOf(record).length > 0 ? [`  cites ${citesOf(record).join(", ")}`] : [];
+}
+
 function stamp(at: string): string {
   return `${at.slice(0, 10)} ${at.slice(11, 16)}`;
 }
 
-/** One order with everything bound to it: its history, the journal records, the runs. */
-export function renderOrder(order: WorkOrder, journal: readonly JournalRecord[], runs: readonly RunRecord[]): string[] {
+/** The line that names a record from either store in a list of related records: time, id, kind, agent, subject. */
+export function relatedLine(record: AnyRecord): string {
+  return `${stamp(record.at)} ${record.id}  ${kindLabel(record)}  ${record.agent}  ${anySubjectOf(record)}`;
+}
+
+/** Every record the order's own records cite, in the order they were written, with the record that cites it. */
+function orderCites(order: WorkOrder): { by: string; id: string }[] {
+  return [
+    ...(order.cites ?? []).map((id) => ({ by: order.id, id })),
+    ...order.history.flatMap((event) => citesOf(event).map((id) => ({ by: event.id, id }))),
+  ];
+}
+
+/** The work records an order fold came from: each order's own record and its history. */
+export function workRecordsOf(orders: readonly WorkOrder[]): AnyRecord[] {
+  return orders.flatMap((order): AnyRecord[] => [
+    { id: order.id, kind: "order", at: order.at, session: order.session, agent: order.agent, commit: null, dirty: false, objective: order.objective, success: order.success, boundary: order.boundary, owner: order.owner, ...(order.cites === undefined ? {} : { cites: order.cites }) },
+    ...order.history,
+  ]);
+}
+
+/** Time order, then id, for records from either store. */
+function byTime(a: AnyRecord, b: AnyRecord): number {
+  if (a.at !== b.at) return a.at < b.at ? -1 : 1;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * One order with everything related to it: its history, the records it
+ * cites, the journal records bound to it, the records that cite it or one
+ * of its own records, and the runs bound to it. `orders` is every order, so
+ * a work record that cites this one is found too.
+ */
+export function renderOrder(order: WorkOrder, journal: readonly JournalRecord[], runs: readonly RunRecord[], orders: readonly WorkOrder[] = [order]): string[] {
   const lines = [
     `${order.id}  ${order.state}  owner ${order.owner}`,
     `  objective: ${order.objective}`,
@@ -114,9 +155,24 @@ export function renderOrder(order: WorkOrder, journal: readonly JournalRecord[],
     const what = event.kind === "owner" ? `owner -> ${event.owner}` : `-> ${event.state}`;
     lines.push(`  ${stamp(event.at)} ${event.id}  ${what}  ${event.agent}: ${event.because}`);
   }
+  const everything: AnyRecord[] = [...journal, ...workRecordsOf(orders)];
+  const byId = new Map(everything.map((record) => [record.id, record]));
+  const cites = orderCites(order);
+  lines.push(`  cites: ${cites.length}`);
+  for (const { by, id } of cites) {
+    const found = byId.get(id);
+    lines.push(`    ${found === undefined ? `${id}  (not in the stores read)` : relatedLine(found)}${by === order.id ? "" : `  [cited by ${by}]`}`);
+  }
   const bound = journal.filter((record) => record.work === order.id);
   lines.push(`  journal records bound: ${bound.length}`);
   for (const record of bound) lines.push(`    ${stamp(record.at)} ${GLYPH[record.kind]} ${record.id}  ${record.agent}  ${subjectOf(record)}`);
+  const own = new Set([order.id, ...order.history.map((event) => event.id)]);
+  const index = citedBy(everything);
+  const citing = new Map<string, AnyRecord>();
+  for (const id of own) for (const record of index.get(id) ?? []) if (!own.has(record.id)) citing.set(record.id, record);
+  const citers = [...citing.values()].sort(byTime);
+  lines.push(`  cited by: ${citers.length}`);
+  for (const record of citers) lines.push(`    ${relatedLine(record)}  [cites ${citesOf(record).filter((id) => own.has(id)).join(", ")}]`);
   const boundRuns = runs.filter((run) => (run as RunRecord & { work?: string }).work === order.id);
   lines.push(`  runs bound: ${boundRuns.length}`);
   for (const run of boundRuns) {
@@ -137,7 +193,7 @@ function inspect(argv: string[], ctx: Context): WorkWritten {
   }
   const order = orders.find((o) => o.id === id);
   if (order === undefined) throw new JournalError(`work inspect: no work order with id ${id}`);
-  return { lines: renderOrder(order, loadJournal(ctx.cwd).records, loadRuns(ctx.cwd).records) };
+  return { lines: renderOrder(order, loadJournal(ctx.cwd).records, loadRuns(ctx.cwd).records, orders) };
 }
 
 export function work(argv: string[], ctx: Context): Written | WorkWritten {
@@ -160,9 +216,9 @@ export function work(argv: string[], ctx: Context): Written | WorkWritten {
 
 export const WORK_USAGE = [
   "work orders (writes need --session <id> --agent <name>; binding to journal writes and runs is inferred from sole active ownership):",
-  '  work create "<objective>" --success "<observable criterion>" --boundary "<folders or files the owner may write>" [--owner-session <id>]',
-  '  work move <id> <open|active|waiting|cancelled> --because "<why>"',
-  '  work close <id> --because "<what was done>"',
+  '  work create "<objective>" --success "<observable criterion>" --boundary "<folders or files the owner may write>" [--owner-session <id>] [--cite <id>]...',
+  '  work move <id> <open|active|waiting|cancelled> --because "<why>" [--cite <id>]...',
+  '  work close <id> --because "<what was done>" [--cite <id>]...',
   '  work owner <id> --owner-session <id> --because "<why>"',
   "  work inspect [<id>]",
 ].join("\n");

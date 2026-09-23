@@ -8,6 +8,7 @@
 
 import { slug } from "./html.ts";
 import type {
+  WorkOrder,
   Grade,
   JournalKind,
   JournalRecord,
@@ -497,6 +498,14 @@ export function structureOf(state: ShellState, preview: readonly StructurePrevie
 export const RUN_WINDOW = 12;
 /** How many of the latest journal records a page embeds, beyond open escalations and what they point at. */
 export const JOURNAL_WINDOW = 150;
+/**
+ * How many older records a page embeds because a kept record or a work order
+ * cites them. Citations are followed one hop, latest citer first, and stop
+ * at this cap, so a journal dense with citations cannot pull the whole store
+ * back into the page; a citation past the cap renders as an id with the
+ * command that shows it.
+ */
+export const CITED_WINDOW = 60;
 
 /**
  * The run records a page embeds: the latest `keep`, and every run that holds
@@ -526,12 +535,31 @@ export function windowRuns(records: readonly RunRecord[], keep: number = RUN_WIN
 
 /**
  * The journal records a page embeds: the latest `keep`, every open
- * escalation, and every record one of those points at (so a retraction or a
- * close can name what it answers), in their original order.
+ * escalation, up to `cap` older records that a kept record or a work order
+ * cites (so a citation lands on a card; the latest citers are served first),
+ * and every record one of those points at (so a retraction or a close can
+ * name what it answers), in their original order. `orders` supplies the
+ * work orders' own citations.
  */
-export function windowJournal(records: readonly JournalRecord[], keep: number = JOURNAL_WINDOW): { records: JournalRecord[]; omitted: number } {
+export function windowJournal(
+  records: readonly JournalRecord[],
+  keep: number = JOURNAL_WINDOW,
+  orders: readonly WorkOrder[] = [],
+  cap: number = CITED_WINDOW,
+): { records: JournalRecord[]; omitted: number } {
   const kept = new Set<string>(records.slice(Math.max(0, records.length - keep)).map((record) => record.id));
   for (const escalation of openEscalations(records)) kept.add(escalation.id);
+  const present = new Set(records.map((record) => record.id));
+  const citing = [...records.filter((record) => kept.has(record.id)).reverse().map(citesOf), ...[...orders].reverse().map(workCites)];
+  let pulled = 0;
+  for (const ids of citing) {
+    for (const id of ids) {
+      if (pulled >= cap) break;
+      if (!present.has(id) || kept.has(id)) continue;
+      kept.add(id);
+      pulled += 1;
+    }
+  }
   for (const record of records) {
     const of = kept.has(record.id) ? pointsAt(record) : null;
     if (of !== null) kept.add(of);
@@ -570,6 +598,56 @@ export function pointsAt(record: JournalRecord): string | null {
     default:
       return null;
   }
+}
+
+/** The ids a record cites; empty for a record that cites nothing or was written before citations. */
+export function citesOf(record: { cites?: string[] | undefined }): readonly string[] {
+  return Array.isArray(record.cites) ? record.cites : [];
+}
+
+/** Every id a work order's own records cite: the order record, then its moves and close, in time order. */
+export function workCites(order: WorkOrder): string[] {
+  return [...(order.cites ?? []), ...order.history.flatMap((event) => citesOf(event as { cites?: string[] }))];
+}
+
+/** One record that cites another: its id, and the work order it belongs to when it is a work record. */
+export interface Citer {
+  id: string;
+  order?: string;
+}
+
+/**
+ * The citations the page can draw, both ways, derived at render: what cites
+ * each id (journal records and work records alike, in time order within
+ * each store), and which order each work record belongs to, so a citation
+ * of an order's move lands on the order's card.
+ */
+export interface Citations {
+  citedBy: Map<string, Citer[]>;
+  orderOf: Map<string, WorkOrder>;
+}
+
+export function citations(records: readonly JournalRecord[], orders: readonly WorkOrder[]): Citations {
+  const edges: { target: string; citer: Citer; at: string }[] = [];
+  for (const record of records) for (const id of citesOf(record)) edges.push({ target: id, citer: { id: record.id }, at: record.at });
+  const orderOf = new Map<string, WorkOrder>();
+  for (const order of orders) {
+    orderOf.set(order.id, order);
+    for (const id of order.cites ?? []) edges.push({ target: id, citer: { id: order.id, order: order.id }, at: order.at });
+    for (const event of order.history) {
+      orderOf.set(event.id, order);
+      for (const id of citesOf(event as { cites?: string[] })) edges.push({ target: id, citer: { id: event.id, order: order.id }, at: event.at });
+    }
+  }
+  // Oldest citer first across both stores, so the order on the page is the order the citations were written.
+  edges.sort((a, b) => (a.at !== b.at ? (a.at < b.at ? -1 : 1) : a.citer.id < b.citer.id ? -1 : a.citer.id > b.citer.id ? 1 : 0));
+  const citedBy = new Map<string, Citer[]>();
+  for (const { target, citer } of edges) {
+    const list = citedBy.get(target) ?? [];
+    if (!list.some((c) => c.id === citer.id)) list.push(citer);
+    citedBy.set(target, list);
+  }
+  return { citedBy, orderOf };
 }
 
 /** Escalations with no acknowledgement pointing at them, oldest first. */
@@ -627,7 +705,7 @@ export function subjectOf(record: JournalRecord): string {
 
 /** Every text a record carries, for search. */
 export function journalText(record: JournalRecord): string[] {
-  const head = [record.id, record.kind, record.agent, record.session, record.commit ?? ""];
+  const head = [record.id, record.kind, record.agent, record.session, record.commit ?? "", ...citesOf(record), record.human ?? ""];
   switch (record.kind) {
     case "decision":
       return [...head, record.chose, record.because, ...(record.over === "none" ? [] : record.over)];

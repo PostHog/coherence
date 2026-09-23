@@ -261,7 +261,7 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
  */
 function windowed(state: ShellState): ShellState {
   const runs = windowRuns(state.runs.records);
-  const journal = windowJournal(state.journal.records);
+  const journal = windowJournal(state.journal.records, undefined, state.journal.work.kind === "present" ? state.journal.work.orders : []);
   return {
     ...state,
     runs: { ...state.runs, records: runs.records, ...(runs.omitted === 0 ? {} : { omitted: runs.omitted }) },

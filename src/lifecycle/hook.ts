@@ -50,12 +50,12 @@ import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
 import { openFeed, peerFeed } from "../journal/feed.ts";
-import { openEscalations } from "../journal/read.ts";
+import { namedLine, openEscalations } from "../journal/read.ts";
 import { recordReadTrace, snapshotTrace } from "../economy/trace.ts";
 import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
-import type { Unable } from "../journal/record.ts";
-import { loadOrders, ownedIn, type WorkOrder } from "../journal/work.ts";
+import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
+import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
 import { renderCompactWithin, type InjectionLevel } from "./glossary.ts";
 import { installedRoot, isCoherenceItself, loadProjectGlossaries, within } from "./project.ts";
 
@@ -164,12 +164,27 @@ export async function changedFiles(root: string): Promise<ChangedFiles> {
   return { files: all.filter((f) => own.has(f) || !existsSync(resolve(root, f))) };
 }
 
-/** Escalations no human has acknowledged, under a heading, or nothing. Never shortened: a human must see them whole. */
+/**
+ * Escalations no human has acknowledged, under a heading, or nothing. Never
+ * shortened: a human must see them whole. Each record an escalation cites
+ * (a decision, a work order, any record) is named beneath it by id, kind
+ * and subject, so the human sees what the question is about.
+ */
 export function escalationBlock(root: string): string {
-  const open = openEscalations(loadJournal(root).records);
+  const journal = loadJournal(root).records;
+  const open = openEscalations(journal);
   if (open.length === 0) return "";
+  const cited = open.some((e) => citesOf(e).length > 0);
+  const byId = new Map<string, AnyRecord>(cited ? [...journal, ...loadWork(root).records].map((record) => [record.id, record]) : []);
   const lines = [`Escalations awaiting a human (${open.length}); answer one with: acknowledge <id> --because "<what the human decided>"`];
-  for (const e of open) lines.push(`▲ ${e.id}  ${e.agent}  ${e.what} — ${e.because}`);
+  for (const e of open) {
+    lines.push(`▲ ${e.id}  ${e.agent}  ${e.what} — ${e.because}`);
+    if (e.human !== undefined) lines.push(`  human (as the agent attributes): ${e.human}`);
+    for (const id of citesOf(e)) {
+      const record = byId.get(id);
+      lines.push(`  about ${record === undefined ? `${id} (not found)` : namedLine(record)}`);
+    }
+  }
   return lines.join("\n") + "\n\n";
 }
 

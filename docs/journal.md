@@ -11,17 +11,33 @@ hit a wall, what a human must see. It is also how subagents compare notes
 Every writing verb takes `--session <id>` and `--agent <name>`, refused when
 absent. A single-value flag given twice is refused.
 
-- `decide "<chose>" [--over "<rejected>"]... --because "<why>"`
+- `decide "<chose>" [--over "<rejected>"]... --because "<why>" [--human "<what the human said>"] [--cite <id>]...`
 - `retract <id> --because "<what refuted it>"`: points at a record; nothing is edited.
-- `conjecture "<observation>" [--could-be "<candidate>"]... --discriminated-by "<test>"`: "the instrument is wrong" is always a candidate.
+- `conjecture "<observation>" [--could-be "<candidate>"]... --discriminated-by "<test>" [--cite <id>]...`: "the instrument is wrong" is always a candidate.
 - `resolved <id> --because "<what the test showed>" [--as "<candidate>"]`
 - `dismiss <id> --because "<why nobody will chase it>"`
-- `defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]...`
-- `experiment create "<expectation>" [--context <file>]... --action "<step>"... --success "<criterion>"...`: prints step ids.
+- `defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--cite <id>]...`
+- `experiment create "<expectation>" [--context <file>]... --action "<step>"... --success "<criterion>"... [--cite <id>]...`: prints step ids.
 - `experiment close <id> --result <stepId>=<pass|fail|unknown>...`: every step needs a result; the outcome is derived.
-- `unable "<what you could not do>" --because "<the wall>"`
-- `escalate "<what a human must see>" --because "<why a human>"`: heads every read until acknowledged.
-- `acknowledge <id> --because "<what the human decided>"`
+- `unable "<what you could not do>" --because "<the wall>" [--cite <id>]...`
+- `escalate "<what a human must see>" --because "<why a human>" [--human "<what the human said>"] [--cite <id>]...`: heads every read until acknowledged; orient names each record it cites.
+- `acknowledge <id> --because "<what the human decided>" [--human "<what the human said>"]`
+
+**Citations.** `--cite <id>`, repeatable, names an earlier record this one
+rests on or is about: a decision it builds on, the decision or work order an
+escalation is about, a defect a conjecture explains. Any kind, in either store
+(journal or work). Every id must name a record that exists when the citation is
+written; an unknown id, or one given twice, refuses the whole write. Citations
+are untyped: the record's own text says how it relates. A record that cites
+nothing carries no `cites` field, so records written before citations read
+unchanged. A verb that already answers one record by `of` (retract, resolved,
+dismiss, experiment close, acknowledge) takes no citation.
+
+**Human words.** `--human` on decide, escalate and acknowledge stores words the
+agent attributes to a human in a `human` field, apart from the agent's own
+`because`, and every reader labels them as the agent's attribution. It records
+that the agent says a human said them; it does not prove a human wrote them.
+Proof of authorship is out of scope.
 
 ## Work orders
 
@@ -29,11 +45,11 @@ A work order is content, not permission: objective, observable success
 criterion, boundary (what the owner may write), owner session. It grants
 nothing; its value is that a reader sees everything one assignment produced.
 
-- `work create "<objective>" --success "<criterion>" --boundary "<files>" [--owner-session <id>]`: open, owned by the creating session unless another is named.
-- `work move <id> <open|active|waiting|cancelled> --because "<why>"`: by anyone, recorded. Waiting is the order that cannot proceed until something outside its owner happens (a dependency, a peer, a human); nothing binds to it while it waits.
-- `work close <id> --because "<what was done>"`: the only path to completed.
+- `work create "<objective>" --success "<criterion>" --boundary "<files>" [--owner-session <id>] [--cite <id>]...`: open, owned by the creating session unless another is named.
+- `work move <id> <open|active|waiting|cancelled> --because "<why>" [--cite <id>]...`: by anyone, recorded. Waiting is the order that cannot proceed until something outside its owner happens (a dependency, a peer, a human); nothing binds to it while it waits.
+- `work close <id> --because "<what was done>" [--cite <id>]...`: the only path to completed.
 - `work owner <id> --owner-session <id> --because "<why>"`
-- `work inspect [<id>]`: one order with everything bound to it, or every order.
+- `work inspect [<id>]`: one order with its history, what its records cite, the journal records bound to it, the records citing it or its moves, and the runs bound to it; or every order.
 
 A completed or cancelled order accepts no further write. Records live in
 `.coherence/work/<session>.jsonl`, append only, with the journal's head.
@@ -71,15 +87,23 @@ the command for their project alongside the decision write template.
 `journal` prints the merged timeline across every session, oldest first: date,
 glyph, id, agent, text; a decision shows its rejected alternatives indented.
 Filters: `--session`, `--agent`, `--kind`, `--since <cursorOrIso>`; `--json`
-for the records. `journal --subjects --since <cursorOrIso>` prints only each
-record's subject and the next cursor. An unparsable line is reported with
+for the records. Beneath each record the timeline prints the words it
+attributes to a human, the ids it cites, and the ids of the records (either
+store) that cite it; `--json` carries each record's `cites` and a `citedBy`
+map for the reverse direction, derived at the read and stored nowhere.
+`journal <id>` prints one journal or work record with each record it cites and
+each record citing it, by id, kind and subject. `journal --subjects --since
+<cursorOrIso>` prints only each record's subject and the next cursor; it never
+carries citations. An unparsable line is reported with
 its file and line number and skipped; the damaged count prints last.
 
 ## Record shape
 
 One JSONL file per session at `.coherence/journal/<session>.jsonl`, append
 only. Every record carries `id`, `kind`, `at` (ISO), `session`, `agent`,
-`commit` (short sha or null), `dirty`, its binding, and its kind's fields. The
+`commit` (short sha or null), `dirty`, its binding, and its kind's fields;
+`cites` (a list of ids) when it cites any, and `human` when the agent recorded
+a human's words. The
 id is the kind's prefix plus eight hex digits hashed from session, time, and
 text; work records share the minter. The branch is never stored; a read asks
 git.

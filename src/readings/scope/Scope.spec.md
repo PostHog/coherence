@@ -315,3 +315,17 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   crossing: record -> reading
   refuted: put the old Full observed population totals line back at the head of the vocabulary section in glossary-view.ts, ahead of the ranked signal -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
+- citations linked in the Journal view: Each journal record on the page lists what it cites and what cites it as in-page links to those records' cards, with kind and subject; each work order lists what its records cite, what cites it, and the journal records bound to it; a cited record the page does not embed is an id with the command that shows it, never a dead link.
+  over: every journal record and work order of the fixture, a record citing a work order, a work order's close citing a decision, a pinned escalation, and a state that leaves a cited record out
+  via: the Journal view links citations both ways: each record lists what it cites and what cites it as in-page links, and a work order lists its citations and bound records
+  because: a relationship a human cannot follow on the page is one they will not check; linking both directions on the card lets the reader walk from an escalation to the decision it is about and back, and an absent card is named rather than linked so no link on the page lands nowhere
+  crossing: record -> reading
+  refuted: left what cites a record off its card in renderRecord -> the totality oracle went red in check.test.ts; restored, green (2026-09-23)
+  kinds: none
+- the window keeps what is cited: The page's journal window also keeps, one hop and at most CITED_WINDOW records, the older records a kept record or a work order cites, latest citer first, and counts everything it leaves out.
+  over: a journal of 400 records where the latest cites an old one and a work order cites another, and one where each of the latest 150 records cites a distinct older record
+  via: the journal window keeps what kept records and work orders cite, one hop, up to a cap
+  because: a citation's link should land on a card, as a retraction's pointer already does; following citations without a cap would let a densely cited journal pull the whole store back into the page past its 2 MB budget (defect df-d6deded9), so the window follows one hop, serves the latest citers first, and stops at the cap, and a citation past it renders as an id with the command that shows it
+  crossing: record -> reading
+  refuted: made windowJournal follow no citation, so an old cited record was left out of the page -> the totality oracle went red in check.test.ts; restored, green (2026-09-23)
+  kinds: none

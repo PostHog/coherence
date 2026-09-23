@@ -141,6 +141,13 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   kinds: read
   checklist: scoped-reads dismissed: every session sees every open escalation
   checklist: redaction dismissed: the block is never shortened
+- escalation names what it cites: An open escalation in the start injection names each record it cites, a decision or a work order or any record, by id, kind and subject beneath it.
+  over: the start injection over a journal with an escalation that cites a decision and a work order
+  via: an open escalation that cites a decision and a work order names each by id, kind and subject in the start output
+  because: an escalation is the one record that exists for a human; a question that arrives without what it is about sends the human to the journal to reconstruct it, and a cited decision's subject is the shortest faithful statement of that context
+  crossing: record -> reading
+  refuted: stopped escalationBlock from naming the records an escalation cites -> the totality oracle went red in hook.test.ts; restored, green (2026-09-23)
+  kinds: none
 - revelation at the edit: After a file-writing tool, the chokepoint invariants the file may involve are re-checked and a bypass is shown in the same turn with the two honest options; the stop carries the defects.
   over: every chokepoint invariant whose latest run touched the written file or whose protected or chokepoint name appears in it
   via: PostToolUse on a file-writing tool re-checks the invariants that may involve the file and prints the bypass with the two options; Stop carries the defects

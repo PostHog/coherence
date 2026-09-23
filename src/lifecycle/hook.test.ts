@@ -227,6 +227,25 @@ test("an unacknowledged escalation heads the start output; an acknowledged one d
   assert.match((JSON.parse(after.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext, /^Coherence vocabulary/);
 });
 
+test("an open escalation that cites a decision and a work order names each by id, kind and subject in the start output", async () => {
+  const printed: string[] = [];
+  const io = { cwd: root, out: (line: string) => printed.push(line), err: (line: string) => printed.push(line) };
+  const who = ["--session", "s1", "--agent", "main"];
+  assert.equal(journalVerbs["decide"]!(["the widget keeps one name", "--because", "two names split the docs", ...who], io), 0, printed.join("\n"));
+  const decision = printed.at(-2)!.split(/\s+/)[0]!;
+  assert.equal(journalVerbs["work"]!(["create", "rename the widget", "--success", "one name in docs", "--boundary", "docs", ...who], io), 0, printed.join("\n"));
+  const order = printed.at(-2)!.split(/\s+/)[0]!;
+  assert.equal(journalVerbs["escalate"]!(["may the widget be renamed", "--because", "only the owner renames", "--cite", decision, "--cite", order, ...who], io), 0, printed.join("\n"));
+  const escalation = openEscalations(loadJournal(root).records).find((e) => e.what === "may the widget be renamed")!;
+
+  const start = await runHook("SessionStart", { cwd: root, session_id: "s1" }, root);
+  const context = (JSON.parse(start.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext;
+  assert.match(context, new RegExp(`▲ ${escalation.id}  main  may the widget be renamed — only the owner renames\\n  about ${decision}  decision  main: the widget keeps one name\\n  about ${order}  work order  main: rename the widget\\n`));
+  assert.ok(context.length <= CONTEXT_BUDGET);
+
+  assert.equal(journalVerbs["acknowledge"]!([escalation.id, "--because", "renamed", ...who], io), 0, printed.join("\n"));
+});
+
 test("the start injection stays under the budget with escalations present: the vocabulary steps down to names and then to a pointer, and no escalation is shortened", async () => {
   const dir = await freshRoot();
   try {

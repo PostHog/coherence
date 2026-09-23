@@ -19,9 +19,9 @@ import { loadJournal } from "../../journal/store.ts";
 import { loadSpecModel } from "../../spec/model.ts";
 import { DEFAULTS, buildScopePage, writeScopePage, writeStructurePreview, type BuildOptions } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
-import { allReliance, componentId, defectsOf, flowChokepointId, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, verifiedOf, workId } from "./derive.ts";
+import { CITED_WINDOW, windowJournal, allReliance, componentId, defectsOf, flowChokepointId, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, verifiedOf, workId } from "./derive.ts";
 import { escapeHtml } from "./html.ts";
-import type { Glossary, GlossaryCoverage, RecordedSite, ShellState, StructurePreview } from "./model.ts";
+import type { Glossary, GlossaryCoverage, RecordedSite, ShellState, StructurePreview, WorkOrder } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
 import { flowOf } from "./structure-flow.ts";
 
@@ -578,6 +578,59 @@ test("the Structure preview bridge validates crossings, selects Structure, and w
   } finally {
     await rm(output, { recursive: true, force: true });
   }
+});
+
+test("the Journal view links citations both ways: each record lists what it cites and what cites it as in-page links, and a work order lists its citations and bound records", () => {
+  const state = fresh();
+  const journal = renderView(state, "journal").text;
+  const decision = card(journal, "journal-d-00000001");
+  const citedBy = decision.slice(decision.indexOf('data-field="cited-by"'));
+  assert.ok(decision.includes('data-field="cited-by"'), "a cited decision lists what cites it");
+  assert.ok(citedBy.includes('href="#journal-e-00000003"'), "the escalation that cites it links to its card");
+  assert.ok(citedBy.includes('data-cited="wc-00000004"') && citedBy.includes('href="#work-w-00000003"'), "a work order's close that cites it links to its order's card");
+  const escalation = card(journal, "journal-e-00000003");
+  const cites = escalation.slice(escalation.indexOf('data-field="cites"'));
+  assert.ok(cites.includes('href="#journal-d-00000001"') && cites.includes("one door for writes"), "the escalation links to the decision it cites, with its subject");
+  assert.ok(cites.includes('href="#work-w-00000001"') && cites.includes("make every write pass through one door"), "and to the work order it cites, with its objective");
+  assert.ok(escalation.includes('data-field="human"') && escalation.includes("the owner asked whether the rule still earns its place") && escalation.includes("as the agent attributes"), "the human's words are shown apart from the because, as the agent's attribution");
+  assert.ok(card(journal, "pinned-journal-e-00000003").includes('href="#journal-d-00000001"'), "the pinned escalation shows what it is about");
+  assert.ok(card(journal, "journal-u-00000006").includes('href="#journal-c-00000002"'), "unable links to the conjecture it cites");
+  assert.ok(card(journal, "journal-c-00000002").includes('href="#journal-u-00000006"'), "and the conjecture links back");
+  assert.ok(!card(journal, "journal-ak-00000005").includes('class="citations"'), "a record that cites nothing and nothing cites shows no citation section");
+  const active = card(journal, workId("w-00000001"));
+  assert.ok(active.includes('data-field="cited-by"') && active.includes('href="#journal-e-00000003"'), "a work order lists the records citing it");
+  assert.ok(active.includes('data-field="bound"') && active.includes('href="#journal-d-00000001"'), "a work order lists the journal records bound to it");
+  const completed = card(journal, workId("w-00000003"));
+  assert.ok(completed.includes('data-field="cites"') && completed.includes('href="#journal-d-00000001"'), "a work order lists what its own records cite");
+  for (const [, target] of journal.matchAll(/href="#((?:journal|work)-[^"]+)"/g)) {
+    assert.ok(journal.includes(`id="${target}"`), `link #${target} lands on a card in the view`);
+    assert.equal(resolveHash(state, `#${target}`)?.view, "journal", `#${target} resolves to the Journal view`);
+  }
+  const trimmed = fresh();
+  trimmed.journal.records = trimmed.journal.records.filter((r) => r.id !== "c-00000002");
+  const absent = card(renderView(trimmed, "journal").text, "journal-u-00000006");
+  assert.ok(absent.includes("data-absent") && absent.includes("journal c-00000002") && !absent.includes('href="#journal-c-00000002"'), "a citation the page does not embed is an id with the command that shows it, never a dead link");
+});
+
+test("the journal window keeps what kept records and work orders cite, one hop, up to a cap", () => {
+  const decision = (i: number, cites?: string[]): ShellState["journal"]["records"][number] => ({
+    id: `d-${i.toString(16).padStart(8, "0")}`, kind: "decision", at: new Date(Date.UTC(2026, 8, 12) + i * 1000).toISOString(), session: "s", agent: "a", commit: null, dirty: false,
+    chose: `choice ${i}`, over: [], because: "b", ...(cites === undefined ? {} : { cites }),
+  });
+  const id = (i: number): string => `d-${i.toString(16).padStart(8, "0")}`;
+  const order: WorkOrder = { id: "w-1", objective: "o", success: "s", boundary: "b", owner: "s", state: "active", at: "2026-09-12T00:00:00.000Z", session: "s", agent: "a", history: [], cites: [id(10)] };
+  const records = Array.from({ length: 400 }, (_, i) => decision(i, i === 399 ? [id(5)] : undefined));
+  const window = windowJournal(records, 150, [order]);
+  const kept = new Set(window.records.map((r) => r.id));
+  assert.ok(kept.has(id(5)), "an old record a kept record cites is kept");
+  assert.ok(kept.has(id(10)), "an old record a work order cites is kept");
+  assert.ok(!kept.has(id(6)), "an old record nothing kept cites is left out");
+  assert.equal(window.omitted, 400 - 152, "what is left out is counted");
+  const dense = Array.from({ length: 400 }, (_, i) => decision(i, i >= 250 ? [id(i - 250)] : undefined));
+  const capped = windowJournal(dense, 150, [], CITED_WINDOW);
+  assert.equal(capped.records.length, 150 + CITED_WINDOW, `citations pull in at most ${CITED_WINDOW} older records`);
+  const cappedIds = new Set(capped.records.map((r) => r.id));
+  assert.ok(cappedIds.has(id(149)) && cappedIds.has(id(150 - CITED_WINDOW)) && !cappedIds.has(id(149 - CITED_WINDOW)), "the latest citers are served first");
 });
 
 test("deep links resolve: every card id on every view resolves to that view", () => {

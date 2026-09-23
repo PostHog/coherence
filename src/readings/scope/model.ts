@@ -351,6 +351,10 @@ export interface JournalHead {
   work?: string;
   commit: string | null;
   dirty: boolean;
+  /** The ids of earlier records, in either store, this record cites; absent when it cites none. */
+  cites?: string[];
+  /** Words the writing agent attributes to a human (decision, escalation, acknowledgement); not proof a human wrote them. */
+  human?: string;
 }
 
 export interface JournalStep {
@@ -392,9 +396,10 @@ export interface JournalData {
   work: WorkData;
   /**
    * How many records the page does not embed. The window keeps the latest
-   * records, every open escalation, and every record a kept record points
-   * at; the whole journal is one `journal` command away. Absent when nothing
-   * was left out.
+   * records, every open escalation, every record a kept record points at,
+   * and (up to a cap) every record a kept record or a work order cites; the
+   * whole journal is one `journal` command away. Absent when nothing was
+   * left out.
    */
   omitted?: number;
 }

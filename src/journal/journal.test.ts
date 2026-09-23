@@ -9,7 +9,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -487,6 +487,118 @@ test("a write binds to the one active order its session owns; none or several bi
     assert.match(inspected, /◆ d-[0-9a-f]{8}  alpha  flagged\n/);
     assert.match(inspected, /runs bound: 0/);
     assert.match(run("journal").out.join("\n"), /before any order/, "binding never hides a record from the timeline");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("citations resolve at the write: an unknown id refuses the write, a record of any kind in either store is accepted, and records without citations still load", () => {
+  const cwd = scratch();
+  try {
+    const run = runIn(cwd, clock());
+    // A record written before citations existed: no cites field, no binding.
+    const old = { id: "d-0ld00001", kind: "decision", at: "2026-09-01T00:00:00.000Z", session: "s0", agent: "old", commit: null, dirty: false, chose: "an old choice", over: [], because: "before citations" };
+    mkdirSync(join(cwd, JOURNAL_DIR), { recursive: true });
+    appendFileSync(join(cwd, JOURNAL_DIR, "s0.jsonl"), `${JSON.stringify(old)}\n`);
+    const conjectured = idOf(run("conjecture", "the cache misses", "--discriminated-by", "log the key", ...WHO));
+    const order = idOf(run("work", "create", "ship citations", "--success", "s", "--boundary", "b", "--cite", "d-0ld00001", ...WHO));
+    const move = idOf(run("work", "move", order, "active", "--because", "taking it up", "--cite", conjectured, ...WHO));
+
+    const before = records(cwd).length;
+    const unknown = run("decide", "build on a ghost", "--because", "b", "--cite", "d-00000000", ...WHO);
+    assert.equal(unknown.code, 1, "an unknown id refuses the write");
+    assert.match(unknown.err.join("\n"), /--cite d-00000000: no journal or work record has that id/);
+    assert.equal(records(cwd).length, before, "a refused write appends nothing");
+    assert.equal(run("work", "close", order, "--because", "b", "--cite", "wm-00000000", ...WHO).code, 1, "a work write refuses an unknown citation too");
+    assert.equal(run("decide", "twice", "--because", "b", "--cite", conjectured, "--cite", conjectured, ...WHO).code, 1, "a citation given twice is refused");
+
+    const decided = idOf(run("decide", "cite everything", "--because", "b", "--cite", "d-0ld00001", "--cite", conjectured, "--cite", order, "--cite", move, ...WHO));
+    assert.deepEqual((byId(cwd, decided) as { cites?: string[] }).cites, ["d-0ld00001", conjectured, order, move], "a decision cites a journal record of any kind, a work order, and a work order's move");
+    for (const [verb, ...args] of [
+      ["escalate", "a human must see", "--because", "b"],
+      ["defect", "it broke", "--evidence", "e"],
+      ["conjecture", "maybe", "--discriminated-by", "t"],
+      ["unable", "could not", "--because", "wall"],
+      ["experiment", "create", "it works", "--action", "try", "--success", "green"],
+    ] as string[][]) {
+      const written = run(verb!, ...args, "--cite", decided, ...WHO);
+      assert.equal(written.code, 0, `${verb} cites: ${written.err.join("\n")}`);
+      assert.match(written.out.join("\n"), new RegExp(`cites ${decided}`), `${verb} prints what it cites`);
+    }
+    assert.equal(run("retract", decided, "--because", "b", "--cite", conjectured, ...WHO).code, 1, "a verb that answers one record by `of` takes no citation");
+    const closed = run("work", "close", order, "--because", "done", "--cite", decided, ...WHO);
+    assert.equal(closed.code, 0, closed.err.join("\n"));
+
+    const plain = idOf(run("decide", "no citations", "--because", "b", ...WHO));
+    assert.ok(!Object.hasOwn(byId(cwd, plain), "cites"), "a record that cites nothing carries no cites field, like one written before citations");
+    assert.ok(!Object.hasOwn(byId(cwd, plain), "human"), "nor a human field");
+    assert.equal(byId(cwd, "d-0ld00001").kind, "decision", "a record written before citations still loads");
+    assert.equal(loadJournal(cwd).damaged.length, 0);
+    assert.match(run("journal").out.join("\n"), /an old choice\n    over: \(unexamined\)\n    because: before citations\n    cited by: /, "and still renders, now with what cites it");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("citations read both ways: the timeline, the JSON envelope, journal <id>, and work inspect show what a record cites and what cites it", () => {
+  const cwd = scratch();
+  try {
+    const run = runIn(cwd, clock());
+    const base = idOf(run("decide", "one door for writes", "--because", "two writers disagree", ...WHO));
+    const order = idOf(run("work", "create", "route writes through the door", "--success", "s", "--boundary", "b", "--cite", base, ...WHO));
+    idOf(run("work", "move", order, "active", "--because", "up", ...WHO));
+    const built = idOf(run("decide", "the door takes a batch", "--because", "throughput", "--cite", base, ...WHO));
+    const escalated = idOf(run("escalate", "should the door take deletes", "--because", "a human decides scope", "--cite", built, "--cite", order, ...WHO));
+
+    const timeline = run("journal").out.join("\n");
+    assert.match(timeline, new RegExp(`one door for writes\\n    over: \\(unexamined\\)\\n    because: two writers disagree\\n    cited by: ${order}, ${built}`), "the cited record lists what cites it, from both stores");
+    assert.match(timeline, new RegExp(`the door takes a batch\\n(?:.*\\n)*?    cites: ${base}\\n    cited by: ${escalated}`), "a record shows what it cites and what cites it");
+
+    const envelope = JSON.parse(run("journal", "--json").out.join("\n")) as { records: { id: string; cites?: string[] }[]; citedBy: Record<string, string[]> };
+    assert.deepEqual(envelope.records.find((r) => r.id === escalated)?.cites, [built, order], "--json carries each record's cites as stored");
+    assert.deepEqual(envelope.citedBy[base], [order, built], "--json carries what cites each record");
+    assert.deepEqual(envelope.citedBy[built], [escalated]);
+
+    const one = run("journal", base);
+    assert.equal(one.code, 0, one.err.join("\n"));
+    const text = one.out.join("\n");
+    assert.match(text, new RegExp(`◆ ${base}  alpha  one door for writes`));
+    assert.match(text, /cites \(0\):\n  cited by \(2\):/);
+    assert.match(text, new RegExp(`    ${order}  work order  alpha: route writes through the door`), "journal <id> names a citing work order by kind and subject");
+    assert.match(text, new RegExp(`    ${built}  decision  alpha: the door takes a batch`));
+    const ofOrder = run("journal", order).out.join("\n");
+    assert.match(ofOrder, new RegExp(`${order}  work order  alpha: route writes through the door\\n  cites \\(1\\):\\n    ${base}  decision  alpha: one door for writes\\n  cited by \\(1\\):\\n    ${escalated}  escalation`), "journal <id> reads a work record both ways too");
+    assert.equal(run("journal", "d-00000000").code, 1, "an unknown id is refused");
+    assert.equal(run("journal", base, "--kind", "decision").code, 1, "journal <id> takes no filter");
+
+    const inspected = run("work", "inspect", order).out.join("\n");
+    assert.match(inspected, new RegExp(`  cites: 1\\n    .* ${base}  decision  alpha  one door for writes`), "an order lists what it cites");
+    assert.match(inspected, new RegExp(`  journal records bound: 2\\n.*the door takes a batch\\n.*should the door take deletes`), "the records bound to it");
+    assert.match(inspected, new RegExp(`  cited by: 1\\n    .* ${escalated}  escalation  alpha  should the door take deletes  \\[cites ${order}\\]`), "and the records citing it");
+
+    const feed = run("journal", "--subjects").out.join("\n");
+    assert.ok(!feed.includes("cites") && !feed.includes("cited by"), "the subjects feed stays subjects only");
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("--human records the words an agent attributes to a human, apart from its because", () => {
+  const cwd = scratch();
+  try {
+    const run = runIn(cwd, clock());
+    const decided = idOf(run("decide", "rename it lexicon later", "--because", "the owner ruled it", "--human", "call it lexicon, but not yet", ...WHO));
+    const record = byId(cwd, decided) as { human?: string; because: string };
+    assert.equal(record.human, "call it lexicon, but not yet");
+    assert.equal(record.because, "the owner ruled it", "the because stays the agent's own");
+    const escalated = idOf(run("escalate", "retire the rule?", "--because", "a human decides retirements", "--human", "I want to see this one", ...WHO));
+    assert.equal((byId(cwd, escalated) as { human?: string }).human, "I want to see this one");
+    const acked = idOf(run("acknowledge", escalated, "--because", "kept", "--human", "keep it", ...WHO));
+    assert.equal((byId(cwd, acked) as { human?: string }).human, "keep it");
+    assert.equal(run("decide", "blank", "--because", "b", "--human", " ", ...WHO).code, 1, "blank human words are refused");
+    assert.equal(run("defect", "no human here", "--evidence", "e", "--human", "x", ...WHO).code, 1, "a verb that does not carry human words refuses the flag");
+    const timeline = run("journal").out.join("\n");
+    assert.match(timeline, /because: the owner ruled it\n    human \(as the agent attributes\): call it lexicon, but not yet/, "the timeline labels the words as the agent's attribution");
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }

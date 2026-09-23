@@ -148,12 +148,12 @@ export function makeFixture(): Fixture {
 
   const head = (id: string, kind: string, at: string): { id: string; kind: string; at: string; session: string; agent: string; commit: string; dirty: boolean } => ({ id, kind, at, session: SESSION, agent: "fixture", commit: "abc1234", dirty: false });
   const journal: { id: string; [key: string]: unknown }[] = [
-    { ...head("d-00000001", "decision", "2026-09-10T11:00:00.000Z"), chose: "one door for writes", over: ["a writer per caller"], because: "two writers disagree" },
+    { ...head("d-00000001", "decision", "2026-09-10T11:00:00.000Z"), chose: "one door for writes", over: ["a writer per caller"], because: "two writers disagree", work: "w-00000001", binding: "flag" },
     { ...head("c-00000002", "conjecture", "2026-09-10T11:01:00.000Z"), observation: "the cache misses more than it should", couldBe: ["the key is normalized twice", "the instrument is wrong"], discriminatedBy: "log the key at both sites" },
-    { ...head("e-00000003", "escalation", "2026-09-10T11:02:00.000Z"), what: "retire the read shape rule", because: "a human decides retirements" },
+    { ...head("e-00000003", "escalation", "2026-09-10T11:02:00.000Z"), what: "retire the read shape rule", because: "a human decides retirements", human: "the owner asked whether the rule still earns its place", cites: ["d-00000001", "w-00000001"] },
     { ...head("e-00000004", "escalation", "2026-09-10T11:03:00.000Z"), what: "the store needs a second file", because: "a human decides scope" },
     { ...head("ak-00000005", "acknowledgement", "2026-09-10T11:04:00.000Z"), of: "e-00000004", because: "one file stays" },
-    { ...head("u-00000006", "unable", "2026-09-10T11:05:00.000Z"), what: "could not start the language server", because: "no binary on this machine" },
+    { ...head("u-00000006", "unable", "2026-09-10T11:05:00.000Z"), what: "could not start the language server", because: "no binary on this machine", cites: ["c-00000002"] },
   ];
   write(root, `.coherence/journal/${SESSION}.jsonl`, journal.map((r) => JSON.stringify(r)).join("\n") + "\n");
   // The work store as the journal writes it: an order and the records that moved it. The reader folds them; nothing here is an order's state.
@@ -162,7 +162,7 @@ export function makeFixture(): Fixture {
     { ...workHead("w-00000001", "order", "2026-09-10T09:00:00.000Z"), objective: "make every write pass through one door", success: "the chokepoint check passes", boundary: "src/store", owner: SESSION },
     { ...workHead("wm-00000002", "move", "2026-09-10T09:01:00.000Z"), of: "w-00000001", state: "active", because: "taking it up" },
     { ...workHead("w-00000003", "order", "2026-09-10T09:02:00.000Z"), objective: "retire the cache", success: "no file under src/store/cache", boundary: "src/store/cache", owner: SESSION },
-    { ...workHead("wc-00000004", "completion", "2026-09-10T09:03:00.000Z"), of: "w-00000003", state: "completed", because: "the cache is gone" },
+    { ...workHead("wc-00000004", "completion", "2026-09-10T11:06:00.000Z"), of: "w-00000003", state: "completed", because: "the cache is gone", cites: ["d-00000001"] },
   ];
   write(root, `.coherence/work/${SESSION}.jsonl`, work.map((r) => JSON.stringify(r)).join("\n") + "\n");
 

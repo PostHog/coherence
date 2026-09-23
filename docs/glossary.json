@@ -507,7 +507,7 @@
     {
       "name": "journal",
       "status": "settled",
-      "definition": "Compression. The journal compresses possibly millions of subagent session tokens into a handful of durable, comprehensible outcomes. It is also a signaling system so subagents can compare notes, and a means of escalation to humans. Getting a pile of code into RAM is expensive; the journal exists to maximize the value extracted while the cache is hot.",
+      "definition": "Compression. The journal compresses possibly millions of subagent session tokens into a handful of durable, comprehensible outcomes. It is also a signaling system so subagents can compare notes, and a means of escalation to humans. Getting a pile of code into RAM is expensive; the journal exists to maximize the value extracted while the cache is hot. A record may cite the earlier records it rests on or is about (a citation, checked at the write and read both ways), and a decision, escalation or acknowledgement may carry words the agent attributes to a human, kept apart from its own because; that records the attribution, not proof a human wrote them.",
       "related": [
         "decision",
         "conjecture",
@@ -608,7 +608,7 @@
     {
       "name": "work order",
       "status": "settled",
-      "definition": "A named unit of assigned work: an objective, an observable success criterion, a boundary and write scope, an owner session set at creation, and a state (open, active, waiting, completed, cancelled). Journal records and verification runs written by the owner session bind to it by inference. It grants no authority and gates nothing; its value is context, so a reader can see everything one assignment produced and why.",
+      "definition": "A named unit of assigned work, held by an owner session and moved through states. It carries an objective, an observable success criterion, a boundary and write scope, and the owner session set at creation; its states are open, active, waiting, completed and cancelled. Journal records and verification runs written by the owner session bind to it by inference. It grants no authority and gates nothing; its value is context, so a reader can see everything one assignment produced and why. Its create, moves and close may cite earlier records, and its reading lists what it cites, what binds to it, and what cites it.",
       "related": [
         "journal",
         "decision",
@@ -1268,6 +1268,38 @@
       "provenance": {
         "defined_by": "agent proposal during the vocabulary coverage redesign, 2026-09-23 (journal d-c8f34e4b)",
         "because": "The owner ruled that names with so much gravity there is no fear of ambiguity need no definition, while a common word in a project sense still does."
+      }
+    },
+    {
+      "name": "citation",
+      "status": "settled",
+      "definition": "A record's checked pointer to an earlier record it rests on or is about. It names the record by id, in either store and of any kind; it is given with --cite on decisions, conjectures, defects, experiments, unable, escalations, and work order creates, moves and closes, and an id that names no record refuses the write. Untyped, and read both ways: what a record cites, and what cites it, derived at every read.",
+      "related": [
+        "journal",
+        "work order",
+        "attribution"
+      ],
+      "rejected": [
+        {
+          "alternative": "typed citations naming what one record does to another (implements, repairs, verifies, authorizes)",
+          "because": "the work order's typed consequences were written by the closing session restating its own close and never read back; a reader needs to know that one record rests on another, and the record's own text says how"
+        },
+        {
+          "alternative": "a record id written into a because as plain text",
+          "because": "never resolved or checked; a typo or an id from another checkout reads as a relationship to nothing, and no reader can walk it back"
+        },
+        {
+          "alternative": "a citedBy field written onto the cited record",
+          "because": "the stores are append only; the reverse direction is derived at read time, so an old record gains its citers without an edit"
+        }
+      ],
+      "detail": {
+        "validation": "Every cited id must name a record already in the journal or the work store when the citation is written; one unknown id refuses the whole write and appends nothing. An id given twice is refused. A record that cites nothing carries no cites field, so records written before citations read unchanged.",
+        "reading": "journal and journal --json show each record's cites and what cites it; journal <id> names both directions by kind and subject; work inspect and query order list what an order's records cite, what binds to it, and what cites it; Scope's Journal view links both directions; orient names what an open escalation cites. The peer feed stays subjects only.",
+        "scope_window": "The page keeps, one hop and up to a cap, the older records its kept records and work orders cite; a citation past the cap shows its id and the command that reads it."
+      },
+      "provenance": {
+        "defined_by": "agent relations (session a40acfaebbf15f7f7), 2026-09-23, on the owner-approved approach for relationships between journal and work records"
       }
     }
   ],

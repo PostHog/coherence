@@ -8,7 +8,8 @@
  *   relies-on <chokepoint> who references this chokepoint
  *   status                 structural defects, open requirements, escalations
  *   component <folder>     one component and its bullets
- *   order                  the session's active work order, as the journal folds it
+ *   order                  the session's active work order, as the journal folds it, with the
+ *                          records it cites, the records bound to it, and the records citing it
  *   economy <path...>      what must be loaded to change these files safely: the
  *                          economy prediction, which the command line answers through
  *                          the economy's own closure and the warm instrument
@@ -19,6 +20,8 @@
 import {
   allInvariants,
   chokepointNames,
+  citesOf,
+  subjectOf,
   componentByFolder,
   componentOfFile,
   defectsOf,
@@ -50,7 +53,7 @@ export const QUERY_USAGE = [
   "  query structure                the structural routes, core dependencies, interface identifiers and component interfaces Structure draws, and the placement",
   "  query status                   structural defects, open requirements, escalations awaiting a human",
   "  query component <folder>       one component: intent, counts, bullets",
-  "  query order [--session <id>]   the active work order the session owns, folded from its records, with what binds to it",
+  "  query order [--session <id>]   the active work order the session owns, folded from its records, with what it cites, what binds to it, and what cites it",
   "  query economy <path...> | --changed [--since <commit>]   what must be loaded to change these files safely: the economy prediction, through the instrument; --changed reads the working change from git (staged, unstaged, untracked), --since widens it from the merge base of <commit> and HEAD (--since main: this branch's whole change set)",
   "  query observed [<component>] [--failures [--since <commit>]]   each component interface exercised by N tests or never observed, from the latest observation, fresh or stale; failing tests with what broke, the likely site, and the region",
 ].join("\n");
@@ -265,7 +268,16 @@ function answerStatus(state: ShellState): Answer {
   lines.push(`open requirements (${requirements.length})${requirements.length === 0 ? ": none" : ":"}`);
   lines.push(...capped(requirements, (i) => `  ○ ${i.component}/${i.name}  lacks ${i.lacks.length === 0 ? "nothing; the latest run is missing" : i.lacks.join(", ")}`));
   lines.push(`escalations awaiting a human (${escalations.length})${escalations.length === 0 ? ": none" : ":"}`);
-  lines.push(...capped(escalations, (e) => `  ▲ ${e.id} ${e.agent} (${shortSession(e.session)}): ${e.what}`));
+  const records = new Map(state.journal.records.map((r) => [r.id, r]));
+  const orders = state.journal.work.kind === "present" ? state.journal.work.orders : [];
+  // An escalation names each record it cites, so the question arrives with what it is about.
+  const about = (id: string): string => {
+    const record = records.get(id);
+    if (record !== undefined) return `${id} ${record.kind}: ${subjectOf(record)}`;
+    const order = orders.find((o) => o.id === id || o.history.some((event) => event.id === id));
+    return order === undefined ? `${id} (not found)` : `${id} work order${order.id === id ? "" : ` ${order.id}`}: ${order.objective}`;
+  };
+  lines.push(...capped(escalations, (e) => [`  ▲ ${e.id} ${e.agent} (${shortSession(e.session)}): ${e.what}`, ...citesOf(e).map((id) => `      about ${about(id)}`)].join("\n")));
   const c = state.spec.counts;
   lines.push(`${c.components} components, ${c.bullets} bullets: ${c.invariants} invariants, ${c.requirements} requirements, ${c.structuralDefects} structural defects; ${state.runs.records.length} runs, ${state.journal.records.length} journal records`);
   return { text: lines.join("\n"), code: 0 };
@@ -310,7 +322,7 @@ function answerOrder(state: ShellState, session: string | undefined): Answer {
     const who = session === undefined ? "" : ` for session ${session}`;
     return { text: `no active work order${who} (${work.orders.length} on record${active.length > 0 ? `, ${active.length} active` : ""})`, code: 0 };
   }
-  return { text: mine.map((order) => renderOrder(order, state.journal.records, state.runs.records).join("\n")).join("\n"), code: 0 };
+  return { text: mine.map((order) => renderOrder(order, state.journal.records, state.runs.records, work.orders).join("\n")).join("\n"), code: 0 };
 }
 
 export interface QueryOptions {

@@ -10,10 +10,16 @@
  *
  * The subjects feed is the peer feed's data source: only the subject of each
  * record after a cursor, and the cursor to pass next time.
+ *
+ * Citations read in both directions: a record shows the ids it cites and
+ * the ids of the records, in either store, that cite it. `journal <id>`
+ * shows one record of either store with each record it cites and each
+ * record citing it named by kind and subject. The subjects feed never
+ * carries citations: it stays subjects only.
  */
 
 import { JournalError } from "./args.ts";
-import { GLYPH, isKind, pointsAt, subjectOf, type Escalation, type JournalRecord, type Kind } from "./record.ts";
+import { GLYPH, anySubjectOf, citedBy, citesOf, isKind, kindLabel, pointsAt, subjectOf, type AnyRecord, type Escalation, type JournalRecord, type Kind } from "./record.ts";
 import { compareRecords, type Damaged, type Loaded } from "./store.ts";
 
 export interface Filters {
@@ -80,8 +86,25 @@ function stamp(at: string): string {
   return `${at.slice(0, 10)} ${at.slice(11, 16)}`;
 }
 
-/** One record as its timeline lines: the head line, then indented detail. */
-export function renderRecord(record: JournalRecord, status: string | undefined): string[] {
+/** The lines a record's relations add beneath it: the human's words, what it cites, and what cites it. */
+function relationLines(record: JournalRecord, citers: readonly AnyRecord[]): string[] {
+  const lines: string[] = [];
+  const human = (record as { human?: unknown }).human;
+  if (typeof human === "string") lines.push(`human (as the agent attributes): ${human}`);
+  const cites = citesOf(record);
+  if (cites.length > 0) lines.push(`cites: ${cites.join(", ")}`);
+  if (citers.length > 0) lines.push(`cited by: ${citers.map((citer) => citer.id).join(", ")}`);
+  return lines;
+}
+
+/** One record as its timeline lines: the head line, then indented detail, then its relations. */
+export function renderRecord(record: JournalRecord, status: string | undefined, citers: readonly AnyRecord[] = []): string[] {
+  const body = renderBody(record, status);
+  const relations = relationLines(record, citers);
+  return relations.length === 0 ? body : [...body, ...indent(relations)];
+}
+
+function renderBody(record: JournalRecord, status: string | undefined): string[] {
   const suffix = status === undefined ? "" : `  [${status}]`;
   const line = (text: string): string => `${stamp(record.at)} ${GLYPH[record.kind]} ${record.id}  ${record.agent}  ${text}${suffix}`;
   const detail: string[] = [];
@@ -127,31 +150,83 @@ function indent(lines: string[]): string[] {
 }
 
 /** The heading every read starts with while an escalation awaits a human. */
-function escalationHeading(records: readonly JournalRecord[], status: Map<string, string>): string[] {
+function escalationHeading(records: readonly JournalRecord[], status: Map<string, string>, index: Map<string, AnyRecord[]>): string[] {
   const open = openEscalations(records);
   if (open.length === 0) return [];
   return [
     `awaiting a human (${open.length}):`,
-    ...open.flatMap((record) => renderRecord(record, status.get(record.id))),
+    ...open.flatMap((record) => renderRecord(record, status.get(record.id), index.get(record.id))),
     "",
   ];
 }
 
-export function renderTimeline(loaded: Loaded, filters: Filters, since: Cursor | null = null): string[] {
+/**
+ * The merged timeline. `work` is every work store record, so a record a work
+ * order cites shows that order's record among what cites it.
+ */
+export function renderTimeline(loaded: Loaded, filters: Filters, since: Cursor | null = null, work: readonly AnyRecord[] = []): string[] {
   const status = statuses(loaded.records);
+  const index = citedBy([...loaded.records, ...work]);
   const shown = applyFilters(loaded.records, filters).filter((record) => since === null || after(record, since));
-  const body = shown.length === 0 ? ["nothing recorded"] : shown.flatMap((record) => renderRecord(record, status.get(record.id)));
-  return [...escalationHeading(loaded.records, status), ...body];
+  const body = shown.length === 0 ? ["nothing recorded"] : shown.flatMap((record) => renderRecord(record, status.get(record.id), index.get(record.id)));
+  return [...escalationHeading(loaded.records, status, index), ...body];
 }
 
-export function renderJson(loaded: Loaded, filters: Filters, branch: string | null): string {
+/**
+ * The JSON envelope: the records as stored (each carries what it cites),
+ * and `citedBy`, the reverse direction for every shown record some record
+ * of either store cites, derived at the read and stored nowhere.
+ */
+export function renderJson(loaded: Loaded, filters: Filters, branch: string | null, work: readonly AnyRecord[] = []): string {
+  const records = applyFilters(loaded.records, filters);
+  const index = citedBy([...loaded.records, ...work]);
+  const reverse: Record<string, string[]> = {};
+  for (const record of records) {
+    const citers = index.get(record.id);
+    if (citers !== undefined) reverse[record.id] = citers.map((citer) => citer.id);
+  }
   const envelope = {
     branch,
     escalations: openEscalations(loaded.records).map((record) => record.id),
-    records: applyFilters(loaded.records, filters),
+    records,
+    citedBy: reverse,
     damaged: loaded.damaged,
   };
   return JSON.stringify(envelope, null, 2);
+}
+
+/** A record of either store named on one line: id, kind, agent, the truncated subject. */
+export function namedLine(record: AnyRecord): string {
+  return `${record.id}  ${kindLabel(record)}  ${record.agent}: ${truncateSubject(anySubjectOf(record))}`;
+}
+
+/**
+ * One record of either store, by id, and its citations both ways: each
+ * record it cites and each record citing it, named by kind and subject. A
+ * journal record prints as the timeline prints it; a work record prints its
+ * one line (work inspect shows an order whole). Refused for an unknown id.
+ */
+export function renderOne(id: string, loaded: Loaded, work: readonly AnyRecord[]): string[] {
+  const everything: AnyRecord[] = [...loaded.records, ...work];
+  const found = everything.find((record) => record.id === id);
+  if (found === undefined) throw new JournalError(`no journal or work record has id ${id}`);
+  const byId = new Map(everything.map((record) => [record.id, record]));
+  const status = statuses(loaded.records);
+  const head = isKind(found.kind) ? renderBody(found as JournalRecord, status.get(found.id)) : [`${stamp(found.at)} ${namedLine(found)}`];
+  const human = (found as { human?: unknown }).human;
+  const cites = citesOf(found);
+  const citers = citedBy(everything).get(found.id) ?? [];
+  return [
+    ...head,
+    ...(typeof human === "string" ? [`    human (as the agent attributes): ${human}`] : []),
+    `  cites (${cites.length}):`,
+    ...cites.map((cited) => {
+      const record = byId.get(cited);
+      return `    ${record === undefined ? `${cited}  (not in the stores read)` : namedLine(record)}`;
+    }),
+    `  cited by (${citers.length}):`,
+    ...citers.map((citer) => `    ${namedLine(citer)}`),
+  ];
 }
 
 /** Lines that report each damaged line and then the count, for the end of every read. */

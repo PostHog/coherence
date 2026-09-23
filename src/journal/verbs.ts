@@ -7,12 +7,20 @@
  * that writes a new subject (decide, conjecture, defect, experiment create,
  * unable, escalate) needs nothing but its own fields and the attribution every
  * write requires.
+ *
+ * A verb that writes a new subject, and the work verbs that create, move or
+ * close an order, may cite earlier records with --cite <id>, repeated. Every
+ * cited id must name a record already in the journal or the work store, of
+ * any kind; one that does not refuses the whole write. decide, escalate and
+ * acknowledge take --human "<what the human said>": the words the agent
+ * attributes to a human, stored apart from its own because.
  */
 
 import { JournalError, onePositional, parseFlags, required, type FlagShape, type Parsed } from "./args.ts";
 import {
   INSTRUMENT_IS_WRONG,
   deriveOutcome,
+  citesOf,
   pointsAt,
   recordId,
   type Acknowledgement,
@@ -35,7 +43,7 @@ import {
   type WorkKind,
 } from "./record.ts";
 import { JOURNAL_DIR, appendRecord, gitState, loadJournal, type Loaded } from "./store.ts";
-import { describeBinding } from "./work.ts";
+import { describeBinding, loadWork } from "./work.ts";
 
 export interface Context {
   cwd: string;
@@ -73,6 +81,42 @@ export function head<K extends Kind | WorkKind>(kind: K, who: Attribution, ctx: 
   return { id: recordId(kind, who.session, at, text), kind, at, ...who, commit, dirty };
 }
 
+/** The flag that cites earlier records, for every verb that may cite. */
+export const CITE: Record<string, FlagShape> = { cite: "many" };
+
+/**
+ * The records a write cites, checked against both stores: each --cite must
+ * name a record already in the journal or the work store, of any kind, and
+ * none may be given twice. Returns the field to spread into the record,
+ * empty when nothing is cited, so a record that cites nothing looks exactly
+ * like one written before citations existed. This is the one site that
+ * accepts a citation.
+ */
+export function citations(parsed: Parsed, cwd: string): { cites?: string[] } {
+  const given = parsed.many.get("cite") ?? [];
+  if (given.length === 0) return {};
+  const known = new Set<string>([
+    ...loadJournal(cwd).records.map((record) => record.id),
+    ...loadWork(cwd).records.map((record) => record.id),
+  ]);
+  const seen = new Set<string>();
+  for (const id of given) {
+    if (id.trim() === "") throw new JournalError("--cite needs a record id");
+    if (seen.has(id)) throw new JournalError(`--cite ${id} given twice`);
+    seen.add(id);
+    if (!known.has(id)) throw new JournalError(`--cite ${id}: no journal or work record has that id; cite a record that exists (journal, work inspect)`);
+  }
+  return { cites: given };
+}
+
+/** The words a human said, as the agent attributes them; refused when given blank. */
+function humanWords(parsed: Parsed): { human?: string } {
+  const human = parsed.one.get("human");
+  if (human === undefined) return {};
+  if (human.trim() === "") throw new JournalError("--human needs the words the human said");
+  return { human };
+}
+
 function write(ctx: Context, record: JournalRecord, extra: string[] = []): Written {
   const written = appendRecord(ctx.cwd, record);
   return {
@@ -80,6 +124,7 @@ function write(ctx: Context, record: JournalRecord, extra: string[] = []): Writt
     lines: [
       `${written.id}  ${written.kind} recorded in ${JOURNAL_DIR}/${written.session}.jsonl`,
       `  ${describeBinding({ binding: written.binding ?? "none: unsettled", ...(written.work === undefined ? {} : { work: written.work }) })}`,
+      ...(citesOf(written).length > 0 ? [`  cites ${citesOf(written).join(", ")}`] : []),
       ...extra,
     ],
   };
@@ -108,7 +153,7 @@ function refuseIfAnswered(loaded: Loaded, id: string, verb: string, kinds: reado
 }
 
 export function decide(argv: string[], ctx: Context): Written {
-  const parsed = parseFlags(argv, withCommon({ over: "many", because: "one" }));
+  const parsed = parseFlags(argv, withCommon({ over: "many", because: "one", human: "one", ...CITE }));
   const who = attribution(parsed);
   const chose = onePositional(parsed, "what was chosen");
   const because = required(parsed, "because", "a decision records why");
@@ -122,7 +167,7 @@ export function decide(argv: string[], ctx: Context): Written {
   } else {
     over = given;
   }
-  const record: Decision = { ...head("decision", who, ctx, chose), chose, over, because };
+  const record: Decision = { ...head("decision", who, ctx, chose), chose, over, because, ...humanWords(parsed), ...citations(parsed, ctx.cwd) };
   return write(ctx, record);
 }
 
@@ -140,7 +185,7 @@ export function retract(argv: string[], ctx: Context): Written {
 }
 
 export function conjecture(argv: string[], ctx: Context): Written {
-  const parsed = parseFlags(argv, withCommon({ "could-be": "many", "discriminated-by": "one" }));
+  const parsed = parseFlags(argv, withCommon({ "could-be": "many", "discriminated-by": "one", ...CITE }));
   const who = attribution(parsed);
   const observation = onePositional(parsed, "the observation");
   const discriminatedBy = required(parsed, "discriminated-by", "a conjecture names the test that separates its candidates");
@@ -152,6 +197,7 @@ export function conjecture(argv: string[], ctx: Context): Written {
     observation,
     couldBe,
     discriminatedBy,
+    ...citations(parsed, ctx.cwd),
   };
   return write(ctx, record);
 }
@@ -187,12 +233,12 @@ export function dismiss(argv: string[], ctx: Context): Written {
 }
 
 export function defect(argv: string[], ctx: Context): Written {
-  const parsed = parseFlags(argv, withCommon({ evidence: "one", file: "many" }));
+  const parsed = parseFlags(argv, withCommon({ evidence: "one", file: "many", ...CITE }));
   const who = attribution(parsed);
   const what = onePositional(parsed, "what failed");
   const evidence = required(parsed, "evidence", "a defect carries the reproducer or report that made it one");
   const files = parsed.many.get("file") ?? [];
-  const record: Defect = { ...head("defect", who, ctx, what), what, evidence, files };
+  const record: Defect = { ...head("defect", who, ctx, what), what, evidence, files, ...citations(parsed, ctx.cwd) };
   return write(ctx, record);
 }
 
@@ -204,7 +250,7 @@ export function experiment(argv: string[], ctx: Context): Written {
 }
 
 function experimentCreate(argv: string[], ctx: Context): Written {
-  const parsed = parseFlags(argv, withCommon({ context: "many", action: "many", success: "many" }));
+  const parsed = parseFlags(argv, withCommon({ context: "many", action: "many", success: "many", ...CITE }));
   const who = attribution(parsed);
   const expectation = onePositional(parsed, "the expectation");
   const context = parsed.many.get("context") ?? [];
@@ -223,6 +269,7 @@ function experimentCreate(argv: string[], ctx: Context): Written {
     context,
     actions: steps("a", actionTexts),
     criteria: steps("c", successTexts),
+    ...citations(parsed, ctx.cwd),
   };
   const ids = [...record.actions, ...record.criteria];
   const template = [
@@ -271,31 +318,31 @@ function experimentClose(argv: string[], ctx: Context): Written {
 }
 
 export function unable(argv: string[], ctx: Context): Written {
-  const parsed = parseFlags(argv, withCommon({ because: "one" }));
+  const parsed = parseFlags(argv, withCommon({ because: "one", ...CITE }));
   const who = attribution(parsed);
   const what = onePositional(parsed, "what you could not do");
   const because = required(parsed, "because", "unable names the wall");
-  const record: Unable = { ...head("unable", who, ctx, what), what, because };
+  const record: Unable = { ...head("unable", who, ctx, what), what, because, ...citations(parsed, ctx.cwd) };
   return write(ctx, record);
 }
 
 export function escalate(argv: string[], ctx: Context): Written {
-  const parsed = parseFlags(argv, withCommon({ because: "one" }));
+  const parsed = parseFlags(argv, withCommon({ because: "one", human: "one", ...CITE }));
   const who = attribution(parsed);
   const what = onePositional(parsed, "what a human must see");
   const because = required(parsed, "because", "an escalation records why a human");
-  const record: Escalation = { ...head("escalation", who, ctx, what), what, because };
+  const record: Escalation = { ...head("escalation", who, ctx, what), what, because, ...humanWords(parsed), ...citations(parsed, ctx.cwd) };
   return write(ctx, record, ["  this escalation heads every read until a human acknowledges it"]);
 }
 
 export function acknowledge(argv: string[], ctx: Context): Written {
-  const parsed = parseFlags(argv, withCommon({ because: "one" }));
+  const parsed = parseFlags(argv, withCommon({ because: "one", human: "one" }));
   const who = attribution(parsed);
   const of = onePositional(parsed, "the escalation id");
   const because = required(parsed, "because", "an acknowledgement records what the human decided");
   const loaded = loadJournal(ctx.cwd);
   target(loaded, of, "escalation", "acknowledge");
   refuseIfAnswered(loaded, of, "acknowledge", ["acknowledgement"]);
-  const record: Acknowledgement = { ...head("acknowledgement", who, ctx, `${of}\n${because}`), of, because };
+  const record: Acknowledgement = { ...head("acknowledgement", who, ctx, `${of}\n${because}`), of, because, ...humanWords(parsed) };
   return write(ctx, record);
 }

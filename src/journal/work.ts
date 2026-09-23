@@ -112,6 +112,8 @@ export interface WorkOrder {
   agent: string;
   /** Every record about it after the order record, oldest first. */
   history: Exclude<WorkRecord, { kind: "order" }>[];
+  /** The records the order record cites, when it cites any; its moves and close carry their own. */
+  cites?: string[];
 }
 
 /** Every order, oldest first, folded from the loaded records; a record about an unknown order is skipped. */
@@ -130,6 +132,7 @@ export function foldOrders(loaded: LoadedWork): WorkOrder[] {
         session: record.session,
         agent: record.agent,
         history: [],
+        ...(record.cites === undefined ? {} : { cites: record.cites }),
       });
       continue;
     }
