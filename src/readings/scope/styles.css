@@ -2,32 +2,55 @@
 
 :root {
   color-scheme: light dark;
-  --paper: #ffffff;
-  --ink: #1b1b19;
-  --ink-quiet: #5f5e57;
-  --rule: #cfcdc5;
-  --rule-soft: #e8e6e0;
-  --accent: #1f4fb8;
+  --paper: #eef1f7;
+  --ink: #141a29;
+  --ink-quiet: #4d566b;
+  --rule: rgb(20 26 41 / 0.16);
+  --rule-soft: rgb(20 26 41 / 0.08);
+  --accent: #2346b0;
   --quote-bar: #b9b6ad;
   --landed: #fff2bf;
-  --field: #f6f5f1;
+  --field: rgb(255 255 255 / 0.55);
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia,
     "Times New Roman", serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /*
+   * Glass (the owner's ruling d-a5c6442d): the page's panes are frosted glass over a softly lit field, each with a 1px border, a
+   * lighter inner top edge and a soft drop; their frames take Expanse's cut corners. The glows are the page's own light.
+   */
+  --glow-1: rgb(92 124 214 / 0.16);
+  --glow-2: rgb(132 104 206 / 0.12);
+  --glow-3: rgb(56 150 170 / 0.12);
+  --glass: linear-gradient(180deg, rgb(255 255 255 / 0.82), rgb(255 255 255 / 0.62));
+  --glass-chip: rgb(255 255 255 / 0.7);
+  --glass-border: rgb(20 26 41 / 0.12);
+  --glass-frame: rgb(15 118 110 / 0.34);
+  --glass-edge: inset 0 1px 0 rgb(255 255 255 / 0.9);
+  --glass-drop: 0 14px 32px -16px rgb(30 41 82 / 0.28);
+  --cut: 14px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #141517;
-    --ink: #e8e6e0;
-    --ink-quiet: #a3a199;
-    --rule: #34363a;
-    --rule-soft: #24262a;
-    --accent: #9ab7ff;
+    --paper: #0a0d16;
+    --ink: #f1f4fb;
+    --ink-quiet: #aeb7ca;
+    --rule: rgb(255 255 255 / 0.14);
+    --rule-soft: rgb(255 255 255 / 0.08);
+    --accent: #a9c1ff;
     --quote-bar: #4a4c51;
     --landed: #3b3410;
-    --field: #1d1f22;
+    --field: rgb(255 255 255 / 0.05);
+    --glow-1: rgb(70 96 170 / 0.28);
+    --glow-2: rgb(96 70 160 / 0.2);
+    --glow-3: rgb(40 110 140 / 0.18);
+    --glass: linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.03));
+    --glass-chip: rgb(255 255 255 / 0.06);
+    --glass-border: rgb(255 255 255 / 0.14);
+    --glass-frame: rgb(94 214 196 / 0.34);
+    --glass-edge: inset 0 1px 0 rgb(255 255 255 / 0.14), inset 0 0 0 1px rgb(255 255 255 / 0.03);
+    --glass-drop: 0 18px 40px -12px rgb(0 0 0 / 0.55);
   }
 }
 
@@ -52,6 +75,19 @@ html {
 body {
   margin: 0;
   line-height: 1.5;
+}
+
+/* The lit field: three soft glows on a layer of its own, fixed, so scrolling never repaints them. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 600px at 12% 8%, var(--glow-1), transparent 60%),
+    radial-gradient(900px 700px at 88% 30%, var(--glow-2), transparent 60%),
+    radial-gradient(1200px 800px at 50% 110%, var(--glow-3), transparent 60%);
 }
 
 a {
@@ -93,7 +129,7 @@ a {
   justify-content: space-between;
   gap: 1rem 2rem;
   padding: 2.25rem 0 0;
-  border-bottom: 1px solid var(--ink);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .masthead {
@@ -297,7 +333,10 @@ a {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--paper);
+  /* A strip of glass the results scroll beneath: the one small pane besides the inspector that blurs. */
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   padding: 0.875rem 0;
   border-bottom: 1px solid var(--rule-soft);
 }
@@ -1058,10 +1097,15 @@ code {
   --flow-key-rail: #5f6b7a;
   --flow-key-quiet: #9aa5bd;
   --flow-key-verified: #1f3a5f;
+  /* Broken is filled dark enough that white text on it reaches 4.5:1. */
   --flow-key-broken: #c32836;
   /* Attention that is not breakage (nothing enforced, no control, not covered): amber, never red. */
   --flow-key-attention: #945400;
   --flow-key-halo: rgb(23 32 51 / 0.2);
+  /* The map's pane, opaque: what the fade at its scrolling edge fades to. */
+  --flow-pane: #f4f6fb;
+  /* An inspector opened as a sheet over the map: nearly opaque, so its text never sits on the map's colors. */
+  --flow-sheet: rgb(246 248 252 / 0.92);
 }
 
 /* Numbers that line up down a column of rows are tabular; identifiers are not. */
@@ -1075,9 +1119,11 @@ code {
     --flow-key-rail: #9aa6b6;
     --flow-key-quiet: #6f7c96;
     --flow-key-verified: #c9d6f2;
-    --flow-key-broken: #d13438;
+    --flow-key-broken: #c4262e;
     --flow-key-attention: #f0b04a;
     --flow-key-halo: rgb(243 246 255 / 0.26);
+    --flow-pane: #121a2c;
+    --flow-sheet: rgb(16 21 34 / 0.92);
   }
 }
 
@@ -1091,7 +1137,49 @@ code {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.375rem 0.5rem;
-  margin: 0 0 0.625rem;
+  margin: 0 0 0.75rem;
+  padding: 0.625rem 0.75rem 0.75rem;
+}
+
+/*
+ * The glass panes: the health strip with its trust key, the map's frame, and the inspector. Each is a frosted pane
+ * with a hairline frame, a lighter inner top edge and a soft drop. Only the inspector blurs what is behind it (it opens
+ * as a sheet over the map); the others sit on the lit field, where a blur would cost the GPU and show nothing.
+ */
+.flow-health,
+.flow-canvas,
+.flow-inspector {
+  background: var(--glass);
+  border: 1px solid var(--glass-frame);
+  border-radius: 0.75rem;
+  box-shadow: var(--glass-edge), var(--glass-drop);
+}
+
+/* Expanse's cut corners on the panes and chips where the browser draws them; rounded glass elsewhere. */
+@supports (corner-shape: bevel) {
+  .flow-health,
+  .flow-inspector {
+    border-radius: var(--cut) 0;
+    corner-shape: bevel;
+  }
+
+  .flow-canvas {
+    border-radius: 18px 0;
+    corner-shape: bevel;
+  }
+
+  .flow-fade {
+    border-radius: 0 0 17px 0;
+    corner-shape: bevel;
+  }
+
+  .flow-health-count,
+  .flow-trust-level,
+  .flow-close,
+  .flow-action {
+    border-radius: 7px 0;
+    corner-shape: bevel;
+  }
 }
 
 .flow-health-count {
@@ -1101,10 +1189,11 @@ code {
   font: inherit;
   font-size: 0.875rem;
   color: var(--ink);
-  background: var(--paper);
-  border: 1px solid var(--rule);
+  background: var(--glass-chip);
+  border: 1px solid var(--glass-border);
   border-radius: 999px;
-  padding: 0.25rem 0.75rem 0.25rem 0.5rem;
+  box-shadow: var(--glass-edge);
+  padding: 0.25rem 0.75rem 0.25rem 0.55rem;
   cursor: pointer;
 }
 
@@ -1115,7 +1204,7 @@ code {
 
 .flow-health-count[aria-pressed="true"] {
   border-color: var(--ink);
-  box-shadow: inset 0 0 0 1px var(--ink);
+  box-shadow: var(--glass-edge), 0 0 0 3px var(--flow-key-halo);
 }
 
 .flow-health-swatch,
@@ -1213,30 +1302,31 @@ code {
   flex: none;
   font: inherit;
   color: var(--ink);
-  background: var(--paper);
-  border: 1px solid var(--rule);
+  background: var(--glass-chip);
+  border: 1px solid var(--glass-border);
   border-radius: 999px;
+  box-shadow: var(--glass-edge);
   padding: 0 0.5rem;
   cursor: pointer;
 }
 
 .flow-trust-level[aria-pressed="true"] {
   border-color: var(--ink);
-  box-shadow: 0 0 0 3px var(--flow-key-halo);
+  box-shadow: var(--glass-edge), 0 0 0 3px var(--flow-key-halo);
 }
 
-.flow-trust-level.flow-trust-unknown {
-  border-style: dashed;
-  cursor: default;
+/* Unknown and no control read in the key as they read on the map: the tag beneath a token, words alone. */
+.flow-trust-tag {
+  flex: none;
+  color: var(--ink-quiet);
 }
 
-.flow-trust-level.flow-trust-nocontrol {
+.flow-trust-tag.flow-trust-nocontrol {
   color: var(--flow-key-attention);
-  border-color: var(--flow-key-attention);
-  cursor: default;
 }
 
-.flow-trust-level code {
+.flow-trust-level code,
+.flow-trust-tag code {
   font-size: 0.75rem;
 }
 
@@ -1327,7 +1417,6 @@ a.flow-term {
 .flow-canvas {
   max-width: 100%;
   overflow-x: auto;
-  border-radius: 0.75rem;
   scroll-timeline: --flow-x inline;
 }
 
@@ -1363,8 +1452,10 @@ a.flow-term {
 }
 
 .flow-fade-end {
-  right: 0;
-  background: linear-gradient(to right, transparent, var(--paper) 85%);
+  right: 1px;
+  top: 1px;
+  bottom: 1px;
+  background: linear-gradient(to right, transparent, var(--flow-pane) 85%);
   animation: flow-fade-end linear both;
   animation-timeline: --flow-x;
 }
@@ -1382,10 +1473,9 @@ a.flow-term {
 }
 
 .flow-inspector {
-  border: 1px solid var(--rule);
-  border-radius: 0.75rem;
-  padding: 0.875rem 1rem 1rem;
-  background: var(--field);
+  padding: 1rem 1.125rem 1.125rem;
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
   font-size: 0.875rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -1401,9 +1491,10 @@ a.flow-term {
   font-size: 1.125rem;
   line-height: 1;
   color: var(--ink-quiet);
-  background: var(--paper);
-  border: 1px solid var(--rule);
-  border-radius: 0.375rem;
+  background: var(--glass-chip);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  box-shadow: var(--glass-edge);
   cursor: pointer;
 }
 
@@ -1451,7 +1542,9 @@ a.flow-term {
     overflow-y: auto;
     margin: 0;
     border-radius: 0.75rem 0.75rem 0 0;
-    box-shadow: 0 -0.5rem 1.5rem rgb(0 0 0 / 0.18);
+    corner-shape: round;
+    background: var(--flow-sheet);
+    box-shadow: var(--glass-edge), 0 -0.5rem 1.5rem rgb(0 0 0 / 0.22);
   }
 
   .flow-stage:has(.flow-inspector[data-open="true"]:not([data-default="true"])) {
@@ -1631,8 +1724,9 @@ a.flow-term {
 
 .flow-action {
   padding: 0.25rem 0.5rem;
-  border: 1px solid var(--rule);
-  background: var(--paper);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-chip);
+  box-shadow: var(--glass-edge);
 }
 
 .flow-ident {

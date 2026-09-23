@@ -141,13 +141,30 @@ const FLOW_NAME_GAP = 10;
 const FLOW_TOKEN_PAD_X = 6;
 const FLOW_TOKEN_PAD_Y = 3;
 const FLOW_DOT_R = 5;
+/**
+ * The cut corners (the owner's ruling d-a5c6442d: glass, with Expanse's
+ * token shapes): a station's and a token's top-left and bottom-right corners
+ * are chamfered, a station's by FLOW_BOX_CUT and a token's by FLOW_TOKEN_CUT.
+ */
+const FLOW_BOX_CUT = 8;
+const FLOW_TOKEN_CUT = 6;
+/**
+ * The trust tag hangs beneath its token, right-aligned to the edge the route
+ * leaves by: the room a route with one keeps below its token, its gap from
+ * the token, and its hit box's padding.
+ */
+const FLOW_TRUST_ROOM = 12;
+const FLOW_TRUST_GAP = 1.5;
+const FLOW_TRUST_PAD = 3;
 
 /**
  * Route colors, light and dark: hues that never read as red, orange or
  * amber (red is broken, amber is attention, and the selection wears no
- * color at all), each darkened only until white text on it reaches 4.5:1 (the
- * owner asked for white text in every origin token; identity is also the
- * name, never color alone). The check measures every one.
+ * color at all); identity is also the name, never color alone. A route's
+ * token is a tint of its color (FLOW_TOKEN_TINT) with its text in the map's
+ * token ink, and the check measures that ink against every tint, light and
+ * dark. (The colors were darkened for white text when tokens were solid; they
+ * stay, so a line keeps its color.)
  */
 export const FLOW_ROUTE_COLORS: [string, string][] = [
   ["#2874d0", "#1d73db"],
@@ -166,8 +183,18 @@ export const FLOW_RAIL_COLORS: [string, string][] = [
   ["#6f6478", "#8f8398"],
   ["#56707a", "#76909a"],
 ];
-/** The route past the eighth, drawn neutral and still named; white on it reaches 4.5:1 too. */
+/** The route past the eighth, drawn neutral and still named. */
 export const FLOW_NEUTRAL_ROUTE: [string, string] = ["#6b7588", "#69758c"];
+
+/**
+ * An origin token, light and dark: the opaque base its fill tints (a
+ * station's own fill), how much of the route's color the fill takes, how much
+ * of it the border takes (the rest white in the dark, the color itself in the
+ * light), and the ink of its text.
+ */
+export const FLOW_TOKEN_BASE: [string, string] = ["#ffffff", "#172036"];
+export const FLOW_TOKEN_TINT: [number, number] = [0.12, 0.26];
+export const FLOW_TOKEN_INK: [string, string] = ["#141a29", "#f3f6ff"];
 
 /** WCAG relative luminance of a #rrggbb color. */
 function luminance(hex: string): number {
@@ -175,63 +202,104 @@ function luminance(hex: string): number {
   return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
 }
 
-/** The WCAG contrast of white text on a #rrggbb color. */
-export function whiteContrast(hex: string): number {
-  return 1.05 / (luminance(hex) + 0.05);
+/** The WCAG contrast of two #rrggbb colors. */
+export function contrast(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** `share` of `a` mixed into `b`, channel by channel in sRGB, as CSS color-mix(in srgb) does. */
+export function mixHex(a: string, b: string, share: number): string {
+  const ch = (hex: string, i: number): number => parseInt(hex.slice(i, i + 2), 16);
+  return `#${[1, 3, 5].map((i) => Math.round(ch(a, i) * share + ch(b, i) * (1 - share)).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** A token's fill and border for a route color, light (0) or dark (1): what the map paints and what the check measures. */
+export function tokenPaint(color: [string, string], theme: 0 | 1): { fill: string; edge: string } {
+  return { fill: mixHex(color[theme], FLOW_TOKEN_BASE[theme], FLOW_TOKEN_TINT[theme]), edge: theme === 0 ? color[0] : mixHex(color[1], "#ffffff", 0.7) };
 }
 
 function routeVars(): string {
-  const light = FLOW_ROUTE_COLORS.map(([l], i) => `--flow-route-${i}: ${l};`).concat(FLOW_RAIL_COLORS.map(([l], i) => `--flow-rail-${i}: ${l};`));
-  const dark = FLOW_ROUTE_COLORS.map(([, d], i) => `--flow-route-${i}: ${d};`).concat(FLOW_RAIL_COLORS.map(([, d], i) => `--flow-rail-${i}: ${d};`));
-  return `.flow-svg { ${light.join(" ")} }\n@media (prefers-color-scheme: dark) { .flow-svg { ${dark.join(" ")} } }`;
+  const vars = (theme: 0 | 1): string =>
+    [
+      ...FLOW_ROUTE_COLORS.map((c, i) => `--flow-route-${i}: ${c[theme]}; --flow-token-${i}: ${tokenPaint(c, theme).fill}; --flow-token-edge-${i}: ${tokenPaint(c, theme).edge};`),
+      `--flow-token-neutral: ${tokenPaint(FLOW_NEUTRAL_ROUTE, theme).fill}; --flow-token-edge-neutral: ${tokenPaint(FLOW_NEUTRAL_ROUTE, theme).edge};`,
+      ...FLOW_RAIL_COLORS.map((c, i) => `--flow-rail-${i}: ${c[theme]};`),
+    ].join(" ");
+  return `.flow-svg { ${vars(0)} }\n@media (prefers-color-scheme: dark) { .flow-svg { ${vars(1)} } }`;
 }
 
+/** A box with its top-left and bottom-right corners cut by `cut`: a station's or a token's outline. */
+export function chamfer(box: FlowBox, cut: number): string {
+  const { x, y, w, h } = box;
+  const c = Math.min(cut, w / 4, h / 4);
+  const pts: Point[] = [[x + c, y], [x + w, y], [x + w, y + h - c], [x + w - c, y + h], [x, y + h], [x, y + c]];
+  return `M ${pts.map(([a, b]) => `${r1(a)} ${r1(b)}`).join(" L ")} Z`;
+}
+
+/**
+ * The map's look (the owner's ruling d-a5c6442d): glass, with Expanse's token
+ * shapes and styles. The canvas is a pane of the page's glass; stations and
+ * origin tokens are opaque cut-corner cards on it, drawn with 1px hairlines
+ * that stay 1px however wide the map is drawn (a station's in teal, an
+ * entrance's heavier and brighter, a token's in its route's color over a tint
+ * of it), each lifted by a soft shadow. Text never sits on anything
+ * translucent: a token's ink is measured against its own tint. Red is broken
+ * only, drawn darker where it is filled so white text on it reaches 4.5:1;
+ * amber is attention; the selection is the ink, which no route wears.
+ */
 const FLOW_SVG_STYLE = `
 .flow-svg {
-  --flow-surface: #fbfcfe;
-  --flow-ink: #172033;
-  --flow-muted: #5c677d;
+  --flow-surface: #f7f9fc;
+  --flow-glass: rgba(255, 255, 255, 0.62);
+  --flow-ink: #141a29;
+  --flow-role: #2c3547;
+  --flow-muted: #4f5a70;
   --flow-node: #ffffff;
-  --flow-node-border: #3d4a66;
-  --flow-quiet: #9aa5bd;
+  --flow-node-border: rgba(15, 118, 110, 0.55);
+  --flow-node-entry: #0f766e;
+  --flow-quiet: #97a3bb;
   --flow-defect: #c32836;
+  --flow-defect-fill: #c32836;
+  --flow-defect-ink: #b3261e;
   --flow-proposed: #8b5e19;
   --flow-tag: #ffffff;
   --flow-hatch: #9aa5bd;
   --flow-boundary: #5c677d;
-  --flow-select: #172033;
-  --flow-halo: rgba(23, 32, 51, 0.2);
+  --flow-select: #141a29;
+  --flow-halo: rgba(20, 26, 41, 0.16);
   --flow-attention: #945400;
   --flow-verified: #1f3a5f;
+  --flow-token-ink: ${FLOW_TOKEN_INK[0]};
+  --flow-shadow: rgba(30, 41, 82, 0.14);
   --flow-neutral-route: ${FLOW_NEUTRAL_ROUTE[0]};
 }
-.flow-svg .flow-surface { fill: var(--flow-surface); }
+.flow-svg .flow-surface { fill: var(--flow-glass); }
 .flow-svg text { font-family: ${FLOW_FONT}; fill: var(--flow-ink); }
 .flow-svg text.flow-mono { font-family: ${FLOW_MONO}; }
 .flow-svg .flow-caption { fill: var(--flow-muted); }
 .flow-svg .flow-colcap { fill: var(--flow-muted); }
-.flow-svg .flow-station rect.flow-box { fill: var(--flow-node); stroke: var(--flow-node-border); stroke-width: 1.5; }
-.flow-svg .flow-station.flow-entry rect.flow-box { stroke-width: 2.5; }
-.flow-svg .flow-station.flow-unconnected rect.flow-box, .flow-svg .flow-mass rect { fill: var(--flow-surface); stroke-dasharray: 4 4; }
-.flow-svg .flow-station.flow-broken rect.flow-box { stroke: var(--flow-defect); }
+.flow-svg .flow-box { fill: var(--flow-node); stroke: var(--flow-node-border); stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-linejoin: miter; filter: drop-shadow(0 4px 7px var(--flow-shadow)); }
+.flow-svg .flow-station.flow-entry .flow-box { stroke: var(--flow-node-entry); stroke-width: 2px; }
+.flow-svg .flow-station.flow-unconnected .flow-box { fill: var(--flow-surface); stroke-dasharray: 4 4; }
+.flow-svg .flow-mass rect { fill: var(--flow-surface); stroke: var(--flow-quiet); stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-dasharray: 4 4; }
+.flow-svg .flow-station.flow-broken .flow-box { stroke: var(--flow-defect); }
 .flow-svg .flow-station-folder { fill: var(--flow-muted); }
-.flow-svg .flow-station-role { fill: var(--flow-ink); }
+.flow-svg .flow-station-role { fill: var(--flow-role); }
 .flow-svg .flow-state-bar { stroke: none; }
 .flow-svg .flow-state-verified { fill: var(--flow-verified); }
 .flow-svg .flow-state-requirement { fill: url(#flow-hatch); stroke: var(--flow-verified); stroke-width: 0.8; }
 .flow-svg .flow-state-broken { fill: var(--flow-defect); }
 .flow-svg .flow-state-bar.flow-state-hollow { fill: var(--flow-node); stroke: var(--flow-attention); stroke-width: 1.2; }
 .flow-svg .flow-route { fill: none; stroke-width: 3.5; stroke-linejoin: round; stroke-linecap: butt; }
-.flow-svg .flow-terminus-dot { stroke: var(--flow-surface); stroke-width: 1.5; }
-.flow-svg .flow-derived .flow-terminus-dot { fill: var(--flow-surface); stroke-width: 2.5; stroke-dasharray: 3 2; }
-.flow-svg .flow-origin { fill: #ffffff; }
-.flow-svg .flow-origin-more { fill: #ffffff; }
-.flow-svg .flow-derived .flow-origin-token { stroke: #ffffff; stroke-width: 1; stroke-dasharray: 3 2; }
-.flow-svg .flow-trust .flow-trust-box { fill: rgba(255, 255, 255, 0.16); stroke: #ffffff; stroke-width: 1; }
-.flow-svg .flow-trust.flow-trust-unknown .flow-trust-box { fill: none; stroke-dasharray: 2.5 1.5; }
-.flow-svg .flow-trust text { fill: #ffffff; }
-.flow-svg .flow-trust.flow-trust-nocontrol .flow-trust-box { fill: #ffffff; stroke: #ffffff; }
-.flow-svg .flow-trust.flow-trust-nocontrol text { fill: #8a4e00; }
+.flow-svg .flow-origin-token { stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-linejoin: miter; filter: drop-shadow(0 3px 5px var(--flow-shadow)); }
+.flow-svg .flow-derived .flow-origin-token { stroke-dasharray: 4 3; }
+.flow-svg .flow-origin, .flow-svg .flow-origin-more { fill: var(--flow-token-ink); }
+.flow-svg .flow-trust .flow-trust-box { fill: transparent; stroke: none; }
+.flow-svg .flow-trust text { fill: var(--flow-muted); }
+.flow-svg .flow-trust.flow-trust-nocontrol text { fill: var(--flow-attention); }
+.flow-svg .flow-trust[data-structure-select]:hover text { text-decoration: underline; }
+.flow-svg .flow-trust:focus .flow-trust-box { stroke: var(--flow-select); stroke-width: 1px; vector-effect: non-scaling-stroke; }
 .flow-svg .flow-faint { fill: none; stroke: var(--flow-quiet); stroke-width: 1.4; stroke-dasharray: 5 4; }
 .flow-svg .flow-bearing-line { fill: none; stroke: var(--flow-quiet); stroke-width: 1.6; }
 .flow-svg .flow-broken-line { stroke: var(--flow-defect); stroke-width: 2; stroke-dasharray: 6 3; }
@@ -240,77 +308,84 @@ const FLOW_SVG_STYLE = `
 .flow-svg .flow-joint { stroke: none; }
 .flow-svg .flow-rail-label { fill: var(--flow-ink); }
 .flow-svg .flow-station-name { fill: var(--flow-ink); }
-.flow-svg .flow-tag .flow-tag-shape { stroke-width: 1.2; }
+.flow-svg .flow-tag .flow-tag-shape { stroke-width: 1px; vector-effect: non-scaling-stroke; }
 .flow-svg .flow-tag-verified .flow-tag-shape { fill: var(--flow-verified); stroke: var(--flow-verified); }
 .flow-svg .flow-tag-verified text { fill: #ffffff; }
-.flow-svg .flow-tag-requirement .flow-tag-shape { fill: url(#flow-tag-hatch); stroke: var(--flow-node-border); }
+.flow-svg .flow-tag-requirement .flow-tag-shape { fill: url(#flow-tag-hatch); stroke: var(--flow-verified); }
 .flow-svg .flow-tag-requirement text { fill: var(--flow-ink); paint-order: stroke; stroke: var(--flow-tag); stroke-width: 2.5px; stroke-linejoin: round; }
-.flow-svg .flow-tag-broken .flow-tag-shape { fill: var(--flow-defect); stroke: var(--flow-defect); }
+.flow-svg .flow-tag-broken .flow-tag-shape { fill: var(--flow-defect-fill); stroke: var(--flow-defect); }
 .flow-svg .flow-tag-broken text { fill: #ffffff; }
-.flow-svg .flow-tag-mark .flow-tag-shape { fill: var(--flow-tag); stroke: var(--flow-defect); stroke-width: 1.8; }
-.flow-svg .flow-tag-mark text { fill: var(--flow-defect); }
-.flow-svg .flow-tag-boundary .flow-tag-shape { fill: var(--flow-tag); stroke: var(--flow-muted); stroke-width: 1.2; }
+.flow-svg .flow-tag-mark .flow-tag-shape { fill: var(--flow-tag); stroke: var(--flow-defect); stroke-width: 1.5px; }
+.flow-svg .flow-tag-mark text { fill: var(--flow-defect-ink); }
+.flow-svg .flow-tag-boundary .flow-tag-shape { fill: var(--flow-tag); stroke: var(--flow-muted); }
 .flow-svg .flow-tag-boundary text { fill: var(--flow-ink); }
 .flow-svg .flow-tag-tick .flow-tag-shape { fill: transparent; stroke: none; }
-.flow-svg .flow-tag-attention .flow-tag-shape { fill: var(--flow-tag); stroke: var(--flow-attention); stroke-width: 1.4; }
+.flow-svg .flow-tag-attention .flow-tag-shape { fill: var(--flow-tag); stroke: var(--flow-attention); }
 .flow-svg .flow-tag-attention text { fill: var(--flow-attention); }
-.flow-svg .flow-tag-repeat .flow-tag-shape { stroke-width: 1.4; }
-.flow-svg .flow-tag.is-selected .flow-tag-halo { fill: none; stroke: var(--flow-halo); stroke-width: 5; }
-.flow-svg .flow-tag:focus .flow-tag-shape, .flow-svg .flow-tag.is-selected .flow-tag-shape { stroke: var(--flow-select); stroke-width: 2.2; }
+.flow-svg .flow-tag-repeat .flow-tag-shape { stroke-width: 1.5px; }
+.flow-svg .flow-tag.is-selected .flow-tag-halo { fill: none; stroke: var(--flow-halo); stroke-width: 5px; vector-effect: non-scaling-stroke; }
+.flow-svg .flow-tag:focus .flow-tag-shape, .flow-svg .flow-tag.is-selected .flow-tag-shape { stroke: var(--flow-select); stroke-width: 2px; }
 .flow-svg .flow-boundary { stroke: var(--flow-boundary); stroke-width: 2; stroke-dasharray: 3 2; }
-.flow-svg .flow-caption, .flow-svg .flow-colcap, .flow-svg .flow-rail-label { paint-order: stroke; stroke: var(--flow-surface); stroke-width: 3px; stroke-linejoin: round; }
+.flow-svg .flow-caption, .flow-svg .flow-colcap, .flow-svg .flow-rail-label, .flow-svg .flow-trust-text { paint-order: stroke; stroke: var(--flow-surface); stroke-width: 3px; stroke-linejoin: round; }
 .flow-svg .structure-edge.structure-proposed { fill: none; stroke: var(--flow-proposed); stroke-width: 2; stroke-dasharray: 9 6; }
 .flow-svg .structure-proposed-word { fill: var(--flow-proposed); }
 .flow-svg [data-structure-select], .flow-svg [data-structure-expand] { cursor: pointer; }
 .flow-svg [data-structure-select]:focus { outline: none; }
-.flow-svg .flow-halo { fill: none; stroke: var(--flow-halo); stroke-width: 6; }
-.flow-svg .flow-station:focus rect.flow-box, .flow-svg .flow-station.is-selected rect.flow-box { stroke: var(--flow-select); stroke-width: 3; }
-.flow-svg .flow-station.is-lit rect.flow-box, .flow-svg .flow-station.is-caller rect.flow-box { stroke: var(--flow-select); stroke-width: 2; }
-.flow-svg .flow-station.is-callee rect.flow-box { stroke: var(--flow-select); stroke-width: 2; stroke-dasharray: 5 3; }
-.flow-svg .flow-tag.is-lit .flow-tag-shape { stroke: var(--flow-select); stroke-width: 2; }
+.flow-svg .flow-halo { fill: none; stroke: var(--flow-halo); stroke-width: 6px; vector-effect: non-scaling-stroke; }
+.flow-svg .flow-station:focus .flow-box, .flow-svg .flow-station.is-selected .flow-box { stroke: var(--flow-select); stroke-width: 2px; }
+.flow-svg .flow-station.is-lit .flow-box, .flow-svg .flow-station.is-caller .flow-box { stroke: var(--flow-select); stroke-width: 1.5px; }
+.flow-svg .flow-station.is-callee .flow-box { stroke: var(--flow-select); stroke-width: 1.5px; stroke-dasharray: 5 3; }
+.flow-svg .flow-tag.is-lit .flow-tag-shape { stroke: var(--flow-select); stroke-width: 1.5px; }
 .flow-svg .flow-faint.is-lit, .flow-svg .flow-bearing-line.is-lit { stroke: var(--flow-select); stroke-opacity: 0.85; }
 .flow-svg .flow-faint.is-in, .flow-svg .flow-bearing-line.is-in { stroke-dasharray: none; stroke-width: 1.8; }
 .flow-svg .flow-faint.is-out, .flow-svg .flow-bearing-line.is-out { stroke-dasharray: 5 3; stroke-width: 1.6; }
 .flow-svg .flow-route-group.is-lit .flow-route { stroke-width: 5; }
-.flow-svg .flow-route-group.is-dim .flow-route, .flow-svg .flow-route-group.is-dim .flow-terminus-dot { opacity: 0.16; }
+.flow-svg .flow-route-group.is-dim .flow-route { opacity: 0.16; }
 .flow-svg .flow-route-group.is-dim .flow-route { stroke-width: 2; }
-.flow-svg .flow-route-group.is-dim .flow-origin-token { opacity: 0.8; }
+.flow-svg .flow-route-group.is-dim .flow-origin-token { opacity: 0.8; filter: none; }
 .flow-svg .is-dim { opacity: 0.16; }
 .flow-svg .flow-route-group.is-dim { opacity: 1; }
 .flow-svg .flow-station.is-dim { opacity: 1; }
-.flow-svg .flow-station.is-dim rect.flow-box { stroke-opacity: 0.2; }
+.flow-svg .flow-station.is-dim .flow-box { stroke-opacity: 0.2; filter: none; }
 .flow-svg .flow-station.is-dim text, .flow-svg .flow-station.is-dim .flow-state-bar { opacity: 0.25; }
 .flow-svg .flow-tag.is-dim { opacity: 0.3; }
 .flow-svg .flow-tag.flow-tag-tick .flow-tag-shape { fill: transparent; stroke: none; }
 .flow-svg .flow-pulse { fill: none; stroke-linecap: round; stroke-width: 2.5; opacity: 0.7; pointer-events: none; animation-name: flow-pulse; animation-timing-function: linear; animation-iteration-count: infinite; animation-fill-mode: backwards; }
 .flow-svg .flow-tick { animation-name: flow-tick; animation-timing-function: ease-out; animation-iteration-count: infinite; }
-.flow-svg .flow-station.is-reach rect.flow-box { animation: flow-reach 0.35s ease-out both; }
+.flow-svg .flow-station.is-reach .flow-box { animation: flow-reach 0.35s ease-out both; }
 .flow-svg .flow-chevron { display: none; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 @keyframes flow-pulse { from { stroke-dashoffset: 0; } to { stroke-dashoffset: var(--pulse-end); } }
 @keyframes flow-tick { 0% { filter: brightness(1.35) drop-shadow(0 0 2px var(--flow-halo)); } 18%, 100% { filter: none; } }
 @keyframes flow-reach { from { stroke-opacity: 0.2; } to { stroke-opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .flow-svg .flow-pulse { display: none; animation: none; }
-  .flow-svg .flow-tick, .flow-svg .flow-station.is-reach rect.flow-box { animation: none; }
+  .flow-svg .flow-tick, .flow-svg .flow-station.is-reach .flow-box { animation: none; }
   .flow-svg .flow-chevron { display: inline; }
 }
 @media (prefers-color-scheme: dark) {
   .flow-svg {
-    --flow-surface: #111827;
+    --flow-surface: #121a2c;
+    --flow-glass: rgba(18, 26, 44, 0.8);
     --flow-ink: #f3f6ff;
-    --flow-muted: #b5bfd3;
-    --flow-node: #1a2336;
-    --flow-node-border: #9fb0d8;
+    --flow-role: #dde3f0;
+    --flow-muted: #aab5cc;
+    --flow-node: #1b2438;
+    --flow-node-border: rgba(94, 214, 196, 0.5);
+    --flow-node-entry: #7ff0de;
     --flow-quiet: #6f7c96;
-    --flow-defect: #e5484d;
+    --flow-defect: #ff5c63;
+    --flow-defect-fill: #c4262e;
+    --flow-defect-ink: #ff8f8f;
     --flow-proposed: #f2bd68;
-    --flow-tag: #111827;
+    --flow-tag: #121a2c;
     --flow-hatch: #6f7c96;
     --flow-boundary: #b5bfd3;
     --flow-select: #f3f6ff;
-    --flow-halo: rgba(243, 246, 255, 0.26);
+    --flow-halo: rgba(243, 246, 255, 0.24);
     --flow-attention: #f0b04a;
     --flow-verified: #c9d6f2;
+    --flow-token-ink: ${FLOW_TOKEN_INK[1]};
+    --flow-shadow: rgba(0, 0, 0, 0.5);
     --flow-neutral-route: ${FLOW_NEUTRAL_ROUTE[1]};
   }
   .flow-svg .flow-tag-verified text { fill: #111827; }
@@ -396,7 +471,7 @@ export interface FlowText {
  * full once, and as a dot wherever it stands again), a bypass mark or a
  * count on a pipe, or a component's broken, boundary or not-covered mark,
  * attached to its box. (A route's trust, and its no-control mark, is the
- * badge in its origin token, not a tag.)
+ * tag beneath its origin token, not one of these.)
  */
 export interface FlowTagDraw {
   /** The identifier text (C3, X7), a bypass mark, a count of identifiers that did not fit, or a component mark's words. */
@@ -434,8 +509,8 @@ export interface FlowLayout {
   lines: FlowLineDraw[];
   stubs: FlowStubDraw[];
   tags: FlowTagDraw[];
-  /** Each entrance route's trust badge, left of its origin token: the levels its entrances carry in, or unknown. */
-  badges: { route: string; box: FlowBox; levels: string[] }[];
+  /** Each entrance route's trust tag, beneath its origin token and right-aligned to it: its hit box, and the levels its entrances carry in (none: unknown). */
+  trustTags: { route: string; box: FlowBox; levels: string[] }[];
   texts: FlowText[];
   /** Text a priority dropped: what did not fit, by key. */
   dropped: string[];
@@ -448,10 +523,10 @@ export function trustWords(route: Pick<FlowRoute, "trust">): string {
 }
 
 /**
- * What a route's badge says: "no control" when nothing controls it (its trust
+ * What a route's trust tag says: "no control" when nothing controls it (its trust
  * is then unknown by construction), else its trust (decision d-7d36881b).
  */
-export function badgeWords(route: Pick<FlowRoute, "trust" | "noControl">): string {
+export function trustTagWords(route: Pick<FlowRoute, "trust" | "noControl">): string {
   return route.noControl ? "no control" : trustWords(route);
 }
 
@@ -692,30 +767,51 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
   const gapW = (c: number): number => Math.max(FLOW_GAP_MIN, 14 + channel(dropsRight(c)) + inGap(c, "bracket").length * FLOW_TRACK + 12 + inGap(c, "forward").length * FLOW_TRACK + 12 + inGap(c, "back").length * FLOW_TRACK + 12 + channel(c + 1 < columns ? dropsLeft(c + 1) : 0) + 14);
 
   // The left margin: the widest named origin, its dot, and room for the lines to fan into their stations. An entrance
-  // route's trust badge sits inside its token, left of its shortest line, where the right-aligned names leave room, so it
-  // rarely widens the margin (decision d-29200639).
-  const badgeW = (route: FlowRoute): number => Math.ceil(textWidth(badgeWords(route), TYPE_SMALL, false, 0, true) + 10);
+  // route's trust tag hangs beneath its token, right-aligned to the edge the route leaves by (the owner's ruling
+  // d-a5c6442d), so a trust level's name never widens the margin: a tag that does not fit is dropped, and the route's
+  // inspector states it. The margin is only ever as narrow as the fixed words "no control" and "unknown" allow, so the
+  // attention a route with no control carries is never the tag that drops.
   const lineW = (route: FlowRoute, j: number): number => textWidth(originLines(route)[j]!, FLOW_NAME_SIZE, !(route.names.length > originLines(route).length && j === originLines(route).length - 1));
-  /** The line the badge shares: the shortest, the last of equals. */
-  const badgeLine = (route: FlowRoute): number => originLines(route).reduce((best, _, j) => (lineW(route, j) <= lineW(route, best) ? j : best), 0);
-  const termW = Math.max(0, ...drawn.flatMap((route) => [...originLines(route).map((_, j) => lineW(route, j)), route.derived ? 0 : lineW(route, badgeLine(route)) + 5 + badgeW(route)]));
+  const fixedTag = drawn.some((route) => !route.derived && (route.noControl || route.trust.length === 0)) ? textWidth("no control", TYPE_SMALL, false, 0, true) : 0;
+  const termW = Math.max(0, fixedTag + 3 - (FLOW_PAD + 2 * FLOW_TOKEN_PAD_X + 8 - 6), ...drawn.flatMap((route) => originLines(route).map((_, j) => lineW(route, j))));
+  /** The room a route keeps beneath its token for its trust tag: an entrance route has one, a derived route none. */
+  const trustRoom = (route: FlowRoute): number => (route.derived ? 0 : FLOW_TRUST_ROOM);
   // Identifiers where work enters stand on the line from the origin: the margin leaves them room.
   const tagW = (text: string): number => Math.ceil(textWidth(text, TYPE_SMALL, false, 0, true) + 8 + (text.startsWith("X") ? 6 : 0));
   const markW = (text: string): number => Math.ceil(textWidth(text, TYPE_SMALL, true) + 10);
   const entryRoom = Math.max(0, ...drawn.map((route) => (route.entry.length === 0 ? 0 : route.entry.reduce((sum, text) => sum + tagW(text) + 3, 0) + 12)));
+  // A token's right edge, where its route leaves, is dotX - FLOW_DOT_R - 6: FLOW_PAD + termW + 2 * FLOW_TOKEN_PAD_X + 8 - 6.
   const dotX = r1(FLOW_PAD + termW + 2 * FLOW_TOKEN_PAD_X + 8 + FLOW_DOT_R);
-  // Each group: its route, its name lines, where its names start (below the trust badge's row), and its dot.
+  // Each group: its route, its name lines, where its names start, and its dot; beneath the names, room for its trust tag.
   const blocks = new Map<string, { top: number; groups: { route: FlowRoute; lines: string[]; top: number; y0: number; dot: number }[] }>();
   let fan = 0;
-  for (const [folder, routes] of starts) {
-    const node = byFolder.get(folder)!;
+  // Each station's block of tokens is centered on it, and blocks from different stations never overlap: where two would,
+  // they move apart evenly, the upper one up and the lower one down, so every name and trust tag keeps its room.
+  const stacked = [...starts].map(([folder, routes]) => {
     const heights = routes.map((route) => originLines(route).length * FLOW_NAME_LINE);
-    const blockH = heights.reduce((a, b) => a + b, 0) + (routes.length - 1) * FLOW_NAME_GAP;
-    const top = cy(node) - blockH / 2;
+    const blockH = heights.reduce((a, b) => a + b, 0) + routes.reduce((sum, route) => sum + trustRoom(route), 0) + (routes.length - 1) * FLOW_NAME_GAP;
+    return { folder, routes, heights, blockH, top: cy(byFolder.get(folder)!) - blockH / 2 };
+  }).sort((a, b) => a.top - b.top || a.folder.localeCompare(b.folder));
+  for (let pass = 0; pass < 40; pass++) {
+    let moved = false;
+    for (let i = 1; i < stacked.length; i++) {
+      const above = stacked[i - 1]!;
+      const below = stacked[i]!;
+      const overlap = above.top + above.blockH + FLOW_NAME_GAP - below.top;
+      if (overlap <= 0.01) continue;
+      const up = Math.min(overlap / 2, Math.max(0, above.top - FLOW_TOP / 2));
+      above.top -= up;
+      below.top += overlap - up;
+      moved = true;
+    }
+    if (!moved) break;
+  }
+  for (const { folder, routes, heights, top } of stacked) {
+    const node = byFolder.get(folder)!;
     let y = top;
     const groups = routes.map((route, i) => {
       const group = { route, lines: originLines(route), top: y, y0: y, dot: r1(y + heights[i]! / 2) };
-      y += heights[i]! + FLOW_NAME_GAP;
+      y += heights[i]! + trustRoom(route) + FLOW_NAME_GAP;
       return group;
     });
     blocks.set(folder, { top, groups });
@@ -966,17 +1062,21 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
       });
     }
   }
-  // 2. Each entrance route's trust badge: a pill inside its origin token, left of its shortest line.
-  const badges: FlowLayout["badges"] = [];
+  // 2. Each entrance route's trust tag: a subscript beneath its origin token, right-aligned to the token's right edge,
+  // where the route leaves. Placed like any text: never over text or a station, else dropped (its inspector states it).
+  const trustTags: FlowLayout["trustTags"] = [];
+  const tokenRight = dotX - FLOW_DOT_R - 6;
   for (const block of blocks.values()) {
     for (const group of block.groups) {
       if (group.route.derived) continue;
-      const w = badgeW(group.route);
-      const j = badgeLine(group.route);
-      const end = dotX - FLOW_DOT_R - 6 - FLOW_TOKEN_PAD_X - lineW(group.route, j) - 5;
-      const box: FlowBox = { x: r1(end - w), y: r1(group.y0 + j * FLOW_NAME_LINE + 1), w, h: 13 };
-      const placedBadge = tryPlace([{ text: badgeWords(group.route), x: r1(box.x + w / 2), y: r1(box.y + 10.1), size: TYPE_SMALL, bold: false, align: "middle", mono: true }], `trust ${group.route.id}`, 2, "flow-trust-text flow-mono", false);
-      if (placedBadge !== undefined) badges.push({ route: group.route.id, box, levels: group.route.trust });
+      const lastLine = texts.find((t) => t.key === `origin ${group.route.id} ${group.lines.length - 1}`);
+      const bottom = (lastLine === undefined ? group.y0 + group.lines.length * FLOW_NAME_LINE : textBox(lastLine).y + textBox(lastLine).h) + FLOW_TOKEN_PAD_Y;
+      const words = trustTagWords(group.route);
+      const placedTag = tryPlace([{ text: words, x: r1(tokenRight), y: r1(bottom + FLOW_TRUST_GAP + TYPE_SMALL * 0.78), size: TYPE_SMALL, bold: false, align: "end", mono: true }], `trust ${group.route.id}`, 2, "flow-trust-text flow-mono");
+      if (placedTag === undefined) continue;
+      const text = textBox(placedTag);
+      const box: FlowBox = { x: r1(text.x - FLOW_TRUST_PAD), y: r1(text.y - 1), w: r1(text.w + FLOW_TRUST_PAD), h: r1(text.h + 2) };
+      trustTags.push({ route: group.route.id, box, levels: group.route.trust });
     }
   }
   // 2. Rail labels, once each.
@@ -1259,7 +1359,7 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
     tryPlace([{ text, x: colX[c]!, y: 44, size: TYPE_SMALL, bold: false, align: "start" }], `column ${c}`, 7, "flow-colcap");
   }
 
-  return { width, height, stations, rails, routes, lines, stubs, tags, badges, texts, dropped, mass: massBox };
+  return { width, height, stations, rails, routes, lines, stubs, tags, trustTags, texts, dropped, mass: massBox };
 }
 
 /** Whether a component's crossing count shows: only while a trust level, the component, or its boundary is selected. */
@@ -1274,15 +1374,19 @@ function flowLit(selection: FlowSelection, lit: boolean): string {
   return lit ? "is-lit" : "is-dim";
 }
 
-/** The colored token behind a route's named origin: one rounded rectangle around all its lines, in the route's color. */
-function originToken(lines: FlowText[], color: string): Markup {
+/**
+ * The token behind a route's named origin: one cut-corner card around all its lines, a tint of the route's color with a
+ * hairline border in it (FLOW_TOKEN_TINT; the check measures the ink against this fill).
+ */
+function originToken(lines: FlowText[], route: FlowRoute): Markup {
   if (lines.length === 0) return html``;
   const boxes = lines.map(textBox);
   const x0 = Math.min(...boxes.map((b) => b.x)) - FLOW_TOKEN_PAD_X;
   const x1 = Math.max(...boxes.map((b) => b.x + b.w)) + FLOW_TOKEN_PAD_X;
   const y0 = Math.min(...boxes.map((b) => b.y)) - FLOW_TOKEN_PAD_Y;
   const y1 = Math.max(...boxes.map((b) => b.y + b.h)) + FLOW_TOKEN_PAD_Y;
-  return html`<rect class="flow-origin-token" x="${r1(x0)}" y="${r1(y0)}" width="${r1(x1 - x0)}" height="${r1(y1 - y0)}" rx="5" fill="${color}"/>`;
+  const slot = route.slot === undefined ? "neutral" : String(route.slot);
+  return html`<path class="flow-origin-token" d="${chamfer({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, FLOW_TOKEN_CUT)}" fill="var(--flow-token-${slot})" stroke="var(--flow-token-edge-${slot})"/>`;
 }
 
 function renderText(t: FlowText): Markup {
@@ -1317,14 +1421,17 @@ function renderStation(node: FlowNode, station: FlowStation, texts: FlowText[], 
   const state = node.state;
   // A component nothing covers carries a hollow bar, unless it is broken: red stays.
   const hollow = !node.covered && state !== "broken";
+  // The bar starts below the cut top-left corner, clear of its diagonal.
+  const barY = r1(station.y + FLOW_BOX_CUT);
+  const barH = r1(station.h - FLOW_BOX_CUT - 6);
   const bar = hollow
-    ? html`<rect class="flow-state-bar flow-state-hollow" data-state-bar="${state ?? "none"}" data-covered="false" x="${r1(station.x + 3.5)}" y="${r1(station.y + 6)}" width="4" height="${r1(station.h - 12)}" rx="2"/>`
-    : state === undefined ? null : html`<rect class="flow-state-bar flow-state-${state}" data-state-bar="${state}" x="${r1(station.x + 3.5)}" y="${r1(station.y + 6)}" width="4" height="${r1(station.h - 12)}" rx="2"/>`;
+    ? html`<rect class="flow-state-bar flow-state-hollow" data-state-bar="${state ?? "none"}" data-covered="false" x="${r1(station.x + 3.5)}" y="${barY}" width="4" height="${barH}" rx="2"/>`
+    : state === undefined ? null : html`<rect class="flow-state-bar flow-state-${state}" data-state-bar="${state}" x="${r1(station.x + 3.5)}" y="${barY}" width="4" height="${barH}" rx="2"/>`;
   const standingWords = standing === "caller" ? "; calls the selected component" : standing === "callee" ? "; the selected component calls it" : "";
   return html`<g class="${classes}" id="${node.id}" data-folder="${node.folder}" data-row="${String(node.row)}" data-column="${String(node.column)}" data-seat="${`${station.seat.x} ${station.seat.y}`}" data-state="${state ?? "none"}" data-covered="${node.covered ? "true" : "false"}"${standing === undefined ? null : raw(` data-standing="${standing}"`)} data-structure-select="${node.id}" role="button" tabindex="0" aria-pressed="${own ? "true" : "false"}" aria-label="${flowName(node)}, ${node.folder}: ${node.intent} ${stateWords(node)}; calls ${node.out}, called by ${node.in}${routes.length === 0 ? "" : `, on routes ${routes.join("; ")}`}${standingWords}">
     <title>${flowName(node)} · ${node.folder} · ${node.intent} · ${stateWords(node)} · calls ${node.out} · called by ${node.in}${routes.length === 0 ? "" : ` · routes: ${routes.join("; ")}`}</title>
-    ${own ? html`<rect class="flow-halo" x="${r1(station.x - 4)}" y="${r1(station.y - 4)}" width="${r1(station.w + 8)}" height="${r1(station.h + 8)}" rx="10"/>` : null}
-    <rect class="flow-box" id="${node.id}-box" x="${station.x}" y="${station.y}" width="${station.w}" height="${station.h}" rx="7"${standing === undefined ? null : raw(` style="animation-delay: ${FLOW_HOP_DELAY}s"`)}/>
+    ${own ? html`<path class="flow-halo" d="${chamfer({ x: station.x - 4, y: station.y - 4, w: station.w + 8, h: station.h + 8 }, FLOW_BOX_CUT + 2)}"/>` : null}
+    <path class="flow-box" id="${node.id}-box" d="${chamfer(station, FLOW_BOX_CUT)}"${standing === undefined ? null : raw(` style="animation-delay: ${FLOW_HOP_DELAY}s"`)}/>
     ${bar}
     ${mine.map(renderText)}
     ${node.children > 0 ? html`<g data-structure-expand="${node.folder}"><rect class="flow-expand" x="${station.x + station.w - 16}" y="${station.y + 2}" width="14" height="14" rx="3" fill="transparent" stroke="none"/><path class="flow-expand-mark" d="${node.expanded ? `M ${station.x + station.w - 13} ${station.y + 9} L ${station.x + station.w - 5} ${station.y + 9}` : `M ${station.x + station.w - 13} ${station.y + 9} L ${station.x + station.w - 5} ${station.y + 9} M ${station.x + station.w - 9} ${station.y + 5} L ${station.x + station.w - 9} ${station.y + 13}`}" stroke="var(--flow-muted)" stroke-width="1.5"/><title>${node.expanded ? `Close its ${plural(node.children, "component", "components")}` : `Open its ${plural(node.children, "component", "components")} in place`}</title></g>` : null}
@@ -1484,7 +1591,7 @@ export function renderFlowSvg(model: FlowModel, selected: string | undefined, pr
       <pattern id="flow-hatch" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="3" fill="var(--flow-node)"/><rect width="1.4" height="3" fill="var(--flow-verified)"/></pattern>
       <pattern id="flow-tag-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4" height="4" fill="var(--flow-tag)"/><rect width="1.6" height="4" fill="var(--flow-hatch)"/></pattern>
     </defs>
-    <rect class="flow-surface" x="0" y="0" width="${layout.width}" height="${layout.height}" rx="12"/>
+    <rect class="flow-surface" x="0" y="0" width="${layout.width}" height="${layout.height}"/>
     ${texts("caption").map(renderText)}
     ${texts("column").map(renderText)}
     ${layout.rails.map((rail) => {
@@ -1500,13 +1607,13 @@ export function renderFlowSvg(model: FlowModel, selected: string | undefined, pr
     ${layout.stubs.map((stub) => html`<g class="flow-stub-group ${flowLit(selection, selection.edges.has(stub.edge.id))}" data-stub="${stub.edge.id}" data-from="${stub.edge.from}" data-to="${stub.edge.to}"><path class="flow-line flow-stub" data-line="${`stub ${stub.edge.id}`}" d="${pathD(stub.points)}" stroke="var(--flow-rail-${stub.rail % FLOW_RAIL_COLORS.length})"/>${stub.joints.map(([x, y]) => html`<circle class="flow-joint" cx="${x}" cy="${y}" r="2.6" fill="var(--flow-rail-${stub.rail % FLOW_RAIL_COLORS.length})"/>`)}</g>`)}
     ${layout.lines.map((draw) => html`<g class="flow-interface ${flowLit(selection, selection.edges.has(draw.edge.id))}" id="${draw.edge.id}" data-from="${draw.edge.from}" data-to="${draw.edge.to}" data-drawn="${draw.kind}" data-structure-select="${draw.edge.id}" role="button" tabindex="0" aria-label="${draw.edge.from} to ${draw.edge.to}, on no structural route"><title>${draw.edge.from} → ${draw.edge.to}: on no structural route</title><path class="flow-line ${draw.kind === "faint" ? "flow-faint" : "flow-bearing-line"}${draw.edge.bypasses.length > 0 ? " flow-broken-line" : ""}${selection.edges.has(draw.edge.id) ? ` is-lit${lineDirection(draw.edge.id)}` : ""}" data-line="${draw.edge.id}" data-edge="${draw.edge.id}" d="${pathD(draw.line.points)}" marker-end="url(#flow-arrow)"/></g>`)}
     ${layout.routes.map((draw) => {
-      const badge = layout.badges.find((b) => b.route === draw.route.id);
-      const level = badge === undefined || badge.levels.length !== 1 ? undefined : model.levels.find((l) => l.name === badge.levels[0]);
+      const trustTag = layout.trustTags.find((b) => b.route === draw.route.id);
+      const level = trustTag === undefined || trustTag.levels.length !== 1 ? undefined : model.levels.find((l) => l.name === trustTag.levels[0]);
       return html`<g class="flow-route-group ${routeClass(draw.route)}" id="${draw.route.id}" data-names="${draw.route.names.join(", ")}" data-derived="${draw.route.derived ? "true" : "false"}" data-stops="${draw.route.stops.join(" ")}" data-edges="${draw.route.edges.join(" ")}"${draw.route.rail === undefined ? null : raw(` data-rail="${draw.route.rail}"`)} data-trust="${draw.route.trust.join(" ")}" data-controls="${draw.route.controls.join(" ")}" data-structure-select="${draw.route.id}" role="button" tabindex="0" aria-pressed="${selection.id === draw.route.id ? "true" : "false"}" aria-label="${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(", ")}${draw.route.derived ? "" : `; trust ${trustWords(draw.route)}`}${draw.route.noControl ? "; no control" : ""}">
       <title>${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(" → ")}${draw.route.rail === undefined ? "" : ` → ${byFolder.get(draw.route.rail)!.name} (rail)`}${draw.route.derived ? "" : ` · trust in: ${trustWords(draw.route)}`}</title>
       <path class="flow-line flow-route" data-line="${draw.route.id}" d="${pathD(draw.path)}" stroke="${draw.color}"/>
-      <g class="flow-token${draw.route.derived ? " flow-derived" : ""}">${originToken([...texts(`origin ${draw.route.id} `), ...texts(`trust ${draw.route.id}`)], draw.color)}</g>
-      ${badge === undefined ? null : html`<g class="flow-trust${draw.route.noControl ? " flow-trust-nocontrol" : badge.levels.length === 0 ? " flow-trust-unknown" : ""}" data-trust-badge="${badgeWords(draw.route)}" data-no-control="${draw.route.noControl ? "true" : "false"}"${level === undefined ? null : raw(` data-structure-select="${level.id}" role="button" tabindex="0" aria-label="trust level ${level.name}: ${level.meaning.replace(/"/g, "&quot;")}"`)}><title>${draw.route.noControl ? "No control: no chokepoint or crossing stands where this route's work enters or on any interface it takes, and the trust its entrances carry in is unknown (no crossing's chokepoint is their handler), so the map treats it as untrusted." : badge.levels.length === 0 ? "Trust in: unknown. No crossing's chokepoint is these entrances' handler, so the trust they carry in is not derived; the map treats it as untrusted." : `Trust in: ${badge.levels.join(", ")}, the entering side of the crossing whose chokepoint is these entrances' handler.`}</title><rect class="flow-trust-box" x="${badge.box.x}" y="${badge.box.y}" width="${badge.box.w}" height="${badge.box.h}" rx="7"/>${texts(`trust ${draw.route.id}`).map(renderText)}</g>`}
+      <g class="flow-token${draw.route.derived ? " flow-derived" : ""}">${originToken(texts(`origin ${draw.route.id} `), draw.route)}</g>
+      ${trustTag === undefined ? null : html`<g class="flow-trust${draw.route.noControl ? " flow-trust-nocontrol" : trustTag.levels.length === 0 ? " flow-trust-unknown" : ""}" data-trust-tag="${trustTagWords(draw.route)}" data-no-control="${draw.route.noControl ? "true" : "false"}"${level === undefined ? null : raw(` data-structure-select="${level.id}" role="button" tabindex="0" aria-label="trust level ${level.name}: ${level.meaning.replace(/"/g, "&quot;")}"`)}><title>${draw.route.noControl ? "No control: no chokepoint or crossing stands where this route's work enters or on any interface it takes, and the trust its entrances carry in is unknown (no crossing's chokepoint is their handler), so the map treats it as untrusted." : trustTag.levels.length === 0 ? "Trust in: unknown. No crossing's chokepoint is these entrances' handler, so the trust they carry in is not derived; the map treats it as untrusted." : `Trust in: ${trustTag.levels.join(", ")}, the entering side of the crossing whose chokepoint is these entrances' handler.`}</title><rect class="flow-trust-box" x="${trustTag.box.x}" y="${trustTag.box.y}" width="${trustTag.box.w}" height="${trustTag.box.h}"/>${texts(`trust ${draw.route.id}`).map(renderText)}</g>`}
       <g class="flow-terminus${draw.route.derived ? " flow-derived" : ""}">${texts(`origin ${draw.route.id} `).map(renderText)}</g>
     </g>`;
     })}
@@ -1746,8 +1853,8 @@ function renderHealthStrip(model: FlowModel, selected: string | undefined): Mark
     ${shown.map((kind) => html`<button type="button" class="flow-health-count" data-health="${kind}" data-count="${String(counts[kind])}" data-structure-select="${target(kind)}" aria-pressed="${selected === target(kind) || selected === flowHealthId(kind) ? "true" : "false"}"><span class="flow-health-swatch" aria-hidden="true"></span><strong>${String(counts[kind])}</strong> ${healthWords(kind, counts[kind]).replace(/^\d+ /, "")}</button>`)}
     ${nothingEnforced ? html`<p class="flow-health-note" data-field="nothing-enforced">Nothing is enforced yet: every declared invariant is still a requirement, so no identifier on this map is a working control.</p>` : null}
     ${model.levels.length === 0 ? null : html`<div class="flow-trust-key" data-field="trust-key">
-      <p class="flow-trust-key-title">Trust levels <span class="flow-meta">each entrance's badge says which it carries in; select one to see where its crossings stand</span></p>
-      <ul>${model.levels.map((level) => html`<li><button type="button" class="flow-trust-level" data-structure-select="${level.id}" aria-pressed="${selected === level.id ? "true" : "false"}" title="${level.meaning}"><code>${level.name}</code></button> <span>${levelLine(level.meaning)}</span></li>`)}${derived ? html`<li data-level="unknown"><span class="flow-trust-level flow-trust-unknown"><code>unknown</code></span> <span>not derived, treated as untrusted</span></li><li data-level="no-control"><span class="flow-trust-level flow-trust-nocontrol"><code>no control</code></span> <span>unknown, and nothing on the route controls it</span></li>` : null}</ul>
+      <p class="flow-trust-key-title">Trust levels <span class="flow-meta">the tag beneath each entrance route's token says which it carries in; select one to see where its crossings stand</span></p>
+      <ul>${model.levels.map((level) => html`<li><button type="button" class="flow-trust-level" data-structure-select="${level.id}" aria-pressed="${selected === level.id ? "true" : "false"}" title="${level.meaning}"><code>${level.name}</code></button> <span>${levelLine(level.meaning)}</span></li>`)}${derived ? html`<li data-level="unknown"><span class="flow-trust-tag flow-trust-unknown"><code>unknown</code></span> <span>not derived, treated as untrusted</span></li><li data-level="no-control"><span class="flow-trust-tag flow-trust-nocontrol"><code>no control</code></span> <span>unknown, and nothing on the route controls it</span></li>` : null}</ul>
     </div>`}
   </div>`;
 }
@@ -2083,18 +2190,18 @@ const KEY_HATCH = '<defs><pattern id="flow-key-hatch" width="4" height="4" patte
 function renderFlowKey(state: ShellState): Markup {
   return html`<div class="flow-key" data-field="key">
     <ul aria-label="Map key">
-      ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-route-0)" stroke-width="3.5"/>', html`${termLink(state, "structural route", "Structural route")}: the path its entrances' handler takes; its origin token names up to four entrances and counts the rest, and the pill in it is the ${termLink(state, "trust level")} they carry in (dashed: unknown, not derived, treated as untrusted)`)}
-      ${keyItem('<rect x="2" y="2" width="24" height="10" rx="3" fill="none" stroke="currentColor" stroke-dasharray="3 2"/>', html`${termLink(state, "derived", "Derived")} route: no entrance declared, drawn by ${termLink(state, "reference weight")}, not flow`)}
-      ${keyItem('<rect x="2" y="1.5" width="24" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="4" y="3.5" width="2.5" height="7" rx="1" fill="currentColor"/>', html`${termLink(state, "component", "Component")}: its name, its role, its folder; the bar at its left is its worst verdict; a heavier border declares an entrance`)}
+      ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-route-0)" stroke-width="3.5"/>', html`${termLink(state, "structural route", "Structural route")}: the path its entrances' handler takes; its origin token names up to four entrances and counts the rest, and the tag beneath it, at the edge the route leaves by, is the ${termLink(state, "trust level")} they carry in (unknown: not derived, treated as untrusted)`)}
+      ${keyItem('<path d="M5 2 H26 V9 L23 12 H2 V5 Z" fill="none" stroke="currentColor" stroke-dasharray="3 2"/>', html`${termLink(state, "derived", "Derived")} route: no entrance declared, drawn by ${termLink(state, "reference weight")}, not flow`)}
+      ${keyItem('<path d="M6 1.5 H26 V9 L22.5 12.5 H2 V5.5 Z" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="4" y="5.5" width="2.5" height="5" rx="1" fill="currentColor"/>', html`${termLink(state, "component", "Component")}: its name, its role, its folder; the bar at its left is its worst verdict; a heavier border declares an entrance`)}
       ${keyItem('<rect x="4" y="1.5" width="20" height="11" rx="2.5" fill="var(--flow-key-verified)"/><text x="8" y="10.2" font-size="8.5" font-weight="500" fill="var(--paper)">C</text>', html`${termLink(state, "interface identifier", "Interface identifier")}, solid fill: its ${termLink(state, "invariant")} is enforced and verified`)}
       ${keyItem(`${KEY_HATCH}<rect x="4" y="1.5" width="20" height="11" rx="2.5" fill="url(#flow-key-hatch)" stroke="currentColor"/><text x="8" y="10.2" font-size="8.5" font-weight="500" fill="currentColor">C</text>`, html`Hollow and hatched: a ${termLink(state, "requirement")}, not enforced, so not a working control`)}
       ${keyItem('<rect x="4" y="1.5" width="20" height="11" rx="2.5" fill="var(--flow-key-broken)"/><text x="8" y="10.2" font-size="8.5" font-weight="500" fill="#fff">C</text>', html`Red fill: broken, a ${termLink(state, "structural defect")} or a ${termLink(state, "chokepoint")} with a ${termLink(state, "bypass")}; a component with one carries a red broken mark that lists its bypass sites. Red means broken and nothing else`)}
       ${keyItem('<rect x="1" y="2" width="11" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M17 2 H24 L27 7 L24 12 H17 L14 7 Z" fill="none" stroke="currentColor" stroke-width="1.3"/>', html`C = ${termLink(state, "chokepoint")}, rounded: the one site every reference to a protected thing passes. X = ${termLink(state, "crossing")}, pointed: a chokepoint whose invariant names the trust levels on either side of it`)}
       ${keyItem('<circle cx="7" cy="7" r="4" fill="var(--flow-key-verified)"/><path d="M20 2 L25 7 L20 12 L15 7 Z" fill="var(--flow-key-verified)"/>', "A dot: the same identifier drawn in full elsewhere on the map; select it to select that identifier")}
       ${keyItem('<path d="M14 0 V14" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/><path d="M1 7 H27" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>', html`Trust boundary: where a crossing's ${termLink(state, "trust level")} changes, on its interface, on the line where work enters, or dashed along a component's edge for the crossings inside it (their count shows when a trust level or the component is selected)`)}
-      ${keyItem('<rect x="1" y="2" width="26" height="10" rx="3" fill="none" stroke="var(--flow-key-attention)" stroke-width="1.4"/>', html`Amber, attention, not breakage: <strong>no control</strong>, the pill of an untrusted route with no chokepoint or crossing where its work enters or on any interface it takes; <strong>not covered</strong>, on a component no enforcement covers, whose bar is hollow`)}
+      ${keyItem('<path d="M4 0.5 H24 V4.5 L21 7.5 H1 V3.5 Z" fill="none" stroke="currentColor"/><path d="M12 11.5 H24" stroke="var(--flow-key-attention)" stroke-width="2.5"/>', html`Amber, attention, not breakage: <strong>no control</strong>, the tag beneath an untrusted route's token with no chokepoint or crossing where its work enters or on any interface it takes; <strong>not covered</strong>, on a component no enforcement covers, whose bar is hollow`)}
       ${keyItem('<path d="M1 11 H27" stroke="var(--flow-key-rail)" stroke-width="4" stroke-linecap="round"/><path d="M8 1 V11" stroke="var(--flow-key-rail)" stroke-width="1.5"/>', html`${termLink(state, "core dependency", "Core dependency")} (rail) and a caller's stub to it`)}
-      ${keyItem('<rect x="3" y="2" width="22" height="10" rx="3" fill="none" stroke="var(--flow-key-halo)" stroke-width="5"/><rect x="3" y="2" width="22" height="10" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>', "Selected: a neutral halo and a heavier border, never a route's color")}
+      ${keyItem('<path d="M7 1.5 H25 V9 L21.5 12.5 H3 V5 Z" fill="none" stroke="var(--flow-key-halo)" stroke-width="5"/><path d="M7 1.5 H25 V9 L21.5 12.5 H3 V5 Z" fill="none" stroke="currentColor" stroke-width="2"/>', "Selected: a neutral halo and a heavier border, never a route's color")}
       ${keyItem('<path d="M1 4 H27" stroke="currentColor" stroke-width="1.8"/><path d="M1 10 H27" stroke="currentColor" stroke-width="1.6" stroke-dasharray="5 3"/>', "With a component selected: solid, a caller that depends on it; dashed, a callee it uses")}
       ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-quiet)" stroke-width="1.6"/>', "Load-bearing interface on no route")}
       ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-quiet)" stroke-width="1.4" stroke-dasharray="5 4"/>', "Interface a selection reached")}

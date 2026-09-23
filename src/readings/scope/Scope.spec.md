@@ -233,12 +233,26 @@ The reading: one surface projecting the model for a human, in six views: Lexicon
   crossing: record -> reading
   refuted: let a route follow a utility another component also calls, in flowOf's follows -> the totality oracle went red; restored, green (2026-09-22)
   kinds: none
-- origin tokens stay readable: An origin token shows at most four entrance names and a count of the rest, which the route's inspector lists in full, and its text is white on a route color darkened until white reaches 4.5:1, light and dark.
-  over: a route six entrances share, and every route color and the neutral one in both themes
+- origin tokens stay readable: An origin token shows at most four entrance names and a count of the rest, which the route's inspector lists in full.
+  over: a route six entrances share
   via: an origin token shows at most four entrance names and a count of the rest; the route's inspector lists every one
-  because: the first adopter's nineteen-name block was unreadable, and the owner asked for white text in every token, calling the dark text baffling and hard to read
+  because: the first adopter's nineteen-name block was unreadable. How a token's text reads against its fill is the next bullet's
   crossing: record -> reading
   refuted: showed every entrance name on its origin token, uncapped -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none
+- token text clears its real fill: Every origin token's text reaches 4.5:1 against the token's own fill as the map paints it, a tint of its route's color over the station fill, for every route color and the neutral one, light and dark; and a broken mark's white text reaches 4.5:1 against the broken fill.
+  over: the token ink and every route's and the neutral route's token fill in the light and the dark rules of the rendered map's own style, the fill each drawn token references, and the broken fill in both themes
+  via: token text clears 4.5:1 against the token's own tinted fill for every route color, light and dark, and white clears it on the broken fill
+  because: the owner ruled (d-a5c6442d) for glass with Expanse's token shapes and styles, so a token is now a tint of its route's color with a hairline border, not a solid fill; the check it replaces measured white on the solid route color, a fill no longer painted, and would stay green while the real text failed. The gallery measured every text against its rendered background and found the broken mark at 3.91:1 (white on #e5484d), so the broken fill is darker (#c4262e in the dark) and measured here. Light-mode tokens are pale tints with the map's dark ink, not white on a saturated fill, which is what the owner found baffling (d-4366e47f)
+  crossing: record -> reading
+  refuted: tinted the light origin token 90% toward its route color in FLOW_TOKEN_TINT, so the dark token ink sat on a nearly solid route fill -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none
+- the trust tag sits outside its token: Each entrance route's trust tag (its trust level, unknown, or no control) is set beneath its origin token, outside it, right-aligned to the token's right edge where the route leaves, in the map's monospace face, amber for no control and neutral for a trust level; it is placed like any text on the map, so it never overlaps text or a station, no token or tag touches another whichever station their routes begin at, and it never widens the map: a trust level too wide for the margin is dropped and the route's inspector still states the route's trust and controls.
+  over: every entrance route of the flow, trust, no-control, crowded, shared and broken fixtures and of one whose stacked stations' blocks of tokens would meet, at rest and under every route, component and trust level selection, and a trust level wider than the margin
+  via: the trust tag sits outside its token, right-aligned beneath it, and never overlaps
+  because: the owner found the no-control pill inside the token "just looks jammed in there" and asked that "that tag should live as a subscript outside the token, on the bottom, aligned to the right edge" (d-a5c6442d). Placing it by the map's own text placement keeps the rule that text is dropped, never overlapped; the margin is only ever as narrow as the words no control and unknown allow, so the attention signal is never the tag that drops
+  crossing: record -> reading
+  refuted: stopped moving apart the blocks of tokens of stations one above the other in flowLayout, so a tag hung onto the next station's token -> the totality oracle went red; restored, green (2026-09-23). Before: set each trust tag 10 px left of its token's right edge in flowLayout, so it no longer hangs from the edge the route leaves by -> red; restored, green (2026-09-23)
   kinds: none
 - the map opens on the whole system: With nothing chosen the map opens with nothing selected and every route drawn whole, unless a component is broken, when it opens on the component with the most broken chokepoints, then the first in folder order; the key and the query state that rule, and a deep link selects anything.
   over: the default of the flow, crowded, shared, derived and broken fixtures, their routes at rest and cleared, the key's words, and the query's
@@ -268,10 +282,10 @@ The reading: one surface projecting the model for a human, in six views: Lexicon
   crossing: record -> reading
   refuted: skipped the broken branch of flowVerdict, so a broken project's masthead read as verified -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
-- trust shows where work enters: Each entrance route's origin token carries the trust its entrances carry in (derived as decision d-a5e5c691 derives it), unknown when none is derived, and no control when no identifier stands where its work enters, on an interface it takes, or on the stub to its rail; the trust-level key beside the health strip makes each level a selection defined in one line, and the route's inspector and the query say the same.
-  over: every route of the flow, trust, crowded, shared and no-control fixtures, its controls, its badge and where the badge sits, the key's levels, and the query's route lines
+- trust shows where work enters: Each entrance route's origin token carries, in the tag beneath it, the trust its entrances carry in (derived as decision d-a5e5c691 derives it), unknown when none is derived, and no control when no identifier stands where its work enters, on an interface it takes, or on the stub to its rail; the trust-level key beside the health strip makes each level a selection defined in one line, and the route's inspector and the query say the same.
+  over: every route of the flow, trust, crowded, shared and no-control fixtures, its controls, its trust tag, the key's levels, and the query's route lines
   via: trust shows where work enters: each entrance route's token carries the trust its entrances carry in, or unknown, or no control when nothing on the route controls it, and a trust-level key sits with the health strip
-  because: the security reader could not tell which inputs were untrusted without reading inspector prose, and unprotected untrusted routes (document upload to IO, OAuth to Auth, the scope page to Scope) looked the same as protected ones (docs/reviews/2026-09-23-structure-map-synthesis.md, item 5). Unknown trust is treated as untrusted (d-6df8d09a), and one pill says both facts without widening the map (d-7d36881b)
+  because: the security reader could not tell which inputs were untrusted without reading inspector prose, and unprotected untrusted routes (document upload to IO, OAuth to Auth, the scope page to Scope) looked the same as protected ones (docs/reviews/2026-09-23-structure-map-synthesis.md, item 5). Unknown trust is treated as untrusted (d-6df8d09a), and one tag says both facts (d-7d36881b), beneath the token (d-a5c6442d)
   crossing: record -> reading
   refuted: marked no route as having no control in flowOf, so an uncontrolled route's token read unknown -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none

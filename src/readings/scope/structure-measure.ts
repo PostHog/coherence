@@ -227,11 +227,22 @@ function overlap(a: { x: number; y: number; w: number; h: number }, b: { x: numb
   return a.x < b.x + b.w - 0.5 && b.x < a.x + a.w - 0.5 && a.y < b.y + b.h - 0.5 && b.y < a.y + a.h - 0.5;
 }
 
+/** The box a path of absolute M and L commands spans. */
+function spanOf(d: string): { x: number; y: number; w: number; h: number } {
+  const n = [...d.matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
+  const xs = n.filter((_, i) => i % 2 === 0);
+  const ys = n.filter((_, i) => i % 2 === 1);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
 /**
  * Measure a rendered map. A drawn line is a `path` in an edge group of the
  * earlier map (not its wide hit target) or any `path` or `line` whose class
  * includes `flow-line`; a station box is a `rect` whose group is a node or
- * a station.
+ * a station, or a station's cut-corner `path` of class `flow-box`, measured
+ * by the box its outline spans.
  */
 export function measureSvg(svg: string): SvgMeasure {
   const stack: Element[] = [];
@@ -287,8 +298,9 @@ export function measureSvg(svg: string): SvgMeasure {
       continue;
     }
     const visible = shown([...stack, el]);
-    if (tag === "rect") {
-      const box = { x: Number(el.attrs["x"] ?? 0), y: Number(el.attrs["y"] ?? 0), w: Number(el.attrs["width"] ?? 0), h: Number(el.attrs["height"] ?? 0) };
+    const outline = tag === "path" && classes(el).includes("flow-box");
+    if (tag === "rect" || outline) {
+      const box = outline ? spanOf(el.attrs["d"] ?? "") : { x: Number(el.attrs["x"] ?? 0), y: Number(el.attrs["y"] ?? 0), w: Number(el.attrs["width"] ?? 0), h: Number(el.attrs["height"] ?? 0) };
       if (el.attrs["id"] !== undefined) rects.set(el.attrs["id"], box);
       const group = stack[stack.length - 1];
       if (group !== undefined && (classes(group).includes("flow-node") || classes(group).includes("flow-station"))) stations.push(box);

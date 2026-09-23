@@ -30,7 +30,7 @@ import { allInvariants, flowChokepointId, flowLevelId, invariantVerdict, relianc
 import type { InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, RunEntry, ShellState, SpecComponent, SpecEntrance, SpecInvariant } from "./model.ts";
 import { renderView } from "./shell.ts";
 import { CORE_RULE, FLOW_CHANGE_ID, FLOW_HEALTH_KINDS, FLOW_NONE_ID, compareFlows, flowBrokenId, flowHealthId, flowHealthMembers, flowDefaultSelection, flowEdgeId, flowEntranceId, flowKeyAction, flowLabelLines, flowNodeId, flowOf, flowSelected, flowSelection, type FlowModel } from "./structure-flow.ts";
-import { FLOW_HOP_DELAY, FLOW_NEUTRAL_ROUTE, FLOW_PULSE_PERIOD, FLOW_PULSE_SPEED, FLOW_RAIL_COLORS, FLOW_ROUTE_COLORS, flowLayout, flowPulses, polylineLength, renderFlowSvg, whiteContrast } from "./structure-flow-view.ts";
+import { FLOW_HOP_DELAY, FLOW_NEUTRAL_ROUTE, FLOW_PULSE_PERIOD, FLOW_PULSE_SPEED, FLOW_RAIL_COLORS, FLOW_ROUTE_COLORS, contrast, flowLayout, flowPulses, polylineLength, renderFlowSvg } from "./structure-flow-view.ts";
 import { measureSvg, textWidth } from "./structure-measure.ts";
 
 let fixture: Fixture;
@@ -930,7 +930,7 @@ test("every identifier and every component is drawn in its invariant's state by 
   assert.match(rule(".flow-svg .flow-tag-verified .flow-tag-shape"), /fill: var\(--flow-verified\)/, "verified is a solid fill");
   assert.match(rule(".flow-svg .flow-tag-requirement .flow-tag-shape"), /fill: url\(#flow-tag-hatch\)/, "a requirement is hollow and hatched");
   assert.doesNotMatch(rule(".flow-svg .flow-tag-requirement .flow-tag-shape"), /dasharray/, "the state is in the fill, not in a dashed outline's weight");
-  assert.match(rule(".flow-svg .flow-tag-broken .flow-tag-shape"), /fill: var\(--flow-defect\)/, "broken is a red fill");
+  assert.match(rule(".flow-svg .flow-tag-broken .flow-tag-shape"), /fill: var\(--flow-defect(?:-fill)?\)/, "broken is a red fill");
   assert.match(svg, /<pattern id="flow-tag-hatch"/, "the hatch is drawn");
   for (const node of model.nodes.filter((n) => !n.core && n.state !== undefined)) {
     assert.match(svg, new RegExp(`id="${node.id}"[^>]*data-state="${node.state}"[^]*?data-state-bar="${node.state}"`), `${node.folder} carries its worst verdict, ${node.state}, as a drawn bar`);
@@ -1090,7 +1090,7 @@ test("a selected component shows direction: its callers and callees are drawn ap
   const hooks = renderFlowSvg(flowOf(projectState()), flowNodeId("src/core")).text;
   assert.match(hooks, /<g class="flow-station[^"]*\bis-caller\b/, "a caller station");
   const style = /<style>([^]*?)<\/style>/.exec(svg)![1]!;
-  assert.match(style, /\.flow-station\.is-callee rect\.flow-box \{[^}]*stroke-dasharray/, "callees are dashed, callers solid: a static distinction with or without motion");
+  assert.match(style, /\.flow-station\.is-callee \.flow-box \{[^}]*stroke-dasharray/, "callees are dashed, callers solid: a static distinction with or without motion");
   // The inspector: verdict, callers, callees, then invariants with the rest folded.
   const many = healthState();
   const store = many.spec.components.find((c) => c.folder === "src/store")!;
@@ -1128,14 +1128,54 @@ test("below the side-by-side width the default story's inspector never opens ove
   assert.match(renderView(state, "structure").text, /<aside class="flow-inspector"[^>]*data-open="true" data-default="false"/, "a reader's choice is not");
 });
 
-test("origin tokens keep white text, and every route color, light and dark, gives it at least 4.5:1", () => {
-  for (const [light, dark] of [...FLOW_ROUTE_COLORS, FLOW_NEUTRAL_ROUTE]) {
-    assert.ok(whiteContrast(light) >= 4.5, `${light}: white at ${whiteContrast(light).toFixed(2)}:1`);
-    assert.ok(whiteContrast(dark) >= 4.5, `${dark}: white at ${whiteContrast(dark).toFixed(2)}:1`);
+test("token text clears 4.5:1 against the token's own tinted fill for every route color, light and dark, and white clears it on the broken fill", () => {
+  const svg = renderFlowSvg(flowOf(healthState()), undefined).text;
+  const style = /<style>([^]*?)<\/style>/.exec(svg)![1]!;
+  // The two themes as the map's own style paints them: the light rules, and the dark ones inside the dark media query.
+  let light = "";
+  let dark = "";
+  for (let at = 0; at < style.length;) {
+    const media = style.indexOf("@media (prefers-color-scheme: dark)", at);
+    if (media === -1) {
+      light += style.slice(at);
+      break;
+    }
+    light += style.slice(at, media);
+    let depth = 0;
+    let end = style.indexOf("{", media);
+    for (let i = end; i < style.length; i++) {
+      if (style[i] === "{") depth += 1;
+      if (style[i] === "}") depth -= 1;
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+    }
+    dark += style.slice(media, end + 1);
+    at = end + 1;
   }
-  const style = /<style>([^]*?)<\/style>/.exec(renderFlowSvg(flowOf(projectState()), undefined).text)![1]!;
-  assert.match(style, /\.flow-svg \.flow-origin \{ fill: #ffffff; \}/, "origin text is white");
-  assert.doesNotMatch(style, /--flow-route-ink/, "no per-color dark ink");
+  const value = (css: string, name: string): string => {
+    const found = new RegExp(`${name}: (#[0-9a-f]{6});`).exec(css);
+    assert.ok(found !== null, `${name} is painted as an opaque color`);
+    return found[1]!;
+  };
+  // The ink is what the token's text is filled with; the fill is what the token's outline is filled with.
+  assert.match(style, /\.flow-svg \.flow-origin, \.flow-svg \.flow-origin-more \{ fill: var\(--flow-token-ink\); \}/, "token text is the token ink");
+  for (const m of svg.matchAll(/<path class="flow-origin-token" d="[^"]+" fill="var\((--flow-token-[a-z0-9]+)\)"/g)) assert.ok(style.includes(`${m[1]}:`), `${m[1]} is defined`);
+  assert.ok(/<path class="flow-origin-token"/.test(svg), "tokens are drawn");
+  const slots = [...FLOW_ROUTE_COLORS.map((_, i) => String(i)), "neutral"];
+  for (const [theme, css] of [["light", light], ["dark", dark]] as const) {
+    const ink = value(css, "--flow-token-ink");
+    for (const slot of slots) {
+      const fill = value(css, `--flow-token-${slot}`);
+      const ratio = contrast(ink, fill);
+      assert.ok(ratio >= 4.5, `${theme} route ${slot}: ${ink} on its token fill ${fill} at ${ratio.toFixed(2)}:1`);
+    }
+    const broken = value(css, "--flow-defect-fill");
+    assert.ok(contrast("#ffffff", broken) >= 4.5, `${theme}: white on the broken fill ${broken} at ${contrast("#ffffff", broken).toFixed(2)}:1`);
+  }
+  assert.match(style, /\.flow-tag-broken \.flow-tag-shape \{ fill: var\(--flow-defect-fill\);[^}]*\}\s*\.flow-svg \.flow-tag-broken text \{ fill: #ffffff; \}/, "a broken mark is white on the broken fill");
+  assert.doesNotMatch(style, /--flow-route-ink/, "no per-color ink");
 });
 
 test("jargon links to its definition where the key and the inspector first show it", () => {
@@ -1185,9 +1225,9 @@ test("red means broken: no route or rail color reads as red, orange or amber, th
   const value = (name: string): string => new RegExp(`${name}: ([^;]+);`).exec(style)![1]!;
   const colors = new Set([...FLOW_ROUTE_COLORS.flat(), ...FLOW_RAIL_COLORS.flat(), ...FLOW_NEUTRAL_ROUTE]);
   assert.ok(!colors.has(value("--flow-select")) && value("--flow-select") === value("--flow-ink"), "the selection is the ink, a color no route wears");
-  assert.match(style, /\.flow-station\.is-selected rect\.flow-box \{ stroke: var\(--flow-select\)/);
+  assert.match(style, /\.flow-station\.is-selected \.flow-box \{ stroke: var\(--flow-select\)/);
   assert.match(style, /\.flow-halo \{ fill: none; stroke: var\(--flow-halo\)/, "and a halo");
-  assert.match(svg, /<rect class="flow-halo"/, "the selected component wears its halo");
+  assert.match(svg, /<(?:rect|path) class="flow-halo"/, "the selected component wears its halo");
   assert.ok(!["#b3261e", "#c32836", "#e5484d", "#ff8a80"].includes(value("--flow-boundary")), "a trust boundary is not drawn red");
   // A component whose crossings inside it include a broken one: its count is neutral, never red.
   const brokenInside = healthState();
@@ -1228,6 +1268,79 @@ test("the masthead leads with health: one verdict in large type that links to it
   assert.equal(size(".masthead .meta-counts"), "0.8125rem", "the counts are small");
 });
 
+/** The box a path of absolute M and L commands spans: a cut-corner token's or station's outline. */
+function spanOfPath(d: string): { x: number; y: number; w: number; h: number } {
+  const n = [...d.matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
+  const xs = n.filter((_, i) => i % 2 === 0);
+  const ys = n.filter((_, i) => i % 2 === 1);
+  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+}
+
+test("the trust tag sits outside its token, right-aligned beneath it, and never overlaps", () => {
+  const apart = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }): boolean => a.x + a.w <= b.x + 0.5 || b.x + b.w <= a.x + 0.5 || a.y + a.h <= b.y + 0.5 || b.y + b.h <= a.y + 0.5;
+  let checked = 0;
+  // Two stations one above the other whose blocks of tokens would meet: the hooks' two routes and the reader's own, each
+  // with more names than a token shows.
+  const packed = trustState();
+  const entering = (folder: string, names: string[], handler: string, file: string): void => {
+    const component = packed.spec.components.find((c) => c.folder === folder)!;
+    component.entrances = [...component.entrances, ...names.map((name, i): SpecEntrance => ({ name, meaning: `${name} enters`, handler, line: 20 + i, handlerLine: 21 + i, component: folder, file }))];
+    if (packed.componentInterfaces.kind === "read") packed.componentInterfaces.entrances = [...packed.componentInterfaces.entrances, ...names.map((name) => ({ component: folder, name, file }))];
+  };
+  entering("src/hooks", ["hook replay", "hook retry", "hook drain", "hook flush"], "runHooks in run.ts", "src/hooks/run.ts");
+  entering("src/hooks", ["tick fast", "tick slow", "tick idle", "tick burst"], "tickHooks in run.ts", "src/hooks/run.ts");
+  entering("src/hooks", ["drain", "drain fast", "drain slow", "drain idle", "drain burst"], "drainHooks in run.ts", "src/hooks/run.ts");
+  const drain = packed.spec.components.find((c) => c.folder === "src/hooks")!;
+  drain.invariants = [...drain.invariants, { ...drain.invariants[0]!, name: "the drain answers one queue", enforcements: [{ form: "chokepoint", chokepoint: "drainHooks", protects: "queue", line: 30 }], crossing: { from: "record", to: "inside", line: 31 } }];
+  entering("src/reader", ["read one", "read many", "read all", "read tail", "read head"], "lookup in look.ts", "src/reader/look.ts");
+  for (const state of [projectState(), trustState(), noControlState(), crowdedState(), sharedState(), healthState(), packed]) {
+    const model = flowOf(state);
+    const selections = [undefined, ...model.routes.map((r) => r.id), ...model.nodes.map((n) => n.id), ...model.levels.map((l) => l.id)];
+    for (const selected of selections) {
+      const svg = renderFlowSvg(model, selected).text;
+      const layout = flowLayout(model, flowSelection(model, selected));
+      const measured = measureSvg(svg);
+      const drawn: { what: string; box: { x: number; y: number; w: number; h: number } }[] = [];
+      for (const route of model.routes.filter((r) => r.derived)) {
+        const group = new RegExp(`<g class="flow-route-group[^"]*" id="${route.id}"[^>]*>([^]*?)</g>\\s*</g>`).exec(svg)![1]!;
+        drawn.push({ what: `${route.id} token`, box: spanOfPath(/<path class="flow-origin-token" d="([^"]+)"/.exec(group)![1]!) });
+      }
+      for (const route of model.routes.filter((r) => !r.derived)) {
+        const group = new RegExp(`<g class="flow-route-group[^"]*" id="${route.id}"[^>]*>([^]*?)</g>\\s*</g>`).exec(svg)![1]!;
+        const token = spanOfPath(/<path class="flow-origin-token" d="([^"]+)"/.exec(group)![1]!);
+        const tag = /<g class="flow-trust[^"]*" data-trust-tag="([^"]+)"[^>]*>[^]*?<text class="flow-trust-text flow-mono" x="([\d.]+)" y="([\d.]+)" font-size="(\d+)">([^<]+)<\/text>/.exec(group);
+        assert.ok(tag !== null, `${route.id}: its trust tag is placed`);
+        const size = Number(tag[4]);
+        const box = { x: Number(tag[2]), y: Number(tag[3]) - size * 0.78, w: textWidth(tag[5]!, size, false, 0, true), h: size };
+        assert.ok(!group.slice(0, group.indexOf("<g class=\"flow-trust")).includes("flow-trust-text"), `${route.id}: no tag inside the token`);
+        assert.ok(box.y >= token.y + token.h, `${route.id}: the tag is beneath its token, outside it (tag top ${box.y}, token bottom ${token.y + token.h})`);
+        assert.ok(box.y - (token.y + token.h) <= 4, `${route.id}: and hangs from it`);
+        assert.ok(Math.abs(box.x + box.w - (token.x + token.w)) <= 0.5, `${route.id}: right-aligned to the token's right edge (${box.x + box.w} against ${token.x + token.w})`);
+        for (const station of layout.stations.values()) assert.ok(apart(box, station), `${route.id}: the tag overlaps the station ${station.folder}`);
+        const others = measured.texts.filter((t) => !(Math.abs(t.x - box.x) < 0.05 && Math.abs(t.y - box.y) < 0.05 && t.text === tag[5]));
+        for (const other of others) assert.ok(apart(box, other), `${route.id}: the tag overlaps "${other.text}"`);
+        drawn.push({ what: `${route.id} token`, box: token }, { what: `${route.id} tag`, box });
+        checked += 1;
+      }
+      // No token or tag touches another, whichever station's routes they begin.
+      for (let a = 0; a < drawn.length; a++) for (let b = a + 1; b < drawn.length; b++) assert.ok(apart(drawn[a]!.box, drawn[b]!.box), `${drawn[a]!.what} and ${drawn[b]!.what} overlap`);
+    }
+  }
+  assert.ok(checked > 40, `tags checked: ${checked}`);
+  // A tag wider than the margin never widens the map: it is dropped, and the route's inspector still states the trust.
+  const long = "a-trust-level-whose-name-is-far-wider-than-the-margin-holds";
+  const wide = trustState();
+  wide.spec.components.find((c) => c.folder === "src/hooks")!.invariants[0]!.crossing = { from: long, to: "inside", line: 7 };
+  const before = flowLayout(flowOf(trustState()));
+  const model = flowOf(wide);
+  const after = flowLayout(model);
+  const route = model.routes.find((r) => r.trust.includes(long))!;
+  assert.equal(after.width, before.width, "the map is no wider");
+  assert.ok(after.dropped.includes(`trust ${route.id}`), "the tag that does not fit is dropped");
+  const page = renderView({ ...wide, structure: { selected: route.id, preview: [] } } as ShellState, "structure").text;
+  assert.match(page, new RegExp(`data-field="trust">${long}</span>`), "and the route's inspector states it");
+});
+
 test("trust shows where work enters: each entrance route's token carries the trust its entrances carry in, or unknown, or no control when nothing on the route controls it, and a trust-level key sits with the health strip", () => {
   for (const state of [projectState(), trustState(), noControlState(), crowdedState(), sharedState()]) {
     const model = flowOf(state);
@@ -1239,18 +1352,15 @@ test("trust shows where work enters: each entrance route's token carries the tru
       assert.equal(route.noControl, !route.derived && expected.length === 0, `${route.id}: no control exactly when nothing stands on it`);
       if (route.derived) continue;
       const group = new RegExp(`<g class="flow-route-group[^"]*" id="${route.id}"[^>]*>([^]*?)</g>\\s*</g>`).exec(svg)![1]!;
-      const badge = /<g class="flow-trust[^"]*" data-trust-badge="([^"]+)" data-no-control="(true|false)"[^>]*>[^]*?<rect class="flow-trust-box" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/.exec(group);
-      assert.ok(badge !== null, `${route.id} carries a trust badge`);
-      assert.equal(badge[1], route.noControl ? "no control" : route.trust.length === 0 ? "unknown" : route.trust.join(", "));
-      assert.equal(badge[2], String(route.noControl));
-      const token = /<rect class="flow-origin-token" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/.exec(group)!.slice(1).map(Number) as [number, number, number, number];
-      const [bx, by, bw, bh] = badge.slice(3).map(Number) as [number, number, number, number];
-      assert.ok(bx >= token[0] && by >= token[1] && bx + bw <= token[0] + token[2] + 0.5 && by + bh <= token[1] + token[3] + 0.5, `${route.id}: the badge sits inside its origin token`);
+      const tag = /<g class="flow-trust[^"]*" data-trust-tag="([^"]+)" data-no-control="(true|false)"[^>]*>/.exec(group);
+      assert.ok(tag !== null, `${route.id} carries a trust tag`);
+      assert.equal(tag[1], route.noControl ? "no control" : route.trust.length === 0 ? "unknown" : route.trust.join(", "));
+      assert.equal(tag[2], String(route.noControl));
     }
   }
   const trusted = flowOf(trustState());
   const event = trusted.routes.find((r) => r.trust.length > 0)!;
-  assert.match(renderFlowSvg(trusted, undefined).text, new RegExp(`data-trust-badge="outside" data-no-control="false" data-structure-select="${flowLevelId("outside")}"`), "a derived trust level is a selection");
+  assert.match(renderFlowSvg(trusted, undefined).text, new RegExp(`data-trust-tag="outside" data-no-control="false" data-structure-select="${flowLevelId("outside")}"`), "a derived trust level is a selection");
   assert.ok(event.controls.length > 0, "a route with derived trust always carries its handler's identifier");
   const look = flowOf(noControlState()).routes.find((r) => r.names.includes("look"))!;
   assert.equal(look.noControl, true, "the reader's route crosses no identifier");
@@ -1447,5 +1557,5 @@ test("motion runs caller to callee while selected: every drawn line runs from ca
   assert.match(style, /\.flow-svg \.flow-pulse \{[^}]*animation-iteration-count: infinite;/, "the flow continues while the selection holds");
   assert.doesNotMatch(renderFlowSvg(flowOf(projectState()), undefined).text, /class="flow-pulse|class="[^"]*flow-tick/, "clearing the selection stops all motion");
   assert.doesNotMatch(readFileSync(new URL("./styles.css", import.meta.url), "utf8"), /infinite/, "nothing on the page outside a selection loops");
-  assert.match(style, /@media \(prefers-reduced-motion: reduce\) \{\s*\.flow-svg \.flow-pulse \{ display: none; animation: none; \}\s*\.flow-svg \.flow-tick, \.flow-svg \.flow-station\.is-reach rect\.flow-box \{ animation: none; \}\s*\.flow-svg \.flow-chevron \{ display: inline; \}/, "with reduced motion nothing animates and the chevrons show");
+  assert.match(style, /@media \(prefers-reduced-motion: reduce\) \{\s*\.flow-svg \.flow-pulse \{ display: none; animation: none; \}\s*\.flow-svg \.flow-tick, \.flow-svg \.flow-station\.is-reach \.flow-box \{ animation: none; \}\s*\.flow-svg \.flow-chevron \{ display: inline; \}/, "with reduced motion nothing animates and the chevrons show");
 });
