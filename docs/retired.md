@@ -99,3 +99,11 @@ its consumers were hook self-verification (one row per session suffices), experi
 Carried over: one row per session recording that the hook reached the body with which bundle
 
 Decided by owner, 2026-09-17.
+
+## observed as a measured value (label, value, baseline, threshold; an unexplained crossing opened a conjecture)
+
+a harness metric crossing its own threshold is the project's business; when it surprises an agent, the conjecture verb records it directly, with the number in the observation text. The name now belongs to observation: a record of runtime behavior from a named source, bound to a commit and a session (per-test coverage and failures, read by `query observed`).
+
+Carried over: nothing; the conjecture verb covers the unexplained-move case
+
+Decided by owner, 2026-09-23.
