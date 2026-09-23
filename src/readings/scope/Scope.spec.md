@@ -1,6 +1,6 @@
 # Scope
 
-The reading: one surface projecting the model for a human, in six views: Lexicon, Components, Structure, Invariants, Runs, Journal; a fixed shell that loads its state from the warm server and follows the stores live, or carries one state as a snapshot file; and the agent query, the same state as plain text.
+The reading: one surface projecting the model for a human, in six views: Structure, Lexicon, Components, Invariants, Runs, Journal; a fixed shell that loads its state from the warm server and follows the stores live, or carries one state as a snapshot file; and the agent query, the same state as plain text.
 
 ## entrances
 - scope: a human opens the live reading from the root's warm server, or an agent writes a snapshot of this project or another root
@@ -386,4 +386,16 @@ The reading: one surface projecting the model for a human, in six views: Lexicon
   because: a live page that dropped a record while its server restarted, or showed one twice, would disagree with the journal it claims to follow. The journal's cursor orders by time then id, and two writers can append out of that order, so the catch-up reaches a minute before each cursor and the merge is keyed, which makes the overlap harmless; the cursors are derived from the state, never stored beside it, so they cannot disagree with what the page holds
   crossing: record -> reading
   refuted: dropped the catch-up's slack in withSlack, so a record a slower writer stamped before the page's latest was never sent -> the totality oracle went red once it also reconnected to a running server, where only the catch-up can bring the record (across a restart the new snapshot carried it, and the same break first stayed green); restored, green (2026-09-23)
+  kinds: none
+- the masthead does not move between views: The page's head, the masthead and the view strip, is the same markup on every view but for which tab is selected, and no style sizes or places the page, the shell or anything in its head by which view is shown or what it renders; the selected tab only paints, and the page always keeps the scrollbar's gutter.
+  over: the head of every view of the fixture project, and every rule of the page's style sheet that names the page, the shell or its head
+  via: the masthead does not move between views: its markup is the same on every view but for the selected tab, and no style sizes or places the frame by view
+  because: the owner saw the header jump when switching between Structure and the other tabs (the same request that ruled d-bf90cb79): the shell widened from 76rem to 100rem only while Structure was shown, so at 1440 wide the masthead moved 112 px left and the strip 112 px right. The masthead is where a reader's eye rests between views, so it must be one frame: every view shares the width the map needs, and the other views keep a readable measure inside it
+  refuted: widened the shell only while Structure is shown, with .shell:has(.flow-stage) in styles.css -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none
+- Structure is the first view: The view strip leads with Structure, then Lexicon, then Components, Invariants, Runs and Journal, and a page whose address names no view opens on Structure; an address naming a view opens that view.
+  over: the strip of the fixture project's page, the view its state opens on, and every view's own address
+  via: Structure is the first view: the strip leads with Structure then Lexicon, and a page whose address names no view opens on it
+  because: the owner ruled it (d-bf90cb79): the map is what a reader comes to Scope for, and the lexicon is the vocabulary beneath it. The first tab is the one a page opens on, so a reader who chooses nothing sees what the strip says comes first, and a deep link still opens the view it names
+  refuted: opened a page whose address names no view on Lexicon in loadState, the strip still leading with Structure -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none

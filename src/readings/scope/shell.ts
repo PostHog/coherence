@@ -17,15 +17,21 @@ import { renderRunsResults, renderRunsTools } from "./runs-view.ts";
 import { flowOf, flowVerdict } from "./structure-flow.ts";
 import { renderStructureResults, renderStructureTools } from "./structure-view.ts";
 
-/** The views in strip order. The builder embeds this list; the page reads it from state. */
+/**
+ * The views in strip order: Structure first, then Lexicon, then the rest (the owner's ruling, d-bf90cb79). The builder
+ * embeds this list; the page reads it from state.
+ */
 export const VIEWS = [
+  { id: "structure", label: "Structure" },
   { id: "lexicon", label: "Lexicon" },
   { id: "components", label: "Components" },
-  { id: "structure", label: "Structure" },
   { id: "invariants", label: "Invariants" },
   { id: "runs", label: "Runs" },
   { id: "journal", label: "Journal" },
 ] as const;
+
+/** The view a page opens on when its address names none: the first in strip order. */
+export const DEFAULT_VIEW: string = VIEWS[0].id;
 
 /** The demoted line under the verdict: what the model holds, derived on every render. */
 export function modelCounts(state: ShellState): string {
@@ -58,7 +64,7 @@ export function renderConnection(state: ShellState): Markup | null {
         : connection.status === "live"
           ? html`Live: follows the journal, runs, work orders and specs as they change.`
           : html`Disconnected from the warm server${connection.reason === undefined ? "" : ` (${connection.reason})`}; retrying${connection.attempt === undefined ? "" : `, attempt ${connection.attempt}`}. What is shown is as of the last update. If it stays down, <code>coherence scope</code> starts it again.`;
-  return html`<p class="connection" data-field="connection" data-connection="${mark}" role="status" aria-live="polite"><span class="connection-dot" aria-hidden="true"></span> ${text}</p>`;
+  return html`<p class="connection" data-field="connection" data-connection="${mark}" role="status" aria-live="polite"><span class="connection-dot" aria-hidden="true"></span><span class="connection-text">${text}</span></p>`;
 }
 
 /**

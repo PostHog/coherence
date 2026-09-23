@@ -340,12 +340,12 @@ function start(root: HTMLElement, state: ShellState, live: LiveAccess | undefine
       return;
     }
     if (!(target instanceof HTMLElement) || target.getAttribute("role") !== "tab") return;
-    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft" && event.key !== "Home" && event.key !== "End") return;
     const ids = state.views.map((v) => v.id);
     const current = ids.indexOf(state.activeView);
     if (current === -1 || ids.length < 2) return;
     const step = event.key === "ArrowRight" ? 1 : -1;
-    const next = ids[(current + step + ids.length) % ids.length];
+    const next = event.key === "Home" ? ids[0] : event.key === "End" ? ids[ids.length - 1] : ids[(current + step + ids.length) % ids.length];
     if (next === undefined) return;
     showView(next);
     history.replaceState(null, "", `#${next}`);

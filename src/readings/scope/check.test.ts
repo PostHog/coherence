@@ -149,7 +149,7 @@ test("the embedded state is the loaded lexicon, unchanged", async () => {
 
 test("the render shows every concept name and every rejected alternative's because", async () => {
   const { state } = await buildScopePage(options);
-  const rendered = renderShell(state).text;
+  const rendered = renderView(state, "lexicon").text;
   const lexicon = firstLexicon(state);
   for (const concept of lexicon.concepts) {
     assert.ok(rendered.includes(escapeHtml(concept.name)), `concept ${concept.name} is on the page`);
@@ -187,7 +187,7 @@ function conceptCard(rendered: string, id: string): { card: string; vocabulary: 
 
 test("provenance and detail are one click away; no provenance key or value appears in the vocabulary", async () => {
   const { state } = await buildScopePage(options);
-  const rendered = renderShell(state).text;
+  const rendered = renderView(state, "lexicon").text;
   const lexicon = firstLexicon(state);
   for (const concept of lexicon.concepts) {
     const id = `coherence-${slug(concept.name)}`;
@@ -242,22 +242,74 @@ test("the render has one view strip with the six views in order", async () => {
   const { state } = await buildScopePage(options);
   const rendered = renderShell(state).text;
   const tabs = [...rendered.matchAll(/role="tab"[^>]*data-view="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs, ["lexicon", "components", "structure", "invariants", "runs", "journal"]);
-  for (const label of ["Lexicon", "Components", "Structure", "Invariants", "Runs", "Journal"]) {
+  assert.deepEqual(tabs, ["structure", "lexicon", "components", "invariants", "runs", "journal"]);
+  for (const label of ["Structure", "Lexicon", "Components", "Invariants", "Runs", "Journal"]) {
     assert.ok(rendered.includes(`>${label}</button>`), `${label} tab`);
   }
+});
+
+test("Structure is the first view: the strip leads with Structure then Lexicon, and a page whose address names no view opens on it", () => {
+  const state = fresh();
+  assert.deepEqual(state.views.map((v) => v.id), ["structure", "lexicon", "components", "invariants", "runs", "journal"], "Structure, then Lexicon, then the rest in their order");
+  assert.equal(state.activeView, state.views[0]!.id, "the state opens on the first view");
+  assert.equal(state.activeView, "structure");
+  const rendered = renderShell(state).text;
+  const first = /<button[^>]*role="tab"[^>]*data-view="([^"]+)"[^>]*aria-selected="([a-z]+)"[^>]*tabindex="(-?\d)"/.exec(rendered);
+  assert.deepEqual(first?.slice(1), ["structure", "true", "0"], "the first tab is the selected one and the one keyboard focus reaches");
+  assert.equal(resolveHash(state, ""), undefined, "an address with no hash names no view, so the state's own view stands");
+  for (const view of state.views) assert.deepEqual(resolveHash(state, `#${view.id}`), { view: view.id, id: undefined }, `#${view.id} still opens ${view.id}`);
+});
+
+/** The page's head on one view, with the only difference a view may make (which tab is selected) taken out. */
+function headOf(rendered: string): string {
+  const head = /<div class="shell">\s*<header class="shell-head">[^]*?<\/header>\s*<main class="[^"]*"/.exec(rendered);
+  assert.ok(head !== null, "the page has one head before its view");
+  return head[0].replace(/aria-selected="(true|false)"/g, "aria-selected").replace(/tabindex="-?\d"/g, "tabindex");
+}
+
+/** Every rule of a style sheet as selector and declarations, @media and @supports blocks flattened. */
+function rulesOf(css: string): { selector: string; body: string }[] {
+  const text = css.replace(/\/\*[^]*?\*\//g, "");
+  return [...text.matchAll(/([^{}@;]+)\{([^{}]*)\}/g)].map((m) => ({ selector: m[1]!.trim(), body: m[2]! }));
+}
+
+test("the masthead does not move between views: its markup is the same on every view but for the selected tab, and no style sizes or places the frame by view", async () => {
+  const state = fresh();
+  const heads = state.views.map((view) => ({ view: view.id, head: headOf(renderView(state, view.id).text) }));
+  for (const { view, head } of heads) assert.equal(head, heads[0]!.head, `the head on ${view} is the head on ${heads[0]!.view}`);
+
+  // The frame is html, body, the shell and everything in its head. A rule that sizes or places any of it must not
+  // depend on the view: no :has() on what a view renders, no view id, and the selected tab paints but never moves.
+  const css = await readFile(new URL("./styles.css", import.meta.url), "utf8");
+  const frame = /(^|[\s>+~,])(html|body|\.shell|\.shell-head|\.masthead|\.views|\.reading-name|\.connection)(?![-\w])/;
+  const byView = /:has\(|#view-|\[data-view|\.flow-|\.view-|\.view(?![-\w])|\.structure-results/;
+  const paint = new Set(["color", "border-color", "border-bottom-color", "background", "background-color", "text-decoration-color", "outline-color"]);
+  let frameRules = 0;
+  for (const rule of rulesOf(css)) {
+    for (const selector of rule.selector.split(",").map((s) => s.trim())) {
+      if (!frame.test(` ${selector}`)) continue;
+      frameRules += 1;
+      assert.doesNotMatch(selector, byView, `the frame rule "${selector}" depends on no view`);
+      if (/aria-selected="true"|\[aria-selected\]/.test(selector)) {
+        const properties = [...rule.body.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]!);
+        for (const property of properties) assert.ok(paint.has(property), `the selected tab only paints: "${selector}" sets ${property}`);
+      }
+    }
+  }
+  assert.ok(frameRules > 10, `the frame's rules were read (${frameRules})`);
+  assert.match(css, /\nhtml \{[^}]*scrollbar-gutter: stable;/, "a view too short to scroll keeps the scrollbar's gutter");
 });
 
 test("the search derives its matches from state and hides the rest", async () => {
   const { state } = await buildScopePage(options);
   const total = firstLexicon(state).concepts.length;
   state.lexicon.query = "chokepoint";
-  const rendered = renderShell(state).text;
+  const rendered = renderView(state, "lexicon").text;
   const shown = [...rendered.matchAll(/class="entry concept"/g)].length;
   assert.ok(shown > 0 && shown < total, `query narrows ${total} concepts to ${shown}`);
   assert.ok(rendered.includes(`${shown} of ${total} concepts match “chokepoint”.`));
   state.lexicon.query = "no concept says this sentence";
-  assert.ok(renderShell(state).text.includes("No concept matches"));
+  assert.ok(renderView(state, "lexicon").text.includes("No concept matches"));
 });
 
 test("the Scope lexicon reading displays every applicable property meaning without choosing an owner", () => {
@@ -298,11 +350,11 @@ test("the Scope lexicon reading displays every applicable property meaning witho
 
 test("an absent domain lexicon is rendered as a placeholder, a present one as a second layer", async () => {
   const absent = await buildScopePage(options);
-  const absentRendered = renderShell(absent.state).text;
+  const absentRendered = renderView(absent.state, "lexicon").text;
   assert.ok(absentRendered.includes("No domain lexicon is present."));
 
   const present = await buildScopePage({ ...options, domainPath: DEFAULTS.lexiconPath, domainTitle: "Stand-in domain" });
-  const presentRendered = renderShell(present.state).text;
+  const presentRendered = renderView(present.state, "lexicon").text;
   assert.ok(!presentRendered.includes("No domain lexicon is present."));
   assert.ok(presentRendered.includes("Stand-in domain"));
   assert.equal([...presentRendered.matchAll(/class="layer"/g)].length, 2);
@@ -311,7 +363,7 @@ test("an absent domain lexicon is rendered as a placeholder, a present one as a 
 
 test("related names that resolve become links; the rest are marked unresolved", async () => {
   const { state } = await buildScopePage(options);
-  const rendered = renderShell(state).text;
+  const rendered = renderView(state, "lexicon").text;
   assert.ok(rendered.includes('href="#coherence-invariant"'));
   assert.ok(rendered.includes('class="unresolved"'), "some related names are not concepts and say so");
 });
@@ -684,7 +736,7 @@ test("the Mnemion domain lexicon renders beneath Coherence's with every concept,
   assert.ok(Buffer.byteLength(html, "utf8") < TWO_MB);
   assert.deepEqual(embeddedState(html), state);
   const mnemion = secondLexicon(state);
-  const rendered = renderShell(state).text;
+  const rendered = renderView(state, "lexicon").text;
 
   const layers = [...rendered.matchAll(/id="layer-(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(layers, ["coherence", "domain"], "Coherence's layer comes first, the domain layer beneath");

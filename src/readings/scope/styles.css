@@ -64,6 +64,8 @@ html {
   font-family: var(--sans);
   font-size: 100%;
   -webkit-text-size-adjust: 100%;
+  /* A view short enough not to scroll must not widen the page by a classic scrollbar's width: the gutter is always kept. */
+  scrollbar-gutter: stable;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -114,8 +116,13 @@ a {
   color: var(--ink-quiet);
 }
 
+/*
+ * One width for every view: the masthead and the view strip never move when the view changes. Structure's map needs the
+ * room; the other views keep a readable measure inside it (their prose is capped in ch), so the width is the frame's and
+ * not the text's.
+ */
 .shell {
-  max-width: 76rem;
+  max-width: 100rem;
   margin: 0 auto;
   padding: 0 1.25rem 6rem;
 }
@@ -161,6 +168,11 @@ a {
   border-radius: 50%;
   border: 1.5px solid currentColor;
   transform: translateY(-0.05rem);
+}
+
+/* The line's words and code wrap as one text beside the dot, never as columns of their own. */
+.connection-text {
+  min-width: 0;
 }
 
 .connection[data-connection="live"] .connection-dot {
@@ -346,6 +358,18 @@ a {
   align-items: center;
   gap: 0.75rem;
   max-width: 40rem;
+}
+
+/* Beside the filters the search takes the room its placeholder needs rather than its input's intrinsic width. */
+.view-tools .search {
+  flex: 1 1 20rem;
+  max-width: 32rem;
+}
+
+/* What the first load left out is prose: it keeps a reading measure in the one wide frame. */
+[data-field="omitted"],
+.lexicon-coverage > p {
+  max-width: 72ch;
 }
 
 .search .label {
@@ -1409,11 +1433,6 @@ a.flow-term {
 .flow-evidence.flow-partial {
   color: var(--flow-key-attention);
   font-weight: 600;
-}
-
-/* The map needs its width: the shell widens while Structure is shown. */
-.shell:has(.flow-stage) {
-  max-width: 100rem;
 }
 
 .flow-stage {

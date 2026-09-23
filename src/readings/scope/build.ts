@@ -38,7 +38,7 @@ import { loadSpecModel } from "../../spec/model.ts";
 import { projectLexiconCoverage } from "./lexicon-projection.ts";
 import { windowJournal, windowRuns } from "./derive.ts";
 import { parseLexicon, type Lexicon, type InterfaceReading, type Ladder, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
-import { VIEWS } from "./shell.ts";
+import { DEFAULT_VIEW, VIEWS } from "./shell.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -241,7 +241,7 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
   return {
     project: options.project,
     views: VIEWS.map((v) => ({ id: v.id, label: v.label })),
-    activeView: options.structurePreview === undefined || options.structurePreview.length === 0 ? "lexicon" : "structure",
+    activeView: options.structurePreview === undefined || options.structurePreview.length === 0 ? DEFAULT_VIEW : "structure",
     lexicon: { layers: [coherence, domain], query: "", coverage: projectLexiconCoverage(await lexiconCoverage(root)) },
     spec,
     runs: { records: runs.records, damaged: runs.damaged },
