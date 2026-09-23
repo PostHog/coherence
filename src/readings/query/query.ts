@@ -220,9 +220,10 @@ export function answerStructure(state: ShellState): Answer {
     `crossings (${model.crossings.length}), every one drawn: ${model.crossings.filter((c) => c.on === "interface").length} on component interfaces, ${model.crossings.filter((c) => c.on === "entrance").length} on entrance lines only, ${model.crossings.filter((c) => c.on === "component").length} on component boundary marks`,
     `structural routes (${model.routes.length}), ${model.routesFrom === "root interfaces" ? "derived from the root component's component interfaces by reference weight, not flow: no entrance is declared" : model.routesFrom === "entrances" ? `one per distinct path and trust from the declared entrances; ${ROUTE_RULE}` : "none: no entrance is declared and there is no root"}:`,
   ];
-  for (const route of model.routes) lines.push(`  ${routeName(route)}  ${route.stops.join(" -> ")}${route.rail === undefined ? "" : ` -> ${route.rail} (rail)`}${route.trust.length === 0 ? "" : `  trust ${route.trust.join(", ")}`}${route.entry.length === 0 ? "" : `  enters through ${route.entry.join(" ")}`}  ${route.sites} sites`);
-  const opens = model.routes.find((route) => route.id === flowDefaultSelection(model));
-  if (opens !== undefined) lines.push(`the map opens on: ${routeName(opens)} (${DEFAULT_RULE})`);
+  for (const route of model.routes) lines.push(`  ${routeName(route)}  ${route.stops.join(" -> ")}${route.rail === undefined ? "" : ` -> ${route.rail} (rail)`}${route.derived ? "" : `  trust ${route.trust.length === 0 ? "unknown" : route.trust.join(", ")}`}${route.entry.length === 0 ? "" : `  enters through ${route.entry.join(" ")}`}${route.noControl ? "  no control" : ""}  ${route.sites} sites`);
+  const opens = model.nodes.find((node) => node.id === flowDefaultSelection(model));
+  lines.push(`the map opens on: ${opens === undefined ? "nothing selected, the whole system" : `${opens.folder}, broken`} (${DEFAULT_RULE})`);
+  lines.push(`not covered (${h.uncovered.length})${h.uncovered.length === 0 ? "" : `: ${h.uncovered.join(", ")}`}`);
   lines.push(`core dependencies (${model.coreDependencies.length}), each ${CORE_RULE}:`);
   for (const core of model.coreDependencies) lines.push(`  ${core.folder}  called by ${core.callers.join(", ")}`);
   lines.push(`interface identifiers (${model.identifiers.length}):`);

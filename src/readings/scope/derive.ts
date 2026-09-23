@@ -258,7 +258,8 @@ export function invariantVerdict(invariant: SpecInvariant, runs: readonly RunRec
   if (invariant.state === "structural defect") return { state: "broken", bypassed: false, at, label: dated("structural defect") };
   if (failing) return invariant.state === "invariant" ? { state: "broken", bypassed: false, at, label: dated("structural defect") } : { state: "broken", bypassed: true, at, label: dated("requirement, bypassed") };
   if (invariant.state === "invariant") return { state: "verified", bypassed: false, at, label: dated("verified") };
-  return { state: "requirement", bypassed: false, at, label: at === undefined ? "requirement" : `requirement, checked ${at}` };
+  // A requirement is not a control: its label says so first, so "checked" never reads as a pass.
+  return { state: "requirement", bypassed: false, at, label: at === undefined ? "not enforced · requirement" : `not enforced · requirement, checked ${at}` };
 }
 
 /* ------------------------------------------------------------ reliance */

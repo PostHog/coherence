@@ -189,12 +189,12 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   crossing: record -> reading
   refuted: counted requirements as the verified count in renderHealthStrip -> the totality oracle went red; restored, green (2026-09-22)
   kinds: none
-- identifiers carry their state: Every interface identifier is drawn in its invariant's one verdict, solid when enforced and verified, a dashed outline when a requirement, red when broken, and every component carries its worst verdict as a drawn bar inside its box.
-  over: every identifier and every component the rendered map draws for a fixture holding a verified invariant, a requirement, and a structural defect
-  via: every identifier and every component is drawn in its invariant's state: solid verified, outlined requirement, red broken
-  because: the security and owner readers found an unenforced, never-run requirement indistinguishable from a verified, refuted invariant (synthesis item 2); a control that is not one must not look like one
+- identifiers carry their state: Every interface identifier is drawn in its invariant's one verdict by its fill, solid when enforced and verified, hollow and hatched when a requirement, red when broken, every component carries its worst verdict as a drawn bar inside its box, and a requirement's label leads with not enforced.
+  over: every identifier and every component the rendered map draws for a fixture holding a verified invariant, a requirement, and a structural defect, and the label of every requirement
+  via: every identifier and every component is drawn in its invariant's state by fill: solid verified, hollow and hatched requirement, red broken, and a requirement reads not enforced first
+  because: the security and owner readers found an unenforced, never-run requirement indistinguishable from a verified, refuted invariant (synthesis item 2); a control that is not one must not look like one. The second round (docs/reviews/2026-09-23-structure-map-synthesis.md, item 3) found a dashed outline too faint a difference at tag size, and "requirement, checked 2026-09-17" read as a pass, so the state moved into the fill and the label says not enforced first
   crossing: record -> reading
-  refuted: drew every identifier verified in flowLayout's identifierOf -> the totality oracle went red; restored, green (2026-09-22)
+  refuted: drew a requirement's identifier as the old dashed outline on a blank fill, not hollow and hatched -> the totality oracle went red; restored, green (2026-09-23). Before the fill: drew every identifier verified in flowLayout's identifierOf -> red; restored, green (2026-09-22)
   kinds: none
 - broken marks are attached and list their sites: A component with a broken chokepoint carries a red broken mark touching its box, a button that selects its broken chokepoints and lists every bypass site, naming those inside the component as inside and saying so when all are.
   over: the broken mark and inspector of a fixture component bypassed from another component and from inside itself, and of one bypassed only from inside
@@ -238,17 +238,73 @@ The reading: one surface projecting the model for a human, in six views: Glossar
   crossing: record -> reading
   refuted: showed every entrance name on its origin token, uncapped -> the totality oracle went red; restored, green (2026-09-22)
   kinds: none
-- the map opens on the busiest route: With nothing chosen the map opens on the route whose component interfaces carry the most reference sites, then the most entrances, then by name, and the key states that rule.
-  over: the default of the flow, crowded, shared, and derived fixtures, and the key's words
-  via: the map opens on the busiest route, every other route muted; clearing mutes them all; a deep link selects anything
-  because: the newcomer found the key claimed the busiest route while the first adopter opened on a 3-site route beside a 157-site one, and stopped trusting the key (synthesis item 9)
+- the map opens on the whole system: With nothing chosen the map opens with nothing selected and every route drawn whole, unless a component is broken, when it opens on the component with the most broken chokepoints, then the first in folder order; the key and the query state that rule, and a deep link selects anything.
+  over: the default of the flow, crowded, shared, derived and broken fixtures, their routes at rest and cleared, the key's words, and the query's
+  via: the map opens on the whole system, every route drawn, unless something is broken, when the broken component opens selected; a deep link selects anything
+  because: the owner and security readers found the page opened on a minor route (query, or the MCP tools) instead of the whole system or the riskiest place (docs/reviews/2026-09-23-structure-map-synthesis.md, item 10); the busiest-route rule it replaces is retired with it
   crossing: record -> reading
-  refuted: opened on the route with the fewest reference sites in flowDefaultSelection -> the totality oracle went red; restored, green (2026-09-22)
+  refuted: opened a healthy map on its first route in flowDefaultSelection instead of nothing -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
-- one verdict per invariant: The Structure inspector shows each invariant's one dated verdict, leads a component's inspector with its own invariants and their verdicts, and folds every per-enforcement record, test command, and advice, closed.
+- one verdict per invariant: The Structure inspector shows each invariant's one dated verdict, gives a component's inspector its verdict summary before its callers, callees and invariants, and folds every per-enforcement record, test command, and advice, closed.
   over: a chokepoint whose enforcement a later run kept, and a component holding a structural defect, in the rendered inspector
   via: one verdict per invariant: the inspector shows one dated state, and every per-enforcement record and test command is folded
   because: one invariant showed verified, not run, and kept from an earlier run at once, the inspector ran past 2000 px with test commands, and a component's own invariants were not listed at all, so "I changed Session" could not be answered (synthesis items 6 and 7)
   crossing: record -> reading
   refuted: opened the per-enforcement record fold in the chokepoint inspector -> the totality oracle went red; restored, green (2026-09-22)
+  kinds: none
+- red means broken: Red on the Structure map means broken and nothing else: no route or rail color reads as red, orange or amber, the selection is a neutral halo and weight that no route wears, and nothing enforced, a component's crossing count and a trust boundary are drawn in neutral or amber attention, never the broken color.
+  over: every route, rail and neutral color in both themes, the selection's color, a component whose crossings inside it include a broken one, the nothing-enforced note, and the key's trust boundary
+  via: red means broken: no route or rail color reads as red, orange or amber, the selection is a neutral halo no route wears, and nothing enforced, crossing counts and trust boundaries never use the broken color
+  because: all three blind readers found red doing four jobs (the hook route, the first adopter's crossing chip on its busiest component, the nothing-enforced banner, and broken), so the loudest thing on the healthy Coherence map was a red block that meant nothing was wrong, and the orange selection tangled with the spec route in light mode (docs/reviews/2026-09-23-structure-map-synthesis.md, items 1 and 2)
+  crossing: record -> reading
+  refuted: gave the eighth route the old hook route's red (#df2c2b) in FLOW_ROUTE_COLORS -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none
+- the masthead leads with health: The page's masthead leads with one verdict in large type (every invariant verified, nothing enforced yet, or how many are broken) that links to its set on the Structure map, and demotes the component, invariant, run, journal and glossary counts beneath it.
+  over: the masthead of a healthy fixture, one with nothing enforced, and one with a broken component, and the type sizes the page gives the verdict and the counts
+  via: the masthead leads with health: one verdict in large type that links to its set, with the counts demoted beneath it
+  because: the owner and security readers found the verdict too quiet: Coherence's 114 of 114 sat in small type under a masthead that led with the glossary's size and a count of bullets (docs/reviews/2026-09-23-structure-map-synthesis.md, item 3)
+  crossing: record -> reading
+  refuted: skipped the broken branch of flowVerdict, so a broken project's masthead read as verified -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none
+- trust shows where work enters: Each entrance route's origin token carries the trust its entrances carry in (derived as decision d-a5e5c691 derives it), unknown when none is derived, and no control when no identifier stands where its work enters, on an interface it takes, or on the stub to its rail; the trust-level key beside the health strip makes each level a selection defined in one line, and the route's inspector and the query say the same.
+  over: every route of the flow, trust, crowded, shared and no-control fixtures, its controls, its badge and where the badge sits, the key's levels, and the query's route lines
+  via: trust shows where work enters: each entrance route's token carries the trust its entrances carry in, or unknown, or no control when nothing on the route controls it, and a trust-level key sits with the health strip
+  because: the security reader could not tell which inputs were untrusted without reading inspector prose, and unprotected untrusted routes (document upload to IO, OAuth to Auth, the scope page to Scope) looked the same as protected ones (docs/reviews/2026-09-23-structure-map-synthesis.md, item 5). Unknown trust is treated as untrusted (d-6df8d09a), and one pill says both facts without widening the map (d-7d36881b)
+  crossing: record -> reading
+  refuted: marked no route as having no control in flowOf, so an uncontrolled route's token read unknown -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none
+- a component selection shows direction: Selecting a component draws its callers and its callees apart (solid and dashed, as stations and as lines, with or without motion), and its inspector gives its verdict, then who depends on it, then what it uses, then its invariants, the first few shown and the rest folded.
+  over: the callers, callees and lines of a selected component in the flow and broken fixtures, and the order of its inspector for a component with more invariants than it shows
+  via: a selected component shows direction: its callers and callees are drawn apart, and its inspector gives its verdict, then who depends on it and what it uses, then its invariants, the first few shown and the rest folded
+  because: the owner could not see which way a change to the first adopter's busiest component runs: callers and callees were one color, and the inspector listed eighteen invariants before who depends on it (docs/reviews/2026-09-23-structure-map-synthesis.md, item 4)
+  crossing: record -> reading
+  refuted: left a selected component's interfaces into it out of its into set in flowSelection, so its callers were not drawn as callers -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none
+- the unenforced is visible: A component no enforcement covers (no chokepoint on a component interface it exposes or on an entrance line into it, and no verified totality oracle of its own) carries a hollow state bar and a not-covered mark, on its box or its rail, and the health strip counts them in a selection that lists them.
+  over: every component of the flow, broken, trust, totality-covered and rail-uncovered fixtures, against the rule computed independently, and the strip's count and its list
+  via: the unenforced is visible: a component no enforcement covers carries a hollow state bar and a not-covered mark, and the health strip counts and lists them
+  because: the owner found not covered existed only as an unclickable count, and nothing on the map said that the first adopter's shared core component, called by seven of seven, had nothing standing on it (docs/reviews/2026-09-23-structure-map-synthesis.md, item 6; the rule is decision d-a02f255c)
+  crossing: record -> reading
+  refuted: counted every component as covered in flowOf -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none
+- each identifier is drawn once: Every interface identifier is drawn in full once, where work enters first, and as a dot of its shape and state wherever it stands again; a crossing's identifier has pointed ends and a chokepoint's is rounded, the key spells both out, and a component's crossing count shows only while a trust level, the component or its boundary is selected, a neutral tick otherwise.
+  over: every identifier and boundary mark of the flow, crowded, trust and broken fixtures, at rest and under every trust level and component selection
+  via: each identifier is drawn once in full and as a dot wherever it stands again, a crossing's with pointed ends and a chokepoint's rounded, and a component's crossing count shows only while a trust level, the component or its boundary is selected
+  because: all three readers found the map noisy: X21 drawn four times and X14 and X15 twice read as different controls, C and X differed by one letter, and a crossing count sat on every component (docs/reviews/2026-09-23-structure-map-synthesis.md, item 7)
+  crossing: record -> reading
+  refuted: drew every placement of an identifier in full in flowLayout, never as a dot -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none
+- roles are never cut mid-phrase: A component's role on its box wraps to three lines at most, widening its column before it would cut mid-phrase, and otherwise ends at a clause; and a map wider than its window says so with a hint and a fade, the view strip wraps rather than clip its last tab, and the health strip's broken count selects the broken mark.
+  over: every station of a fixture whose roles are long sentences, the rendered page's scroll affordance against the map's width, the view strip's narrow rule, and the broken count of a fixture with one broken component
+  via: roles are never cut mid-phrase: a component's role wraps to three lines at most, or ends at a clause, and a narrow window says the map scrolls, keeps its last tab, and reaches the broken mark from the health strip
+  because: the newcomer found every Coherence role cut mid-phrase, and all three found the narrow map cut off with no sign it scrolled, the Journal tab clipped, and the only broken mark scrolled out of reach (docs/reviews/2026-09-23-structure-map-synthesis.md, items 8 and 9)
+  crossing: record -> reading
+  refuted: stopped widening a column for a role that would otherwise be cut mid-phrase, in roleWidth -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none
+- motion runs caller to callee and stops: Only the direction of work moves, and only on what is selected: every drawn line runs from caller to callee, a selected route's pulse runs its own path from its entrance and a selected component's run its own interfaces one hop after it lights, every pulse lasts its length over one speed and plays a fixed two or three times, broken marks never move, nothing loops, and with reduced motion chevrons point the same way instead.
+  over: every route, line and stub of the flow, crowded, broken and trust fixtures under every selection, every pulse and tick they render, and the map's and the page's styles
+  via: motion runs caller to callee and stops: every drawn line runs from caller to callee, only a selected route or component moves, every pulse's duration is its length over one speed, plays a fixed number of times, and reduced motion shows chevrons instead
+  because: the owner approved motion under one rule, only the direction of work moves and only on what is selected; a pulse that ran backwards or at a speed set by anything but its length would tell the reader the wrong direction, and a loop would break WCAG 2.2.2
+  crossing: record -> reading
+  refuted: reversed every pulse's points in flowPulses, so the pulse ran callee to caller -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none

@@ -120,6 +120,71 @@ a {
   font-size: 1.0625rem;
 }
 
+/* The masthead leads with health: one verdict in large type, a link to its set; the counts are demoted beneath it. */
+.masthead .verdict {
+  display: inline-block;
+  margin: 0.5rem 0 0;
+  font-size: clamp(1.375rem, 3vw, 1.75rem);
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.masthead .verdict:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+.masthead .verdict::before {
+  content: "";
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-right: 0.45em;
+  border-radius: 0.15em;
+  vertical-align: 0.02em;
+  background: var(--pass);
+}
+
+.masthead .verdict[data-verdict="broken"] {
+  color: var(--fail);
+}
+
+.masthead .verdict[data-verdict="broken"]::before {
+  background: var(--fail);
+}
+
+.masthead .verdict[data-verdict="nothing"],
+.masthead .verdict[data-verdict="partial"] {
+  color: var(--hold);
+}
+
+.masthead .verdict[data-verdict="nothing"]::before,
+.masthead .verdict[data-verdict="partial"]::before {
+  background: repeating-linear-gradient(45deg, var(--hold) 0 2px, transparent 2px 5px);
+  box-shadow: inset 0 0 0 1.5px var(--hold);
+}
+
+.masthead .verdict[data-verdict="empty"]::before {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--ink-quiet);
+}
+
+.masthead .verdict-detail {
+  margin: 0.125rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--ink-quiet);
+}
+
+.masthead .meta-counts {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+  max-width: 72ch;
+}
+
 .views ul {
   display: flex;
   gap: 0.25rem;
@@ -144,6 +209,19 @@ a {
 .views button[aria-selected="true"] {
   color: var(--ink);
   border-bottom-color: var(--ink);
+}
+
+/* Narrow windows: the view strip wraps rather than clip its last tab. */
+@media (max-width: 40rem) {
+  .views ul {
+    flex-wrap: wrap;
+    column-gap: 0.75rem;
+  }
+
+  .views button {
+    font-size: 0.9375rem;
+    padding: 0.375rem 0.125rem 0.5rem;
+  }
 }
 
 /* The Glossary view's tools */
@@ -914,6 +992,9 @@ code {
   --flow-key-quiet: #9aa5bd;
   --flow-key-verified: #1f3a5f;
   --flow-key-broken: #c32836;
+  /* Attention that is not breakage (nothing enforced, no control, not covered): amber, never red. */
+  --flow-key-attention: #945400;
+  --flow-key-halo: rgb(23 32 51 / 0.2);
 }
 
 /* Numbers that line up down a column of rows are tabular; identifiers are not. */
@@ -928,6 +1009,8 @@ code {
     --flow-key-quiet: #6f7c96;
     --flow-key-verified: #c9d6f2;
     --flow-key-broken: #d13438;
+    --flow-key-attention: #f0b04a;
+    --flow-key-halo: rgb(243 246 255 / 0.26);
   }
 }
 
@@ -994,20 +1077,100 @@ code {
 
 .flow-health-count[data-health="escalations"] .flow-health-swatch {
   background: none;
-  border-color: var(--fail);
+  border-color: var(--flow-key-attention);
   border-radius: 50%;
+}
+
+.flow-health-count[data-health="uncovered"] .flow-health-swatch {
+  background: none;
+  border-color: var(--flow-key-attention);
 }
 
 .flow-health-count[data-health="defects"][data-count="0"] .flow-health-swatch {
   background: none;
 }
 
+/* Nothing enforced is attention, not breakage: amber with a bar, never red. */
 .flow-health-note {
   flex-basis: 100%;
   margin: 0.125rem 0 0;
+  padding: 0.125rem 0 0.125rem 0.625rem;
+  border-left: 3px solid var(--flow-key-attention);
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--fail);
+  color: var(--flow-key-attention);
+}
+
+.flow-attention {
+  color: var(--flow-key-attention);
+}
+
+.flow-verdict-line {
+  margin: 0.5rem 0 0;
+  font-weight: 600;
+}
+
+/* The trust-level key beside the health counts: each level a selection, defined in one line. */
+.flow-trust-key {
+  flex-basis: 100%;
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+}
+
+.flow-trust-key-title {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+}
+
+.flow-trust-key-title .flow-meta {
+  font-weight: 400;
+}
+
+.flow-trust-key ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow-trust-key li {
+  display: inline-flex;
+  gap: 0.375rem;
+  align-items: baseline;
+  color: var(--ink-quiet);
+}
+
+.flow-trust-level {
+  flex: none;
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0 0.5rem;
+  cursor: pointer;
+}
+
+.flow-trust-level[aria-pressed="true"] {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px var(--flow-key-halo);
+}
+
+.flow-trust-level.flow-trust-unknown {
+  border-style: dashed;
+  cursor: default;
+}
+
+.flow-trust-level.flow-trust-nocontrol {
+  color: var(--flow-key-attention);
+  border-color: var(--flow-key-attention);
+  cursor: default;
+}
+
+.flow-trust-level code {
+  font-size: 0.75rem;
 }
 
 .flow-verdict {
@@ -1028,7 +1191,8 @@ code {
 }
 
 .flow-ident[data-verdict-state="requirement"] {
-  border-style: dashed;
+  border-color: var(--ink-quiet);
+  background: repeating-linear-gradient(45deg, var(--rule) 0 1px, var(--paper) 1px 4px);
 }
 
 .flow-ident[data-verdict-state="broken"] {
@@ -1097,6 +1261,50 @@ a.flow-term {
   max-width: 100%;
   overflow-x: auto;
   border-radius: 0.75rem;
+  scroll-timeline: --flow-x inline;
+}
+
+/*
+ * When the map is wider than its room, a hint above it and a fade at the edge it continues past say that it scrolls. The
+ * page writes the container query from the map's own width; the fade clears once the map is scrolled to its end.
+ */
+.flow-canvas-wrap {
+  container: flow-canvas / inline-size;
+  timeline-scope: --flow-x;
+}
+
+.flow-canvas-frame {
+  position: relative;
+}
+
+.flow-scroll-hint {
+  display: none;
+  margin: 0 0 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+}
+
+.flow-fade {
+  display: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3rem;
+  pointer-events: none;
+  border-radius: 0 0.75rem 0.75rem 0;
+}
+
+.flow-fade-end {
+  right: 0;
+  background: linear-gradient(to right, transparent, var(--paper) 85%);
+  animation: flow-fade-end linear both;
+  animation-timeline: --flow-x;
+}
+
+@keyframes flow-fade-end {
+  0%, 92% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* The map fills its canvas and never shrinks below its own size (text never shrinks below what was measured). */
@@ -1141,7 +1349,7 @@ a.flow-term {
   .flow-stage {
     display: grid;
     /* The map takes the room; the inspector is a fixed, modest column beside it. */
-    grid-template-columns: minmax(0, 1fr) 21rem;
+    grid-template-columns: minmax(0, 1fr) 20rem;
     gap: 1rem;
     align-items: start;
   }

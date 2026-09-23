@@ -14,6 +14,7 @@ import { renderInvariantsResults, renderInvariantsTools } from "./invariants-vie
 import { renderJournalResults, renderJournalTools } from "./journal-view.ts";
 import type { ShellState } from "./model.ts";
 import { renderRunsResults, renderRunsTools } from "./runs-view.ts";
+import { flowOf, flowVerdict } from "./structure-flow.ts";
 import { renderStructureResults, renderStructureTools } from "./structure-view.ts";
 
 /** The views in strip order. The builder embeds this list; the page reads it from state. */
@@ -26,12 +27,12 @@ export const VIEWS = [
   { id: "journal", label: "Journal" },
 ] as const;
 
-/** The one sentence under the project name: what the model holds, derived on every render. */
+/** The demoted line under the verdict: what the model holds, derived on every render. */
 export function modelCounts(state: ShellState): string {
   const c = state.spec.counts;
   const parts = [
     plural(c.components, "component", "components"),
-    `${plural(c.bullets, "bullet", "bullets")} (${c.invariants} ${c.invariants === 1 ? "invariant" : "invariants"}, ${c.requirements} ${c.requirements === 1 ? "requirement" : "requirements"}${c.structuralDefects > 0 ? `, ${plural(c.structuralDefects, "structural defect", "structural defects")}` : ""})`,
+    `${c.invariants} ${c.invariants === 1 ? "invariant" : "invariants"}, ${c.requirements} ${c.requirements === 1 ? "requirement" : "requirements"}${c.structuralDefects > 0 ? `, ${plural(c.structuralDefects, "structural defect", "structural defects")}` : ""}`,
     plural(state.runs.records.length + (state.runs.omitted ?? 0), "run", "runs"),
     plural(state.journal.records.length + (state.journal.omitted ?? 0), "journal record", "journal records"),
   ];
@@ -40,17 +41,32 @@ export function modelCounts(state: ShellState): string {
   return `${parts.join(", ")}.`;
 }
 
+/**
+ * The masthead leads with health: one verdict in large type, the link to its
+ * set on the Structure map (the broken component's mark when one component
+ * holds everything broken), and what else the verdict leaves out beneath it.
+ * The glossary and the record counts are demoted to one small line.
+ */
 function renderMasthead(state: ShellState): Markup {
   const first = state.glossary.layers[0];
   const counts =
     first !== undefined && first.kind === "present"
       ? glossaryCounts(first.glossary)
       : "No glossary is loaded.";
+  const model = flowOf(state);
+  const verdict = flowVerdict(model);
+  const requirements = model.health.requirements.length;
+  const detail = [
+    verdict.kind === "broken" && requirements > 0 ? `${requirements} ${requirements === 1 ? "requirement" : "requirements"} not enforced yet` : "",
+    verdict.kind === "nothing" ? `${requirements} ${requirements === 1 ? "requirement" : "requirements"} declared, none enforced` : "",
+    model.health.uncovered.length > 0 ? plural(model.health.uncovered.length, "component not covered", "components not covered") : "",
+  ].filter(Boolean).join(" · ");
   return html`<div class="masthead">
     <p class="reading-name">Scope</p>
     <h1>${state.project}</h1>
-    <p class="counts">${counts}</p>
-    <p class="counts model-counts" data-field="model-counts">${modelCounts(state)}</p>
+    <a class="verdict" data-field="verdict" data-verdict="${verdict.kind}" href="#${verdict.select}">${verdict.text}</a>
+    ${detail === "" ? null : html`<p class="verdict-detail" data-field="verdict-detail">${detail}</p>`}
+    <p class="meta-counts model-counts" data-field="model-counts">${modelCounts(state)} ${counts}</p>
   </div>`;
 }
 

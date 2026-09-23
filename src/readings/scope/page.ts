@@ -97,6 +97,32 @@ function boot(): void {
     // A card scrolls into view; a map element does not, since the map is already where Structure opens and the inspector shows it.
     const landed = target.id === undefined ? null : document.getElementById(decodeURIComponent(target.id));
     if (landed !== null && landed.closest(".flow-svg") === null) landed.scrollIntoView();
+    revealSelection(false);
+  };
+
+  /**
+   * Bring what is selected on the map into view: the canvas scrolls sideways
+   * to center it when it is outside the canvas's width (a narrow window, or a
+   * broken mark past the right edge); after a reader's click the page also
+   * scrolls, as little as it can, so the map element is on screen. A load
+   * never scrolls the page, only the canvas.
+   */
+  const revealSelection = (page: boolean): void => {
+    if (state.activeView !== "structure") return;
+    const canvas = root.querySelector<HTMLElement>(".flow-canvas");
+    const id = state.structure.selected ?? (state.structure.preview.length > 0 ? undefined : flowDefaultSelection(flowOf(state)));
+    if (canvas === null || id === undefined || id === FLOW_NONE_ID) return;
+    const target = canvas.querySelector<SVGElement>(`svg [id="${id}"]`) ?? canvas.querySelector<SVGElement>(`svg [data-structure-select="${id}"]`);
+    if (target === null) return;
+    const box = target.getBoundingClientRect();
+    const frame = canvas.getBoundingClientRect();
+    if (box.left < frame.left || box.right > frame.right) canvas.scrollLeft += box.left + box.width / 2 - (frame.left + frame.width / 2);
+    if (!page) return;
+    // Below the side-by-side width the inspector is a sheet over the lower part of the screen: keep the element above it.
+    const sheet = window.matchMedia("(max-width: 63.99rem)").matches;
+    const shown = target.getBoundingClientRect();
+    const floor = sheet ? window.innerHeight * 0.42 : window.innerHeight - 8;
+    if (shown.top < 8 || shown.bottom > floor) window.scrollBy({ top: shown.top - (sheet ? 72 : window.innerHeight / 3), behavior: "instant" });
   };
 
   /**
@@ -106,12 +132,13 @@ function boot(): void {
    * inspector. The hash follows so it can be linked.
    */
   const selectStory = (id: string): void => {
-    const current = state.structure.selected ?? flowDefaultSelection(flowOf(state));
+    const current = state.structure.selected ?? (state.structure.preview.length > 0 ? undefined : flowDefaultSelection(flowOf(state)));
     const closing = id === "" || id === FLOW_NONE_ID || current === id;
     if (closing && state.structure.selected === FLOW_NONE_ID) return;
     state.structure.selected = closing ? FLOW_NONE_ID : id;
     history.replaceState(null, "", `#${state.structure.selected}`);
     renderResults();
+    if (!closing) revealSelection(true);
     const again = closing
       ? root.querySelector<HTMLElement | SVGElement>(`[data-structure-select="${current ?? ""}"]`) ?? root.querySelector<HTMLElement>(".flow-canvas")
       : root.querySelector<HTMLElement | SVGElement>(`[id="${id}"][data-structure-select]`) ?? root.querySelector<HTMLElement | SVGElement>(`svg [data-structure-select="${id}"]`);
