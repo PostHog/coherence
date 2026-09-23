@@ -324,18 +324,21 @@ The reading: one surface projecting the model for a human, in six views: Structu
   via: an entrance's declared trust level is its route's trust, even where a crossing on its handler would derive another
   because: the owner ruled (d-ba18b0fd) that entrances declare the trust they carry in: inferred trust left Coherence's own local commands reading no control because nothing on their handler declares a crossing. Declared and checked is how entrances are already treated; derivation from crossings (d-a5e5c691) stays as the fallback, and the spec check refuses a declaration that contradicts it, so the map never has to choose between them
   crossing: project-source -> reading
+  refuted: ignored the entrance's trust: line in flowOf, so its route took the trust derived from the crossing on its handler -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
 - derived trust is labeled: Trust derived from the crossings on an entrance's handler is labeled derived in the route's tag (the level and (derived), or the fixed word derived where the margin cannot hold both), its tooltip, its inspector and the query; declared trust shows its level alone in the tag and is labeled declared in the inspector.
   over: the trust fixture with its entrances declaring trust and without, each route's tag words, drawn text, source and tooltip, its inspector, the query's route line, and the trust-level key
   via: trust derived from a crossing is labeled derived in the tag, the inspector and the query, and declared trust is labeled declared in the inspector
   because: the ruling keeps inference as the fallback, labeled derived (d-ba18b0fd): a derived level is a reading of the crossings, not a statement anyone made about the entrance, and a reader weighing a route's trust must see which it is. The fixed word keeps the label when a long level would otherwise drop the whole tag, so a derived level never passes for a declared one
   crossing: project-source -> reading
+  refuted: made trustInWords return the level alone, so a derived level read as a declared one in the tag and the query -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
 - no control marks only the untrusted: The no-control mark stands on an entrance route only when nothing controls it and its trust is untrusted: unknown, a level no entry spec declares, or a level the entry spec marks as from outside the system's control; a route carrying a level inside the system's control with nothing on it shows its level, neutral, and its inspector says nothing stands on it.
   over: the reader's route, which no identifier stands on, carrying unknown trust, a declared level marked outside, a level no entry spec declares, a level inside, and a level named outside that the entry spec does not mark, with its tag, inspector, query line, and the key's outside marks
   via: no control marks only an untrusted route with nothing on it: unknown trust or a level from outside the system's control, never a trusted one
   because: the ruling (d-ba18b0fd): no control is attention for an untrusted entrance with no control on its route, and each trust level declares whether it comes from outside the system's control. Coherence's local commands carry project-source, which the owner's own agents write inside the system; marking them alongside a browser's request to the warm server made the one real exposure look like nine. Unknown stays untrusted (d-6df8d09a)
   crossing: project-source -> reading
+  refuted: marked every uncontrolled entrance route no control in flowOf, whatever trust it carries in -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
 - a component selection shows direction: Selecting a component draws its callers and its callees apart (solid and dashed, as stations and as lines, with or without motion), and its inspector gives its verdict, then who depends on it, then what it uses, then its invariants, the first few shown and the rest folded.
   over: the callers, callees and lines of a selected component in the flow and broken fixtures, and the order of its inspector for a component with more invariants than it shows

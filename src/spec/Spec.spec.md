@@ -68,10 +68,12 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   via: the model: an entrance's trust names a declared trust level, and a trust level's one marker is (outside)
   because: the owner ruled (d-ba18b0fd) that entrances declare the trust level they carry in and that each level declares whether it comes from outside the system's control; a level named in a trust: line that no entry spec declares would be a trust nobody defined, and Structure would have to guess whether it is untrusted. One marker spelled one way keeps the declaration a fact the map can read, never prose it must interpret
   crossing: project-source -> reading
+  refuted: dropped the unknown-level problem from entranceTrustProblems, so a trust: line naming no declared level passed -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
 - declared trust agrees with the handler's crossing: An entrance whose declared trust differs from the entering side of a crossing whose chokepoint is its handler, in the component holding the handler, is a problem naming both.
   over: every entrance with a trust: line, against every crossing-bearing invariant whose chokepoint is its handler, named bare or with its file
   via: the model: an entrance's declared trust contradicting a crossing on its handler is a problem
   because: the crossing's entering side is the trust the handler receives (d-a5e5c691); a declaration that disagrees is two statements of one fact, one of them wrong, so it is a problem that fails spec --check rather than a warning nobody reads, and the map never has to choose which to believe. Declared trust wins on the map (d-ba18b0fd) only because the check has already made the two agree
   crossing: project-source -> reading
+  refuted: let entranceTrustProblems skip every crossing on the handler, so a declared trust that contradicts it passed -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
