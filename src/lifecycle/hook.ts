@@ -56,7 +56,7 @@ import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import type { Unable } from "../journal/record.ts";
 import { loadOrders, ownedIn, type WorkOrder } from "../journal/work.ts";
-import { renderCompactWithin } from "./glossary.ts";
+import { renderCompactWithin, type InjectionLevel } from "./glossary.ts";
 import { installedRoot, isCoherenceItself, loadProjectGlossaries, within } from "./project.ts";
 
 import { glossaryCoverage, type Coverage } from "./glossary-coverage.ts";
@@ -435,14 +435,19 @@ export async function editContext(root: string, input: HookInput, options: HookO
  * points at the glossary command.
  */
 export async function startContext(root: string, input: HookInput = {}, report?: Coverage): Promise<string> {
+  return (await startReading(root, input, report)).text;
+}
+
+/** The start injection with the level the vocabulary was delivered at, so a reading of the hook can say what orient carries. */
+export async function startReading(root: string, input: HookInput = {}, report?: Coverage): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
   const { coherence, project } = await loadProjectGlossaries(root);
   const head = escalationBlock(root) + specBlock(root) + workBlock(root, input);
   const reading=report ?? await glossaryCoverage(root);
   const commands=await cliName(root);
   const coverage=`\nGlossary coverage: ${reading.totals.unresolved} unresolved candidate terms; ${reading.totals.unreviewedContexts} contexts need sense review. No semantic completeness is implied. Read: ${commands} glossary coverage; maintain: ${commands} glossary help.\n`;
   const tail = coverage + `\n${await sessionBlock(root, input)}`;
-  const { text } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root));
-  return head + text + tail;
+  const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root));
+  return { text: head + text + tail, detail, coverage: reading };
 }
 
 /** The feed for a boundary event: the text to inject and the advance to commit once it is in the host's hands. */

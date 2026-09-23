@@ -166,6 +166,23 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: graceful-drain dismissed: nothing is shut down by an install
   checklist: readiness-evidence dismissed: status reports what is written in the settings file and claims nothing about a running process
   checklist: declared-target-coverage declared as install keeps other hooks
+- uninstall keeps other hooks: Uninstalling the hook removes every command of Coherence's from the agent host's settings and nothing else: another tool's hook stays in its entry with its matcher, an entry, event list, or hooks object goes only when this removal emptied it, the file keeps its layout, and a second uninstall changes nothing.
+  over: both agent hosts, settings in every layout (two spaces with a final newline, a tab without one, no hooks object), and every hook command another tool could have written beside ours or in the same entry
+  via: uninstall removes only Coherence's commands and returns the settings to what they were before install
+  because: the settings file belongs to the adopter; an uninstall that took a neighbouring hook, reformatted the file, or left an empty husk would make removing Coherence cost the adopter its own automation or a diff to review, and an adopter who cannot leave cleanly will not try it. Ownership is the same command rule install uses, so what uninstall removes is exactly what install could have written
+  crossing: project-source -> harness
+  refuted: made stripHooks drop an entry of ours whole, so another tool's hook sharing that entry left with it -> "uninstall removes only Coherence's commands and returns the settings to what they were before install" went red in install.test.ts; restored, green (2026-09-23)
+  kinds: deploy
+  checklist: graceful-drain dismissed: nothing is shut down by an uninstall; a session already running keeps the hooks its agent host loaded
+  checklist: readiness-evidence dismissed: uninstall reports what it removed from the settings file and claims nothing about a running process
+  checklist: declared-target-coverage dismissed: one host's one settings file per call, not a registry of targets
+- check fails on any drift: The hook check exits non-zero, naming the event and the kind, whenever an agent host's installed hooks differ from what install would write: an event missing, an entry of ours stale in any field or shape, or an extra entry of ours; another tool's hook is never drift.
+  over: every event install wires, every field and the shape of the entry install writes, and every entry of ours under any event, for both agent hosts
+  via: the check names every drift from what install would write: missing, stale, and extra
+  because: the check is what CI and a person run to know the gyroscope is actually delivered; one that passed a stale launcher, a dropped Codex context limit, or a duplicate entry would report delivery that is not happening, which is the reference's failure of a mechanism described rather than automatic. It compares against the one entry install writes, so the two cannot disagree
+  crossing: project-source -> harness
+  refuted: made the check compare only the command, so a changed timeout, a dropped Codex context limit, a shared entry, or a matcher passed as clean -> "the check names every drift from what install would write: missing, stale, and extra" went red in install.test.ts; restored, green (2026-09-23)
+  kinds: none
 - feed injects subjects only: At prompt and tool boundaries the peer feed injects the subjects of records other sessions wrote since this session's cursor, twelve at most with a count of the rest and the command that shows them whole; a full record is never injected.
   over: every record another session wrote after the cursor, at every UserPromptSubmit and PostToolUse
   via: the peer feed injects subjects of other sessions' records since the cursor, capped, never full records
