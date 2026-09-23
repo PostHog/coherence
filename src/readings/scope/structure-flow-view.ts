@@ -151,6 +151,27 @@ const FLOW_DOT_R = 5;
 const FLOW_BOX_CUT = 8;
 const FLOW_TOKEN_CUT = 6;
 /**
+ * Pointer and stack (the owner's ruling d-e3abc2c8): an origin token's right
+ * edge, where its route leaves into the system, is a point FLOW_TOKEN_POINT
+ * deep (at most half the token's height), so a token reads "work enters here"
+ * and never as a station, which keeps its flat edge; the route's line leaves
+ * from the point's tip. A token that stands for several entrances is a stack
+ * of up to FLOW_STACK_CARDS glass cards (one per entrance: two for two, three
+ * for three or more), each card behind offset up and left by FLOW_STACK_DX
+ * and FLOW_STACK_DY, into the token column's left pad and the gap above the
+ * token, never toward its trust tag or its line. The gap above a token
+ * (FLOW_NAME_GAP + FLOW_TRUST_ROOM, less the trust tag of the route above, its
+ * gap and the token's padding: 6.5 px) is free to take but for
+ * FLOW_STACK_CLEAR, so a three-card stack fits it and the map is no taller and
+ * no wider; a stack that would rise further reserves the difference above its
+ * token in the layout.
+ */
+const FLOW_TOKEN_POINT = 9;
+const FLOW_STACK_CARDS = 3;
+const FLOW_STACK_DX = 3;
+const FLOW_STACK_DY = 2.5;
+const FLOW_STACK_CLEAR = 1.5;
+/**
  * The trust tag hangs beneath its token, right-aligned to the edge the route
  * leaves by: the room a route with one keeps below its token, its gap from
  * the token, and its hit box's padding.
@@ -239,6 +260,57 @@ export function chamfer(box: FlowBox, cut: number): string {
   return `M ${pts.map(([a, b]) => `${r1(a)} ${r1(b)}`).join(" L ")} Z`;
 }
 
+/** An origin token's card: `box` with its top-left corner cut and its right edge a point `depth` deep, tip at mid-height. */
+function pointerPoints(box: FlowBox, depth: number): Point[] {
+  const { x, y, w, h } = box;
+  const c = Math.min(FLOW_TOKEN_CUT, w / 4, h / 4);
+  return [[x + c, y], [x + w, y], [x + w + depth, y + h / 2], [x + w, y + h], [x, y + h], [x, y + c]];
+}
+
+function polygonD(pts: readonly Point[]): string {
+  return `M ${pts.map(([a, b]) => `${r1(a)} ${r1(b)}`).join(" L ")} Z`;
+}
+
+/** How many cards an origin token stacks: one per entrance it stands for, up to three; a derived route stands for none, one card. */
+export function tokenCards(route: Pick<FlowRoute, "names" | "derived">): number {
+  return route.derived ? 1 : Math.max(1, Math.min(FLOW_STACK_CARDS, route.names.length));
+}
+
+/** The convex hull of points, counter-clockwise in screen coordinates (y down): monotone chain. */
+function convexHull(points: readonly Point[]): Point[] {
+  const pts = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (pts.length < 3) return pts;
+  const cross = (o: Point, a: Point, b: Point): number => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = (list: Point[]): Point[] => {
+    const out: Point[] = [];
+    for (const p of list) {
+      while (out.length >= 2 && cross(out[out.length - 2]!, out[out.length - 1]!, p) <= 0) out.pop();
+      out.push(p);
+    }
+    out.pop();
+    return out;
+  };
+  return [...half(pts), ...half([...pts].reverse())];
+}
+
+/** A convex polygon grown outward by `d`: each edge moved out along its normal, corners mitered. */
+function growConvex(pts: readonly Point[], d: number): Point[] {
+  const n = pts.length;
+  let area = 0;
+  for (let i = 0; i < n; i++) area += pts[i]![0] * pts[(i + 1) % n]![1] - pts[(i + 1) % n]![0] * pts[i]![1];
+  const sign = area > 0 ? 1 : -1;
+  const normal = (a: Point, b: Point): Point => {
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [(sign * (b[1] - a[1])) / len, (-sign * (b[0] - a[0])) / len];
+  };
+  return pts.map((p, i) => {
+    const n1 = normal(pts[(i - 1 + n) % n]!, p);
+    const n2 = normal(p, pts[(i + 1) % n]!);
+    const k = d / (1 + n1[0] * n2[0] + n1[1] * n2[1]);
+    return [p[0] + (n1[0] + n2[0]) * k, p[1] + (n1[1] + n2[1]) * k] as Point;
+  });
+}
+
 /**
  * The map's look (the owner's ruling d-a5c6442d): glass, with Expanse's token
  * shapes and styles. The canvas is a pane of the page's glass; stations and
@@ -295,7 +367,10 @@ const FLOW_SVG_STYLE = `
 .flow-svg .flow-state-bar.flow-state-hollow { fill: var(--flow-node); stroke: var(--flow-attention); stroke-width: 1.2; }
 .flow-svg .flow-route { fill: none; stroke-width: 3.5; stroke-linejoin: round; stroke-linecap: butt; }
 .flow-svg .flow-origin-token { stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-linejoin: miter; filter: drop-shadow(0 3px 5px var(--flow-shadow)); }
-.flow-svg .flow-derived .flow-origin-token { stroke-dasharray: 4 3; }
+.flow-svg .flow-origin-card { stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-linejoin: miter; fill-opacity: 0.9; stroke-opacity: 0.6; filter: drop-shadow(0 2px 3px var(--flow-shadow)); }
+.flow-svg .flow-origin-card-2 { fill-opacity: 0.8; stroke-opacity: 0.42; }
+.flow-svg .flow-token-halo { fill: none; stroke: var(--flow-halo); stroke-width: 5px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.flow-svg .flow-derived .flow-origin-token, .flow-svg .flow-derived .flow-origin-card { stroke-dasharray: 4 3; }
 .flow-svg .flow-origin, .flow-svg .flow-origin-more { fill: var(--flow-token-ink); }
 .flow-svg .flow-trust .flow-trust-box { fill: transparent; stroke: none; }
 .flow-svg .flow-trust text { fill: var(--flow-muted); }
@@ -344,7 +419,7 @@ const FLOW_SVG_STYLE = `
 .flow-svg .flow-route-group.is-lit .flow-route { stroke-width: 5; }
 .flow-svg .flow-route-group.is-dim .flow-route { opacity: 0.16; }
 .flow-svg .flow-route-group.is-dim .flow-route { stroke-width: 2; }
-.flow-svg .flow-route-group.is-dim .flow-origin-token { opacity: 0.8; filter: none; }
+.flow-svg .flow-route-group.is-dim .flow-origin-token, .flow-svg .flow-route-group.is-dim .flow-origin-card { opacity: 0.8; filter: none; }
 .flow-svg .is-dim { opacity: 0.16; }
 .flow-svg .flow-route-group.is-dim { opacity: 1; }
 .flow-svg .flow-station.is-dim { opacity: 1; }
@@ -502,12 +577,28 @@ export interface FlowTagDraw {
   boundary: { x1: number; y1: number; x2: number; y2: number } | undefined;
 }
 
+/**
+ * A route's origin token (pointer and stack, d-e3abc2c8): its front card's
+ * body (the box its names sit in, the point not included), the point's depth
+ * past the body's right edge, its tip (where the route's line starts), and
+ * every card's outline, back to front, the front card last.
+ */
+export interface FlowTokenDraw {
+  route: string;
+  box: FlowBox;
+  depth: number;
+  tip: Point;
+  cards: Point[][];
+}
+
 export interface FlowLayout {
   width: number;
   height: number;
   stations: Map<string, FlowStation>;
   rails: FlowRailDraw[];
   routes: FlowRouteDraw[];
+  /** Each route's origin token, measured with its point and its stack. */
+  tokens: FlowTokenDraw[];
   lines: FlowLineDraw[];
   stubs: FlowStubDraw[];
   tags: FlowTagDraw[];
@@ -773,7 +864,12 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
   // d-a5c6442d), so a trust level's name never widens the margin: a tag that does not fit is dropped, and the route's
   // inspector states it. The margin is only ever as narrow as the fixed words "no control" and "unknown" allow, so the
   // attention a route with no control carries is never the tag that drops.
-  const lineW = (route: FlowRoute, j: number): number => textWidth(originLines(route)[j]!, FLOW_NAME_SIZE, !(route.names.length > originLines(route).length && j === originLines(route).length - 1));
+  /** A name line set quiet (regular, not medium): a derived route's last line, or the count of names a token does not show. */
+  const quietLine = (route: FlowRoute, j: number): boolean => {
+    const n = originLines(route).length;
+    return j === n - 1 && (route.derived || route.names.length > n);
+  };
+  const lineW = (route: FlowRoute, j: number): number => textWidth(originLines(route)[j]!, FLOW_NAME_SIZE, !quietLine(route, j));
   const fixedTag = drawn.some((route) => !route.derived && (route.noControl || route.trust.length === 0)) ? textWidth("no control", TYPE_SMALL, false, 0, true) : 0;
   const termW = Math.max(0, fixedTag + 3 - (FLOW_PAD + 2 * FLOW_TOKEN_PAD_X + 8 - 6), ...drawn.flatMap((route) => originLines(route).map((_, j) => lineW(route, j))));
   /** The room a route keeps beneath its token for its trust tag: an entrance route has one, a derived route none. */
@@ -786,12 +882,19 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
   const dotX = r1(FLOW_PAD + termW + 2 * FLOW_TOKEN_PAD_X + 8 + FLOW_DOT_R);
   // Each group: its route, its name lines, where its names start, and its dot; beneath the names, room for its trust tag.
   const blocks = new Map<string, { top: number; groups: { route: FlowRoute; lines: string[]; top: number; y0: number; dot: number }[] }>();
+  // A stack's back cards rise (FLOW_STACK_DY each) into the gap above its token: between the trust tag of the route
+  // above and a token's top card there are FLOW_NAME_GAP + FLOW_TRUST_ROOM, less the tag (its gap and its line) and the
+  // token's own padding beyond its lines (3 px), and all of that is free but FLOW_STACK_CLEAR. A stack that would rise
+  // further reserves the rest above its token, so its cards always clear the text above them.
+  const stackFree = FLOW_NAME_GAP + FLOW_TRUST_ROOM - FLOW_TRUST_GAP - TYPE_SMALL - 3 - FLOW_STACK_CLEAR;
+  const rise = (route: FlowRoute): number => (tokenCards(route) - 1) * FLOW_STACK_DY;
+  const reserve = (route: FlowRoute): number => Math.max(0, rise(route) - stackFree);
   let fan = 0;
   // Each station's block of tokens is centered on it, and blocks from different stations never overlap: where two would,
   // they move apart evenly, the upper one up and the lower one down, so every name and trust tag keeps its room.
   const stacked = [...starts].map(([folder, routes]) => {
     const heights = routes.map((route) => originLines(route).length * FLOW_NAME_LINE);
-    const blockH = heights.reduce((a, b) => a + b, 0) + routes.reduce((sum, route) => sum + trustRoom(route), 0) + (routes.length - 1) * FLOW_NAME_GAP;
+    const blockH = heights.reduce((a, b) => a + b, 0) + routes.reduce((sum, route) => sum + reserve(route) + trustRoom(route), 0) + (routes.length - 1) * FLOW_NAME_GAP;
     return { folder, routes, heights, blockH, top: cy(byFolder.get(folder)!) - blockH / 2 };
   }).sort((a, b) => a.top - b.top || a.folder.localeCompare(b.folder));
   for (let pass = 0; pass < 40; pass++) {
@@ -801,7 +904,8 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
       const below = stacked[i]!;
       const overlap = above.top + above.blockH + FLOW_NAME_GAP - below.top;
       if (overlap <= 0.01) continue;
-      const up = Math.min(overlap / 2, Math.max(0, above.top - FLOW_TOP / 2));
+      // A block moves up no higher than FLOW_TOP / 2, its first token's back cards included, clear of the caption.
+      const up = Math.min(overlap / 2, Math.max(0, above.top - FLOW_TOP / 2 - rise(above.routes[0]!)));
       above.top -= up;
       below.top += overlap - up;
       moved = true;
@@ -812,6 +916,7 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
     const node = byFolder.get(folder)!;
     let y = top;
     const groups = routes.map((route, i) => {
+      y += reserve(route);
       const group = { route, lines: originLines(route), top: y, y0: y, dot: r1(y + heights[i]! / 2) };
       y += heights[i]! + trustRoom(route) + FLOW_NAME_GAP;
       return group;
@@ -826,8 +931,29 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
       fan = Math.max(fan, Math.abs(portY - group.dot));
     });
   }
+  // Each origin token, measured before any text is placed: its body holds its name lines, centered on its route's line,
+  // right-aligned to tokenRight; its point reaches past that edge onto the start of its own line, into the room between
+  // the token column and the first entrance identifier, so the map is no wider; its back cards step up and left, into
+  // the column's left pad (the widest token's body starts FLOW_PAD + 2 from the canvas edge) and the gap reserved above.
+  const tokenRight = r1(dotX - FLOW_DOT_R - 6);
+  const tokens = new Map<string, FlowTokenDraw>();
+  for (const block of blocks.values()) {
+    for (const group of block.groups) {
+      const n = group.lines.length;
+      const h = n * FLOW_NAME_LINE + 3;
+      const w = Math.max(...group.lines.map((_, j) => lineW(group.route, j))) + 2 * FLOW_TOKEN_PAD_X;
+      const box: FlowBox = { x: r1(tokenRight - w), y: r1(group.dot - h / 2), w: r1(w), h };
+      const depth = Math.min(FLOW_TOKEN_POINT, h / 2);
+      const count = tokenCards(group.route);
+      const cards = Array.from({ length: count }, (_, i) => {
+        const back = count - 1 - i;
+        return pointerPoints({ ...box, x: box.x - back * FLOW_STACK_DX, y: box.y - back * FLOW_STACK_DY }, depth).map(([a, b]): Point => [r1(a), r1(b)]);
+      });
+      tokens.set(group.route.id, { route: group.route.id, box, depth, tip: [r1(tokenRight + depth), group.dot], cards });
+    }
+  }
   const colX: number[] = [];
-  colX[0] = r1(dotX + FLOW_DOT_R + 16 + entryRoom + fan + 12 + channel(dropsLeft(0)));
+  colX[0] =r1(dotX + FLOW_DOT_R + 16 + entryRoom + fan + 12 + channel(dropsLeft(0)));
   for (let c = 1; c < columns; c++) colX[c] = r1(colX[c - 1]! + colW[c - 1]! + gapW(c - 1));
   const last = columns - 1;
   const trailing = 14 + channel(dropsRight(last)) + inGap(last, "bracket").length * FLOW_TRACK + 24;
@@ -895,8 +1021,8 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
     const first = stations.get(route.stops[0]!)!;
     const startPort = portAt(first.folder, "left", `term ${route.id}`);
     const group = blocks.get(first.folder)!.groups.find((g) => g.route === route)!;
-    // The route starts at the right edge of its origin token, as the lettered dots did: the line leaves the name itself.
-    const terminus: Point = [r1(dotX - FLOW_DOT_R - 6), group.dot];
+    // The route starts at the tip of its origin token's point: the line leaves where the token points into the system.
+    const terminus: Point = tokens.get(route.id)!.tip;
     const dy = Math.abs(terminus[1] - startPort[1]);
     const bend = r1(startPort[0] - 10 - channel(byFolder.get(first.folder)!.column === 0 ? dropsLeft(0) : 0));
     const path: Point[] = [terminus, [r1(bend - dy), terminus[1]], [bend, startPort[1]], startPort];
@@ -1055,24 +1181,36 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
     tryPlace([{ text: "No component", x: massBox.x + 10, y: massBox.y + 15, size: TYPE_NAME, bold: true, align: "start", within: "structure--mass-box" }], "mass name", 1, "flow-station-name", false);
     tryPlace([{ text: `${plural(model.unowned.files, "file", "files")}, ${plural(model.unowned.lines, "line", "lines")}`, x: massBox.x + 10, y: massBox.y + 29, size: TYPE_SMALL, bold: false, align: "start", within: "structure--mass-box" }], "mass size", 4, "flow-station-folder", false);
   }
-  // 2. Named origins, one line each, set to end at the terminus dot: at most four names and a count of the rest.
+  // 2. Named origins, one line each, right-aligned in their token's body and centered on its route's line: at most four
+  // names and a count of the rest.
   for (const block of blocks.values()) {
     for (const group of block.groups) {
+      const n = group.lines.length;
       group.lines.forEach((line, j) => {
-        const quiet = (group.route.derived && j === group.lines.length - 1) || (!group.route.derived && group.route.names.length > group.lines.length && j === group.lines.length - 1);
-        tryPlace([{ text: line, x: dotX - FLOW_DOT_R - 6 - FLOW_TOKEN_PAD_X, y: r1(group.y0 + (j + 1) * FLOW_NAME_LINE - 3), size: FLOW_NAME_SIZE, bold: !quiet, align: "end" }], `origin ${group.route.id} ${j}`, 2, quiet ? "flow-origin-more" : "flow-origin", false);
+        const quiet = quietLine(group.route, j);
+        // A line's text box (FLOW_NAME_SIZE tall, its top 0.78 of the size above the baseline) centered on its slot.
+        const baseline = group.dot + (j - (n - 1) / 2) * FLOW_NAME_LINE + FLOW_NAME_SIZE * (0.78 - 0.5);
+        tryPlace([{ text: line, x: tokenRight - FLOW_TOKEN_PAD_X, y: r1(baseline), size: FLOW_NAME_SIZE, bold: !quiet, align: "end" }], `origin ${group.route.id} ${j}`, 2, quiet ? "flow-origin-more" : "flow-origin", false);
       });
     }
   }
-  // 2. Each entrance route's trust tag: a subscript beneath its origin token, right-aligned to the token's right edge,
-  // where the route leaves. Placed like any text: never over text or a station, else dropped (its inspector states it).
+  // Every card of every token, its point included, is placed ahead of the text that follows, so nothing is set over it.
+  for (const token of tokens.values()) {
+    for (const card of token.cards) {
+      const xs = card.map((p) => p[0]);
+      const ys = card.map((p) => p[1]);
+      placedText.push({ x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) });
+    }
+  }
+  // 2. Each entrance route's trust tag: a subscript beneath its origin token, right-aligned under its body's right edge,
+  // the base of the point its route leaves by, so it lines up with the names above it. Placed like any text: never over
+  // text, a token or a station, else dropped (its inspector states it).
   const trustTags: FlowLayout["trustTags"] = [];
-  const tokenRight = dotX - FLOW_DOT_R - 6;
   for (const block of blocks.values()) {
     for (const group of block.groups) {
       if (group.route.derived) continue;
-      const lastLine = texts.find((t) => t.key === `origin ${group.route.id} ${group.lines.length - 1}`);
-      const bottom = (lastLine === undefined ? group.y0 + group.lines.length * FLOW_NAME_LINE : textBox(lastLine).y + textBox(lastLine).h) + FLOW_TOKEN_PAD_Y;
+      const token = tokens.get(group.route.id)!;
+      const bottom = token.box.y + token.box.h;
       const words = trustTagWords(group.route);
       const placedTag = tryPlace([{ text: words, x: r1(tokenRight), y: r1(bottom + FLOW_TRUST_GAP + TYPE_SMALL * 0.78), size: TYPE_SMALL, bold: false, align: "end", mono: true }], `trust ${group.route.id}`, 2, "flow-trust-text flow-mono");
       if (placedTag === undefined) continue;
@@ -1361,7 +1499,7 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
     tryPlace([{ text, x: colX[c]!, y: 44, size: TYPE_SMALL, bold: false, align: "start" }], `column ${c}`, 7, "flow-colcap");
   }
 
-  return { width, height, stations, rails, routes, lines, stubs, tags, trustTags, texts, dropped, mass: massBox };
+  return { width, height, stations, rails, routes, tokens: [...tokens.values()], lines, stubs, tags, trustTags, texts, dropped, mass: massBox };
 }
 
 /** Whether a component's crossing count shows: only while a trust level, the component, or its boundary is selected. */
@@ -1377,18 +1515,28 @@ function flowLit(selection: FlowSelection, lit: boolean): string {
 }
 
 /**
- * The token behind a route's named origin: one cut-corner card around all its lines, a tint of the route's color with a
- * hairline border in it (FLOW_TOKEN_TINT; the check measures the ink against this fill).
+ * The token behind a route's named origin (pointer and stack, d-e3abc2c8): its cards back to front, each a card with its
+ * top-left corner cut and its right edge a point into the system, a tint of the route's color with a hairline border in
+ * it (FLOW_TOKEN_TINT; the check measures the ink against the front card's fill, the only one text sits on). A card
+ * behind is Glass's layering: the same tint, fainter, with a softer shadow.
  */
-function originToken(lines: FlowText[], route: FlowRoute): Markup {
-  if (lines.length === 0) return html``;
-  const boxes = lines.map(textBox);
-  const x0 = Math.min(...boxes.map((b) => b.x)) - FLOW_TOKEN_PAD_X;
-  const x1 = Math.max(...boxes.map((b) => b.x + b.w)) + FLOW_TOKEN_PAD_X;
-  const y0 = Math.min(...boxes.map((b) => b.y)) - FLOW_TOKEN_PAD_Y;
-  const y1 = Math.max(...boxes.map((b) => b.y + b.h)) + FLOW_TOKEN_PAD_Y;
+function originToken(token: FlowTokenDraw, route: FlowRoute): Markup {
   const slot = route.slot === undefined ? "neutral" : String(route.slot);
-  return html`<path class="flow-origin-token" d="${chamfer({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, FLOW_TOKEN_CUT)}" fill="var(--flow-token-${slot})" stroke="var(--flow-token-edge-${slot})"/>`;
+  const cards = token.cards.length;
+  return html`${token.cards.map((card, i) => {
+    const back = cards - 1 - i;
+    return back === 0
+      ? html`<path class="flow-origin-token" d="${polygonD(card)}" fill="var(--flow-token-${slot})" stroke="var(--flow-token-edge-${slot})" data-cards="${String(cards)}"/>`
+      : html`<path class="flow-origin-card flow-origin-card-${String(back)}" d="${polygonD(card)}" fill="var(--flow-token-${slot})" stroke="var(--flow-token-edge-${slot})" aria-hidden="true"/>`;
+  })}`;
+}
+
+/**
+ * A selected route's token halo: one outline around the whole stack, its point included (the convex hull of its cards,
+ * grown 3 px), drawn beneath every route so it never covers the text beside it.
+ */
+function tokenHalo(token: FlowTokenDraw): Markup {
+  return html`<path class="flow-token-halo" data-halo="${token.route}" d="${polygonD(growConvex(convexHull(token.cards.flat()), 3))}"/>`;
 }
 
 function renderText(t: FlowText): Markup {
@@ -1608,13 +1756,14 @@ export function renderFlowSvg(model: FlowModel, selected: string | undefined, pr
     })}
     ${layout.stubs.map((stub) => html`<g class="flow-stub-group ${flowLit(selection, selection.edges.has(stub.edge.id))}" data-stub="${stub.edge.id}" data-from="${stub.edge.from}" data-to="${stub.edge.to}"><path class="flow-line flow-stub" data-line="${`stub ${stub.edge.id}`}" d="${pathD(stub.points)}" stroke="var(--flow-rail-${stub.rail % FLOW_RAIL_COLORS.length})"/>${stub.joints.map(([x, y]) => html`<circle class="flow-joint" cx="${x}" cy="${y}" r="2.6" fill="var(--flow-rail-${stub.rail % FLOW_RAIL_COLORS.length})"/>`)}</g>`)}
     ${layout.lines.map((draw) => html`<g class="flow-interface ${flowLit(selection, selection.edges.has(draw.edge.id))}" id="${draw.edge.id}" data-from="${draw.edge.from}" data-to="${draw.edge.to}" data-drawn="${draw.kind}" data-structure-select="${draw.edge.id}" role="button" tabindex="0" aria-label="${draw.edge.from} to ${draw.edge.to}, on no structural route"><title>${draw.edge.from} → ${draw.edge.to}: on no structural route</title><path class="flow-line ${draw.kind === "faint" ? "flow-faint" : "flow-bearing-line"}${draw.edge.bypasses.length > 0 ? " flow-broken-line" : ""}${selection.edges.has(draw.edge.id) ? ` is-lit${lineDirection(draw.edge.id)}` : ""}" data-line="${draw.edge.id}" data-edge="${draw.edge.id}" d="${pathD(draw.line.points)}" marker-end="url(#flow-arrow)"/></g>`)}
+    ${layout.tokens.filter((token) => token.route === selection.id && texts(`origin ${token.route} `).length > 0).map(tokenHalo)}
     ${layout.routes.map((draw) => {
       const trustTag = layout.trustTags.find((b) => b.route === draw.route.id);
       const level = trustTag === undefined || trustTag.levels.length !== 1 ? undefined : model.levels.find((l) => l.name === trustTag.levels[0]);
       return html`<g class="flow-route-group ${routeClass(draw.route)}" id="${draw.route.id}" data-names="${draw.route.names.join(", ")}" data-derived="${draw.route.derived ? "true" : "false"}" data-stops="${draw.route.stops.join(" ")}" data-edges="${draw.route.edges.join(" ")}"${draw.route.rail === undefined ? null : raw(` data-rail="${draw.route.rail}"`)} data-trust="${draw.route.trust.join(" ")}" data-controls="${draw.route.controls.join(" ")}" data-structure-select="${draw.route.id}" role="button" tabindex="0" aria-pressed="${selection.id === draw.route.id ? "true" : "false"}" aria-label="${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(", ")}${draw.route.derived ? "" : `; trust ${trustWords(draw.route)}`}${draw.route.noControl ? "; no control" : ""}">
       <title>${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(" → ")}${draw.route.rail === undefined ? "" : ` → ${byFolder.get(draw.route.rail)!.name} (rail)`}${draw.route.derived ? "" : ` · trust in: ${trustWords(draw.route)}`}</title>
       <path class="flow-line flow-route" data-line="${draw.route.id}" d="${pathD(draw.path)}" stroke="${draw.color}"/>
-      <g class="flow-token${draw.route.derived ? " flow-derived" : ""}">${originToken(texts(`origin ${draw.route.id} `), draw.route)}</g>
+      <g class="flow-token${draw.route.derived ? " flow-derived" : ""}">${texts(`origin ${draw.route.id} `).length === 0 ? null : originToken(layout.tokens.find((t) => t.route === draw.route.id)!, draw.route)}</g>
       ${trustTag === undefined ? null : html`<g class="flow-trust${draw.route.noControl ? " flow-trust-nocontrol" : trustTag.levels.length === 0 ? " flow-trust-unknown" : ""}" data-trust-tag="${trustTagWords(draw.route)}" data-no-control="${draw.route.noControl ? "true" : "false"}"${level === undefined ? null : raw(` data-structure-select="${level.id}" role="button" tabindex="0" aria-label="trust level ${level.name}: ${level.meaning.replace(/"/g, "&quot;")}"`)}><title>${draw.route.noControl ? "No control: no chokepoint or crossing stands where this route's work enters or on any interface it takes, and the trust its entrances carry in is unknown (no crossing's chokepoint is their handler), so the map treats it as untrusted." : trustTag.levels.length === 0 ? "Trust in: unknown. No crossing's chokepoint is these entrances' handler, so the trust they carry in is not derived; the map treats it as untrusted." : `Trust in: ${trustTag.levels.join(", ")}, the entering side of the crossing whose chokepoint is these entrances' handler.`}</title><rect class="flow-trust-box" x="${trustTag.box.x}" y="${trustTag.box.y}" width="${trustTag.box.w}" height="${trustTag.box.h}"/>${texts(`trust ${draw.route.id}`).map(renderText)}</g>`}
       <g class="flow-terminus${draw.route.derived ? " flow-derived" : ""}">${texts(`origin ${draw.route.id} `).map(renderText)}</g>
     </g>`;
@@ -2194,7 +2343,8 @@ const KEY_HATCH = '<defs><pattern id="flow-key-hatch" width="4" height="4" patte
 function renderFlowKey(state: ShellState): Markup {
   return html`<div class="flow-key" data-field="key">
     <ul aria-label="Map key">
-      ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-route-0)" stroke-width="3.5"/>', html`${termLink(state, "structural route", "Structural route")}: the path its entrances' handler takes; its origin token names up to four entrances and counts the rest, and the tag beneath it, at the edge the route leaves by, is the ${termLink(state, "trust level")} they carry in (unknown: not derived, treated as untrusted)`)}
+      ${keyItem('<path d="M1 7 H27" stroke="var(--flow-key-route-0)" stroke-width="3.5"/>', html`${termLink(state, "structural route", "Structural route")}: the path its entrances' handler takes; its origin token names up to four entrances and counts the rest, and the tag beneath it, under the base of its point, is the ${termLink(state, "trust level")} they carry in (unknown: not derived, treated as untrusted)`)}
+      ${keyItem('<path d="M5 1.5 H14 L18 5.5 L14 9.5 H3 V3.5 Z" fill="var(--paper)" stroke="currentColor" stroke-opacity="0.42"/><path d="M7 3 H16 L20 7 L16 11 H5 V5 Z" fill="var(--paper)" stroke="currentColor" stroke-opacity="0.6"/><path d="M9 4.5 H18 L22 8.5 L18 12.5 H7 V6.5 Z" fill="var(--paper)" stroke="currentColor"/><path d="M22 8.5 H28" stroke="var(--flow-key-route-0)" stroke-width="2.5"/>', html`Origin token: its point is where work leaves it for the system, and a component's card never has one. One card is one ${termLink(state, "entrance")}; two stacked cards, two entrances sharing the route; three, three or more. The tag beneath says the trust they carry in`)}
       ${keyItem('<path d="M5 2 H26 V9 L23 12 H2 V5 Z" fill="none" stroke="currentColor" stroke-dasharray="3 2"/>', html`${termLink(state, "derived", "Derived")} route: no entrance declared, drawn by ${termLink(state, "reference weight")}, not flow`)}
       ${keyItem('<path d="M6 1.5 H26 V9 L22.5 12.5 H2 V5.5 Z" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="4" y="5.5" width="2.5" height="5" rx="1" fill="currentColor"/>', html`${termLink(state, "component", "Component")}: its name, its role, its folder; the bar at its left is its worst verdict; a heavier border declares an entrance`)}
       ${keyItem('<rect x="4" y="1.5" width="20" height="11" rx="2.5" fill="var(--flow-key-verified)"/><text x="8" y="10.2" font-size="8.5" font-weight="500" fill="var(--paper)">C</text>', html`${termLink(state, "interface identifier", "Interface identifier")}, solid fill: its ${termLink(state, "invariant")} is enforced and verified`)}

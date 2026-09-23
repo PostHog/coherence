@@ -1268,12 +1268,32 @@ test("the masthead leads with health: one verdict in large type that links to it
   assert.equal(size(".masthead .meta-counts"), "0.8125rem", "the counts are small");
 });
 
+/** The vertices of a path of absolute M and L commands. */
+function pointsOfPath(d: string): [number, number][] {
+  const n = [...d.matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
+  return n.flatMap((_, i) => (i % 2 === 0 ? [[n[i]!, n[i + 1]!] as [number, number]] : []));
+}
+
 /** The box a path of absolute M and L commands spans: a cut-corner token's or station's outline. */
 function spanOfPath(d: string): { x: number; y: number; w: number; h: number } {
-  const n = [...d.matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
-  const xs = n.filter((_, i) => i % 2 === 0);
-  const ys = n.filter((_, i) => i % 2 === 1);
+  const pts = pointsOfPath(d);
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
   return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+}
+
+/** An origin token's body: the box its front card spans without the tip of its point. */
+function bodyOfPath(d: string): { x: number; y: number; w: number; h: number } {
+  const pts = pointsOfPath(d);
+  const right = Math.max(...pts.map((p) => p[0]));
+  const xs = pts.map((p) => p[0]).filter((x) => x < right - 0.05);
+  const ys = pts.map((p) => p[1]);
+  return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+}
+
+/** Every card of a route group's origin token, back to front: the outlines of its back cards, then its front card's. */
+function cardsOf(group: string): string[] {
+  return [...group.matchAll(/<path class="flow-origin-(?:card flow-origin-card-\d|token)" d="([^"]+)"/g)].map((m) => m[1]!);
 }
 
 test("the trust tag sits outside its token, right-aligned beneath it, and never overlaps", () => {
@@ -1303,11 +1323,12 @@ test("the trust tag sits outside its token, right-aligned beneath it, and never 
       const drawn: { what: string; box: { x: number; y: number; w: number; h: number } }[] = [];
       for (const route of model.routes.filter((r) => r.derived)) {
         const group = new RegExp(`<g class="flow-route-group[^"]*" id="${route.id}"[^>]*>([^]*?)</g>\\s*</g>`).exec(svg)![1]!;
-        drawn.push({ what: `${route.id} token`, box: spanOfPath(/<path class="flow-origin-token" d="([^"]+)"/.exec(group)![1]!) });
+        for (const card of cardsOf(group)) drawn.push({ what: `${route.id} token`, box: spanOfPath(card) });
       }
       for (const route of model.routes.filter((r) => !r.derived)) {
         const group = new RegExp(`<g class="flow-route-group[^"]*" id="${route.id}"[^>]*>([^]*?)</g>\\s*</g>`).exec(svg)![1]!;
-        const token = spanOfPath(/<path class="flow-origin-token" d="([^"]+)"/.exec(group)![1]!);
+        // The token's body: its front card without its point, whose base is the edge the tag is right-aligned under.
+        const token = bodyOfPath(/<path class="flow-origin-token" d="([^"]+)"/.exec(group)![1]!);
         const tag = /<g class="flow-trust[^"]*" data-trust-tag="([^"]+)"[^>]*>[^]*?<text class="flow-trust-text flow-mono" x="([\d.]+)" y="([\d.]+)" font-size="(\d+)">([^<]+)<\/text>/.exec(group);
         assert.ok(tag !== null, `${route.id}: its trust tag is placed`);
         const size = Number(tag[4]);
@@ -1315,15 +1336,16 @@ test("the trust tag sits outside its token, right-aligned beneath it, and never 
         assert.ok(!group.slice(0, group.indexOf("<g class=\"flow-trust")).includes("flow-trust-text"), `${route.id}: no tag inside the token`);
         assert.ok(box.y >= token.y + token.h, `${route.id}: the tag is beneath its token, outside it (tag top ${box.y}, token bottom ${token.y + token.h})`);
         assert.ok(box.y - (token.y + token.h) <= 4, `${route.id}: and hangs from it`);
-        assert.ok(Math.abs(box.x + box.w - (token.x + token.w)) <= 0.5, `${route.id}: right-aligned to the token's right edge (${box.x + box.w} against ${token.x + token.w})`);
+        assert.ok(Math.abs(box.x + box.w - (token.x + token.w)) <= 0.5, `${route.id}: right-aligned under the base of the token's point (${box.x + box.w} against ${token.x + token.w})`);
         for (const station of layout.stations.values()) assert.ok(apart(box, station), `${route.id}: the tag overlaps the station ${station.folder}`);
         const others = measured.texts.filter((t) => !(Math.abs(t.x - box.x) < 0.05 && Math.abs(t.y - box.y) < 0.05 && t.text === tag[5]));
         for (const other of others) assert.ok(apart(box, other), `${route.id}: the tag overlaps "${other.text}"`);
-        drawn.push({ what: `${route.id} token`, box: token }, { what: `${route.id} tag`, box });
+        for (const card of cardsOf(group)) drawn.push({ what: `${route.id} token`, box: spanOfPath(card) });
+        drawn.push({ what: `${route.id} tag`, box });
         checked += 1;
       }
-      // No token or tag touches another, whichever station's routes they begin.
-      for (let a = 0; a < drawn.length; a++) for (let b = a + 1; b < drawn.length; b++) assert.ok(apart(drawn[a]!.box, drawn[b]!.box), `${drawn[a]!.what} and ${drawn[b]!.what} overlap`);
+      // No token (any card of its stack, its point included) or tag touches another, whichever station's routes they begin.
+      for (let a = 0; a < drawn.length; a++) for (let b = a + 1; b < drawn.length; b++) assert.ok(drawn[a]!.what === drawn[b]!.what ||apart(drawn[a]!.box, drawn[b]!.box), `${drawn[a]!.what} and ${drawn[b]!.what} overlap`);
     }
   }
   assert.ok(checked > 40, `tags checked: ${checked}`);
@@ -1339,6 +1361,100 @@ test("the trust tag sits outside its token, right-aligned beneath it, and never 
   assert.ok(after.dropped.includes(`trust ${route.id}`), "the tag that does not fit is dropped");
   const page = renderView({ ...wide, structure: { selected: route.id, preview: [] } } as ShellState, "structure").text;
   assert.match(page, new RegExp(`data-field="trust">${long}</span>`), "and the route's inspector states it");
+});
+
+/** Routes whose tokens stand for one, two, three and six entrances, stacked at one station and at the next. */
+function stackState(): ShellState {
+  const state = trustState();
+  const entering = (folder: string, names: string[], handler: string, file: string): void => {
+    const component = state.spec.components.find((c) => c.folder === folder)!;
+    component.entrances = [...component.entrances, ...names.map((name, i): SpecEntrance => ({ name, meaning: `${name} enters`, handler, line: 40 + i, handlerLine: 41 + i, component: folder, file }))];
+    if (state.componentInterfaces.kind === "read") state.componentInterfaces.entrances = [...state.componentInterfaces.entrances, ...names.map((name) => ({ component: folder, name, file }))];
+  };
+  entering("src/hooks", ["tick slow"], "tickHooks in run.ts", "src/hooks/run.ts");
+  entering("src/hooks", ["drain", "drain fast", "drain slow", "drain idle", "drain burst", "drain all"], "drainHooks in run.ts", "src/hooks/run.ts");
+  entering("src/reader", ["read one", "read many", "read all"], "lookup in look.ts", "src/reader/look.ts");
+  return state;
+}
+
+test("origin tokens point into the system and stack by entrance count: one card per entrance up to three, the route leaves from the point's tip, a station never points, and no card overlaps anything", () => {
+  const apart = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }): boolean => a.x + a.w <= b.x + 0.5 || b.x + b.w <= a.x + 0.5 || a.y + a.h <= b.y + 0.5 || b.y + b.h <= a.y + 0.5;
+  const within = (inner: { x: number; y: number; w: number; h: number }, outer: { x: number; y: number; w: number; h: number }): boolean => inner.x >= outer.x - 0.5 && inner.y >= outer.y - 0.5 && inner.x + inner.w <= outer.x + outer.w + 0.5 && inner.y + inner.h <= outer.y + outer.h + 0.5;
+  const counts = new Set<number>();
+  let checked = 0;
+  for (const state of [projectState(), trustState(), noControlState(), crowdedState(), sharedState(), healthState(), derivedState(), stackState()]) {
+    const model = flowOf(state);
+    for (const selected of [undefined, ...model.routes.map((r) => r.id), ...model.nodes.map((n) => n.id), ...model.levels.map((l) => l.id)]) {
+      const svg = renderFlowSvg(model, selected).text;
+      const selection = flowSelection(model, selected);
+      const layout = flowLayout(model, selection);
+      const measured = measureSvg(svg);
+      const every: { route: string; box: { x: number; y: number; w: number; h: number } }[] = [];
+      for (const route of model.routes) {
+        const group = new RegExp(`<g class="flow-route-group[^"]*" id="${route.id}"[^>]*>([^]*?)</g>\\s*</g>`).exec(svg)![1]!;
+        const cards = cardsOf(group);
+        // One card per entrance, up to three; a derived route stands for no entrance, one card.
+        const expected = route.derived ? 1 : Math.min(3, route.names.length);
+        assert.equal(cards.length, expected, `${route.id}: ${route.names.length} entrances, ${expected} cards`);
+        assert.match(group, new RegExp(`class="flow-origin-token"[^>]*data-cards="${expected}"`), `${route.id}: its front card says how many cards it stacks`);
+        counts.add(cards.length);
+        // Every card points: exactly one vertex at its right edge, the tip, midway down it.
+        const front = pointsOfPath(cards[cards.length - 1]!);
+        const right = Math.max(...front.map((p) => p[0]));
+        const tips = front.filter((p) => Math.abs(p[0] - right) < 0.05);
+        assert.equal(tips.length, 1, `${route.id}: the token's right edge is a point`);
+        const tip = tips[0]!;
+        const body = bodyOfPath(cards[cards.length - 1]!);
+        assert.ok(Math.abs(tip[1] - (body.y + body.h / 2)) <= 0.1, `${route.id}: the tip is midway down the token`);
+        assert.ok(tip[0] - (body.x + body.w) > 1 && tip[0] - (body.x + body.w) <= 9.05,`${route.id}: the point reaches past the body, at most 9 px (tip ${tip[0]}, body right ${body.x + body.w})`);
+        // The back cards are the front card stepped up and to the left, never toward the tag beneath or the line.
+        cards.slice(0, -1).forEach((card, i) => {
+          const back = pointsOfPath(card);
+          const k = cards.length - 1 - i;
+          assert.equal(back.length, front.length);
+          back.forEach((p, j) => assert.ok(Math.abs(p[0] - (front[j]![0] - 3 * k)) <= 0.11 && Math.abs(p[1] - (front[j]![1] - 2.5 * k)) <= 0.11, `${route.id}: card ${k} behind is the front card stepped up and left`));
+        });
+        // The route's line, and its motion, start at the tip.
+        const line = new RegExp(`<path class="flow-line flow-route" data-line="${route.id}" d="M ([\\d.]+) ([\\d.]+)`).exec(group)!;
+        assert.deepEqual([Number(line[1]), Number(line[2])], tip, `${route.id}: the route's line leaves from the tip`);
+        if (selection.routes.has(route.id)) {
+          const pulse = flowPulses(model, selection, layout).find((p) => p.on === route.id);
+          if (pulse !== undefined) assert.deepEqual(pulse.points[0], tip, `${route.id}: its motion starts at the tip`);
+        }
+        // Selected, one halo follows the whole stack.
+        const halo = new RegExp(`<path class="flow-token-halo" data-halo="${route.id}" d="([^"]+)"`).exec(svg);
+        assert.equal(halo !== null, selection.id === route.id, `${route.id}: a halo exactly when it is the selection`);
+        if (halo !== null) for (const card of cards) assert.ok(within(spanOfPath(card), spanOfPath(halo[1]!)), `${route.id}: the halo surrounds every card`);
+        // No card covers text but its own names, which sit inside its front card, or any station or tag on the map.
+        const own = terminusLines(svg, route.id);
+        for (const card of cards) {
+          const span = spanOfPath(card);
+          assert.ok(span.x >= 2, `${route.id}: its cards stay inside the canvas, in the token column's left pad`);
+          for (const text of measured.texts) {
+            if (apart(span, text)) continue;
+            const mine = own.some((l) => l.text === text.text && Math.abs(l.y - (text.y + text.h * 0.78)) < 0.2);
+            assert.ok(mine && within(text, body), `${route.id}: a card overlaps "${text.text}"`);
+          }
+          for (const station of layout.stations.values()) assert.ok(apart(span, station), `${route.id}: a card overlaps the station ${station.folder}`);
+          for (const tag of layout.tags) assert.ok(apart(span, tag.box), `${route.id}: a card overlaps the tag ${tag.text}`);
+          every.push({ route: route.id, box: span });
+        }
+        checked += 1;
+      }
+      for (let a = 0; a < every.length; a++) for (let b = a + 1; b < every.length; b++) if (every[a]!.route !== every[b]!.route) assert.ok(apart(every[a]!.box, every[b]!.box), `${every[a]!.route} and ${every[b]!.route}: their tokens touch`);
+      // A station never points: its right edge is flat.
+      for (const m of svg.matchAll(/<path class="flow-box" id="[^"]+" d="([^"]+)"/g)) {
+        const pts = pointsOfPath(m[1]!);
+        const right = Math.max(...pts.map((p) => p[0]));
+        assert.ok(pts.filter((p) => Math.abs(p[0] - right) < 0.05).length >= 2, "a station's right edge is flat");
+      }
+    }
+  }
+  assert.deepEqual([...counts].sort(), [1, 2, 3], "one, two and three cards are all drawn");
+  assert.ok(checked > 100, `tokens checked: ${checked}`);
+  // Dimmed, every card of a stack dims with its front card.
+  const style = /<style>([^]*?)<\/style>/.exec(renderFlowSvg(flowOf(stackState()), undefined).text)![1]!;
+  assert.match(style, /\.flow-route-group\.is-dim \.flow-origin-token, \.flow-svg \.flow-route-group\.is-dim \.flow-origin-card \{ opacity: 0\.8;/, "a dimmed route dims every card");
 });
 
 test("trust shows where work enters: each entrance route's token carries the trust its entrances carry in, or unknown, or no control when nothing on the route controls it, and a trust-level key sits with the health strip", () => {
