@@ -43,9 +43,9 @@ We are writing good code by accident.
 ***4
 at:
 sync:
-picture: Diffs with small cut corners highlighted, then buried as more diffs pile on top.
+picture: LOCKED (scenes/04-corners.src.html). Scene 3's white world. Left, a chat: you ask "did you build it to the spec?", the agent types, "of course bro. why would I deceive you?" At the halfway mark: qa-agent, "actually...", then review-droid, "CRITICAL: 5 findings" (red chip). Right, black boxes fall from the sky and tumble into a messy heap (a recorded rigid-body simulation), faster and faster. A few boxes have a corner sliced off, the cut face orange then red, soon buried. Pull back: the heap is a hill beside a speck of chat, and the boxes keep coming.
 supers:
-source: motion graphics over real diffs
+source: motion graphics (three.js, Rapier)
 transition:
 
 The systems at our disposal are trained to finish the job at any cost, so they cut subtle corners where we can’t see.

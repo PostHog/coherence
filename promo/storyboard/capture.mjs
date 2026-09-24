@@ -19,7 +19,7 @@ for (const [n, sc] of Object.entries(registry)) {
   writeFileSync(page, `<!doctype html><html><head><meta charset="utf-8"><style>.wrap>header,.caption{display:none!important}</style></head><body>${readFileSync(join(scenesDir, `${sc.file}.html`), "utf8")}</body></html>`);
   sc.stills.forEach((t, i) => {
     const shot = join(tmp, `${sc.file}-${i}.png`);
-    execFileSync(CHROME, ["--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--window-size=1280,800", "--virtual-time-budget=6000", `--screenshot=${shot}`, `file://${page}#t${t}`], { stdio: "ignore" });
+    execFileSync(CHROME, ["--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--window-size=1280,800", "--virtual-time-budget=15000", `--screenshot=${shot}`, `file://${page}#t${t}`], { stdio: "ignore" });
     execFileSync("ffmpeg", ["-loglevel", "error", "-y", "-i", shot, "-vf", "crop=1240:697:20:24,scale=640:-1", "-q:v", "4", join(out, `${n.padStart(2, "0")}-${i}.jpg`)]);
   });
   console.log(`scene ${n}: ${sc.stills.length} stills`);
