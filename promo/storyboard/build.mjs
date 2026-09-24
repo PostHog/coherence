@@ -69,9 +69,16 @@ function peaks(path, buckets) {
   return out;
 }
 
+// scenes that have been built: their published page and the stills capture.mjs rendered into frames/
+const registry = JSON.parse(readFileSync(join(here, "scenes.json"), "utf8"));
+const scenes = parseScenes(scriptText);
+scenes.forEach((s) => {
+  const r = registry[String(s.n)];
+  if (r) s.render = { url: r.url, stills: r.stills.map((t, i) => ({ t, src: `frames/${String(s.n).padStart(2, "0")}-${i}.jpg` })) };
+});
 const data = {
   duration: DURATION, acts: ACTS, markers: MARKERS, anchors: ANCHORS,
-  scenes: parseScenes(scriptText), raw: scriptText, peaks: peaks(trackPath, 1400),
+  scenes, raw: scriptText, peaks: peaks(trackPath, 1400),
 };
 const json = JSON.stringify(data).replace(/</g, "\\u003c");
 const template = readFileSync(join(here, "page.html"), "utf8");

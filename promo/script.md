@@ -57,9 +57,9 @@ More complexity than we can possibly get our arms around.
 ***5
 at:
 sync:
-picture: A review bot commenting on a pull request a bot wrote; the same bug returning in a later one.
+picture: DRAFT (scenes/05-machines.src.html). Scene 3's white world as a production line: small platinum code-asterisk tokens pour into an AGENT machine that extrudes black boxes onto a conveyor; gold merge tokens pour into the CODE REVIEW machine they pass through. Boxes exit with a lamp: mint ships; red is diverted to a return belt, back into the agent, and out again. Red lamps pop up along the line and get struck down (whack-a-mole) while the token counters race.
 supers:
-source: screen capture
+source: motion graphics (three.js)
 transition:
 
 Our solution? Throw more inference at the problem. We use inference to write code, then we use more inference to ask if the code we wrote was good.
@@ -74,9 +74,9 @@ supers: 25x tokens used in 2026 (source needed)
 source: motion graphics
 transition:
 
-The result is a 25x increase in tokens used in 2026. The result is a sea of pull requests.
+OpenRouter does twenty trillion tokens a day. GitHub struggles to stay online.
 
-The result is incoherent.
+Software staggers under this scale of motion.
 
 Because we don’t yet have the tools to make sense of this new world.
 

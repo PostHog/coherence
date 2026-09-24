@@ -1,0 +1,273 @@
+<title>Scene 6 · The Result</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.caption { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 6 · the result</div>
+    <h1>Tokens go vertical; uptime drains to 78.33</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="17" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 17.00</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <section class="box">
+    <h2>Beats (about 16 s; ends act one's argument, into the black of scene 7)</h2>
+    <ol class="beats">
+      <li><span class="t">0.0</span><div><q>The result is a 25x increase in tokens used in 2026.</q><span>Left: weekly tokens across OpenRouter's top 50 models, a stacked chart drawing itself from January 2025, flat for a long while and then vertical. The multiple of 2026 over the same weeks of 2025 counts up beside it.</span></div></li>
+      <li><span class="t">4.5</span><div><q>The result is a sea of pull requests.</q><span>Right: GitHub's uptime for April 2026, played day by day as a calendar. Days land green, orange, red.</span></div></li>
+      <li><span class="t">7.1</span><div><q>The result is incoherent.</q><span>The number drains as April's downtime adds up: through 88.8% on the 22nd, down to the month's 78.33%.</span></div></li>
+      <li><span class="t">9.4</span><div><q>Because we don't yet have the tools to make sense of this new world.</q><span>Fog rolls in across both panels and the camera drifts back until almost nothing is left but dark: straight into scene 7's black.</span></div></li>
+    </ol>
+    <p class="note" id="dataNote"></p>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const ICONS = /*ICONS*/{};
+const OPENROUTER = /*DATA:openrouter-daily-2026*/null;   // from OpenRouter's rankings dataset: daily totals, top 50 models plus other
+const T = 17;
+const C = { bg: 0x07090C, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2" };
+const LINES = [
+  [0.2, 4.2, "The result is a 25x increase in tokens used in 2026."],
+  [4.5, 6.8, "The result is a sea of pull requests."],
+  [7.1, 9.0, "The result is incoherent."],
+  [9.4, 15.5, "Because we don’t yet have the tools to make sense of this new world."],
+];
+
+/*COMMON*/
+
+territory.visible = false;
+scene.fog.density = .02;
+
+// ---------- the data: OpenRouter's daily token totals for 2026, top 50 models as one band and everything else as another ----------
+const BANDS = 1;
+const DATA = OPENROUTER
+  ? { real: true, weeks: OPENROUTER.rows.map((r) => r.d), series: OPENROUTER.rows.map((r) => ({ d: r.d, bands: [r.top], rest: r.other, total: r.total })) }
+  : { real: false, weeks: [...Array(265).keys()].map((i) => new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10)), series: [] };
+if (!DATA.real) DATA.series = DATA.weeks.map((d, i) => { const total = .7e12 * Math.pow(1.0128, i); return { d, bands: [total * .93], rest: total * .07, total }; });
+// the multiple: the last seven days' average over the first seven's
+const MULTIPLE = (() => { const avg = (s) => s.reduce((n, r) => n + r.total, 0) / s.length; return avg(DATA.series.slice(-7)) / avg(DATA.series.slice(0, 7)); })();
+// on screen: 25×, the narration's figure, inside the spread of honest comparisons (30.3× day to day down to 22.7× week to week)
+const SHOWN = 25;
+const LAST = DATA.weeks[DATA.weeks.length - 1];
+const noteText = () => (DATA.real
+  ? `Data: OpenRouter rankings dataset, daily token totals for the top 50 models plus the rest, 1 January to ${LAST} 2026. The screen shows 25×, the narration's figure. The end of the series over its start is 30.3× day to day, 26.5× over three days, 24.4× over five, and ${MULTIPLE.toFixed(1)}× over seven.`
+  : "Placeholder data until promo/data/openrouter-daily-2026.json exists.") + (UPTIME ? ` Uptime: ${UPTIME.month}, ${UPTIME.uptime}% (non-maintenance downtime, merged windows), from The Missing GitHub Status Page, a community mirror of GitHub's status history. The running figure is the month's downtime so far counted against the whole month.` : " Uptime: placeholder month.");
+
+const fmtTok = (n) => n >= 1e12 ? `${(n / 1e12).toFixed(n >= 1e13 ? 0 : 1)}T` : n >= 1e9 ? `${(n / 1e9).toFixed(0)}B` : `${(n / 1e6).toFixed(0)}M`;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// ---------- the chart panel ----------
+const CH = { px: [1600, 1000], w: 7.4, h: 4.625 };
+const chCanvas = document.createElement("canvas"); chCanvas.width = CH.px[0]; chCanvas.height = CH.px[1];
+const chTex = new THREE.CanvasTexture(chCanvas);
+const chart = new THREE.Mesh(new THREE.PlaneGeometry(CH.w, CH.h), new THREE.MeshBasicMaterial({ map: chTex, transparent: true, toneMapped: false }));
+chart.position.set(-3.3, .35, 0); chart.rotation.y = .2; scene.add(chart);
+const BAND_COLORS = ["#26323B", "#34424C"];   // other on top, the top 50 beneath
+function drawChart(t) {
+  const g = chCanvas.getContext("2d"), [W, H] = CH.px, L = 130, R = 1540, TOP = 170, B = 880;
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = "rgba(10,13,17,.92)"; g.beginPath(); g.roundRect(4, 4, W - 8, H - 8, 26); g.fill();
+  g.strokeStyle = "#26313A"; g.lineWidth = 3; g.stroke();
+  g.fillStyle = C.muted; g.font = `500 30px "JetBrains Mono"`; g.fillText("TOKENS PER DAY · 2026", L, 78);
+  g.fillStyle = "#56636D"; g.font = `500 24px "JetBrains Mono"`; g.fillText("OpenRouter · all models", L, 116);
+  if (!DATA.real) { g.fillStyle = C.orange; g.textAlign = "right"; g.fillText("PLACEHOLDER DATA", R, 78); g.textAlign = "left"; }
+  const N = DATA.series.length, max = Math.max(...DATA.series.map((s) => s.total));
+  const step = Math.pow(10, Math.floor(Math.log10(max))), tick = max / step > 5 ? step * 2 : step;
+  // the grid
+  g.font = `500 22px "JetBrains Mono"`; g.textAlign = "right";
+  for (let v = 0; v <= max * 1.02; v += tick) {
+    const y = B - (v / max) * (B - TOP);
+    g.strokeStyle = "#1C252C"; g.lineWidth = 2; g.beginPath(); g.moveTo(L, y); g.lineTo(R, y); g.stroke();
+    g.fillStyle = "#56636D"; g.fillText(v ? fmtTok(v) : "0", L - 16, y + 8);
+  }
+  g.textAlign = "left";
+  DATA.weeks.forEach((d, i) => {
+    if (d.slice(8, 10) !== "01") return;
+    const x = L + (i / (N - 1)) * (R - L);
+    g.fillStyle = "#56636D"; g.fillText(MONTHS[+d.slice(5, 7) - 1], x - 4, B + 44);
+    g.strokeStyle = "#1C252C"; g.beginPath(); g.moveTo(x, B); g.lineTo(x, B + 12); g.stroke();
+  });
+  // the stack, drawn on from the left
+  const reveal = (N - 1) * ease(smooth(.3, 4.2, t)), last = Math.floor(reveal), frac = reveal - last;
+  const X = (i) => L + (i / (N - 1)) * (R - L), Y = (v) => B - (v / max) * (B - TOP);
+  const lerpS = (i, f) => { const a = DATA.series[i], b = DATA.series[Math.min(N - 1, i + 1)]; return { bands: a.bands.map((v, k) => v + (b.bands[k] - v) * f), rest: a.rest + (b.rest - a.rest) * f, total: a.total + (b.total - a.total) * f }; };
+  const pts = []; for (let i = 0; i <= last; i++) pts.push([i, DATA.series[i]]); if (last < N - 1) pts.push([last + frac, lerpS(last, frac)]);
+  const layers = BANDS + 1;
+  for (let k = layers - 1; k >= 0; k--) {
+    g.beginPath();
+    pts.forEach(([i, s], j) => { const upTo = s.bands.slice(0, k + 1).reduce((a, b) => a + b, 0) + (k === layers - 1 ? s.rest : 0); const x = X(i), y = Y(k === layers - 1 ? s.total : upTo); j ? g.lineTo(x, y) : g.moveTo(x, y); });
+    for (let j = pts.length - 1; j >= 0; j--) { const [i, s] = pts[j]; const below = k ? s.bands.slice(0, k).reduce((a, b) => a + b, 0) : 0; g.lineTo(X(i), Y(below)); }
+    g.closePath(); g.fillStyle = BAND_COLORS[layers - 1 - k] || "#2A333A"; g.fill();
+  }
+  // the total, a bright edge riding the top
+  g.strokeStyle = C.orange; g.lineWidth = 5; g.lineJoin = "round"; g.beginPath();
+  pts.forEach(([i, s], j) => { const x = X(i), y = Y(s.total); j ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke();
+  const [hi, hs] = pts[pts.length - 1];
+  g.fillStyle = C.orange; g.beginPath(); g.arc(X(hi), Y(hs.total), 11, 0, 7); g.fill();
+  // the multiple
+  const m = SHOWN * ease(smooth(1.2, 4.2, t));
+  g.fillStyle = C.ink; g.font = `700 150px "JetBrains Mono"`; g.fillText(`${Math.round(m)}×`, L + 30, TOP + 150);
+  g.fillStyle = C.muted; g.font = `500 26px "JetBrains Mono"`; g.fillText("tokens a day, since 1 January", L + 36, TOP + 200);
+  chTex.needsUpdate = true;
+}
+
+// ---------- the uptime panel: one month of a source host's status, played day by day ----------
+// Real data when promo/data/github-uptime.json is present (April 2026, from The Missing GitHub Status Page);
+// its running figure is the month's non-maintenance downtime so far, counted against the whole month, so it drains to the month's number
+const UPTIME = /*DATA:github-uptime*/null;
+const MONTH = UPTIME || { month: "One month", uptime: 78.33, days: [3, 2, 0, 0, 0, 0, 0, 0, 3, 2, 0, 0, 3, 2, 0, 3, 2, 0, 0, 3, 3, 4, 4, 2, 2, 0, 4, 2, 2, 2], running: null, placeholder: true };
+if (!MONTH.running) MONTH.running = MONTH.days.map((_, i) => 100 - (100 - MONTH.uptime) * (i + 1) / MONTH.days.length);
+const FIRST_WEEKDAY = UPTIME ? new Date(Date.parse(`1 ${MONTH.month} UTC`)).getUTCDay() : 3;
+const UP = { px: [1000, 1000], w: 4.5, h: 4.5 };
+const upCanvas = document.createElement("canvas"); upCanvas.width = UP.px[0]; upCanvas.height = UP.px[1];
+const upTex = new THREE.CanvasTexture(upCanvas);
+const uptime = new THREE.Mesh(new THREE.PlaneGeometry(UP.w, UP.h), new THREE.MeshBasicMaterial({ map: upTex, transparent: true, opacity: 0, toneMapped: false }));
+uptime.position.set(4.0, .35, 0); uptime.rotation.y = -.2; scene.add(uptime);
+// the brand, when promo/data/uptime-brand.json is present: {name, path} with a 24-unit SVG path. Absent, the panel stays generic
+const BRAND = /*DATA:uptime-brand*/null;
+const brandMark = BRAND && new Path2D(BRAND.path);
+const PLAY = [4.6, 9.0];   // the month plays across these seconds, one day at a time
+const SEV = [[C.mint, "All systems operational"], ["#6FA8FF", "Maintenance"], [C.orange, "Minor outage"], [C.red, "Major outage"], ["#FF2E4D", "Critical outage"]];
+function dayAt(t) { return (MONTH.days.length) * clamp((t - PLAY[0]) / (PLAY[1] - PLAY[0])); }
+function drawUptime(t) {
+  const g = upCanvas.getContext("2d"), [W, H] = UP.px, n = MONTH.days.length, k = dayAt(t), done = Math.floor(k);
+  // the number: the running figure, eased from one day's close to the next
+  const before = done ? MONTH.running[done - 1] : 100, after = MONTH.running[Math.min(n - 1, done)];
+  const v = done >= n ? MONTH.running[n - 1] : before + (after - before) * ease(k - done);
+  const today = done ? MONTH.days[Math.min(n, done) - 1] : 0, state = SEV[today];
+  const vc = v >= 99 ? C.mint : v >= 95 ? C.orange : C.red;
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = "rgba(10,13,17,.92)"; g.beginPath(); g.roundRect(4, 4, W - 8, H - 8, 26); g.fill();
+  g.strokeStyle = "#26313A"; g.lineWidth = 3; g.stroke();
+  if (BRAND) {
+    g.save(); g.translate(W - 60 - 64, 44); g.scale(64 / 24, 64 / 24); g.fillStyle = C.ink; g.fill(brandMark); g.restore();
+    g.fillStyle = C.ink; g.font = `600 40px "Instrument Sans"`; g.fillText(BRAND.name, 60, 82);
+  } else {
+    g.fillStyle = C.muted; g.font = `500 30px "JetBrains Mono"`; g.fillText("UPTIME", 60, 78);
+  }
+  g.fillStyle = "#56636D"; g.font = `500 24px "JetBrains Mono"`; g.fillText(`uptime · ${MONTH.month}`, 60, 116);
+  if (MONTH.placeholder) { g.fillStyle = C.orange; g.textAlign = "right"; g.fillText("PLACEHOLDER DATA", W - 60, 116); g.textAlign = "left"; }
+  // the status line: the day being played
+  g.fillStyle = state[0]; g.beginPath(); g.arc(74, 186, 14, 0, 7); g.fill();
+  g.font = `600 34px "Instrument Sans"`; g.fillText(state[1], 104, 198);
+  g.fillStyle = vc; g.font = `700 190px "JetBrains Mono"`; g.textAlign = "center";
+  g.fillText(`${v.toFixed(2)}%`, W / 2, 420); g.textAlign = "left";
+  // the month as a calendar, Sunday first; each day lands as the playhead reaches it
+  const cw = 880 / 7, bw = cw - 16, bh = 46, x0 = 60, y0 = 486, rh = 70;
+  for (let i = 0; i < n; i++) {
+    const cell = i + FIRST_WEEKDAY, x = x0 + (cell % 7) * cw + 8, y = y0 + Math.floor(cell / 7) * rh;
+    const land = clamp(k - i), sev = MONTH.days[i];
+    g.fillStyle = "#1A2229"; g.beginPath(); g.roundRect(x, y, bw, bh, 12); g.fill();
+    if (land > 0) { g.globalAlpha = land; g.fillStyle = SEV[sev][0]; g.beginPath(); g.roundRect(x, y, bw, bh, 12); g.fill(); g.globalAlpha = 1; }
+  }
+  if (!MONTH.placeholder) { g.fillStyle = "#56636D"; g.font = `500 20px "JetBrains Mono"`; g.fillText("source: The Missing GitHub Status Page · mrshu.github.io/github-statuses", 60, H - 44); }
+  upTex.needsUpdate = true;
+}
+
+// ---------- the fog: wisps carried in front of the lens, then the dark ----------
+scene.add(camera);
+const veil = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: fogTex, transparent: true, opacity: 0, depthTest: false, depthWrite: false, fog: false, color: "#56646F" }));
+veil.renderOrder = 60; camera.add(veil);
+const dark = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthTest: false, depthWrite: false, fog: false }));
+dark.renderOrder = 61; camera.add(dark);
+
+// ---------- camera ----------
+const KEYS = [
+  [0, [-3.0, .45, 7.2], [-3.4, .35, 0]],
+  [4.2, [-.4, .4, 12.2], [.2, .3, 0]],
+  [9.2, [0, .4, 12.8], [.35, .3, 0]],
+  [T, [.3, .9, 16], [.35, .3, 0]],
+];
+const V = (a) => new THREE.Vector3(...a);
+function cameraAt(t) {
+  let i = 0; while (i < KEYS.length - 2 && t > KEYS[i + 1][0]) i++;
+  const [t0, p0, q0] = KEYS[i], [t1, p1, q1] = KEYS[i + 1], k = ease(clamp((t - t0) / (t1 - t0)));
+  camera.position.copy(V(p0).lerp(V(p1), k)); camera.lookAt(V(q0).lerp(V(q1), k));
+  camera.position.x += Math.sin(t * .5) * .04; camera.position.y += Math.cos(t * .4) * .03;
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+function render(t) {
+  cameraAt(t);
+  drawChart(t); drawUptime(t);
+  uptime.material.opacity = smooth(4.3, 4.9, t);
+  // incoherent: the panels dim and the fog takes over; then the dark
+  const fog = smooth(9.4, 14.5, t), end = smooth(14.2, 16.6, t);
+  chart.material.opacity = 1 - .75 * fog; uptime.material.opacity *= 1 - .75 * fog; uptime.visible = uptime.material.opacity > .01;
+  const d = 2, hh = 2 * d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.25;
+  veil.position.set(Math.sin(t * .2) * .3, 0, -d); veil.scale.set(hh * camera.aspect * 1.4, hh * 1.4, 1); veil.material.opacity = .85 * fog;
+  fogTex.offset.set(t * .015, 0);
+  dark.position.set(0, 0, -1); dark.scale.set(3, 3, 1); dark.material.opacity = .92 * end;
+  sheets.forEach((s, i) => { s.position.x = s.userData.base.x + Math.sin(t * .15 + i) * 2 + t * s.userData.speed; s.material.opacity = s.userData.o * (.4 + 1.2 * fog); });
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  composer.render();
+}
+
+document.getElementById("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; document.getElementById("play").textContent = "Play"; } };
+document.getElementById("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); document.getElementById("play").click(); } });
+
+document.getElementById("dataNote").textContent = noteText();
+
+Promise.all(["500 1em 'JetBrains Mono'", "700 1em 'JetBrains Mono'", "600 1em 'Instrument Sans'"].map((f) => document.fonts.load(f).catch(() => {})))
+  .finally(() => { size(); requestAnimationFrame(frame); });
+</script>

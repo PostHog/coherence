@@ -103,6 +103,12 @@ dd { margin: 0; }
 dd.empty { color: var(--muted); opacity: .6; }
 .card footer { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--line); }
 .card footer button { padding: 4px 8px; font-size: 12px; }
+.card footer a.open { margin-left: auto; font: 600 12px var(--sans); color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; background: var(--panel); }
+.card footer a.open:hover { border-color: var(--muted); }
+.stills { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; margin: -2px 0 2px; }
+.stills figure { margin: 0; position: relative; }
+.stills img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; background: #000; }
+.stills figcaption { position: absolute; left: 4px; bottom: 4px; font: 500 10px var(--mono); color: #fff; background: rgb(0 0 0 / .55); padding: 1px 4px; border-radius: 3px; }
 
 .export { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; }
 .export textarea { width: 100%; height: 220px; font: 12px/1.5 var(--mono); background: var(--ground); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 10px; box-sizing: border-box; }
@@ -275,6 +281,7 @@ function render() {
         <span class="pill ${pace.cls}">${pace.label}</span>
       </div>
       <div class="body">
+        ${p.s.render ? `<div class="stills">${p.s.render.stills.map((st) => `<figure><img src="${st.src}" alt="Scene ${p.s.n} at ${st.t} s" loading="lazy"><figcaption>${st.t.toFixed(1)} s</figcaption></figure>`).join("")}</div>` : ""}
         ${p.s.note ? `<div class="note">${esc(p.s.note)}</div>` : ""}
         <div class="vo">${p.s.paras.map((x) => `<p>${esc(x)}</p>`).join("")}</div>
         <dl>${field("sync", "Sync")}${field("picture", "Picture")}${field("supers", "Supers")}${field("source", "Source")}${field("transition", "Transition")}</dl>
@@ -285,6 +292,7 @@ function render() {
         <button data-nudge="${p.s.n}" data-by="-0.1" ${p.placed ? "" : "disabled"}>−0.1</button>
         <button data-nudge="${p.s.n}" data-by="0.1" ${p.placed ? "" : "disabled"}>+0.1</button>
         ${marks[p.s.n] != null ? `<button data-clear="${p.s.n}">Clear</button>` : ""}
+        ${p.s.render ? `<a class="open" href="${p.s.render.url}" target="_blank" rel="noopener">Open scene ↗</a>` : ""}
       </footer>
     </article>`;
   }).join("");

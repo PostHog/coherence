@@ -1,0 +1,9 @@
+{
+  "1": { "file": "01-opening", "url": "https://claude.ai/artifact/4xdeDEfDYiCXYF1WoQXaSu", "stills": [2.4, 6.4, 9.4, 11.2] },
+  "2": { "file": "02-road", "url": "https://claude.ai/artifact/Gi2XaGPZxGewr8BaXx1uFM", "stills": [0.3, 2.4, 10.0, 22.5] },
+  "3": { "file": "03-specs", "url": "https://claude.ai/artifact/B1vrPx97YZ9PH8PoDKYref", "stills": [2.5, 8.2, 17.4, 20.6] },
+  "5": { "file": "05-machines", "url": "https://claude.ai/artifact/UW9zghJ854oGfPRPpr5hDe", "stills": [2.0, 7.5, 16.5, 19.5] },
+  "6": { "file": "06-result", "url": "https://claude.ai/artifact/D1ZdZDPDvw8EbT7CmLke6M", "stills": [3.0, 6.0, 8.5, 12.0] },
+  "8": { "file": "08-lexicon", "url": "https://claude.ai/artifact/VEs62895rnKvApSHcyxGY1", "stills": [4.6, 8.2, 12.4, 18.8] },
+  "9": { "file": "09-journal", "url": "https://claude.ai/artifact/HLEpcqFZq3KGAYWyg6AroD", "stills": [5.0, 8.8, 10.5, 17.8] }
+}
