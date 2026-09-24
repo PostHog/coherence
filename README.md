@@ -1,9 +1,81 @@
-# Coherence (rebuild)
+# Coherence
 
-This branch rebuilds Coherence from zero. The previous implementation is the
-reference: it is preserved at commit 645d928 on the reference branch named in
-`docs/retired.md`, and it is used as a check against the new work and a source of
-rejected alternatives, never as a source of code.
+Coherence keeps a project's invariants explicit and enforced while agents write
+the code. It settles the project's vocabulary in a lexicon, declares each
+component's invariants in a spec, checks them through the language server,
+records every decision in a journal, and shows the whole system live in Scope.
+
+It was rebuilt from zero on the `distill` branch (merged into `main` on
+2026-09-23; see pull request #1). The previous implementation is preserved at
+commit 645d928 on the reference branch named in `docs/retired.md`; it was used
+as a check against the new work and a source of rejected alternatives, never
+as a source of code.
+
+## Set up Coherence in a project: paste this into your agent
+
+Coherence is not on npm yet, so this installs a linked checkout. It needs
+Node 22.18 or newer on an Apple Silicon Mac, and access to
+`github.com/PostHog/coherence`.
+
+```text
+Set up Coherence in this project. Work through these steps in order, and
+report what each one found.
+
+1. Install. Clone git@github.com:PostHog/coherence.git into a folder beside
+   this project, run `npm ci` there, then run `npm link <that folder>` from this
+   project. The command is then node_modules/.bin/coherence (call it
+   `coherence` below). Check it with `coherence spec --check`.
+
+2. Config. Write coherence.config.json at the project root with: "name";
+   "language" ("typescript" or "python"); "ignore" (folders that are not this
+   project's code or prose: vendored code, generated output, fixtures, promo
+   material); and, where the project has them, "typecheck" and "test" (an argv
+   array the test-name filter is appended to, or a string containing
+   {filter}), "testMatch" and "testJson". Read the usage that any unknown
+   `coherence` command prints for the full surface.
+
+3. Hooks. Run `coherence hooks install --host claude` (or `--host codex`).
+   From the next session on, every session starts with Coherence's vocabulary,
+   the project's open requirements, and the exact journal command, including
+   the session id to pass with --session.
+
+4. Lexicon. Run `coherence lexicon coverage` to see the recurring terms that
+   lack a definition. Declare the ones that carry the project's domain
+   meaning: `coherence lexicon propose declare <term> --definition "<one
+   sentence>" --because "<why>"`, then `coherence lexicon apply <proposal id>
+   --because "<why>" --over "<the alternative>" --session <id> --agent <your
+   name>`. The first apply creates lexicon.json. Settle contested terms from
+   the project's own history (commit messages and pull request discussions),
+   and record your tie-breaks with `coherence decide`.
+
+5. Specs. Run `coherence scaffold component . "<one-line intent>"` for the
+   entry spec, then add its `## trust levels`: one bullet per level, written
+   `- name (outside): meaning` for a level whose data or caller comes from
+   outside the system's control. Scaffold one spec per component folder.
+   Declare each entrance (command, route, event, tool) in the spec of the
+   component that owns its handler, with `trust: <level>`. Add the few
+   invariants that matter most (security, tenant isolation, data integrity)
+   with `coherence scaffold invariant <folder> "<sentence>" --kinds <a,b|none>
+   --chokepoint` (or `--totality-oracle`) `--write`, fill every placeholder,
+   and answer the decomposition checklist it prints.
+
+6. Enforce. Run `coherence run --session <id> --agent <name>`. For each
+   bullet, stage a real break, run `coherence refute <component>/<name>
+   --broke "<what you changed>"`, restore the code, and run again. A broken
+   chokepoint is a finding, not a failure: report its bypass sites. Continue
+   until `coherence spec --check` reports 0 problems.
+
+7. Record and show. Commit coherence.config.json, lexicon.json, the specs, the
+   hook settings, and .coherence/journal, .coherence/runs and .coherence/work.
+   Run `coherence scope` and report what the reading shows: health, broken
+   chokepoints, entrances whose trust comes from outside with no control on
+   their route, and components no enforcement covers.
+
+Record every non-obvious choice with `coherence decide "<chose>" --over
+"<rejected>" --because "<why>" --session <id> --agent <name>`. Never use a name
+the lexicon rejects: the hook lists them, and `coherence lexicon --check`
+finds them.
+```
 
 The vocabulary is settled in `docs/lexicon.json`. Every concept there carries its
 definition, the names rejected for it and why, and the reference mechanisms it
