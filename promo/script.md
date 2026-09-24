@@ -149,9 +149,9 @@ Coherence uses your language server to detect security bypasses. The moment an a
 ***12
 at:
 sync:
-picture: The agent routes the reference through the chokepoint; the run goes green.
+picture: LOCKED (scenes/12-reduce.src.html). Scene 11's board, still red: the agent edits admin/dashboard.ts again, the bypass retracts, a new link draws into the gate, the PostToolUse check passes silently, the re-check logs ok, and the red walks back to mint; BYPASS DETECTED folds back into PROTECTED. The camera glides across the board to another system: a billing ledger, not yet locked on, with six call sites wired straight to it, each carrying its own copy of the guard (one drifted, role === "admin"; one missing). The agent's reduce pass finds them one by one, removes every copy, and they converge into one gate, the chokepoint billing.guard(), and only then does the ledger get its lock-on reticle and PROTECTED tag; the direct links retract, every site routes through the gate, all mint. The agent finalizes with one more tool call on the board, Edit Billing.spec.md, adding one line in the real spec format: chokepoint: billing.guard in billing/guard.ts; only then does it read enforced and the ledger turn mint. Pull back: both systems, the same shape, one door each. Fog clarity 0.5 to 0.65.
 supers:
-source: terminal capture
+source: motion graphics (three.js)
 transition:
 
 The agent discovers the violation immediately.
@@ -192,9 +192,9 @@ supers: Coherence
 source: motion graphics
 transition: fade to black with the music
 
-These are the tools that clear the fog of agent development.
+These are the kinds of tools we need to clear the fog.
 
-You can less inference on code that doesn’t work, less inference detecting bugs, less inference investigating the decisions that went into your changes.
+Spend less inference on code that doesn’t work, less inference detecting bugs, less inference investigating the decisions that went into your changes.
 
 You get a more stable, coherent project, steadily driving toward the floor of irreducible complexity.
 
