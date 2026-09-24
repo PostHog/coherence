@@ -161,9 +161,9 @@ Instead of enforcing security through implicit conventions, we know our intentio
 ***13
 at:
 sync:
-picture: Scope's Structure map: entrances, then routes lighting one by one across components.
+picture: LOCKED (scenes/13-structure.src.html, from structure-gen.py). A stylized Scope Structure view settles on the ground as a map over the territory, in Scope's real grammar, on the app from scenes 11-12: entrance tokens with trust tags slide in (webhook in: no control, amber), stations appear by column (where work enters, 1 step, 2 steps), structural routes light one at a time in their own colours, C and X interface identifiers settle on the lines, core dependencies run along the bottom as rails, and the masthead lands: All 24 invariants verified, live. As the map assembles, the ground's noise gives way to a ruled order spreading out from under it. Fog clarity 0.65 to 0.75.
 supers:
-source: Scope capture
+source: motion graphics (three.js), after Scope's Structure view
 transition:
 
 But how do we check that the agent did what we want?
@@ -173,9 +173,9 @@ The Coherence structure view shows you the entrypoints into your project, its ma
 ***14 (to land at climax)
 at:
 sync:
-picture: A component turns red with its ✕ broken button; the bypass sites listed beside it.
+picture: LOCKED (scenes/14-structure.src.html). The map, live, on ruled ground. A red dashed reference from Admin into Sessions; Sessions' verdict bar goes red with ✕ 1 broken, C1 goes red, the rest dims, and the inspector names the chokepoint and the bypass site (admin/dashboard.ts:42). The fix clears it. Then a change: a new entrance POST /export and its route through Admin to Webhooks; the old Jobs → Webhooks route ghosts and withdraws; a strip names the change since the last commit (Scope computes these differences today; this view of them is the planned design). The ground fills with streaming code, which dissolves; the map returns, verified; in the last stretch its pieces (stations, entrance tokens, tags) rise off it to 45 degrees in a cascade, like the signs, the lines and rails staying flat, and the camera comes down low to see them standing, in nearly clear air. Fog clarity 0.75 to 0.9.
 supers:
-source: Scope capture
+source: motion graphics (three.js), after Scope's Structure view
 transition:
 
 When chokepoints are violated, you’ll see it.
