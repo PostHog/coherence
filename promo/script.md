@@ -28,10 +28,10 @@ But our processes have never been more confused. The work we do is more opaque, 
 
 ***3
 at:
-sync: "accident" → 0:44 bass hit
-picture: A clean architecture diagram; the code beneath it scrolls past and quietly diverges.
+sync: "accident" → 0:44 bass hit (the field of black boxes rises)
+picture: LOCKED (scenes/03-specs.src.html). One spec sprouts a tree of sixteen grey-white file cards (SPECIFICATIONS label, live count); an Agent Skills folder, qa-review, sprouts its own tree facing it. Then the film's one inversion: the ground goes white, the camera swings isometric, each spec card thickens into a black box on a white plane, more black boxes stack, and the skill's cards assemble into an arcade machine labeled CODE REVIEW. Gold tokens stamped with the merge glyph drop into the slot on its top; each turns one box to glass, full of fog. On "accident" the camera pulls away as black boxes rise to the horizon: 4 of thousands reviewed.
 supers:
-source: motion graphics
+source: motion graphics (three.js)
 transition:
 
 We can imagine new code, we can describe thoughtful architecture, we can specify sturdy systems.

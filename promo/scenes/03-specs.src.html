@@ -1,0 +1,450 @@
+<title>Scene 3 · The Specs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.caption { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 3 · the specs</div>
+    <h1>Specs become black boxes; a review machine buys a look inside a few of them, and finds fog</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="21" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 21.00</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <section class="box">
+    <h2>Beats (about 20 s; “accident” on the bass hit)</h2>
+    <ol class="beats">
+      <li><span class="t">0.0</span><div><q>We can imagine new code, we can describe thoughtful architecture, we can specify sturdy systems.</q><span>One spec, architecture, sprouts a tree of sixteen grey-white file cards under a SPECIFICATIONS label that counts them.</span></div></li>
+      <li><span class="t">6.1</span><div><q>But we have no idea how faithfully our robots are building for us.</q><span>From the right, an Agent Skills folder, qa-review, sprouts its own tree. Then the world inverts: the ground goes white, the camera swings over into an isometric view, and each spec card thickens and darkens into a black box that settles onto a white plane. More black boxes drop in and stack: the code, built from the specs, is a black box. The skill's cards fly together and assemble into an arcade machine labeled CODE REVIEW.</span></div></li>
+      <li><span class="t">10.8</span><div><q>The more complex our designs, the more challenging they are to validate.</q><span>Gold tokens fade in above the slot on its top and drop straight in, one at a time: review is expensive. Each buys one box: a mint trace runs along the ground to it, and it turns to glass. Inside is only fog. Four tokens, four boxes; the rest stay black.</span></div></li>
+      <li><span class="t">17.2</span><div><q>We are writing good code by accident.</q><span>On “accident”, on the bass hit, the camera pulls up and away and the white fog thins: black boxes run to the horizon. The machine's readout: 4 of thousands reviewed.</span></div></li>
+    </ol>
+    <p class="note">The film's one inversion: dark to white, cards to boxes, so the viewer feels the switch from what we write to what gets built. The files and skill structure are illustrative: qa-review follows the Agent Skills layout (SKILL.md with references, scripts and examples beside it).</p>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const ICONS = /*ICONS*/{};
+const T = 21;
+const C = { bg: 0x07090C, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2", steel: "#7E93A3" };
+const LINES = [
+  [0.2, 5.8, "We can imagine new code, we can describe thoughtful architecture, we can specify sturdy systems."],
+  [6.1, 10.4, "But we have no idea how faithfully our robots are building for us."],
+  [10.8, 16.6, "The more complex our designs, the more challenging they are to validate."],
+  [17.2, 20.8, "We are writing good code by accident."],
+];
+const ACCIDENT = 19.6;   // the bass hit
+
+/*COMMON*/
+
+territory.visible = false;
+sheets.forEach((m) => (m.visible = false));
+scene.fog.density = .012;
+
+// ---------- the two trees ----------
+// specs grow from the left; the skill grows from the right, toward them. [name, parent, glyph]
+const SPECS = [
+  ["architecture.md", -1], ["product.md", 0], ["auth.md", 0], ["data-model.md", 0],
+  ["billing.md", 1], ["onboarding.md", 1], ["sessions.md", 2], ["permissions.md", 2],
+  ["api.md", 3], ["retention.md", 3], ["invoices.md", 4], ["sso.md", 6],
+  ["webhooks.md", 8], ["admin.md", 8], ["rate-limits.md", 12], ["audit-log.md", 13],
+].map(([name, parent]) => ({ name, parent, glyph: "markdown" }));
+const SKILL = [
+  ["qa-review/", -1, "folder"], ["SKILL.md", 0, "markdown"], ["references/", 0, "folder"], ["scripts/", 0, "folder"], ["examples/", 0, "folder"],
+  ["checklist.md", 2, "markdown"], ["security.md", 2, "markdown"], ["rubrics/", 2, "folder"], ["run-checks.py", 3, "file-code"], ["diff-summary.sh", 3, "file-code"],
+  ["good-pr.md", 4, "markdown"], ["bad-pr.md", 4, "markdown"], ["severity.md", 7, "markdown"], ["coverage.md", 7, "markdown"],
+].map(([name, parent, glyph]) => ({ name, parent, glyph }));
+const CARD = { w: 2.3, h: .56, px: [736, 180] };
+function layout(nodes, rootX, dir, step, pitch) {
+  nodes.forEach((n, i) => { n.i = i; n.kids = []; n.level = n.parent < 0 ? 0 : nodes[n.parent].level + 1; if (n.parent >= 0) nodes[n.parent].kids.push(n); });
+  let leaf = 0;
+  const place = (n) => { if (!n.kids.length) n.y = leaf++; else { n.kids.forEach(place); n.y = (n.kids[0].y + n.kids[n.kids.length - 1].y) / 2; } };
+  place(nodes[0]);
+  nodes.forEach((n) => { n.x = rootX + dir * n.level * step; n.y = (n.y - (leaf - 1) / 2) * -pitch; n.dir = dir; });
+}
+layout(SPECS, -10.2, 1, 2.62, .82);
+layout(SKILL, 10.9, -1, 2.62, .82);
+// growth: the specs one by one, faster as they go; then the skill, quickly, breadth first
+const bfs = (nodes) => { const out = [], q = [nodes[0]]; while (q.length) { const n = q.shift(); out.push(n); q.push(...n.kids); } return out; };
+bfs(SPECS).forEach((n, r) => (n.born = .3 + 5.4 * Math.pow(r / 15, .8)));
+bfs(SKILL).forEach((n, r) => (n.born = 6.1 + r * .17));
+
+// a file card is a grey-white tile; its glyph and name are black and drawn in the crisp pass, after the bloom
+const CARD_FILL = "#CDD4D9";
+function cardFill() {
+  return canvasTex(...CARD.px, (g, w, h) => { g.fillStyle = CARD_FILL; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 18); g.fill(); });
+}
+function cardText(n) {
+  return canvasTex(...CARD.px, (g, w, h) => {
+    icon(g, n.glyph, 18, h / 2 - 44, 88, "#000", 2.4);
+    const name = n.name.replace(/\.md$/, "");              // the glyph already says markdown
+    g.fillStyle = "#000"; let size = 74; g.font = `600 ${size}px "JetBrains Mono"`;
+    while (g.measureText(name).width > w - 136 && size > 34) { size -= 2; g.font = `600 ${size}px "JetBrains Mono"`; }
+    g.fillText(name, 120, h / 2 + size * .36);
+  });
+}
+const overlay = new THREE.Scene();
+const crisp = [];
+function syncCrisp() {
+  scene.updateMatrixWorld();
+  for (const [m, o] of crisp) { o.matrix.copy(m.matrixWorld); o.material.opacity = m.material.opacity; }
+}
+const cards = [], links = [];
+function build(nodes, border) {
+  nodes.forEach((n) => {
+    n.mesh = new THREE.Mesh(new THREE.PlaneGeometry(CARD.w, CARD.h), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+    n.mesh.position.set(n.x, n.y, (rand() - .5) * .6); n.mesh.renderOrder = 5; scene.add(n.mesh); n.border = border; cards.push(n);
+    n.text = new THREE.Mesh(n.mesh.geometry, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+    n.text.matrixAutoUpdate = false; n.text.renderOrder = 6; overlay.add(n.text); crisp.push([n.mesh, n.text]);
+    if (n.parent >= 0) {
+      const l = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: "#3A4A56", transparent: true, opacity: 0, toneMapped: false }));
+      scene.add(l); links.push({ l, n, p: nodes[n.parent] });
+    }
+  });
+}
+build(SPECS, C.steel); build(SKILL, "#B9C7D2");
+function linkPoints(p, n, k) {
+  // an elbow: out of the parent's facing edge, along to the middle, across, and into the child
+  const a = new THREE.Vector3(p.x + p.dir * CARD.w / 2, p.y, p.mesh.position.z), b = new THREE.Vector3(n.x - n.dir * CARD.w / 2, n.y, n.mesh.position.z);
+  const mx = (a.x + b.x) / 2, pts = [a, new THREE.Vector3(mx, a.y, a.z), new THREE.Vector3(mx, b.y, b.z), b];
+  const seg = pts.slice(1).map((q, i) => q.distanceTo(pts[i])), L = seg.reduce((s, v) => s + v, 0);
+  let d = L * k; const out = [pts[0]];
+  for (let i = 0; i < seg.length; i++) { if (d >= seg[i]) { out.push(pts[i + 1]); d -= seg[i]; } else { out.push(pts[i].clone().lerp(pts[i + 1], d / seg[i])); break; } }
+  return out;
+}
+
+// ---------- each tree's label: a bracket along its top, a chip naming it, a live file count ----------
+const LABEL = { px: [1400, 150], h: .85 };
+function makeLabel(nodes, glyph, title, sub) {
+  const xs = nodes.map((n) => n.x), top = Math.max(...nodes.map((n) => n.y)) + CARD.h / 2 + .42;
+  const x0 = Math.min(...xs) - CARD.w / 2, x1 = Math.max(...xs) + CARD.w / 2;
+  const canvas = document.createElement("canvas"); canvas.width = LABEL.px[0]; canvas.height = LABEL.px[1];
+  const tex = new THREE.CanvasTexture(canvas), w = LABEL.h * LABEL.px[0] / LABEL.px[1];
+  const chip = new THREE.Mesh(new THREE.PlaneGeometry(w, LABEL.h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+  chip.position.set(x0 + w / 2, top + LABEL.h / 2 + .06, .2); chip.renderOrder = 9; overlay.add(chip);
+  const rule = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: "#8A9AA6", transparent: true, opacity: 0 }));
+  rule.renderOrder = 9; overlay.add(rule);
+  return { nodes, glyph, title, sub, top, x0, x1, canvas, tex, chip, rule, shown: -1 };
+}
+function drawLabel(L, n) {
+  const g = L.canvas.getContext("2d"), [w, h] = L.px || LABEL.px;
+  g.clearRect(0, 0, w, h);
+  g.font = `800 58px "JetBrains Mono"`; const tw = g.measureText(L.title).width;
+  const cw = 130 + tw + 40;
+  g.fillStyle = "#CDD4D9"; g.beginPath(); g.roundRect(4, 8, cw, h - 16, 20); g.fill();
+  icon(g, L.glyph, 28, h / 2 - 40, 80, "#000", 2.6);
+  g.fillStyle = "#000"; g.fillText(L.title, 130, h / 2 + 21);
+  g.font = `500 52px "JetBrains Mono"`; g.fillStyle = "#C5CED4";
+  g.fillText(`${L.sub ? L.sub + " · " : ""}${n} file${n === 1 ? "" : "s"}`, cw + 34, h / 2 + 19);
+  L.tex.needsUpdate = true;
+}
+function updateLabel(L, t) {
+  const born = L.nodes.filter((n) => t >= n.born + .1);
+  const a = smooth(L.nodes[0].born - .1, L.nodes[0].born + .4, t);
+  L.chip.material.opacity = a; L.rule.material.opacity = a * .9;
+  if (born.length !== L.shown) { drawLabel(L, born.length); L.shown = born.length; }
+  // the bracket spans what has grown so far, ticks down at both ends
+  const xs = (born.length ? born : [L.nodes[0]]).map((n) => n.x), left = L.nodes[0].dir > 0;
+  const a0 = Math.min(...xs) - CARD.w / 2, a1 = Math.max(...xs) + CARD.w / 2, y = L.top, z = .2;
+  L.rule.geometry.setFromPoints([new THREE.Vector3(a0, y - .22, z), new THREE.Vector3(a0, y, z), new THREE.Vector3(a1, y, z), new THREE.Vector3(a1, y - .22, z)]);
+  // the chip rides the tree's outer end: left for the specs, right for the skill
+  const w = LABEL.h * LABEL.px[0] / LABEL.px[1];
+  L.chip.position.x = left ? a0 + w / 2 : a1 - w / 2 + (w - chipWidth(L)) ;
+}
+function chipWidth(L) {
+  const g = L.canvas.getContext("2d"); g.font = `800 58px "JetBrains Mono"`;
+  const cw = 130 + g.measureText(L.title).width + 40; g.font = `500 52px "JetBrains Mono"`;
+  const full = cw + 34 + g.measureText(`${L.sub ? L.sub + " · " : ""}${L.nodes.length} files`).width;
+  return full / LABEL.px[0] * LABEL.h * LABEL.px[0] / LABEL.px[1];
+}
+const labels = [makeLabel(SPECS, "markdown", "SPECIFICATIONS", ""), makeLabel(SKILL, "folder", "AGENT SKILL", "qa-review")];
+
+// ---------- the inversion: the ground goes white, specs become black boxes, the skill becomes a machine ----------
+const INV = [8.6, 10.8];
+const inv = (t) => ease(smooth(...INV, t));
+scene.add(new THREE.AmbientLight(0xffffff, .72));
+const sun = new THREE.DirectionalLight(0xffffff, .95); sun.position.set(7, 14, 9); scene.add(sun);
+const GROUND = -4.6, S = .9, PITCH = 1.02, CX = -2.4, CZ = .2;   // boxes sit on one pitch in every direction: an even gap all round
+const WHITE = new THREE.Color("#EEF1F3"), DARK = new THREE.Color(C.bg);
+const plane = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshBasicMaterial({ color: WHITE, transparent: true, opacity: 0, depthWrite: false }));
+plane.rotation.x = -Math.PI / 2; plane.position.y = GROUND; plane.renderOrder = -1; scene.add(plane);
+const shadowTex = canvasTex(256, 256, (g) => { const gr = g.createRadialGradient(128, 128, 8, 128, 128, 128); gr.addColorStop(0, "rgba(16,20,24,.30)"); gr.addColorStop(1, "rgba(16,20,24,0)"); g.fillStyle = gr; g.fillRect(0, 0, 256, 256); });
+const shadow = new THREE.Mesh(new THREE.PlaneGeometry(9.5, 7.5), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: 0, depthWrite: false }));
+shadow.rotation.x = -Math.PI / 2; shadow.position.set(CX, GROUND + .01, CZ); scene.add(shadow);
+
+// the stacks: a 5 × 4 footprint; the sixteen specs make the first course, and more code drops on top
+const foot = []; for (let r = 0; r < 4; r++) for (let c = 0; c < 5; c++) foot.push({ x: CX + (c - 2) * 1.02, z: CZ + (r - 1.5) * 1.02 });
+const heights = foot.map(() => 1 + Math.floor(rand() * 3));
+const slots = []; for (let lv = 0; lv < 3; lv++) foot.forEach((f, i) => { if (heights[i] > lv) slots.push({ x: f.x, z: f.z, y: GROUND + S / 2 + lv * PITCH, lv, i }); });
+const boxGeo = new THREE.BoxGeometry(1, 1, 1), edgeGeo = new THREE.EdgesGeometry(boxGeo);
+const BLACK = new THREE.Color("#131619"), CARDC = new THREE.Color("#CDD4D9"), GLASS = new THREE.Color("#E9F5F1");
+const boxes = slots.map((sl, k) => {
+  const m = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: BLACK, transparent: true, opacity: 1 }));
+  m.visible = false; m.renderOrder = 3; scene.add(m);
+  const e = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color: "#3A4148", transparent: true, opacity: 0 })); m.add(e);
+  const spec = k < SPECS.length ? SPECS[k] : null;
+  return { m, e, sl, k, spec, at: spec ? INV[0] + .15 + k * .07 : INV[1] - .4 + (k - SPECS.length) * .075 };
+});
+const topOf = (i) => boxes.filter((b) => b.sl.i === i).sort((a, b) => b.sl.lv - a.sl.lv)[0];
+
+// ---------- the code-review machine: an arcade token slot, assembled from the skill ----------
+const MX = 5.0, MZ = .9;
+const machine = new THREE.Group(); machine.position.set(MX, GROUND, MZ); machine.rotation.y = .7; scene.add(machine);
+const body = new THREE.Mesh(new THREE.BoxGeometry(2.0, 3.3, 1.2), new THREE.MeshLambertMaterial({ color: "#1B1F23" }));
+body.position.y = 1.65; machine.add(body);
+const PANEL = { px: [520, 860] };
+const panelCanvas = document.createElement("canvas"); panelCanvas.width = PANEL.px[0]; panelCanvas.height = PANEL.px[1];
+const panelTex = new THREE.CanvasTexture(panelCanvas);
+const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.8 * PANEL.px[1] / PANEL.px[0]), new THREE.MeshBasicMaterial({ map: panelTex, toneMapped: false }));
+panel.position.set(0, 1.65, .61); machine.add(panel);
+// the slot is on top: a dark mouth with a mint rim, lighting up as each token drops through
+const TOP = 3.3;
+const slotRim = new THREE.Mesh(new THREE.PlaneGeometry(.9, .22), new THREE.MeshBasicMaterial({ color: C.mint, toneMapped: false }));
+slotRim.rotation.x = -Math.PI / 2; slotRim.position.set(0, TOP + .004, 0); machine.add(slotRim);
+const slotMouth = new THREE.Mesh(new THREE.PlaneGeometry(.78, .1), new THREE.MeshBasicMaterial({ color: "#040506" }));
+slotMouth.rotation.x = -Math.PI / 2; slotMouth.position.set(0, TOP + .008, 0); machine.add(slotMouth);
+const TOKENS = [12.8, 14.0, 15.1, 16.2], INSERT = .95, HANG = .22;
+const ENTER = HANG + (1 - HANG) * Math.sqrt(1.8 / 2.4);   // the moment a falling coin meets the slot, as a fraction of INSERT
+const REVEAL = [13, 18, 9, 16].map((i) => topOf(i)).filter(Boolean);   // tops of stacks the camera faces
+let fieldCount = 0;
+function drawPanel(t) {
+  const g = panelCanvas.getContext("2d"), [w, h] = PANEL.px;
+  g.fillStyle = "#15191C"; g.fillRect(0, 0, w, h);
+  // the label plate
+  g.fillStyle = "#E6ECEF"; g.beginPath(); g.roundRect(34, 40, w - 68, 110, 14); g.fill();
+  g.fillStyle = "#000"; g.font = `800 50px "JetBrains Mono"`; g.textAlign = "center"; g.fillText("CODE REVIEW", w / 2, 112);
+  // the readout
+  g.fillStyle = "#0A0C0E"; g.beginPath(); g.roundRect(44, 250, w - 88, 330, 12); g.fill();
+  const n = TOKENS.filter((a) => t >= a + INSERT).length, total = t >= ACCIDENT ? fieldCount : boxes.length;
+  const blink = Math.floor(t * 2.2) % 2 === 0;
+  g.fillStyle = C.mint; g.font = `600 30px "JetBrains Mono"`;
+  if (blink || t < TOKENS[0] - 1) g.fillText("INSERT TOKENS", w / 2, 320);
+  g.font = `600 110px "JetBrains Mono"`; g.fillStyle = t >= ACCIDENT ? C.orange : C.mint; g.fillText(String(n), w / 2, 460);
+  g.font = `500 30px "JetBrains Mono"`; g.fillStyle = "#8B98A2"; g.fillText(`of ${total.toLocaleString("en-US")} reviewed`, w / 2, 535);
+  // the coin return
+  g.fillStyle = "#0A0C0E"; g.beginPath(); g.roundRect(w / 2 - 90, 690, 180, 90, 10); g.fill();
+  g.textAlign = "left";
+  panelTex.needsUpdate = true;
+}
+// gold tokens: review is expensive. A struck face with the review (merge) glyph, a milled edge
+const coinFace = canvasTex(256, 256, (g) => {
+  const gr = g.createRadialGradient(100, 90, 10, 128, 128, 128);
+  gr.addColorStop(0, "#FFF0B8"); gr.addColorStop(.45, "#E8B545"); gr.addColorStop(.85, "#B07D18"); gr.addColorStop(1, "#6E4A08");
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(${rand() < .5 ? "255,240,190" : "90,60,8"},${.05 + rand() * .08})`; g.fillRect(rand() * 256, rand() * 256, 2, 2); }
+  g.lineWidth = 7; g.strokeStyle = "rgba(255,236,170,.75)"; g.beginPath(); g.arc(128, 128, 112, 0, 7); g.stroke();
+  g.lineWidth = 3; g.strokeStyle = "rgba(110,74,8,.8)"; g.beginPath(); g.arc(128, 128, 98, 0, 7); g.stroke();
+  // the coin's cap texture lands turned a quarter clockwise once the coin stands in the slot's frame: draw the glyph a quarter back
+  g.save(); g.translate(128, 128); g.rotate(-Math.PI / 2); g.translate(-128, -128); icon(g, "git-merge", 64, 64, 128, "#7A520C", 3); g.restore();
+});
+const coinEdge = canvasTex(256, 32, (g) => { for (let x = 0; x < 256; x += 4) { g.fillStyle = x % 8 ? "#C9951F" : "#8C630F"; g.fillRect(x, 0, 4, 32); } });
+coinEdge.wrapS = THREE.RepeatWrapping; coinEdge.repeat.x = 6;
+const goldMat = (map) => new THREE.MeshStandardMaterial({ map, transparent: true, opacity: 1, metalness: .55, roughness: .3, emissive: new THREE.Color("#3A2604"), emissiveIntensity: .7 });
+const tokens = TOKENS.map((at) => {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, .07, 48), [goldMat(coinEdge), goldMat(coinFace), goldMat(coinFace)]);
+  m.visible = false; m.rotation.x = Math.PI / 2; machine.add(m); return { m, at };   // edge-on to the slot, in the machine's frame
+});
+// what a token buys: one box, turned to glass, with fog inside
+const puffTex = canvasTex(128, 128, (g) => {
+  const img = g.createImageData(128, 128), d = img.data;
+  for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+    const r = Math.hypot(x - 64, y - 64) / 64, n = .55 + .45 * Math.sin(x * .19 + Math.sin(y * .23) * 2.1) * Math.cos(y * .17 - x * .05);
+    const a = clamp((1 - r) * 1.3) * clamp(n), i = (y * 128 + x) * 4; d[i] = 140; d[i + 1] = 152; d[i + 2] = 160; d[i + 3] = a * 230;
+  }
+  g.putImageData(img, 0, 0);
+});
+REVEAL.forEach((b, i) => {
+  b.reveal = TOKENS[i] + INSERT;
+  b.puffs = [0, 1, 2, 3].map((j) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, opacity: 0, depthWrite: false })); sp.scale.setScalar(.55 + rand() * .3); b.m.add(sp); sp.userData = { ph: rand() * 6.28, r: .18 + rand() * .12 }; return sp; });
+  b.wire = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: C.mint, transparent: true, opacity: 0 })); scene.add(b.wire);
+});
+
+// ---------- the field: black boxes to the horizon, hidden in the white fog until the end ----------
+{
+  const pos = [];
+  for (let gx = -30; gx <= 30; gx++) for (let gz = -30; gz <= 30; gz++) {
+    const x = CX + gx * 1.02, z = CZ + gz * 1.02;
+    if (Math.abs(gx) <= 5 && Math.abs(gz) <= 5) continue;
+    if (x > MX - 3 && x < MX + 3 && z > MZ - 3 && z < MZ + 3) continue;
+    if (rand() < .18) continue;
+    const hgt = 1 + Math.floor(Math.pow(rand(), 1.8) * 4);
+    for (let lv = 0; lv < hgt; lv++) pos.push([x, GROUND + S / 2 + lv * PITCH, z]);
+  }
+  fieldCount = pos.length + slots.length;
+  const field = new THREE.InstancedMesh(boxGeo, new THREE.MeshLambertMaterial({ color: BLACK }), pos.length);
+  const mm = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(S, S, S);
+  pos.forEach((p, i) => field.setMatrixAt(i, mm.compose(new THREE.Vector3(...p), q, sc)));
+  field.visible = false; scene.add(field); window.__field = field;
+}
+
+// ---------- camera: close on the first spec, back to both trees, over into isometric, then up and away on the hit ----------
+const ISO_T = new THREE.Vector3(CX + 3.0, GROUND + 1.1, CZ + .2);
+const KEYS = [
+  [0, [-10.2, .4, 5.2], [-10.2, .2, 0]],
+  [2.0, [-8.4, .3, 7.4], [-8.2, .1, 0]],
+  [5.6, [-3.6, .2, 12.8], [-3.2, 0, 0]],
+  [8.4, [.4, -.7, 19.4], [.4, -.9, 0]],
+  [11.0, [ISO_T.x + 8, ISO_T.y + 7.6, ISO_T.z + 9.6], ISO_T.toArray()],
+  [ACCIDENT - .1, [ISO_T.x + 7, ISO_T.y + 6.8, ISO_T.z + 8.4], ISO_T.toArray()],
+  [T, [ISO_T.x + 24, ISO_T.y + 23, ISO_T.z + 29], [ISO_T.x, ISO_T.y - 1, ISO_T.z]],
+];
+const V = (a) => new THREE.Vector3(...a);
+function cameraAt(t) {
+  let i = 0; while (i < KEYS.length - 2 && t > KEYS[i + 1][0]) i++;
+  const [t0, p0, q0] = KEYS[i], [t1, p1, q1] = KEYS[i + 1], k = ease(clamp((t - t0) / (t1 - t0)));
+  camera.position.copy(V(p0).lerp(V(p1), k)); camera.lookAt(V(q0).lerp(V(q1), k));
+  camera.position.x += Math.sin(t * .5) * .05; camera.position.y += Math.cos(t * .4) * .04;
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+const tmpC = new THREE.Color(), outBack = (k) => 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2);
+function render(t) {
+  cameraAt(t);
+  const I = inv(t);
+  // the world inverts: dark to white, and the glow drops away
+  scene.background.copy(DARK).lerp(WHITE, I); scene.fog.color.copy(scene.background);
+  scene.fog.density = .012 + .006 * I - .006 * smooth(ACCIDENT, ACCIDENT + 1.2, t);
+  plane.material.opacity = I; shadow.material.opacity = I;
+  bloom.strength = .8 * (1 - I) + .04;
+  // the trees grow; the specs' cards hand over to their boxes; the skill's cards fly into the machine
+  cards.forEach((n) => {
+    const a = smooth(n.born, n.born + .35, t);
+    const tree = SPECS.includes(n) ? SPECS : SKILL, p = n.parent >= 0 ? tree[n.parent] : null;
+    const x = p ? p.x + (n.x - p.x) * ease(smooth(n.born - .15, n.born + .35, t)) : n.x;
+    n.mesh.position.set(x, n.y, n.mesh.position.z); n.mesh.scale.setScalar(.85 + .15 * a);
+    let fade = 1;
+    if (tree === SPECS) { const b = boxes[n.i]; fade = 1 - smooth(b.at, b.at + .2, t); }
+    else {
+      const k = ease(smooth(9.0 + n.i * .05, 9.9 + n.i * .05, t));
+      if (k > 0) { const dst = machine.localToWorld(new THREE.Vector3(0, 1.65, .7)); n.mesh.position.lerp(dst, k); n.mesh.scale.setScalar(1 - .85 * k); }
+      fade = 1 - smooth(.75, 1, k);
+    }
+    n.mesh.material.opacity = a * fade;
+  });
+  links.forEach(({ l, n, p }) => {
+    const k = smooth(n.born - .25, n.born + .2, t);
+    l.geometry.setFromPoints(linkPoints(p, n, Math.max(.001, k))); l.material.opacity = k ? .9 * (1 - smooth(INV[0], INV[0] + .6, t)) : 0;
+  });
+  labels.forEach((L) => { updateLabel(L, t); const f = 1 - smooth(INV[0], INV[0] + .5, t); L.chip.material.opacity *= f; L.rule.material.opacity *= f; });
+  // the boxes: specs morph from their cards; the rest of the code drops onto the stacks
+  boxes.forEach((b) => {
+    if (t < b.at) { b.m.visible = false; return; }
+    b.m.visible = true;
+    const mat = b.m.material;
+    if (b.spec) {
+      const k = ease(smooth(b.at, b.at + 1.4, t)), from = new THREE.Vector3(b.spec.x, b.spec.y, b.spec.mesh.position.z);
+      b.m.position.copy(from.lerp(new THREE.Vector3(b.sl.x, b.sl.y, b.sl.z), k));
+      b.m.scale.set(CARD.w + (S - CARD.w) * k, CARD.h + (S - CARD.h) * k, .03 + (S - .03) * k);
+      mat.color.copy(CARDC).lerp(BLACK, k); mat.emissive.copy(CARDC).multiplyScalar(1 - k);
+    } else {
+      const k = clamp((t - b.at) / .55);
+      b.m.position.set(b.sl.x, b.sl.y + 7 * (1 - outBack(k)) * (k < 1 ? 1 : 0), b.sl.z); b.m.scale.setScalar(S);
+      mat.color.copy(BLACK); mat.emissive.setRGB(0, 0, 0);
+    }
+    b.e.material.opacity = .55 * I;
+    // bought with a token: the box goes to glass, and inside there's only fog
+    if (b.reveal !== undefined) {
+      const gk = smooth(b.reveal + .25, b.reveal + .9, t);
+      mat.color.copy(BLACK).lerp(GLASS, gk); mat.opacity = 1 - .84 * gk; mat.depthWrite = gk < .5;
+      b.e.material.color.set(gk > .01 ? "#5FCFAE" : "#3A4148"); b.e.material.opacity = .55 * I + .4 * gk;
+      b.puffs.forEach((sp, j) => { const u = sp.userData, a = t * .5 + u.ph; sp.position.set(Math.cos(a) * u.r, Math.sin(a * 1.3) * .14, Math.sin(a) * u.r); sp.material.opacity = .85 * gk; });
+      // a quick mint trace along the ground from the machine to the box it opened
+      const w = smooth(b.reveal - .1, b.reveal + .3, t), wf = 1 - smooth(b.reveal + .9, b.reveal + 1.8, t);
+      const s0 = machine.localToWorld(new THREE.Vector3(0, .02, .7)), s1 = new THREE.Vector3(b.sl.x, GROUND + .02, b.sl.z), mid = new THREE.Vector3(s1.x, GROUND + .02, s0.z);
+      const pts = [s0, mid, s1], L1 = s0.distanceTo(mid), L2 = mid.distanceTo(s1), d = w * (L1 + L2);
+      b.wire.geometry.setFromPoints(d <= L1 ? [s0, s0.clone().lerp(mid, d / Math.max(L1, 1e-3))] : [s0, mid, mid.clone().lerp(s1, (d - L1) / Math.max(L2, 1e-3))]);
+      b.wire.material.opacity = w ? wf : 0;
+    }
+  });
+  // the field rises out of the white ground on the hit, as the camera pulls away
+  const rise = ease(smooth(ACCIDENT - .05, ACCIDENT + 1.1, t));
+  window.__field.visible = rise > 0; window.__field.position.y = -4 * PITCH * (1 - rise);
+  // the machine: assembled from the skill as its files fly in
+  const mk = ease(smooth(9.3, 10.5, t)); machine.scale.setScalar(Math.max(.001, mk)); machine.visible = mk > .001;
+  drawPanel(t);
+  // tokens: each fades in above the slot and drops straight down into it
+  tokens.forEach(({ m, at }) => {
+    const k = clamp((t - at) / INSERT);
+    const y = TOP + 1.8 - 2.4 * Math.pow(clamp((k - HANG) / (1 - HANG)), 2);   // hangs a beat, then falls all the way through the slot
+    if (k <= 0 || k >= 1 || y < TOP - .25) { m.visible = false; return; }
+    m.visible = true; m.position.set(0, y, 0);
+    m.material.forEach((mt) => (mt.opacity = smooth(0, .3, k)));
+  });
+  // the rim flares only once the coin actually reaches the slot
+  const hot = TOKENS.some((a) => t > a + ENTER * INSERT && t < a + ENTER * INSERT + .4);
+  slotRim.material.color.set(hot ? "#FFD27A" : C.mint);   // it flares gold as the coin goes in
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  cap.style.color = I > .5 ? "#0B0E11" : "#fff"; cap.style.textShadow = I > .5 ? "0 1px 10px rgb(255 255 255 / .9)" : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  composer.render();
+  syncCrisp();
+  renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
+}
+
+document.getElementById("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; document.getElementById("play").textContent = "Play"; } };
+document.getElementById("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); document.getElementById("play").click(); } });
+
+Promise.all(["500 1em 'JetBrains Mono'", "600 1em 'JetBrains Mono'", "700 1em 'JetBrains Mono'", "800 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
+  .finally(() => {
+    const fill = cardFill();
+    cards.forEach((n) => { n.mesh.material.map = fill; n.mesh.material.needsUpdate = true; n.text.material.map = cardText(n); n.text.material.needsUpdate = true; });
+    size(); requestAnimationFrame(frame);
+  });
+</script>
