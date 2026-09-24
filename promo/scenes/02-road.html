@@ -1,0 +1,478 @@
+<title>Scene 2 · The Road</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hud { position: absolute; left: 3%; top: 5%; display: grid; gap: 4px; font: 500 clamp(10px, 1.3vw, 15px) var(--mono); color: var(--ink); pointer-events: none; text-shadow: 0 1px 8px rgb(7 9 12 / .85); background: rgb(9 12 16 / .62); border: 1px solid #1F2A33; border-radius: 10px; padding: .8em 1em; }
+.hud .k { color: var(--muted); letter-spacing: .12em; text-transform: uppercase; font-size: .8em; display: flex; gap: 8px; align-items: center; }
+.hud .k svg { width: 1.4em; height: 1.4em; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.hud .v { font-size: 1.9em; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.hud .rows { display: grid; gap: .28em; margin-top: .5em; }
+.hud .row { display: grid; grid-template-columns: 1.1em 1.3em 12ch 9ch 6.5em; white-space: nowrap; gap: .5em; align-items: center; font-size: .82em; color: var(--muted); opacity: 0; }
+.hud .row svg { width: 1.25em; height: 1.25em; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.hud .row .tree { color: #3E4F5D; text-align: right; }
+.hud .row .n { text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+.hud .row .bar { height: .38em; background: #1B252D; border-radius: 1px; overflow: hidden; }
+.hud .row .bar i { display: block; height: 100%; background: #7E93A3; }
+.hud .row.lead { color: var(--ink); }
+.reviews { position: absolute; right: 2.5%; top: 5%; width: 31%; pointer-events: none; font: 500 clamp(8px, 1.05vw, 13px) var(--sans); }
+.reviews .head { display: flex; justify-content: flex-end; gap: .6em; align-items: center; width: fit-content; margin-left: auto; background: rgb(9 12 16 / .62); border: 1px solid #1F2A33; border-radius: 6px; padding: .35em .7em; font: 500 1em var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: .7em; text-shadow: 0 1px 8px rgb(7 9 12 / .85); }
+.reviews .head b { color: var(--orange); font-weight: 600; letter-spacing: 0; }
+.reviews .stack { position: relative; height: 34em; overflow: hidden; }
+.note-card { position: absolute; left: 0; right: 0; top: 0; height: 3.9em; box-sizing: border-box; display: grid; grid-template-columns: 2.3em 1fr auto; gap: .2em .7em; align-items: center; padding: .5em .8em; background: rgb(12 16 20 / .93); border: 1px solid #25313A; border-left: 3px solid var(--sev); border-radius: 8px; box-shadow: 0 8px 22px -12px rgb(0 0 0 / .8); opacity: 0; }
+.note-card .av { grid-row: span 2; width: 2.3em; height: 2.3em; border-radius: 50%; display: grid; place-items: center; background: var(--vc); color: #07090C; }
+.note-card .av svg { width: 1.35em; height: 1.35em; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.note-card .who { font: 600 .92em var(--mono); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-card .who span { color: var(--muted); font-weight: 400; }
+.note-card .sev { font: 700 .72em var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #07090C; background: var(--sev); border-radius: 4px; padding: .15em .45em; justify-self: end; }
+.note-card .msg { grid-column: 2 / 4; color: #C5CED4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.caption { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 2 · the road</div>
+    <h1>A transcript laid down as a road: faster and faster, deeper into the fog</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div class="hud" id="hud"><div class="k" id="hudK"></div><div class="v" id="hudV"></div><div class="rows" id="hudRows"></div></div>
+    <div class="reviews" id="reviews"><div class="head" id="revHead"></div><div class="stack" id="revStack"></div></div>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="24" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 24.00</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <section class="box">
+    <h2>Beats (from the bass at 0:19, about 22 s of narration)</h2>
+    <ol class="beats">
+      <li><span class="t">0.0</span><div><q>Our industry is kind of lost.</q><span>Out of the fog that closed scene 1, an agent transcript stands upright before us like a page. It tips back on its bottom edge, the way scene 1's wall fell, until it lies flat and runs to the horizon: a road, rising to meet us as we drop onto it. Its rows cross the road like lines of text; tool-call chips and their indented output punctuate it, and the tool-call chips keep facing us as the page tips, so they end up standing on the road like signposts rushing past. We start moving along it, slowly.</span></div></li>
+      <li><span class="t">2.6</span><div><q>We have completely new tools for building software, and we can build it faster than ever.</q><span>We pick up speed. Then more. On the right, review notifications begin to slide in: bots from several vendors, each with feedback on the same pull request, stacking newest on top. The corner readout spins up and starts to branch: the session becomes a coordinator, and subagents spawn under it, one row at a time, each with its own token count and a gauge filling with it, the tokens begin to smear into streaks, and the lens widens as we drop closer to the surface.</span></div></li>
+      <li><span class="t">8.6</span><div><q>But our processes have never been more confused.</q><span>The faster we go, the thicker the fog, and we're in it: wisps stream at us out of the distance and past the lens, faster as we go. The road ahead stops resolving well before the horizon.</span></div></li>
+      <li><span class="t">13.6</span><div><q>The work we do is more opaque, more complex, more difficult to reason about than at any point in our careers.</q><span>Flat out now. The transcript is a blur of streaks under a wall of fog; tool-call signposts flash past unread; we can see only a few rows ahead. By the end almost nothing is legible but speed, and the corner is a coordinator running ten subagents, the session total well into the millions, while review comments pour down the right side faster than anyone could read them.</span></div></li>
+    </ol>
+    <p class="note">The review bots and their vendors are invented names, so the film depicts no real company's product. The same transcript as scene 9, turned into a road: the agent's output is the path we're on, and speed is what the new tools give us. The fog is the cost: the faster the work goes, the less of it we can see.</p>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const ICONS = {"abc": ["M3 16v-6a2 2 0 1 1 4 0v6", "M3 13h4", "M10 8v6a2 2 0 1 0 4 0v-1a2 2 0 1 0 -4 0v1", "M20.732 12a2 2 0 0 0 -3.732 1v1a2 2 0 0 0 3.726 1.01"], "alert-triangle": ["M12 9v4", "M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0", "M12 16h.01"], "arrow-fork": ["M16 3h5v5", "M8 3h-5v5", "M21 3l-7.536 7.536a5 5 0 0 0 -1.464 3.534v6.93", "M3 3l7.536 7.536a5 5 0 0 1 1.464 3.534v.93"], "arrows-split-2": ["M21 17h-5.397a5 5 0 0 1 -4.096 -2.133l-.514 -.734a5 5 0 0 0 -4.096 -2.133h-3.897", "M21 7h-5.395a5 5 0 0 0 -4.098 2.135l-.51 .73a5 5 0 0 1 -4.097 2.135h-3.9", "M18 10l3 -3l-3 -3", "M18 20l3 -3l-3 -3"], "binary-tree-2": ["M14 6a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M7 14a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M21 14a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M14 18a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M12 8v8", "M6.316 12.496l4.368 -4.992", "M17.684 12.496l-4.366 -4.99"], "book-2": ["M19 4v16h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12", "M19 16h-12a2 2 0 0 0 -2 2", "M9 8h6"], "books": ["M5 5a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -14", "M9 5a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -14", "M5 8h4", "M9 16h4", "M13.803 4.56l2.184 -.53c.562 -.135 1.133 .19 1.282 .732l3.695 13.418a1.02 1.02 0 0 1 -.634 1.219l-.133 .041l-2.184 .53c-.562 .135 -1.133 -.19 -1.282 -.732l-3.695 -13.418a1.02 1.02 0 0 1 .634 -1.219l.133 -.041", "M14 9l4 -1", "M16 16l3.923 -.98"], "bug": ["M9 9v-1a3 3 0 0 1 6 0v1", "M8 9h8a6 6 0 0 1 1 3v3a5 5 0 0 1 -10 0v-3a6 6 0 0 1 1 -3", "M3 13l4 0", "M17 13l4 0", "M12 20l0 -6", "M4 19l3.35 -2", "M20 19l-3.35 -2", "M4 7l3.75 2.4", "M20 7l-3.75 2.4"], "circle-check": ["M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0", "M9 12l2 2l4 -4"], "clipboard-check": ["M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2", "M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2", "M9 14l2 2l4 -4"], "door-enter": ["M13 12v.01", "M3 21h18", "M5 21v-16a2 2 0 0 1 2 -2h6m4 10.5v7.5", "M21 7h-7m3 -3l-3 3l3 3"], "file-code": ["M14 3v4a1 1 0 0 0 1 1h4", "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2", "M10 13l-1 2l1 2", "M14 13l1 2l-1 2"], "file-plus": ["M14 3v4a1 1 0 0 0 1 1h4", "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2", "M12 11l0 6", "M9 14l6 0"], "file-text": ["M14 3v4a1 1 0 0 0 1 1h4", "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2", "M9 9l1 0", "M9 13l6 0", "M9 17l6 0"], "filter": ["M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227"], "flask": ["M9 3l6 0", "M10 9l4 0", "M10 3v6l-4 11a.7 .7 0 0 0 .5 1h11a.7 .7 0 0 0 .5 -1l-4 -11v-6"], "git-commit": ["M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M12 3l0 6", "M12 15l0 6"], "git-fork": ["M10 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M15 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M7 8v2a2 2 0 0 0 2 2h6a2 2 0 0 0 2 -2v-2", "M12 12l0 4"], "git-merge": ["M5 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M15 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M7 8l0 8", "M7 8a4 4 0 0 0 4 4h4"], "hierarchy-2": ["M10 3h4v4h-4l0 -4", "M3 17h4v4h-4l0 -4", "M17 17h4v4h-4l0 -4", "M7 17l5 -4l5 4", "M12 7l0 6"], "lock-access": ["M4 8v-2a2 2 0 0 1 2 -2h2", "M4 16v2a2 2 0 0 0 2 2h2", "M16 4h2a2 2 0 0 1 2 2v2", "M16 20h2a2 2 0 0 0 2 -2v-2", "M8 12a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1l0 -3", "M10 11v-2a2 2 0 1 1 4 0v2"], "message-dots": ["M12 11v.01", "M8 11v.01", "M16 11v.01", "M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3l12 0"], "pencil": ["M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4", "M13.5 6.5l4 4"], "plug-connected": ["M7 12l5 5l-1.5 1.5a3.536 3.536 0 1 1 -5 -5l1.5 -1.5", "M17 12l-5 -5l1.5 -1.5a3.536 3.536 0 1 1 5 5l-1.5 1.5", "M3 21l2.5 -2.5", "M18.5 5.5l2.5 -2.5", "M10 11l-2 2", "M13 14l-2 2"], "robot": ["M6 6a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2l0 -4", "M12 2v2", "M9 12v9", "M15 12v9", "M5 16l4 -2", "M15 14l4 2", "M9 18h6", "M10 8v.01", "M14 8v.01"], "route": ["M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0", "M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4", "M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5"], "search": ["M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0", "M21 21l-6 -6"], "shield-check": ["M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.09 7.06", "M15 19l2 2l4 -4"], "shield-lock": ["M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3", "M11 11a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M12 12l0 2.5"], "target": ["M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M7 12a5 5 0 1 0 10 0a5 5 0 1 0 -10 0", "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"], "terminal-2": ["M8 9l3 3l-3 3", "M13 15l3 0", "M3 6a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2l0 -12"], "topology-star-3": ["M10 19a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M18 5a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M10 5a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M6 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M18 19a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M14 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M22 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M6 12h4", "M14 12h4", "M15 7l-2 3", "M9 7l2 3", "M11 14l-2 3", "M13 14l2 3"], "user": ["M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0", "M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"], "world": ["M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0", "M3.6 9h16.8", "M3.6 15h16.8", "M11.5 3a17 17 0 0 0 0 18", "M12.5 3a17 17 0 0 1 0 18"]};
+const T = 24;
+const C = { bg: 0x07090C, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2" };
+const LINES = [
+  [0.3, 2.4, "Our industry is kind of lost."],
+  [2.6, 8.2, "We have completely new tools for building software, and we can build it faster than ever."],
+  [8.6, 13.4, "But our processes have never been more confused."],
+  [13.6, 22.8, "The work we do is more opaque, more complex, more difficult to reason about than at any point in our careers."],
+];
+
+// Shared by every scene: utilities, the renderer with its bloom, fog sheets, and the territory's ground.
+// Inlined at /*COMMON*/ by build.mjs; the scene defines C, T and ICONS before it.
+// ---------- utilities ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (k) => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const smooth = (a, b, x) => { const k = clamp((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+const rand = (() => { let s = 20260923; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+function icon(ctx, name, x, y, size, color, width = 1.5) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(size / 24, size / 24);
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for (const d of ICONS[name] || []) ctx.stroke(new Path2D(d));
+  ctx.restore();
+}
+function svgIcon(name) {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${(ICONS[name] || []).map((d) => `<path d="${d}"/>`).join("")}</svg>`;
+}
+function wrap(ctx, text, maxW) {
+  const words = text.split(" "), lines = []; let cur = "";
+  for (const w of words) { const t = cur ? cur + " " + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; }
+  if (cur) lines.push(cur); return lines;
+}
+
+// ---------- renderer ----------
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("gl"), antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(C.bg);
+scene.fog = new THREE.FogExp2(C.fog, 0.042);
+const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.05, 300);
+const composer = new THREE.EffectComposer(renderer);
+composer.addPass(new THREE.RenderPass(scene, camera));
+const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(1280, 720), 0.85, 0.55, 0.18);
+composer.addPass(bloom);
+function size() {
+  const r = stage.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false); composer.setSize(r.width, r.height);
+}
+new ResizeObserver(size).observe(stage);
+
+function canvasTex(w, h, draw) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  draw(c.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+
+// ---------- fog sheets ----------
+function noiseTex() {
+  return canvasTex(512, 256, (g, w, h) => {
+    const img = g.createImageData(w, h), d = img.data;
+    const grid = (n) => { const a = []; for (let i = 0; i < (n + 1) * (n + 1); i++) a.push(rand()); return a; };
+    const octaves = [[6, .5], [12, .3], [24, .2]].map(([n, amp]) => ({ n, amp, g: grid(n) }));
+    const val = (o, x, y) => {
+      const fx = x * o.n, fy = y * o.n, ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy;
+      const at = (i, j) => o.g[(j % o.n) * (o.n + 1) + (i % o.n)];
+      const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+      return (at(ix, iy) * (1 - sx) + at(ix + 1, iy) * sx) * (1 - sy) + (at(ix, iy + 1) * (1 - sx) + at(ix + 1, iy + 1) * sx) * sy;
+    };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let v = 0; for (const o of octaves) v += val(o, x / w, y / h) * o.amp;
+      const edge = Math.sin(Math.PI * x / w) * Math.sin(Math.PI * y / h);
+      const a = clamp((v - .22) * 1.5) * edge;
+      const i = (y * w + x) * 4; d[i] = 170; d[i + 1] = 190; d[i + 2] = 205; d[i + 3] = a * 255;
+    }
+    g.putImageData(img, 0, 0);
+  });
+}
+const fogTex = noiseTex();
+const sheets = [];
+for (let i = 0; i < 12; i++) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(64, 12), new THREE.MeshBasicMaterial({ map: fogTex, transparent: true, depthWrite: false, opacity: .16, fog: false }));
+  m.position.set((rand() - .5) * 14, -3 + rand() * 2.6, -6 - i * 6);
+  m.userData = { base: m.position.clone(), speed: (rand() - .5) * .35, o: .06 + rand() * .07, near: i < 4 };
+  m.renderOrder = 2; scene.add(m); sheets.push(m);
+}
+
+// ---------- the territory: a map's ground, fogged ----------
+const territory = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.MeshBasicMaterial({
+  map: canvasTex(2048, 2048, (g, w) => {
+    g.fillStyle = "#07090C"; g.fillRect(0, 0, w, w);
+    g.strokeStyle = "#1B252D"; g.lineWidth = 3; g.lineJoin = "round";
+    for (let r = 0; r < 70; r++) {
+      let x = rand() * w, y = rand() * w; g.beginPath(); g.moveTo(x, y);
+      for (let s = 0; s < 5; s++) { if (s % 2) x += (rand() - .5) * 700; else y += (rand() - .5) * 700; g.lineTo(x, y); }
+      g.stroke();
+    }
+    g.strokeStyle = "#24313A"; g.lineWidth = 2;
+    for (let s = 0; s < 120; s++) { const x = rand() * w, y = rand() * w; g.strokeRect(x, y, 40 + rand() * 90, 22 + rand() * 30); }
+  }),
+}));
+territory.rotation.x = -Math.PI / 2; territory.position.set(0, -6.02, -16); scene.add(territory);
+
+
+territory.visible = false;
+sheets.forEach((m) => (m.visible = false));   // no distant clouds here: the fog is carried with the camera, and we're in it
+
+// ---------- speed: slow at first, then faster than ever ----------
+const speed = (t) => 2.4 * Math.exp(Math.max(0, t - 3.5) / 4.6);               // world units per second
+const dist = (t) => 2.4 * Math.min(t, 3.5) + 2.4 * 4.6 * (Math.exp(Math.max(0, t - 3.5) / 4.6) - 1);
+const rush = (t) => clamp(Math.log(speed(t) / 2.4) / Math.log(speed(T) / 2.4)); // 0 at rest, 1 flat out
+
+// ---------- the road: the transcript laid flat, rows across it like lines of text ----------
+const PITCH = .42, ROAD = 6.4, AHEAD = 110;
+const TOOLS = [
+  ["Read", "file-text", "src/session/store.ts"], ["Grep", "search", "\"getSession(\" src/"], ["Bash", "terminal-2", "npm test -- auth"],
+  ["Edit", "pencil", "src/api/admin.ts"], ["Read", "file-text", "src/auth/middleware.ts"], ["Bash", "terminal-2", "git diff --stat"],
+  ["WebFetch", "world", "docs: webhook retries"], ["Write", "file-plus", "src/log/redact.ts"], ["Grep", "search", "\"cache.raw\""],
+];
+const NROWS = Math.ceil((dist(T) + AHEAD + 10) / PITCH);
+const rows = [];
+{
+  let tool = 0;
+  while (rows.length < NROWS) {
+    const prose = 3 + Math.floor(rand() * 5);
+    for (let i = 0; i < prose; i++) rows.push({ type: i === prose - 1 ? "last" : "prose" });
+    const calls = rand() < .3 ? 2 : 1;
+    // rows are numbered from the page's foot, so a call's output comes first and its chip sits above it:
+    // upright, the page reads top-down, chip then output; laid down, we pass the output and then its signpost
+    for (let k = 0; k < calls; k++) {
+      const out = 2 + Math.floor(rand() * 3);
+      for (let i = 0; i < out; i++) rows.push({ type: "out", n: out });
+      rows.push({ type: "tool", tool: tool++ % TOOLS.length, n: out }, { type: "pad" });
+    }
+    rows.push({ type: "blank" });
+  }
+  // each text row's tokens
+  rows.forEach((r) => {
+    r.cells = [];
+    if (r.type !== "prose" && r.type !== "last" && r.type !== "out") return;
+    const code = r.type === "out", x0 = -ROAD / 2 + (code ? .7 : 0);
+    const len = ROAD * (code ? .4 + rand() * .45 : r.type === "last" ? .25 + rand() * .4 : .82 + rand() * .18);
+    let x = x0;
+    while (x < -ROAD / 2 + len) {
+      const w = (code ? .06 : .08) + rand() * (code ? .32 : .42); if (x + w > ROAD / 2) break;
+      r.cells.push({ x: x + w / 2, w, kind: code ? "code" : rand() < .09 ? "orange" : "grey" });
+      x += w + (code ? .07 : .09);
+    }
+  });
+}
+const flat = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+const MAXC = 4200;
+const cells = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), MAXC);
+// the whole road lives in one group, hinged at its near end: it starts upright as a page and tips down into a road
+const road = new THREE.Group(); scene.add(road);
+const SWING = [.4, 3.3];
+cells.instanceMatrix.setUsage(THREE.DynamicDrawUsage); cells.frustumCulled = false; road.add(cells);
+const tint = { grey: new THREE.Color(C.grey), orange: new THREE.Color(C.orange), code: new THREE.Color("#46596A") };
+for (let i = 0; i < MAXC; i++) cells.setColorAt(i, tint.grey);
+// tool calls: a pool of flat chips and output rules, reassigned to whichever calls are on the road ahead
+function chipTex([name, glyph, arg]) {
+  return canvasTex(832, 96, (g, w, h) => {
+    g.font = `600 38px "JetBrains Mono"`;
+    const cw = 96 + g.measureText(name).width;
+    g.beginPath(); g.roundRect(3, 8, cw, 80, 16);
+    g.fillStyle = "rgba(126,147,163,.14)"; g.fill(); g.strokeStyle = "#7E93A3"; g.lineWidth = 3; g.stroke();
+    icon(g, glyph, 22, 24, 48, "#9FB2C1", 2.2);
+    g.fillStyle = "#B4C4D0"; g.fillText(name, 80, 61);
+    g.font = `400 34px "JetBrains Mono"`; g.fillStyle = "#7A8FA1"; g.fillText(arg, cw + 26, 60);
+  });
+}
+let chipMaps = [];
+const CHIP = { w: 3.4, h: 3.4 * 96 / 832 };
+const chips = [], rules = [];
+for (let i = 0; i < 40; i++) {
+  // a chip hinges on its near edge: flat on the road far away, standing up to face us as it comes close
+  const c = new THREE.Group(), face = new THREE.Mesh(new THREE.PlaneGeometry(CHIP.w, CHIP.h), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+  face.position.y = CHIP.h / 2; c.add(face); c.face = face; c.visible = false; road.add(c); chips.push(c);
+  const r = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: "#3E4F5D", toneMapped: false }));
+  r.quaternion.copy(flat); r.visible = false; road.add(r); rules.push(r);
+}
+// the road's two edges, faint steel lines running into the fog
+const edges = [-1, 1].map((s) => {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(.035, AHEAD * 1.3), new THREE.MeshBasicMaterial({ color: "#33414C", toneMapped: false }));
+  m.quaternion.copy(flat); m.position.x = s * (ROAD / 2 + .45); road.add(m); return m;
+});
+
+const M = new THREE.Matrix4(), P = new THREE.Vector3(), S = new THREE.Vector3(), _c = new THREE.Color();
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+function updateRoad(t, camZ) {
+  const v = speed(t), streak = Math.min(1.5, v * .013);            // tokens smear along the road as we speed up
+  const dim = 1 / (1 + streak * 1.6);                              // and a smear spreads the same light thinner
+  const r0 = Math.max(0, Math.floor((-camZ - 4) / PITCH)), r1 = Math.min(rows.length - 1, Math.ceil((-camZ + AHEAD) / PITCH));
+  let n = 0, ci = 0;
+  for (let r = r0; r <= r1; r++) {
+    const row = rows[r], z = -r * PITCH;
+    for (const c of row.cells) {
+      if (n >= MAXC) break;
+      P.set(c.x, 0, z); S.set(c.w, .08 + streak * .9, 1);
+      M.compose(P, flat, S); cells.setMatrixAt(n, M); cells.setColorAt(n, _c.copy(tint[c.kind]).multiplyScalar(dim)); n++;
+    }
+    if (row.type === "tool" && ci < chips.length) {
+      const ch = chips[ci], ru = rules[ci]; ci++;
+      ch.visible = !!chipMaps.length; if (chipMaps.length) ch.face.material.map = chipMaps[row.tool];
+      // a chip always faces us: part of the upright page at first, then standing on the road as the page tips down,
+      // counter-turning against the road so the whole thing is one motion, with no separate flip
+      ch.position.set(-ROAD / 2 + CHIP.w / 2, .002, z - PITCH / 2);
+      ch.rotation.set(-road.rotation.x, 0, 0);
+      ch.scale.setScalar(1 + .5 * (1 - road.rotation.x / (Math.PI / 2))); ch.face.scale.set(1, 1, 1);
+      const len = (row.n + .6) * PITCH;                              // the rule runs from the chip down its output
+      ru.visible = true; ru.position.set(-ROAD / 2 + .32, .001, z + len / 2 - .1); ru.scale.set(.03, len, 1);
+    }
+  }
+  for (let i = n; i < MAXC; i++) cells.setMatrixAt(i, ZERO);
+  for (let i = ci; i < chips.length; i++) { chips[i].visible = false; rules[i].visible = false; }
+  cells.instanceMatrix.needsUpdate = true; cells.instanceColor.needsUpdate = true;
+  edges.forEach((e) => (e.position.z = camZ - AHEAD * .55));
+}
+
+// ---------- fog we're inside: soft wisp layers bigger than the frame, streaming from the distance through the lens ----------
+scene.add(camera);
+function wispTex() {
+  // tileable value noise, low frequency, with holes: no edges anywhere, so a layer never reads as an object
+  return canvasTex(512, 512, (g, w, h) => {
+    const img = g.createImageData(w, h), d = img.data;
+    const oct = [[4, .55], [8, .28], [16, .17]].map(([n, amp]) => ({ n, amp, g: Array.from({ length: n * n }, () => rand()) }));
+    const val = (o, x, y) => {
+      const fx = x * o.n, fy = y * o.n, ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy;
+      const at = (i, j) => o.g[((j % o.n) + o.n) % o.n * o.n + ((i % o.n) + o.n) % o.n];
+      const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+      return (at(ix, iy) * (1 - sx) + at(ix + 1, iy) * sx) * (1 - sy) + (at(ix, iy + 1) * (1 - sx) + at(ix + 1, iy + 1) * sx) * sy;
+    };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let v = 0; for (const o of oct) v += val(o, x / w, y / h) * o.amp;
+      const a = clamp((v - .3) * 1.9), i = (y * w + x) * 4;
+      d[i] = 70; d[i + 1] = 84; d[i + 2] = 96; d[i + 3] = a * 255;   // the fog's own blue-grey, dark enough to stay under the bloom
+    }
+    g.putImageData(img, 0, 0);
+  });
+}
+const WISPS = 7, wispMap = wispTex();
+wispMap.wrapS = wispMap.wrapT = THREE.RepeatWrapping;
+const wisps = [...Array(WISPS).keys()].map((i) => {
+  const map = wispMap.clone(); map.needsUpdate = true; map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(1.6, 1.2); map.offset.set(rand(), rand());
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, depthTest: false, fog: false, opacity: 0 }));
+  m.renderOrder = 50 + i; camera.add(m);
+  return { m, phase: i / WISPS, drift: (rand() - .5) * .3 };
+});
+const haze = (t) => .12 * (1 - smooth(1, 3.2, t)) + .07 + .5 * Math.pow(rush(t), 1.4);
+function updateWisps(t) {
+  const H = haze(t), tan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  wisps.forEach((w, i) => {
+    // each layer travels from far ahead to just past the lens; it fades in far away and out as it passes us
+    const p = (w.phase + dist(t) * .012 + t * .03) % 1;
+    const d = 14 * (1 - p) + .6;
+    const hh = 2 * d * tan * 1.6, ww = hh * camera.aspect;
+    w.m.position.set(w.drift * d, 0, -d); w.m.scale.set(ww, hh, 1);
+    w.m.material.opacity = H * Math.sin(Math.PI * p) * .62;
+    w.m.material.map.offset.x += 0;       // the texture itself stays put: the layer's travel is the motion
+  });
+}
+
+// ---------- camera: down out of the fog onto the road, then lower and wider as we speed up ----------
+const fogDark = new THREE.Color(C.fog), fogPale = new THREE.Color("#1C252D"), fogCol = new THREE.Color();
+function cameraAt(t) {
+  // facing the upright page at first; as it tips down, we drop onto it and the road comes up to meet us
+  const z = -dist(t), land = ease(smooth(.3, 3.6, t)), k = rush(t);
+  const y = 3.6 - (3.6 - 1.25) * land - .45 * k;
+  camera.position.set(Math.sin(t * .7) * .12 * (1 - k * .6), y, z + 2 + 9 * (1 - land));
+  camera.fov = 40 + 22 * k; camera.updateProjectionMatrix();
+  camera.lookAt(0, 3.4 * (1 - land) + .2 * land, (z - 24) * land);
+  camera.up.set(Math.sin(t * .9) * .015 * (1 + k), 1, 0);
+  return z;
+}
+
+// ---------- HUD: one thread, then a coordinator with a growing pack of subagents; the session runs into the millions ----------
+// each thread burns tokens in proportion to the road covered since it started; subagents spawn faster as we speed up
+const THREADS = [{ name: "session", spawn: 0, rate: 260, base: 41288 }];
+[5.2, 7.4, 9.0, 10.4, 11.6, 12.7, 13.7, 14.6, 15.4, 16.2].forEach((spawn, i) => THREADS.push({ name: `subagent ${i + 1}`, spawn, rate: 300 + rand() * 260, base: 0 }));
+const rowsEl = document.getElementById("hudRows");
+rowsEl.innerHTML = THREADS.map((th, i) => `<div class="row${i ? "" : " lead"}"><span class="tree">${i ? (i === THREADS.length - 1 ? "└" : "├") : ""}</span>${svgIcon(i ? "robot" : "hierarchy-2")}<span class="name">${th.name}</span><span class="n"></span><span class="bar"><i></i></span></div>`).join("");
+const rowEls = [...rowsEl.children];
+const GAUGE_MAX = 1.08 * Math.max(...THREADS.map((th) => th.base + th.rate * (dist(T) - dist(th.spawn))));   // every gauge on one scale: the biggest thread's final count
+function tokensOf(th, t) { return t < th.spawn ? 0 : th.base + th.rate * (dist(t) - dist(th.spawn)); }
+function hud(t) {
+  const live = THREADS.filter((th) => t >= th.spawn).length;
+  const total = THREADS.reduce((n, th) => n + tokensOf(th, t), 0);
+  document.getElementById("hudK").innerHTML = `${svgIcon("message-dots")}session 7f3a · ${live > 1 ? `coordinator + ${live - 1} subagent${live > 2 ? "s" : ""}` : "1 thread"}`;
+  document.getElementById("hudV").textContent = `${Math.round(total).toLocaleString("en-US")} tokens`;
+  THREADS.forEach((th, i) => {
+    const el = rowEls[i], on = i === 0 ? smooth(4.6, 5.2, t) : smooth(th.spawn, th.spawn + .35, t);
+    el.style.opacity = String(on);
+    el.style.display = on > 0 ? "" : "none";        // a row takes space only once its thread exists: the panel grows with the pack
+    el.style.transform = `translateY(${(1 - on) * -4}px)`;
+    // the lone session becomes the coordinator once it has a subagent to coordinate
+    if (i === 0) el.querySelector(".name").textContent = live > 1 ? "coordinator" : "session";
+    el.querySelector(".n").textContent = Math.round(tokensOf(th, t)).toLocaleString("en-US");
+    // the gauge fills with the thread's own token count, steadily and only ever forward
+    const fill = clamp(tokensOf(th, t) / GAUGE_MAX);
+    el.querySelector(".bar i").style.width = `${(fill * 100).toFixed(1)}%`;
+  });
+  document.getElementById("hud").style.opacity = String(smooth(.6, 1.4, t) * (1 - .25 * smooth(20, 23.5, t)));
+}
+
+// ---------- reviews: bots from several vendors, each with feedback, sliding in on the right and stacking ----------
+// the bot names and vendors are invented; the feedback is the kind every team gets, at a rate no one can read
+const BOTS = [
+  ["diffhawk[bot]", "#FFB866"], ["codecritic[bot]", "#9FC6FF"], ["merge-sentinel[bot]", "#C9A7FF"],
+  ["nitpick.ai[bot]", "#8FE3C4"], ["prowl-review[bot]", "#FF9A9A"], ["lintwise[bot]", "#E6ECEF"],
+];
+const FEEDBACK = [
+  ["warn", "Possible race in session refresh"], ["nit", "Prefer const over let here"], ["crit", "This bypasses the session check"],
+  ["warn", "Missing test for the retry path"], ["nit", "Consider extracting this function"], ["warn", "Potential N+1 query in loop"],
+  ["crit", "Token written to logs in plain text"], ["nit", "Unused import: cache"], ["warn", "Flaky test detected: webhook retry"],
+  ["nit", "Rename for clarity: acct → account"], ["warn", "Error swallowed in catch block"], ["crit", "Admin route reads cache directly"],
+  ["nit", "Trailing whitespace"], ["warn", "Duplicate logic in middleware"], ["warn", "Magic number: 3600"],
+  ["crit", "SQL built from user input"], ["nit", "Docstring out of date"], ["warn", "Retry has no backoff"],
+];
+const SEV = { nit: ["#5E6A73", "nit"], warn: [C.orange, "warning"], crit: [C.red, "critical"] };
+const REV_START = 5.6, CARD_H = 3.9, CARD_GAP = .5, SHOW = 8;
+// arrivals: slow at first, then faster than anyone could read
+const arrivals = []; for (let a = REV_START, i = 0; a < T; i++) { arrivals.push(a); a += Math.max(.22, 1.5 * Math.exp(-(a - REV_START) / 5.2)); }
+const stackEl = document.getElementById("revStack");
+stackEl.innerHTML = arrivals.map((_, i) => {
+  const [bot, vc] = BOTS[(i * 5 + (i >> 2)) % BOTS.length], [sev, msg] = FEEDBACK[(i * 7 + 3) % FEEDBACK.length];
+  return `<div class="note-card" style="--vc:${vc};--sev:${SEV[sev][0]}"><span class="av">${svgIcon("robot")}</span><span class="who">${bot} <span>· #4821</span></span><span class="sev">${SEV[sev][1]}</span><span class="msg">${msg}</span></div>`;
+}).join("");
+const cardEls = [...stackEl.children];
+function reviews(t) {
+  const n = arrivals.filter((a) => t >= a).length;
+  document.getElementById("revHead").innerHTML = n ? `PR #4821 · <b>${n}</b> review comment${n === 1 ? "" : "s"}` : "";
+  const em = parseFloat(getComputedStyle(stackEl).fontSize);
+  cardEls.forEach((el, i) => {
+    const a = arrivals[i];
+    if (t < a) { el.style.opacity = "0"; return; }
+    // each later arrival pushes this card down one slot, smoothly; the newest slides in from above
+    let slot = 0; for (let j = i + 1; j < arrivals.length && arrivals[j] <= t; j++) slot += ease(clamp((t - arrivals[j]) / .3));
+    const enter = ease(clamp((t - a) / .3));
+    const y = (slot - (1 - enter)) * (CARD_H + CARD_GAP) * em;
+    el.style.transform = `translateY(${y}px)`;
+    el.style.opacity = String(enter * (1 - smooth(SHOW - 1.5, SHOW, slot)));
+  });
+  document.getElementById("reviews").style.opacity = String(1 - .25 * smooth(20, 23.5, t));
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+function render(t) {
+  const camZ = cameraAt(t);
+  road.rotation.x = Math.PI / 2 * (1 - ease(smooth(...SWING, t)));   // upright page → road
+  updateRoad(t, camZ);
+  // the faster we go, the thicker and paler the fog
+  const k = rush(t);
+  updateWisps(t);
+  scene.fog.density = .035 + .5 * (1 - smooth(0, 3.2, t)) * .1 + .13 * k * k;
+  fogCol.copy(fogDark).lerp(fogPale, k); scene.fog.color.copy(fogCol); scene.background.copy(fogCol);
+  bloom.strength = .8 - .2 * k;
+  hud(t);
+  reviews(t);
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  composer.render();
+}
+
+document.getElementById("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; document.getElementById("play").textContent = "Play"; } };
+document.getElementById("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); document.getElementById("play").click(); } });
+
+Promise.all(["600 1em 'JetBrains Mono'", "400 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
+  .finally(() => { chipMaps = TOOLS.map(chipTex); size(); requestAnimationFrame(frame); });
+</script>
