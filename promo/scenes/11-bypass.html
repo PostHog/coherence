@@ -1,0 +1,491 @@
+<title>Scene 11 · Bypass</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.caption { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+.hud { position: absolute; font: 500 clamp(8px, 1.05vw, 14px)/1.4 var(--mono); color: var(--ink); pointer-events: none; }
+.panel { background: rgb(8 11 14 / .86); border: 1px solid #26313A; border-radius: 6px; padding: .7em .9em; }
+.hud svg { width: 1.3em; height: 1.3em; vertical-align: -.3em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: .45em; }
+.hud .k { color: var(--muted); font-size: .82em; letter-spacing: .08em; text-transform: uppercase; }
+.hud .v { margin-top: .25em; }
+#inv { left: 2.5%; top: 4%; width: 34%; transition: none; }
+#lsp { right: 2.5%; top: 4%; width: 33%; }
+#hook { right: 2.5%; bottom: 17%; width: 50%; opacity: 0; }
+#hook .chip { display: inline-block; background: var(--mint); color: #000; font-weight: 800; border-radius: 1em; padding: .15em .8em; margin-bottom: .55em; }
+#hook .chip svg { stroke: #000; }
+#hook pre { margin: 0; white-space: pre-wrap; font: inherit; }
+#wash { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 55%, rgb(255 75 75 / 0) 40%, rgb(255 75 75 / .28) 100%); opacity: 0; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 11 · bypass</div>
+    <h1>A chokepoint guards the flag; an edit routes around it, and the project goes red</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div id="wash"></div>
+    <div class="hud panel" id="inv"></div>
+    <div class="hud panel" id="lsp"></div>
+    <div class="hud panel" id="hook"></div>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="17" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 17.00</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <section class="box">
+    <h2>Beats (about 17 s; the Deus Ex hacking board; fog clarity 0.35 to 0.5)</h2>
+    <ol class="beats">
+      <li><span class="t">0.0</span><div><q>We also need constant confidence that our code matches our intentions.</q><span>A hacking board resolves on the half-cleared ground: components as nodes, references as links, entrances (routes, a cron job) at the near edge. At the far end, the flag: the session store, protected. In front of it, the one gate every path must pass: the chokepoint, sessions.get(). Path by path, links capture in mint from each entrance through the gate to the flag. Top left, the invariant: enforced.</span></div></li>
+      <li><span class="t">4.2</span><div><q>Coherence uses your language server to detect security bypasses.</q><span>The language server runs its pass like a compiler: a cursor visits each reference in turn at a fixed step, each blinks white as it's checked, and the panel logs one terse line per reference. 12 references, 0 bypasses.</span></div></li>
+      <li><span class="t">9.3</span><div><q>The moment an agent writes code that touches something sensitive without routing through a designated chokepoint,</q><span>An agent edits admin/dashboard.ts. A new link draws from it straight to the flag, orange, around the gate. The PostToolUse hook fires in the same turn and re-checks the chokepoint through the language server.</span></div></li>
+      <li><span class="t">13.2</span><div><q>the project goes red.</q><span>The link goes red, and like the game, every path that now reaches the flag without the gate is marked: GET /admin and GET /stats, both through the edited file. The flag goes red, and its PROTECTED tag morphs into a larger BYPASS DETECTED tag with the warning triangle; the hook's message lands in the agent's turn: structural defect revealed at this edit, the bypass by file and line, and the two honest options.</span></div></li>
+    </ol>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const ICONS = {"abc": ["M3 16v-6a2 2 0 1 1 4 0v6", "M3 13h4", "M10 8v6a2 2 0 1 0 4 0v-1a2 2 0 1 0 -4 0v1", "M20.732 12a2 2 0 0 0 -3.732 1v1a2 2 0 0 0 3.726 1.01"], "alert-triangle": ["M12 9v4", "M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0", "M12 16h.01"], "arrow-fork": ["M16 3h5v5", "M8 3h-5v5", "M21 3l-7.536 7.536a5 5 0 0 0 -1.464 3.534v6.93", "M3 3l7.536 7.536a5 5 0 0 1 1.464 3.534v.93"], "arrows-split-2": ["M21 17h-5.397a5 5 0 0 1 -4.096 -2.133l-.514 -.734a5 5 0 0 0 -4.096 -2.133h-3.897", "M21 7h-5.395a5 5 0 0 0 -4.098 2.135l-.51 .73a5 5 0 0 1 -4.097 2.135h-3.9", "M18 10l3 -3l-3 -3", "M18 20l3 -3l-3 -3"], "binary-tree-2": ["M14 6a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M7 14a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M21 14a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M14 18a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M12 8v8", "M6.316 12.496l4.368 -4.992", "M17.684 12.496l-4.366 -4.99"], "book-2": ["M19 4v16h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12", "M19 16h-12a2 2 0 0 0 -2 2", "M9 8h6"], "books": ["M5 5a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -14", "M9 5a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -14", "M5 8h4", "M9 16h4", "M13.803 4.56l2.184 -.53c.562 -.135 1.133 .19 1.282 .732l3.695 13.418a1.02 1.02 0 0 1 -.634 1.219l-.133 .041l-2.184 .53c-.562 .135 -1.133 -.19 -1.282 -.732l-3.695 -13.418a1.02 1.02 0 0 1 .634 -1.219l.133 -.041", "M14 9l4 -1", "M16 16l3.923 -.98"], "bug": ["M9 9v-1a3 3 0 0 1 6 0v1", "M8 9h8a6 6 0 0 1 1 3v3a5 5 0 0 1 -10 0v-3a6 6 0 0 1 1 -3", "M3 13l4 0", "M17 13l4 0", "M12 20l0 -6", "M4 19l3.35 -2", "M20 19l-3.35 -2", "M4 7l3.75 2.4", "M20 7l-3.75 2.4"], "circle-check": ["M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0", "M9 12l2 2l4 -4"], "circle-x": ["M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0", "M10 10l4 4m0 -4l-4 4"], "clipboard-check": ["M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2", "M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2", "M9 14l2 2l4 -4"], "code-asterisk": ["M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2", "M12 11.875l3 -1.687", "M12 11.875v3.375", "M12 11.875l-3 -1.687", "M12 11.875l3 1.688", "M12 8.5v3.375", "M12 11.875l-3 1.688", "M18 19a2 2 0 0 0 2 -2v-4l1 -1l-1 -1v-4a2 2 0 0 0 -2 -2"], "code": ["M7 8l-4 4l4 4", "M17 8l4 4l-4 4", "M14 4l-4 16"], "door-enter": ["M13 12v.01", "M3 21h18", "M5 21v-16a2 2 0 0 1 2 -2h6m4 10.5v7.5", "M21 7h-7m3 -3l-3 3l3 3"], "file-code": ["M14 3v4a1 1 0 0 0 1 1h4", "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2", "M10 13l-1 2l1 2", "M14 13l1 2l-1 2"], "file-plus": ["M14 3v4a1 1 0 0 0 1 1h4", "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2", "M12 11l0 6", "M9 14l6 0"], "file-text": ["M14 3v4a1 1 0 0 0 1 1h4", "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2", "M9 9l1 0", "M9 13l6 0", "M9 17l6 0"], "filter": ["M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227"], "flask": ["M9 3l6 0", "M10 9l4 0", "M10 3v6l-4 11a.7 .7 0 0 0 .5 1h11a.7 .7 0 0 0 .5 -1l-4 -11v-6"], "folder": ["M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2"], "git-commit": ["M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M12 3l0 6", "M12 15l0 6"], "git-fork": ["M10 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M15 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M7 8v2a2 2 0 0 0 2 2h6a2 2 0 0 0 2 -2v-2", "M12 12l0 4"], "git-merge": ["M5 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M15 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M7 8l0 8", "M7 8a4 4 0 0 0 4 4h4"], "help-circle": ["M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0", "M12 16v.01", "M12 13a2 2 0 0 0 .914 -3.782a1.98 1.98 0 0 0 -2.414 .483"], "hierarchy-2": ["M10 3h4v4h-4l0 -4", "M3 17h4v4h-4l0 -4", "M17 17h4v4h-4l0 -4", "M7 17l5 -4l5 4", "M12 7l0 6"], "lock-access": ["M4 8v-2a2 2 0 0 1 2 -2h2", "M4 16v2a2 2 0 0 0 2 2h2", "M16 4h2a2 2 0 0 1 2 2v2", "M16 20h2a2 2 0 0 0 2 -2v-2", "M8 12a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1l0 -3", "M10 11v-2a2 2 0 1 1 4 0v2"], "markdown": ["M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10", "M7 15v-6l2 2l2 -2v6", "M14 13l2 2l2 -2m-2 2v-6"], "message-dots": ["M12 11v.01", "M8 11v.01", "M16 11v.01", "M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3l12 0"], "pencil": ["M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4", "M13.5 6.5l4 4"], "plug-connected": ["M7 12l5 5l-1.5 1.5a3.536 3.536 0 1 1 -5 -5l1.5 -1.5", "M17 12l-5 -5l1.5 -1.5a3.536 3.536 0 1 1 5 5l-1.5 1.5", "M3 21l2.5 -2.5", "M18.5 5.5l2.5 -2.5", "M10 11l-2 2", "M13 14l-2 2"], "robot": ["M6 6a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2l0 -4", "M12 2v2", "M9 12v9", "M15 12v9", "M5 16l4 -2", "M15 14l4 2", "M9 18h6", "M10 8v.01", "M14 8v.01"], "route": ["M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0", "M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4", "M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5"], "search": ["M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0", "M21 21l-6 -6"], "shield-check": ["M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.09 7.06", "M15 19l2 2l4 -4"], "shield-lock": ["M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3", "M11 11a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M12 12l0 2.5"], "target": ["M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M7 12a5 5 0 1 0 10 0a5 5 0 1 0 -10 0", "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"], "terminal-2": ["M8 9l3 3l-3 3", "M13 15l3 0", "M3 6a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2l0 -12"], "topology-star-3": ["M10 19a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M18 5a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M10 5a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M6 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M18 19a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M14 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M22 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M6 12h4", "M14 12h4", "M15 7l-2 3", "M9 7l2 3", "M11 14l-2 3", "M13 14l2 3"], "user": ["M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0", "M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"], "world": ["M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0", "M3.6 9h16.8", "M3.6 15h16.8", "M11.5 3a17 17 0 0 0 0 18", "M12.5 3a17 17 0 0 1 0 18"], "git-pull-request": ["M4 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M4 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M16 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M6 8l0 8", "M11 6h5a2 2 0 0 1 2 2v8", "M14 9l-3 -3l3 -3"], "message-circle": ["M3 20l1.3 -3.9c-2.324 -3.437 -1.426 -7.872 2.1 -10.374c3.526 -2.501 8.59 -2.296 11.845 .48c3.255 2.777 3.695 7.266 1.029 10.501c-2.666 3.235 -7.615 4.215 -11.574 2.293l-4.7 1"], "dots": ["M4 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M18 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"], "coin": ["M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0", "M14.8 9a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1", "M12 7v10"], "building-bank": ["M3 21l18 0", "M3 10l18 0", "M5 6l7 -3l7 3", "M4 10l0 11", "M20 10l0 11", "M8 14l0 3", "M12 14l0 3", "M16 14l0 3"], "flag": ["M5 5a5 5 0 0 1 7 0a5 5 0 0 0 7 0v9a5 5 0 0 1 -7 0a5 5 0 0 0 -7 0v-9", "M5 21v-7"], "clock": ["M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0", "M12 7v5l3 3"]};
+const T = 17;
+const CLARITY = [.35, .5];   // act two's clearing, picking up from scene 10
+const C = { bg: 0x07090C, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2", steel: "#7E93A3" };
+const LINES = [
+  [0.3, 3.8, "We also need constant confidence that our code matches our intentions."],
+  [4.2, 9.0, "Coherence uses your language server to detect security bypasses."],
+  [9.3, 16.4, "The moment an agent writes code that touches something sensitive without routing through a designated chokepoint, the project goes red."],
+];
+
+// Shared by every scene: utilities, the renderer with its bloom, fog sheets, and the territory's ground.
+// Inlined at /*COMMON*/ by build.mjs; the scene defines C, T and ICONS before it.
+// ---------- utilities ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (k) => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const smooth = (a, b, x) => { const k = clamp((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+const rand = (() => { let s = 20260923; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+function icon(ctx, name, x, y, size, color, width = 1.5) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(size / 24, size / 24);
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for (const d of ICONS[name] || []) ctx.stroke(new Path2D(d));
+  ctx.restore();
+}
+function svgIcon(name) {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${(ICONS[name] || []).map((d) => `<path d="${d}"/>`).join("")}</svg>`;
+}
+function wrap(ctx, text, maxW) {
+  const words = text.split(" "), lines = []; let cur = "";
+  for (const w of words) { const t = cur ? cur + " " + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; }
+  if (cur) lines.push(cur); return lines;
+}
+
+// ---------- renderer ----------
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("gl"), antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(C.bg);
+scene.fog = new THREE.FogExp2(C.fog, 0.042);
+const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.05, 300);
+const composer = new THREE.EffectComposer(renderer);
+composer.addPass(new THREE.RenderPass(scene, camera));
+const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(1280, 720), 0.85, 0.55, 0.18);
+composer.addPass(bloom);
+function size() {
+  const r = stage.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false); composer.setSize(r.width, r.height);
+}
+new ResizeObserver(size).observe(stage);
+
+function canvasTex(w, h, draw) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  draw(c.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+
+// ---------- fog sheets ----------
+function noiseTex() {
+  return canvasTex(512, 256, (g, w, h) => {
+    const img = g.createImageData(w, h), d = img.data;
+    const grid = (n) => { const a = []; for (let i = 0; i < (n + 1) * (n + 1); i++) a.push(rand()); return a; };
+    const octaves = [[6, .5], [12, .3], [24, .2]].map(([n, amp]) => ({ n, amp, g: grid(n) }));
+    const val = (o, x, y) => {
+      const fx = x * o.n, fy = y * o.n, ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy;
+      const at = (i, j) => o.g[(j % o.n) * (o.n + 1) + (i % o.n)];
+      const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+      return (at(ix, iy) * (1 - sx) + at(ix + 1, iy) * sx) * (1 - sy) + (at(ix, iy + 1) * (1 - sx) + at(ix + 1, iy + 1) * sx) * sy;
+    };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let v = 0; for (const o of octaves) v += val(o, x / w, y / h) * o.amp;
+      const edge = Math.sin(Math.PI * x / w) * Math.sin(Math.PI * y / h);
+      const a = clamp((v - .22) * 1.5) * edge;
+      const i = (y * w + x) * 4; d[i] = 170; d[i + 1] = 190; d[i + 2] = 205; d[i + 3] = a * 255;
+    }
+    g.putImageData(img, 0, 0);
+  });
+}
+const fogTex = noiseTex();
+const sheets = [];
+for (let i = 0; i < 12; i++) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(64, 12), new THREE.MeshBasicMaterial({ map: fogTex, transparent: true, depthWrite: false, opacity: .16, fog: false }));
+  m.position.set((rand() - .5) * 14, -3 + rand() * 2.6, -6 - i * 6);
+  m.userData = { base: m.position.clone(), speed: (rand() - .5) * .35, o: .06 + rand() * .07, near: i < 4 };
+  m.renderOrder = 2; scene.add(m); sheets.push(m);
+}
+
+// ---------- the territory: a map's ground, fogged ----------
+const territory = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.MeshBasicMaterial({
+  map: canvasTex(2048, 2048, (g, w) => {
+    g.fillStyle = "#07090C"; g.fillRect(0, 0, w, w);
+    g.strokeStyle = "#1B252D"; g.lineWidth = 3; g.lineJoin = "round";
+    for (let r = 0; r < 70; r++) {
+      let x = rand() * w, y = rand() * w; g.beginPath(); g.moveTo(x, y);
+      for (let s = 0; s < 5; s++) { if (s % 2) x += (rand() - .5) * 700; else y += (rand() - .5) * 700; g.lineTo(x, y); }
+      g.stroke();
+    }
+    g.strokeStyle = "#24313A"; g.lineWidth = 2;
+    for (let s = 0; s < 120; s++) { const x = rand() * w, y = rand() * w; g.strokeRect(x, y, 40 + rand() * 90, 22 + rand() * 30); }
+  }),
+}));
+territory.rotation.x = -Math.PI / 2; territory.position.set(0, -6.02, -16); scene.add(territory);
+
+// ---------- clarity: act two burns the fog off, scene by scene ----------
+// A scene sets CLARITY = [start, end] before this code; each starts where the last one ended, so the clearing runs across cuts.
+// At 0 the fog is act one's; at 1 the air is clear and the territory under the map is lit.
+function clarityAt(t) { return typeof CLARITY === "undefined" ? 0 : CLARITY[0] + (CLARITY[1] - CLARITY[0]) * clamp(t / T); }
+function applyClarity(c) {
+  territory.material.color.setScalar(1 + 2.4 * c);
+  return { fog: 1 - .85 * c, sheets: 1 - c };
+}
+
+
+// ---------- the board: lying on the ground, just above the territory ----------
+const BOARD_Y = -5.6;
+const board = new THREE.Group(); board.position.y = BOARD_Y; scene.add(board);
+const flat = (m, x, z, lift = 0) => { m.rotation.x = -Math.PI / 2; m.position.set(x, lift, z); board.add(m); return m; };
+const GREY = new THREE.Color("#4A5863"), MINT = new THREE.Color(C.mint), ORANGE = new THREE.Color(C.orange), RED = new THREE.Color(C.red), INK = new THREE.Color("#C9D3DA");
+// a faint grid, the board's surface
+const grid = flat(new THREE.Mesh(new THREE.PlaneGeometry(24, 16), new THREE.MeshBasicMaterial({ transparent: true, opacity: .5, depthWrite: false, map: canvasTex(1536, 1024, (g, w, h) => {
+  g.strokeStyle = "rgba(84,104,118,.35)"; g.lineWidth = 2;
+  for (let x = 0; x <= w; x += 64) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+  for (let y = 0; y <= h; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+}) })), -1, -1.5, -.01);
+
+// the nodes: white artwork tinted by state
+const NODES = {
+  F: { x: 0, z: -6.4, kind: "flag", label: "session store" },
+  K: { x: 0, z: -3.9, kind: "gate", label: "sessions.get()", sub: "CHOKEPOINT", sign: "right" },
+  D: { x: -1.9, z: -1.6, label: "auth/trust.ts" },
+  G: { x: 2.2, z: -1.8, label: "billing/invoice.ts" },
+  A: { x: -3.2, z: .6, label: "routes/admin.ts" },
+  B: { x: 0, z: .8, label: "routes/account.ts" },
+  Cc: { x: 3.4, z: .6, label: "jobs/cleanup.ts" },
+  N: { x: -5.2, z: -2.7, label: "admin/dashboard.ts" },
+  X: { x: -6.6, z: .4, label: "routes/stats.ts" },
+  E1: { x: -3.2, z: 3.1, kind: "door", label: "GET /admin" },
+  E2: { x: 0, z: 3.3, kind: "door", label: "GET /account" },
+  E3: { x: 3.4, z: 3.1, kind: "door", label: "cron · nightly", glyph: "clock" },
+  E4: { x: -6.6, z: 2.9, kind: "door", label: "GET /stats" },
+};
+function nodeArt(n) {
+  return canvasTex(256, 256, (g, w) => {
+    g.lineWidth = 12; g.strokeStyle = "#fff"; g.fillStyle = "rgba(9,12,15,.94)";
+    g.beginPath();
+    if (n.kind === "flag") g.roundRect(22, 22, 212, 212, 26);
+    else if (n.kind === "gate") { g.moveTo(128, 12); g.lineTo(244, 128); g.lineTo(128, 244); g.lineTo(12, 128); g.closePath(); }
+    else if (n.kind === "door") g.roundRect(30, 62, 196, 132, 60);
+    else g.arc(128, 128, 96, 0, 7);
+    g.fill(); g.stroke();
+    const glyph = n.glyph || { flag: "flag", gate: "shield-lock", door: "door-enter" }[n.kind] || "file-code";
+    const sz = n.kind === "door" ? 84 : 112; icon(g, glyph, 128 - sz / 2, 128 - sz / 2, sz, "#fff", 1.8);
+  });
+}
+function labelArt(n) {
+  return canvasTex(640, 160, (g, w, h) => {
+    // a translucent sign: dark glass, a thin rim
+    g.fillStyle = "rgba(8,11,14,.86)"; g.beginPath(); g.roundRect(6, 6, w - 12, h - 12, 18); g.fill();
+    g.strokeStyle = "#fff"; g.lineWidth = 4; g.stroke();
+    g.textAlign = "center"; g.fillStyle = "#fff";
+    g.font = `600 ${n.kind === "flag" || n.kind === "gate" ? 50 : 42}px "JetBrains Mono"`; g.fillText(n.label, w / 2, n.sub ? 64 : 94);
+    if (n.sub) { g.font = `800 34px "JetBrains Mono"`; g.letterSpacing = "6px"; g.fillText(n.sub, w / 2, 118); g.letterSpacing = "0px"; }
+  });
+}
+function buildNodes() {
+  for (const [id, n] of Object.entries(NODES)) {
+    n.text = n.label;   // the name, kept before the sign mesh takes the slot
+    const s = n.kind === "flag" ? 1.5 : n.kind === "gate" ? 1.35 : n.kind === "door" ? 1.0 : .95;
+    n.mesh = flat(new THREE.Mesh(new THREE.PlaneGeometry(s, s), new THREE.MeshBasicMaterial({ map: nodeArt(n), transparent: true, opacity: 0, depthWrite: false, toneMapped: false })), n.x, n.z, .02);
+    n.mesh.renderOrder = 5;
+    const lw = n.kind === "flag" || n.kind === "gate" ? 2.6 : 2.2;
+    // a sign: it stands just off the board behind the node, tilted back 45 degrees toward the camera, so links pass beneath it
+    const sh = lw / 4, back = n.z - s / 2 - (n.kind === "flag" ? .45 : .12), rise = .06;
+    n.label = new THREE.Mesh(new THREE.PlaneGeometry(lw, sh), new THREE.MeshBasicMaterial({ map: labelArt(n), transparent: true, opacity: 0, depthWrite: false }));
+    // most signs stand behind their node; one whose view that would block (the gate, in front of the flag) stands to its right
+    const px = n.sign === "right" ? n.x + s / 2 + .15 : n.x, pz = n.sign === "right" ? n.z : back, sx = n.sign === "right" ? px + lw / 2 - .1 : n.x;
+    n.label.rotation.x = -Math.PI / 4; n.label.position.set(sx, rise + sh / 2 * Math.SQRT1_2, pz - sh / 2 * Math.SQRT1_2); board.add(n.label);
+    n.label.renderOrder = 8; n.id = id; n.color = new THREE.Color();
+  }
+}
+
+// the links: references, drawn as bars; a fill rides along each one, like capturing a node
+const LINKS = [
+  ["E1", "A"], ["E2", "B"], ["E3", "Cc"], ["E4", "X"], ["A", "D"], ["D", "K"], ["B", "K"], ["Cc", "G"], ["G", "K"], ["K", "F"], ["A", "N"], ["X", "N"],
+].map(([a, b]) => ({ a, b }));
+const BYPASS = { a: "N", b: "F", bypass: true };
+LINKS.push(BYPASS);
+const barGeo = new THREE.BoxGeometry(1, .02, 1); barGeo.translate(.5, 0, 0);
+function buildLinks() {
+  LINKS.forEach((l) => {
+    const A = NODES[l.a], B = NODES[l.b], dx = B.x - A.x, dz = B.z - A.z, len = Math.hypot(dx, dz);
+    const inset = (n) => (n.kind === "flag" ? .8 : n.kind === "gate" ? .72 : n.kind === "door" ? .5 : .5);
+    l.x0 = A.x + dx / len * inset(A); l.z0 = A.z + dz / len * inset(A); l.len = len - inset(A) - inset(B); l.rot = -Math.atan2(dz, dx);
+    const bar = (w, col, y, order) => { const m = new THREE.Mesh(barGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, toneMapped: false })); m.position.set(l.x0, y, l.z0); m.rotation.y = l.rot; m.scale.set(l.len, 1, w); m.renderOrder = order; board.add(m); return m; };
+    l.base = bar(.05, GREY, .005, 3); l.fill = bar(.075, MINT, .01, 4);
+    // the arrowhead: which way the reference points
+    l.head = flat(new THREE.Mesh(new THREE.CircleGeometry(.13, 3), new THREE.MeshBasicMaterial({ color: GREY, transparent: true, opacity: 0, depthWrite: false, toneMapped: false })), l.x0 + Math.cos(-l.rot) * l.len, l.z0 + Math.sin(-l.rot) * l.len, .015);
+    l.head.rotation.z = l.rot; l.head.renderOrder = 4;
+  });
+}
+const link = (a, b) => LINKS.find((l) => l.a === a && l.b === b);
+
+// ---------- the timeline ----------
+// the verified paths capture in mint, one after another; each link fills over CAP seconds from when its path reaches it
+const CAP = .45;
+const VERIFY = [[.9, ["E2", "B", "K", "F"]], [1.6, ["E1", "A", "D", "K", "F"]], [2.3, ["E3", "Cc", "G", "K", "F"]]];
+const SCAN = [4.6, 8.2];              // the language server's sweep, near edge to far
+const EDIT = 9.6, DRAW = [10.2, 11.2], HOOK = 11.6, RED_AT = 12.5;
+const MARK = [[13.0, ["E1", "A", "N", "F"]], [13.6, ["E4", "X", "N", "F"]]];   // every path to the flag that skips the gate
+function pathTimes(list) {   // when each link on a path starts to fill
+  const out = new Map();
+  for (const [t0, path] of list) for (let i = 1; i < path.length; i++) { const l = link(path[i - 1], path[i]); const at = t0 + (i - 1) * CAP; if (!out.has(l) || out.get(l) > at) out.set(l, at); }
+  return out;
+}
+const verifyAt = pathTimes(VERIFY), markAt = pathTimes(MARK);
+const nodeAt = (list) => { const m = new Map(); for (const [t0, path] of list) path.forEach((id, i) => { const at = t0 + i * CAP; if (!m.has(id) || m.get(id) > at) m.set(id, at); }); return m; };
+const nodeVerify = nodeAt(VERIFY), nodeMark = nodeAt(MARK);
+
+// the flag's lock-on: corner brackets that breathe, a dashed ring turning inside them, and a PROTECTED tag on a leader
+let reticle, ring, tag, alertTag;
+function buildReticle() {
+  const F = NODES.F;
+  reticle = flat(new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.5), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false, map: canvasTex(512, 512, (g, w) => {
+    g.strokeStyle = "#fff"; g.lineWidth = 12; g.lineCap = "square"; const m = 22, L = 104;
+    for (const [x, y, dx, dy] of [[m, m, 1, 1], [w - m, m, -1, 1], [m, w - m, 1, -1], [w - m, w - m, -1, -1]]) { g.beginPath(); g.moveTo(x + dx * L, y); g.lineTo(x, y); g.lineTo(x, y + dy * L); g.stroke(); }
+    g.lineWidth = 8; for (const [x0, y0, x1, y1] of [[w / 2, 6, w / 2, 40], [w / 2, w - 6, w / 2, w - 40], [6, w / 2, 40, w / 2], [w - 6, w / 2, w - 40, w / 2]]) { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }
+  }) })), F.x, F.z, .025);
+  ring = flat(new THREE.Mesh(new THREE.PlaneGeometry(2.05, 2.05), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false, map: canvasTex(512, 512, (g, w) => {
+    g.strokeStyle = "#fff"; g.lineWidth = 5; g.setLineDash([26, 18]); g.beginPath(); g.arc(w / 2, w / 2, w / 2 - 8, 0, 7); g.stroke();
+  }) })), F.x, F.z, .022);
+  // both tags hang from the reticle's upper-left corner: their geometry is moved so that corner is the origin, and they scale from it
+  const anchored = (w, h) => { const geo = new THREE.PlaneGeometry(w, h); geo.translate(-w / 2, h / 2, 0); return geo; };
+  tag = flat(new THREE.Mesh(anchored(3.0, .75), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false, map: canvasTex(800, 200, (g, w, h) => {
+    g.strokeStyle = "#fff"; g.lineWidth = 6; g.beginPath(); g.moveTo(w - 4, h - 8); g.lineTo(w - 150, 70); g.lineTo(w - 230, 70); g.stroke();   // the leader, off the bracket's upper-left corner
+    g.fillStyle = "#fff"; g.beginPath(); g.roundRect(w - 776, 32, 540, 80, 10); g.fill();
+    g.fillStyle = "#000"; g.font = `800 50px "JetBrains Mono"`; g.letterSpacing = "8px"; g.fillText("PROTECTED", w - 746, 91); g.letterSpacing = "0px";
+  }) })), F.x - 1.25, F.z - .175, .03);
+  // the breach: the same tag, larger, with the warning glyph
+  alertTag = flat(new THREE.Mesh(anchored(4.8, .96), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false, map: canvasTex(1200, 240, (g, w, h) => {
+    g.strokeStyle = "#fff"; g.lineWidth = 7; g.beginPath(); g.moveTo(w - 4, h - 8); g.lineTo(w - 170, 84); g.lineTo(w - 262, 84); g.stroke();
+    g.fillStyle = "#fff"; g.beginPath(); g.roundRect(w - 1186, 22, 924, 124, 14); g.fill();
+    icon(g, "alert-triangle", w - 1160, 40, 88, "#000", 2.6);
+    g.fillStyle = "#000"; g.font = `800 62px "JetBrains Mono"`; g.letterSpacing = "6px"; g.fillText("BYPASS DETECTED", w - 1056, 106); g.letterSpacing = "0px";
+  }) })), F.x - 1.25, F.z - .175, .032);
+  [reticle, ring, tag, alertTag].forEach((m) => (m.renderOrder = 6));
+}
+// the edit chip beside the edited file
+let editChip;
+function buildEditChip() {
+  editChip = flat(new THREE.Mesh(new THREE.PlaneGeometry(2.7, .45), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false, map: canvasTex(900, 150, (g, w, h) => {
+    g.fillStyle = "rgba(9,12,15,.94)"; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 26); g.fill(); g.strokeStyle = C.orange; g.lineWidth = 6; g.stroke();
+    icon(g, "robot", 26, 38, 74, C.orange, 2); icon(g, "pencil", 114, 42, 66, C.orange, 2);
+    g.fillStyle = C.ink; g.font = `600 44px "JetBrains Mono"`; g.fillText("Edit  admin/dashboard.ts", 204, 92);
+  }) })), NODES.N.x - 2.1, NODES.N.z + .15, .03);
+  editChip.renderOrder = 7;
+}
+// the language server's pass: a cursor visits each reference in turn, at a fixed step, and every one gets a verdict
+const cursor = flat(new THREE.Mesh(new THREE.PlaneGeometry(.2, .2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, toneMapped: false })), 0, 0, .05);
+cursor.renderOrder = 9;
+const PASS = [];   // [start, link, verdict]
+function planPass() {
+  const refs = LINKS.filter((l) => !l.bypass), step = (SCAN[1] - SCAN[0]) / refs.length;
+  refs.forEach((l, i) => PASS.push({ at: SCAN[0] + i * step, dur: step, l, n: i + 1, of: refs.length, verdict: "ok" }));
+  // the re-check at the edit: the two references into the flag, the new one last
+  PASS.push({ at: HOOK + .1, dur: .38, l: link("K", "F"), n: refs.length, of: refs.length + 1, verdict: "ok", recheck: true });
+  PASS.push({ at: HOOK + .48, dur: .38, l: BYPASS, n: refs.length + 1, of: refs.length + 1, verdict: "BYPASS", recheck: true });
+}
+const short = (id) => NODES[id].text;
+function passAt(t) { let cur = null; for (const p of PASS) if (t >= p.at && t < p.at + p.dur) cur = p; return cur; }
+const sweep = flat(new THREE.Mesh(new THREE.PlaneGeometry(24, .9), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false, map: canvasTex(16, 128, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "rgba(126,147,163,0)"); gr.addColorStop(.5, "rgba(170,200,220,.55)"); gr.addColorStop(1, "rgba(126,147,163,0)"); g.fillStyle = gr; g.fillRect(0, 0, w, h); }) })), -1, 4, .04);
+sweep.renderOrder = 6;
+
+// ---------- the HUD ----------
+const $ = (id) => document.getElementById(id);
+function hud(t) {
+  const red = smooth(RED_AT, RED_AT + .3, t), verified = smooth(3.2, 3.5, t);
+  const state = red > .5 ? ["broken", C.red] : verified > .5 ? ["enforced", C.mint] : ["checking", C.muted];
+  $("inv").innerHTML = `<div class="k">${svgIcon("shield-lock")}invariant · Sessions</div><div class="v">admin sessions are read only through <b>sessions.get()</b></div><div class="v" style="color:${state[1]}">● ${state[0]}</div>`;
+  $("inv").style.borderColor = red > .5 ? C.red : "#26313A";
+  // the machine's log: one terse line per reference checked, the last four showing
+  const done = PASS.filter((p) => t >= p.at + p.dur * .7), log = done.slice(-4).map((p) => {
+    const bad = p.verdict !== "ok", pad = String(p.n).padStart(2, "0") + "/" + String(p.of).padStart(2, "0");
+    return `<div style="color:${bad ? C.red : "#7E93A3"};white-space:nowrap;overflow:hidden">ref ${pad}  ${short(p.l.a)} → ${short(p.l.b)}  <b style="color:${bad ? C.red : C.mint}">${p.verdict}</b></div>`;
+  }).join("");
+  const running = passAt(t) ? (passAt(t).recheck ? " · re-check" : " · references") : "";
+  const bypasses = done.filter((p) => p.verdict !== "ok").length, checked = done.length ? done[done.length - 1] : null;
+  $("lsp").innerHTML = `<div class="k">${svgIcon("binary-tree-2")}language server${running}</div><div class="v" style="min-height:5.6em;font-size:.86em">${log}</div><div class="v">${checked ? checked.of : 0} references · <span style="color:${bypasses ? C.red : C.mint}">${bypasses} bypass${bypasses === 1 ? "" : "es"}</span></div>`;
+  $("lsp").style.opacity = smooth(4.2, 4.6, t);
+  $("lsp").style.borderColor = bypasses ? C.red : "#26313A";
+  const h = smooth(HOOK, HOOK + .25, t), msg = smooth(RED_AT + .5, RED_AT + .8, t);
+  $("hook").style.opacity = h;
+  $("hook").style.borderColor = msg > .5 ? C.red : "#26313A";
+  $("hook").innerHTML = `<span class="chip" style="transform:scale(${1 + .06 * Math.max(0, Math.sin((t - HOOK) * 9)) * (1 - smooth(HOOK + 1, HOOK + 1.4, t))})">${svgIcon("plug-connected")}PostToolUse · chokepoint check</span>` +
+    (msg > 0 ? `<pre style="opacity:${msg}"><span style="color:${C.red}">Structural defect revealed at this edit (admin/dashboard.ts):</span>
+✕ Sessions/admin-sessions — chokepoint sessions.get() protects the session store: broken
+    bypass admin/dashboard.ts:42 in loadStats (this edit)
+<span style="color:${C.muted}">Two honest options: route the reference through the chokepoint, or escalate a retirement for a human.</span></pre>` : "");
+  $("wash").style.opacity = smooth(RED_AT + .2, RED_AT + 1.4, t) * (.8 + .2 * Math.sin(t * 3));
+}
+
+// ---------- camera ----------
+const KEYS = [
+  [0, [0, BOARD_Y + 10.5, 7.0], [0, BOARD_Y, -2.5]],
+  [4.2, [.3, BOARD_Y + 11.4, 6.6], [-.4, BOARD_Y, -3.6]],
+  [9.0, [-2.0, BOARD_Y + 9.4, 5.2], [-2.8, BOARD_Y, -3.3]],
+  [12.2, [-2.4, BOARD_Y + 9.2, 5.0], [-2.8, BOARD_Y, -3.4]],
+  [T, [-.6, BOARD_Y + 12.4, 7.6], [-1.4, BOARD_Y, -3.2]],
+];
+const V = (a) => new THREE.Vector3(...a);
+function cameraAt(t) {
+  let i = 0; while (i < KEYS.length - 2 && t > KEYS[i + 1][0]) i++;
+  const [t0, p0, q0] = KEYS[i], [t1, p1, q1] = KEYS[i + 1], k = ease(clamp((t - t0) / (t1 - t0)));
+  camera.position.copy(V(p0).lerp(V(p1), k)); camera.lookAt(V(q0).lerp(V(q1), k));
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+const _c = new THREE.Color();
+function render(t) {
+  cameraAt(t);
+  const cl = applyClarity(clarityAt(t));
+  territory.material.color.multiplyScalar(.4);   // the board is the reading here; the ground under it stays quiet
+  scene.fog.density = .04 * cl.fog;
+  sheets.forEach((s, i) => { s.position.x = s.userData.base.x + Math.sin(t * .15 + i) * 2 + t * s.userData.speed; s.material.opacity = s.userData.o * cl.sheets; });
+  const red = smooth(RED_AT, RED_AT + .3, t);
+  // nodes: appear, capture mint along the verified paths, mark red along the bypassing ones
+  Object.values(NODES).forEach((n, i) => {
+    const appear = n.id === "N" ? 1 : 1;
+    const shown = smooth(.1 + i * .04, .5 + i * .04, t) * appear;
+    _c.copy(n.kind === "flag" || n.kind === "gate" ? INK : GREY);
+    if (nodeVerify.has(n.id)) _c.lerp(MINT, smooth(nodeVerify.get(n.id), nodeVerify.get(n.id) + .2, t));
+    if (n.id === "N") _c.lerp(ORANGE, smooth(EDIT, EDIT + .25, t));
+    if (nodeMark.has(n.id)) _c.lerp(RED, smooth(nodeMark.get(n.id), nodeMark.get(n.id) + .2, t));
+    if (n.id === "F") _c.lerp(RED, red);
+    n.mesh.material.color.copy(_c); n.mesh.material.opacity = shown;
+    n.label.material.color.copy(_c).lerp(INK, .45); n.label.material.opacity = shown * .95;
+    const pulse = (n.id === "F" ? red : 0) * .08 * Math.max(0, Math.sin(t * 6));
+    n.mesh.scale.setScalar(1 + pulse);
+    if (n.id === "F") {   // the lock-on takes the flag's colour; it tightens when the flag is breached
+      const lock = smooth(.9, 1.6, t), breathe = 1 + .04 * Math.sin(t * 2.2) - .08 * red + .05 * red * Math.max(0, Math.sin(t * 6));
+      [reticle, ring, tag].forEach((m) => { m.material.color.copy(_c); m.material.opacity = shown * lock; });
+      reticle.scale.setScalar((1.25 - .25 * ease(lock)) * breathe); ring.rotation.z = t * .35; ring.scale.setScalar(breathe);
+      tag.material.opacity *= smooth(1.4, 1.9, t);
+      // the morph: PROTECTED stretches and fades as the alert swells in from the same corner
+      const morph = smooth(RED_AT + .05, RED_AT + .45, t), swell = morph < 1 ? .6 + .52 * ease(morph) : 1.12 - .12 * smooth(RED_AT + .45, RED_AT + .75, t);
+      tag.material.opacity *= 1 - morph; tag.scale.set(1 + .45 * morph, 1 + .2 * morph, 1);
+      alertTag.material.color.copy(_c); alertTag.material.opacity = shown * morph * (.85 + .15 * Math.max(0, Math.sin(t * 6)));
+      alertTag.scale.setScalar(swell);
+      // and it stands up like the signs: hinged on its near edge, tilted back 45 degrees toward the camera
+      const lift = ease(smooth(RED_AT + .15, RED_AT + .55, t));
+      alertTag.rotation.x = -Math.PI / 2 + Math.PI / 4 * lift; alertTag.position.y = .032 + .03 * lift;
+    }
+  });
+  // links
+  LINKS.forEach((l, i) => {
+    const shown = l.bypass ? smooth(DRAW[0], DRAW[0] + .1, t) : smooth(.3 + i * .05, .7 + i * .05, t);
+    l.base.material.opacity = shown * (l.bypass ? .0 : .8); l.head.material.opacity = shown;
+    let p = 0, col = MINT;
+    if (verifyAt.has(l)) p = smooth(verifyAt.get(l), verifyAt.get(l) + CAP, t);
+    if (l.bypass) { p = smooth(DRAW[0], DRAW[1], t); col = _c.copy(ORANGE).lerp(RED, red); }
+    if (markAt.has(l) && t > markAt.get(l)) { const m = smooth(markAt.get(l), markAt.get(l) + CAP, t); l.fill.material.color.copy(RED); p = l.bypass ? 1 : m; col = RED; }
+    l.fill.material.color.copy(col); l.fill.material.opacity = shown * (p > 0 ? 1 : 0);
+    l.fill.scale.x = Math.max(.001, l.len * p);
+    l.head.material.color.copy(p >= 1 ? col : GREY);
+    // the rest of the board steps back once the bypass is marked
+    if (!markAt.has(l) && !l.bypass) { l.fill.material.opacity *= 1 - .6 * red; l.base.material.opacity *= 1 - .5 * red; }
+  });
+  // the pass: the cursor crosses the current reference at a constant speed, then the reference blinks white, checked
+  const cur = passAt(t);
+  if (cur) {
+    const l = cur.l, k = clamp((t - cur.at) / (cur.dur * .7));
+    cursor.position.set(l.x0 + Math.cos(-l.rot) * l.len * k, .05, l.z0 + Math.sin(-l.rot) * l.len * k);
+    cursor.material.color.set(cur.verdict === "ok" ? "#FFFFFF" : C.red); cursor.material.opacity = 1;
+  } else cursor.material.opacity = 0;
+  for (const p of PASS) {
+    const since = t - (p.at + p.dur * .7);
+    if (since > 0 && since < .22 && p.verdict === "ok") { p.l.fill.material.color.lerp(WHITE, .85); p.l.base.material.color.set(0xffffff); p.l.base.material.opacity = Math.max(p.l.base.material.opacity, .9); }
+    else if (!(since > 0 && since < .22)) p.l.base.material.color.copy(GREY);
+  }
+  editChip.material.opacity = smooth(EDIT, EDIT + .25, t);
+  editChip.material.color.copy(WHITE).lerp(RED_TINT, red);
+  hud(t);
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  composer.render();
+}
+const WHITE = new THREE.Color(1, 1, 1), RED_TINT = new THREE.Color(1, .55, .55);
+
+document.getElementById("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; document.getElementById("play").textContent = "Play"; } };
+document.getElementById("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); document.getElementById("play").click(); } });
+
+Promise.all(["600 1em 'JetBrains Mono'", "800 1em 'JetBrains Mono'", "500 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
+  .finally(() => { buildNodes(); buildLinks(); buildEditChip(); buildReticle(); planPass(); size(); last = performance.now(); requestAnimationFrame(frame); });
+</script>

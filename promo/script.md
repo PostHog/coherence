@@ -57,7 +57,7 @@ More complexity than we can possibly get our arms around.
 ***5
 at:
 sync:
-picture: DRAFT (scenes/05-machines.src.html). Scene 3's white world as a production line: small platinum code-asterisk tokens pour into an AGENT machine that extrudes black boxes onto a conveyor; gold merge tokens pour into the CODE REVIEW machine they pass through. Boxes exit with a lamp: mint ships; red is diverted to a return belt, back into the agent, and out again. Red lamps pop up along the line and get struck down (whack-a-mole) while the token counters race.
+picture: DRAFT (scenes/05-machines.src.html). Scene 3's white world as a production line: small platinum code-asterisk tokens pour into an AGENT machine that extrudes black boxes onto a conveyor; gold merge tokens pour into the CODE REVIEW machine they pass through. Boxes exit with a lamp: mint ships; red is diverted to a return belt, back into the agent, and out again. Red lamps pop up along the line and get struck down (whack-a-mole) while the token counters race. Behind the line stand two miniature art deco banks, ANTHROPIC TREASURY and OPENAI TREASURY (names only, no logos). Smoked-glass pipes run from beneath both machines, arch over the return belt into a header, and branch to each bank's door; Cherenkov-blue pulses flow through them at one steady pace, brightening as the tokens pour in, and the doors glow blue.
 supers:
 source: motion graphics (three.js)
 transition:
@@ -92,7 +92,7 @@ It's time to build the next generation of tools.
 
 Developers need clarity and confidence, not just speed.
 
-The race is on to deliver.
+The race is on to deliver. Coherence lets us compete.
 
 ***8
 at:
@@ -137,9 +137,9 @@ And decisions are never buried in a long transcript.
 ***11
 at:
 sync:
-picture: An agent's edit reaches past the chokepoint; the hook's bypass message appears in the same turn.
+picture: LOCKED (scenes/11-bypass.src.html). The Deus Ex: Human Revolution hacking board, on the half-cleared ground: components as nodes, references as links, entrances (routes, a cron job) at the near edge, the flag (the session store) at the far end, held in a lock-on reticle tagged PROTECTED, behind one gate, the chokepoint sessions.get(). Every node's name stands on a translucent sign just off the board, tilted toward the camera, so links pass beneath the labels. Paths capture in mint through the gate to the flag; invariant enforced. The language server runs its pass like a compiler: a cursor visits each reference in turn at a fixed step, each blinks white as checked, and the panel logs one terse line per reference (12 references, 0 bypasses). An agent edits admin/dashboard.ts and a link draws straight to the flag, orange, around the gate; the PostToolUse hook re-checks in the same turn, the same machine walking the references into the flag, the last line logged BYPASS. The link goes red, every path that now reaches the flag without the gate is marked red (GET /admin, GET /stats), the flag goes red and its PROTECTED tag swells into a larger BYPASS DETECTED tag with the warning triangle, and the hook's message lands: structural defect revealed at this edit, the bypass by file and line, the two honest options. Fog clarity 0.35 to 0.5.
 supers:
-source: terminal capture
+source: motion graphics (three.js); the message quotes the hook's real output format
 transition:
 
 We also need constant confidence that our code matches our intentions.

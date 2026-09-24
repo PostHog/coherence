@@ -53,7 +53,7 @@ p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch
     <h2>Beats (about 19 s)</h2>
     <ol class="beats">
       <li><span class="t">0.0</span><div><q>Our solution? Throw more inference at the problem.</q><span>The white plane of scene 3, now a production line: a conveyor belt, an AGENT machine on the left, the CODE REVIEW machine from scene 3 in the middle. Small platinum tokens stamped with the code-asterisk start pouring into the agent's slot.</span></div></li>
-      <li><span class="t">3.5</span><div><q>We use inference to write code, then we use more inference to ask if the code we wrote was good.</q><span>On the transporter pad inside the agent's arch, a black box shimmers into being every beat, platinum edges and a scan of light solidifying to black, and rides out; the belt carries them, orderly, left to right. Gold tokens start pouring into the reviewer too. Each box passes through its scanner, a gold-lined wall and a curtain of light that flares as the box crosses, and comes out with a lamp: mint, it ships off the right edge.</span></div></li>
+      <li><span class="t">3.5</span><div><q>We use inference to write code, then we use more inference to ask if the code we wrote was good.</q><span>On the transporter pad inside the agent's arch, a black box shimmers into being every beat, platinum edges and a scan of light solidifying to black, and rides out; the belt carries them, orderly, left to right. Gold tokens start pouring into the reviewer too. Behind the line, two small art deco banks, ANTHROPIC TREASURY and OPENAI TREASURY; glass pipes run from beneath both machines, over the return belt, into a header that feeds their doors, Cherenkov-blue pulses flowing through the smoked glass at one steady pace. Each box passes through its scanner, a gold-lined wall and a curtain of light that flares as the box crosses, and comes out with a lamp: mint, it ships off the right edge.</span></div></li>
       <li><span class="t">11.0</span><div><q>So what do we get for all this?</q><span>The camera eases back: behind the line, a return belt.</span></div></li>
       <li><span class="t">14.5</span><div><q>Bugs that recur. Endless whack-a-mole adversarial reviews.</q><span>More boxes come out red and go all the way round: diverted onto the return belt, back across, along the front belt into the agent, where they dematerialize on the pad; the agent sends out another box that goes red again. Red lamps pop up on boxes all along the line, get struck down with a flash, and pop up somewhere else. Everything speeds up, and the token counters race.</span></div></li>
     </ol>
@@ -82,6 +82,7 @@ const LINES = [
 /*COMMON*/
 
 // the inverted world of scene 3: a white plane, black boxes, soft light, almost no glow
+camera.near = .5; camera.updateProjectionMatrix();   // nothing comes close to the lens here; the depth precision goes to the far field
 territory.visible = false;
 sheets.forEach((m) => (m.visible = false));
 scene.fog.density = .012;
@@ -239,9 +240,119 @@ function drawPanel(mc, tokens, done) {
   g.textAlign = "left"; mc.tex.needsUpdate = true;
 }
 
+// ---------- where the money goes: glass pipes from beneath the machines to two small treasuries ----------
+const GOLD = "#D9A93A", XW = writer.g.position.x, XR = reviewer.g.position.x;
+// black marble: veins traced by a sine bent through fractal noise
+function marbleCanvas(w, h, base, vein, scale = 1) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"), img = g.createImageData(w, h), d = img.data;
+  const grid = (n) => { const a = []; for (let i = 0; i < (n + 1) * (n + 1); i++) a.push(rand()); return a; };
+  const oct = [[3, .5], [7, .25], [15, .15], [31, .1]].map(([n, amp]) => ({ n, amp, g: grid(n) }));
+  const val = (o, x, y) => {
+    const fx = x * o.n, fy = y * o.n, ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy;
+    const at = (i, j) => o.g[(j % o.n) * (o.n + 1) + (i % o.n)], sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+    return (at(ix, iy) * (1 - sx) + at(ix + 1, iy) * sx) * (1 - sy) + (at(ix, iy + 1) * (1 - sx) + at(ix + 1, iy + 1) * sx) * sy;
+  };
+  const B = new THREE.Color(base), Vn = new THREE.Color(vein);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const u = x / w, v = y / h; let n = 0; for (const o of oct) n += val(o, u, v) * o.amp;
+    const main = Math.pow(1 - Math.abs(Math.sin((u * 2.2 + v * 1.1) * Math.PI * scale + n * 7)), 22);
+    const fine = Math.pow(1 - Math.abs(Math.sin((u * 5 - v * 3) * Math.PI * scale + n * 11)), 60) * .5;
+    const k = Math.min(1, main + fine), cloud = (n - .5) * .06;
+    const i = (y * w + x) * 4;
+    d[i] = 255 * Math.min(1, B.r + cloud + (Vn.r - B.r) * k); d[i + 1] = 255 * Math.min(1, B.g + cloud + (Vn.g - B.g) * k); d[i + 2] = 255 * Math.min(1, B.b + cloud + (Vn.b - B.b) * k); d[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0); return c;
+}
+const MARBLE = marbleCanvas(512, 512, "#15191C", "#A7B0B6"), MARBLE_PLINTH = marbleCanvas(256, 256, "#2B3137", "#B9C1C6", .7);
+function marbleMat(canvas) { const t = new THREE.CanvasTexture(canvas); t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return new THREE.MeshStandardMaterial({ map: t, roughness: .28, metalness: .05 }); }
+const marbleBody = marbleMat(MARBLE), marblePlinth = marbleMat(MARBLE_PLINTH);
+// a miniature art deco bank: plinth, a black body with gold fluting and a stepped door, setbacks rising to a spire
+function makeTreasury(x, z, name) {
+  const g = new THREE.Group(); g.position.set(x, GROUND, z); scene.add(g);
+  const dark = marbleBody, gold = new THREE.MeshBasicMaterial({ color: GOLD, toneMapped: false });
+  const box = (w, h, d, y, mat = dark) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.y = y; g.add(m); return m; };
+  box(3.3, .28, 2.7, .14, marblePlinth);   // plinth
+  box(2.7, 2.5, 2.2, 1.53);                                                           // body
+  box(2.1, .5, 1.7, 3.03); box(1.4, .45, 1.15, 3.5); box(.6, .5, .6, 3.95);           // setbacks and spire
+  box(.05, .7, .05, 4.55, gold);                                                      // mast
+  // a gold line along the front edge of each setback
+  [[2.1, 3.28, .85], [1.4, 3.73, .575], [.6, 4.2, .3]].forEach(([w, y, dz]) => { const l = box(w, .03, .03, y, gold); l.position.z = dz; });
+  // the facade: drawn once the fonts are in
+  const facade = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 2.5), new THREE.MeshBasicMaterial({ toneMapped: false }));
+  facade.position.set(0, 1.53, 1.101); g.add(facade);
+  const drawFacade = () => { facade.material.map = canvasTex(1080, 1000, (c, w, h) => {
+    c.drawImage(MARBLE, 0, 0, w, h);
+    c.strokeStyle = GOLD; c.lineWidth = 6; c.strokeRect(34, 34, w - 68, h - 68);
+    // the name band
+    c.fillStyle = "rgba(16,19,22,.72)"; c.fillRect(40, 70, w - 80, 290);   // the marble quiets behind the name
+    c.textAlign = "center"; c.fillStyle = GOLD;
+    c.font = `600 104px "Instrument Sans"`; c.letterSpacing = "18px"; c.fillText(name, w / 2 + 9, 196);
+    c.lineWidth = 4; c.beginPath(); c.moveTo(160, 240); c.lineTo(w - 160, 240); c.stroke();
+    c.font = `600 60px "Instrument Sans"`; c.letterSpacing = "30px"; c.fillText("TREASURY", w / 2 + 15, 318);
+    c.letterSpacing = "0px";
+    // fluting either side of the door
+    c.lineWidth = 5; for (const x of [120, 180, 240, 300, w - 300, w - 240, w - 180, w - 120]) { c.beginPath(); c.moveTo(x, 390); c.lineTo(x, h - 60); c.stroke(); }
+    // the stepped door
+    const dw = 300, dx = w / 2 - dw / 2, dy = 470;
+    c.fillStyle = "#07090B"; c.beginPath(); c.moveTo(dx, h - 34); c.lineTo(dx, dy + 80); c.lineTo(dx + 50, dy + 80); c.lineTo(dx + 50, dy + 40); c.lineTo(dx + 100, dy + 40); c.lineTo(dx + 100, dy);
+    c.lineTo(dx + dw - 100, dy); c.lineTo(dx + dw - 100, dy + 40); c.lineTo(dx + dw - 50, dy + 40); c.lineTo(dx + dw - 50, dy + 80); c.lineTo(dx + dw, dy + 80); c.lineTo(dx + dw, h - 34); c.closePath(); c.fill();
+    c.lineWidth = 6; c.stroke();
+    c.textAlign = "left";
+  }); facade.material.needsUpdate = true; };
+  // the door's glow as the money arrives
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(.62, .95), new THREE.MeshBasicMaterial({ color: "#4DA6FF", transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+  glow.position.set(0, .8, 1.106); g.add(glow);
+  return { g, drawFacade, glow, door: new THREE.Vector3(x, .2, z + 1.35) };
+}
+const treasuries = [makeTreasury(-3.4, -9.6, "ANTHROPIC"), makeTreasury(4.4, -9.6, "OPENAI")];
+
+// the pipes: smoked glass, with Cherenkov-blue pulses riding inside at one steady pace
+const PIPE_Y = .17, HEADER_Z = -4.3, ARCH_Y = 1.3;
+const pulseTex = canvasTex(256, 16, (g, w, h) => { const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, "rgba(30,110,255,.45)"); gr.addColorStop(.35, "rgba(50,150,255,.75)"); gr.addColorStop(.5, "rgba(170,225,255,1)"); gr.addColorStop(.65, "rgba(50,150,255,.75)"); gr.addColorStop(1, "rgba(30,110,255,.45)"); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+const glassMat = new THREE.MeshStandardMaterial({ color: "#2E363D", transparent: true, opacity: .58, roughness: .12, metalness: .2, depthWrite: false });   // smoked glass
+const pipes = [], FITTINGS = [];
+function pipe(points, phase = 0) {
+  const path = new THREE.CurvePath();
+  for (let i = 1; i < points.length; i++) path.add(new THREE.LineCurve3(new THREE.Vector3(...points[i - 1]), new THREE.Vector3(...points[i])));
+  points.slice(1, -1).forEach((p) => FITTINGS.push(p));
+  const len = path.getLength(), segs = Math.ceil(len * 12);
+  const glass = new THREE.Mesh(new THREE.TubeGeometry(path, segs, .13, 16, false), glassMat); glass.renderOrder = 4; scene.add(glass);
+  const tex = pulseTex.clone(); tex.needsUpdate = true; tex.wrapS = THREE.RepeatWrapping; tex.repeat.x = len / 1.4;
+  const core = new THREE.Mesh(new THREE.TubeGeometry(path, segs, .07, 10, false), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false }));
+  core.renderOrder = 5; scene.add(core);
+  // the glow, faked: a wider sheath carrying the same pulse, soft, outside the glass (real bloom would wash out the white world)
+  const halo = new THREE.Mesh(new THREE.TubeGeometry(path, segs, .24, 16, false), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false, side: THREE.BackSide }));
+  halo.renderOrder = 6; scene.add(halo);
+  pipes.push({ tex, len, phase, core, halo }); return path;
+}
+// out from under each machine, over the return belt, into the header
+for (const x of [XW, XR]) pipe([[x, PIPE_Y, -.9], [x, PIPE_Y, -1.75], [x, ARCH_Y, -2.0], [x, ARCH_Y, -3.2], [x, PIPE_Y, -3.45], [x, PIPE_Y, HEADER_Z]]);
+pipe([[XW, PIPE_Y, HEADER_Z], [treasuries[1].door.x, PIPE_Y, HEADER_Z]], .3);
+// the header's ends and tees are joints too
+[[XW, PIPE_Y, HEADER_Z], [XR, PIPE_Y, HEADER_Z], ...treasuries.map((tr) => [tr.door.x, PIPE_Y, HEADER_Z])].forEach((p) => FITTINGS.push(p));
+treasuries.forEach((tr, i) => pipe([[tr.door.x, PIPE_Y, HEADER_Z], [tr.door.x, PIPE_Y, tr.door.z]], .6 + i * .2));
+// opaque fittings at every bend, tee and joint: they swallow the ends of the glass so no two transparent layers stack
+const fittingGeo = new THREE.BoxGeometry(.5, .5, .5), fittingMat = new THREE.MeshLambertMaterial({ color: "#2A3036" });
+const fittingBand = new THREE.MeshBasicMaterial({ color: GOLD, toneMapped: false });
+const placed = new Set();
+function fitting(x, y, z) {
+  const key = [x, y, z].map((v) => v.toFixed(2)).join();
+  if (placed.has(key)) return; placed.add(key);
+  const f = new THREE.Mesh(fittingGeo, fittingMat); f.position.set(x, y, z); scene.add(f);
+  const band = new THREE.Mesh(new THREE.BoxGeometry(.58, .05, .58), fittingBand); band.position.set(x, y + .12, z); scene.add(band);   // a deco band
+}
+FITTINGS.forEach((p) => fitting(...p));
+const PULSE_V = 1.6;   // world units a second, always
+function updatePipes(t) {
+  const flow = smooth(.6, 3, t), strength = .6 + .4 * smooth(4, 16, t);   // the flow starts with the first tokens and brightens as they pour in, never faster
+  pipes.forEach((p) => { p.tex.offset.x = -(t * PULSE_V / 1.4) + p.phase; p.core.material.opacity = flow * strength; p.halo.material.opacity = .3 * flow * strength; });
+  treasuries.forEach((tr, i) => (tr.glow.material.opacity = flow * strength * (.45 + .3 * (.5 + .5 * Math.sin(t * PULSE_V / 1.4 * Math.PI * 2 + i)))));
+}
+
 // ---------- the boxes: extruded on the beat, carried along, judged, and sometimes sent back ----------
 const EMIT = []; for (let a = 3.4; a < T; a += .78) EMIT.push(a);
-const XW = writer.g.position.x, XR = reviewer.g.position.x, XD = 7.6;
+const XD = 7.6;
 // a box's fate: before 12 s nearly all pass; after 14 s most come out red and go around again
 const fateOf = (i, a) => { const h = ((i * 2654435761) >>> 0) % 100; return h < (a < 6.5 ? 6 : a < 9.5 ? 30 : 64) ? "red" : "mint"; };
 const PLAT = new THREE.Color("#E9EEF2");
@@ -287,7 +398,7 @@ function moleAt(b, t) {
 }
 
 // ---------- camera ----------
-const LOOK = new THREE.Vector3(.4, .8, -1.1);
+const LOOK = new THREE.Vector3(-.9, 1.5, -2.6);
 const KEYS = [
   [0, [LOOK.x + 4.6, LOOK.y + 6.0, LOOK.z + 11.0], LOOK.toArray()],
   [10.6, [LOOK.x + 5.0, LOOK.y + 6.6, LOOK.z + 11.8], LOOK.toArray()],
@@ -348,6 +459,7 @@ function render(t) {
   curtain.material.opacity = .1 + .45 * inCurtain; curtainEdge.material.opacity = .5 + .5 * inCurtain;
   padWall.material.opacity = .8 + .2 * pulse; padGlow.material.opacity = .25 + .65 * pulse; padWall.material.color.setScalar(.85 + .3 * pulse);
   const wIn = updateCoins(writer, t), rIn = updateCoins(reviewer, t);
+  updatePipes(t);
   drawPanel(writer, wIn, boxes.filter((b) => t > b.a + MAT).length);
   drawPanel(reviewer, rIn, boxes.filter((b) => { const p = boxAt(b, t); return t > b.a && (!p || p.leg !== "front" || p.x > XR + 1.2); }).length);
   const line = LINES.find(([a, b]) => t >= a && t < b);
@@ -361,6 +473,6 @@ scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false;
 document.getElementById("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
 document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); document.getElementById("play").click(); } });
 
-Promise.all(["500 1em 'JetBrains Mono'", "600 1em 'JetBrains Mono'", "800 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
-  .finally(() => { size(); requestAnimationFrame(frame); });
+Promise.all(["500 1em 'JetBrains Mono'", "600 1em 'JetBrains Mono'", "800 1em 'JetBrains Mono'", "600 1em 'Instrument Sans'"].map((f) => document.fonts.load(f).catch(() => {})))
+  .finally(() => { treasuries.forEach((v) => v.drawFacade()); size(); requestAnimationFrame(frame); });
 </script>
