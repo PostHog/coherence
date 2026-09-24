@@ -5,6 +5,8 @@
   "4": { "file": "04-corners", "url": "https://claude.ai/artifact/KYGoAjyD2vPNHuMdwa3zjS", "stills": [3.5, 10.3, 13.0, 18.4] },
   "5": { "file": "05-machines", "url": "https://claude.ai/artifact/UW9zghJ854oGfPRPpr5hDe", "stills": [2.0, 7.5, 16.5, 19.5] },
   "6": { "file": "06-result", "url": "https://claude.ai/artifact/D1ZdZDPDvw8EbT7CmLke6M", "stills": [3.0, 6.0, 8.5, 12.0] },
+  "7": { "file": "07-power", "url": "https://claude.ai/artifact/21Lhvh5V5DnS8MkXoL5Yhv", "stills": [0.2, 0.7, 1.85, 10.2] },
   "8": { "file": "08-lexicon", "url": "https://claude.ai/artifact/VEs62895rnKvApSHcyxGY1", "stills": [4.6, 8.2, 12.4, 18.8] },
-  "9": { "file": "09-journal", "url": "https://claude.ai/artifact/HLEpcqFZq3KGAYWyg6AroD", "stills": [5.0, 8.8, 10.5, 17.8] }
+  "9": { "file": "09-journal", "url": "https://claude.ai/artifact/HLEpcqFZq3KGAYWyg6AroD", "stills": [5.0, 8.8, 10.5, 17.8] },
+  "10": { "file": "10-switchboard", "url": "https://claude.ai/artifact/NzmCdB9gg4416rZ59LXudg", "stills": [2.6, 4.2, 6.5, 11.8] }
 }

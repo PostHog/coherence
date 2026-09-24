@@ -1,0 +1,408 @@
+<title>Scene 10 · Switchboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.caption { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 10 · switchboard</div>
+    <h1>Sessions come and go; the journal carries what they decided</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="12" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 12.00</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <section class="box">
+    <h2>Beats (about 12 s; the fog keeps clearing, 0.20 to 0.35)</h2>
+    <ol class="beats">
+      <li><span class="t">0.0</span><div><q>Quickly move between different conversations and agents without costly handoff files,</q><span>A switchboard in the fog: transcript lanes, one per session, scrolling on either side of the journal, a short spine of scene 9's decision records. The coordinator's session ends and goes dark. A new one opens in its place; its SessionStart hook pulses (orient) and threads run from the records into it: it starts knowing what was decided.</span></div></li>
+      <li><span class="t">3.2</span><div><q>while letting subagents compare notes.</q><span>As it works, every session adds its decisions to the one spine, each one a decide call in its transcript that lifts out as a record: the new coordinator first, then subagent-a: “Route admin reads through the session store”, the reversal of scene 9's bad call, which steps back, superseded. Before their next tool calls, the peer feed drops only its subject into subagent-b and subagent-c. subagent-c's next edit turns from the cache to the session store.</span></div></li>
+      <li><span class="t">7.0</span><div><q>And decisions are never buried in a long transcript.</q><span>Pull back: lanes multiply and rush until they're only texture, and every one of them sends its decisions into the spine. Many streams in, one stream out: each decision joins the top of the journal and the stream flows down into the ground, crisp and in order.</span></div></li>
+    </ol>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const ICONS = /*ICONS*/{};
+const T = 12;
+const CLARITY = [.2, .35];   // act two's clearing, picking up from scene 9
+const C = { bg: 0x07090C, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2", steel: "#7E93A3" };
+const LINES = [
+  [0.3, 6.6, "Quickly move between different conversations and agents without costly handoff files, while letting subagents compare notes."],
+  [7.0, 10.6, "And decisions are never buried in a long transcript."],
+];
+
+/*COMMON*/
+
+// ---------- the crisp pass: text on bright shapes is drawn after the bloom ----------
+const overlay = new THREE.Scene();
+overlay.fog = scene.fog;
+const crisp = [];
+function crispOver(mesh, w, h, draw, opacity) {
+  const o = new THREE.Mesh(mesh.geometry, new THREE.MeshBasicMaterial({ map: canvasTex(w, h, draw), transparent: true, depthWrite: false, toneMapped: false, fog: false }));
+  o.matrixAutoUpdate = false; o.renderOrder = mesh.renderOrder + 10; overlay.add(o); crisp.push({ mesh, o, opacity });
+}
+function syncCrisp() {
+  scene.updateMatrixWorld();
+  for (const { mesh, o, opacity } of crisp) { o.matrix.copy(mesh.matrixWorld); o.material.opacity = (opacity ? opacity() : mesh.material.opacity) * (mesh.parent && mesh.parent.visible === false ? 0 : 1); }
+}
+function fitFont(g, text, weight, size, maxW, family) {
+  let s = size; g.font = `${weight} ${s}px "${family}"`;
+  while (g.measureText(text).width > maxW && s > 20) { s -= 1; g.font = `${weight} ${s}px "${family}"`; }
+}
+function plane(w, h, tex, order = 5, fog = false) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, toneMapped: false, fog }));
+  m.renderOrder = order; return m;
+}
+function line(color) {
+  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0, fog: false, toneMapped: false }));
+  scene.add(l); return l;
+}
+function setLine(l, a, b) { const p = l.geometry.attributes.position; p.setXYZ(0, a.x, a.y, a.z); p.setXYZ(1, b.x, b.y, b.z); p.needsUpdate = true; }
+
+// ---------- the journal: one stream that every session's decisions join ----------
+// scene 9's records are already there; every lane adds its own as it works, in the order they land (at),
+// flying in from the lane that made it (from), landing orange at the top and settling mint, the stream flowing down into the ground
+const RECORDS = [
+  { chose: "One session store behind a chokepoint", agent: "subagent 1", at: -1 },
+  { chose: "Split auth middleware by trust level", agent: "main", at: -1 },
+  { chose: "Keep tokens out of logs", agent: "subagent 4", at: -1 },
+  { chose: "Read admin sessions straight from cache", agent: "subagent 3", at: -1, bad: true },
+  { chose: "Split the admin audit across three subagents", agent: "coordinator", from: "coord", at: 2.75 },
+  { chose: "Route admin reads through the session store", agent: "subagent-a", from: "a", at: 3.9, reversal: true },
+  { chose: "Fail loud when a session write misses", agent: "subagent-b", from: "b", at: 6.3 },
+  { chose: "Give admin sessions a 15-minute lifetime", agent: "subagent-c", from: "c", at: 6.95 },
+  ...[
+    "Reject API keys in query strings", "Paginate the audit log by cursor", "Expire project tokens after 90 days",
+    "Keep invoices immutable once sent", "Validate webhook payloads at the edge", "Log membership changes to the audit log",
+    "One export job per workspace", "Move rate limits into the gateway", "Store the region on the workspace", "Cache plan lookups for a minute",
+  ].map((chose, k) => ({ chose, agent: "subagent-" + String.fromCharCode(100 + k), from: "x" + k, at: 7.6 + k * .38 }))   // an even beat: the lanes rush, the journal keeps a steady pace,
+];
+const REV = RECORDS.findIndex((r) => r.reversal), BAD_I = RECORDS.findIndex((r) => r.bad);
+const REC = { w: 3.1, h: .64, x: 0, top: 2.35, step: .8, px: [1240, 256] };
+const settle = (r, t) => r.at < 0 ? 1 : smooth(r.at + .45, r.at + .75, t);   // orange as it lands, mint once written
+function recordFace(r, col) {
+  return canvasTex(...REC.px, (g, w, h) => {
+    g.fillStyle = "rgba(10,14,18,.94)"; g.beginPath(); g.roundRect(5, 5, w - 10, h - 10, 20); g.fill();
+    g.strokeStyle = col; g.lineWidth = 3; g.stroke();
+    g.fillStyle = col; g.beginPath(); g.roundRect(5, 5, 238, 64, [18, 0, 16, 0]); g.fill();
+    g.fillStyle = C.muted; g.font = `500 22px "JetBrains Mono"`; g.textAlign = "right"; g.fillText(r.agent, w - 30, 48); g.textAlign = "left";
+    g.fillStyle = C.ink; g.font = `600 46px "Instrument Sans"`; g.fillText(r.chose, 32, 168);
+  });
+}
+function recordChip(g) {   // the chip's glyph and word, drawn crisp over the glowing fill
+  icon(g, "arrow-fork", 22, 15, 40, "#000", 2.6);
+  g.fillStyle = "#000"; g.font = `800 23px "JetBrains Mono"`; g.fillText("DECISION", 74, 47);
+}
+const spine = new THREE.Group(); scene.add(spine);
+let records = [];
+function buildRecords() {
+  records = RECORDS.map((r, i) => {
+    const g = new THREE.Group(); g.position.set(REC.x, REC.top - i * REC.step, 0); spine.add(g);
+    const faces = {};
+    for (const [k, col] of [["mint", C.mint], ["orange", C.orange], ["red", C.red]]) {
+      if ((k === "orange" && r.at < 0) || (k === "red" && !r.bad)) continue;
+      const f = plane(REC.w, REC.h, recordFace(r, col), 6 + i); g.add(f); faces[k] = f;
+      crispOver(f, ...REC.px, recordChip);
+    }
+    return { r, g, faces };
+  });
+  // the spine's label: a bracket rule and a name
+  const label = plane(3.1, .3, canvasTex(1240, 120, (g, w, h) => {
+    g.strokeStyle = "#3C4A55"; g.lineWidth = 3; g.beginPath(); g.moveTo(6, h - 10); g.lineTo(6, 60); g.lineTo(w - 6, 60); g.lineTo(w - 6, h - 10); g.stroke();
+    g.fillStyle = "#07090C"; g.fillRect(40, 30, 420, 60);
+    icon(g, "book-2", 52, 38, 44, C.muted, 2); g.fillStyle = C.muted; g.font = `600 32px "JetBrains Mono"`; g.fillText("JOURNAL", 112, 72);
+  }), 5);
+  label.position.set(0, REC.top + .56, 0); spine.add(label); spine.userData.label = label;
+}
+
+// ---------- the lanes: one transcript per session, scrolling ----------
+const TOOLS = [["file-text", "Read  auth/session.ts"], ["search", 'Grep  "adminSession"'], ["pencil", "Edit  routes/admin.ts"], ["terminal-2", "Bash  npm test"], ["file-text", "Read  cache/index.ts"], ["pencil", "Edit  auth/trust.ts"]];
+function laneTex(seed) {
+  const tex = canvasTex(512, 2048, (g, w, h) => {
+    let y = 20, r = seed;
+    const R = () => (r = (r * 16807) % 2147483647) / 2147483647;
+    while (y < h - 40) {
+      if (R() < .12) {
+        const [gl, label] = TOOLS[Math.floor(R() * TOOLS.length)];
+        g.strokeStyle = C.steel; g.lineWidth = 2.5; g.beginPath(); g.roundRect(14, y, 330, 40, 10); g.stroke();
+        icon(g, gl, 24, y + 8, 24, C.steel, 1.8); g.fillStyle = C.steel; g.font = `500 20px "JetBrains Mono"`; g.fillText(label, 58, y + 27);
+        y += 54; continue;
+      }
+      let x = 14; const indent = R() < .3 ? 30 : 0; x += indent;
+      while (x < w - 60) { const cw = 18 + R() * 70; if (x + cw > w - 14) break; g.fillStyle = `rgba(94,106,115,${.55 + R() * .35})`; g.fillRect(x, y, cw, 16); x += cw + 8; if (R() < .1) break; }
+      y += 28;
+    }
+  });
+  tex.wrapT = THREE.RepeatWrapping; return tex;
+}
+function laneMaterial(tex) {
+  return new THREE.ShaderMaterial({
+    uniforms: { uTex: { value: tex }, uScroll: { value: 0 }, uOpacity: { value: 0 }, uRep: { value: (LANE.h / LANE.w) * (512 / 2048) }, uTint: { value: new THREE.Color(1, 1, 1) } },
+    transparent: true, depthWrite: false,
+    vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+    fragmentShader: `uniform sampler2D uTex; uniform float uScroll, uOpacity, uRep; uniform vec3 uTint; varying vec2 vUv;
+      void main() {
+        vec4 c = texture2D(uTex, vec2(vUv.x, vUv.y * uRep - uScroll));
+        float edge = smoothstep(0., .14, vUv.y) * smoothstep(1., .72, vUv.y);
+        gl_FragColor = vec4(c.rgb * uTint, c.a * edge * uOpacity);
+      }`,
+  });
+}
+const LANE = { w: 2.1, h: 5.6, y: -.35 };
+function labelTex(glyph, text, col) {
+  return canvasTex(640, 96, (g) => { icon(g, glyph, 8, 20, 52, col, 2); g.fillStyle = col; g.font = `600 34px "JetBrains Mono"`; g.fillText(text, 74, 60); });
+}
+// a lane: its scrolling transcript, its name, and a pinned head where injected context lands
+function makeLane(name, x, seed, glyph = "robot") {
+  const g = new THREE.Group(); g.position.set(x, 0, 0); scene.add(g);
+  const body = new THREE.Mesh(new THREE.PlaneGeometry(LANE.w, LANE.h), laneMaterial(laneTex(seed)));
+  body.position.y = LANE.y; body.renderOrder = 3; g.add(body);
+  const label = plane(2.1, .315, labelTex(glyph, name, C.ink), 5); label.position.set(0, LANE.y + LANE.h / 2 + .32, 0); g.add(label);
+  return { g, body, label, name, x, heads: [] };
+}
+// a strip: one line of injected context, pinned under the lane's name
+function stripTex(glyph, text, col) {
+  return canvasTex(840, 104, (g, w, h) => {
+    g.fillStyle = "rgba(10,14,18,.94)"; g.beginPath(); g.roundRect(3, 3, w - 6, h - 6, 14); g.fill();
+    g.strokeStyle = col; g.lineWidth = 3; g.stroke();
+    icon(g, glyph, 14, 28, 46, col, 2.2); fitFont(g, text, 500, 36, w - 90, "Instrument Sans"); g.fillStyle = C.ink; g.fillText(text, 70, 65);
+  });
+}
+// the hook pulse: the recurring plug chip, naming the event that delivered what landed
+function hookTex(text) {
+  return canvasTex(700, 84, (g, w, h) => {
+    g.fillStyle = C.mint; g.beginPath(); g.roundRect(3, 3, w - 6, h - 6, 40); g.fill();
+    icon(g, "plug-connected", 22, 18, 46, "#000", 2.6); g.fillStyle = "#000"; g.font = `800 27px "JetBrains Mono"`; g.fillText(text, 82, 52);
+  });
+}
+// the decide call, drawn like the transcript's other tool calls
+function decideTex(chose, col) {
+  return canvasTex(840, 84, (g, w, h) => {
+    g.fillStyle = "rgba(10,14,18,.9)"; g.beginPath(); g.roundRect(3, 3, w - 6, h - 6, 16); g.fill();
+    g.strokeStyle = col; g.lineWidth = 4; g.stroke();
+    icon(g, "arrow-fork", 16, 18, 48, col, 2.4);
+    const text = `decide "${chose}"`; fitFont(g, text, 500, 30, w - 96, "JetBrains Mono"); g.fillStyle = col === C.steel ? C.steel : C.ink; g.fillText(text, 78, 53);
+  });
+}
+function hookChip(text) {
+  const m = plane(2.0, .24, hookTex(text), 12);
+  crispOver(m, 700, 84, (g) => { icon(g, "plug-connected", 22, 18, 46, "#000", 2.6); g.fillStyle = "#000"; g.font = `800 27px "JetBrains Mono"`; g.fillText(text, 82, 52); });
+  return m;
+}
+
+let lanes = {}, extras = [], orientStrips = [], orientHook, peerHooks = [], peerStrips = [], nextEdit = {}, endedTag, threads = [];
+const X = { old: -5.5, coord: -5.5, a: -2.9, b: 2.9, c: 5.5 };
+const SESSION_END = 1.0, NEW_SESSION = 1.5, ORIENT = 1.8, PEER = [4.9, 5.35], TURN = 5.9;
+function build() {
+  buildRecords();
+  lanes.old = makeLane("coordinator", X.old, 11);
+  lanes.coord = makeLane("coordinator · new", X.coord, 23);
+  lanes.a = makeLane("subagent-a", X.a, 37);
+  lanes.b = makeLane("subagent-b", X.b, 41);
+  lanes.c = makeLane("subagent-c", X.c, 53);
+  endedTag = plane(2.1, .3, canvasTex(700, 100, (g) => { g.strokeStyle = C.grey; g.lineWidth = 3; g.beginPath(); g.roundRect(4, 4, 692, 92, 14); g.stroke(); g.fillStyle = C.grey; g.font = `600 34px "JetBrains Mono"`; g.fillText("session ended", 40, 62); }), 8);
+  endedTag.position.set(0, .3, .02); lanes.old.g.add(endedTag);
+  // orient: the new session's first reading, three records by subject
+  orientHook = hookChip("SessionStart · orient"); orientHook.position.set(0, LANE.y + LANE.h / 2 - .02, .03); lanes.coord.g.add(orientHook);
+  orientStrips = [0, 1, 3].map((ri, k) => {
+    const s = plane(2.1, .26, stripTex("arrow-fork", RECORDS[ri].chose, ri === 3 ? C.red : C.mint), 9);
+    s.position.set(0, LANE.y + LANE.h / 2 - .34 - k * .3, .02); lanes.coord.g.add(s); return s;
+  });
+  // the peer feed: before their next tool calls, b and c get the new decision's subject, not its text
+  ["b", "c"].forEach((k, j) => {
+    const h = hookChip("peer feed"); h.position.set(0, LANE.y + LANE.h / 2 - .02, .03); lanes[k].g.add(h); peerHooks.push(h);
+    const s = plane(2.1, .26, stripTex("arrow-fork", RECORDS[REV].chose, C.mint), 9); s.position.set(0, LANE.y + LANE.h / 2 - .34, .02); lanes[k].g.add(s); peerStrips.push(s);
+  });
+  // subagent-c's next edit, before and after it has the note
+  for (const [k, label, col] of [["before", "Edit  cache/admin-sessions.ts", C.orange], ["after", "Edit  session/store.ts", C.mint]]) {
+    const m = plane(2.1, .26, canvasTex(840, 104, (g, w, h) => {
+      g.fillStyle = "rgba(10,14,18,.94)"; g.beginPath(); g.roundRect(3, 3, w - 6, h - 6, 16); g.fill(); g.strokeStyle = col; g.lineWidth = 4; g.stroke();
+      icon(g, "pencil", 18, 26, 50, col, 2.2); g.fillStyle = C.ink; g.font = `500 30px "JetBrains Mono"`; g.fillText(label, 84, 64);
+    }), 9);
+    m.position.set(0, LANE.y + LANE.h / 2 - .72, .03); lanes.c.g.add(m); nextEdit[k] = m;
+  }
+  // subagent-a's selection: the stretch it decides from
+  // the pull back: more sessions than anyone could read
+  for (let i = 0; i < 12; i++) {
+    const side = i % 2 ? 1 : -1, k = Math.floor(i / 2);
+    const l = makeLane("subagent-" + String.fromCharCode(100 + i), side * (8.1 + k * 2.6), 60 + i * 7);
+    l.g.position.z = -1.5 - k * 1.4; extras.push(l);
+  }
+  // how far each lane has scrolled by t, so anything pinned in a transcript can ride with it
+  lanes.old.scrollFn = (t) => scrollAt(Math.min(t, SESSION_END), 0, .07);
+  lanes.coord.scrollFn = (t) => scrollAt(t, ORIENT + 1.0, .07) + .3;   // it reads its orientation first, then gets going
+  [["a", .6], ["b", .15], ["c", .45]].forEach(([k, o]) => (lanes[k].scrollFn = (t) => scrollAt(t, -1, .07) + o));
+  extras.forEach((l, i) => (l.scrollFn = (t) => scrollAt(t, 7.2 + (i % 6) * .25, .07) + i * .13));
+  // the decide calls: each record starts as a tool call in its lane's transcript
+  RECORDS.forEach((r) => {
+    if (!r.from) return;
+    const lane = laneOf(r);
+    r.chip = { hot: plane(2.0, .2, decideTex(r.chose, C.orange), 8), cool: plane(2.0, .2, decideTex(r.chose, C.steel), 8) };
+    lane.g.add(r.chip.hot); lane.g.add(r.chip.cool);
+  });
+  threads = [0, 1, 3].map((ri) => ({ l: line(ri === 3 ? C.red : C.mint), ri }));
+  threads.push({ l: line(C.mint), ri: REV, to: "b" }, { l: line(C.mint), ri: REV, to: "c" });
+}
+
+// ---------- camera ----------
+const KEYS = [
+  [0, [-3.4, 1.7, 8.8], [-2.8, 1.4, 0]],
+  [1.5, [-3.9, 1.7, 6.6], [-3.3, 1.6, 0]],
+  [2.9, [-3.6, 1.7, 6.8], [-3.0, 1.6, 0]],
+  [3.6, [-1.3, 2.0, 8.0], [-1.1, 1.7, 0]],
+  [4.5, [-1.0, 2.0, 8.2], [-.8, 1.7, 0]],
+  [5.1, [3.6, 1.8, 7.2], [4.0, 1.6, 0]],
+  [6.8, [3.9, 1.8, 7.0], [4.2, 1.6, 0]],
+  [T, [0, 2.2, 30], [0, -1.4, -2]],
+];
+const V = (a) => new THREE.Vector3(...a);
+function cameraAt(t) {
+  let i = 0; while (i < KEYS.length - 2 && t > KEYS[i + 1][0]) i++;
+  const [t0, p0, q0] = KEYS[i], [t1, p1, q1] = KEYS[i + 1], k = ease(clamp((t - t0) / (t1 - t0)));
+  camera.position.copy(V(p0).lerp(V(p1), k)); camera.lookAt(V(q0).lerp(V(q1), k));
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+// how far a lane has scrolled by t: a steady read, then the pull back's rush (the integral of the speed, so scrubbing is exact)
+function scrollAt(t, t0, v) { const r = Math.max(0, t - 7); return Math.max(0, t - t0) * v + r * r * .09; }
+const _a = new THREE.Vector3(), _b = new THREE.Vector3();
+const laneOf = (r) => r.from[0] === "x" ? extras[+r.from.slice(1)] : lanes[r.from];
+// a decide call is typed near the bottom of its transcript a beat before the record lifts off, then rides the scroll up
+const TYPED_AHEAD = 1.2, CHIP_Y = LANE.y - .1, WORLD_PER_SCROLL = 4 * LANE.w;   // the lane shows 1/4 of its texture per lane-width of height
+function chipY(r, t) { const l = laneOf(r); return CHIP_Y + (l.scrollFn(t) - l.scrollFn(r.at - TYPED_AHEAD)) * WORLD_PER_SCROLL; }
+function placeChip(r, t) {
+  const y = chipY(r, t), v = (y - (LANE.y - LANE.h / 2)) / LANE.h;
+  const edge = smooth(0, .14, v) * (1 - smooth(.72, 1, v)), on = smooth(r.at - TYPED_AHEAD, r.at - TYPED_AHEAD + .15, t) * edge * (laneOf(r).on ?? 1);
+  const cool = smooth(r.at + .1, r.at + .6, t);   // once the record has gone, it's one more tool call in the transcript
+  r.chip.hot.position.set(0, y, .02); r.chip.cool.position.set(0, y, .02);
+  r.chip.hot.material.opacity = on * (1 - cool); r.chip.cool.material.opacity = on * cool * .9;
+}
+function laneState(l, t, { from = -1, to = 99, seedOff = 0, alpha = 1 } = {}) {
+  const on = smooth(from, from + .45, t) * (1 - smooth(to, to + .5, t));
+  l.body.material.uniforms.uOpacity.value = on * alpha;
+  l.body.material.uniforms.uScroll.value = l.scrollFn ? l.scrollFn(t) : scrollAt(Math.min(t, to), from, .07) + seedOff;
+  l.on = on * alpha;
+  l.label.material.opacity = on * alpha;
+  return on;
+}
+function render(t) {
+  cameraAt(t);
+  const cl = applyClarity(clarityAt(t));
+  scene.fog.density = .04 * cl.fog;
+  sheets.forEach((s, i) => { s.position.x = s.userData.base.x + Math.sin(t * .15 + i) * 2 + t * s.userData.speed; s.position.y = s.userData.base.y - 3; s.material.opacity = s.userData.o * cl.sheets; });
+  // the spine
+  // how many records have landed, fractionally, so the stream slides down smoothly as each one arrives at the top
+  const count = RECORDS.reduce((n, r) => n + (r.at < 0 ? 1 : smooth(r.at - .7, r.at - .2, t)), 0);   // the stream makes room first, then the record glides in
+  records.forEach(({ r, g, faces }, i) => {
+    const slot = REC.top - REC.step * (count - 1 - i), sink = 1 - smooth(-4.4, -5.8, slot);   // the oldest sink into the ground
+    const shown = r.at < 0 ? 1 : smooth(r.at - .75, r.at - .45, t), done = settle(r, t);
+    const superseded = r.bad ? settle(RECORDS[REV], t) : 0;
+    if (faces.orange) { faces.orange.material.opacity = shown * sink * (1 - done); faces.mint.material.opacity = shown * sink * done; }
+    else if (faces.red) faces.red.material.opacity = shown * sink * (1 - .7 * superseded);
+    else faces.mint.material.opacity = shown * sink;
+    if (r.at < 0) { g.position.set(REC.x, slot, 0); return; }
+    // in flight: from the lane that made it, to the top of the stream
+    const lane = laneOf(r), fromY = chipY(r, Math.min(t, r.at - .75));
+    const fly = ease(smooth(r.at - .75, r.at + .05, t));
+    const to = Math.min(slot, REC.top);
+    g.position.set(lane.g.position.x + (REC.x - lane.g.position.x) * fly, fromY + (to - fromY) * fly, lane.g.position.z * (1 - fly));
+    g.scale.setScalar(.7 + .3 * fly);
+  });
+  spine.userData.label.material.opacity = 1;
+  spine.userData.label.position.y = REC.top + .56;
+  // the coordinator hands over: the old session ends, a new one opens where it was and orients
+  const oldOn = laneState(lanes.old, t, { to: SESSION_END + .9 });
+  lanes.old.g.position.x = X.old - 2.2 * ease(smooth(SESSION_END + .2, SESSION_END + 1.2, t));
+  lanes.old.body.material.uniforms.uTint.value.setScalar(1 - .6 * smooth(SESSION_END, SESSION_END + .3, t));
+  endedTag.material.opacity = oldOn * smooth(SESSION_END, SESSION_END + .25, t);
+  laneState(lanes.coord, t, { from: NEW_SESSION, seedOff: .3 });
+  const oh = smooth(ORIENT - .1, ORIENT + .1, t) * (1 - smooth(ORIENT + 1.4, ORIENT + 1.8, t));
+  orientHook.material.opacity = oh; orientHook.scale.setScalar(1 + .08 * Math.max(0, Math.sin((t - ORIENT) * 9)) * oh);
+  orientStrips.forEach((s, k) => (s.material.opacity = smooth(ORIENT + .3 + k * .15, ORIENT + .5 + k * .15, t) * (1 - smooth(8, 9, t))));
+  // subagents
+  laneState(lanes.a, t); laneState(lanes.b, t); laneState(lanes.c, t);
+  RECORDS.forEach((r) => r.chip && placeChip(r, t));
+  peerHooks.forEach((h, j) => { const p = smooth(PEER[j] - .1, PEER[j] + .1, t) * (1 - smooth(PEER[j] + 1.3, PEER[j] + 1.7, t)); h.material.opacity = p; h.scale.setScalar(1 + .08 * Math.max(0, Math.sin((t - PEER[j]) * 9)) * p); });
+  peerStrips.forEach((s, j) => (s.material.opacity = smooth(PEER[j] + .25, PEER[j] + .45, t) * (1 - smooth(8, 9, t))));
+  const flip = smooth(TURN, TURN + .3, t), edgeOn = smooth(3.4, 3.7, t) * (1 - smooth(7.6, 8.4, t));
+  nextEdit.before.material.opacity = edgeOn * (1 - flip); nextEdit.after.material.opacity = edgeOn * flip;
+  nextEdit.before.rotation.x = flip * Math.PI / 2; nextEdit.after.rotation.x = (1 - flip) * -Math.PI / 2;
+  // threads: records into the new session at orient; the new record into b and c at the peer feed
+  threads.forEach((th) => {
+    const rec = records[th.ri].g; rec.getWorldPosition(_a);
+    let k, dst;
+    if (th.to) { const j = th.to === "b" ? 0 : 1; k = smooth(PEER[j] - .1, PEER[j] + .1, t) * (1 - smooth(PEER[j] + .5, PEER[j] + .9, t)); lanes[th.to].g.getWorldPosition(_b); _a.x += REC.w / 2; _b.x -= LANE.w / 2; }
+    else { k = smooth(ORIENT, ORIENT + .2, t) * (1 - smooth(ORIENT + .8, ORIENT + 1.2, t)); lanes.coord.g.getWorldPosition(_b); _a.x -= REC.w / 2; _b.x += LANE.w / 2; }
+    _b.y = LANE.y + LANE.h / 2 - .1; setLine(th.l, _a, _b); th.l.material.opacity = .9 * k;
+  });
+  // the pull back: more sessions, all of them rushing
+  extras.forEach((l, i) => laneState(l, t, { from: 7.2 + (i % 6) * .25, seedOff: i * .13, alpha: .8 }));
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  composer.render();
+  renderer.autoClear = false; renderer.clearDepth(); syncCrisp(); renderer.render(overlay, camera); renderer.autoClear = true;
+}
+
+document.getElementById("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; document.getElementById("play").textContent = "Play"; } };
+document.getElementById("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); document.getElementById("play").click(); } });
+
+Promise.all(["500 1em 'JetBrains Mono'", "600 1em 'JetBrains Mono'", "800 1em 'JetBrains Mono'", "500 1em 'Instrument Sans'", "600 1em 'Instrument Sans'"].map((f) => document.fonts.load(f).catch(() => {})))
+  .finally(() => { build(); size(); last = performance.now(); requestAnimationFrame(frame); });
+</script>

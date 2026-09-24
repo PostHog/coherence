@@ -83,12 +83,16 @@ Because we don’t yet have the tools to make sense of this new world.
 ***7 (to land at first act break)
 at:
 sync:
-picture: Everything cuts to black on the drop; the Coherence wordmark.
-supers: Coherence
+picture: DRAFT (scenes/07-power.src.html). Like a CRT going black, then turning back on, typing the script. Out of scene 6's dark, the last of the picture is static on a tube; it collapses to a line, a dot, and dies. A beat of black, then the tube powers on (dot, line, flash) to a phosphor screen with scanlines, and the two lines type out in mint under a block cursor. Hard cut to black.
+supers:
 source: motion graphics
 transition: hard cut to black
 
-All of that ends now. Coherence is the path to clarity, sturdiness, and productive machine-generated code.
+It's time to build the next generation of tools.
+
+Developers need clarity and confidence, not just speed.
+
+The race is on to deliver.
 
 ***8
 at:
@@ -98,11 +102,11 @@ supers: Delivered through your agent's own hooks
 source: motion graphics (three.js)
 transition:
 
-Coherence starts with an authoritative lexicon.
+Starts with clera definitions.
 
-What does a word mean in your project context? It seems like a simple issue, but if a language model is what’s building your code, being precise about what words mean is the foundation to getting what you want.
+Language models are build out of language. Clearly defining your terms changes their behavior. Agents start to do what you meant, not just what you said.
 
-This changes the integrity of what gets built, unpacking assumptions into documented clarity.
+This impacts the integrity of what gets built, making bugs easier for agents to detect.
 
 ***9
 at:
@@ -121,9 +125,9 @@ If a bad call happened in the process, it’s right there in the history, instea
 ***10
 at:
 sync:
-picture: Two agent sessions side by side; peer feed lines arriving in one from the other.
+picture: LOCKED (scenes/10-switchboard.src.html). A switchboard: transcript lanes, one per session, on either side of a short spine of scene 9's decision records. The coordinator's session ends; a new one opens where it was, its SessionStart hook pulses (orient) and three records thread into it by subject. subagent-a records "Route admin reads through the session store", reversing scene 9's bad call, which steps back. The peer feed drops only that subject into subagent-b and -c; c's next edit turns from the cache to the session store. Every session adds its decisions to the one spine as it works: a decide tool call appears in its transcript in orange, and the record lifts out of it, flies in, lands orange at the top of the stream, settles mint, and the stream flows down. Pull back: lanes multiply and rush to texture, all feeding the spine, which pours down into the ground as one crisp stream. Fog clarity 0.20 to 0.35.
 supers:
-source: terminal capture
+source: motion graphics (three.js)
 transition:
 
 Quickly move between different conversations and agents without costly handoff files, while letting subagents compare notes.

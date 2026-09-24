@@ -76,6 +76,10 @@ Every state change is a colour change along one path: grey or orange → mint, o
   - Stay true to what each hook does. Starts deliver the lexicon and orientation. Tool boundaries deliver the peer feed and, after edits, the chokepoint re-check. Stops run regulate, and SubagentStop refuses to let a subagent stop while findings remain. Coherence never detects a sense overload by itself: the catch is the agent's, made possible by what the hook delivered.
 - **Threads:** thin red lines that connect a record to where its consequence lives, typically down through the fog to a cell on the territory.
 
+## Clarity
+
+Act two burns the fog off. Each act-two scene sets `CLARITY = [start, end]` before `/*COMMON*/`, and each starts where the last one ended, so the clearing runs across cuts rather than stepping at them. `applyClarity(clarityAt(t))` thins the fog and the fog sheets and lights the territory under the map; at 1 the air is clear and the ground is lit, ready for the pull-out onto the mint surface. The schedule so far: 8 is 0 to .1, 9 is .1 to .2, 10 is .2 to .35, then 11 to 14 climb toward .9 and 15 reaches 1.
+
 ## Camera
 
 - The camera sits roughly square to the layout it is showing: things are laid out flat, in depth, and the camera moves through that space.

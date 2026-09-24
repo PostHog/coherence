@@ -1,0 +1,198 @@
+<title>Scene 7 · Power Cycle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.caption { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 7 · the turn</div>
+    <h1>The screen goes dark, comes back on, and types the way forward</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="11" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 11.00</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <section class="box">
+    <h2>Beats (about 11 s; lands on the first act break, hard cut to black)</h2>
+    <ol class="beats">
+      <li><span class="t">0.0</span><div><span>Out of scene 6's dark: the last of the picture is static on a tube. It collapses to a bright line, then a dot, and the dot dies.</span></div></li>
+      <li><span class="t">1.6</span><div><span>A beat of black, then the tube comes back on: a dot, a line, a flash, and a dark phosphor screen with scanlines and a blinking cursor.</span></div></li>
+      <li><span class="t">2.3</span><div><q>It’s time to build the next generation of tools.</q><span>Typed in mint as it's said.</span></div></li>
+      <li><span class="t">5.4</span><div><q>Developers deserve to move with clarity and confidence, not just speed.</q><span>Typed below it. The cursor blinks, then a hard cut to black into scene 8.</span></div></li>
+    </ol>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const ICONS = /*ICONS*/{};
+const T = 11;
+const C = { bg: 0x000000, fog: 0x000000, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2" };
+const LINES = [
+  [2.3, 5.2, "It’s time to build the next generation of tools."],
+  [5.4, 10.4, "Developers deserve to move with clarity and confidence, not just speed."],
+];
+
+/*COMMON*/
+
+territory.visible = false;
+sheets.forEach((m) => (m.visible = false));
+scene.fog = null;
+bloom.strength = .75; bloom.radius = .5; bloom.threshold = .12;
+
+// ---------- the terminal: what the tube shows, drawn flat ----------
+const TW = 1920, TH = 1080, MARGIN = 190, FONT = `500 54px "JetBrains Mono"`, LH = 84;
+const term = document.createElement("canvas"); term.width = TW; term.height = TH;
+const termTex = new THREE.CanvasTexture(term);
+// the script, pre-wrapped, with when each block starts typing and how fast
+const TYPED = [
+  { at: 2.3, cps: 18.5, rows: ["It’s time to build the next generation of tools."] },
+  { at: 5.4, cps: 17.5, rows: ["Developers deserve to move with clarity and", "confidence, not just speed."] },
+];
+const hash = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+// each character's moment: a steady rate, a little human jitter, a pause after punctuation
+TYPED.forEach((b, bi) => {
+  let at = b.at; b.times = [];
+  b.rows.forEach((row) => { b.times.push([...row].map((ch, i) => { const t0 = at; at += (1 + (hash(bi * 97 + i) - .5) * .7) / b.cps + (/[.,]/.test(ch) ? .12 : 0); return t0; })); });
+  b.end = at;
+});
+function drawTerm(t) {
+  const g = term.getContext("2d");
+  g.fillStyle = "#020504"; g.fillRect(0, 0, TW, TH);
+  g.font = FONT; g.textBaseline = "alphabetic"; g.fillStyle = C.mint;
+  const cw = g.measureText("M").width;
+  let y = 430, cursor = [MARGIN, 430], typing = false;
+  TYPED.forEach((b, bi) => {
+    if (bi && t >= b.at) y += LH * .6;
+    b.rows.forEach((row, ri) => {
+      const n = b.times[ri].filter((x) => x <= t).length;
+      if (n) { g.fillText(row.slice(0, n), MARGIN, y); cursor = [MARGIN + n * cw, y]; if (n < row.length) typing = true; }
+      if (n || ri === 0) y += LH;
+    });
+  });
+  // the cursor: solid while typing, blinking while it waits
+  if (typing || Math.floor(t * 1.9) % 2 === 0) g.fillRect(cursor[0] + 6, cursor[1] - 46, cw * .9, 58);
+  termTex.needsUpdate = true;
+}
+
+// ---------- the tube: scanlines, a little curvature, phosphor, and the power cycle ----------
+const tube = new THREE.ShaderMaterial({
+  uniforms: { uTex: { value: termTex }, uTime: { value: 0 }, uSX: { value: 1 }, uSY: { value: 1 }, uGain: { value: 1 }, uStatic: { value: 0 }, uFlash: { value: 0 } },
+  vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader: `
+    uniform sampler2D uTex; uniform float uTime, uSX, uSY, uGain, uStatic, uFlash; varying vec2 vUv;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main() {
+      vec2 p = vUv - .5;
+      p *= 1. + .07 * dot(p, p);                         // the glass bulges a little
+      vec2 q = p / vec2(uSX, uSY);                        // the power cycle squeezes the picture
+      if (abs(q.x) > .5 || abs(q.y) > .5) { gl_FragColor = vec4(0., 0., 0., 1.); return; }
+      vec2 uv = q + .5;
+      vec3 c = vec3(texture2D(uTex, uv + vec2(.0011, 0.)).r, texture2D(uTex, uv).g, texture2D(uTex, uv - vec2(.0011, 0.)).b);
+      float n = hash(floor(uv * vec2(480., 270.)) + floor(uTime * 30.) * 7.13);
+      c = mix(c, vec3(.02 + .16 * n), uStatic);
+      c *= .4 + .6 * pow(abs(sin(uv.y * 180. * 3.14159)), 1.4);   // scanlines
+      c *= 1. + .05 * sin(uv.y * 5. - uTime * 1.7);             // a slow rolling band
+      c = mix(c, vec3(.85, 1., .93), uFlash);
+      c *= smoothstep(.78, .28, length(p * vec2(1., 1.25)));   // vignette
+      gl_FragColor = vec4(c * uGain, 1.);
+    }`,
+});
+const screen = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), tube);
+scene.add(screen);
+camera.position.set(0, 0, 5); camera.lookAt(0, 0, 0);
+function fitScreen() {
+  const h = 2 * 5 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  screen.scale.set(h * camera.aspect, h, 1);
+}
+
+// the power cycle, as a function of time
+const MIN = .004;
+function power(t) {
+  const u = tube.uniforms;
+  u.uTime.value = t; u.uFlash.value = 0; u.uStatic.value = 0;
+  if (t < 1.0) {           // off: the static collapses to a line, the line to a dot, the dot dies
+    const a = smooth(.3, .58, t), b = smooth(.58, .8, t);
+    u.uStatic.value = 1; u.uSY.value = 1 - a * (1 - MIN); u.uSX.value = 1 - b * (1 - MIN);
+    u.uGain.value = (1 + 3.5 * a + 5 * b) * (1 - smooth(.8, .98, t));
+  } else if (t < 1.6) {    // black
+    u.uGain.value = 0;
+  } else if (t < T - .1) { // on: a dot, a line, a flash, then the phosphor settles
+    u.uSX.value = MIN + (1 - MIN) * ease(smooth(1.6, 1.76, t));
+    u.uSY.value = MIN + (1 - MIN) * ease(smooth(1.78, 1.98, t));
+    const flash = smooth(1.76, 1.9, t) * (1 - smooth(1.92, 2.12, t));
+    u.uFlash.value = .45 * flash; u.uGain.value = smooth(1.6, 1.64, t) * (1 + 4 * (1 - smooth(1.6, 1.98, t)) * (t < 1.98 ? 1 : 0));
+  } else {                 // hard cut
+    u.uGain.value = 0;
+  }
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+function render(t) {
+  fitScreen();
+  drawTerm(t); power(t);
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  composer.render();
+}
+
+document.getElementById("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; document.getElementById("play").textContent = "Play"; } };
+document.getElementById("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); document.getElementById("play").click(); } });
+
+document.fonts.load(FONT).catch(() => {}).finally(() => { size(); last = performance.now(); requestAnimationFrame(frame); });
+</script>
