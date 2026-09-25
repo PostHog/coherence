@@ -12,8 +12,9 @@
  *
  *   ## entrances               (any spec)
  *   - <name>: <one-line meaning: what work enters here from outside>
- *     handler: <symbol, or symbol in file>
+ *     handler: <symbol, symbol in file, or a module file>   a module file: its top-level script is the handler
  *     trust: <the trust level it carries in>              optional; else derived from crossings
+ *     guard: <a chokepoint's symbol>                     optional; the chokepoint its handler is registered through
  *
  *   ## invariants
  *   - <name>: <sentence>
@@ -85,8 +86,10 @@ export const OUTSIDE_MARKER = "(outside)";
 
 /**
  * Where work enters the system from outside: a command, a host event, a
- * route, a tool. The handler is the code that receives it, named as a symbol
- * or a symbol in a file; the model checks that it resolves.
+ * route, a tool. The handler is the code that receives it, named as a symbol,
+ * a symbol in a file, or a module file whose top-level script receives it;
+ * the model checks that it resolves. A guard names the chokepoint the handler
+ * is registered through, where the reading cannot see the registration.
  */
 export interface Entrance {
   name: string;
@@ -100,6 +103,15 @@ export interface Entrance {
   trust: string | undefined;
   /** The trust line, when there is one. */
   trustLine: number | undefined;
+  /** The chokepoint it declares its handler is registered through (a guard: line); undefined when it declares none. */
+  guard?: string | undefined;
+  /** The guard line, when there is one. */
+  guardLine?: number | undefined;
+}
+
+/** A handler named as a module file (a path with an extension): the module's top-level script receives the work. */
+export function isModuleHandler(handler: string): boolean {
+  return /^[A-Za-z0-9_./@-]+\.[A-Za-z]+$/.test(handler.trim()) && !/\s/.test(handler.trim());
 }
 
 export type Enforcement =
@@ -333,7 +345,7 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         if (bullet !== null) {
           const colon = bullet[1]!.indexOf(":");
           if (colon <= 0) {
-            problem(line, "an entrance is one bullet: - <name>: <one-line meaning>, with an indented handler: <symbol> line and an optional trust: <trust level> line");
+            problem(line, "an entrance is one bullet: - <name>: <one-line meaning>, with an indented handler: <symbol> line and optional trust: <trust level> and guard: <chokepoint> lines");
             return;
           }
           const name = bullet[1]!.slice(0, colon).trim();
@@ -346,7 +358,7 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         const current = entrances[entrances.length - 1];
         const field = /^\s+([a-z]+):\s*(.*)$/.exec(raw);
         if (current === undefined || field === null) {
-          problem(line, "expected an entrance bullet (- <name>: <meaning>) or an indented handler: or trust: line under one");
+          problem(line, "expected an entrance bullet (- <name>: <meaning>) or an indented handler:, trust: or guard: line under one");
           return;
         }
         if (field[1] === "trust") {
@@ -358,8 +370,16 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
           current.trustLine = line;
           return;
         }
+        if (field[1] === "guard") {
+          if (current.guardLine !== undefined) problem(line, `entrance ${current.name} names its guard twice`);
+          const value = field[2]!.trim();
+          if (value === "") problem(line, `guard: on entrance ${current.name} names no chokepoint`);
+          else if (!isPlaceholder(value)) current.guard = value;
+          current.guardLine = line;
+          return;
+        }
         if (field[1] !== "handler") {
-          problem(line, `unknown key "${field[1]}": an entrance carries handler and trust`);
+          problem(line, `unknown key "${field[1]}": an entrance carries handler, trust and guard`);
           return;
         }
         if (current.handler !== undefined) problem(line, `entrance ${current.name} names its handler twice`);
@@ -417,7 +437,7 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
 
   for (const entrance of entrances) {
     if (entrance.handler === undefined || entrance.handler === "" || isPlaceholder(entrance.handler)) {
-      problem(entrance.line, `entrance ${entrance.name} names no handler: add handler: <symbol, or symbol in file>`);
+      problem(entrance.line, `entrance ${entrance.name} names no handler: add handler: <symbol, symbol in file, or module file>`);
     }
   }
   const invariants = bullets.map((bullet) => buildInvariant(bullet, problem, options.seed));

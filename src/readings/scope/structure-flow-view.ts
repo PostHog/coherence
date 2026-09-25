@@ -22,7 +22,7 @@
  * view, unless something is broken, when the broken component opens
  * selected. Red means broken and nothing else; the selection is a neutral
  * halo and weight, a color no route wears; attention that is not breakage
- * (nothing enforced, no control, not covered) is amber.
+ * (nothing enforced, no traced control, not covered) is amber.
  *
  * Motion (the owner's rule): only the direction of work moves, and only on
  * what is selected. A selected route carries a slow, faint procession of
@@ -46,8 +46,10 @@ import { html, join, raw, slug, type Markup } from "./html.ts";
 import { renderEnforcement, renderRefutation } from "./invariants-view.ts";
 import type { ShellState, StructurePreview } from "./model.ts";
 import {
+  CONTROL_WORDS,
   CORE_RULE,
   DEFAULT_RULE,
+  NO_TRACED_CONTROL,
   FLOW_CHANGE_ID,
   FLOW_HEALTH_KINDS,
   FLOW_NONE_ID,
@@ -377,7 +379,7 @@ const FLOW_SVG_STYLE = `
 .flow-svg .flow-origin, .flow-svg .flow-origin-more { fill: var(--flow-token-ink); }
 .flow-svg .flow-trust .flow-trust-box { fill: transparent; stroke: none; }
 .flow-svg .flow-trust text { fill: var(--flow-muted); }
-.flow-svg .flow-trust.flow-trust-nocontrol text { fill: var(--flow-attention); }
+.flow-svg .flow-trust.flow-trust-untraced text { fill: var(--flow-attention); }
 .flow-svg .flow-trust[data-structure-select]:hover text { text-decoration: underline; }
 .flow-svg .flow-trust:focus .flow-trust-box { stroke: var(--flow-select); stroke-width: 1px; vector-effect: non-scaling-stroke; }
 .flow-svg .flow-faint { fill: none; stroke: var(--flow-quiet); stroke-width: 1.4; stroke-dasharray: 5 4; }
@@ -550,7 +552,7 @@ export interface FlowText {
  * entrance line, or once on a rail for a core dependency's stubs; drawn in
  * full once, and as a dot wherever it stands again), a bypass mark or a
  * count on a pipe, or a component's broken, boundary or not-covered mark,
- * attached to its box. (A route's trust, and its no-control mark, is the
+ * attached to its box. (A route's trust, and its no-traced-control mark, is the
  * tag beneath its origin token, not one of these.)
  */
 export interface FlowTagDraw {
@@ -614,24 +616,25 @@ export interface FlowLayout {
 }
 
 /**
- * What a route's trust tag says: "no control" when it is untrusted and nothing
- * controls it (decisions d-7d36881b, d-ba18b0fd), else its trust: a declared
- * level alone, a derived one marked derived, or unknown.
+ * What a route's trust tag says: "no traced control" when it is untrusted and
+ * no control is traced on it (decisions d-7d36881b, d-ba18b0fd, d-127ab8e4),
+ * else its trust: a declared level alone, a derived one marked derived, or
+ * unknown.
  */
-export function trustTagWords(route: Pick<FlowRoute, "trust" | "trustSource" | "noControl">): string {
-  return route.noControl ? "no control" : trustInWords(route);
+export function trustTagWords(route: Pick<FlowRoute, "trust" | "trustSource" | "noTracedControl">): string {
+  return route.noTracedControl ? NO_TRACED_CONTROL : trustInWords(route);
 }
 
 /** The tag's tooltip: what its words mean for this route. */
 function trustTagTitle(route: FlowRoute, levels: readonly FlowLevel[]): string {
   const outside = route.trust.filter((name) => levels.find((level) => level.name === name)?.outside === true);
-  if (route.noControl) {
+  if (route.noTracedControl) {
     const why = route.trust.length === 0
       ? "its trust is unknown, so it is treated as untrusted"
       : outside.length > 0
         ? `${outside.join(", ")} comes from outside the system's control`
         : `${route.trust.join(", ")} is no declared trust level`;
-    return `No control: nothing stands on this route, and ${why}.`;
+    return `No traced control: no verified chokepoint or totality oracle was traced on this route, and ${why}. Not a demonstrated bypass.`;
   }
   if (route.trust.length === 0) return "Trust in: unknown, neither declared nor derived; treated as untrusted.";
   return route.trustSource === "declared" ? `Trust in: ${route.trust.join(", ")} (declared).` : `Trust in: ${route.trust.join(", ")} (derived), from the crossing on its handler.`;
@@ -876,8 +879,8 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
   // The left margin: the widest named origin, its dot, and room for the lines to fan into their stations. An entrance
   // route's trust tag hangs beneath its token, right-aligned to the edge the route leaves by (the owner's ruling
   // d-a5c6442d), so a trust level's name never widens the margin: a tag that does not fit is dropped, and the route's
-  // inspector states it. The margin is only ever as narrow as the fixed words "no control" and "unknown" allow, so the
-  // attention a route with no control carries is never the tag that drops.
+  // inspector states it. The margin is only ever as narrow as the fixed words "no traced control" and "unknown" allow, so
+  // the attention a route with no traced control carries is never the tag that drops.
   /** A name line set quiet (regular, not medium): a derived route's last line, or the count of names a token does not show. */
   const quietLine = (route: FlowRoute, j: number): boolean => {
     const n = originLines(route).length;
@@ -886,8 +889,8 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
   const lineW = (route: FlowRoute, j: number): number => textWidth(originLines(route)[j]!, FLOW_NAME_SIZE, !quietLine(route, j));
   // A derived trust whose tag does not fit falls back to the fixed word "derived" (d-ba18b0fd), which the margin also allows.
   const fixedWords = [
-    ...(drawn.some((route) => !route.derived && (route.noControl || route.trust.length === 0)) ? ["no control"] : []),
-    ...(drawn.some((route) => !route.derived && !route.noControl && route.trust.length > 0 && route.trustSource === "derived") ? [FLOW_DERIVED_TAG] : []),
+    ...(drawn.some((route) => !route.derived && (route.noTracedControl || route.trust.length === 0)) ? [NO_TRACED_CONTROL] : []),
+    ...(drawn.some((route) => !route.derived && !route.noTracedControl && route.trust.length > 0 && route.trustSource === "derived") ? [FLOW_DERIVED_TAG] : []),
   ];
   const fixedTag = Math.max(0, ...fixedWords.map((words) => textWidth(words, TYPE_SMALL, false, 0, true)));
   const termW = Math.max(0, fixedTag + 3 - (FLOW_PAD + 2 * FLOW_TOKEN_PAD_X + 8 - 6), ...drawn.flatMap((route) => originLines(route).map((_, j) => lineW(route, j))));
@@ -1232,7 +1235,7 @@ export function flowLayout(model: FlowModel, selection: FlowSelection = flowSele
       const bottom = token.box.y + token.box.h;
       const words = trustTagWords(group.route);
       // A derived level too wide for the margin still says it is derived: the fixed word, its level in the tooltip and inspector.
-      const fallback = !group.route.noControl && group.route.trust.length > 0 && group.route.trustSource === "derived" ? [FLOW_DERIVED_TAG] : [];
+      const fallback = !group.route.noTracedControl && group.route.trust.length > 0 && group.route.trustSource === "derived" ? [FLOW_DERIVED_TAG] : [];
       const placedTag = tryPlace([words, ...fallback].map((text) => ({ text, x: r1(tokenRight), y: r1(bottom + FLOW_TRUST_GAP + TYPE_SMALL * 0.78), size: TYPE_SMALL, bold: false, align: "end" as const, mono: true })), `trust ${group.route.id}`, 2, "flow-trust-text flow-mono");
       if (placedTag === undefined) continue;
       const text = textBox(placedTag);
@@ -1781,11 +1784,11 @@ export function renderFlowSvg(model: FlowModel, selected: string | undefined, pr
     ${layout.routes.map((draw) => {
       const trustTag = layout.trustTags.find((b) => b.route === draw.route.id);
       const level = trustTag === undefined || trustTag.levels.length !== 1 ? undefined : model.levels.find((l) => l.name === trustTag.levels[0]);
-      return html`<g class="flow-route-group ${routeClass(draw.route)}" id="${draw.route.id}" data-names="${draw.route.names.join(", ")}" data-derived="${draw.route.derived ? "true" : "false"}" data-stops="${draw.route.stops.join(" ")}" data-edges="${draw.route.edges.join(" ")}"${draw.route.rail === undefined ? null : raw(` data-rail="${draw.route.rail}"`)} data-trust="${draw.route.trust.join(" ")}" data-controls="${draw.route.controls.join(" ")}" data-structure-select="${draw.route.id}" role="button" tabindex="0" aria-pressed="${selection.id === draw.route.id ? "true" : "false"}" aria-label="${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(", ")}${draw.route.derived ? "" : `; trust ${trustInWords(draw.route)}`}${draw.route.noControl ? "; no control" : ""}">
+      return html`<g class="flow-route-group ${routeClass(draw.route)}" id="${draw.route.id}" data-names="${draw.route.names.join(", ")}" data-derived="${draw.route.derived ? "true" : "false"}" data-stops="${draw.route.stops.join(" ")}" data-edges="${draw.route.edges.join(" ")}"${draw.route.rail === undefined ? null : raw(` data-rail="${draw.route.rail}"`)} data-trust="${draw.route.trust.join(" ")}" data-controls="${draw.route.controls.join(" ")}" data-structure-select="${draw.route.id}" role="button" tabindex="0" aria-pressed="${selection.id === draw.route.id ? "true" : "false"}" aria-label="${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(", ")}${draw.route.derived ? "" : `; trust ${trustInWords(draw.route)}`}${draw.route.noTracedControl ? `; ${NO_TRACED_CONTROL}` : ""}">
       <title>${routeName(draw.route)}: ${draw.route.stops.map((stop) => flowName(byFolder.get(stop)!)).join(" → ")}${draw.route.rail === undefined ? "" : ` → ${byFolder.get(draw.route.rail)!.name} (rail)`}${draw.route.derived ? "" : ` · trust in: ${trustInWords(draw.route)}`}</title>
       <path class="flow-line flow-route" data-line="${draw.route.id}" d="${pathD(draw.path)}" stroke="${draw.color}"/>
       <g class="flow-token${draw.route.derived ? " flow-derived" : ""}">${texts(`origin ${draw.route.id} `).length === 0 ? null : originToken(layout.tokens.find((t) => t.route === draw.route.id)!, draw.route)}</g>
-      ${trustTag === undefined ? null : html`<g class="flow-trust${draw.route.noControl ? " flow-trust-nocontrol" : trustTag.levels.length === 0 ? " flow-trust-unknown" : ""}" data-trust-tag="${trustTagWords(draw.route)}" data-no-control="${draw.route.noControl ? "true" : "false"}"${level === undefined ? null : raw(` data-structure-select="${level.id}" role="button" tabindex="0" aria-label="trust level ${level.name}: ${level.meaning.replace(/"/g, "&quot;")}"`)} data-trust-source="${draw.route.trust.length === 0 ? "unknown" : draw.route.trustSource}"><title>${trustTagTitle(draw.route, model.levels)}</title><rect class="flow-trust-box" x="${trustTag.box.x}" y="${trustTag.box.y}" width="${trustTag.box.w}" height="${trustTag.box.h}"/>${texts(`trust ${draw.route.id}`).map(renderText)}</g>`}
+      ${trustTag === undefined ? null : html`<g class="flow-trust${draw.route.noTracedControl ? " flow-trust-untraced" : trustTag.levels.length === 0 ? " flow-trust-unknown" : ""}" data-trust-tag="${trustTagWords(draw.route)}" data-no-traced-control="${draw.route.noTracedControl ? "true" : "false"}"${level === undefined ? null : raw(` data-structure-select="${level.id}" role="button" tabindex="0" aria-label="trust level ${level.name}: ${level.meaning.replace(/"/g, "&quot;")}"`)} data-trust-source="${draw.route.trust.length === 0 ? "unknown" : draw.route.trustSource}"><title>${trustTagTitle(draw.route, model.levels)}</title><rect class="flow-trust-box" x="${trustTag.box.x}" y="${trustTag.box.y}" width="${trustTag.box.w}" height="${trustTag.box.h}"/>${texts(`trust ${draw.route.id}`).map(renderText)}</g>`}
       <g class="flow-terminus${draw.route.derived ? " flow-derived" : ""}">${texts(`origin ${draw.route.id} `).map(renderText)}</g>
     </g>`;
     })}
@@ -1961,7 +1964,7 @@ function routeStops(model: FlowModel, route: FlowRoute): string {
 }
 
 function routeRow(model: FlowModel, route: FlowRoute): Markup {
-  const trust = route.derived ? "" : ` · trust ${trustInWords(route)}${route.noControl ? " · no control" : ""}`;
+  const trust = route.derived ? "" : ` · trust ${trustInWords(route)}${route.noTracedControl ? ` · ${NO_TRACED_CONTROL}` : ""}`;
   return flowRow(flowPick(route.id, routeName(route)), `${routeStops(model, route)}${trust}`, "line", routeSwatch(route));
 }
 
@@ -1974,11 +1977,12 @@ function renderRouteTrust(state: ShellState, route: FlowRoute): Markup {
       : route.trustSource === "declared"
         ? html`<span data-field="trust">${route.trust.join(", ")}</span> <span class="flow-meta" data-field="trust-source">(declared)</span>`
         : html`<span data-field="trust">${route.trust.join(", ")}</span> <span class="flow-meta" data-field="trust-source">(derived) the entering side of the crossing whose chokepoint is its entrances' handler; they declare none</span>`],
-    ["Controls on it", route.noControl
-      ? html`<span class="flow-attention" data-field="controls">no control</span> <span class="flow-meta">no chokepoint or crossing stands where its work enters or on any interface it takes, and what it carries in is untrusted</span>`
-      : route.controls.length === 0
-        ? html`<span data-field="controls">none</span> <span class="flow-meta">nothing stands on it, and it carries in a trust level inside the system's control</span>`
-        : html`<span data-field="controls">${route.controls.join(" ")}</span>`],
+    ["Controls on it", route.noTracedControl
+      ? html`<span class="flow-attention" data-field="controls">${NO_TRACED_CONTROL}</span> <span class="flow-meta">what it carries in is untrusted, and no verified chokepoint or totality oracle was traced on it: none stands on its lines, wraps its handler, stands inside a component on it where its reach meets the protected thing, or covers its trust at a component on it. Not a demonstrated bypass</span>`
+      : route.traced.length === 0
+        ? html`<span data-field="controls">none</span> <span class="flow-meta">no control was traced on it, and it carries in a trust level inside the system's control</span>`
+        : html`<ul class="flow-rows" data-field="controls">${route.traced.map((control) => html`<li class="flow-row" data-control="${control.kind}" data-invariant="${control.name}"${control.declared ? raw(' data-declared="true"') : null}>${control.identifier === undefined ? null : html`<span class="flow-ident" data-verdict-state="${control.verdict.state}">${control.identifier}</span>`}<a class="flow-pick" href="#${invariantId(control.component, control.name)}">${control.name}</a><span class="flow-meta">${control.kind === "wrapper" && control.declared ? `${CONTROL_WORDS.wrapper}, declared by its guard: line` : CONTROL_WORDS[control.kind]} · ${verdictMark(control)}</span></li>`)}</ul>`],
+    route.partial.length === 0 ? null : ["Passed by some", html`<ul class="flow-rows" data-field="partial-controls">${route.partial.map((control) => html`<li class="flow-row" data-control="${control.kind}" data-invariant="${control.name}" data-entrances="${String(control.entrances)}"><a class="flow-pick" href="#${invariantId(control.component, control.name)}">${control.name}</a><span class="flow-meta">${control.kind === "wrapper" && control.declared ? `${CONTROL_WORDS.wrapper}, declared by its guard: line` : CONTROL_WORDS[control.kind]}, on ${control.entrances} of its ${route.entrances.length} entrances; not counted, since every entrance on a route must pass a control · ${verdictMark(control)}</span></li>`)}</ul>`],
   ])}`;
 }
 
@@ -2036,7 +2040,7 @@ function renderHealthStrip(model: FlowModel, selected: string | undefined): Mark
     ${nothingEnforced ? html`<p class="flow-health-note" data-field="nothing-enforced">Nothing is enforced yet: every declared invariant is still a requirement, so no identifier on this map is a working control.</p>` : null}
     ${model.levels.length === 0 ? null : html`<div class="flow-trust-key" data-field="trust-key">
       <p class="flow-trust-key-title">Trust levels <span class="flow-meta">the tag beneath each entrance route's token says which it carries in; select one to see where its crossings stand</span></p>
-      <ul>${model.levels.map((level) => html`<li><button type="button" class="flow-trust-level" data-structure-select="${level.id}" aria-pressed="${selected === level.id ? "true" : "false"}" title="${level.meaning}"><code>${level.name}</code></button> <span>${levelLine(level.meaning)}</span>${level.outside ? html` <span class="flow-meta" data-outside="true">outside the system's control</span>` : null}</li>`)}${derived ? html`<li data-level="derived"><span class="flow-trust-tag"><code>(derived)</code></span> <span>read from the crossing on its handler</span></li><li data-level="unknown"><span class="flow-trust-tag flow-trust-unknown"><code>unknown</code></span> <span>neither declared nor derived: untrusted</span></li><li data-level="no-control"><span class="flow-trust-tag flow-trust-nocontrol"><code>no control</code></span> <span>untrusted, and nothing on the route controls it</span></li>` : null}</ul>
+      <ul>${model.levels.map((level) => html`<li><button type="button" class="flow-trust-level" data-structure-select="${level.id}" aria-pressed="${selected === level.id ? "true" : "false"}" title="${level.meaning}"><code>${level.name}</code></button> <span>${levelLine(level.meaning)}</span>${level.outside ? html` <span class="flow-meta" data-outside="true">outside the system's control</span>` : null}</li>`)}${derived ? html`<li data-level="derived"><span class="flow-trust-tag"><code>(derived)</code></span> <span>read from the crossing on its handler</span></li><li data-level="unknown"><span class="flow-trust-tag flow-trust-unknown"><code>unknown</code></span> <span>neither declared nor derived: untrusted</span></li><li data-level="no-traced-control"><span class="flow-trust-tag flow-trust-untraced"><code>no traced control</code></span> <span>untrusted, and no verified chokepoint or totality oracle was traced on the route; not a demonstrated bypass</span></li>` : null}</ul>
     </div>`}
   </div>`;
 }
@@ -2132,8 +2136,9 @@ function renderEntranceInspector(state: ShellState, model: FlowModel, entrance: 
     ${flowHead("Entrance", html`${entrance.name}`, `${entrance.id}-heading`, entrance.meaning)}
     ${flowFacts([
       ["Declared by", html`<code>${entrance.declaredBy}</code>`],
-      ["Handler", entrance.handler === undefined ? "none" : html`<code>${entrance.handler}</code>`],
+      ["Handler", entrance.handler === undefined ? "none" : html`<code>${entrance.handler}</code>${entrance.module ? html` <span class="flow-meta" data-field="module">the module's top-level script</span>` : null}`],
       entrance.start === undefined ? null : ["Starts in", html`<code>${entrance.start}</code>`],
+      entrance.guard === undefined ? null : ["Guard", html`<code>${entrance.guard}</code> <span class="flow-meta" data-field="guard">${entrance.guardUnconfirmed === undefined ? (entrance.guards?.some((g) => g.how === "declared" || g.how === "wrapper") ? "declared, and its registration confirmed" : "declared; the reading did not confirm it") : `declared, not counted: ${entrance.guardUnconfirmed}`}</span>`],
     ])}
     ${entrance.reachable ? (route === undefined ? html`<p class="flow-note">Its route is not drawn.</p>` : renderRouteBody(state, model, route, true)) : html`<p class="empty" data-field="unreachable">${entrance.resolved ? "Unreachable" : "Unresolved"}: ${entrance.reason}</p>`}
   </div>`;
@@ -2382,7 +2387,7 @@ function renderFlowKey(state: ShellState): Markup {
       ${keyItem('<rect x="1" y="2" width="11" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M17 2 H24 L27 7 L24 12 H17 L14 7 Z" fill="none" stroke="currentColor" stroke-width="1.3"/>', html`C = ${termLink(state, "chokepoint")}, rounded: the one site every reference to a protected thing passes. X = ${termLink(state, "crossing")}, pointed: a chokepoint whose invariant names the trust levels on either side of it`)}
       ${keyItem('<circle cx="7" cy="7" r="4" fill="var(--flow-key-verified)"/><path d="M20 2 L25 7 L20 12 L15 7 Z" fill="var(--flow-key-verified)"/>', "A dot: the same identifier drawn in full elsewhere on the map; select it to select that identifier")}
       ${keyItem('<path d="M14 0 V14" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"/><path d="M1 7 H27" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>', html`Trust boundary: where a crossing's ${termLink(state, "trust level")} changes, on its interface, on the line where work enters, or dashed along a component's edge for the crossings inside it (their count shows when a trust level or the component is selected)`)}
-      ${keyItem('<path d="M4 0.5 H24 V4.5 L21 7.5 H1 V3.5 Z" fill="none" stroke="currentColor"/><path d="M12 11.5 H24" stroke="var(--flow-key-attention)" stroke-width="2.5"/>', html`Amber, attention, not breakage: <strong>no control</strong>, the tag beneath an untrusted route's token with no chokepoint or crossing where its work enters or on any interface it takes; <strong>not covered</strong>, on a component no enforcement covers, whose bar is hollow`)}
+      ${keyItem('<path d="M4 0.5 H24 V4.5 L21 7.5 H1 V3.5 Z" fill="none" stroke="currentColor"/><path d="M12 11.5 H24" stroke="var(--flow-key-attention)" stroke-width="2.5"/>', html`Amber, attention, not breakage: <strong>no traced control</strong>, the tag beneath an untrusted route's token when no verified chokepoint or totality oracle was traced on it (on its lines, wrapping its handler, inside a component on it, or covering its trust); the route's inspector names each control it has and how it was traced; <strong>not covered</strong>, on a component no enforcement covers, whose bar is hollow`)}
       ${keyItem('<path d="M1 11 H27" stroke="var(--flow-key-rail)" stroke-width="4" stroke-linecap="round"/><path d="M8 1 V11" stroke="var(--flow-key-rail)" stroke-width="1.5"/>', html`${termLink(state, "core dependency", "Core dependency")} (rail) and a caller's stub to it`)}
       ${keyItem('<path d="M7 1.5 H25 V9 L21.5 12.5 H3 V5 Z" fill="none" stroke="var(--flow-key-halo)" stroke-width="5"/><path d="M7 1.5 H25 V9 L21.5 12.5 H3 V5 Z" fill="none" stroke="currentColor" stroke-width="2"/>', "Selected: a neutral halo and a heavier border, never a route's color")}
       ${keyItem('<path d="M1 4 H27" stroke="currentColor" stroke-width="1.8"/><path d="M1 10 H27" stroke="currentColor" stroke-width="1.6" stroke-dasharray="5 3"/>', "With a component selected: solid, a caller that depends on it; dashed, a callee it uses")}

@@ -27,7 +27,7 @@ import { buildScopePage } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
 import { allInvariants, flowChokepointId, flowLevelId, invariantVerdict, relianceId, resolveHash, structureId } from "./derive.ts";
-import type { InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, RunEntry, ShellState, SpecComponent, SpecEntrance, SpecInvariant } from "./model.ts";
+import type { EntranceGuard, InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, RunEntry, ShellState, SpecComponent, SpecEntrance, SpecInvariant } from "./model.ts";
 import { renderView } from "./shell.ts";
 import { CORE_RULE, FLOW_CHANGE_ID, FLOW_HEALTH_KINDS, FLOW_NONE_ID, compareFlows, flowBrokenId, flowHealthId, flowHealthMembers, flowDefaultSelection, flowEdgeId, flowEntranceId, flowKeyAction, flowLabelLines, flowNodeId, flowOf, flowSelected, flowSelection, type FlowEntrance, type FlowModel, type FlowRoute } from "./structure-flow.ts";
 import { FLOW_HOP_DELAY, FLOW_NEUTRAL_ROUTE, FLOW_PULSE_PERIOD, FLOW_PULSE_SPEED, FLOW_RAIL_COLORS, FLOW_ROUTE_COLORS, contrast, flowLayout, flowPulses, polylineLength, renderFlowSvg } from "./structure-flow-view.ts";
@@ -1189,7 +1189,7 @@ test("jargon links to its definition where the key and the inspector first show 
 /* ------------------------------------------------ the clarity pass (the 2026-09-23 review) */
 
 /** The flow fixture with one more entrance, handled in the reader: its route (root, reader, store) has no identifier on it anywhere. */
-function noControlState(): ShellState {
+function untracedState(): ShellState {
   const state = projectState({ symbols: [...SYMBOLS, sym(".", "src/reader", "lookup", "src/reader/look.ts", 1)] });
   const root = state.spec.components.find((c) => c.folder === ".")!;
   root.entrances = [...root.entrances, { name: "look", meaning: "a reader looks", handler: "lookup in src/reader/look.ts", line: 12, handlerLine: 13, component: ".", file: "src/reader/look.ts" }];
@@ -1313,7 +1313,7 @@ test("the trust tag sits outside its token, right-aligned beneath it, and never 
   const drain = packed.spec.components.find((c) => c.folder === "src/hooks")!;
   drain.invariants = [...drain.invariants, { ...drain.invariants[0]!, name: "the drain answers one queue", enforcements: [{ form: "chokepoint", chokepoint: "drainHooks", protects: "queue", line: 30 }], crossing: { from: "record", to: "inside", line: 31 } }];
   entering("src/reader", ["read one", "read many", "read all", "read tail", "read head"], "lookup in look.ts", "src/reader/look.ts");
-  for (const state of [projectState(), trustState(), noControlState(), crowdedState(), sharedState(), healthState(), packed]) {
+  for (const state of [projectState(), trustState(), untracedState(), crowdedState(), sharedState(), healthState(), packed]) {
     const model = flowOf(state);
     const selections = [undefined, ...model.routes.map((r) => r.id), ...model.nodes.map((n) => n.id), ...model.levels.map((l) => l.id)];
     for (const selected of selections) {
@@ -1393,7 +1393,7 @@ test("origin tokens point into the system and stack by entrance count: one card 
   const within = (inner: { x: number; y: number; w: number; h: number }, outer: { x: number; y: number; w: number; h: number }): boolean => inner.x >= outer.x - 0.5 && inner.y >= outer.y - 0.5 && inner.x + inner.w <= outer.x + outer.w + 0.5 && inner.y + inner.h <= outer.y + outer.h + 0.5;
   const counts = new Set<number>();
   let checked = 0;
-  for (const state of [projectState(), trustState(), noControlState(), crowdedState(), sharedState(), healthState(), derivedState(), stackState()]) {
+  for (const state of [projectState(), trustState(), untracedState(), crowdedState(), sharedState(), healthState(), derivedState(), stackState()]) {
     const model = flowOf(state);
     for (const selected of [undefined, ...model.routes.map((r) => r.id), ...model.nodes.map((n) => n.id), ...model.levels.map((l) => l.id)]) {
       const svg = renderFlowSvg(model, selected).text;
@@ -1468,36 +1468,37 @@ test("origin tokens point into the system and stack by entrance count: one card 
   assert.match(style, /\.flow-route-group\.is-dim \.flow-origin-token, \.flow-svg \.flow-route-group\.is-dim \.flow-origin-card \{ opacity: 0\.8;/, "a dimmed route dims every card");
 });
 
-test("trust shows where work enters: each entrance route's token carries the trust its entrances carry in, or unknown, or no control when nothing on the route controls it, and a trust-level key sits with the health strip", () => {
-  for (const state of [projectState(), trustState(), noControlState(), crowdedState(), sharedState()]) {
+test("trust shows where work enters: each entrance route's token carries the trust its entrances carry in, or unknown, or no traced control when no control is traced on it, and a trust-level key sits with the health strip", () => {
+  for (const state of [projectState(), trustState(), untracedState(), crowdedState(), sharedState()]) {
     const model = flowOf(state);
     const svg = renderFlowSvg(model, undefined).text;
     for (const route of model.routes) {
       const railStub = route.rail === undefined ? undefined : model.edges.find((e) => e.from === route.stops[route.stops.length - 1] && e.to === route.rail);
       const expected = [...new Set([...route.entry, ...route.edges.flatMap((id) => model.edges.find((e) => e.id === id)!.identifiers), ...(railStub?.identifiers ?? [])])];
       assert.deepEqual(route.controls, expected, `${route.id}: its controls are every identifier on it`);
-      assert.equal(route.noControl, !route.derived && expected.length === 0 && untrustedByRule(state, route.trust), `${route.id}: no control exactly when it is untrusted and nothing stands on it`);
+      assert.deepEqual(route.traced.filter((c) => c.kind === "interface").map((c) => c.identifier), expected, `${route.id}: each identifier on it is a traced control`);
+      assert.equal(route.noTracedControl, !route.derived && route.traced.length === 0 && untrustedByRule(state, route.trust), `${route.id}: no traced control exactly when it is untrusted and nothing is traced on it`);
       if (route.derived) continue;
       const group = new RegExp(`<g class="flow-route-group[^"]*" id="${route.id}"[^>]*>([^]*?)</g>\\s*</g>`).exec(svg)![1]!;
-      const tag = /<g class="flow-trust[^"]*" data-trust-tag="([^"]+)" data-no-control="(true|false)"[^>]*>/.exec(group);
+      const tag = /<g class="flow-trust[^"]*" data-trust-tag="([^"]+)" data-no-traced-control="(true|false)"[^>]*>/.exec(group);
       assert.ok(tag !== null, `${route.id} carries a trust tag`);
-      assert.equal(tag[1], route.noControl ? "no control" : route.trust.length === 0 ? "unknown" : `${route.trust.join(", ")}${route.trustSource === "derived" ? " (derived)" : ""}`);
-      assert.equal(tag[2], String(route.noControl));
+      assert.equal(tag[1], route.noTracedControl ? "no traced control" : route.trust.length === 0 ? "unknown" : `${route.trust.join(", ")}${route.trustSource === "derived" ? " (derived)" : ""}`);
+      assert.equal(tag[2], String(route.noTracedControl));
     }
   }
   const trusted = flowOf(trustState());
   const event = trusted.routes.find((r) => r.trust.length > 0)!;
-  assert.match(renderFlowSvg(trusted, undefined).text, new RegExp(`data-trust-tag="outside \\(derived\\)" data-no-control="false" data-structure-select="${flowLevelId("outside")}"`), "a derived trust level is a selection");
+  assert.match(renderFlowSvg(trusted, undefined).text, new RegExp(`data-trust-tag="outside \\(derived\\)" data-no-traced-control="false" data-structure-select="${flowLevelId("outside")}"`), "a derived trust level is a selection");
   assert.ok(event.controls.length > 0, "a route with derived trust always carries its handler's identifier");
-  const look = flowOf(noControlState()).routes.find((r) => r.names.includes("look"))!;
-  assert.equal(look.noControl, true, "the reader's route crosses no identifier");
-  const page = renderView({ ...noControlState(), structure: { selected: look.id, preview: [] } } as ShellState, "structure").text;
-  assert.match(page, /data-field="trust">unknown<\/span>[^]*data-field="controls">no control<\/span>/, "its inspector says so");
+  const look = flowOf(untracedState()).routes.find((r) => r.names.includes("look"))!;
+  assert.equal(look.noTracedControl, true, "the reader's route crosses no identifier");
+  const page = renderView({ ...untracedState(), structure: { selected: look.id, preview: [] } } as ShellState, "structure").text;
+  assert.match(page, /data-field="trust">unknown<\/span>[^]*data-field="controls">no traced control<\/span>/, "its inspector says so");
   const key = /data-field="trust-key">([^]*?)<\/div>/.exec(renderView(projectState(), "structure").text)![1]!;
   const pattern = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/'/g, "(?:'|&#39;)");
   for (const level of projectState().spec.trustLevels) assert.match(key, new RegExp(`data-structure-select="${flowLevelId(level.name)}"[^>]*title="${pattern(level.meaning)}"><code>${level.name}</code></button> <span>${pattern(level.meaning.split(/[.:;]\s|\.$/)[0]!)}</span>`), `${level.name}: a selection, defined in one line`);
-  assert.match(key, /<code>unknown<\/code>[^]*<code>no control<\/code>/, "the key says what unknown and no control mean");
-  assert.match(answerStructure(noControlState()).text, /look {2}\. -> src\/reader -> src\/store {2}trust unknown {2}no control/, "the query says the same");
+  assert.match(key, /<code>unknown<\/code>[^]*<code>no traced control<\/code>/, "the key says what unknown and no traced control mean");
+  assert.match(answerStructure(untracedState()).text, /look {2}\. -> src\/reader -> src\/store {2}trust unknown {2}no traced control/, "the query says the same");
 });
 
 /** Whether trust carried in is untrusted, by the ruling's own words (d-ba18b0fd, d-6df8d09a): unknown, undeclared, or from outside the system's control. */
@@ -1556,10 +1557,10 @@ test("trust derived from a crossing is labeled derived in the tag, the inspector
   assert.match(key, /<li data-level="derived">[^]*?<code>\(derived\)<\/code>/, "the key says what derived means");
 });
 
-test("no control marks only an untrusted route with nothing on it: unknown trust or a level from outside the system's control, never a trusted one", () => {
+test("no traced control marks only an untrusted route with nothing traced on it: unknown trust or a level from outside the system's control, never a trusted one", () => {
   // The reader's route (no identifier anywhere on it) carrying each kind of trust in.
   const look = (trust: string | undefined, outside: boolean): FlowRoute => {
-    const state = noControlState();
+    const state = untracedState();
     state.spec.trustLevels = state.spec.trustLevels.map((level) => ({ ...level, outside: level.name === "outside" ? outside : false }));
     const root = state.spec.components.find((c) => c.folder === ".")!;
     root.entrances = root.entrances.map((e) => (e.name === "look" ? { ...e, trust, trustLine: e.handlerLine + 1 } : e));
@@ -1567,26 +1568,26 @@ test("no control marks only an untrusted route with nothing on it: unknown trust
     assert.deepEqual(route.controls, [], "nothing stands on the reader's route");
     return route;
   };
-  assert.equal(look(undefined, true).noControl, true, "unknown trust is untrusted (d-6df8d09a)");
-  assert.equal(look("outside", true).noControl, true, "a level from outside the system's control is untrusted");
-  assert.equal(look("not-declared", false).noControl, true, "a level no entry spec declares is untrusted");
+  assert.equal(look(undefined, true).noTracedControl, true, "unknown trust is untrusted (d-6df8d09a)");
+  assert.equal(look("outside", true).noTracedControl, true, "a level from outside the system's control is untrusted");
+  assert.equal(look("not-declared", false).noTracedControl, true, "a level no entry spec declares is untrusted");
   const inside = look("inside", false);
-  assert.equal(inside.noControl, false, "a level inside the system's control is not marked");
-  assert.equal(look("outside", false).noControl, false, "nor is outside when the entry spec does not mark it outside");
-  const state = noControlState();
+  assert.equal(inside.noTracedControl, false, "a level inside the system's control is not marked");
+  assert.equal(look("outside", false).noTracedControl, false, "nor is outside when the entry spec does not mark it outside");
+  const state = untracedState();
   const root = state.spec.components.find((c) => c.folder === ".")!;
   root.entrances = root.entrances.map((e) => (e.name === "look" ? { ...e, trust: "inside", trustLine: e.handlerLine + 1 } : e));
   const model = flowOf(state);
   const route = model.routes.find((r) => r.names.includes("look"))!;
   const svg = renderFlowSvg(model, undefined).text;
-  assert.match(svg, new RegExp(`id="${route.id}"[^]*?data-trust-tag="inside" data-no-control="false"`), "the trusted route's tag shows its level, neutral");
+  assert.match(svg, new RegExp(`id="${route.id}"[^]*?data-trust-tag="inside" data-no-traced-control="false"`), "the trusted route's tag shows its level, neutral");
   const page = renderView({ ...state, structure: { selected: route.id, preview: [] } } as ShellState, "structure").text;
   assert.match(page, /data-field="controls">none<\/span>/, "its inspector says nothing stands on it");
   // What the inspector says, not the definitions its term links carry in their titles.
-  assert.doesNotMatch(/<aside class="flow-inspector"[^>]*>([^]*?)<\/aside>/.exec(page)![1]!.replace(/ title="[^"]*"/g, ""), /no control/, "and never says no control");
-  assert.doesNotMatch(answerStructure(state).text, /look {2}[^\n]*no control/, "nor does the query");
+  assert.doesNotMatch(/<aside class="flow-inspector"[^>]*>([^]*?)<\/aside>/.exec(page)![1]!.replace(/ title="[^"]*"/g, ""), /no traced control/, "and never says no traced control");
+  assert.doesNotMatch(answerStructure(state).text, /look {2}[^\n]*no traced control/, "nor does the query");
   // The key says which levels come from outside the system's control.
-  const marked = noControlState();
+  const marked = untracedState();
   marked.spec.trustLevels = marked.spec.trustLevels.map((level) => ({ ...level, outside: level.name === "outside" }));
   const key = /data-field="trust-key">([^]*?)<\/div>/.exec(renderView(marked, "structure").text)![1]!;
   assert.match(key, /<code>outside<\/code><\/button> <span>[^<]*<\/span> <span class="flow-meta" data-outside="true">outside the system's control<\/span>/);
@@ -1770,12 +1771,165 @@ test("motion runs caller to callee while selected: every drawn line runs from ca
   }
   const run = flowOf(projectState()).routes.find((r) => r.names.includes("run"))!;
   assert.match(renderFlowSvg(flowOf(projectState()), run.id).text, /class="flow-tag flow-tag-verified[^"]*\bflow-tick\b"/, "a control on the route ticks as the pulse passes");
-  const look = flowOf(noControlState()).routes.find((r) => r.names.includes("look"))!;
-  assert.doesNotMatch(renderFlowSvg(flowOf(noControlState()), look.id).text, /class="[^"]*flow-tick/, "a route with no control shows no tick at all");
+  const look = flowOf(untracedState()).routes.find((r) => r.names.includes("look"))!;
+  assert.doesNotMatch(renderFlowSvg(flowOf(untracedState()), look.id).text, /class="[^"]*flow-tick/, "a route with no traced control shows no tick at all");
   assert.ok(FLOW_PULSE_SPEED <= 60 && FLOW_PULSE_PERIOD / FLOW_PULSE_SPEED >= 1.5, "slow enough to follow: at most 60 px/s, a cycle of at least 1.5 s");
   const style = /<style>([^]*?)<\/style>/.exec(renderFlowSvg(flowOf(projectState()), run.id).text)![1]!;
   assert.match(style, /\.flow-svg \.flow-pulse \{[^}]*animation-iteration-count: infinite;/, "the flow continues while the selection holds");
   assert.doesNotMatch(renderFlowSvg(flowOf(projectState()), undefined).text, /class="flow-pulse|class="[^"]*flow-tick/, "clearing the selection stops all motion");
   assert.doesNotMatch(readFileSync(new URL("./styles.css", import.meta.url), "utf8"), /infinite/, "nothing on the page outside a selection loops");
   assert.match(style, /@media \(prefers-reduced-motion: reduce\) \{\s*\.flow-svg \.flow-pulse \{ display: none; animation: none; \}\s*\.flow-svg \.flow-tick, \.flow-svg \.flow-station\.is-reach \.flow-box \{ animation: none; \}\s*\.flow-svg \.flow-chevron \{ display: inline; \}/, "with reduced motion nothing animates and the chevrons show");
+});
+
+/* ------------------------------------------------ traced controls (d-127ab8e4) */
+
+/** The untraced fixture's reader route carrying outside in, with the reading's guards on its entrance and an invariant enforced by a totality oracle alone in the reader. */
+function tracedState(options: { guards?: EntranceGuard[]; totality?: { from: string; chokepoint?: boolean; state?: SpecInvariant["state"] }; states?: Record<string, SpecInvariant["state"]>; guard?: string; unconfirmed?: string } = {}): ShellState {
+  const state = untracedState();
+  state.spec.trustLevels = state.spec.trustLevels.map((level) => ({ ...level, outside: level.name === "outside" }));
+  for (const component of state.spec.components) for (const invariant of component.invariants) invariant.state = options.states?.[invariant.name] ?? invariant.state;
+  const root = state.spec.components.find((c) => c.folder === ".")!;
+  root.entrances = root.entrances.map((e) => (e.name === "look" ? { ...e, trust: "outside", trustLine: e.handlerLine + 1, ...(options.guard === undefined ? {} : { guard: options.guard, guardLine: e.handlerLine + 2 }) } : e));
+  if (state.componentInterfaces.kind === "read") {
+    state.componentInterfaces.entrances = state.componentInterfaces.entrances.map((e) => (e.name === "look" ? { ...e, ...(options.guards === undefined ? {} : { guards: options.guards }), ...(options.unconfirmed === undefined ? {} : { guardUnconfirmed: options.unconfirmed }) } : e));
+  }
+  if (options.totality !== undefined) {
+    const reader = state.spec.components.find((c) => c.folder === "src/reader")!;
+    const enforcements: SpecInvariant["enforcements"] = [{ form: "totality oracle", over: "every look", via: "looks stay scoped", line: 9 }, ...(options.totality.chokepoint === true ? [{ form: "chokepoint" as const, chokepoint: "peekAt", protects: "peek", line: 10 }] : [])];
+    reader.invariants.push({ ...state.spec.components.find((c) => c.folder === "src/core")!.invariants[0]!, component: "src/reader", name: "looks stay scoped", sentence: "looks stay scoped.", enforcements, crossing: { from: options.totality.from, to: "inside", line: 11 }, state: options.totality.state ?? "invariant" });
+  }
+  return state;
+}
+
+test("a route's controls are traced four ways, verified only: an identifier on its lines, a chokepoint its handler is registered through, a chokepoint inside a component on it whose protected thing its reach reaches, and a totality oracle on it whose crossing enters from its trust", () => {
+  const look = (state: ShellState): FlowRoute => flowOf(state).routes.find((r) => r.names.includes("look"))!;
+  const kinds = (route: FlowRoute): string[] => route.traced.map((c) => `${c.kind} ${c.name}${c.declared ? " (declared)" : ""}`);
+  const bare = look(tracedState());
+  assert.deepEqual([bare.stops, bare.controls, bare.traced], [[".", "src/reader", "src/store"], [], []], "nothing stands on the reader's route");
+  assert.equal(bare.noTracedControl, true, "untrusted, and nothing traced: no traced control");
+  // A wrapper: the handler's own declaration references a verified chokepoint, wherever it stands.
+  const wrapped = look(tracedState({ guards: [{ component: "src/core", name: "one door", how: "wrapper" }] }));
+  assert.deepEqual(kinds(wrapped), ["wrapper one door"]);
+  assert.equal(wrapped.noTracedControl, false);
+  assert.deepEqual(kinds(look(tracedState({ guards: [{ component: "src/core", name: "one door", how: "declared" }] }))), ["wrapper one door (declared)"], "a guard: line the reading confirmed is a wrapper, marked declared");
+  assert.deepEqual(kinds(look(tracedState({ guards: [{ component: "src/core", name: "one door", how: "wrapper" }], states: { "one door": "requirement" } }))), [], "an unverified chokepoint is no control");
+  // Inside: a chokepoint the reach passes counts only in a component on the route.
+  assert.deepEqual(kinds(look(tracedState({ guards: [{ component: "src/store", name: "single writer", how: "reach" }] }))), ["inside single writer"], "the store is on the route");
+  assert.deepEqual(kinds(look(tracedState({ guards: [{ component: "src/journal", name: "append-only store", how: "reach" }] }))), [], "the journal is not");
+  // Test-backed: an invariant enforced by a totality oracle alone on the route whose crossing enters from the trust the route carries in.
+  assert.deepEqual(kinds(look(tracedState({ totality: { from: "outside" } }))), ["totality looks stay scoped"]);
+  assert.deepEqual(kinds(look(tracedState({ totality: { from: "inside" } }))), [], "a crossing entering from another level");
+  assert.deepEqual(kinds(look(tracedState({ totality: { from: "outside", state: "requirement" } }))), [], "an unverified totality");
+  assert.deepEqual(kinds(look(tracedState({ totality: { from: "outside", chokepoint: true } }))), [], "an invariant with a chokepoint is traced by its chokepoint, never as an totality");
+  // Every kind at once, in order, and the route is controlled.
+  const all = look(tracedState({ totality: { from: "outside" }, guards: [{ component: "src/store", name: "single writer", how: "reach" }, { component: "src/core", name: "one door", how: "wrapper" }] }));
+  assert.deepEqual(kinds(all), ["wrapper one door", "inside single writer", "totality looks stay scoped"]);
+  // The inspector names each control, its kind and its invariant; the query says the same.
+  const state = tracedState({ totality: { from: "outside" }, guards: [{ component: "src/store", name: "single writer", how: "reach" }, { component: "src/core", name: "one door", how: "declared" }], guard: "door" });
+  const page = renderView({ ...state, structure: { selected: all.id, preview: [] } } as ShellState, "structure").text;
+  const controls = /<ul class="flow-rows" data-field="controls">([^]*?)<\/ul>/.exec(page)![1]!;
+  assert.match(controls, /data-control="wrapper" data-invariant="one door" data-declared="true">[^]*structural chokepoint wrapping its handler, declared by its guard: line/);
+  assert.match(controls, /data-control="inside" data-invariant="single writer">[^]*structural chokepoint inside a component on it/);
+  assert.match(controls, /data-control="totality" data-invariant="looks stay scoped">[^]*test-backed totality oracle/);
+  assert.match(answerStructure(state).text, /look {2}[^\n]*traced: structural chokepoint wrapping its handler \(declared by guard:\): one door \(src\/core\); structural chokepoint inside a component on it: single writer \(src\/store\); test-backed totality oracle: looks stay scoped \(src\/reader\)/);
+  assert.doesNotMatch(answerStructure(state).text, /look {2}[^\n]*no traced control/);
+  // A control beyond the lines is each entrance's own: one only some entrances on the route pass is listed apart, never counted.
+  const twins = tracedState({ guards: [{ component: "src/core", name: "one door", how: "wrapper" }] });
+  const rootSpec = twins.spec.components.find((c) => c.folder === ".")!;
+  rootSpec.entrances = [...rootSpec.entrances, { ...rootSpec.entrances.find((e) => e.name === "look")!, name: "glance", meaning: "a reader glances" }];
+  if (twins.componentInterfaces.kind === "read") twins.componentInterfaces.entrances = [...twins.componentInterfaces.entrances, { component: ".", name: "glance", file: "src/reader/look.ts" }];
+  const shared = look(twins);
+  assert.deepEqual([shared.names, shared.traced, shared.partial.map((c) => `${c.kind} ${c.name} ${c.entrances}`), shared.noTracedControl], [["look", "glance"], [], ["wrapper one door 1"], true], "one of two entrances wrapped: listed, not counted");
+  assert.match(renderView({ ...twins, structure: { selected: shared.id, preview: [] } } as ShellState, "structure").text, /data-field="partial-controls">[^]*data-control="wrapper" data-invariant="one door" data-entrances="1">[^]*on 1 of its 2 entrances; not counted/);
+  // A declared guard the reading could not confirm says why in the entrance's inspector, and counts for nothing.
+  const unconfirmed = tracedState({ guard: "door", unconfirmed: "no registration of the handler spells door" });
+  const entrance = flowOf(unconfirmed).entrances.find((e) => e.name === "look")!;
+  assert.equal(look(unconfirmed).noTracedControl, true);
+  assert.match(renderView({ ...unconfirmed, structure: { selected: entrance.id, preview: [] } } as ShellState, "structure").text, /data-field="guard">declared, not counted: no registration of the handler spells door/);
+});
+
+test("the reading traces the chokepoints a handler passes: a wrapper around it, one further along its reach, a declared guard at its registration, and a module handler's top-level script", { timeout: 120_000 }, async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-guards-"));
+  try {
+    writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ name: "guards", entryDir: ".", language: "typescript" }));
+    writeFileSync(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["**/*.ts"] }));
+    writeFileSync(
+      join(root, "Root.spec.md"),
+      [
+        "# Root", "", "The root.", "", "## entrances",
+        "- save: a wrapped handler", "  handler: save in src/api/api.ts",
+        "- post: a handler registered through the guard elsewhere", "  handler: post in src/api/api.ts", "  guard: guard",
+        "- plain: a handler no registration guards", "  handler: plain in src/api/api.ts", "  guard: guard",
+        "- job: a script", "  handler: src/api/job.ts",
+        "- deep: a handler that reaches the writer through another", "  handler: deep in src/api/api.ts",
+        "- mutate: a handler inside a factory's guarded product", "  handler: mutate in src/api/api.ts", "  guard: guardedRpc",
+        "", "## invariants", "",
+      ].join("\n"),
+    );
+    for (const folder of ["src/api", "src/store", "src/guard"]) mkdirSync(join(root, folder), { recursive: true });
+    writeFileSync(join(root, "src/api/Api.spec.md"), "# Api\n\nTakes requests.\n\n## invariants\n");
+    writeFileSync(join(root, "src/store/Store.spec.md"), "# Store\n\nHolds rows.\n\n## invariants\n- single writer: rows are written in one place.\n  protects: writeRow in rows.ts\n  chokepoint: write in write.ts\n");
+    writeFileSync(join(root, "src/guard/Guard.spec.md"), "# Guard\n\nChecks origins.\n\n## invariants\n- origin checked: every guarded call checks its origin.\n  protects: checkOrigin in origin.ts\n  chokepoint: guard in guard.ts\n- rpc origin: every guarded rpc checks its origin.\n  protects: checkRpcOrigin in origin.ts\n  chokepoint: src/guard/rpc.ts\n");
+    writeFileSync(join(root, "src/guard/rpc.ts"), "import { checkRpcOrigin } from \"./origin.ts\";\nfunction makeRpc(check: () => void) {\n  return { plainRpc: <T>(work: () => T): T => work(), guardedRpc: <T>(work: () => T): T => {\n    check();\n    return work();\n  } };\n}\nexport const { plainRpc, guardedRpc } = makeRpc(checkRpcOrigin);\n");
+    writeFileSync(join(root, "src/store/rows.ts"), "export function writeRow(value: string): string {\n  return value;\n}\n");
+    writeFileSync(join(root, "src/store/write.ts"), "import { writeRow } from \"./rows.ts\";\nexport function write(value: string): string {\n  return writeRow(value);\n}\n");
+    writeFileSync(join(root, "src/guard/origin.ts"), "export function checkOrigin(): void {}\nexport function checkRpcOrigin(): void {}\n");
+    writeFileSync(join(root, "src/guard/guard.ts"), "import { checkOrigin } from \"./origin.ts\";\nexport function guard<T>(work: () => T): () => T {\n  return () => {\n    checkOrigin();\n    return work();\n  };\n}\n");
+    writeFileSync(
+      join(root, "src/api/api.ts"),
+      "import { guard } from \"../guard/guard.ts\";\nimport { guardedRpc } from \"../guard/rpc.ts\";\nimport { write } from \"../store/write.ts\";\nexport const save = guard(() => write(\"a\"));\nexport function post(): string {\n  return write(\"b\");\n}\nexport function plain(): number {\n  return 1;\n}\nexport function deep(): string {\n  return post();\n}\nexport const mutate = (): string =>\n  guardedRpc(() => write(\"m\"));\n",
+    );
+    writeFileSync(join(root, "src/api/routes.ts"), "import { guard } from \"../guard/guard.ts\";\nimport { post, plain } from \"./api.ts\";\nexport const routes = [\n  guard(post),\n];\nexport const open = [plain];\n");
+    writeFileSync(join(root, "src/api/job.ts"), "import { write } from \"../store/write.ts\";\nconst stamp = \"c\";\ntry {\n  const done = write(stamp);\n  console.log(done);\n} finally {\n  console.log(stamp);\n}\n");
+    const model = loadSpecModel(root, { runs: false });
+    assert.deepEqual(model.problems.filter((p) => /entrance|guard|handler/.test(p.message)), [], "a module handler and a guard naming a declared chokepoint are well formed");
+    const read = await readComponentInterfaces(root);
+    if (read.kind === "unread") {
+      t.skip(`no instrument on this machine: ${read.because}`);
+      return;
+    }
+    const of = (name: string) => read.entrances.find((e) => e.name === name)!;
+    const guards = (name: string): string[] => (of(name).guards ?? []).map((g) => `${g.how} ${g.name}`).sort();
+    assert.deepEqual(guards("save"), ["wrapper origin checked", "wrapper single writer"], "save is wrapped by the guard, and its own code calls the store's writer");
+    assert.deepEqual(guards("post"), ["declared origin checked", "wrapper single writer"], "post's guard: line is confirmed where routes.ts registers it");
+    assert.deepEqual([guards("plain"), of("plain").guardUnconfirmed], [[], "no registration of the handler spells guard: no statement referencing it calls the guard"], "plain's registration spells no guard");
+    assert.equal(of("job").file, "src/api/job.ts", "the module handler resolves to its file");
+    assert.deepEqual(of("job").reach?.map((r) => `${r.from} -> ${r.to} ${r.symbol}`), ["src/api -> src/store write"], "the script's top-level call is its reach; its import is not a use");
+    assert.deepEqual(guards("job"), ["wrapper single writer"], "the script calls the writer at its top level");
+    assert.deepEqual(guards("deep"), ["reach single writer"], "deep reaches the writer through post: further along its reach");
+    assert.deepEqual(guards("mutate"), ["declared rpc origin", "wrapper single writer"], "a factory's destructured product no declaration line names: its guard: line is confirmed by the handler's own declaration");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a reference inside a multi-line top-level initializer is that declaration's own use, so a handler's reach follows a registry to the guard inside", { timeout: 300_000 }, async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-registry-"));
+  try {
+    const files: Record<string, string> = {
+      "coherence.config.json": JSON.stringify({ name: "registry", entryDir: ".", language: "python" }),
+      "Root.spec.md": "# Root\n\nThe root.\n\n## invariants\n",
+      "app/App.spec.md": "# App\n\nDispatches through a registry.\n\n## entrances\n- start: work arrives\n  handler: start in app/main.py\n\n## invariants\n",
+      "lib/Lib.spec.md": "# Lib\n\nThe guard.\n\n## invariants\n- team guard: every printed query is scoped to its team.\n  protects: team_guard in guard.py\n  chokepoint: guarded in guard.py\n",
+      "app/__init__.py": "",
+      "lib/__init__.py": "",
+      "lib/guard.py": "def team_guard():\n    return 1\n\n\ndef guarded():\n    return team_guard()\n",
+      "app/registry.py": "from lib.guard import guarded\n\nPRINTERS = {\n    \"x\": guarded,\n}\n",
+      "app/main.py": "from app.registry import PRINTERS\n\n\ndef start():\n    return PRINTERS[\"x\"]()\n",
+    };
+    for (const [path, text] of Object.entries(files)) {
+      mkdirSync(join(root, path, ".."), { recursive: true });
+      writeFileSync(join(root, path), text);
+    }
+    const read = await readComponentInterfaces(root);
+    if (read.kind === "unread") {
+      t.skip(`no Python instrument on this machine: ${read.because}`);
+      return;
+    }
+    const start = read.entrances.find((e) => e.name === "start")!;
+    assert.deepEqual(start.reach?.map((r) => `${r.from} -> ${r.to} ${r.symbol}`), ["app -> lib guarded"], "the registry's entry is the registry's own use");
+    assert.deepEqual(start.guards, [{ component: "lib", name: "team guard", how: "reach" }], "and the guard behind it is on the reach");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

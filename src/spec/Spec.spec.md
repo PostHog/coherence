@@ -77,3 +77,17 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: let entranceTrustProblems skip every crossing on the handler, so a declared trust that contradicts it passed -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
+- a module handler exists: An entrance's handler may name a module file, whose top-level script receives the work; it resolves under the component, then the root, and a missing file or one that is not source code is a problem.
+  over: an entrance naming an existing script, a missing one, and a file that is not source
+  via: the model: an entrance's handler may be a module file whose top-level script receives the work, and it must exist
+  because: module-top-level scripts had no way to declare a command entrance (praetorium.gg, d-127ab8e4); a module that does not exist is a handler nobody wrote
+  crossing: project-source -> reading
+  refuted: returned a module handler's first candidate path in handlerFile without checking the file exists -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- an entrance guard names a chokepoint: An entrance's guard: line names a chokepoint some invariant declares, by its symbol, or a symbol declared in a chokepoint that is a module; any other name, an empty line, or a second guard line is a problem.
+  over: every guard: line: a chokepoint's symbol, a symbol of a chokepoint module, a name no invariant declares, an empty and a second line
+  via: the model: an entrance's guard: line names a chokepoint an invariant declares, or a symbol of a chokepoint module
+  because: a guard declares a control the map will count once the reading confirms the registration (d-127ab8e4); one naming no declared chokepoint would claim an enforcement nobody declared
+  crossing: project-source -> reading
+  refuted: skipped the problem in entranceGuardProblems, so a guard naming no declared chokepoint passed -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none

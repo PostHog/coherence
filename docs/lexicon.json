@@ -459,7 +459,7 @@
     {
       "name": "trust level",
       "status": "settled",
-      "definition": "One entry in the short list the entry spec declares for crossings and entrances: a name and a one-line meaning for a class of data or caller. A level marked (outside) comes from outside the system's control; an entrance carrying it with no control on its route is marked no control. Declared order carries no meaning. Not a place in the code and not a container of components.",
+      "definition": "One entry in the short list the entry spec declares for crossings and entrances: a name and a one-line meaning for a class of data or caller. A level marked (outside) comes from outside the system's control; an entrance carrying it with no control traced on its route is marked no traced control. Declared order carries no meaning. Not a place in the code and not a container of components.",
       "rejected": [
         {
           "alternative": "zones as a topology with residence (lives in) and nesting (inside)",
@@ -1208,7 +1208,7 @@
     },
     {
       "name": "entrance",
-      "definition": "Where work enters the system from outside it: a command, a host event, a route, a tool. Declared in the owning component's spec and checked against the code: the named handler must resolve and be reachable, so a declared entrance cannot rot unseen. It declares the trust level it carries in with a trust: line; without one, its trust is derived from the crossings on its handler.",
+      "definition": "Where work enters the system from outside it: a command, a host event, a route, a tool. Declared in the owning component's spec and checked against the code: the named handler (a symbol, or a module file whose top-level script receives the work) must resolve and be reachable, so a declared entrance cannot rot unseen. It declares the trust level it carries in with a trust: line; without one, its trust is derived from the crossings on its handler. A guard: line names the chokepoint its handler is registered through, counted once the reading confirms the registration.",
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-0db9b17b)",
         "owner_words": "Declared and checked for entrypoints is good."
@@ -1237,7 +1237,7 @@
     },
     {
       "name": "structural route",
-      "definition": "The path one entrance takes through the components it reaches, in the order work flows, drawn as one line of its own color. Computed from the entrance and the component interfaces, never declared. Components on more than one structural route are where those routes meet.",
+      "definition": "The path one entrance takes through the components it reaches, in the order work flows, drawn as one line of its own color. Computed from the entrance and the component interfaces, never declared. Components on more than one structural route are where those routes meet. Its controls are traced, never declared: the interface identifiers on its lines, and the verified chokepoints wrapping its handler or standing inside a component on it, and verified totality oracles on it covering its trust. An untrusted route with none is marked no traced control, which is not a demonstrated bypass.",
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-e4cd0983)",
         "owner_words": "structural route. not utility, core dependency. not tag. interface identifier"

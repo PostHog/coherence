@@ -452,3 +452,43 @@ test("a long refuted value parses in linear time, and three digit groups that na
   assert.deepEqual(good.problems, []);
   assert.deepEqual({ broke: good.invariants[0]?.refutations[0]?.broke, date: good.invariants[0]?.refutations[0]?.date }, { broke: "broke it", date: "2026-09-18" });
 });
+
+test("the model: an entrance's handler may be a module file whose top-level script receives the work, and it must exist", () => {
+  const door = trustedDoor({});
+  const withJob = (handler: string): Record<string, string> => ({
+    ...door,
+    "Widgetry.spec.md": door["Widgetry.spec.md"]!.replace("\n## invariants\n", `- job: an operator runs the nightly job\n  handler: ${handler}\n\n## invariants\n`),
+    "scripts/nightly.ts": "import { take } from \"../src/door/door.ts\";\ntake();\n",
+  });
+  withModel(withJob("scripts/nightly.ts"), (model) => {
+    assert.deepEqual(model.problems, []);
+    assert.deepEqual(model.components.find((c) => c.folder === ".")!.entrances.find((e) => e.name === "job")!.file, "scripts/nightly.ts", "resolved to the module itself");
+  });
+  withModel(withJob("scripts/missing.ts"), (model) => {
+    assert.deepEqual(model.problems.map((p) => p.message), ["entrance job: handler module scripts/missing.ts does not exist (read under . and under the root)"]);
+  });
+  withModel(withJob("scripts/notes.md"), (model) => {
+    assert.deepEqual(model.problems.map((p) => p.message), ["entrance job: handler scripts/notes.md names a file that is not source code"]);
+  });
+});
+
+test("the model: an entrance's guard: line names a chokepoint an invariant declares, or a symbol of a chokepoint module", () => {
+  const door = trustedDoor({});
+  const guarded = (guard: string, chokepoint = "take"): Record<string, string> => ({
+    ...door,
+    "Widgetry.spec.md": door["Widgetry.spec.md"]!.replace("  handler: peek in src/door/door.ts\n", `  handler: peek in src/door/door.ts\n  guard: ${guard}\n`),
+    "src/door/Door.spec.md": door["src/door/Door.spec.md"]!.replace("chokepoint: take", `chokepoint: ${chokepoint}`),
+  });
+  withModel(guarded("take"), (model) => {
+    assert.deepEqual(model.problems, []);
+    assert.equal(model.components.find((c) => c.folder === ".")!.entrances.find((e) => e.name === "peek")!.guard, "take");
+  });
+  withModel(guarded("peek", "src/door/door.ts"), (model) => assert.deepEqual(model.problems, [], "a symbol declared in a chokepoint module"));
+  withModel({ ...guarded("mutate", "src/door/door.ts"), "src/door/door.ts": "export function take(): void {}\nexport function peek(): void {}\nexport const { read, mutate } = makeRpc();\n" }, (model) => assert.deepEqual(model.problems, [], "a factory's destructured product in a chokepoint module"));
+  withModel(guarded("nobody"), (model) => {
+    assert.deepEqual(model.problems.map((p) => `${p.file}:${p.line} ${p.message}`), ["Widgetry.spec.md:15 entrance peek: guard nobody is no chokepoint an invariant declares, nor a symbol of a chokepoint module; declared chokepoints: take"]);
+  });
+  const twice = parseSpec("# A\n\nAn a.\n\n## entrances\n- in: work enters\n  handler: x\n  guard:\n  guard: y\n", "A.spec.md");
+  assert.ok(twice.problems.some((p) => p.line === 8 && p.message === "guard: on entrance in names no chokepoint"));
+  assert.ok(twice.problems.some((p) => p.line === 9 && p.message === "entrance in names its guard twice"));
+});

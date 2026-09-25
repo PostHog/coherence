@@ -16,7 +16,7 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
+import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type Latest } from "../enforcement/record.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
@@ -252,6 +252,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   }
   components.sort((a, b) => a.folder.localeCompare(b.folder));
   problems.push(...entranceTrustProblems(components, trustLevels));
+  problems.push(...entranceGuardProblems(root, components));
   const byName = new Map(components.map((c) => [c.folder, c]));
   for (const component of components) {
     if (component.parent !== undefined) byName.get(component.parent)!.children.push(component.folder);
@@ -310,12 +311,52 @@ function entranceTrustProblems(components: readonly Component[], trustLevels: re
 }
 
 const HANDLER = /^([A-Za-z_$][\w$]*)(?:\s+in\s+(\S+))?$/;
+
+/**
+ * An entrance's declared guard, checked (d-127ab8e4): it names a chokepoint
+ * some invariant declares, by its symbol, or a symbol declared at the top
+ * level of a chokepoint that is a module. That its handler really is
+ * registered through it is the reading's to confirm, where references resolve.
+ */
+function entranceGuardProblems(root: string, components: readonly Component[]): Problem[] {
+  const problems: Problem[] = [];
+  const chokepoints = components.flatMap((c) => c.invariants.flatMap((invariant) => invariant.enforcements.flatMap((e) => (e.form === "chokepoint" ? [{ component: c, value: e.chokepoint.trim() }] : []))));
+  for (const component of components) {
+    for (const entrance of component.entrances) {
+      if (entrance.guard === undefined) continue;
+      const guard = HANDLER.exec(entrance.guard.trim());
+      const line = entrance.guardLine ?? entrance.line;
+      if (guard === null) {
+        problems.push({ file: component.specPath, line, message: `entrance ${entrance.name}: guard "${entrance.guard}" reads <chokepoint symbol> or <symbol> in <file>` });
+        continue;
+      }
+      const name = guard[1]!;
+      const named = chokepoints.some(({ component: owner, value }) => {
+        const symbol = HANDLER.exec(value)?.[1];
+        if (symbol !== undefined) return symbol === name;
+        if (!SOURCE.test(value)) return false;
+        return [owner.folder === "." ? value : `${owner.folder}/${value}`, value].some((path) => {
+          const at = resolve(root, path);
+          return existsSync(at) && statSync(at).isFile() && declaresAtTop(readFileSync(at, "utf8"), name);
+        });
+      });
+      if (!named) {
+        const listed = chokepoints.length === 0 ? "no invariant declares a chokepoint" : `declared chokepoints: ${[...new Set(chokepoints.map((c) => c.value))].join(", ")}`;
+        problems.push({ file: component.specPath, line, message: `entrance ${entrance.name}: guard ${name} is no chokepoint an invariant declares, nor a symbol of a chokepoint module; ${listed}` });
+      }
+    }
+  }
+  return problems;
+}
 const SOURCE = /\.(?:[cm]?[jt]sx?|py)$/;
 
 /** Whether a source text declares the name at its top level (TypeScript, JavaScript, or Python). */
-function declaresAtTop(text: string, name: string): boolean {
+export function declaresAtTop(text: string, name: string): boolean {
   const escaped = name.replace(/\$/g, "\\$");
   const typescript = new RegExp(`^(?:export\\s+)?(?:default\\s+)?(?:declare\\s+)?(?:abstract\\s+)?(?:async\\s+)?(?:function\\*?|const|let|var|class|interface|type|enum|namespace)\\s+${escaped}\\b`, "m");
+  // A destructured binding on one line, as a factory's products are exported: export const { rpc, mutationRpc } = make().
+  const destructured = new RegExp(`^(?:export\\s+)?(?:const|let|var)\\s*\\{[^}\\n]*?(?<=[\\s,{:])${escaped}(?=\\s*[,}=])[^}\\n]*\\}\\s*=`, "m");
+  if (destructured.test(text)) return true;
   const python = new RegExp(`^(?:async\\s+)?(?:def|class)\\s+${escaped}\\b|^${escaped}\\s*(?::[^=\\n]+)?=`, "m");
   return typescript.test(text) || python.test(text);
 }
@@ -333,8 +374,19 @@ function sourcesUnder(root: string, folder: string, ignore: readonly string[]): 
  * the reading, where reachability is known.
  */
 function handlerFile(root: string, folder: string, handler: string, ignore: readonly string[]): string | { reason: string } {
+  if (isModuleHandler(handler)) {
+    // A module file: its top-level script is the handler. It must be a source file that exists, under the component or the root.
+    const file = handler.trim();
+    if (!SOURCE.test(file)) return { reason: `handler ${file} names a file that is not source code` };
+    const candidates = [folder === "." ? file : `${folder}/${file}`, file].filter((path, index, all) => all.indexOf(path) === index && !path.split("/").includes(".."));
+    for (const candidate of candidates) {
+      const path = resolve(root, candidate);
+      if (existsSync(path) && statSync(path).isFile()) return candidate;
+    }
+    return { reason: `handler module ${file} does not exist (read under ${folder} and under the root)` };
+  }
   const parsed = HANDLER.exec(handler.trim());
-  if (parsed === null) return { reason: `handler "${handler}" reads <symbol> or <symbol> in <file>` };
+  if (parsed === null) return { reason: `handler "${handler}" reads <symbol>, <symbol> in <file>, or a module file` };
   const [, name, file] = parsed as unknown as [string, string, string | undefined];
   const candidates =
     file === undefined
