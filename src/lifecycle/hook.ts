@@ -41,8 +41,9 @@
  * that tree is refused with exit 78 rather than read or written.
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
@@ -261,9 +262,44 @@ export function workStopText(root: string, input: HookInput): string {
     .join("\n");
 }
 
-/** How a session at this root invokes the tool: its own source tree, or the installed bin. */
-async function cliName(root: string): Promise<string> {
-  return (await isCoherenceItself(root)) ? "node src/cli.ts" : "node_modules/.bin/coherence";
+/**
+ * This checkout's cli: the one the hook is running from, wherever the adopter
+ * keeps it, by the path it was invoked through when that is this file (a
+ * sibling reached through a link reads as ../coherence, not as the link's
+ * target).
+ */
+const OWN_CLI = ((): string => {
+  const own = fileURLToPath(new URL("../cli.ts", import.meta.url));
+  const invoked = process.argv[1];
+  try {
+    if (invoked !== undefined && realpathSync(invoked) === realpathSync(own)) return resolve(invoked);
+  } catch {
+    // An invocation path that cannot be resolved is not used.
+  }
+  return own;
+})();
+
+/**
+ * How a session at this root invokes the tool: its own source tree, or the
+ * checkout this hook ran from, as a path from the root (`node
+ * ../coherence/src/cli.ts`) or, when that climbs further than a sibling of a
+ * worktree's main checkout, absolute. It is never a path into the project's
+ * node_modules, which a pnpm-safe install leaves alone.
+ */
+export async function cliName(root: string, cli: string = OWN_CLI): Promise<string> {
+  if (await isCoherenceItself(root)) return "node src/cli.ts";
+  // Both sides are compared as real paths, except the checkout's own folder, which keeps the name it was reached by.
+  const real = (path: string): string => {
+    try {
+      return realpathSync(path);
+    } catch {
+      return path;
+    }
+  };
+  const checkout = dirname(dirname(cli));
+  const rel = relative(real(root), join(real(dirname(checkout)), basename(checkout), relative(checkout, cli)));
+  const path = rel.split(sep).filter((part) => part === "..").length <= 4 ? rel : cli;
+  return `node ${/[\s"'$`\\]/.test(path) ? JSON.stringify(path) : path}`;
 }
 
 /** The session id as the exact --session value, write and read commands, and the rule. */
@@ -425,7 +461,7 @@ export async function editContext(root: string, input: HookInput, options: HookO
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
   if (failed.length === 0) return "";
-  const cli = (await isCoherenceItself(root)) ? "node src/cli.ts" : "node_modules/.bin/coherence";
+  const cli = await cliName(root);
   const lines = [`Structural defect revealed at this edit (${files.join(", ")}); recorded in ${outcome.file ?? "the run"}:`];
   for (const d of failed) {
     const e = d.entry;

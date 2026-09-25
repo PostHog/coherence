@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync, realpathSync } from "node:fs";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { HOOK_EVENTS } from "./hook.ts";
-import { driftOf, formatCheck, formatStatus, install, mergeHooks, status, stripHooks, uninstall } from "./install.ts";
+import { cliName, HOOK_EVENTS, REFUSE_EXIT } from "./hook.ts";
+import { driftOf, formatCheck, formatStatus, install, LOCATED_PREFIX, locate, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
@@ -54,11 +55,12 @@ test("mergeHooks adds one Coherence entry per event, keeps everything else, and 
     "./scripts/cli.ts hook Stop",
     "npx incoherence hook Stop",
     "my-coherence-wrapper hook Stop",
+    'exec node "$incoherence" hook Stop',
   ];
   const crowded = mergeHooks({ hooks: { Stop: foreign.map((command) => ({ hooks: [{ type: "command", command }] })) } }, { command: "npx coherence", host: "claude" });
   const stop = (crowded["hooks"] as Record<string, { hooks: { command: string }[] }[]>)["Stop"]!;
   assert.deepEqual(stop.map((e) => e.hooks[0]!.command), [...foreign, "npx coherence hook Stop"], "no foreign hook is deleted");
-  for (const command of ["npx coherence hook Stop", '"${CLAUDE_PROJECT_DIR:-.}/node_modules/.bin/coherence" hook Stop', "node src/cli.ts hook Stop", 'node "${CLAUDE_PROJECT_DIR:-.}/src/cli.ts" hook Stop', "coherence hook Stop"]) {
+  for (const command of ["npx coherence hook Stop", '"${CLAUDE_PROJECT_DIR:-.}/node_modules/.bin/coherence" hook Stop', "node src/cli.ts hook Stop", 'node "${CLAUDE_PROJECT_DIR:-.}/src/cli.ts" hook Stop', "coherence hook Stop", `${LOCATED_PREFIX} hook Stop`]) {
     const merged = mergeHooks({ hooks: { Stop: [{ hooks: [{ type: "command", command }] }] } }, { command: "npx coherence", host: "claude" });
     assert.deepEqual((merged["hooks"] as Record<string, { hooks: { command: string }[] }[]>)["Stop"]!.map((e) => e.hooks[0]!.command), ["npx coherence hook Stop"], `${command} is ours and is replaced`);
   }
@@ -134,12 +136,13 @@ test("the CLI installs into the current directory and reports status", async () 
     assert.equal(run.status, 0, run.stderr);
     assert.match(run.stdout, /^wrote .*\.claude\/settings\.json: SessionStart, /);
     const written = JSON.parse(await readFile(join(dir, ".claude", "settings.json"), "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
-    assert.ok(written.hooks["Stop"]![0]!.hooks[0]!.command.endsWith('/node_modules/.bin/coherence" hook Stop'));
-    assert.ok(written.hooks["Stop"]![0]!.hooks[0]!.command.includes('while [ "$dir"'));
+    assert.equal(written.hooks["Stop"]![0]!.hooks[0]!.command, `${LOCATED_PREFIX} hook Stop`, "an adopter's hook locates Coherence outside the project");
+    assert.ok(!written.hooks["Stop"]![0]!.hooks[0]!.command.includes(dir), "the committed command names no path on this machine");
+    assert.match(run.stdout, /note: the hooks cannot find Coherence from here/, "install says the hooks will find nothing, and how to fix it");
 
     const shown = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", "status"], { cwd: dir, encoding: "utf8" });
     assert.equal(shown.status, 0, shown.stderr);
-    assert.match(shown.stdout, /claude: .*\n  SessionStart: .*\/node_modules\/\.bin\/coherence" hook SessionStart/);
+    assert.match(shown.stdout, /claude: .*\n  SessionStart: .*exec node "\$coherence" hook SessionStart/);
     assert.match(shown.stdout, /codex: .*\(absent\)/);
 
     const noHost = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", "install"], { cwd: dir, encoding: "utf8" });
@@ -317,7 +320,7 @@ test("the CLI checks, uninstalls, and exits by what it found", async () => {
 
     const other = cli("--check", "--host", "claude", "--command", "npx coherence");
     assert.equal(other.status, 1);
-    assert.match(other.stdout, /SessionStart: stale\n    command: installed ".*node_modules\/\.bin\/coherence\\" hook SessionStart"; install would write "npx coherence hook SessionStart"/);
+    assert.match(other.stdout, /SessionStart: stale\n    command: installed ".*exec node \\"\$coherence\\" hook SessionStart"; install would write "npx coherence hook SessionStart"/);
 
     const gone = cli("uninstall", "--host", "claude");
     assert.equal(gone.status, 0, gone.stderr);
@@ -337,4 +340,120 @@ test("the CLI checks, uninstalls, and exits by what it found", async () => {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+/** This checkout, as an adopter keeps it outside the project. */
+const CHECKOUT = resolve(dirname(CLI), "..");
+
+/** The environment a host starts a hook with: nothing of Coherence's, and Claude Code's project dir only for Claude Code. */
+function hostEnv(host: "claude" | "codex", project: string, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, ...extra };
+  if (extra["COHERENCE_HOME"] === undefined) delete env["COHERENCE_HOME"];
+  if (host === "claude") env["CLAUDE_PROJECT_DIR"] = project;
+  else delete env["CLAUDE_PROJECT_DIR"];
+  return env;
+}
+
+/** Run one installed command as the host does: through a shell, in the project, with the event on stdin. */
+function runInstalled(project: string, host: "claude" | "codex", event: string, input: Record<string, unknown>, extra: NodeJS.ProcessEnv = {}) {
+  const file = host === "claude" ? ".claude/settings.json" : ".codex/hooks.json";
+  return (async () => {
+    const settings = JSON.parse(await readFile(join(project, file), "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
+    const command = settings.hooks[event]!.at(-1)!.hooks[0]!.command;
+    return spawnSync("bash", ["-c", command], { cwd: project, env: hostEnv(host, project, extra), input: JSON.stringify({ cwd: project, hook_event_name: event, ...input }), encoding: "utf8" });
+  })();
+}
+
+function git(cwd: string, ...args: string[]): void {
+  const run = spawnSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd, encoding: "utf8" });
+  assert.equal(run.status, 0, run.stderr);
+}
+
+test("a hook without Coherence installed is silent but for one line", async () => {
+  const parent = await mkdtemp(join(tmpdir(), "coherence-absent-"));
+  const project = join(parent, "project");
+  try {
+    await mkdir(project);
+    for (const host of ["claude", "codex"] as const) {
+      await install({ root: project, host, command: LOCATED_PREFIX });
+      assert.deepEqual((await status(project, host)).missing, [], `${host}: every event is wired and recognised as ours`);
+      assert.deepEqual(driftOf(JSON.parse(await readFile(join(project, host === "claude" ? ".claude/settings.json" : ".codex/hooks.json"), "utf8")), { command: LOCATED_PREFIX, host }), [], `${host}: the check accepts the located command`);
+    }
+    assert.equal(locate(project, hostEnv("codex", project)), undefined);
+    for (const host of ["claude", "codex"] as const) {
+      for (const event of HOOK_EVENTS) {
+        const run = await runInstalled(project, host, event, { session_id: "s1", stop_hook_active: false });
+        assert.equal(run.status, 0, `${host} ${event}: never blocks the session`);
+        assert.equal(run.stderr, "", `${host} ${event}: no shell errors`);
+        assert.equal(run.stdout, JSON.stringify({ systemMessage: NOT_INSTALLED }) + "\n", `${host} ${event}: one line the host shows`);
+      }
+    }
+
+    // Found, but node is not on the PATH the hook runs with: the same one line, naming node.
+    await symlink(CHECKOUT, join(parent, "coherence"));
+    const noNode = (process.env["PATH"] ?? "").split(":").filter((dir) => dir !== "" && !existsSync(join(dir, "node"))).join(":");
+    const bare = await runInstalled(project, "claude", "SessionStart", {}, { PATH: noNode });
+    assert.deepEqual([bare.status, bare.stderr, bare.stdout], [0, "", JSON.stringify({ systemMessage: NO_NODE }) + "\n"]);
+
+    // Uninstall still knows the located command as ours and removes all of it.
+    for (const host of ["claude", "codex"] as const) assert.equal((await uninstall(project, host)).removed.length, HOOK_EVENTS.length);
+  } finally {
+    await rm(parent, { recursive: true, force: true });
+  }
+});
+
+test("a located Coherence answers, and refuses, as a direct command does", async () => {
+  const parent = await mkdtemp(join(tmpdir(), "coherence-located-"));
+  const project = join(parent, "project");
+  try {
+    await mkdir(project);
+    await writeFile(join(project, "clean.md"), "Nothing to see.\n");
+    await writeFile(join(project, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, concepts: [{ name: "widget", definition: "A thing with a knob." }], rejected: [{ concept: "doohickey", because: "retired surface" }] }));
+    git(project, "init", "-q");
+    git(project, "add", ".");
+    git(project, "commit", "-q", "-m", "seed");
+    for (const host of ["claude", "codex"] as const) await install({ root: project, host, command: LOCATED_PREFIX });
+    await symlink(CHECKOUT, join(parent, "coherence"));
+    assert.equal(realpathSync(locate(project, hostEnv("codex", project))!), realpathSync(CLI), "the sibling is found");
+
+    for (const host of ["claude", "codex"] as const) {
+      const start = await runInstalled(project, host, "SessionStart", { session_id: `s-${host}` });
+      assert.equal(start.status, 0, start.stderr);
+      const context = (JSON.parse(start.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext;
+      assert.match(context, /Coherence vocabulary/, `${host}: the start injection arrives through the located command`);
+      assert.match(context, /\n  node \.\.\/coherence\/src\/cli\.ts journal\n/, `${host}: the session is told the checkout beside it, not a node_modules path`);
+    }
+
+    // A rejected name in a changed file: the subagent stop is refused exactly as a direct command refuses it.
+    await writeFile(join(project, "notes.md"), "The doohickey turns.\n");
+    const direct = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "SubagentStop"], { cwd: project, env: hostEnv("codex", project), input: JSON.stringify({ cwd: project, stop_hook_active: false }), encoding: "utf8" });
+    assert.equal(direct.status, REFUSE_EXIT, direct.stderr);
+    for (const host of ["claude", "codex"] as const) {
+      const refused = await runInstalled(project, host, "SubagentStop", { stop_hook_active: false });
+      assert.deepEqual([refused.status, refused.stdout, refused.stderr], [direct.status, direct.stdout, direct.stderr], `${host}: the located command refuses as the direct one does`);
+    }
+
+    // COHERENCE_HOME finds a checkout kept anywhere; it is read before the sibling.
+    await rm(join(parent, "coherence"));
+    assert.equal(locate(project, hostEnv("codex", project)), undefined);
+    const home = await runInstalled(project, "codex", "SessionStart", {}, { COHERENCE_HOME: CHECKOUT });
+    assert.equal(home.status, 0, home.stderr);
+    assert.match(home.stdout, /"hookSpecificOutput"/);
+
+    // A git worktree of the project finds the Coherence beside its main checkout.
+    await symlink(CHECKOUT, join(parent, "coherence"));
+    git(project, "add", ".");
+    git(project, "commit", "-q", "-m", "hooks");
+    const worktree = join(project, ".claude", "worktrees", "w");
+    git(project, "worktree", "add", "-q", worktree);
+    assert.equal(realpathSync(locate(worktree, hostEnv("codex", worktree))!), realpathSync(CLI), "the main checkout's sibling is found from a worktree");
+  } finally {
+    await rm(parent, { recursive: true, force: true });
+  }
+});
+
+test("a session is told the checkout it ran from: beside it by a relative path, far away by an absolute one, quoted when it must be", async () => {
+  assert.equal(await cliName("/work/project", "/work/coherence/src/cli.ts"), "node ../coherence/src/cli.ts");
+  assert.equal(await cliName("/a/b/c/d/e/project", "/opt/tools/coherence/src/cli.ts"), "node /opt/tools/coherence/src/cli.ts");
+  assert.equal(await cliName("/work/project", "/work/my tools/coherence/src/cli.ts"), 'node "../my tools/coherence/src/cli.ts"');
 });

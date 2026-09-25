@@ -30,6 +30,9 @@
  * to refuse a stop, with the reason on stderr.
  */
 
+import { realpathSync } from "node:fs";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { LEXICON_WORK_USAGE, lexiconWorkCommand } from "./lifecycle/lexicon-cli.ts";
 import { ECONOMY_USAGE, calibrateCommand, economyCommand, massCommand } from "./economy/cli.ts";
 import { ENFORCEMENT_USAGE, refuteCommand, runCommand, serveCommand } from "./enforcement/cli.ts";
@@ -38,7 +41,7 @@ import { formatReport, hasFindings, runCheck } from "./lifecycle/check.ts";
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
 import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
-import { check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, status, uninstall } from "./lifecycle/install.ts";
+import { check, formatCheck, formatStatus, formatUninstall, HOME_VAR, HOSTS, install, isHost, LOCATED_PREFIX, locate, SIBLING, status, uninstall } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectLexicons } from "./lifecycle/project.ts";
 import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
 import { SCOPE_USAGE, scopeCommand } from "./readings/scope/cli.ts";
@@ -107,13 +110,29 @@ function parse(args: string[], valued: Set<string>): Parsed {
 /**
  * The command prefix a hook entry uses to reach this CLI. Paths are relative
  * to the project root, which is where both hosts run hooks; Claude Code also
- * names it in CLAUDE_PROJECT_DIR, honored when set. The installed bin is
- * addressed directly rather than through npx, which would fetch a stranger's
- * package of the same name when the dependency is missing.
+ * names it in CLAUDE_PROJECT_DIR, honored when set. Coherence's own checkout
+ * runs its own source; an adopter's hook locates Coherence outside the
+ * project and fails softly when it is not there (LOCATED_PREFIX), never
+ * through npx, which would fetch a stranger's package of the same name.
  */
 async function defaultCommand(root: string): Promise<string> {
   const dir = '$(dir="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$dir" != "/" ] && [ ! -f "$dir/.claude/settings.json" ] && [ ! -f "$dir/.codex/hooks.json" ]; do dir=$(dirname "$dir"); done; printf "%s" "$dir")';
-  return (await isCoherenceItself(root)) ? `node "${dir}/src/cli.ts"` : `"${dir}/node_modules/.bin/coherence"`;
+  return (await isCoherenceItself(root)) ? `node "${dir}/src/cli.ts"` : LOCATED_PREFIX;
+}
+
+/** This checkout's cli, as the located command would name it once resolved. */
+const THIS_CLI = realpathSync(fileURLToPath(import.meta.url));
+
+/** After an adopter's install: say where the hooks will find Coherence, or how to make them find it. */
+function locateNote(root: string): string {
+  const found = locate(root);
+  const real = found === undefined ? undefined : realpathSync(found);
+  if (real === THIS_CLI) return `the hooks reach this checkout (${dirname(dirname(THIS_CLI))})\n`;
+  if (real !== undefined) return `note: the hooks will run the Coherence at ${real}, not this checkout (${THIS_CLI})\n`;
+  return (
+    `note: the hooks cannot find Coherence from here; they look at $${HOME_VAR}, then ../${SIBLING} beside the project (or beside its main checkout), then node_modules/.bin/coherence.\n` +
+    `  Clone Coherence beside the project as ../${SIBLING}, or set ${HOME_VAR}=${dirname(dirname(THIS_CLI))} where your agent host starts. Until then each hook prints one line and does nothing.\n`
+  );
 }
 
 async function lexiconCommand(args: string[], root: string): Promise<number> {
@@ -228,6 +247,7 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   }
   const result = await install({ root, host, command });
   process.stdout.write(`${result.changed ? "wrote" : "unchanged"} ${result.path}: ${result.events.join(", ")}\n`);
+  if (command === LOCATED_PREFIX) process.stdout.write(locateNote(root));
   return 0;
 }
 

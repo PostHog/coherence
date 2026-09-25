@@ -11,7 +11,7 @@ import { journalVerbs } from "../journal/cli.ts";
 import { openEscalations } from "../journal/read.ts";
 import { loadJournal } from "../journal/store.ts";
 import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
-import { BOUNDARY_RULE, CONTEXT_BUDGET, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, feedContext, readStdinJson, runHook, sessionBlock, type WarmDoor } from "./hook.ts";
+import { BOUNDARY_RULE, CONTEXT_BUDGET, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, runHook, sessionBlock, type WarmDoor } from "./hook.ts";
 import { withWarmAdapter } from "../enforcement/run.ts";
 import { TRACES_DIR, recordReadTrace } from "../economy/trace.ts";
 import { installedRoot } from "./project.ts";
@@ -52,8 +52,10 @@ test("the block after the lexicon is under 120 words: session, decide template, 
   assert.ok(block.split(/\s+/).filter((w) => w !== "").length < 120, block);
   assert.match(block, /^Session: abc123\n/);
   assert.match(block, /Every journal write needs --session abc123 --agent Explore\./);
-  assert.match(block, /\n  node_modules\/\.bin\/coherence decide "<chose>" --over "<rejected>" --because "<why>" --session abc123 --agent Explore\n/);
-  assert.match(block, /Read the project journal from the project root:\n  node_modules\/\.bin\/coherence journal\n/);
+  const cli = await cliName(root);
+  assert.match(cli, /^node \S*src\/cli\.ts$/, "an adopter is told the checkout the hook ran from, never a path into its node_modules");
+  assert.ok(block.includes(`\n  ${cli} decide "<chose>" --over "<rejected>" --because "<why>" --session abc123 --agent Explore\n`), block);
+  assert.ok(block.includes(`Read the project journal from the project root:\n  ${cli} journal\n`), block);
   assert.ok(block.endsWith(`${INSTRUCTION}\n`));
   assert.match(INSTRUCTION, /rejected name .* defect/);
   assert.match(INSTRUCTION, /declared .* concept/);
@@ -78,7 +80,7 @@ test("SessionStart and SubagentStart inject both lexicons and the instruction as
     assert.match(context, /\nWidgetry vocabulary \(1 concept/);
     assert.match(context, /- widget: A thing with a knob\. \(also: gadget\)/);
     assert.match(context, /- rejected names: doohickey/);
-    assert.match(context, /Read the project journal from the project root:\n  node_modules\/\.bin\/coherence journal\n/);
+    assert.ok(context.includes(`Read the project journal from the project root:\n  ${await cliName(root)} journal\n`));
     assert.ok(context.endsWith(`${INSTRUCTION}\n`));
     assert.ok(context.length <= CONTEXT_BUDGET);
   }
@@ -273,8 +275,8 @@ test("the start injection stays under the budget with escalations present: the v
       pointed = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
     }
     assert.doesNotMatch(pointed, /^Coherence vocabulary/m, "the names no longer fit");
-    assert.match(pointed, /\n  node_modules\/\.bin\/coherence journal\n/, "the journal command survives the reduced vocabulary");
-    assert.match(pointed, /^Vocabulary omitted to stay under the host budget; full entries: node_modules\/\.bin\/coherence lexicon$/m, "one line points at the lexicon command instead");
+    assert.ok(pointed.includes(`\n  ${await cliName(dir)} journal\n`), "the journal command survives the reduced vocabulary");
+    assert.ok(pointed.includes(`\nVocabulary omitted to stay under the host budget; full entries: ${await cliName(dir)} lexicon\n`), "one line points at the lexicon command instead");
     assert.ok(pointed.length <= CONTEXT_BUDGET, `${pointed.length} characters against a budget of ${CONTEXT_BUDGET}`);
     ids.forEach((id, n) => assert.ok(pointed.includes(`▲ ${id}  scope  ${what(n)} — only the owner`), `escalation ${n} is still shown whole`));
 
