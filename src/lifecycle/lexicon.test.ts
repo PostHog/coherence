@@ -177,6 +177,8 @@ test("renderCompactWithin steps the project layer down, then Coherence's layer t
   assert.equal(coherenceNames.detail, "coherence-names", "below the project's names, Coherence's own layer steps down to names");
   assert.match(coherenceNames.text, /^Coherence vocabulary \(2 concepts; names only here, rejected names are defects; full entries: coherence lexicon\):\ninvariant, journal\n/);
   assert.doesNotMatch(coherenceNames.text, /rejected: zorp/);
+  assert.match(renderCompactWithin(coherence, big, names.text.length - 1, "coherence", false).text, /^Coherence vocabulary \(2 concepts; names only here, use these names when you mean Coherence's concepts; full entries: coherence lexicon\):\n/, "in an adopter the header binds Coherence's names to Coherence's concepts");
+  assert.match(renderCompact(coherence, big, "full", "full", false), /^Coherence vocabulary \(2 concepts; use these names when you mean Coherence's concepts\):\n/);
   assert.ok(coherenceNames.text.length < names.text.length);
 
   const tooSmall = renderCompactWithin(coherence, big, 10);

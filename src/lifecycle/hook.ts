@@ -57,8 +57,8 @@ import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
-import { renderCompactWithin, type InjectionLevel } from "./lexicon.ts";
-import { installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
+import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, type Lexicon } from "./lexicon.ts";
+import { COHERENCE_LEXICON, installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
@@ -99,7 +99,7 @@ export const OUTSIDE_ROOT_EXIT = 78;
  */
 export const CONTEXT_BUDGET = 9_500;
 
-/** The rule; with the session block above it the whole tail stays under 120 words. */
+/** The rule in Coherence's own repository, where its rejected names are defects everywhere; with the session block above it the whole tail stays under 120 words. */
 export const INSTRUCTION = [
   "Use these names. A rejected name in prose, a spec, a journal record, or an",
   "identifier is a defect: replace it. A new noun the lexicon lacks must be",
@@ -107,6 +107,30 @@ export const INSTRUCTION = [
   "before this session ends. Coherence's names describe the tool; the",
   "project's names describe its domain, and inside the project its sense wins.",
 ].join(" ");
+
+/**
+ * The rule in an adopter, matching what the check enforces there: Coherence's
+ * rejected names cover only text that names Coherence's concepts, the
+ * project's own rejected names are defects everywhere, and the check fails
+ * only on findings newer than the adoption baseline. The example swap is drawn
+ * from the lexicon, so Coherence's own source never spells a rejected name.
+ */
+export function adopterInstruction(example: { concept: string; rejected: string }): string {
+  return [
+    "Use Coherence's names when you mean its concepts in specs, journal records",
+    `and the config: say ${example.concept}, not ${example.rejected}. Its rejected names cover only`,
+    "that use; this project's own words and senses stand everywhere else. The",
+    "project's rejected names are defects: replace them. Declare a new domain noun",
+    "in the lexicon, or map it as an alias, before this session ends. The check",
+    "fails only on findings newer than the adoption baseline.",
+  ].join(" ");
+}
+
+/** The example the adopter rule shows: the invariant concept and its first one-word rejected name. */
+export function adopterExample(coherence: Lexicon): { concept: string; rejected: string } {
+  const found = rejectedNames(coherence).find((n) => n.concept === "invariant" && !n.name.includes(" "));
+  return { concept: "invariant", rejected: found?.name ?? "another name" };
+}
 
 /** The agent name a journal write carries when the harness names none: the main thread. */
 const MAIN_AGENT = "main";
@@ -314,7 +338,7 @@ export async function sessionBlock(root: string, input: HookInput): Promise<stri
     `  ${cli} decide "<chose>" --over "<rejected>" --because "<why>" --session ${id} --agent ${agent}`,
     "Read the project journal from the project root:",
     `  ${cli} journal`,
-    INSTRUCTION,
+    (await isCoherenceItself(root)) ? INSTRUCTION : adopterInstruction(adopterExample(await loadLexicon(COHERENCE_LEXICON))),
   ].join("\n") + "\n";
 }
 
@@ -500,7 +524,7 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   const signal=attentionText(reading, commands);
   const coverage=signal ? `\n${signal}\n` : "";
   const tail = coverage + `\n${await sessionBlock(root, input)}`;
-  const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root));
+  const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root));
   return { text: head + text + tail, detail, coverage: reading };
 }
 
