@@ -254,8 +254,9 @@ export interface FlowRoute {
  *              owns, whose protected thing the handler's reach reaches: it
  *              stands inside that component, on no line of the map
  *   totality   a verified invariant enforced only by a totality oracle, owned
- *              by a component on the route, whose crossing enters from the
- *              trust the route carries in: test-backed, not structural
+ *              by the component that declares or handles the entrance, whose
+ *              crossing enters from the trust the route carries in:
+ *              test-backed, not structural
  */
 export const CONTROL_KINDS = ["interface", "wrapper", "inside", "totality"] as const;
 export type FlowControlKind = (typeof CONTROL_KINDS)[number];
@@ -305,6 +306,8 @@ export interface FlowEntrance {
   meaning: string;
   /** The component whose spec declares it. */
   declaredBy: string;
+  /** The components that own it, unfolded by zoom: the one whose spec declares it and the one holding its resolved handler. */
+  owners: string[];
   handler: string | undefined;
   /** The visible component holding the resolved handler, where its flow starts. */
   start: string | undefined;
@@ -654,7 +657,7 @@ export function flowOf(state: ShellState): FlowModel {
         : [...new Set(invariants.filter((invariant) => invariant.crossing !== undefined && represent(invariant.component) === start && invariant.enforcements.some((e) => e.form === "chokepoint" && flowNamed(e.chokepoint)?.symbol === handlerName)).map((invariant) => invariant.crossing!.from))]
           .sort((a, b) => (levelOrder.get(a) ?? 99) - (levelOrder.get(b) ?? 99) || a.localeCompare(b));
       const passes = [...new Set([component.folder, ...(holder === undefined ? [] : [holder]), ...(resolution?.reach ?? []).flatMap((r) => [r.from, r.to])])].sort();
-      return { id: flowEntranceId(component.folder, entrance.name), name: entrance.name, meaning: entrance.meaning, declaredBy, handler: entrance.handler, start, resolved: start !== undefined, reachable, reason, trust, trustSource, reach: resolution?.reach, passes, module, guard: entrance.guard, guards: resolution?.guards, guardUnconfirmed: resolution?.guardUnconfirmed };
+      return { id: flowEntranceId(component.folder, entrance.name), name: entrance.name, meaning: entrance.meaning, declaredBy, owners: [...new Set([component.folder, ...(holder === undefined ? [] : [holder])])], handler: entrance.handler, start, resolved: start !== undefined, reachable, reason, trust, trustSource, reach: resolution?.reach, passes, module, guard: entrance.guard, guards: resolution?.guards, guardUnconfirmed: resolution?.guardUnconfirmed };
     }),
   );
 
@@ -934,8 +937,12 @@ export function flowOf(state: ShellState): FlowModel {
         if (guard.how === "wrapper" || guard.how === "declared") found.push({ kind: "wrapper", component: guard.component, name: guard.name, identifier: undefined, declared: guard.how === "declared" });
         else if (on.has(guard.component)) found.push({ kind: "inside", component: guard.component, name: guard.name, identifier: undefined, declared: false });
       }
+      // A test-backed control is the entrance's own: owned where the entrance is declared or handled, never merely somewhere
+      // its work passes, so an unrelated test further along cannot stand in for a check on this entrance (owner, d-127ab8e4).
+      // Compared unfolded: a child component folded into a stop at this zoom does not own its parent's entrances.
+      const own = new Set(entrance?.owners ?? []);
       for (const invariant of invariants) {
-        if (invariant.crossing === undefined || !route.trust.includes(invariant.crossing.from) || !on.has(invariant.component)) continue;
+        if (invariant.crossing === undefined || !route.trust.includes(invariant.crossing.from) || !own.has(invariant.component)) continue;
         // An invariant with a chokepoint is traced by its chokepoint; only one enforced by a totality oracle alone is test-backed here.
         if (invariant.enforcements.some((e) => e.form === "chokepoint") || !invariant.enforcements.some((e) => e.form === "totality oracle")) continue;
         if (verified(invariant.component, invariant.name)) found.push({ kind: "totality", component: invariant.component, name: invariant.name, identifier: undefined, declared: false });

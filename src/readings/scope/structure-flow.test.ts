@@ -1784,7 +1784,7 @@ test("motion runs caller to callee while selected: every drawn line runs from ca
 /* ------------------------------------------------ traced controls (d-127ab8e4) */
 
 /** The untraced fixture's reader route carrying outside in, with the reading's guards on its entrance and an invariant enforced by a totality oracle alone in the reader. */
-function tracedState(options: { guards?: EntranceGuard[]; totality?: { from: string; chokepoint?: boolean; state?: SpecInvariant["state"] }; states?: Record<string, SpecInvariant["state"]>; guard?: string; unconfirmed?: string } = {}): ShellState {
+function tracedState(options: { guards?: EntranceGuard[]; totality?: { from: string; chokepoint?: boolean; state?: SpecInvariant["state"]; in?: string }; states?: Record<string, SpecInvariant["state"]>; guard?: string; unconfirmed?: string } = {}): ShellState {
   const state = untracedState();
   state.spec.trustLevels = state.spec.trustLevels.map((level) => ({ ...level, outside: level.name === "outside" }));
   for (const component of state.spec.components) for (const invariant of component.invariants) invariant.state = options.states?.[invariant.name] ?? invariant.state;
@@ -1794,12 +1794,23 @@ function tracedState(options: { guards?: EntranceGuard[]; totality?: { from: str
     state.componentInterfaces.entrances = state.componentInterfaces.entrances.map((e) => (e.name === "look" ? { ...e, ...(options.guards === undefined ? {} : { guards: options.guards }), ...(options.unconfirmed === undefined ? {} : { guardUnconfirmed: options.unconfirmed }) } : e));
   }
   if (options.totality !== undefined) {
-    const reader = state.spec.components.find((c) => c.folder === "src/reader")!;
+    const owner = options.totality.in ?? "src/reader";
+    const reader = state.spec.components.find((c) => c.folder === owner)!;
     const enforcements: SpecInvariant["enforcements"] = [{ form: "totality oracle", over: "every look", via: "looks stay scoped", line: 9 }, ...(options.totality.chokepoint === true ? [{ form: "chokepoint" as const, chokepoint: "peekAt", protects: "peek", line: 10 }] : [])];
-    reader.invariants.push({ ...state.spec.components.find((c) => c.folder === "src/core")!.invariants[0]!, component: "src/reader", name: "looks stay scoped", sentence: "looks stay scoped.", enforcements, crossing: { from: options.totality.from, to: "inside", line: 11 }, state: options.totality.state ?? "invariant" });
+    reader.invariants.push({ ...state.spec.components.find((c) => c.folder === "src/core")!.invariants[0]!, component: owner, name: "looks stay scoped", sentence: "looks stay scoped.", enforcements, crossing: { from: options.totality.from, to: "inside", line: 11 }, state: options.totality.state ?? "invariant" });
   }
   return state;
 }
+
+test("a test-backed control is the entrance's own: a verified totality oracle further along the route, in a component that neither declares nor handles the entrance, never stands in for a check on it", () => {
+  const look = (state: ShellState): FlowRoute => flowOf(state).routes.find((r) => r.names.includes("look"))!;
+  const own = look(tracedState({ totality: { from: "outside" } }));
+  assert.ok(own.stops.includes("src/store"), "the route passes the store");
+  assert.deepEqual(own.traced.map((c) => `${c.kind} ${c.component}`), ["totality src/reader"], "handled in the reader, the reader's totality oracle counts");
+  const further = look(tracedState({ totality: { from: "outside", in: "src/store" } }));
+  assert.deepEqual(further.traced, [], "the same totality oracle in the store, which the route passes but which neither declares nor handles the entrance, does not count");
+  assert.equal(further.noTracedControl, true, "so the route reads no traced control");
+});
 
 test("a route's controls are traced four ways, verified only: an identifier on its lines, a chokepoint its handler is registered through, a chokepoint inside a component on it whose protected thing its reach reaches, and a totality oracle on it whose crossing enters from its trust", () => {
   const look = (state: ShellState): FlowRoute => flowOf(state).routes.find((r) => r.names.includes("look"))!;
