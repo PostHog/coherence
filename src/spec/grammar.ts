@@ -15,6 +15,7 @@
  *     handler: <symbol, symbol in file, or a module file>   a module file: its top-level script is the handler
  *     trust: <the trust level it carries in>              optional; else derived from crossings
  *     guard: <a chokepoint's symbol>                     optional; the chokepoint its handler is registered through
+ *     control: none — <reason>                           optional; it needs no control, and why (never beside guard:)
  *
  *   ## invariants
  *   - <name>: <sentence>
@@ -107,7 +108,21 @@ export interface Entrance {
   guard?: string | undefined;
   /** The guard line, when there is one. */
   guardLine?: number | undefined;
+  /**
+   * Why it needs no control (a `control: none — <reason>` line): static or
+   * public content, a health check. Undefined when it declares none. It is a
+   * declared, visible claim a human can challenge, never a traced control.
+   */
+  noControl?: string | undefined;
+  /** The control line, when there is one. */
+  controlLine?: number | undefined;
 }
+
+/** The one value a control: line takes, and its reason after a dash: `none — <reason>` (an em dash, or - or --). */
+export const NO_CONTROL = /^none(?:\s*(?:—|–|--?)\s*(.*))?$/s;
+
+/** How the control: line is written, for the problems that name it. */
+export const NO_CONTROL_FORM = "control: none — <why this entrance needs no control>";
 
 /** A handler named as a module file (a path with an extension): the module's top-level script receives the work. */
 export function isModuleHandler(handler: string): boolean {
@@ -345,7 +360,7 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         if (bullet !== null) {
           const colon = bullet[1]!.indexOf(":");
           if (colon <= 0) {
-            problem(line, "an entrance is one bullet: - <name>: <one-line meaning>, with an indented handler: <symbol> line and optional trust: <trust level> and guard: <chokepoint> lines");
+            problem(line, `an entrance is one bullet: - <name>: <one-line meaning>, with an indented handler: <symbol> line and optional trust: <trust level>, guard: <chokepoint> and ${NO_CONTROL_FORM} lines`);
             return;
           }
           const name = bullet[1]!.slice(0, colon).trim();
@@ -358,7 +373,7 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
         const current = entrances[entrances.length - 1];
         const field = /^\s+([a-z]+):\s*(.*)$/.exec(raw);
         if (current === undefined || field === null) {
-          problem(line, "expected an entrance bullet (- <name>: <meaning>) or an indented handler:, trust: or guard: line under one");
+          problem(line, "expected an entrance bullet (- <name>: <meaning>) or an indented handler:, trust:, guard: or control: line under one");
           return;
         }
         if (field[1] === "trust") {
@@ -378,8 +393,23 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
           current.guardLine = line;
           return;
         }
+        if (field[1] === "control") {
+          if (current.controlLine !== undefined) problem(line, `entrance ${current.name} names its control twice`);
+          current.controlLine = line;
+          const value = field[2]!.trim();
+          if (value === "" || isPlaceholder(value)) return;
+          const none = NO_CONTROL.exec(value);
+          if (none === null) {
+            problem(line, `control: on entrance ${current.name} takes only none and a reason (${NO_CONTROL_FORM}); a control is traced from the code, or named with guard:`);
+            return;
+          }
+          const reason = (none[1] ?? "").trim();
+          if (reason === "" || isPlaceholder(reason)) problem(line, `control: none on entrance ${current.name} needs a reason: ${NO_CONTROL_FORM}`);
+          else current.noControl = reason;
+          return;
+        }
         if (field[1] !== "handler") {
-          problem(line, `unknown key "${field[1]}": an entrance carries handler, trust and guard`);
+          problem(line, `unknown key "${field[1]}": an entrance carries handler, trust, guard and control`);
           return;
         }
         if (current.handler !== undefined) problem(line, `entrance ${current.name} names its handler twice`);
@@ -438,6 +468,10 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
   for (const entrance of entrances) {
     if (entrance.handler === undefined || entrance.handler === "" || isPlaceholder(entrance.handler)) {
       problem(entrance.line, `entrance ${entrance.name} names no handler: add handler: <symbol, symbol in file, or module file>`);
+    }
+    // A guard is a control: an entrance that names one cannot also say it needs none.
+    if (entrance.noControl !== undefined && entrance.guardLine !== undefined) {
+      problem(entrance.controlLine ?? entrance.line, `entrance ${entrance.name} names a guard: and control: none; a guard is a control, so keep one of them`);
     }
   }
   const invariants = bullets.map((bullet) => buildInvariant(bullet, problem, options.seed));

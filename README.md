@@ -111,8 +111,11 @@ report what each one found.
    Run `coherence scope` and report what the reading shows: health, broken
    chokepoints, entrances whose trust comes from outside with no traced
    control on their route, and components no enforcement covers. "No traced
-   control" means Coherence could not trace one, not that none exists: if a
-   shared wrapper checks these entrances, declare it with `guard:`.
+   control" means Coherence could not trace one, not that none exists: close
+   each with `guard:` where a verified chokepoint wraps its handler, an
+   invariant whose crossing enters from its trust, or `control: none —
+   <reason>` where it needs none (`coherence scaffold control <entrance>`
+   proposes which).
 
 Record every non-obvious choice with `coherence decide "<chose>" --over
 "<rejected>" --because "<why>" --session <id> --agent <name>`. Never use a name

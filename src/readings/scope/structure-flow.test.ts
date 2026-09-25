@@ -1944,3 +1944,55 @@ test("a reference inside a multi-line top-level initializer is that declaration'
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+/* ------------------------------------------ control: none (d-a1095ef2) */
+
+test("an entrance that declares control: none with its reason is never marked no traced control: its route and tag say no control needed, neutral, the inspector and the query give the reason, the trust key lists every one, and it never shares a line with an entrance that does not declare it", () => {
+  const reason = "static files, the same bytes for every caller";
+  const waive = (state: ShellState, names: string[]): ShellState => {
+    const root = state.spec.components.find((c) => c.folder === ".")!;
+    root.entrances = root.entrances.map((e) => (names.includes(e.name) ? { ...e, noControl: reason, controlLine: e.handlerLine + 2 } : e));
+    return state;
+  };
+  const look = (state: ShellState): FlowRoute => flowOf(state).routes.find((r) => r.names.includes("look"))!;
+  assert.equal(look(tracedState()).noTracedControl, true, "untrusted and untraced: marked");
+  const state = waive(tracedState(), ["look"]);
+  const route = look(state);
+  assert.deepEqual([route.noControl, route.noTracedControl], [true, false], "declared: not marked");
+  const svg = renderFlowSvg(flowOf(state), undefined).text;
+  const tag = new RegExp(`id="${route.id}"[^]*?<g class="flow-trust([^"]*)" data-trust-tag="([^"]+)"[^>]*data-no-control="(true)"`).exec(svg);
+  assert.ok(tag !== null, "its tag is drawn");
+  assert.deepEqual([tag[1], tag[2], tag[3]], [" flow-trust-unneeded", "no control needed", "true"], "neutral words, never the attention class");
+  const page = renderView({ ...state, structure: { selected: route.id, preview: [] } } as ShellState, "structure").text;
+  const controls = /<dt>Controls on it<\/dt>\s*<dd>([^]*?)<\/dd>/.exec(page)?.[1] ?? /data-field="controls" data-no-control="true">[^]*?<\/ul>/.exec(page)?.[0] ?? "";
+  assert.match(controls, /no control needed[^]*data-field="no-control-reason">static files, the same bytes for every caller</, "the route inspector gives the reason");
+  assert.doesNotMatch(controls, /flow-attention/, "and nothing in its controls is amber");
+  assert.match(renderView(state, "structure").text, /data-level="no-control-needed" data-count="1">[^]*1 entrance needs no control[^]*data-entrance="look">[^]*the root: static files, the same bytes for every caller/, "the trust key lists it where a human reads the map's words");
+  const query = answerStructure(state).text;
+  assert.match(query, /look {2}[^\n]*no control needed/, "the query says the same of the route");
+  assert.doesNotMatch(query, /look {2}[^\n]*no traced control/);
+  assert.match(query, /\.\/look {2}[^\n]*no control needed: static files, the same bytes for every caller/, "and of the entrance, with its reason");
+  // A twin on the same stops and trust that declares nothing takes its own line, which stays marked.
+  const twins = tracedState();
+  const rootSpec = twins.spec.components.find((c) => c.folder === ".")!;
+  rootSpec.entrances = [...rootSpec.entrances, { ...rootSpec.entrances.find((e) => e.name === "look")!, name: "glance", meaning: "a reader glances" }];
+  if (twins.componentInterfaces.kind === "read") twins.componentInterfaces.entrances = [...twins.componentInterfaces.entrances, { component: ".", name: "glance", file: "src/reader/look.ts" }];
+  assert.deepEqual(look(twins).names, ["look", "glance"], "undeclared, they share a line");
+  const split = flowOf(waive(twins, ["look"]));
+  const lookRoute = split.routes.find((r) => r.names.includes("look"))!;
+  const glanceRoute = split.routes.find((r) => r.names.includes("glance"))!;
+  assert.notEqual(lookRoute.id, glanceRoute.id, "declared differently, they never share a line");
+  assert.deepEqual([lookRoute.noControl, lookRoute.noTracedControl, glanceRoute.noControl, glanceRoute.noTracedControl], [true, false, false, true]);
+});
+
+test("entrances that declare different guard: lines never share a line, so a guard declared on some of a route's entrances counts for those it names", () => {
+  const twins = tracedState({ guards: [{ component: "src/core", name: "one door", how: "declared" }], guard: "door" });
+  const rootSpec = twins.spec.components.find((c) => c.folder === ".")!;
+  rootSpec.entrances = [...rootSpec.entrances, { ...rootSpec.entrances.find((e) => e.name === "look")!, name: "glance", meaning: "a reader glances", guard: undefined, guardLine: undefined }];
+  if (twins.componentInterfaces.kind === "read") twins.componentInterfaces.entrances = [...twins.componentInterfaces.entrances, { component: ".", name: "glance", file: "src/reader/look.ts" }];
+  const model = flowOf(twins);
+  const guarded = model.routes.find((r) => r.names.includes("look"))!;
+  const bare = model.routes.find((r) => r.names.includes("glance"))!;
+  assert.notEqual(guarded.id, bare.id);
+  assert.deepEqual([guarded.traced.map((c) => `${c.kind} ${c.name}`), guarded.noTracedControl, bare.noTracedControl], [["wrapper one door"], false, true]);
+});

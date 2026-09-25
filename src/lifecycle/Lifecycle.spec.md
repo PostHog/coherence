@@ -366,3 +366,17 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: dropped the function-word refusal from nominate in lexicon-coverage.ts, so a function word written capitalized mid-sentence was nominated as a proper noun -> "function words are never candidates: every preposition, conjunction, determiner, pronoun and auxiliary is refused however prose writes it" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
   kinds: none
+- orient names spec gaps: Orient names the spec gaps, entrances carrying outside or unknown trust in with no traced control, in one line under the spec block, read from the recorded Structure reading only while it still describes the tree; when it does not, orient says nothing and, at a session start, starts one reading in the background and never waits on it; it names no gap the adoption baseline holds.
+  over: no reading, a fresh reading, a stale one, and a baselined one, at SessionStart
+  via: orient names the spec gaps in one bounded line from a recorded reading that still describes the tree, says nothing and starts one background reading when it is stale or absent, and names none the adoption baseline holds
+  because: both outside adoptions left their route gaps open because nothing in the session's loop showed them (d-a1095ef2); a reading takes minutes, so a session start may never wait on one, and a stale reading could name gaps that are gone
+  crossing: project-source -> reading
+  refuted: left the gap block out of the start injection in startReading -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- a spec gap never refuses a stop: Regulate names the spec gaps a session touched, the handler files it changed and the untrusted entrances it declared with neither guard: nor control: none, and never refuses a stop for them.
+  over: a session that changed nothing, one that changed a handler file of two gaps and declared an untrusted entrance, at Stop and at SubagentStop
+  via: regulate names the gaps a session touched, a changed handler file and an untrusted entrance it declared, and never refuses a subagent stop for them
+  because: a refusal is spent only on what the tool can prove is owed; no traced control is not a demonstrated bypass (d-127ab8e4), so a gap is named for the session that touched it and left to it and to the human
+  crossing: project-source -> reading
+  refuted: counted a touched spec gap as owed, so SubagentStop refused with exit 2 -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none

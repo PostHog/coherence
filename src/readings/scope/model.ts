@@ -257,6 +257,9 @@ export interface SpecEntrance {
   /** The chokepoint it declares its handler is registered through (a guard: line); absent when it declares none. */
   guard?: string | undefined;
   guardLine?: number | undefined;
+  /** Why it needs no control (a control: none — <reason> line); absent when it declares none. */
+  noControl?: string | undefined;
+  controlLine?: number | undefined;
   component: string;
   /** The file whose top level declares the handler (a module handler: the module itself), as the spec model found it. */
   file: string | undefined;

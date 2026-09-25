@@ -492,3 +492,23 @@ test("the model: an entrance's guard: line names a chokepoint an invariant decla
   assert.ok(twice.problems.some((p) => p.line === 8 && p.message === "guard: on entrance in names no chokepoint"));
   assert.ok(twice.problems.some((p) => p.line === 9 && p.message === "entrance in names its guard twice"));
 });
+
+test("the grammar: an entrance's control: none carries a non-empty reason and never stands beside a guard:", () => {
+  const entrance = (lines: string): ReturnType<typeof parseSpec> => parseSpec(`# A\n\nAn a.\n\n## entrances\n- in: work enters\n  handler: x\n${lines}`, "A.spec.md");
+  const waived = entrance("  control: none — static files, the same bytes for every caller\n");
+  assert.deepEqual(waived.problems, []);
+  assert.equal(waived.entrances[0]!.noControl, "static files, the same bytes for every caller");
+  assert.equal(waived.entrances[0]!.controlLine, 8);
+  assert.equal(entrance("  control: none - a health check\n").entrances[0]!.noControl, "a health check", "a plain hyphen separates the reason too");
+  const unfilled = entrance("  control: none — <why this entrance needs no control>\n");
+  assert.deepEqual([unfilled.problems, unfilled.entrances[0]!.noControl], [[], undefined], "a scaffolded placeholder parses and claims nothing, as an unfilled slot does");
+  for (const bare of ["  control: none\n", "  control: none —\n"]) {
+    const parsed = entrance(bare);
+    assert.equal(parsed.entrances[0]!.noControl, undefined, `${bare.trim()}: no reason, no claim`);
+    assert.deepEqual(parsed.problems.map((p) => `${p.line} ${p.message}`), ["8 control: none on entrance in needs a reason: control: none — <why this entrance needs no control>"], bare.trim());
+  }
+  assert.match(entrance("  control: auth\n").problems[0]!.message, /control: on entrance in takes only none and a reason/, "any other value is refused: a control is traced, never declared");
+  const both = entrance("  guard: door\n  control: none — public\n");
+  assert.deepEqual(both.problems.map((p) => `${p.line} ${p.message}`), ["9 entrance in names a guard: and control: none; a guard is a control, so keep one of them"]);
+  assert.ok(entrance("  control: none — a\n  control: none — b\n").problems.some((p) => p.line === 9 && p.message === "entrance in names its control twice"));
+});

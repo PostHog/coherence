@@ -450,3 +450,38 @@ The reading: one surface projecting the model for a human, in six views: Structu
   because: the owner ruled it (d-bf90cb79): the map is what a reader comes to Scope for, and the lexicon is the vocabulary beneath it. The first tab is the one a page opens on, so a reader who chooses nothing sees what the strip says comes first, and a deep link still opens the view it names
   refuted: opened a page whose address names no view on Lexicon in loadState, the strip still leading with Structure -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
+- control none is never marked: An entrance that declares control: none with its reason is never marked no traced control: its route and tag say no control needed, never in the attention color, the route and entrance inspectors and the query give the reason, the trust key lists every such entrance with its reason, and it never shares a route with an entrance that does not declare it.
+  over: an untrusted untraced entrance with and without control: none, alone and beside a route-mate that declares nothing, in the model, the map's tag, both inspectors, the trust key and query structure
+  via: an entrance that declares control: none with its reason is never marked no traced control: its route and tag say no control needed, neutral, the inspector and the query give the reason, the trust key lists every one, and it never shares a line with an entrance that does not declare it
+  because: a gap closed by saying no control is needed must stay visible and challengeable (d-a1095ef2); marked amber it would read as a gap still open, and hidden it would be a waiver nobody sees
+  crossing: project-source -> reading
+  refuted: dropped the control: none exemption from noTracedControl in flowOf, so a declared entrance was marked no traced control -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- declared guards split routes: Entrances that declare different guard: lines never share a structural route, so a guard declared on some of a route's entrances counts for the ones it names.
+  over: two entrances on the same stops and trust, one declaring a confirmed guard: and one declaring none
+  via: entrances that declare different guard: lines never share a line, so a guard declared on some of a route's entrances counts for those it names
+  because: a control counts on a route only when every entrance on it passes it (d-127ab8e4); without the split, the guard the scaffold proposes for the entrances that pass a chokepoint (praetorium's mutationRpc on 40 of 101) could never close their gap
+  crossing: project-source -> reading
+  refuted: left the declared guard out of the route grouping key in flowOf, so a guarded entrance shared its route with an unguarded one -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- recorded reading stands only for its tree: The Structure reading a hook reads is kept only when complete and when the tree it read is still the tree, and it stands only while its fingerprint holds: a changed source file, handler, guard, chokepoint or config makes it stale and the gaps unknown, while a spec line the reading never reads leaves it standing.
+  over: a partial and an unread reading, an edit made while a reading ran, a changed source file, entrance handler and config, and a control: none added to a spec
+  via: a recorded Structure reading stands for the tree only while its fingerprint holds: a partial one is never kept, an edit made while it ran leaves nothing, a changed source file, handler or config makes it stale, and a spec line the reading never reads leaves it standing
+  because: a hook cannot take a reading (a minute on Coherence, three on a large adopter), so it reads the last one; a reading that no longer describes the tree would name gaps that are gone or miss new ones, and saying nothing is better than a guess (d-a1095ef2)
+  crossing: record -> reading
+  refuted: made freshReading ignore the fingerprint, so a reading of an older tree stood for the current one -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- gap baseline only shrinks: The adoption baseline of spec gaps is a journal decision: the first holds every gap the reading shows, a later one only intersects it, so it never grows.
+  over: a first baseline, a smaller one, and a later one naming a gap the baseline never held
+  via: the gaps derive from the recorded reading with the current runs and spec, and the adoption baseline only shrinks
+  because: gaps present at adoption should not nag every session start, but a baseline that could grow would let a new uncontrolled entrance be excused by recording it; like the lexicon baseline, it is shrunk by work and widened only by a retraction a human can read
+  crossing: record -> reading
+  refuted: made recordGapBaseline record every gap held now instead of intersecting with the prior baseline -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- orient's gap line is bounded: Orient's spec gap line is one line of bounded length: the count of gaps outside the adoption baseline, the busiest route by entrance count, and the three ways to close one; nothing when there are none, and a gap outside the baseline is always named.
+  over: gaps on several routes with an over-long entrance name, none, all baselined, and one new beside a baseline
+  via: orient's gap line is one bounded line naming the count, the busiest route by entrance count and the three ways to close one; nothing when none is outside the baseline
+  because: the start injection shares a fixed budget with the vocabulary and the escalations (CONTEXT_BUDGET), so the line must not grow with the project; one line that names where to start and how to close a gap is what an agent can act on
+  crossing: project-source -> reading
+  refuted: stopped cutting entrance names in orient's gap line, so a long name grew the line without bound -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none

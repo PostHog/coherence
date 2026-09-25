@@ -36,6 +36,13 @@
  * The cursor advances only after the feed was handed to the host: runHook
  * renders and returns the advance as `commit`, and the command line calls it
  * once its stdout write has succeeded, never before.
+ * Spec gaps (d-a1095ef2) ride with both: orient adds one bounded line when
+ * entrances outside the adoption baseline carry untrusted work in with no
+ * traced control, read from the last complete Structure reading while it
+ * still describes the tree (gaps.ts), and nothing when it does not; at a
+ * session start a stale reading starts one refresh in the background, never waited on. Regulate
+ * names the gaps this session touched, advisory: no traced control is not a
+ * demonstrated bypass, so a gap never refuses a stop.
  * The root of every event is confined to the project the hook was installed
  * for: the harness names the working directory on stdin, and a cwd outside
  * that tree is refused with exit 78 rather than read or written.
@@ -61,6 +68,8 @@ import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, t
 import { COHERENCE_LEXICON, installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
+import { currentGaps, declaredThisSession, orientGapText, readGapBaseline, refreshInBackground, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, type GapState } from "../readings/scope/gaps.ts";
+import { loadSpec } from "../readings/scope/build.ts";
 import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
 
 const run = promisify(execFile);
@@ -503,6 +512,43 @@ export async function editContext(root: string, input: HookInput, options: HookO
   return lines.join("\n") + "\n";
 }
 
+/** What orient knows of the spec gaps: the gaps now, when the recorded reading still describes the tree, and the fingerprint it was checked against. */
+export interface GapReading {
+  fingerprint: string | undefined;
+  now: (GapState & { at: string }) | undefined;
+}
+
+/**
+ * Whether any declared entrance could be a gap: one that declares no
+ * control: none and carries untrusted work in, its trust unknown (undeclared,
+ * which a crossing may still derive) or a level outside the system's control
+ * or declared nowhere. Without one, no reading is worth starting.
+ */
+function mayHaveGaps(root: string): boolean {
+  const model = specModelOrNull(root);
+  if ("error" in model) return false;
+  const trusted = new Set(model.trustLevels.filter((l) => !l.outside).map((l) => l.name));
+  return model.components.some((c) => c.entrances.some((e) => e.noControl === undefined && (e.trust === undefined || !trusted.has(e.trust))));
+}
+
+/** The gaps as orient reads them, never guessing: undefined `now` when there is no reading or it is stale. Cheap: a content fingerprint and a parse. */
+export function gapReading(root: string): GapReading {
+  if (!mayHaveGaps(root)) return { fingerprint: undefined, now: undefined };
+  try {
+    const fingerprint = structureFingerprint(root);
+    return { fingerprint, now: currentGaps(root, fingerprint) };
+  } catch {
+    return { fingerprint: undefined, now: undefined };
+  }
+}
+
+/** Orient's gap line under the spec block, or nothing. */
+export async function gapBlock(root: string, reading: GapReading = gapReading(root)): Promise<string> {
+  if (reading.now === undefined) return "";
+  const text = orientGapText(reading.now, readGapBaseline(root), await cliName(root));
+  return text === "" ? "" : `${text}\n\n`;
+}
+
 /**
  * The start injection: escalations (never shortened), what the spec and the
  * work orders owe, the vocabulary at the richest level that leaves the whole
@@ -515,9 +561,9 @@ export async function startContext(root: string, input: HookInput = {}, report?:
 }
 
 /** The start injection with the level the vocabulary was delivered at, so a reading of the hook can say what orient carries. */
-export async function startReading(root: string, input: HookInput = {}, report?: Coverage): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
+export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
   const { coherence, project } = await loadProjectLexicons(root);
-  const head = escalationBlock(root) + specBlock(root) + workBlock(root, input);
+  const head = escalationBlock(root) + specBlock(root) + (await gapBlock(root, gaps)) + workBlock(root, input);
   const reading=report ?? await lexiconCoverage(root);
   const commands=await cliName(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
@@ -579,6 +625,12 @@ export const WARM_DOOR: WarmDoor = withWarmAdapter;
 export interface HookOptions {
   /** An adapter to check with instead of the warm server (tests). */
   adapter?: LanguageAdapter | undefined;
+  /**
+   * Start a Structure reading in the background when the recorded one is
+   * stale or absent. The command line passes STRUCTURE_REFRESH; absent (a
+   * test), nothing is started.
+   */
+  refresh?: ((root: string, fingerprint: string) => void) | undefined;
   /** The door to the warm instrument; enforcement's own by default. */
   door?: WarmDoor | undefined;
 }
@@ -599,6 +651,26 @@ async function snapshotAtStop(root: string, session: string, changed: readonly s
   await door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed }));
 }
 
+/** The refresh the command line starts: this checkout's query structure, which records the reading it takes. */
+export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
+  refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure"], fingerprint);
+};
+
+/** Regulate's gap lines: the gaps this session touched, advisory, or nothing. */
+export async function gapStopText(root: string, input: HookInput, changed: readonly string[]): Promise<string> {
+  if (changed.length === 0 || !mayHaveGaps(root)) return "";
+  try {
+    const session = sessionOf(input);
+    const now = currentGaps(root);
+    const start = session === undefined ? undefined : sessionGaps(root, session);
+    const spec = loadSpec(root);
+    const declared = declaredThisSession(root, changed, spec);
+    return regulateGapText({ changed, now, start, declared, spec, cli: await cliName(root) });
+  } catch {
+    return "";
+  }
+}
+
 /** Run one event. `input` is the parsed stdin the host sent; `root` defaults to its cwd. */
 export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: string, options: HookOptions = {}): Promise<HookResult> {
   const project = installedRoot(fallbackRoot);
@@ -612,11 +684,20 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     case "SessionStart":
     case "SubagentStart": {
       const reading=await lexiconCoverage(root);
-      const context = await startContext(root, input, reading);
+      const gaps = gapReading(root);
+      // A stale or absent reading says nothing now and starts one in the background for a later session; never waited on.
+      // Only a session start: a subagent inherits the session's reading, and one refresh per tree is enough.
+      if (event === "SessionStart" && gaps.now === undefined && gaps.fingerprint !== undefined) options.refresh?.(root, gaps.fingerprint);
+      const context = (await startReading(root, input, reading, gaps)).text;
       const session = sessionOf(input);
       if (session !== undefined) openFeed(root, session);
       const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
-      return { stdout: stdout + "\n", stderr: "", exit: 0, ...(session ? {commit:()=>saveBaseline(root,session,reading)} : {}) };
+      const commit = (): void => {
+        saveBaseline(root, session!, reading);
+        // The gaps as this session found them, for regulate once its own edits make the reading stale.
+        if (gaps.now !== undefined) saveSessionGaps(root, session!, gaps.now);
+      };
+      return { stdout: stdout + "\n", stderr: "", exit: 0, ...(session ? { commit } : {}) };
     }
     case "UserPromptSubmit":
     case "PostToolUse": {
@@ -646,15 +727,18 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
       const coverageText=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : "";
       const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the lexicon check ran over nothing`;
-      if (lexicon.text === "" && spec.text === "" && workText === "" && changedText === "" && coverageText === "") return { stdout: "", stderr: "", exit: 0 };
+      const gapText = await gapStopText(root, input, changed.files);
+      if (lexicon.text === "" && spec.text === "" && workText === "" && changedText === "" && coverageText === "" && gapText === "") return { stdout: "", stderr: "", exit: 0 };
       const parts: string[] = [];
       if (changedText !== "") parts.push(changedText);
       if (lexicon.text !== "") parts.push(`Lexicon check:\n${lexicon.text}`);
       if (spec.text !== "") parts.push(`Spec:\n${spec.text}`);
       if (workText !== "") parts.push(`Work:\n${workText}`);
       if (coverageText) parts.push(coverageText);
+      if (gapText !== "") parts.push(gapText);
       const text = parts.join("\n");
       // A refusal is spent only on what the tool can prove is owed and no recorded wall excuses: a rejected name in a changed file, a spec problem, a structural defect.
+      // A spec gap is not among them: no traced control is not a demonstrated bypass, so gapText never counts toward the refusal.
       const refuse = event === "SubagentStop" && input.stop_hook_active !== true && lexicon.owed + spec.owed > 0;
       if (refuse) {
         return { stdout: "", stderr: `Regulate found what this session owes; settle it before stopping.\n${text}`, exit: REFUSE_EXIT };

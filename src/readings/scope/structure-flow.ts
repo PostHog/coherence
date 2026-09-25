@@ -24,8 +24,11 @@
  * heaviest interface onward, which is reference weight, not flow, and says
  * so. Entrances share one line only when they share its stops and its trust
  * (the trust level each declares it carries in, else, derived, the entering
- * side of the crossings whose chokepoint is its handler: d-ba18b0fd); the
- * line is named for them, at most four names on its token. A project
+ * side of the crossings whose chokepoint is its handler: d-ba18b0fd), and
+ * what they declare of their control, a guard: line or control: none
+ * (d-a1095ef2); the line is named for them, at most four names on its
+ * token. An entrance that declares control: none, with its reason, is never
+ * marked no traced control: its route says no control needed. A project
  * that declares no entrance has its routes derived from the root
  * component's component interfaces, one per callee, each named "via" the
  * first component it reaches and marked reference weight.
@@ -235,6 +238,12 @@ export interface FlowRoute {
    * map traced nothing. A trusted route with no control is not marked.
    */
   noTracedControl: boolean;
+  /**
+   * Whether its entrances declare they need no control (control: none, with a
+   * reason each): never marked no traced control, and tagged no control needed.
+   * Entrances share a route only when they agree on it.
+   */
+  noControl: boolean;
   /** How its stops were followed: the handler's static reach, or, without one, the heaviest interface (reference weight, not flow). */
   followed: "reach" | "weight";
 }
@@ -331,6 +340,8 @@ export interface FlowEntrance {
   guards: EntranceGuard[] | undefined;
   /** Why its declared guard does not count, when the reading could not confirm it. */
   guardUnconfirmed: string | undefined;
+  /** Why it needs no control, when its spec says so (control: none — <reason>). */
+  noControl: string | undefined;
 }
 
 export interface FlowNode {
@@ -657,7 +668,7 @@ export function flowOf(state: ShellState): FlowModel {
         : [...new Set(invariants.filter((invariant) => invariant.crossing !== undefined && represent(invariant.component) === start && invariant.enforcements.some((e) => e.form === "chokepoint" && flowNamed(e.chokepoint)?.symbol === handlerName)).map((invariant) => invariant.crossing!.from))]
           .sort((a, b) => (levelOrder.get(a) ?? 99) - (levelOrder.get(b) ?? 99) || a.localeCompare(b));
       const passes = [...new Set([component.folder, ...(holder === undefined ? [] : [holder]), ...(resolution?.reach ?? []).flatMap((r) => [r.from, r.to])])].sort();
-      return { id: flowEntranceId(component.folder, entrance.name), name: entrance.name, meaning: entrance.meaning, declaredBy, owners: [...new Set([component.folder, ...(holder === undefined ? [] : [holder])])], handler: entrance.handler, start, resolved: start !== undefined, reachable, reason, trust, trustSource, reach: resolution?.reach, passes, module, guard: entrance.guard, guards: resolution?.guards, guardUnconfirmed: resolution?.guardUnconfirmed };
+      return { id: flowEntranceId(component.folder, entrance.name), name: entrance.name, meaning: entrance.meaning, declaredBy, owners: [...new Set([component.folder, ...(holder === undefined ? [] : [holder])])], handler: entrance.handler, start, resolved: start !== undefined, reachable, reason, trust, trustSource, reach: resolution?.reach, passes, module, guard: entrance.guard, guards: resolution?.guards, guardUnconfirmed: resolution?.guardUnconfirmed, noControl: entrance.noControl };
     }),
   );
 
@@ -743,7 +754,7 @@ export function flowOf(state: ShellState): FlowModel {
       route.push(next[0]);
     }
   };
-  const drafts: { stops: string[]; rail: string | undefined; entrance: string | undefined; trust: string[]; trustSource: TrustSource; followed: FlowRoute["followed"] }[] = [];
+  const drafts: { stops: string[]; rail: string | undefined; entrance: string | undefined; trust: string[]; trustSource: TrustSource; followed: FlowRoute["followed"]; declares: string }[] = [];
   const routesFrom: FlowModel["routesFrom"] = anyEntrance ? "entrances" : byFolder.has(".") && order.has(".") && !core.has(".") ? "root interfaces" : "none";
   if (routesFrom === "entrances") {
     for (const entrance of entrances) {
@@ -751,18 +762,22 @@ export function flowOf(state: ShellState): FlowModel {
       const first = entrance.declaredBy === entrance.start ? [entrance.start] : [entrance.declaredBy, entrance.start];
       const followed: FlowRoute["followed"] = entrance.reach === undefined ? "weight" : "reach";
       const { trust, trustSource } = entrance;
-      if (core.has(entrance.start)) drafts.push({ stops: [entrance.declaredBy], rail: entrance.start, entrance: entrance.id, trust, trustSource, followed });
-      else drafts.push({ ...(entrance.reach === undefined ? onward(first) : alongReach(first, entrance.reach)), entrance: entrance.id, trust, trustSource, followed });
+      // What the entrance declares of its control: a guard: line, or control: none. Entrances that declare differently never share a line.
+      const declares = entrance.noControl !== undefined ? "none" : entrance.guard === undefined ? "" : `guard ${entrance.guard}`;
+      if (core.has(entrance.start)) drafts.push({ stops: [entrance.declaredBy], rail: entrance.start, entrance: entrance.id, trust, trustSource, followed, declares });
+      else drafts.push({ ...(entrance.reach === undefined ? onward(first) : alongReach(first, entrance.reach)), entrance: entrance.id, trust, trustSource, followed, declares });
     }
   } else if (routesFrom === "root interfaces") {
     const fromRoot = edges.filter((edge) => edge.from === "." && !core.has(edge.to)).sort((a, b) => b.sites - a.sites || a.to.localeCompare(b.to));
-    for (const edge of fromRoot) drafts.push({ ...onward([".", edge.to]), entrance: undefined, trust: [], trustSource: "derived", followed: "weight" });
+    for (const edge of fromRoot) drafts.push({ ...onward([".", edge.to]), entrance: undefined, trust: [], trustSource: "derived", followed: "weight", declares: "" });
   }
   const nameOf = (folder: string): string => byFolder.get(folder)!.name;
   const routes: FlowRoute[] = [];
-  // Entrances share a route only when they share its stops, its rail, and the trust they carry in, declared or derived alike.
+  // Entrances share a route only when they share its stops, its rail, the trust they carry in, declared or derived alike,
+  // and what they declare of their control (a guard: line, or control: none).
+  const declaresOf = new Map<string, string>();
   for (const draft of drafts) {
-    const known = routes.find((route) => route.stops.join("\u0000") === draft.stops.join("\u0000") && route.rail === draft.rail && route.trust.join("\u0000") === draft.trust.join("\u0000") && route.trustSource === draft.trustSource);
+    const known = routes.find((route) => route.stops.join("\u0000") === draft.stops.join("\u0000") && route.rail === draft.rail && route.trust.join("\u0000") === draft.trust.join("\u0000") && route.trustSource === draft.trustSource && declaresOf.get(route.id) === draft.declares);
     if (known !== undefined) {
       if (draft.entrance !== undefined) {
         known.entrances.push(draft.entrance);
@@ -790,7 +805,9 @@ export function flowOf(state: ShellState): FlowModel {
       traced: [],
       partial: [],
       noTracedControl: false,
+      noControl: draft.declares === "none",
     });
+    declaresOf.set(routes[routes.length - 1]!.id, draft.declares);
   }
   // Eight colors: the routes most entrances take wear them, in route order; the rest are drawn neutral and still named.
   const ranked = routes.map((route, index) => ({ route, index })).sort((a, b) => b.route.entrances.length - a.route.entrances.length || b.route.sites - a.route.sites || a.index - b.index);
@@ -968,7 +985,8 @@ export function flowOf(state: ShellState): FlowModel {
       .map(({ control, entrances: count }) => ({ ...control, verdict: verdictOf(control.component, control.name), entrances: count }))
       .sort((a, b) => CONTROL_KINDS.indexOf(a.kind) - CONTROL_KINDS.indexOf(b.kind) || b.entrances - a.entrances);
     route.traced = traced.sort((a, b) => CONTROL_KINDS.indexOf(a.kind) - CONTROL_KINDS.indexOf(b.kind));
-    route.noTracedControl = !route.derived && route.traced.length === 0 && flowUntrusted(route.trust, levelOrder, outsideLevels);
+    // An entrance that declares it needs no control, with its reason, is never marked: the claim is shown, and challengeable.
+    route.noTracedControl = !route.derived && !route.noControl && route.traced.length === 0 && flowUntrusted(route.trust, levelOrder, outsideLevels);
   }
 
   // Coverage: a chokepoint on a surface the component exposes or on an entrance line into it, or a verified totality oracle of its own.
@@ -1292,6 +1310,9 @@ export function trustInWords(route: Pick<FlowRoute, "trust" | "trustSource">): s
 
 /** The words a route untrusted and with no control traced on it carries (d-127ab8e4): not a demonstrated bypass, only that none was traced. */
 export const NO_TRACED_CONTROL = "no traced control";
+
+/** The words a route whose entrances declare control: none carries (d-a1095ef2): a stated claim, neutral, with each reason beside it. */
+export const NO_CONTROL_NEEDED = "no control needed";
 
 /** How each kind of control was traced, in the inspector's words. */
 export const CONTROL_WORDS: Record<FlowControlKind, string> = {

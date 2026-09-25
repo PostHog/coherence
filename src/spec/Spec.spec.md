@@ -91,3 +91,10 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: skipped the problem in entranceGuardProblems, so a guard naming no declared chokepoint passed -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
+- control none carries its reason: An entrance's control: none line carries a non-empty reason, and never stands beside a guard: on the same entrance; any other control: value, an empty reason and a second line are problems, and an unfilled placeholder claims nothing.
+  over: every control: line of an entrance: with a reason, bare, with an empty reason, with a placeholder, with another value, twice, and beside a guard:
+  via: the grammar: an entrance's control: none carries a non-empty reason and never stands beside a guard:
+  because: an entrance that needs no control is a claim a human must be able to challenge (d-a1095ef2), and only a stated reason can be challenged; an empty one is a silent waiver, and one beside a guard contradicts itself, since a guard is a control
+  crossing: project-source -> reading
+  refuted: made the grammar accept control: none with an empty reason, dropping the problem -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none

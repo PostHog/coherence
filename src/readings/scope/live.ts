@@ -39,6 +39,7 @@ import { loadJournal } from "../../journal/store.ts";
 import { foldOrders, loadWork as loadWorkRecords } from "../../journal/work.ts";
 import { buildShell, rootOptions, scopeState, windowState, type BuildOptions, type Shell } from "./build.ts";
 import { interfaceAdapter, interfaceBounds, readComponentInterfaces } from "./component-interfaces.ts";
+import { readAndRecord } from "./gaps.ts";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
 import { JOURNAL_WINDOW, RUN_WINDOW } from "./derive.ts";
 import type { InterfaceReading, JournalRecord, RunRecord, ShellState, WorkOrder } from "./model.ts";
@@ -258,7 +259,7 @@ class LiveReading implements HttpApp {
           const adapter = await this.interfaceServer();
           await adapter.forget([]);
           // The same reading, bounds and budget (the config's) as a snapshot's: the refresh on a run is never a second rule.
-          const reading = await readComponentInterfaces(this.root, adapter);
+          const reading = await readAndRecord(this.root, () => readComponentInterfaces(this.root, adapter));
           if (this.closed) return;
           this.interfaces = reading;
           if (this.base !== undefined) this.base.componentInterfaces = reading;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -16,6 +16,8 @@ import { withWarmAdapter } from "../enforcement/run.ts";
 import { TRACES_DIR, recordReadTrace } from "../economy/trace.ts";
 import { COHERENCE_LEXICON, installedRoot } from "./project.ts";
 import { loadLexicon, rejectedNames } from "./lexicon.ts";
+import { gapProject } from "../readings/scope/gaps-fixture.ts";
+import { currentGaps, readAndRecord, recordGapBaseline } from "../readings/scope/gaps.ts";
 
 /** Coherence's own rejected names, drawn from its lexicon so this file never spells one. */
 async function coherenceRejected(concept: string): Promise<string> {
@@ -642,5 +644,60 @@ test("the feed cursor advances only after the feed is printed: rendering moves n
     assert.equal(feedContext(dir, { session_id: "child" }).text, "");
   } finally {
     await rm(dir, { recursive: true, force: true });
+  }
+});
+
+/* ------------------------------------------------ spec gaps (d-a1095ef2) */
+
+test("orient names the spec gaps in one bounded line from a recorded reading that still describes the tree, says nothing and starts one background reading when it is stale or absent, and names none the adoption baseline holds", async () => {
+  const { root: project, reading, remove } = gapProject();
+  try {
+    const started: string[] = [];
+    const refresh = (_root: string, fingerprint: string): void => void started.push(fingerprint);
+    const start = async (): Promise<string> => {
+      const result = await runHook("SessionStart", { session_id: "gap-orient", cwd: project }, project, { refresh });
+      return (JSON.parse(result.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext;
+    };
+    assert.doesNotMatch(await start(), /Spec gaps/, "no reading: nothing is said, never guessed");
+    assert.equal(started.length, 1, "and one reading is started in the background");
+    await readAndRecord(project, async () => reading);
+    const text = await start();
+    const line = text.split("\n").find((l) => l.startsWith("Spec gaps"));
+    assert.ok(line !== undefined, text);
+    assert.match(line, /^Spec gaps: 2 entrances carry outside or unknown trust in with no traced control on their route; busiest: look and 1 more \(\.\)\. To close one, declare guard: <chokepoint>[^]*control: none — <reason>; node \S+ scaffold control look proposes it\.$/);
+    assert.ok(text.length <= CONTEXT_BUDGET, "the injection holds the budget");
+    assert.equal(started.length, 1, "a fresh reading starts nothing");
+    writeFileSync(join(project, "src", "look.ts"), "export function look(): void { return; }\nexport function peek(): void {}\nexport function ping(): void {}\n");
+    assert.doesNotMatch(await start(), /Spec gaps/, "a stale reading says nothing");
+    assert.equal(started.length, 2);
+    await readAndRecord(project, async () => reading);
+    recordGapBaseline(project, currentGaps(project)!, { session: "gap-orient", agent: "test" });
+    assert.doesNotMatch(await start(), /Spec gaps/, "gaps present at adoption do not nag orient");
+  } finally {
+    remove();
+  }
+});
+
+test("regulate names the gaps a session touched, a changed handler file and an untrusted entrance it declared, and never refuses a subagent stop for them", async () => {
+  const { root: project, reading, remove } = gapProject();
+  try {
+    await readAndRecord(project, async () => reading);
+    const opened = await runHook("SessionStart", { session_id: "gap-stop", cwd: project }, project);
+    opened.commit?.();
+    assert.equal((await runHook("Stop", { session_id: "gap-stop", cwd: project }, project)).stdout, "", "nothing touched: nothing said");
+    writeFileSync(join(project, "src", "look.ts"), "export function look(): void { return; }\nexport function peek(): void {}\nexport function ping(): void {}\n");
+    const spec = readFileSync(join(project, "Gappy.spec.md"), "utf8");
+    writeFileSync(join(project, "Gappy.spec.md"), spec.replace("## invariants", "- stare: a caller stares\n  handler: look in src/look.ts\n  trust: public\n\n## invariants"));
+    const stop = await runHook("Stop", { session_id: "gap-stop", cwd: project }, project);
+    const message = (JSON.parse(stop.stdout) as { systemMessage: string }).systemMessage;
+    assert.match(message, /Spec gaps this session touched; advisory, never a reason to refuse the stop:/);
+    assert.match(message, /you changed src\/look\.ts, the handler of 2 entrances with no traced control on their routes \(as the reading at this session's start had it, taken [0-9-]+ [0-9:]+ UTC\): look, peek/);
+    assert.match(message, /you declared entrance stare \(\.\), which carries public in and names neither guard: nor control: none; nothing is traced on its route yet/);
+    assert.doesNotMatch(message, /ping/, "an entrance that declares control: none is no gap");
+    const sub = await runHook("SubagentStop", { agent_id: "gap-stop", hook_event_name: "SubagentStop", cwd: project }, project);
+    assert.equal(sub.exit, 0, "advisory: a gap never refuses a subagent stop");
+    assert.match((JSON.parse(sub.stdout) as { systemMessage: string }).systemMessage, /Spec gaps this session touched/);
+  } finally {
+    remove();
   }
 });

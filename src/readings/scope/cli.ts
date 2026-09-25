@@ -20,6 +20,7 @@ import type { Io } from "../../journal/cli.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { DEFAULTS, projectNameOf, writeScopePage, type BuildOptions } from "./build.ts";
 import { BUDGET_FLAGS, budgetFlags, readComponentInterfaces } from "./component-interfaces.ts";
+import { readAndRecord } from "./gaps.ts";
 
 export const SCOPE_USAGE = [
   "  scope [--root <dir>] [--no-open]   open the live Scope reading from the warm server (prints its address)",
@@ -78,7 +79,7 @@ async function snapshot(root: string, values: Map<string, string>, switches: Set
       io.err(`scope: ${budget}\n${SCOPE_USAGE}`);
       return 64;
     }
-    options.componentInterfaces = await readComponentInterfaces(root, undefined, { budget });
+    options.componentInterfaces = await readAndRecord(root, () => readComponentInterfaces(root, undefined, { budget }));
   }
   const domain = values.get("domain");
   if (domain !== undefined) options.domainPath = domain;
