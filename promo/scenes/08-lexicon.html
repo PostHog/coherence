@@ -63,10 +63,10 @@ p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch
   <section class="box">
     <h2>Beats (timed to a ~24 s read)</h2>
     <ol class="beats">
-      <li><span class="t">0.0</span><div><q>Coherence starts with an authoritative lexicon.</q><span>Out of the dark after the drop, the project's vocabulary resolves one tile at a time: a tilted table of the project's settled terms (workspace, seat, invoice, API key and project token side by side), each mint-bordered with its books chip.</span></div></li>
-      <li><span class="t">3.0</span><div><q>What does a word mean in your project context? It seems like a simple issue,</q><span>A subagent starts, and its <b>SubagentStart</b> hook fires: a mint pulse sweeps its plan, a hook chip names the event, and one cell per term streams from the lexicon into the subagent's context until it reads “24 terms in context”. A line on screen names the mechanism once: delivered through your agent's own hooks. The plan types: “Offboarding: when someone leaves the team, deactivate their account…” As “account” lands, the agent checks the word against what it was handed: the word and the account tile go orange, joined by a thread.</span></div></li>
-      <li><span class="t">9.0</span><div><q>but if a language model is what's building your code, being precise about what words mean is the foundation to getting what you want.</q><span>The definition in the agent's context says no: the tile goes red, lifts out of the table and brackets clamp around it, and the word in the plan goes red with it. Then the card scales outward from its corner to full size, and its definition fades in line by line. The billing entity, one per company. Not a person's access to it: that is a membership. The camera pushes in until the definition reads, then eases back out as a mint thread runs from “membership →” to the membership tile.</span></div></li>
-      <li><span class="t">16.0</span><div><q>This changes the integrity of what gets built, unpacking assumptions into documented clarity.</q><span>The plan revises itself: “account” backs out and “membership” types in, mint, tied to its tile, and the account tile returns to mint. The subagent tries to finish: its <b>SubagentStop</b> hook fires, regulate runs, and the plan is stamped clean. The definition fades, the card shrinks back to a tile, the tile settles into the table, and the camera pulls out over the whole lexicon.</span></div></li>
+      <li><span class="t">0.0</span><div><q>Starts with clear definitions.</q><span>Out of the dark after the drop, the project's vocabulary resolves one tile at a time: a tilted table of the project's settled terms (workspace, seat, invoice, API key and project token side by side), each mint-bordered with its books chip.</span></div></li>
+      <li><span class="t">3.2</span><div><q>Language models are built out of language. Clearly defining your terms changes their behavior.</q><span>A subagent starts, and its <b>SubagentStart</b> hook fires: a mint pulse sweeps its plan, a hook chip names the event, and one cell per term streams from the lexicon into the subagent's context until it reads “24 terms in context”. A line on screen names the mechanism once: delivered through your agent's own hooks. The plan types: “Offboarding: when someone leaves the team, deactivate their account…” As “account” lands, the agent checks the word against what it was handed: the word and the account tile go orange, joined by a thread.</span></div></li>
+      <li><span class="t">9.8</span><div><q>Agents start to do what you meant, not just what you said.</q><span>The definition in the agent's context says no: the tile goes red, lifts out of the table and brackets clamp around it, and the word in the plan goes red with it. Then the card scales outward from its corner to full size, and its definition fades in line by line. The billing entity, one per company. Not a person's access to it: that is a membership. The camera pushes in until the definition reads, then eases back out as a mint thread runs from “membership →” to the membership tile.</span></div></li>
+      <li><span class="t">16.2</span><div><q>This impacts the integrity of what gets built, making bugs easier for agents to detect.</q><span>The plan revises itself: “account” backs out and “membership” types in, mint, tied to its tile, and the account tile returns to mint. The subagent tries to finish: its <b>SubagentStop</b> hook fires, regulate runs, and the plan is stamped clean. The definition fades, the card shrinks back to a tile, the tile settles into the table, and the camera pulls out over the whole lexicon.</span></div></li>
     </ol>
     <p class="note">What's true to the tool: Coherence doesn't detect a sense overload by itself. It hands every agent and subagent the lexicon at start through its hooks, definitions and “not” lines included, so the agent has the right sense in hand when it reaches for the word, and it runs regulate at the stop. The scene shows exactly that: the catch is the agent's, made possible by what the hook delivered. The agent is the one who overloads the word here: the lexicon's value is that it binds every agent and subagent, and the narration is about a language model building your code. A human prompt works the same way; only the chip on the plan changes. The slate is an invented SaaS product's vocabulary, with API key and project token placed side by side: the kind of pair that looks interchangeable to every agent until it costs you.</p>
   </section>
@@ -85,11 +85,10 @@ const T = 25;
 const CLARITY = [0, .1];   // act two's clearing starts here
 const C = { bg: 0x07090C, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2", steel: "#7E93A3" };
 const LINES = [
-  [0, 3, "Coherence starts with an authoritative lexicon."],
-  [3, 6.8, "What does a word mean in your project context?"],
-  [6.8, 9, "It seems like a simple issue,"],
-  [9, 16, "but if a language model is what’s building your code, being precise about what words mean is the foundation to getting what you want."],
-  [16, 25, "This changes the integrity of what gets built, unpacking assumptions into documented clarity."],
+  [0, 3, "Starts with clear definitions."],
+  [3.2, 9.6, "Language models are built out of language. Clearly defining your terms changes their behavior."],
+  [9.8, 16, "Agents start to do what you meant, not just what you said."],
+  [16.2, 25, "This impacts the integrity of what gets built, making bugs easier for agents to detect."],
 ];
 // The project's vocabulary: words every model thinks it knows, each settled here to one sense.
 // API key and project token sit side by side: the pair that once meant the same thing to every agent.
@@ -202,6 +201,10 @@ function applyClarity(c) {
   territory.material.color.setScalar(1 + 2.4 * c);
   return { fog: 1 - .85 * c, sheets: 1 - c };
 }
+
+// ---------- driven: a review player can set the scene's time from outside, with postMessage({ t }) ----------
+// (t, playing and T are the scene's own; this runs later, once they exist)
+window.addEventListener("message", (e) => { const d = e.data || {}; if (typeof d.t === "number") { t = Math.min(T, Math.max(0, d.t)); playing = false; } });
 
 
 // ---------- the crisp pass: text on bright shapes is drawn after the bloom ----------

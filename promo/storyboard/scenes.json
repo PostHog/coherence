@@ -5,12 +5,13 @@
   "4": { "file": "04-corners", "url": "https://claude.ai/artifact/KYGoAjyD2vPNHuMdwa3zjS", "stills": [3.5, 10.3, 13.0, 18.4] },
   "5": { "file": "05-machines", "url": "https://claude.ai/artifact/UW9zghJ854oGfPRPpr5hDe", "stills": [2.0, 7.5, 16.5, 19.5] },
   "6": { "file": "06-result", "url": "https://claude.ai/artifact/D1ZdZDPDvw8EbT7CmLke6M", "stills": [3.0, 6.0, 8.5, 12.0] },
-  "7": { "file": "07-power", "url": "https://claude.ai/artifact/21Lhvh5V5DnS8MkXoL5Yhv", "stills": [0.2, 0.7, 1.85, 10.2] },
+  "7": { "file": "07-power", "url": "https://claude.ai/artifact/21Lhvh5V5DnS8MkXoL5Yhv", "stills": [0.2, 0.7, 1.85, 13.6] },
   "8": { "file": "08-lexicon", "url": "https://claude.ai/artifact/VEs62895rnKvApSHcyxGY1", "stills": [4.6, 8.2, 12.4, 18.8] },
   "9": { "file": "09-journal", "url": "https://claude.ai/artifact/HLEpcqFZq3KGAYWyg6AroD", "stills": [5.0, 8.8, 10.5, 17.8] },
   "10": { "file": "10-switchboard", "url": "https://claude.ai/artifact/NzmCdB9gg4416rZ59LXudg", "stills": [2.6, 4.2, 6.5, 11.8] },
   "11": { "file": "11-bypass", "url": "https://claude.ai/artifact/HaW6wrTJoJ5fQCKosbugcM", "stills": [3.4, 6.0, 10.8, 14.2] },
   "12": { "file": "12-reduce", "url": "https://claude.ai/artifact/MvC3YE81c9FS3RCntWReCu", "stills": [1.5, 6.4, 10.2, 12.9] },
   "13": { "file": "13-structure", "url": "https://claude.ai/artifact/74XNGFxiMynJrDsAjXPEit", "stills": [3.6, 5.6, 8.0, 11.8] },
-  "14": { "file": "14-structure", "url": "https://claude.ai/artifact/DuauW9sFv6rrTPksFWNea1", "stills": [2.4, 6.4, 9.8, 14.9] }
+  "14": { "file": "14-structure", "url": "https://claude.ai/artifact/DuauW9sFv6rrTPksFWNea1", "stills": [2.4, 6.4, 9.8, 14.9] },
+  "15": { "file": "15-structure", "url": "https://claude.ai/artifact/2amFtSz8pw85eH814vLvED", "stills": [2.8, 9.0, 16.8, 19.2] }
 }

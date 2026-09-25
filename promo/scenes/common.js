@@ -99,3 +99,7 @@ function applyClarity(c) {
   territory.material.color.setScalar(1 + 2.4 * c);
   return { fog: 1 - .85 * c, sheets: 1 - c };
 }
+
+// ---------- driven: a review player can set the scene's time from outside, with postMessage({ t }) ----------
+// (t, playing and T are the scene's own; this runs later, once they exist)
+window.addEventListener("message", (e) => { const d = e.data || {}; if (typeof d.t === "number") { t = Math.min(T, Math.max(0, d.t)); playing = false; } });

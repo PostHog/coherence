@@ -208,7 +208,9 @@ function placePieces(t, S) {
     g.translate(-bx, -by); x.translate(-bx, -by);
     drawMap(S, { kind: p.kind, id: p.id, g, x });
     p.glow.material.map.needsUpdate = p.text.material.map.needsUpdate = true;
-    const k = ease(smooth(LIFT_AT + p.delay, LIFT_AT + p.delay + .9, t)), th = -Math.PI / 2 + Math.PI / 4 * k;
+    // up in a cascade at LIFT_AT; and, where a scene sets LOWER_AT, back down again in the same order
+    const down = typeof LOWER_AT === "number" ? ease(smooth(LOWER_AT + p.delay * .6, LOWER_AT + p.delay * .6 + .8, t)) : 0;
+    const k = ease(smooth(LIFT_AT + p.delay, LIFT_AT + p.delay + .9, t)) * (1 - down), th = -Math.PI / 2 + Math.PI / 4 * k;
     for (const m of [p.glow, p.text]) { m.rotation.set(th, 0, 0); m.position.set(p.hinge.x, p.hinge.y + .02 * k + Math.cos(th) * p.h / 2, p.hinge.z + Math.sin(th) * p.h / 2); m.material.opacity = mapGlow.material.opacity; }
   }
 }
@@ -271,6 +273,7 @@ function render(t) {
   const line = LINES.find(([a, b]) => t >= a && t < b);
   cap.hidden = !captions; cap.textContent = line ? line[2] : "";
   tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  if (typeof EXTRA === "function") EXTRA(t, S);   // a scene's own layer on top of the map (scene 15's field and title)
   composer.render();
   renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
 }

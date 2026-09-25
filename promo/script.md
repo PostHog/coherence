@@ -38,7 +38,7 @@ We can imagine new code, we can describe thoughtful architecture, we can specify
 
 But we have no idea how faithfully our robots are building for us. The more complex our designs, the more challenging they are to validate.
 
-We are writing good code by accident.
+Agents are writing good code by accident.
 
 ***4
 at:
@@ -83,7 +83,7 @@ Because we don’t yet have the tools to make sense of this new world.
 ***7 (to land at first act break)
 at:
 sync:
-picture: DRAFT (scenes/07-power.src.html). Like a CRT going black, then turning back on, typing the script. Out of scene 6's dark, the last of the picture is static on a tube; it collapses to a line, a dot, and dies. A beat of black, then the tube powers on (dot, line, flash) to a phosphor screen with scanlines, and the two lines type out in mint under a block cursor. Hard cut to black.
+picture: DRAFT (scenes/07-power.src.html). Like a CRT going black, then turning back on, typing the script. Out of scene 6's dark, the last of the picture is static on a tube; it collapses to a line, a dot, and dies. A beat of black, then the tube powers on (dot, line, flash) to a phosphor screen with scanlines, and the narration's three lines type out in mint under a block cursor. Hard cut to black.
 supers:
 source: motion graphics
 transition: hard cut to black
@@ -102,9 +102,9 @@ supers: Delivered through your agent's own hooks
 source: motion graphics (three.js)
 transition:
 
-Starts with clera definitions.
+Starts with clear definitions.
 
-Language models are build out of language. Clearly defining your terms changes their behavior. Agents start to do what you meant, not just what you said.
+Language models are built out of language. Clearly defining your terms changes their behavior. Agents start to do what you meant, not just what you said.
 
 This impacts the integrity of what gets built, making bugs easier for agents to detect.
 
@@ -187,7 +187,7 @@ No more sifting through thousands of lines of code to understand what was built 
 ***15 (to land after climax)
 at:
 sync:
-picture: The Structure map at rest; the fog clears; wordmark.
+picture: DRAFT (scenes/15-structure.src.html, from structure-gen.py). The Structure view, verified, in clear air; the camera pulls straight up, and at 3:31 the view is the first to go coherent, its detail giving way to a flat mint abstraction of itself. More structure views surround it, tile by tile, more abstract the further out (cards and lines, then bare blocks); each view moves one way along grey, amber, red, starting at its own point and never stepping back; from about 5 s in, green trickles outward from the centre cell by cell, then a wave of mint rolls outward until every view is uniform mint, and the field closes into one mint surface. The title: coherence, lowercase, black on mint, its c tilted; a scan line passes, a reticle locks onto the c and tilts it back into place; fade to black with the music.
 supers: Coherence
 source: motion graphics
 transition: fade to black with the music
@@ -198,4 +198,4 @@ Spend less inference on code that doesn’t work, less inference detecting bugs,
 
 You get a more stable, coherent project, steadily driving toward the floor of irreducible complexity.
 
-The software of 2030 is waiting for you.
+The software of 2030 is waiting for us.

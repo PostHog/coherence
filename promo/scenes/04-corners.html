@@ -181,6 +181,10 @@ function applyClarity(c) {
   return { fog: 1 - .85 * c, sheets: 1 - c };
 }
 
+// ---------- driven: a review player can set the scene's time from outside, with postMessage({ t }) ----------
+// (t, playing and T are the scene's own; this runs later, once they exist)
+window.addEventListener("message", (e) => { const d = e.data || {}; if (typeof d.t === "number") { t = Math.min(T, Math.max(0, d.t)); playing = false; } });
+
 
 // scene 3's white world: a white plane, black boxes, soft light, almost no glow
 territory.visible = false;

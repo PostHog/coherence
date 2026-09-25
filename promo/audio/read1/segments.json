@@ -1,0 +1,535 @@
+[
+ {
+  "i": 1,
+  "scene": 1,
+  "text": "What if the best way to save tokens",
+  "start": 12.340000000000003,
+  "end": 15.12,
+  "file": "01-01.wav",
+  "cut": [
+   12.16,
+   15.12
+  ],
+  "heard": "What if the best way to save tokens"
+ },
+ {
+  "i": 2,
+  "scene": 1,
+  "text": "Is to stop writing bad code?",
+  "start": 15.12,
+  "end": 18.58,
+  "file": "01-02.wav",
+  "cut": [
+   15.12,
+   18.93
+  ],
+  "heard": "is to stop writing bad code?"
+ },
+ {
+  "i": 3,
+  "scene": 2,
+  "text": "Our industry is lost in a fog.",
+  "start": 20.76,
+  "end": 23.44,
+  "file": "02-03.wav",
+  "cut": [
+   20.58,
+   23.44
+  ],
+  "heard": "Our industry is lost in a fog."
+ },
+ {
+  "i": 4,
+  "scene": 2,
+  "text": "We have completely new tools for building software, and we can build it faster than ever.",
+  "start": 23.44,
+  "end": 29.74,
+  "file": "02-04.wav",
+  "cut": [
+   23.44,
+   30.09
+  ],
+  "heard": "We have completely new tools for building software, and we can build it faster than ever."
+ },
+ {
+  "i": 5,
+  "scene": 2,
+  "text": "But our processes have never been more confused. The work we do is more opaque, more complex, more difficult to reason about than at any point in our careers.",
+  "start": 30.729999999999997,
+  "end": 41.7,
+  "file": "02-05.wav",
+  "cut": [
+   30.55,
+   42.05
+  ],
+  "heard": "But our processes have never been more confused. The work we do is more opaque, more complex, more difficult to reason about than at any point in our careers."
+ },
+ {
+  "i": 6,
+  "scene": 3,
+  "text": "We can imagine new code, we can describe thoughtful architecture, we can specify sturdy systems.",
+  "start": 42.97,
+  "end": 48.9,
+  "file": "03-06.wav",
+  "cut": [
+   42.79,
+   48.9
+  ],
+  "heard": "We can imagine new code, we can describe thoughtful architecture, we can specify sturdy systems,"
+ },
+ {
+  "i": 7,
+  "scene": 3,
+  "text": "But we have no idea how faithfully our robots are building for us. The more complex our designs, the more challenging they are to validate.",
+  "start": 48.9,
+  "end": 57.08,
+  "file": "03-07.wav",
+  "cut": [
+   48.9,
+   57.43
+  ],
+  "heard": "but we have no idea how faithfully our robots are building for us. The more complex our designs, the more challenging they are to validate."
+ },
+ {
+  "i": 8,
+  "scene": 3,
+  "text": "We are writing good code by accident.",
+  "start": 58.06,
+  "end": 60.46,
+  "file": "03-08.wav",
+  "cut": [
+   57.88,
+   60.81
+  ],
+  "heard": "We are writing good code by accident."
+ },
+ {
+  "i": 9,
+  "scene": 4,
+  "text": "The systems at our disposal are trained to finish the job at any cost, so they cut subtle corners where we can\u2019t see.",
+  "start": 61.620000000000005,
+  "end": 68.22,
+  "file": "04-09.wav",
+  "cut": [
+   61.44,
+   68.57
+  ],
+  "heard": "The systems at our disposal are trained to finish the job at any cost, so they cut subtle corners where we can't see."
+ },
+ {
+  "i": 10,
+  "scene": 4,
+  "text": "Understanding it all requires reading code and reasoning about its consequences, but every day there\u2019s just more.",
+  "start": 69.48,
+  "end": 75.52,
+  "file": "04-10.wav",
+  "cut": [
+   69.3,
+   75.64
+  ],
+  "heard": "Understanding it all requires reading code and reasoning about its consequences, but every day there's just more,"
+ },
+ {
+  "i": 11,
+  "scene": 4,
+  "text": "More complexity than we can possibly get our arms around.",
+  "start": 75.76,
+  "end": 79.46,
+  "file": "04-11.wav",
+  "cut": [
+   75.64,
+   79.81
+  ],
+  "heard": "more complexity than we can possibly get our arms around."
+ },
+ {
+  "i": 12,
+  "scene": 5,
+  "text": "Our solution? Throw more inference at the problem. We use inference to write code, then we use more inference to ask if the code we wrote was good.",
+  "start": 80.72,
+  "end": 89.16,
+  "file": "05-12.wav",
+  "cut": [
+   80.54,
+   89.51
+  ],
+  "heard": "Our solution? Throw more inference at the problem. We use inference to write code, then we use more inference to ask if the code we wrote was good."
+ },
+ {
+  "i": 13,
+  "scene": 5,
+  "text": "So what do we get for all this? Bugs that recur. Endless whack a mole adversarial reviews.",
+  "start": 90.48,
+  "end": 96.18,
+  "file": "05-13.wav",
+  "cut": [
+   90.3,
+   96.53
+  ],
+  "heard": "So what do we get for all this? Bugs that recur? Endless whack-a-mole adversarial reviews?"
+ },
+ {
+  "i": 14,
+  "scene": 6,
+  "text": "OpenRouter does twenty trillion tokens a day. GitHub struggles to stay online.",
+  "start": 96.96,
+  "end": 102.02,
+  "file": "06-14.wav",
+  "cut": [
+   96.76,
+   102.37
+  ],
+  "heard": "Open Router does 20 trillion tokens a day. GitHub struggles to stay online."
+ },
+ {
+  "i": 15,
+  "scene": 6,
+  "text": "Software staggers under this scale of motion.",
+  "start": 102.92000000000002,
+  "end": 105.46,
+  "file": "06-15.wav",
+  "cut": [
+   102.74,
+   105.81
+  ],
+  "heard": "Software staggers under this scale of motion."
+ },
+ {
+  "i": 16,
+  "scene": 6,
+  "text": "Because we don\u2019t yet have the tools to make sense of this new world.",
+  "start": 106.32000000000001,
+  "end": 110.5,
+  "file": "06-16.wav",
+  "cut": [
+   106.14,
+   110.85
+  ],
+  "heard": "Because we don't yet have the tools to make sense of this new world."
+ },
+ {
+  "i": 17,
+  "scene": 7,
+  "text": "It's time to build the next generation of tools.",
+  "start": 124.7,
+  "end": 127.46,
+  "file": "07-17.wav",
+  "cut": [
+   124.52,
+   127.81
+  ],
+  "heard": "It's time to build the next generation of tools."
+ },
+ {
+  "i": 18,
+  "scene": 7,
+  "text": "Developers need clarity and confidence, not just speed.",
+  "start": 130.20000000000002,
+  "end": 133.58,
+  "file": "07-18.wav",
+  "cut": [
+   130.02,
+   133.86
+  ],
+  "heard": "Developers need clarity and confidence, not just speed."
+ },
+ {
+  "i": 19,
+  "scene": 7,
+  "text": "The race is on to deliver. Coherence lets us compete.",
+  "start": 134.14,
+  "end": 138.44,
+  "file": "07-19.wav",
+  "cut": [
+   133.96,
+   138.79
+  ],
+  "heard": "The race is on to deliver. Coherence lets us compete."
+ },
+ {
+  "i": 20,
+  "scene": 8,
+  "text": "Starts with clear definitions.",
+  "start": 141.02,
+  "end": 142.72,
+  "file": "08-20.wav",
+  "cut": [
+   140.84,
+   143.07
+  ],
+  "heard": "We start with clear definitions."
+ },
+ {
+  "i": 21,
+  "scene": 8,
+  "text": "Language models are built out of language. Clearly defining your terms changes their behavior. Agents start to do what you meant, not just what you said.",
+  "start": 143.46,
+  "end": 152.36,
+  "file": "08-21.wav",
+  "cut": [
+   143.28,
+   152.68
+  ],
+  "heard": "Language models are built out of language. Clearly defining your terms changes their behavior. Agents start to do what you meant, not just what you said."
+ },
+ {
+  "i": 22,
+  "scene": 8,
+  "text": "This impacts the integrity of what gets built, making bugs easier for agents to detect.",
+  "start": 153.0,
+  "end": 157.88,
+  "file": "08-22.wav",
+  "cut": [
+   152.82,
+   158.14
+  ],
+  "heard": "This impacts the integrity of what gets built, making bugs easier for agents to detect."
+ },
+ {
+  "i": 23,
+  "scene": 9,
+  "text": "But we can do more.",
+  "start": 158.4,
+  "end": 159.62,
+  "file": "09-23.wav",
+  "cut": [
+   158.22,
+   159.88
+  ],
+  "heard": "But we can do more."
+ },
+ {
+  "i": 24,
+  "scene": 9,
+  "text": "The Coherence decision journal compresses hundreds of thousands of tokens into a handful of decisions.",
+  "start": 160.14,
+  "end": 165.46,
+  "file": "09-24.wav",
+  "cut": [
+   159.96,
+   165.67
+  ],
+  "heard": "The coherence decision journal compresses hundreds of thousands of tokens into a handful of decisions."
+ },
+ {
+  "i": 25,
+  "scene": 9,
+  "text": "If a bad call happened in the process, it\u2019s right there in the history, instead of buried in code.",
+  "start": 165.88,
+  "end": 170.8,
+  "file": "09-25.wav",
+  "cut": [
+   165.7,
+   171.15
+  ],
+  "heard": "If a bad call happened in the process, it's right there in the history, instead of buried in code."
+ },
+ {
+  "i": 26,
+  "scene": 10,
+  "text": "Quickly move between different conversations and agents without costly handoff files, while letting subagents compare notes.",
+  "start": 171.84,
+  "end": 178.76,
+  "file": "10-26.wav",
+  "cut": [
+   171.66,
+   179.11
+  ],
+  "heard": "Quickly move between conversations and agents without costly handoff files, while letting sub-agents compare notes."
+ },
+ {
+  "i": 27,
+  "scene": 10,
+  "text": "And decisions are never buried in a long transcript.",
+  "start": 179.54000000000002,
+  "end": 182.16,
+  "file": "10-27.wav",
+  "cut": [
+   179.36,
+   182.51
+  ],
+  "heard": "And decisions are never buried in a long transcript."
+ },
+ {
+  "i": 28,
+  "scene": 11,
+  "text": "We also need constant confidence that our code matches our intentions.",
+  "start": 183.39999999999998,
+  "end": 187.14,
+  "file": "11-28.wav",
+  "cut": [
+   183.22,
+   187.49
+  ],
+  "heard": "We also need constant confidence that our code matches our intentions."
+ },
+ {
+  "i": 29,
+  "scene": 11,
+  "text": "Coherence uses your language server to detect security bypasses. The moment an agent writes code that touches something sensitive without routing through a designated chokepoint, the project goes red.",
+  "start": 187.84,
+  "end": 198.14,
+  "file": "11-29.wav",
+  "cut": [
+   187.66,
+   198.31
+  ],
+  "heard": "Coherence uses your language server to detect security bypasses. The moment an agent writes code that touches something sensitive without routing through a designated choke point, the project goes red."
+ },
+ {
+  "i": 30,
+  "scene": 12,
+  "text": "The agent discovers the violation immediately.",
+  "start": 198.48,
+  "end": 201.14,
+  "file": "12-30.wav",
+  "cut": [
+   198.31,
+   201.42
+  ],
+  "heard": "The agent discovers the violation immediately."
+ },
+ {
+  "i": 31,
+  "scene": 12,
+  "text": "Instead of enforcing security through implicit conventions, we know our intentions are represented in the structure of our projects themselves.",
+  "start": 201.7,
+  "end": 208.9,
+  "file": "12-31.wav",
+  "cut": [
+   201.52,
+   209.25
+  ],
+  "heard": "Instead of enforcing security through implicit conventions, we know our intentions are represented in the structure of our projects themselves."
+ },
+ {
+  "i": 32,
+  "scene": 13,
+  "text": "But how do we check that the agent did what we want?",
+  "start": 209.82000000000002,
+  "end": 212.28,
+  "file": "13-32.wav",
+  "cut": [
+   209.64,
+   212.56
+  ],
+  "heard": "But how do we check that the agent did what we want?"
+ },
+ {
+  "i": 33,
+  "scene": 13,
+  "text": "The Coherence structure view shows you the entrypoints into your project, its major components, and how those components interact with each other. Always accurate and up to date.",
+  "start": 212.84,
+  "end": 223.04,
+  "file": "13-33.wav",
+  "cut": [
+   212.66,
+   223.3
+  ],
+  "heard": "The coherent structure view shows you entry points into your project, its major components, and how those components interact with each other. Always accurate. Always up to date."
+ },
+ {
+  "i": 34,
+  "scene": 14,
+  "text": "When chokepoints are violated, you\u2019ll see it.",
+  "start": 223.56,
+  "end": 226.4,
+  "file": "14-34.wav",
+  "cut": [
+   223.38,
+   226.62
+  ],
+  "heard": "When choke points are violated, you'll see it right there."
+ },
+ {
+  "i": 35,
+  "scene": 14,
+  "text": "When a major change alters the relationships between components, you\u2019ll see that too.",
+  "start": 226.84,
+  "end": 230.96,
+  "file": "14-35.wav",
+  "cut": [
+   226.66,
+   231.23
+  ],
+  "heard": "When a major change alters the relationship between components, you'll see that too."
+ },
+ {
+  "i": 36,
+  "scene": 14,
+  "text": "No more sifting through thousands of lines of code to understand what was built or changed. See your project as it is right now.",
+  "start": 231.5,
+  "end": 238.36,
+  "file": "14-36.wav",
+  "cut": [
+   231.32,
+   238.62
+  ],
+  "heard": "No more sifting through thousands of lines of code to understand what was built or changed. See your project as it is right now."
+ },
+ {
+  "i": 37,
+  "scene": 15,
+  "text": "These are the kinds of tools we need to clear the fog.",
+  "start": 238.88,
+  "end": 241.64,
+  "file": "15-37.wav",
+  "cut": [
+   238.7,
+   241.99
+  ],
+  "heard": "These are the kinds of tools we need to clear the fog."
+ },
+ {
+  "i": 38,
+  "scene": 15,
+  "text": "Spend less inference on code that doesn\u2019t work, less inference detecting bugs, less inference investigating the decisions that went into your changes.",
+  "start": 242.54000000000002,
+  "end": 250.96,
+  "file": "15-38.wav",
+  "cut": [
+   242.36,
+   251.19
+  ],
+  "heard": "Spend less inference on code that doesn't work, less inference detecting bugs, less inference investigating the decisions that went into your changes."
+ },
+ {
+  "i": 39,
+  "scene": 15,
+  "text": "You get a more stable, coherent project, steadily driving toward the floor of irreducible complexity.",
+  "start": 251.43,
+  "end": 257.1,
+  "file": "15-39.wav",
+  "cut": [
+   251.25,
+   257.45
+  ],
+  "heard": "You get a more stable, coherent project steadily driving toward the floor of irreducible complexity."
+ },
+ {
+  "i": "40-alt",
+  "scene": 15,
+  "text": "The software of 2030 is waiting for you.",
+  "start": 257.96999999999997,
+  "end": 260.66,
+  "file": "15-40-alt-you.wav",
+  "cut": [
+   257.79,
+   261.01
+  ],
+  "heard": "The software of 2030 is waiting for you."
+ },
+ {
+  "i": 40,
+  "scene": 15,
+  "text": "The software of 2030 is waiting for us.",
+  "start": 262.12,
+  "end": 265.2,
+  "file": "15-40.wav",
+  "cut": [
+   261.4,
+   265.6
+  ],
+  "heard": "The software of 2030 is waiting for us."
+ }
+]

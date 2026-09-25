@@ -52,9 +52,9 @@ p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch
   <section class="box">
     <h2>Beats (about 16 s; ends act one's argument, into the black of scene 7)</h2>
     <ol class="beats">
-      <li><span class="t">0.0</span><div><q>The result is a 25x increase in tokens used in 2026.</q><span>Left: OpenRouter's daily token totals for 2026, top 50 models and the rest stacked, drawing itself from 1 January and going vertical by August. 25× counts up beside it.</span></div></li>
-      <li><span class="t">4.5</span><div><q>The result is a sea of pull requests.</q><span>Right: GitHub's uptime for April 2026, played day by day as a calendar. Days land green, orange, red.</span></div></li>
-      <li><span class="t">7.1</span><div><q>The result is incoherent.</q><span>The number drains as April's downtime adds up: through 88.8% on the 22nd, down to the month's 78.33%.</span></div></li>
+      <li><span class="t">0.0</span><div><q>OpenRouter does twenty trillion tokens a day.</q><span>Left: OpenRouter's daily token totals for 2026, top 50 models and the rest stacked, drawing itself from 1 January and going vertical by August. 25× counts up beside it.</span></div></li>
+      <li><span class="t">4.5</span><div><q>GitHub struggles to stay online.</q><span>Right: GitHub's uptime for April 2026, played day by day as a calendar. Days land green, orange, red.</span></div></li>
+      <li><span class="t">7.1</span><div><q>Software staggers under this scale of motion.</q><span>The number drains as April's downtime adds up: through 88.8% on the 22nd, down to the month's 78.33%.</span></div></li>
       <li><span class="t">9.4</span><div><q>Because we don't yet have the tools to make sense of this new world.</q><span>Fog rolls in across both panels and the camera drifts back until almost nothing is left but dark: straight into scene 7's black.</span></div></li>
     </ol>
     <p class="note" id="dataNote"></p>
@@ -74,9 +74,9 @@ const OPENROUTER = {"source":"OpenRouter rankings dataset, daily token totals, t
 const T = 17;
 const C = { bg: 0x07090C, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2" };
 const LINES = [
-  [0.2, 4.2, "The result is a 25x increase in tokens used in 2026."],
-  [4.5, 6.8, "The result is a sea of pull requests."],
-  [7.1, 9.0, "The result is incoherent."],
+  [0.2, 4.2, "OpenRouter does twenty trillion tokens a day."],
+  [4.5, 6.8, "GitHub struggles to stay online."],
+  [7.1, 9.0, "Software staggers under this scale of motion."],
   [9.4, 15.5, "Because we don’t yet have the tools to make sense of this new world."],
 ];
 
@@ -181,6 +181,10 @@ function applyClarity(c) {
   territory.material.color.setScalar(1 + 2.4 * c);
   return { fog: 1 - .85 * c, sheets: 1 - c };
 }
+
+// ---------- driven: a review player can set the scene's time from outside, with postMessage({ t }) ----------
+// (t, playing and T are the scene's own; this runs later, once they exist)
+window.addEventListener("message", (e) => { const d = e.data || {}; if (typeof d.t === "number") { t = Math.min(T, Math.max(0, d.t)); playing = false; } });
 
 
 territory.visible = false;

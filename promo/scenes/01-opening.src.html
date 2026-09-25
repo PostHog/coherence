@@ -72,6 +72,7 @@ p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch
 <script>
 const ICONS = /*ICONS*/{};
 const T = 15;
+const NARROW = .58;
 const C = { bg: 0x000000, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2" };
 const LINES = [
   [2.0, 5.4, "What if the best way to save tokens"],
@@ -133,7 +134,7 @@ const M = new THREE.Matrix4(), P = new THREE.Vector3(), S = new THREE.Vector3(),
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
 function updateField(t) {
   const hs = cols.map((c) => height(c, t));
-  const grey = smooth(11.4, 14, t);                        // tipping into the fog, what was built becomes the unexamined floor
+  const grey = smooth(11.2, 12.9, t);                        // tipping into the fog, what was built becomes the unexamined floor
   segs.forEach((s, i) => {
     const c = cols[s.k], on = smooth(arrive[s.k], arrive[s.k] + .25, t), h = hs[s.k];
     // a little scaffold of ghost segments above each column shows where it's going
@@ -226,6 +227,8 @@ function render(t) {
   // the field tips back on its bottom edge and the fog takes it: a floor now
   const tip = ease(smooth(11.2, 14.8, t));
   field.rotation.x = -1.45 * tip;
+  // and it narrows toward the proportions of scene 2's page, which it dissolves into mid-fall
+  field.scale.x = 1 - NARROW * ease(smooth(11.2, 13.0, t));
   scene.fog.density = .045 * smooth(11, 14, t);
   sheets.forEach((s, i) => {
     s.position.x = s.userData.base.x + Math.sin(t * .15 + i) * 2 + t * s.userData.speed;

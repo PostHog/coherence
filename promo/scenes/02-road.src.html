@@ -267,11 +267,14 @@ function updateWisps(t) {
 
 // ---------- camera: down out of the fog onto the road, then lower and wider as we speed up ----------
 const fogDark = new THREE.Color(C.fog), fogPale = new THREE.Color("#1C252D"), fogCol = new THREE.Color();
+const WIDE_Z = 5.5, WIDE_Y = .5;
 function cameraAt(t) {
   // facing the upright page at first; as it tips down, we drop onto it and the road comes up to meet us
   const z = -dist(t), land = ease(smooth(.3, 3.6, t)), k = rush(t);
-  const y = 3.6 - (3.6 - 1.25) * land - .45 * k;
-  camera.position.set(Math.sin(t * .7) * .12 * (1 - k * .6), y, z + 2 + 9 * (1 - land));
+  // the match cut from scene 1 enters mid-tip (about 1.8 s): held wide like scene 1's wall, then easing in as the page lands
+  const wide = 1 - ease(smooth(1.8, 3.8, t));
+  const y = 3.6 - (3.6 - 1.25) * land - .45 * k + WIDE_Y * wide;
+  camera.position.set(Math.sin(t * .7) * .12 * (1 - k * .6), y, z + 2 + 9 * (1 - land) + WIDE_Z * wide);
   camera.fov = 40 + 22 * k; camera.updateProjectionMatrix();
   camera.lookAt(0, 3.4 * (1 - land) + .2 * land, (z - 24) * land);
   camera.up.set(Math.sin(t * .9) * .015 * (1 + k), 1, 0);

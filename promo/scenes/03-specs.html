@@ -55,7 +55,7 @@ p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch
       <li><span class="t">0.0</span><div><q>We can imagine new code, we can describe thoughtful architecture, we can specify sturdy systems.</q><span>One spec, architecture, sprouts a tree of sixteen grey-white file cards under a SPECIFICATIONS label that counts them.</span></div></li>
       <li><span class="t">6.1</span><div><q>But we have no idea how faithfully our robots are building for us.</q><span>From the right, an Agent Skills folder, qa-review, sprouts its own tree. Then the world inverts: the ground goes white, the camera swings over into an isometric view, and each spec card thickens and darkens into a black box that settles onto a white plane. More black boxes drop in and stack: the code, built from the specs, is a black box. The skill's cards fly together and assemble into an arcade machine labeled CODE REVIEW.</span></div></li>
       <li><span class="t">10.8</span><div><q>The more complex our designs, the more challenging they are to validate.</q><span>Gold tokens fade in above the slot on its top and drop straight in, one at a time: review is expensive. Each buys one box: a mint trace runs along the ground to it, and it turns to glass. Inside is only fog. Four tokens, four boxes; the rest stay black.</span></div></li>
-      <li><span class="t">17.2</span><div><q>We are writing good code by accident.</q><span>On “accident”, on the bass hit, the camera pulls up and away and the white fog thins: black boxes run to the horizon. The machine's readout: 4 of thousands reviewed.</span></div></li>
+      <li><span class="t">17.2</span><div><q>Agents are writing good code by accident.</q><span>On “accident”, on the bass hit, the camera pulls up and away and the white fog thins: black boxes run to the horizon. The machine's readout: 4 of thousands reviewed.</span></div></li>
     </ol>
     <p class="note">The film's one inversion: dark to white, cards to boxes, so the viewer feels the switch from what we write to what gets built. The files and skill structure are illustrative: qa-review follows the Agent Skills layout (SKILL.md with references, scripts and examples beside it).</p>
   </section>
@@ -76,7 +76,7 @@ const LINES = [
   [0.2, 5.8, "We can imagine new code, we can describe thoughtful architecture, we can specify sturdy systems."],
   [6.1, 10.4, "But we have no idea how faithfully our robots are building for us."],
   [10.8, 16.6, "The more complex our designs, the more challenging they are to validate."],
-  [17.2, 20.8, "We are writing good code by accident."],
+  [17.2, 20.8, "Agents are writing good code by accident."],
 ];
 const ACCIDENT = 19.6;   // the bass hit
 
@@ -181,6 +181,10 @@ function applyClarity(c) {
   territory.material.color.setScalar(1 + 2.4 * c);
   return { fog: 1 - .85 * c, sheets: 1 - c };
 }
+
+// ---------- driven: a review player can set the scene's time from outside, with postMessage({ t }) ----------
+// (t, playing and T are the scene's own; this runs later, once they exist)
+window.addEventListener("message", (e) => { const d = e.data || {}; if (typeof d.t === "number") { t = Math.min(T, Math.max(0, d.t)); playing = false; } });
 
 
 territory.visible = false;

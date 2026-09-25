@@ -546,6 +546,9 @@ function hud(t) {
 // ---------- frame ----------
 const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
 let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+// ---------- driven: a review player can set the scene's time from outside, with postMessage({ t }) ----------
+// (t, playing and T are the scene's own; this runs later, once they exist)
+window.addEventListener("message", (e) => { const d = e.data || {}; if (typeof d.t === "number") { t = Math.min(T, Math.max(0, d.t)); playing = false; } });
 const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;

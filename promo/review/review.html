@@ -1,0 +1,475 @@
+<meta charset="utf-8">
+<title>Coherence Promo Cut</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --ground: #07090C; --panel: #0E1216; --line: #1F272E; --ink: #E6ECEF; --muted: #8B98A2; --dim: #56636D;
+  --mint: #54E8B0; --orange: #FF9A3C; --red: #FF4B4B;
+  --sans: "Instrument Sans", system-ui, -apple-system, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--ground); color: var(--ink); font: 15px/1.5 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 22px 56px; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 20px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 24px/1.2 var(--sans); text-wrap: balance; }
+.now { font: 500 13px var(--mono); color: var(--muted); }
+.now b { color: var(--mint); font-weight: 600; }
+
+.stage { position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 4px; overflow: hidden; }
+.stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; opacity: 0; }
+/* the scene frames stack among themselves during a dissolve (z 1-2); everything on the stage above them stays above them */
+.sub, .gate, .pending { z-index: 10; }
+.pending { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--muted); font: 500 14px var(--mono); }
+.pending b { display: block; color: var(--ink); font: 600 22px var(--sans); margin-bottom: 6px; }
+.sub { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: min(84%, 940px); text-align: center; font: 500 clamp(12px, 1.8vw, 23px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .95), 0 0 2px rgb(0 0 0 / .8); pointer-events: none; }
+.gate { position: absolute; inset: 0; display: grid; place-items: center; background: rgb(0 0 0 / .55); }
+.gate[hidden], .pending[hidden] { display: none; }
+
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 14px; cursor: pointer; }
+button.primary { background: var(--mint); color: #041510; border-color: var(--mint); font-weight: 600; }
+button:focus-visible, .strip:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+.tc { font: 500 14px var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); min-width: 12ch; }
+.tc span { color: var(--dim); }
+label.toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+
+/* the timeline: acts, scenes, clips, and the playhead, on one scale */
+.scroller { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.strip { position: relative; height: 104px; min-width: 100%; cursor: pointer; user-select: none; touch-action: none; }
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font: 500 12px var(--mono); color: var(--muted); }
+.tools button { padding: 4px 10px; font-size: 12px; }
+.tools button[aria-pressed="true"] { border-color: var(--mint); color: var(--mint); }
+.status { margin-left: auto; }
+.status.saved { color: var(--mint); }
+.status.warn { color: var(--orange); }
+.act { position: absolute; top: 6px; font: 500 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); padding-left: 6px; border-left: 1px solid #2A3540; height: calc(100% - 12px); }
+.act.mark { border-left-color: var(--orange); color: var(--orange); }
+.scene { position: absolute; top: 24px; height: 30px; border-radius: 3px; background: #18212A; border: 1px solid #2A3540; font: 600 11px var(--mono); color: var(--muted); display: grid; place-items: center; overflow: hidden; }
+.scene.cur { background: #133A2E; border-color: var(--mint); color: var(--ink); }
+.scene.todo { background: repeating-linear-gradient(135deg, #14191E 0 6px, #0E1216 6px 12px); }
+.clip { position: absolute; top: 62px; height: 22px; border-radius: 3px; background: #3A4855; cursor: grab; outline: none; }
+.clip:hover { background: #4E6070; }
+.clip.cur { background: var(--mint); }
+.clip.sel { box-shadow: 0 0 0 2px var(--ink); }
+.clip.clash { background: var(--red); }
+.clip.moved::after { content: ""; position: absolute; right: 2px; top: 2px; width: 5px; height: 5px; border-radius: 50%; background: var(--orange); }
+.clip.adr { background: #2E5A4C; }
+.studio[hidden], .hint[hidden], .gate[hidden] { display: none !important; }
+.studio { display: inline-flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+#rec.on { background: var(--red); border-color: var(--red); color: #fff; }
+.hint { color: var(--dim); font-size: 12px; } .hint code { font: 500 12px var(--mono); color: var(--muted); }
+.sub.cue { color: rgb(255 255 255 / .55); }
+.beatgrid { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.clip.dragging { cursor: grabbing; background: #7FA3BD; }
+.tip { position: absolute; top: 88px; transform: translateX(-50%); font: 500 11px var(--mono); color: var(--ink); background: #000; padding: 1px 6px; border-radius: 3px; white-space: nowrap; pointer-events: none; }
+.head { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); box-shadow: 0 0 8px rgb(230 236 239 / .6); pointer-events: none; }
+
+.meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+.card h2 { margin: 0 0 8px; font: 600 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.card p { margin: 0; color: var(--muted); font-size: 14px; max-width: 70ch; }
+.card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; display: grid; gap: 4px; }
+.card code { font: 500 12.5px var(--mono); color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .head { box-shadow: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Coherence promo · review cut</div>
+      <h1>Black Hole, the narration, and every built scene, in order</h1>
+    </div>
+    <div class="now" id="now">scene <b>1</b> · act one</div>
+  </header>
+
+  <div class="stage" id="stage">
+    <iframe id="fa" title="Scene"></iframe>
+    <iframe id="fb" title="Scene"></iframe>
+    <div class="pending" id="pending" hidden><div><b>Scene 15 isn’t built yet</b>the narration plays over black</div></div>
+    <div class="sub" id="sub"></div>
+    <div class="gate" id="gate"><button class="primary" id="start">Play the cut</button></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Play</button>
+    <button id="back">−5 s</button>
+    <button id="fwd">+5 s</button>
+    <span class="tc" id="tc">0:00.0</span>
+    <label class="toggle"><input type="checkbox" id="subs" checked> Subtitles</label>
+    <span class="studio" id="studio">
+      <button id="rec">● Record</button>
+      <label class="toggle">pre-roll <select id="preroll"><option value="1">1 s</option><option value="2" selected>2 s</option><option value="4">4 s</option></select></label>
+      <label class="toggle"><input type="checkbox" id="guide"> Hear the old read</label>
+    </span>
+    <span class="hint" id="studioHint">Record retakes in the studio: <code>.venv/bin/python review/studio.py</code></span>
+  </div>
+
+  <div class="tools">
+    <span>Zoom</span>
+    <button data-zoom="1" aria-pressed="true">1×</button><button data-zoom="3">3×</button><button data-zoom="8">8×</button>
+    <span>· drag a narration block to move it; select one and use ← → to nudge 0.1 s (shift: 1 s)</span>
+    <label for="mvol">Music</label><input type="range" id="mvol" min="0" max="1" step="0.05" value="0.5" style="width:90px">
+    <button id="reset">Reset to the assembled cut</button>
+    <span class="status" id="status">loading audio…</span>
+  </div>
+  <div class="scroller" id="scroller"><div class="strip" id="strip" tabindex="0" aria-label="Timeline: click to jump, drag narration to move it"></div></div>
+
+  <div class="meta">
+    <div class="card">
+      <h2>How this cut is put together</h2>
+      <p>Drag any narration block to move it: the scenes re-flow around it, and every placement is saved for Claude to bake into the final mix. Every line is where you last placed it; each scene opens just before its first line. Each scene plays stretched or squeezed to fit its window, so a scene that runs fast or slow here is a scene whose pictures and read disagree.</p>
+    </div>
+    <div class="card">
+      <h2>Worth watching for</h2>
+      <ul id="notes"></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+const TL = {"track": 231.938, "trackFull": 236.5, "hardCut": 212.8, "beats": [0.615, 1.253, 1.892, 2.53, 3.168, 3.806, 4.445, 5.083, 5.721, 6.36, 6.998, 7.636, 8.275, 8.913, 9.551, 10.189, 10.828, 11.466, 12.104, 12.743, 13.381, 14.019, 14.658, 15.296, 15.934, 16.572, 17.211, 17.849, 18.487, 19.126, 19.764, 20.402, 21.041, 21.679, 22.317, 22.955, 23.594, 24.232, 24.87, 25.509, 26.147, 26.785, 27.424, 28.062, 28.7, 29.338, 29.977, 30.615, 31.253, 31.892, 32.53, 33.168, 33.806, 34.445, 35.083, 35.721, 36.36, 36.998, 37.636, 38.275, 38.913, 39.551, 40.189, 40.828, 41.466, 42.104, 42.743, 43.381, 44.019, 44.658, 45.296, 45.934, 46.572, 47.211, 47.849, 48.487, 49.126, 49.764, 50.402, 51.041, 51.679, 52.317, 52.955, 53.594, 54.232, 54.87, 55.509, 56.147, 56.785, 57.424, 58.062, 58.7, 59.338, 59.977, 60.615, 61.253, 61.892, 62.53, 63.168, 63.806, 64.445, 65.083, 65.721, 66.36, 66.998, 67.636, 68.275, 68.913, 69.551, 70.189, 70.828, 71.466, 72.104, 72.743, 73.381, 74.019, 74.658, 75.296, 75.934, 76.572, 77.211, 77.849, 78.487, 79.126, 79.764, 80.402, 81.041, 81.679, 82.317, 82.955, 83.594, 84.232, 84.87, 85.509, 86.147, 86.785, 87.424, 88.062, 88.7, 89.338, 89.977, 90.615, 91.253, 91.892, 92.53, 93.168, 93.806, 94.445, 95.083, 95.721, 96.36, 96.998, 97.636, 98.275, 98.913, 99.551, 100.189, 100.828, 101.466, 102.104, 102.743, 103.381, 104.019, 104.658, 105.296, 105.934, 106.572, 107.211, 107.849, 108.487, 109.126, 109.764, 110.402, 111.041, 111.679, 112.317, 112.955, 113.594, 114.232, 114.87, 115.509, 116.147, 116.785, 117.424, 118.062, 118.7, 119.338, 119.977, 120.615, 121.253, 121.892, 122.53, 123.168, 123.806, 124.445, 125.083, 125.721, 126.36, 126.998, 127.636, 128.275, 128.913, 129.551, 130.189, 130.828, 131.466, 132.104, 132.743, 133.381, 134.019, 134.658, 135.296, 135.934, 136.572, 137.211, 137.849, 138.487, 139.126, 139.764, 140.402, 141.041, 141.679, 142.317, 142.955, 143.594, 144.232, 144.87, 145.509, 146.147, 146.785, 147.424, 148.062, 148.7, 149.338, 149.977, 150.615, 151.253, 151.892, 152.53, 153.168, 153.806, 154.445, 155.083, 155.721, 156.36, 156.998, 157.636, 158.275, 158.913, 159.551, 160.189, 160.828, 161.466, 162.104, 162.743, 163.381, 164.019, 164.658, 165.296, 165.934, 166.572, 167.211, 167.849, 168.487, 169.126, 169.764, 170.402, 171.041, 171.679, 172.317, 172.955, 173.594, 174.232, 174.87, 175.509, 176.147, 176.785, 177.424, 178.062, 178.7, 179.338, 179.977, 180.615, 181.253, 181.892, 182.53, 183.168, 183.806, 184.445, 185.083, 185.721, 186.36, 186.998, 187.636, 188.275, 188.913, 189.551, 190.189, 190.828, 191.466, 192.104, 192.743, 193.381, 194.019, 194.658, 195.296, 195.934, 196.572, 197.211, 197.849, 198.487, 199.126, 199.764, 200.402, 201.041, 201.679, 202.317, 202.955, 203.594, 204.232, 204.87, 205.509, 206.147, 206.785, 207.424, 208.062, 208.7, 209.338, 209.977, 210.615, 211.253, 211.892, 212.53, 213.168, 213.806, 214.445, 215.083, 215.721, 216.36, 216.998, 217.636, 218.275, 218.913, 219.551, 220.189, 220.828, 221.466, 222.104, 222.743, 223.381, 224.019, 224.658, 225.296, 225.934, 226.572, 227.211, 227.849, 228.487, 229.126, 229.764, 230.402, 231.041, 231.679, 232.317, 232.955, 233.594, 234.232, 234.87, 235.509, 236.147], "phrases": [3.806, 7.636, 11.466, 15.295, 19.125, 22.955, 26.785, 30.615, 34.444, 38.274, 42.104, 45.934, 49.763, 53.593, 57.423, 61.253, 65.083, 68.912, 72.742, 76.572, 80.402, 84.232, 88.061, 91.891, 95.721, 99.551, 103.38, 107.21, 111.04, 114.87, 118.7, 122.529, 126.359, 130.189, 134.019, 137.849, 141.678, 145.508, 149.338, 153.168, 156.997, 160.827, 164.657, 168.487, 172.317, 176.146, 179.976, 183.806, 187.636, 191.466, 195.295, 199.125, 202.955, 206.785, 210.615, 214.444, 218.274, 222.104, 225.934, 229.763, 233.593], "scenes": [{"n": 1, "file": "01-opening", "length": 15, "start": 0, "end": 6.36, "out": 13.0, "hits": []}, {"n": 2, "file": "02-road", "length": 24, "start": 6.36, "end": 24.87, "in": 1.82, "dissolve": 1.2, "hits": [3.3]}, {"n": 3, "file": "03-specs", "length": 21, "start": 24.87, "end": 42.743, "hits": [8.6, 19.6]}, {"n": 4, "file": "04-corners", "length": 18.5, "start": 42.743, "end": 61.253, "hits": []}, {"n": 5, "file": "05-machines", "length": 20, "start": 61.253, "end": 77.211, "hits": []}, {"n": 6, "file": "06-result", "length": 17, "start": 77.211, "end": 93.806, "hits": []}, {"n": 7, "file": "07-power", "length": 14.5, "start": 93.806, "end": 107.211, "hits": [1.6]}, {"n": 8, "file": "08-lexicon", "length": 25, "start": 107.211, "end": 125.721, "hits": [7.9, 17.4]}, {"n": 9, "file": "09-journal", "length": 18, "start": 125.721, "end": 140.402, "hits": [9.0]}, {"n": 10, "file": "10-switchboard", "length": 12, "start": 140.402, "end": 153.168, "hits": [3.9]}, {"n": 11, "file": "11-bypass", "length": 17, "start": 153.168, "end": 168.487, "hits": [9.6, 12.5]}, {"n": 12, "file": "12-reduce", "length": 13, "start": 168.487, "end": 179.977, "hits": [2.2, 8.3]}, {"n": 13, "file": "13-structure", "length": 12, "start": 179.977, "end": 193.381, "hits": [9.6]}, {"n": 14, "file": "14-structure", "length": 15, "start": 193.381, "end": 209.338, "hits": [1.0, 12.0]}, {"n": 15, "file": "15-structure", "length": 22.6, "start": 209.338, "end": 231.938, "hits": []}], "lines": [{"line": "1", "scene": 1, "text": "What if the best way to save tokens", "clip": "audio/read2/01-01.wav", "at": 0.52, "start": 0.7, "end": 2.98, "src": "clips/read2-01-01-6e9f36f18e83.mp3", "adr": 0, "lead": 0.18}, {"line": "2", "scene": 1, "text": "Is to stop writing bad code?", "clip": "audio/read2/01-02.wav", "at": 2.98, "start": 2.98, "end": 5.58, "src": "clips/read2-01-02-d02c3e2cc6c6.mp3", "adr": 0, "lead": 0.0}, {"line": "3", "scene": 2, "text": "Our industry is lost in a fog.", "clip": "audio/read2/02-03.wav", "at": 6.84, "start": 7.02, "end": 9.04, "src": "clips/read2-02-03-0a497bbffc7d.mp3", "adr": 0, "lead": 0.18}, {"line": "4", "scene": 2, "text": "We have completely new tools for building software, and we can build it faster than ever.", "clip": "audio/read2/02-04.wav", "at": 9.56, "start": 9.74, "end": 14.24, "src": "clips/read2-02-04-57660ec5fa47.mp3", "adr": 0, "lead": 0.18}, {"line": "5", "scene": 2, "text": "But our processes have never been more confused. The work we do is more opaque, more complex, more difficult to reason about than at any point in our careers.", "clip": "audio/read2/02-05.wav", "at": 14.34, "start": 14.52, "end": 24.72, "src": "clips/read2-02-05-376f2057a248.mp3", "adr": 0, "lead": 0.18}, {"line": "6", "scene": 3, "text": "We can imagine new code, we can describe thoughtful architecture, we can specify sturdy systems.", "clip": "audio/read2/03-06.wav", "at": 25.22, "start": 25.4, "end": 30.98, "src": "clips/read2-03-06-8b80f4c70a1c.mp3", "adr": 0, "lead": 0.18}, {"line": "7", "scene": 3, "text": "But we have no idea how faithfully our robots are building for us. The more complex our designs, the more challenging they are to validate.", "clip": "audio/read2/03-07.wav", "at": 31.38, "start": 31.56, "end": 38.6, "src": "clips/read2-03-07-5e7a6c9800de.mp3", "adr": 0, "lead": 0.18}, {"line": "8", "scene": 3, "text": "Agents are writing good code by accident.", "clip": "audio/read2/03-08.wav", "at": 39.22, "start": 39.4, "end": 42.2, "src": "clips/read2-03-08-bc010e7a2e7c.mp3", "adr": 0, "lead": 0.18}, {"line": "9", "scene": 4, "text": "The systems at our disposal are trained to finish the job at any cost, so they cut subtle corners where we can\u2019t see.", "clip": "audio/read2/04-09.wav", "at": 43.42, "start": 43.6, "end": 50.34, "src": "clips/read2-04-09-6e721bbaa52c.mp3", "adr": 0, "lead": 0.18}, {"line": "10", "scene": 4, "text": "Understanding it all requires reading code and reasoning about its consequences, but every day there\u2019s just more.", "clip": "audio/read2/04-10.wav", "at": 51.67, "start": 51.85, "end": 57.15, "src": "clips/read2-04-10-d42e1bab0204.mp3", "adr": 0, "lead": 0.18}, {"line": "11", "scene": 4, "text": "More complexity than we can possibly get our arms around.", "clip": "audio/read2/04-11.wav", "at": 57.81, "start": 57.95, "end": 61.07, "src": "clips/read2-04-11-80f789642d5f.mp3", "adr": 0, "lead": 0.14}, {"line": "12", "scene": 5, "text": "Our solution? Throw more inference at the problem. We use inference to write code, then we use more inference to ask if the code we wrote was good.", "clip": "audio/read2/05-12.wav", "at": 61.87, "start": 62.05, "end": 69.59, "src": "clips/read2-05-12-54927a7128f0.mp3", "adr": 0, "lead": 0.18}, {"line": "13", "scene": 5, "text": "So what do we get for all this? Bugs that recur. Endless whack a mole adversarial reviews.", "clip": "audio/read2/05-13.wav", "at": 70.92, "start": 71.1, "end": 76.76, "src": "clips/read2-05-13-e1ce9fd56601.mp3", "adr": 0, "lead": 0.18}, {"line": "14", "scene": 6, "text": "OpenRouter does twenty trillion tokens a day. GitHub struggles to stay online.", "clip": "audio/read2/06-14.wav", "at": 77.52, "start": 77.7, "end": 82.98, "src": "clips/read2-06-14-ce7b595be846.mp3", "adr": 0, "lead": 0.18}, {"line": "15", "scene": 6, "text": "Software staggers under this scale of motion.", "clip": "audio/read2/06-15.wav", "at": 83.53, "start": 83.7, "end": 86.26, "src": "clips/read2-06-15-7c5f5f81f2c8.mp3", "adr": 0, "lead": 0.17}, {"line": "16", "scene": 6, "text": "Because we don\u2019t yet have the tools to make sense of this new world.", "clip": "audio/read2/06-16.wav", "at": 87.47, "start": 87.65, "end": 91.57, "src": "clips/read2-06-16-d4416e67655f.mp3", "adr": 0, "lead": 0.18}, {"line": "17", "scene": 7, "text": "It's time to build the next generation of tools.", "clip": "audio/read2/07-17.wav", "at": 94.12, "start": 94.3, "end": 97.42, "src": "clips/read2-07-17-abbfdeb340f1.mp3", "adr": 0, "lead": 0.18}, {"line": "18", "scene": 7, "text": "Developers need clarity and confidence, not just speed.", "clip": "audio/read1/07-18.wav", "at": 98.37, "start": 98.55, "end": 101.93, "src": "clips/read1-07-18-37f99bc324dd.mp3", "adr": 0, "lead": 0.18}, {"line": "19", "scene": 7, "text": "The race is on to deliver. Coherence lets us compete.", "clip": "audio/read1/07-19.wav", "at": 102.62, "start": 102.8, "end": 107.1, "src": "clips/read1-07-19-6f59dafe6b89.mp3", "adr": 0, "lead": 0.18}, {"line": "20", "scene": 8, "text": "Starts with clear definitions.", "clip": "audio/read1/08-20.wav", "at": 107.57, "start": 107.75, "end": 109.45, "src": "clips/read1-08-20-972be23488ee.mp3", "adr": 0, "lead": 0.18}, {"line": "21", "scene": 8, "text": "Language models are built out of language. Clearly defining your terms changes their behavior. Agents start to do what you meant, not just what you said.", "clip": "audio/read1/08-21.wav", "at": 110.01, "start": 110.19, "end": 119.09, "src": "clips/read1-08-21-50fb168b41a9.mp3", "adr": 0, "lead": 0.18}, {"line": "22", "scene": 8, "text": "This impacts the integrity of what gets built, making bugs easier for agents to detect.", "clip": "audio/read1/08-22.wav", "at": 119.55, "start": 119.73, "end": 124.61, "src": "clips/read1-08-22-4bdb66aa2fad.mp3", "adr": 0, "lead": 0.18}, {"line": "23", "scene": 9, "text": "But we can do more.", "clip": "audio/read1/09-23.wav", "at": 126.152, "start": 126.332, "end": 127.552, "src": "clips/read1-09-23-ec97ec7a12ba.mp3", "adr": 0, "lead": 0.18}, {"line": "24", "scene": 9, "text": "The Coherence decision journal compresses hundreds of thousands of tokens into a handful of decisions.", "clip": "audio/read1/09-24.wav", "at": 127.892, "start": 128.072, "end": 133.392, "src": "clips/read1-09-24-bd0c42c713d2.mp3", "adr": 0, "lead": 0.18}, {"line": "25", "scene": 9, "text": "If a bad call happened in the process, it\u2019s right there in the history, instead of buried in code.", "clip": "audio/read1/09-25.wav", "at": 133.632, "start": 133.812, "end": 138.732, "src": "clips/read1-09-25-d3ae5c345cd4.mp3", "adr": 0, "lead": 0.18}, {"line": "26", "scene": 10, "text": "Quickly move between different conversations and agents without costly handoff files, while letting subagents compare notes.", "clip": "audio/read1/10-26.wav", "at": 140.793, "start": 140.973, "end": 147.893, "src": "clips/read1-10-26-a928604af277.mp3", "adr": 0, "lead": 0.18}, {"line": "27", "scene": 10, "text": "And decisions are never buried in a long transcript.", "clip": "audio/read1/10-27.wav", "at": 148.493, "start": 148.673, "end": 151.293, "src": "clips/read1-10-27-4c4d34afdde0.mp3", "adr": 0, "lead": 0.18}, {"line": "28", "scene": 11, "text": "We also need constant confidence that our code matches our intentions.", "clip": "audio/read1/11-28.wav", "at": 153.555, "start": 153.735, "end": 157.475, "src": "clips/read1-11-28-423ac376d5f8.mp3", "adr": 0, "lead": 0.18}, {"line": "29", "scene": 11, "text": "Coherence uses your language server to detect security bypasses. The moment an agent writes code that touches something sensitive without routing through a designated chokepoint, the project goes red.", "clip": "audio/read1/11-29.wav", "at": 157.995, "start": 158.175, "end": 168.475, "src": "clips/read1-11-29-a1510241b6c4.mp3", "adr": 0, "lead": 0.18}, {"line": "30", "scene": 12, "text": "The agent discovers the violation immediately.", "clip": "audio/read1/12-30.wav", "at": 168.98, "start": 169.15, "end": 171.81, "src": "clips/read1-12-30-b2c9023516f7.mp3", "adr": 0, "lead": 0.17}, {"line": "31", "scene": 12, "text": "Instead of enforcing security through implicit conventions, we know our intentions are represented in the structure of our projects themselves.", "clip": "audio/read1/12-31.wav", "at": 172.37, "start": 172.55, "end": 179.75, "src": "clips/read1-12-31-e997a20f7f42.mp3", "adr": 0, "lead": 0.18}, {"line": "32", "scene": 13, "text": "But how do we check that the agent did what we want?", "clip": "audio/read1/13-32.wav", "at": 180.12, "start": 180.3, "end": 182.76, "src": "clips/read1-13-32-a26a55f34e57.mp3", "adr": 0, "lead": 0.18}, {"line": "33", "scene": 13, "text": "The Coherence structure view shows you the entrypoints into your project, its major components, and how those components interact with each other. Always accurate and up to date.", "clip": "audio/read1/13-33.wav", "at": 183.07, "start": 183.25, "end": 193.45, "src": "clips/read1-13-33-465ad76aad6e.mp3", "adr": 0, "lead": 0.18}, {"line": "34", "scene": 14, "text": "When chokepoints are violated, you\u2019ll see it.", "clip": "audio/read1/14-34.wav", "at": 194.07, "start": 194.25, "end": 197.09, "src": "clips/read1-14-34-2777910db66a.mp3", "adr": 0, "lead": 0.18}, {"line": "35", "scene": 14, "text": "When a major change alters the relationships between components, you\u2019ll see that too.", "clip": "audio/read1/14-35.wav", "at": 197.57, "start": 197.75, "end": 201.87, "src": "clips/read1-14-35-946b16a2cea9.mp3", "adr": 0, "lead": 0.18}, {"line": "36", "scene": 14, "text": "No more sifting through thousands of lines of code to understand what was built or changed. See your project as it is right now.", "clip": "audio/read1/14-36.wav", "at": 202.02, "start": 202.2, "end": 209.06, "src": "clips/read1-14-36-36bcd6155ba2.mp3", "adr": 0, "lead": 0.18}, {"line": "37", "scene": 15, "text": "These are the kinds of tools we need to clear the fog.", "clip": "audio/read1/15-37.wav", "at": 209.47, "start": 209.65, "end": 212.41, "src": "clips/read1-15-37-b1cede6c6d8e.mp3", "adr": 0, "lead": 0.18}, {"line": "38", "scene": 15, "text": "Spend less inference on code that doesn\u2019t work, less inference detecting bugs, less inference investigating the decisions that went into your changes.", "clip": "audio/read1/15-38.wav", "at": 212.82, "start": 213.0, "end": 221.42, "src": "clips/read1-15-38-604f506f0703.mp3", "adr": 0, "lead": 0.18}, {"line": "39", "scene": 15, "text": "You get a more stable, coherent project, steadily driving toward the floor of irreducible complexity.", "clip": "audio/read1/15-39.wav", "at": 221.67, "start": 221.85, "end": 227.52, "src": "clips/read1-15-39-a544476bcae7.mp3", "adr": 0, "lead": 0.18}, {"line": "40", "scene": 15, "text": "The software of 2030 is waiting for us.", "clip": "audio/read1/15-40.wav", "at": 227.23, "start": 227.95, "end": 231.03, "src": "clips/read1-15-40-b075bb388665.mp3", "adr": 0, "lead": 0.72}]};
+const BASE = JSON.parse(JSON.stringify(TL.lines.map((l) => ({ line: l.line, start: l.start }))));
+const $ = (id) => document.getElementById(id);
+const frames = [$("fa"), $("fb")];
+const fmt = (s) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+const lineAt = (t) => TL.lines.find((l) => t >= l.start - .05 && t <= l.end + .25);
+const status = (text, kind = "") => { $("status").textContent = text; $("status").className = "status " + kind; };
+
+// ---------- the scenes re-flow from the narration: each opens just before its first line ----------
+function reflow() {
+  TL.lines.sort((a, b) => a.start - b.start);
+  for (const s of TL.scenes) {
+    if (s.n === 1) s.start = 0;
+    else { const mine = TL.lines.filter((l) => l.scene === s.n); if (mine.length) s.start = snap(Math.min(...mine.map((l) => l.start)) - .6); }
+  }
+  TL.scenes.forEach((s, i) => (s.end = i + 1 < TL.scenes.length ? TL.scenes[i + 1].start : s.start + s.length));
+  TL.track = TL.scenes[TL.scenes.length - 1].end;   // the film ends when its last scene does
+}
+// every cut lands on a beat (nearest within 0.35 s)
+function snap(t) { let b = t, d = 1e9; for (const x of TL.beats) { const e = Math.abs(x - t); if (e < d) { d = e; b = x; } if (x > t + 1) break; } return d <= .35 ? b : t; }
+// a scene's own clock: its in..out points stretched over its window, bent gently so each hit lands on a beat
+function localAt(s, t) {
+  const a = s.in ?? 0, b = s.out ?? s.length, lin = (u) => s.start + (u - a) / (b - a) * (s.end - s.start);
+  const pts = [[s.start, a]];
+  for (const h of s.hits || []) { if (h <= a || h >= b) continue; const c = snap(lin(h)); if (c > pts[pts.length - 1][0] + .2 && c < s.end - .2) pts.push([c, h]); }
+  pts.push([s.end, b]);
+  for (let i = 1; i < pts.length; i++) if (t <= pts[i][0]) { const [c0, l0] = pts[i - 1], [c1, l1] = pts[i]; return l0 + (t - c0) / (c1 - c0) * (l1 - l0); }
+  return b;
+}
+const sceneAt = (t) => TL.scenes.find((s) => t >= s.start && t < s.end) || TL.scenes[TL.scenes.length - 1];
+
+// ---------- the live mix: the music, and every clip scheduled on top of it ----------
+const ctx = new (window.AudioContext || window.webkitAudioContext)();
+const out = ctx.createDynamicsCompressor(); out.threshold.value = -3; out.ratio.value = 12; out.connect(ctx.destination);
+// the music runs through its own limiter, so its loud passages never climb over the voice (a review level, not the final mix)
+const musicLimit = ctx.createDynamicsCompressor();
+musicLimit.threshold.value = -22; musicLimit.knee.value = 6; musicLimit.ratio.value = 12; musicLimit.attack.value = .005; musicLimit.release.value = .3;
+musicLimit.connect(out);
+const musicGain = ctx.createGain(); musicGain.gain.value = .5; musicGain.connect(musicLimit);
+// clips arrive processed, every one at -16 LUFS
+const voiceGain = ctx.createGain(); voiceGain.gain.value = 1; voiceGain.connect(out);
+const buffers = new Map();
+let music = null, sources = [], playing = false, t0 = 0, ctx0 = 0;
+// fetch politely: a few at a time, each retried, so one refused request can't silence the whole narration
+async function decode(url, tries = 4) {
+  for (let k = 0; ; k++) {
+    try {
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) throw new Error(`${r.status} ${url}`);
+      return await ctx.decodeAudioData(await r.arrayBuffer());
+    } catch (e) { if (k + 1 >= tries) throw e; await new Promise((res) => setTimeout(res, 400 * 2 ** k)); }
+  }
+}
+async function loadAudio() {
+  status("loading music…");
+  music = await decode("music.mp3");
+  const queue = [...TL.lines], failed = [];
+  let n = 0;
+  async function worker() {
+    while (queue.length) {
+      const l = queue.shift();
+      try { buffers.set(l.src, await decode(l.src)); } catch (e) { failed.push(l.line); console.warn("narration clip failed", l.src, e); }
+      status(`loading narration… ${++n}/${TL.lines.length}`);
+    }
+  }
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  if (failed.length) status(`ready, but ${failed.length} line${failed.length === 1 ? "" : "s"} failed to load (${failed.join(", ")}); reload to retry`, "warn");
+  else status("ready");
+  if (playing) startAt(now());
+}
+const now = () => (playing ? t0 + (ctx.currentTime - ctx0) : t0);
+function stopAll() { sources.forEach((s) => { try { s.stop(); } catch (e) {} }); sources = []; }
+function startAt(t) {
+  stopAll(); t0 = Math.max(0, Math.min(TL.track - .05, t)); ctx0 = ctx.currentTime + .03;
+  if (!playing || !music) return;
+  // the music fades out over the last 1.5 s of the cut, with the fade to black
+  const fade = ctx.createGain(); fade.connect(musicGain);
+  const fadeAt = TL.track - 1.5;
+  if (t0 < fadeAt) { fade.gain.setValueAtTime(1, ctx0 + (fadeAt - t0)); fade.gain.linearRampToValueAtTime(0, ctx0 + (TL.track - t0)); }
+  else { fade.gain.setValueAtTime((TL.track - t0) / 1.5, ctx0); fade.gain.linearRampToValueAtTime(0, ctx0 + (TL.track - t0)); }
+  const m = ctx.createBufferSource(); m.buffer = music; m.connect(fade); m.start(ctx0, t0); sources.push(m);
+  scheduled = new Set();
+  scheduleVoice();
+}
+// narration is queued a moment before each line is due, whenever its clip has arrived: late downloads, drags and seeks all just work
+let scheduled = new Set();
+function scheduleVoice() {
+  if (!playing) return;
+  const t = now();
+  for (const l of TL.lines) {
+    if (scheduled.has(l)) continue;
+    const buf = buffers.get(l.src); if (!buf) continue;
+    const at = l.start - l.lead, into = t - at;
+    if (at > t + 1.5 || into >= buf.duration) continue;
+    const when = ctx0 + (Math.max(at, t) - t0);
+    const src = ctx.createBufferSource(); src.buffer = buf; src.connect(voiceGain);
+    src.start(Math.max(ctx.currentTime, when), Math.max(0, into));
+    sources.push(src); scheduled.add(l);
+  }
+}
+function seek(t) { startAt(t); }
+async function playPause() {
+  if (!music) return;
+  if (ctx.state === "suspended") await ctx.resume();
+  if (playing) { t0 = now(); playing = false; stopAll(); $("play").textContent = "Play"; }
+  else { playing = true; startAt(t0); $("play").textContent = "Pause"; $("gate").hidden = true; }
+}
+$("mvol").oninput = (e) => musicGain.gain.setTargetAtTime(+e.target.value, ctx.currentTime, .05);
+$("play").onclick = playPause; $("start").onclick = playPause;
+$("back").onclick = () => seek(now() - 5); $("fwd").onclick = () => seek(now() + 5);
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); playPause(); } });
+
+// ---------- the timeline: zoomable, and the narration draggable ----------
+const strip = $("strip"), scroller = $("scroller");
+let zoom = 1;
+const pxPerSec = () => strip.clientWidth / TL.track;
+const X = (t) => `${(t / TL.track) * 100}%`;
+function buildStrip() {
+  strip.innerHTML = "";
+  for (const [label, t] of [["the drop", 96.3], ["hard cut", TL.hardCut]]) { const a = document.createElement("div"); a.className = "act mark"; a.style.left = X(t); a.textContent = label; strip.append(a); }
+  const a = document.createElement("div"); a.className = "act"; a.style.left = "0"; a.textContent = "act one"; strip.append(a);
+  const grid = document.createElement("canvas"); grid.className = "beatgrid"; strip.append(grid); drawGrid();
+  for (const s of TL.scenes) { const d = document.createElement("div"); d.className = "scene" + (s.file ? "" : " todo"); d.textContent = s.n; strip.append(d); s.el = d; }
+  for (const l of TL.lines) {
+    const c = document.createElement("div"); c.className = "clip"; c.tabIndex = 0; c.title = l.text; c.dataset.line = l.line; strip.append(c); l.el = c;
+    c.addEventListener("pointerdown", (e) => startDrag(e, l));
+    c.addEventListener("focus", () => select(l));
+    c.addEventListener("keydown", (e) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); e.stopPropagation(); moveLine(l, l.start + (e.key === "ArrowRight" ? 1 : -1) * (e.shiftKey ? 1 : .1)); commit(); } });
+  }
+  const h = document.createElement("div"); h.className = "head"; h.id = "head"; strip.append(h);
+  const tip = document.createElement("div"); tip.className = "tip"; tip.id = "tip"; tip.hidden = true; strip.append(tip);
+  layout();
+}
+function drawGrid() {
+  const c = strip.querySelector(".beatgrid"); if (!c) return;
+  const w = c.width = strip.clientWidth * devicePixelRatio, h = c.height = strip.clientHeight * devicePixelRatio, g = c.getContext("2d");
+  for (const b of TL.beats) { g.fillStyle = "rgba(139,152,162,.16)"; g.fillRect(b / TL.track * w, h * .22, 1, h * .7); }
+  for (const b of TL.phrases) { g.fillStyle = "rgba(255,154,60,.45)"; g.fillRect(b / TL.track * w, h * .22, Math.max(1, devicePixelRatio), h * .7); }
+}
+function layout() {
+  for (const s of TL.scenes) { s.el.style.left = X(s.start); s.el.style.width = `calc(${X(s.end - s.start)} - 2px)`; s.el.title = `Scene ${s.n}: ${fmt(s.start)}–${fmt(s.end)}`; }
+  const base = new Map(BASE.map((b) => [b.line, b.start]));
+  TL.lines.forEach((l, i) => {
+    l.el.style.left = X(l.start); l.el.style.width = X(l.end - l.start);
+    const next = TL.lines[i + 1], prev = TL.lines[i - 1];
+    l.el.classList.toggle("clash", (next && next.start < l.end - .03) || (prev && prev.end > l.start + .03));
+    l.el.classList.toggle("moved", Math.abs(base.get(l.line) - l.start) > .01);
+    l.el.classList.toggle("adr", !!l.adr); if (l.adr) l.el.title = `${l.text}\n(retake ${l.adr})`;
+  });
+}
+let selected = null;
+function select(l) { if (selected) selected.el.classList.remove("sel"); selected = l; l.el.classList.add("sel"); }
+function moveLine(l, start) {
+  const d = Math.max(.05, Math.min(TL.track - (l.end - l.start), start)) - l.start;
+  l.start += d; l.end += d; l.at += d;
+  reflow(); layout();
+  const tip = $("tip"); tip.hidden = false; tip.style.left = X(l.start); tip.textContent = `${fmt(l.start)} · ${l.text.slice(0, 32)}${l.text.length > 32 ? "…" : ""}`;
+}
+function startDrag(e, l) {
+  e.stopPropagation(); e.preventDefault(); select(l); l.el.focus({ preventScroll: true });
+  const x0 = e.clientX, s0 = l.start, pps = pxPerSec();
+  l.el.classList.add("dragging"); l.el.setPointerCapture(e.pointerId);
+  l.el.onpointermove = (ev) => moveLine(l, Math.round((s0 + (ev.clientX - x0) / pps) * 20) / 20);
+  l.el.onpointerup = () => { l.el.onpointermove = l.el.onpointerup = null; l.el.classList.remove("dragging"); $("tip").hidden = true; commit(); };
+}
+// clicking empty strip jumps the playhead
+strip.addEventListener("pointerdown", (e) => { if (e.target.classList.contains("clip")) return; const r = strip.getBoundingClientRect(); seek(((e.clientX - r.left) / r.width) * TL.track); });
+document.querySelectorAll("[data-zoom]").forEach((b) => (b.onclick = () => {
+  zoom = +b.dataset.zoom; document.querySelectorAll("[data-zoom]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  strip.style.width = `${zoom * 100}%`; drawGrid(); scroller.scrollLeft = (now() / TL.track) * strip.clientWidth - scroller.clientWidth / 2;
+}));
+
+// ---------- saving: every placement goes to the page's database, where Claude reads it back ----------
+let db = null, saveTimer = null;
+function placements() { return Object.fromEntries(TL.lines.map((l) => [l.line, Math.round(l.start * 1000) / 1000])); }
+function commit() {
+  if (playing) startAt(now());                 // re-schedule so what you hear matches what you see
+  notes();
+  clearTimeout(saveTimer);
+  if (STUDIO) {
+    status("saving…");
+    saveTimer = setTimeout(async () => {
+      try { const r = await fetch("/placements", { method: "POST", body: JSON.stringify({ lines: placements() }) }); if (!r.ok) throw new Error(r.status); status("saved to overrides.json", "saved"); }
+      catch (err) { status(`not saved: ${err.message}`, "warn"); }
+    }, 400);
+    return;
+  }
+  if (!db) { status("moved (not saved: this view can’t save)", "warn"); return; }
+  status("saving…");
+  saveTimer = setTimeout(async () => {
+    try { await db.doc("cut/placements").set({ lines: placements(), savedAt: new Date().toISOString() }); status("saved", "saved"); }
+    catch (err) { status(`not saved: ${err && err.message ? err.message : "the save was refused"}`, "warn"); }
+  }, 400);
+}
+$("reset").onclick = () => {
+  const base = new Map(BASE.map((b) => [b.line, b.start]));
+  for (const l of TL.lines) moveLine(l, base.get(l.line));
+  $("tip").hidden = true; commit();
+};
+(async () => {
+  try {
+    if (STUDIO) return;                  // the studio's placements are the ones baked into this page
+    db = await window.claude?.use?.("db");
+    if (!db) return;
+    const snap = await db.doc("cut/placements").get();
+    const saved = snap.exists ? snap.data().lines : null;
+    if (saved) { for (const l of TL.lines) if (saved[l.line] != null) moveLine(l, saved[l.line]); $("tip").hidden = true; status(music ? "ready · your saved placements" : $("status").textContent, "saved"); }
+  } catch (e) { db = null; }
+})();
+
+// ---------- the scenes: two frames, the next one loading while the current plays ----------
+const CHROME = ".wrap>header,.transport,.box,.caption{display:none!important}.wrap{padding:0!important;max-width:none!important;gap:0!important;margin:0!important}.stage{border-radius:0!important;aspect-ratio:auto!important;height:100vh!important}body{background:#000!important;margin:0!important;overflow:hidden!important}";
+const loaded = new Map();
+function load(frame, file) {
+  if (frame.dataset.file === file) return;
+  frame.dataset.file = file; loaded.delete(frame);
+  frame.onload = () => { try { const st = frame.contentDocument.createElement("style"); st.textContent = CHROME; frame.contentDocument.head.append(st); } catch (e) {} loaded.set(frame, file); };
+  frame.src = `scenes/${file}.html`;
+}
+// a scene's clock past either end of its window runs on at the window's own rate (a dissolve needs both scenes moving)
+function localExt(s, t) {
+  const a = s.in ?? 0, b = s.out ?? s.length, rate = (b - a) / (s.end - s.start);
+  if (t < s.start) return a + (t - s.start) * rate;
+  if (t > s.end) return b + (t - s.end) * rate;
+  return localAt(s, t);
+}
+// which scenes are on screen, and how opaque: one, or two while a dissolve crosses a cut (incoming on top)
+function visible(t) {
+  const i = TL.scenes.indexOf(sceneAt(t)), cur = TL.scenes[i], next = TL.scenes[i + 1], prev = TL.scenes[i - 1];
+  const dis = (s) => (s && s.dissolve ? s.dissolve : 0);
+  if (next && dis(next) && t > next.start - dis(next) / 2) return [[cur, 1], [next, clamp01((t - (next.start - dis(next) / 2)) / dis(next))]];
+  if (prev && dis(cur) && t < cur.start + dis(cur) / 2) return [[prev, 1], [cur, clamp01((t - (cur.start - dis(cur) / 2)) / dis(cur))]];
+  return [[cur, 1]];
+}
+// ---------- the studio: record against the picture (only where the page is served from this Mac: the mic needs it) ----------
+const STUDIO = ["localhost", "127.0.0.1"].includes(location.hostname);
+let recording = null;
+async function record() {
+  if (recording) return stopRecording();
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } }); }
+  catch (e) { status("the microphone was refused: allow it for localhost and try again", "warn"); return; }
+  if (ctx.state === "suspended") await ctx.resume();
+  const pre = +$("preroll").value, from = Math.max(0, now() - pre);
+  const rec = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "" });
+  const chunks = []; rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  recording = { rec, stream, chunks, at: null };
+  voiceGain.gain.value = $("guide").checked ? .6 : 0;       // the old read, only if you want it as a guide
+  playing = true; startAt(from); $("gate").hidden = true; $("play").textContent = "Pause";
+  rec.onstart = () => { recording.at = now() - (ctx.outputLatency || 0) - (ctx.baseLatency || 0); };
+  rec.start();
+  $("rec").textContent = "■ Stop"; $("rec").classList.add("on"); status(`recording from ${fmt(from)}: read when the subtitle turns white`, "warn");
+}
+async function stopRecording() {
+  const { rec, stream, chunks } = recording, end = now();
+  const stopped = new Promise((r) => (rec.onstop = r)); rec.stop(); await stopped;
+  stream.getTracks().forEach((tr) => tr.stop());
+  playing = false; stopAll(); t0 = end; $("play").textContent = "Play";
+  voiceGain.gain.value = 1; $("rec").textContent = "● Record"; $("rec").classList.remove("on");
+  const at = recording.at ?? end, lines = TL.lines.filter((l) => l.end > at - .5 && l.start < end + .5).map((l) => l.line);
+  recording = null;
+  if (!lines.length) { status("no line falls in what you recorded; set the playhead before a line", "warn"); return; }
+  status(`transcribing and placing the take (lines ${lines.join(", ")})…`);
+  try {
+    const r = await fetch(`/take?at=${at.toFixed(3)}&lines=${lines.join(",")}`, { method: "POST", body: new Blob(chunks, { type: "audio/webm" }) });
+    const out = await r.json();
+    if (!r.ok) throw new Error(out.error || r.status);
+    if (!out.takes.length) { status(`no line recognised; heard: “${(out.heard || "").slice(0, 80)}”`, "warn"); return; }
+    status(`took ${out.takes.map((k) => `line ${k.line}${k.differs ? " (wording differs)" : ""}`).join(", ")}; reloading…`, "saved");
+    try { sessionStorage.setItem("playhead", String(Math.max(0, at))); } catch (e) {}
+    setTimeout(() => location.reload(), 700);
+  } catch (e) { status(`the take failed: ${String(e.message).slice(-160)}`, "warn"); }
+}
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+function show(scene, t) {
+  const shown = visible(t);
+  $("pending").hidden = shown.some(([s]) => s.file) || !!scene.file;
+  const used = new Set();
+  shown.forEach(([s, alpha], k) => {
+    if (!s.file) return;
+    let f = frames.find((x) => x.dataset.file === s.file && !used.has(x));
+    if (!f) { f = frames.find((x) => !used.has(x) && !shown.some(([o]) => o.file === x.dataset.file)) || frames.find((x) => !used.has(x)); load(f, s.file); }
+    used.add(f);
+    f.style.opacity = alpha; f.style.zIndex = 1 + k;
+    if (loaded.get(f) === s.file) f.contentWindow.postMessage({ t: localExt(s, t) }, "*");
+  });
+  frames.forEach((f) => { if (!used.has(f)) f.style.opacity = 0; });
+  // the next scene loads in the free frame a few seconds ahead
+  const next = TL.scenes[TL.scenes.indexOf(scene) + 1];
+  if (next && next.file && scene.end - t < 5 && shown.length === 1) { const other = frames.find((x) => !used.has(x)); if (other && other.dataset.file !== next.file) load(other, next.file); }
+}
+
+// ---------- the clock ----------
+let lastScene = null;
+// the clock: each part runs on its own, so one failure can't stop the subtitles, the narration or the loop itself,
+// and any failure is reported in the status line
+let lastErr = "";
+function guard(name, fn) {
+  try { return fn(); }
+  catch (e) { const msg = `${name}: ${e && e.message ? e.message : e}`; if (msg !== lastErr) { lastErr = msg; console.error(e); status(`page error in ${msg}`, "warn"); } }
+}
+function tick() {
+  requestAnimationFrame(tick);
+  guard("narration", scheduleVoice);
+  let t = now();
+  if (playing && t >= TL.track) { playing = false; stopAll(); t0 = TL.track - .05; $("play").textContent = "Play"; t = t0; }
+  const line = lineAt(t);
+  guard("subtitles", () => {
+    const cue = recording ? TL.lines.find((l) => t >= l.start - 1.2 && t <= l.end + .2) : line;
+    $("sub").textContent = $("subs").checked && cue ? cue.text : "";
+    $("sub").classList.toggle("cue", !!recording && !!cue && t < cue.start);
+    $("tc").innerHTML = `${fmt(t)} <span>/ ${fmt(TL.track)}</span>`;
+  });
+  const scene = sceneAt(t);
+  guard("scenes", () => show(scene, t));
+  guard("timeline", () => {
+    $("head").style.left = X(t);
+    if (scene !== lastScene) {
+      TL.scenes.forEach((s) => s.el.classList.toggle("cur", s === scene));
+      $("now").innerHTML = `scene <b>${scene.n}</b> · ${scene.n <= 7 ? "act one" : scene.n <= 14 ? "act two" : "act three"}${scene.file ? "" : " · not built"}`;
+      lastScene = scene;
+    }
+    TL.lines.forEach((l) => l.el.classList.toggle("cur", l === line));
+    if (playing && zoom > 1) { const x = (t / TL.track) * strip.clientWidth; if (x < scroller.scrollLeft + 40 || x > scroller.scrollLeft + scroller.clientWidth - 40) scroller.scrollLeft = x - scroller.clientWidth / 3; }
+  });
+}
+window.addEventListener("error", (e) => status(`page error: ${e.message}`, "warn"));
+window.addEventListener("unhandledrejection", (e) => status(`page error: ${e.reason && e.reason.message ? e.reason.message : e.reason}`, "warn"));
+
+// ---------- notes ----------
+function notes() {
+  $("notes").innerHTML = "";
+  const list = TL.scenes.filter((s) => s.file).map((s) => ({ s, rate: s.length / (s.end - s.start) })).sort((a, b) => Math.abs(Math.log(b.rate)) - Math.abs(Math.log(a.rate)));
+  for (const { s, rate } of list.slice(0, 4)) { const li = document.createElement("li"); li.innerHTML = `Scene ${s.n} plays at <code>${rate.toFixed(2)}×</code> (built ${s.length} s, window ${(s.end - s.start).toFixed(1)} s)`; $("notes").append(li); }
+  const li = document.createElement("li"); li.innerHTML = "Line 15, “this scale of motion”, is a stand-in until the re-record"; $("notes").append(li);
+}
+
+$("studio").hidden = !STUDIO; $("studioHint").hidden = STUDIO;
+$("rec").onclick = record;
+try { const ph = sessionStorage.getItem("playhead"); if (ph) { t0 = +ph; sessionStorage.removeItem("playhead"); } } catch (e) {}
+guard("setup", () => { reflow(); buildStrip(); notes(); load(frames[0], TL.scenes[0].file); });
+loadAudio().catch((e) => { console.warn(e); status("the music didn’t load; reload the page", "warn"); });
+requestAnimationFrame(tick);
+</script>

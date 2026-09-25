@@ -44,18 +44,19 @@ p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch
 
   <div class="transport">
     <button id="play">Pause</button>
-    <input type="range" id="scrub" min="0" max="11" step="0.01" value="0" aria-label="Scene time">
-    <span class="tc" id="tc">0.00 / 11.00</span>
+    <input type="range" id="scrub" min="0" max="14.5" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 14.50</span>
     <button id="cc" aria-pressed="true">Captions on</button>
   </div>
 
   <section class="box">
-    <h2>Beats (about 11 s; lands on the first act break, hard cut to black)</h2>
+    <h2>Beats (about 14.5 s; lands on the first act break, hard cut to black)</h2>
     <ol class="beats">
       <li><span class="t">0.0</span><div><span>Out of scene 6's dark: the last of the picture is static on a tube. It collapses to a bright line, then a dot, and the dot dies.</span></div></li>
       <li><span class="t">1.6</span><div><span>A beat of black, then the tube comes back on: a dot, a line, a flash, and a dark phosphor screen with scanlines and a blinking cursor.</span></div></li>
       <li><span class="t">2.3</span><div><q>It’s time to build the next generation of tools.</q><span>Typed in mint as it's said.</span></div></li>
-      <li><span class="t">5.4</span><div><q>Developers deserve to move with clarity and confidence, not just speed.</q><span>Typed below it. The cursor blinks, then a hard cut to black into scene 8.</span></div></li>
+      <li><span class="t">5.4</span><div><q>Developers need clarity and confidence, not just speed.</q><span>Typed below it.</span></div></li>
+      <li><span class="t">9.2</span><div><q>The race is on to deliver. Coherence lets us compete.</q><span>Typed last. The cursor blinks, then a hard cut to black into scene 8.</span></div></li>
     </ol>
   </section>
 </div>
@@ -69,11 +70,12 @@ p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script>
 const ICONS = /*ICONS*/{};
-const T = 11;
+const T = 14.5;
 const C = { bg: 0x000000, fog: 0x000000, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2" };
 const LINES = [
   [2.3, 5.2, "It’s time to build the next generation of tools."],
-  [5.4, 10.4, "Developers deserve to move with clarity and confidence, not just speed."],
+  [5.4, 8.9, "Developers need clarity and confidence, not just speed."],
+  [9.2, 13.8, "The race is on to deliver. Coherence lets us compete."],
 ];
 
 /*COMMON*/
@@ -90,7 +92,8 @@ const termTex = new THREE.CanvasTexture(term);
 // the script, pre-wrapped, with when each block starts typing and how fast
 const TYPED = [
   { at: 2.3, cps: 18.5, rows: ["It’s time to build the next generation of tools."] },
-  { at: 5.4, cps: 17.5, rows: ["Developers deserve to move with clarity and", "confidence, not just speed."] },
+  { at: 5.4, cps: 17.5, rows: ["Developers need clarity and confidence,", "not just speed."] },
+  { at: 9.2, cps: 16.5, rows: ["The race is on to deliver.", "Coherence lets us compete."] },
 ];
 const hash = (i) => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 // each character's moment: a steady rate, a little human jitter, a pause after punctuation
@@ -104,7 +107,7 @@ function drawTerm(t) {
   g.fillStyle = "#020504"; g.fillRect(0, 0, TW, TH);
   g.font = FONT; g.textBaseline = "alphabetic"; g.fillStyle = C.mint;
   const cw = g.measureText("M").width;
-  let y = 430, cursor = [MARGIN, 430], typing = false;
+  let y = 330, cursor = [MARGIN, 330], typing = false;
   TYPED.forEach((b, bi) => {
     if (bi && t >= b.at) y += LH * .6;
     b.rows.forEach((row, ri) => {
