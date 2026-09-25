@@ -11,10 +11,19 @@ import { journalVerbs } from "../journal/cli.ts";
 import { openEscalations } from "../journal/read.ts";
 import { loadJournal } from "../journal/store.ts";
 import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
-import { BOUNDARY_RULE, CONTEXT_BUDGET, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, feedContext, readStdinJson, runHook, sessionBlock, type WarmDoor } from "./hook.ts";
+import { BOUNDARY_RULE, CONTEXT_BUDGET, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, adopterExample, adopterInstruction, runHook, sessionBlock, type WarmDoor } from "./hook.ts";
 import { withWarmAdapter } from "../enforcement/run.ts";
 import { TRACES_DIR, recordReadTrace } from "../economy/trace.ts";
-import { installedRoot } from "./project.ts";
+import { COHERENCE_LEXICON, installedRoot } from "./project.ts";
+import { loadLexicon, rejectedNames } from "./lexicon.ts";
+
+/** Coherence's own rejected names, drawn from its lexicon so this file never spells one. */
+async function coherenceRejected(concept: string): Promise<string> {
+  return rejectedNames(await loadLexicon(COHERENCE_LEXICON)).find((n) => n.concept === concept && !n.name.includes(" "))!.name;
+}
+async function adopterRule(): Promise<string> {
+  return adopterInstruction(adopterExample(await loadLexicon(COHERENCE_LEXICON)));
+}
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
@@ -52,9 +61,17 @@ test("the block after the lexicon is under 120 words: session, decide template, 
   assert.ok(block.split(/\s+/).filter((w) => w !== "").length < 120, block);
   assert.match(block, /^Session: abc123\n/);
   assert.match(block, /Every journal write needs --session abc123 --agent Explore\./);
-  assert.match(block, /\n  node_modules\/\.bin\/coherence decide "<chose>" --over "<rejected>" --because "<why>" --session abc123 --agent Explore\n/);
-  assert.match(block, /Read the project journal from the project root:\n  node_modules\/\.bin\/coherence journal\n/);
-  assert.ok(block.endsWith(`${INSTRUCTION}\n`));
+  const cli = await cliName(root);
+  assert.match(cli, /^node \S*src\/cli\.ts$/, "an adopter is told the checkout the hook ran from, never a path into its node_modules");
+  assert.ok(block.includes(`\n  ${cli} decide "<chose>" --over "<rejected>" --because "<why>" --session abc123 --agent Explore\n`), block);
+  assert.ok(block.includes(`Read the project journal from the project root:\n  ${cli} journal\n`), block);
+  const rule = await adopterRule();
+  assert.ok(block.endsWith(`${rule}\n`), "an adopter is given the rule its check enforces");
+  assert.ok(rule.includes(`say invariant, not ${await coherenceRejected("invariant")}`), "the example swap comes from the lexicon");
+  assert.match(rule, /project's rejected names are defects/);
+  assert.match(rule, /adoption baseline/);
+  const own = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  assert.ok((await sessionBlock(own, { session_id: "abc123" })).endsWith(`${INSTRUCTION}\n`), "Coherence's own repository keeps the strict rule");
   assert.match(INSTRUCTION, /rejected name .* defect/);
   assert.match(INSTRUCTION, /declared .* concept/);
   assert.match(INSTRUCTION, /alias of an existing concept/);
@@ -78,8 +95,9 @@ test("SessionStart and SubagentStart inject both lexicons and the instruction as
     assert.match(context, /\nWidgetry vocabulary \(1 concept/);
     assert.match(context, /- widget: A thing with a knob\. \(also: gadget\)/);
     assert.match(context, /- rejected names: doohickey/);
-    assert.match(context, /Read the project journal from the project root:\n  node_modules\/\.bin\/coherence journal\n/);
-    assert.ok(context.endsWith(`${INSTRUCTION}\n`));
+    assert.ok(context.includes(`Read the project journal from the project root:\n  ${await cliName(root)} journal\n`));
+    assert.ok(context.endsWith(`${await adopterRule()}\n`));
+    assert.match(context, /^Coherence vocabulary \(\d+ concepts; use these names when you mean Coherence's concepts\):/m, "an adopter's header does not call Coherence's rejected names defects");
     assert.ok(context.length <= CONTEXT_BUDGET);
   }
 });
@@ -117,7 +135,7 @@ test("Stop and SubagentStop with a clean working tree are silent", async () => {
 
 test("with defects in changed files: Stop reports and exits 0; SubagentStop refuses with exit 2 and the reason on stderr", async () => {
   await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
-  await writeFile(join(root, "new.md"), "The Sprocket Wheel turns. It turns the Sprocket Wheel again.\n");
+  await writeFile(join(root, "new.md"), "The Sprocket Wheel turns.\nIt turns the Sprocket Wheel again.\nAsk the Sprocket Wheel.\n");
   assert.deepEqual((await changedFiles(root)).files.sort(), ["clean.md", "new.md"]);
 
   const stop = await runHook("Stop", { cwd: root }, root);
@@ -125,7 +143,7 @@ test("with defects in changed files: Stop reports and exits 0; SubagentStop refu
   assert.equal(stop.stderr, "");
   const message = (JSON.parse(stop.stdout) as { systemMessage: string }).systemMessage;
   assert.match(message, /REJECTED NAME  clean\.md:1  "doohickey"  rejected for widgetry: retired surface/);
-  assert.match(message, /UNKNOWN NOUN   "sprocket wheel" \(2\)  new\.md:1, new\.md:1/);
+  assert.match(message, /UNKNOWN NOUN   "sprocket wheel" \(3\)  new\.md:1, new\.md:2, new\.md:3/);
   assert.match(message, /1 rejected name, 1 unknown noun \(2 files\)/);
 
   const subagent = await runHook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
@@ -142,13 +160,31 @@ test("with defects in changed files: Stop reports and exits 0; SubagentStop refu
 test("an unknown noun in a changed file is advisory: Stop reports it and SubagentStop never refuses on it", async () => {
   // Its own starting tree: a totality oracle must hold when its test runs alone.
   await writeFile(join(root, "clean.md"), "The widget is fine.\n");
-  await writeFile(join(root, "new.md"), "The Sprocket Wheel turns. It turns the Sprocket Wheel again.\n");
+  await writeFile(join(root, "new.md"), "The Sprocket Wheel turns.\nIt turns the Sprocket Wheel again.\nAsk the Sprocket Wheel.\n");
   assert.deepEqual((await changedFiles(root)).files, ["new.md"], "only the file with the unknown noun is changed");
   const subagent = await runHook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
   assert.equal(subagent.exit, 0, `an unknown noun is a nomination, not a proof: ${subagent.stderr}`);
   const message = (JSON.parse(subagent.stdout) as { systemMessage: string }).systemMessage;
-  assert.match(message, /UNKNOWN NOUN   "sprocket wheel" \(2\)/, "it is still reported");
+  assert.match(message, /UNKNOWN NOUN   "sprocket wheel" \(3\)/, "it is still reported");
   await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
+});
+
+test("in an adopter, Coherence's rejected names in the project's own code and prose never refuse a subagent stop", async () => {
+  // Its own starting tree: only the files that use Coherence's rejected names in the project's sense are changed.
+  await writeFile(join(root, "clean.md"), "The widget is fine.\n");
+  const place = await coherenceRejected("trust level");
+  const surface = await coherenceRejected("scope");
+  await writeFile(join(root, "places.ts"), `export const ${place} = 'loading dock';\nexport const ${surface} = ${place};\n`);
+  await writeFile(join(root, "floor.md"), `The ${place} by the ${surface} holds the widget.\n`);
+  try {
+    const subagent = await runHook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
+    assert.equal(subagent.exit, 0, `the project's own words never refuse: ${subagent.stderr}`);
+    assert.doesNotMatch(subagent.stdout + subagent.stderr, /REJECTED NAME/, "and nothing reports them as rejected names");
+  } finally {
+    await rm(join(root, "places.ts"), { force: true });
+    await rm(join(root, "floor.md"), { force: true });
+    await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
+  }
 });
 
 test("an unable record from the session turns the debt it names advisory: SubagentStop reports it and exits 0, and another session is still refused", async () => {
@@ -261,7 +297,7 @@ test("the start injection stays under the budget with escalations present: the v
     assert.ok(context.length <= CONTEXT_BUDGET, `${context.length} characters against a budget of ${CONTEXT_BUDGET}`);
     for (let n = 0; n < 8; n += 1) assert.ok(context.includes(`▲ ${ids[n]}  scope  ${what(n)} — only the owner can retire a vertebra, and this is the ${n}th`), `escalation ${n} is shown whole`);
     assert.doesNotMatch(context, /^- invariant: /m, "the vocabulary stepped down: no full concept line");
-    assert.match(context, /^Coherence vocabulary \(\d+ concepts; names only here, rejected names are defects; full entries: coherence lexicon\):\n/m, "Coherence's layer at names only");
+    assert.match(context, /^Coherence vocabulary \(\d+ concepts; names only here, use these names when you mean Coherence's concepts; full entries: coherence lexicon\):\n/m, "Coherence's layer at names only");
     assert.match(context, /\nSession: s-budget\n/, "the session block still rides along");
 
     // More escalations, until even the names do not fit: the vocabulary gives way to one line that points at the lexicon command.
@@ -273,8 +309,8 @@ test("the start injection stays under the budget with escalations present: the v
       pointed = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "s-budget" }, dir));
     }
     assert.doesNotMatch(pointed, /^Coherence vocabulary/m, "the names no longer fit");
-    assert.match(pointed, /\n  node_modules\/\.bin\/coherence journal\n/, "the journal command survives the reduced vocabulary");
-    assert.match(pointed, /^Vocabulary omitted to stay under the host budget; full entries: node_modules\/\.bin\/coherence lexicon$/m, "one line points at the lexicon command instead");
+    assert.ok(pointed.includes(`\n  ${await cliName(dir)} journal\n`), "the journal command survives the reduced vocabulary");
+    assert.ok(pointed.includes(`\nVocabulary omitted to stay under the host budget; full entries: ${await cliName(dir)} lexicon\n`), "one line points at the lexicon command instead");
     assert.ok(pointed.length <= CONTEXT_BUDGET, `${pointed.length} characters against a budget of ${CONTEXT_BUDGET}`);
     ids.forEach((id, n) => assert.ok(pointed.includes(`▲ ${id}  scope  ${what(n)} — only the owner`), `escalation ${n} is still shown whole`));
 

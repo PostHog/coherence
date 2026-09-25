@@ -18,8 +18,22 @@
  * and names each drift: missing, stale, or an extra entry of ours. Install
  * and uninstall keep the file's indentation and final newline and write
  * nothing when nothing changed, so a round trip gives back the adopter's file.
+ *
+ * An adopter's hook finds Coherence rather than depending on it: Coherence is
+ * a checkout run from outside the project, never a package in the project's
+ * node_modules, so a pnpm lockfile and its tree are never touched (an `npm
+ * link` there installed a second dependency tree and broke a pnpm build).
+ * The command walks up to the project root and looks, in order, at
+ * $COHERENCE_HOME, a `coherence` folder beside the project, one beside the
+ * main checkout when the project is a git worktree, and last the project's
+ * node_modules/.bin/coherence. The committed command names no one's absolute
+ * path, so it is the same on every teammate's machine and the check agrees
+ * across them. When nothing is found, or node is not on the PATH, the hook
+ * prints one line as a systemMessage (both hosts show it to the user), exits
+ * 0, and does nothing else.
  */
 
+import { spawnSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
@@ -45,12 +59,13 @@ const START_EVENTS: ReadonlySet<string> = new Set(["SessionStart", "SubagentStar
 
 /**
  * A command is Coherence's when the program it runs is this tool's binary
- * (`coherence`, bare or at the end of a path such as node_modules/.bin) or
- * this tool's own cli path (`src/cli.ts`, as Coherence's own checkout wires
- * it), followed by `hook <Event>`. A stranger's cli.ts, or a program whose
- * name merely contains "coherence", is never ours and is never touched.
+ * (`coherence`, bare, at the end of a path such as node_modules/.bin, or the
+ * `$coherence` the located command runs) or this tool's own cli path
+ * (`src/cli.ts`, as Coherence's own checkout wires it), followed by `hook
+ * <Event>`. A stranger's cli.ts, or a program whose name merely contains
+ * "coherence", is never ours and is never touched.
  */
-const MINE = new RegExp(`(?:^|[\\s"'/])(?:coherence|src/cli\\.ts)"?\\s+hook\\s+(?:${HOOK_EVENTS.join("|")})\\s*$`);
+const MINE = new RegExp(`(?:^|[\\s"'/$])(?:coherence|src/cli\\.ts)"?\\s+hook\\s+(?:${HOOK_EVENTS.join("|")})\\s*$`);
 
 function isMine(command: unknown): command is string {
   return typeof command === "string" && MINE.test(command);
@@ -76,6 +91,52 @@ export interface InstallOptions {
   host: Host;
   /** The command prefix that reaches this CLI, e.g. "npx coherence" or "node src/cli.ts". */
   command: string;
+}
+
+/** The variable that names a checkout of Coherence outside the default places. */
+export const HOME_VAR = "COHERENCE_HOME";
+
+/** The folder name the hooks look for beside the project. */
+export const SIBLING = "coherence";
+
+/** Walk up from the host's project dir (or cwd) to the folder that holds a host's settings. */
+const ROOT_WALK =
+  'root="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$root" != / ] && [ ! -f "$root/.claude/settings.json" ] && [ ! -f "$root/.codex/hooks.json" ]; do root=$(dirname "$root"); done';
+
+/**
+ * Shell that sets `$coherence` to the cli to run, or to nothing: $COHERENCE_HOME,
+ * the sibling folder, the sibling of a worktree's main checkout, then the
+ * project's own bin. Nothing here names a path on one machine.
+ */
+export const LOCATE = [
+  ROOT_WALK,
+  'main=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)',
+  "coherence=",
+  `for c in "\${${HOME_VAR}:+\$${HOME_VAR}/src/cli.ts}" "$root/../${SIBLING}/src/cli.ts" "\${main:+\${main%/*}/../${SIBLING}/src/cli.ts}" "$root/node_modules/.bin/coherence"; do if [ -n "$c" ] && [ -f "$c" ]; then coherence=$c; break; fi; done`,
+].join("; ");
+
+/** The one line a hook prints when it cannot reach Coherence. No apostrophes: it sits in single quotes. */
+export const NOT_INSTALLED = `Coherence is not installed for this project, so this hook did nothing. To install it, clone github.com/PostHog/coherence beside the project as ../${SIBLING} and run npm ci in the clone, or set ${HOME_VAR} to a checkout.`;
+
+/** The one line a hook prints when Coherence is there but node is not. */
+export const NO_NODE = "Coherence was found but node is not on the PATH this hook runs with, so this hook did nothing. Install Node 22.18 or newer.";
+
+function softExit(message: string): string {
+  return `printf '%s\\n' '${JSON.stringify({ systemMessage: message })}'; exit 0`;
+}
+
+/**
+ * The default prefix for an adopter: locate Coherence, fail softly when it is
+ * not there, and otherwise run it as before (`hook <Event>` follows), so a
+ * found Coherence answers, and refuses, exactly as a direct command would.
+ */
+export const LOCATED_PREFIX = `${LOCATE}; if [ -z "$coherence" ]; then ${softExit(NOT_INSTALLED)}; fi; if ! command -v node >/dev/null 2>&1; then ${softExit(NO_NODE)}; fi; exec node "$coherence"`;
+
+/** Where the located command would find Coherence from `root`, under `env`; undefined when it would find nothing. */
+export function locate(root: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const run = spawnSync("sh", ["-c", `${LOCATE}; printf '%s' "$coherence"`], { cwd: root, env: { ...env, CLAUDE_PROJECT_DIR: root }, encoding: "utf8" });
+  const found = run.status === 0 ? run.stdout : "";
+  return found === "" ? undefined : found;
 }
 
 export function hookCommand(prefix: string, event: HookEvent): string {

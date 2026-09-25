@@ -9,25 +9,26 @@ the code.
 Set up Coherence (github.com/PostHog/coherence) in this project, then tell me
 what it found.
 
-1. Clone git@github.com:PostHog/coherence.git beside this project, run
-   `npm ci` in the clone, then run `npm link ../coherence` from this project.
-   The command is node_modules/.bin/coherence.
+1. Clone git@github.com:PostHog/coherence.git beside this project as
+   ../coherence and run `npm ci` in the clone. Do not link or add it to this
+   project's packages. The command is `node ../coherence/src/cli.ts`.
 2. Write coherence.config.json at the root with "name" and "language"
    ("typescript" or "python"), plus "ignore", "typecheck" and "test" if the
    project has them.
-3. Run `node_modules/.bin/coherence hooks install --host claude`
+3. Run `node ../coherence/src/cli.ts hooks install --host claude`
    (use `--host codex` on Codex).
-4. Run `node_modules/.bin/coherence scaffold component . "<what this project
+4. Run `node ../coherence/src/cli.ts scaffold component . "<what this project
    does>"`, then scaffold one spec per major component folder.
-5. Run `node_modules/.bin/coherence spec --check` and
-   `node_modules/.bin/coherence scope`, and report what they show.
+5. Run `node ../coherence/src/cli.ts spec --check` and
+   `node ../coherence/src/cli.ts scope`, and report what they show.
 
 Then continue with "Full setup" in the Coherence README: the lexicon, trust
 levels, invariants and enforcement.
 ```
 
 It needs Node 22.18 or newer on Apple Silicon. Coherence is not on npm
-yet, so this installs a linked checkout.
+yet, so this runs a checkout beside the project and never touches the
+project's node_modules or lockfile.
 
 ## What it is
 
@@ -43,18 +44,21 @@ as a source of code.
 
 ## Full setup: paste this into your agent
 
-Coherence is not on npm yet, so this installs a linked checkout. It needs
-Node 22.18 or newer on Apple Silicon, and access to
+Coherence is not on npm yet, so this runs a checkout kept beside the project.
+It needs Node 22.18 or newer on Apple Silicon, and access to
 `github.com/PostHog/coherence`.
 
 ```text
 Set up Coherence in this project. Work through these steps in order, and
 report what each one found.
 
-1. Install. Clone git@github.com:PostHog/coherence.git into a folder beside
-   this project, run `npm ci` there, then run `npm link <that folder>` from this
-   project. The command is then node_modules/.bin/coherence (call it
-   `coherence` below). Check it with `coherence spec --check`.
+1. Install. Clone git@github.com:PostHog/coherence.git beside this project as
+   ../coherence and run `npm ci` in the clone. Do not `npm link` it or add it
+   to this project's dependencies: that installs a second dependency tree
+   over this project's lockfile (in a pnpm project it broke the build). The
+   command is `node ../coherence/src/cli.ts` (call it `coherence` below).
+   Check it with `coherence spec --check`. Teammates clone the same way; one
+   who keeps the checkout elsewhere sets COHERENCE_HOME to it.
 
 2. Config. Write coherence.config.json at the project root with: "name";
    "language" ("typescript" or "python"); "ignore" (folders that are not this
@@ -67,7 +71,10 @@ report what each one found.
 3. Hooks. Run `coherence hooks install --host claude` (or `--host codex`).
    From the next session on, every session starts with Coherence's vocabulary,
    the project's open requirements, and the exact journal command, including
-   the session id to pass with --session.
+   the session id to pass with --session. The installed hooks look for
+   Coherence at $COHERENCE_HOME, then ../coherence (also beside the main
+   checkout of a git worktree), then node_modules/.bin/coherence; where none
+   is found, each hook prints one line saying how to install it and exits 0.
 
 4. Lexicon. Run `coherence lexicon coverage` to see the recurring terms that
    lack a definition. Declare the ones that carry the project's domain
@@ -95,7 +102,11 @@ report what each one found.
    chokepoint is a finding, not a failure: report its bypass sites. Continue
    until `coherence spec --check` reports 0 problems.
 
-7. Record and show. Commit coherence.config.json, lexicon.json, the specs, the
+7. Baseline, record and show. Run `coherence lexicon --check`, declare what it
+   names that carries the project's meaning, then run `coherence lexicon
+   baseline --session <id> --agent <name>`: the findings the project already
+   held are recorded in the journal, and the check fails only on new ones.
+   Commit coherence.config.json, lexicon.json, the specs, the
    hook settings, and .coherence/journal, .coherence/runs and .coherence/work.
    Run `coherence scope` and report what the reading shows: health, broken
    chokepoints, entrances whose trust comes from outside with no control on
@@ -103,8 +114,9 @@ report what each one found.
 
 Record every non-obvious choice with `coherence decide "<chose>" --over
 "<rejected>" --because "<why>" --session <id> --agent <name>`. Never use a name
-the lexicon rejects: the hook lists them, and `coherence lexicon --check`
-finds them.
+the project's lexicon rejects, nor one Coherence rejects where you name
+Coherence's own concepts (records, spec grammar); the project's own words keep
+the project's sense. `coherence lexicon --check` finds them.
 ```
 
 The vocabulary is settled in `docs/lexicon.json`. Every concept there carries its

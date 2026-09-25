@@ -41,11 +41,12 @@
  * that tree is refused with exit 78 rather than read or written.
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
+import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
@@ -56,8 +57,8 @@ import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
-import { renderCompactWithin, type InjectionLevel } from "./lexicon.ts";
-import { installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
+import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, type Lexicon } from "./lexicon.ts";
+import { COHERENCE_LEXICON, installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
@@ -98,7 +99,7 @@ export const OUTSIDE_ROOT_EXIT = 78;
  */
 export const CONTEXT_BUDGET = 9_500;
 
-/** The rule; with the session block above it the whole tail stays under 120 words. */
+/** The rule in Coherence's own repository, where its rejected names are defects everywhere; with the session block above it the whole tail stays under 120 words. */
 export const INSTRUCTION = [
   "Use these names. A rejected name in prose, a spec, a journal record, or an",
   "identifier is a defect: replace it. A new noun the lexicon lacks must be",
@@ -106,6 +107,30 @@ export const INSTRUCTION = [
   "before this session ends. Coherence's names describe the tool; the",
   "project's names describe its domain, and inside the project its sense wins.",
 ].join(" ");
+
+/**
+ * The rule in an adopter, matching what the check enforces there: Coherence's
+ * rejected names cover only text that names Coherence's concepts, the
+ * project's own rejected names are defects everywhere, and the check fails
+ * only on findings newer than the adoption baseline. The example swap is drawn
+ * from the lexicon, so Coherence's own source never spells a rejected name.
+ */
+export function adopterInstruction(example: { concept: string; rejected: string }): string {
+  return [
+    "Use Coherence's names when you mean its concepts in specs, journal records",
+    `and the config: say ${example.concept}, not ${example.rejected}. Its rejected names cover only`,
+    "that use; this project's own words and senses stand everywhere else. The",
+    "project's rejected names are defects: replace them. Declare a new domain noun",
+    "in the lexicon, or map it as an alias, before this session ends. The check",
+    "fails only on findings newer than the adoption baseline.",
+  ].join(" ");
+}
+
+/** The example the adopter rule shows: the invariant concept and its first one-word rejected name. */
+export function adopterExample(coherence: Lexicon): { concept: string; rejected: string } {
+  const found = rejectedNames(coherence).find((n) => n.concept === "invariant" && !n.name.includes(" "));
+  return { concept: "invariant", rejected: found?.name ?? "another name" };
+}
 
 /** The agent name a journal write carries when the harness names none: the main thread. */
 const MAIN_AGENT = "main";
@@ -261,9 +286,44 @@ export function workStopText(root: string, input: HookInput): string {
     .join("\n");
 }
 
-/** How a session at this root invokes the tool: its own source tree, or the installed bin. */
-async function cliName(root: string): Promise<string> {
-  return (await isCoherenceItself(root)) ? "node src/cli.ts" : "node_modules/.bin/coherence";
+/**
+ * This checkout's cli: the one the hook is running from, wherever the adopter
+ * keeps it, by the path it was invoked through when that is this file (a
+ * sibling reached through a link reads as ../coherence, not as the link's
+ * target).
+ */
+const OWN_CLI = ((): string => {
+  const own = fileURLToPath(new URL("../cli.ts", import.meta.url));
+  const invoked = process.argv[1];
+  try {
+    if (invoked !== undefined && realpathSync(invoked) === realpathSync(own)) return resolve(invoked);
+  } catch {
+    // An invocation path that cannot be resolved is not used.
+  }
+  return own;
+})();
+
+/**
+ * How a session at this root invokes the tool: its own source tree, or the
+ * checkout this hook ran from, as a path from the root (`node
+ * ../coherence/src/cli.ts`) or, when that climbs further than a sibling of a
+ * worktree's main checkout, absolute. It is never a path into the project's
+ * node_modules, which a pnpm-safe install leaves alone.
+ */
+export async function cliName(root: string, cli: string = OWN_CLI): Promise<string> {
+  if (await isCoherenceItself(root)) return "node src/cli.ts";
+  // Both sides are compared as real paths, except the checkout's own folder, which keeps the name it was reached by.
+  const real = (path: string): string => {
+    try {
+      return realpathSync(path);
+    } catch {
+      return path;
+    }
+  };
+  const checkout = dirname(dirname(cli));
+  const rel = relative(real(root), join(real(dirname(checkout)), basename(checkout), relative(checkout, cli)));
+  const path = rel.split(sep).filter((part) => part === "..").length <= 4 ? rel : cli;
+  return `node ${/[\s"'$`\\]/.test(path) ? JSON.stringify(path) : path}`;
 }
 
 /** The session id as the exact --session value, write and read commands, and the rule. */
@@ -278,7 +338,7 @@ export async function sessionBlock(root: string, input: HookInput): Promise<stri
     `  ${cli} decide "<chose>" --over "<rejected>" --because "<why>" --session ${id} --agent ${agent}`,
     "Read the project journal from the project root:",
     `  ${cli} journal`,
-    INSTRUCTION,
+    (await isCoherenceItself(root)) ? INSTRUCTION : adopterInstruction(adopterExample(await loadLexicon(COHERENCE_LEXICON))),
   ].join("\n") + "\n";
 }
 
@@ -358,13 +418,14 @@ export function specStopText(root: string, changed: readonly string[] = [], wall
 export function lexiconStopText(report: CheckReport | undefined, walls: readonly Unable[] = []): { text: string; owed: number } {
   if (report === undefined || !hasFindings(report)) return { text: "", owed: 0 };
   const lines = formatReport(report).trimEnd().split("\n");
+  const failing = failingRejected(report);
   let owed = 0;
   const out: string[] = [];
   let next = 0;
   for (const line of lines) {
     out.push(line);
     if (!line.startsWith("REJECTED NAME")) continue;
-    const finding = report.rejected[next];
+    const finding = failing[next];
     next += 1;
     if (finding === undefined) continue;
     const wall = excusedBy(walls, [finding.file, finding.name]);
@@ -425,7 +486,7 @@ export async function editContext(root: string, input: HookInput, options: HookO
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
   if (failed.length === 0) return "";
-  const cli = (await isCoherenceItself(root)) ? "node src/cli.ts" : "node_modules/.bin/coherence";
+  const cli = await cliName(root);
   const lines = [`Structural defect revealed at this edit (${files.join(", ")}); recorded in ${outcome.file ?? "the run"}:`];
   for (const d of failed) {
     const e = d.entry;
@@ -463,7 +524,7 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   const signal=attentionText(reading, commands);
   const coverage=signal ? `\n${signal}\n` : "";
   const tail = coverage + `\n${await sessionBlock(root, input)}`;
-  const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root));
+  const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root));
   return { text: head + text + tail, detail, coverage: reading };
 }
 
