@@ -1127,7 +1127,9 @@
         "two_layers": "Coherence's own lexicon (the tool vocabulary) and each project's domain lexicon share one shape and one mechanism; scaffold for a new project begins by asking for the domain lexicon.",
         "growth": "Asymmetric, like invariants: agents propose and announce new concepts; only a human retires or renames one. Each definition change is a decision with a rejected alternative.",
         "injection": "Compact: name, one-line definition, rejected names. Full entries through agent query.",
-        "naming_check": "Identifiers are checked against rejected names and misused concept names by word, not by address."
+        "naming_check": "Identifiers are checked against rejected names and misused concept names by word, not by address.",
+        "baseline": "What was already here when work began, remembered so only what is new speaks. In an adopter, the findings its lexicon check held at adoption, recorded as a journal decision (lexicon baseline) the check then fails only beyond; every later baseline record is intersected with the earlier ones, so it only shrinks. For a session, the vocabulary uses observed at its start. Coherence's own repository keeps no lexicon check baseline: its text is enforced whole.",
+        "where_rejected_names_bind": "Coherence's rejected names bind only where Coherence's concepts are named: everywhere in Coherence's own repository; in an adopter, only in the text written to Coherence (records, spec grammar, coherence.config.json), and there as advisory. A project's own rejected names bind in all of its text, and a word the project declares in its own lexicon is its own inside it."
       },
       "rejected": [
         {

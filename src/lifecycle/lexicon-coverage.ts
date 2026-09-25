@@ -32,7 +32,6 @@ import { createHash, type Hash } from "node:crypto";
 import { dirname } from "node:path";
 import { loadJournal } from "../journal/store.ts";
 import {
-  normalizeTerm,
   readCorpus,
   type UnreadablePath,
 } from "./check.ts";
@@ -43,8 +42,12 @@ import {
   type Concept,
   type Lexicon,
 } from "./lexicon.ts";
-import { loadProjectLexicons, vocabularyFacts } from "./project.ts";
-import { ALWAYS_CAPITALIZED, FUNCTION_WORD_SET, STOPLIST } from "./stoplist.ts";
+import { isCoherenceItself, loadProjectLexicons, vocabularyFacts } from "./project.ts";
+import { BASELINE_CHOSE } from "./lexicon-baseline.ts";
+import { FUNCTION_WORD_SET, STOPLIST } from "./stoplist.ts";
+import { clean, proseNominations, type Nomination } from "./nomination.ts";
+
+export { proseNominations };
 import { isWellKnown, wellKnown, type WellKnown } from "./well-known.ts";
 
 export interface VocabularyUse {
@@ -123,13 +126,6 @@ function digestAll(parts: Iterable<unknown>): string {
   for (const part of parts) hash.update(JSON.stringify(part) ?? "null").update("\n");
   return hash.digest("hex");
 }
-const clean = (s: string): string =>
-  normalizeTerm(
-    s
-      .replace(/([a-z\d])([A-Z])/g, "$1 $2")
-      .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2"),
-  );
-const HEADING_WORD = /[A-Za-z][A-Za-z'-]*/g;
 
 /**
  * A structured sense review as a decision's text: the vocabulary verb,
@@ -237,7 +233,7 @@ function isLexiconDecision(line: string): boolean {
     return (
       record["kind"] === "decision" &&
       typeof record["chose"] === "string" &&
-      (REVIEW.test(record["chose"]) || APPLY.test(record["chose"]))
+      (REVIEW.test(record["chose"]) || APPLY.test(record["chose"]) || BASELINE_CHOSE.test(record["chose"]))
     );
   } catch {
     return false;
@@ -325,57 +321,6 @@ function wordRuns(text: string): Word[][] {
   return runs;
 }
 
-/** Whether the text before a match on a line puts the match at the start of a sentence. */
-function atSentenceStart(prefix: string): boolean {
-  const lead = prefix.replace(/^[\s>*\-+|#]*(?:\d+[.)]\s*)?/, "");
-  if (lead.trim() === "") return true;
-  const trimmed = lead.replace(/[\s"'*_)\]]+$/, "");
-  return /[.!?:|]$/.test(trimmed) || trimmed === "";
-}
-
-interface Nomination {
-  term: string;
-  /** The name as written, for a well-known name skipped only in its capitalized spelling. */
-  spelling: string;
-  /** Title Case away from a sentence start: a proper noun, so a common word stays a candidate. */
-  proper: boolean;
-}
-
-/** Names prose writes as names: Title Case away from a sentence start, heading words, a single backticked word. */
-export function proseNominations(text: string, heading: boolean): Nomination[] {
-  const out: Nomination[] = [];
-  let blanked = text;
-  for (const match of text.matchAll(/`([^`\n]+)`/g)) {
-    const inner = match[1]!.trim();
-    // One plain word only: a backticked identifier (flowOf, work_order) is a code reference, not a word.
-    if (/^[A-Za-z][a-z]+$/.test(inner)) out.push({ term: clean(inner), spelling: inner, proper: false });
-    blanked = blanked.slice(0, match.index) + " ".repeat(match[0].length) + blanked.slice(match.index + match[0].length);
-  }
-  blanked = blanked.replace(/\[([^\]]*)\]\([^)]*\)/g, (m, label: string) => label.padEnd(m.length));
-  if (heading) {
-    for (const m of blanked.replace(/^#+\s*/, "").matchAll(HEADING_WORD)) out.push({ term: clean(m[0]), spelling: m[0], proper: false });
-    return out;
-  }
-  for (const match of blanked.matchAll(/(?<![A-Za-z0-9_'./-])[A-Z][a-z]+(?:[ -][A-Z][a-z]+){0,2}(?![A-Za-z0-9_/-]|\.[A-Za-z0-9])/g)) {
-    // A capitalized common word opening the phrase ("Every Durable Object") is the sentence's, not the name's.
-    let phrase = match[0];
-    let start = match.index;
-    for (;;) {
-      const lead = /^([A-Za-z]+)[\s-]+/.exec(phrase);
-      if (lead === null || !STOPLIST.has(lead[1]!.toLowerCase())) break;
-      phrase = phrase.slice(lead[0].length);
-      start += lead[0].length;
-    }
-    if (atSentenceStart(blanked.slice(0, start))) continue;
-    // A capitalized word after an acronym or a model number ("M4 Pro", "SF Pro") is the tail of that product's name.
-    if (/(?:^|\s)(?:[A-Z]{2,}|\S*\d\S*)\s+$/.test(blanked.slice(0, start))) continue;
-    // Months, weekdays and language names are capitalized in any sentence; that is English, not a proper noun of the project's.
-    if (ALWAYS_CAPITALIZED.has(clean(phrase))) continue;
-    out.push({ term: clean(phrase), spelling: phrase, proper: true });
-  }
-  return out;
-}
-
 /** The fields of a journal or work record that are written prose; ids, sessions, commits and flags are not words. */
 const RECORD_METADATA = new Set(["id", "at", "session", "agent", "commit", "dirty", "binding", "kind", "work", "files", "file", "evidence", "cursor", "target", "owner", "state"]);
 
@@ -448,6 +393,11 @@ export async function lexiconCoverage(root: string): Promise<Coverage> {
     ? new Set([...acceptedNames(project)].map(clean))
     : new Set<string>();
   for (const name of projectNames) rejected.delete(name);
+  // Only a name that binds here marks a sense at risk beside it: Coherence's rejected names bind in an adopter's prose never, the project's own always (check.ts).
+  const own = await isCoherenceItself(root);
+  const binding = new Set(
+    own ? rejected.keys() : (project ? rejectedNames(project) : []).map((r) => clean(r.name)).filter((n) => rejected.has(n)),
+  );
   // The lexicon's "not:" entries name things it already knows are something else (Pyright, Python): never candidates.
   const confusables = new Set<string>();
   for (const g of [coherence, project])
@@ -537,7 +487,7 @@ export async function lexiconCoverage(root: string): Promise<Coverage> {
           add(phrase, use);
           spans.push(phrase);
         }
-      const refused = spans.filter((p) => rejected.has(p));
+      const refused = spans.filter((p) => binding.has(p));
       // Only prose a person can still edit puts a sense at risk: code shares words with the language (Promise), and a record is history.
       if (refused.length && f.kind === "prose") {
         // A rejected word inside a longer known name on the same line is that name, not the refusal.

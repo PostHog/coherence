@@ -13,13 +13,29 @@
  * recall: every finding is meant to be acted on with one of three answers,
  * declare it, map it, or fix it.
  *
- * Inside a project, the project's SENSE of a name wins: a Coherence rejected
- * name the project declares as its own concept or alias is not a finding
- * there, and a hit inside a longer accepted phrase (a project alias that
- * happens to contain a rejected word) is not a hit. Names, though, are held
- * against everything the project writes: both layers' rejected names are
- * matched in prose and in identifiers alike, because a rejected name in an
- * identifier is the drift the lexicon exists to catch.
+ * Whose names bind where. Coherence's rejected names bind only where
+ * Coherence's concepts are named. In Coherence's own repository that is
+ * everywhere, prose, code, data and records alike, as strictly as ever. In
+ * an adopter, the project's code and domain prose are the project's words
+ * and Coherence's names are never matched there: a word the tool refused for
+ * one of its own concepts is an ordinary word of someone else's domain. Only
+ * the text written to Coherence (the journal's and work's records, a spec's
+ * grammar, which is its section headings, property keys and checklist shapes
+ * with their state words, and coherence.config.json) is matched, and there a
+ * hit is advisory: reported as a count, never failing, since a record may
+ * name the domain's thing in the domain's sense. The project's own lexicon's
+ * rejected names bind in
+ * everything the project writes, prose and identifiers alike, because a
+ * rejected name in an identifier is the drift the lexicon exists to catch.
+ *
+ * A project CLAIMS a word by declaring it in its own lexicon (a concept,
+ * alias, or instance): a Coherence rejected name it declares is not a
+ * finding there in any text, and a hit inside a longer accepted phrase (a
+ * project alias that happens to contain a rejected word) is not a hit.
+ *
+ * The findings a project held when it adopted Coherence are its BASELINE
+ * (lexicon-baseline.ts): counted on one line, never failing, and never
+ * allowed to grow. Coherence's own repository keeps none.
  *
  * The corpus is every text file kind a project holds, the journal's records
  * included, and never the files written in another vocabulary on purpose:
@@ -38,8 +54,10 @@ import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "
 import { acceptedNames, rejectedNames, type Lexicon, type RejectedName } from "./lexicon.ts";
 import { STOPLIST } from "./stoplist.ts";
 import { configIgnore, projectFiles, underIgnored } from "../adapters/project-files.ts";
-import { vocabularyFacts } from "./project.ts";
-import { wellKnown } from "./well-known.ts";
+import { CONFIG_FILE, isCoherenceItself, vocabularyFacts } from "./project.ts";
+import { isWellKnown, wellKnown, type WellKnown } from "./well-known.ts";
+import { proseNominations } from "./nomination.ts";
+import { applyBaseline, readBaseline, type BaselineSummary } from "./lexicon-baseline.ts";
 
 export interface CheckOptions {
   root: string;
@@ -47,6 +65,12 @@ export interface CheckOptions {
   paths?: string[];
   coherence: Lexicon;
   project?: Lexicon | undefined;
+  /**
+   * Whether the project is Coherence itself, where Coherence's rejected names
+   * bind in every text and no baseline is kept. Detected from the root, the
+   * way the tool already tells (the package's name), when not given.
+   */
+  coherenceItself?: boolean;
 }
 
 export interface Location {
@@ -68,6 +92,10 @@ export interface RejectedFinding extends Location {
    * next command.
    */
   repair: "edit" | "record";
+  /** A Coherence name in an adopter's Coherence-facing text: counted, never failing. */
+  advisory?: true;
+  /** Held by the project's baseline: counted, never failing. */
+  baselined?: true;
 }
 
 export interface UnknownFinding {
@@ -75,6 +103,8 @@ export interface UnknownFinding {
   count: number;
   locations: Location[];
   options: { declare: string; map: string; fix: string };
+  /** Held by the project's baseline: counted, never failing. */
+  baselined?: true;
 }
 
 /** A path the walk could not read, and why. Reported, never fatal: the check says what it did not see. */
@@ -89,6 +119,8 @@ export interface CheckReport {
   unknown: UnknownFinding[];
   /** Paths the walk could not read; the corpus is that much smaller and the report says so. */
   unreadable: UnreadablePath[];
+  /** What the project's baseline held in this check; absent when no baseline was taken. */
+  baseline?: BaselineSummary;
 }
 
 const PROSE_EXTENSIONS = new Set([".md", ".markdown", ".mdx", ".rst", ".txt"]);
@@ -586,20 +618,33 @@ function rejectedInCode(file: CorpusFile, names: NameTable, guard: Guard): Rejec
   return out;
 }
 
+/**
+ * The words of a spec line written in Coherence's grammar rather than the
+ * project's: a section heading ("## invariants"), a property key ("because:",
+ * "crossing:"), and a checklist's shape with the state word after it
+ * ("checklist: input-validation dismissed"). The component's title, a
+ * requirement's name, and every sentence are the project's own words.
+ */
+export function specGrammar(line: string): string {
+  const heading = /^#{2,6}\s+(.*)$/.exec(line);
+  if (heading !== null) return heading[1]!;
+  const key = /^\s+([A-Za-z][A-Za-z -]*):/.exec(line);
+  if (key === null) return "";
+  const checklist = /^\s+checklist:\s+(\S+)\s+([A-Za-z]+)/.exec(line);
+  return checklist === null ? key[1]! : `${key[1]} ${checklist[1]} ${checklist[2]}`;
+}
+
+/** Coherence's names in an adopter's spec grammar: advisory, and read only where the spec speaks Coherence's language. */
+function rejectedInSpecGrammar(file: CorpusFile, names: NameTable, guard: Guard): RejectedFinding[] {
+  return file.lines.flatMap((line, i) => rejectedInLine(file.rel, specGrammar(line), i + 1, names, guard, true));
+}
+
 /* ----------------------------------------------------------- unknown */
 
 interface Candidate {
   term: string;
   /** Every place prose used the term as a name. */
   locations: Location[];
-}
-
-/** Whether the text before a match on a line puts the match at the start of a sentence. */
-function atSentenceStart(prefix: string): boolean {
-  const lead = prefix.replace(/^[\s>*\-+|#]*(?:\d+[.)]\s*)?/, "");
-  if (lead.trim() === "") return true;
-  const trimmed = lead.replace(/[\s"'*_)\]]+$/, "");
-  return /[.!?:|]$/.test(trimmed) || trimmed === "";
 }
 
 function nominate(term: string, accepted: Set<string>, rejected: Set<string>): string | undefined {
@@ -616,51 +661,29 @@ function nominate(term: string, accepted: Set<string>, rejected: Set<string>): s
 }
 
 /**
- * Candidates from one prose line. A backticked term counts when it is
- * written as a name rather than a field or a file: a snake_case token, so
- * `archived_at` and `_charter` nominate while `title` and `dev-seed` do not.
- * A Title Case phrase (hyphens allowed, so a header name is one phrase)
- * counts away from a sentence start.
+ * Candidates from one prose line: the proper nouns coverage reads there
+ * (nomination.ts), Title Case away from a sentence start, less the tail of an
+ * acronym or a model number, words English always capitalizes, and a
+ * well-known name in the spelling it is well known in. A backticked word is
+ * a code reference or a field, not a name the check asks to define.
  */
-function candidatesOnLine(line: string, accepted: Set<string>, rejected: Set<string>): string[] {
+function candidatesOnLine(line: string, accepted: Set<string>, rejected: Set<string>, famous: WellKnown): string[] {
   const out: string[] = [];
-  let blanked = line;
-  for (const match of line.matchAll(/`([^`\n]+)`/g)) {
-    const code = match[1]!;
-    if (/^_?[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/.test(code)) {
-      const term = nominate(code, accepted, rejected);
-      if (term !== undefined) out.push(term);
-    }
-    blanked = blanked.slice(0, match.index) + " ".repeat(match[0].length) + blanked.slice(match.index + match[0].length);
-  }
-  blanked = blanked.replace(/\[([^\]]*)\]\([^)]*\)/g, (m, label: string) => label.padEnd(m.length));
-  for (const match of blanked.matchAll(/(?<![A-Za-z0-9_'-])[A-Z][a-z]+(?:[\s-]+[A-Z][a-z]+)*(?![A-Za-z0-9_-])/g)) {
-    // A capitalized common word opening the phrase ("Every Durable Object") is the sentence's, not the name's.
-    let phrase = match[0];
-    let start = match.index;
-    for (;;) {
-      const lead = /^([A-Za-z]+)[\s-]+/.exec(phrase);
-      if (lead === null || !STOPLIST.has(lead[1]!.toLowerCase())) break;
-      phrase = phrase.slice(lead[0].length);
-      start += lead[0].length;
-    }
-    if (atSentenceStart(blanked.slice(0, start))) continue;
-    const term = nominate(phrase, accepted, rejected);
+  for (const n of proseNominations(line, false)) {
+    if (!n.proper || isWellKnown(famous, n.term, n.spelling)) continue;
+    const term = nominate(n.term, accepted, rejected);
     if (term !== undefined) out.push(term);
   }
   return out;
 }
 
-/** The names of components: folders (other than the root) holding a *.spec.md. */
-function componentNames(files: CorpusFile[], root: string): string[] {
-  const names = new Set<string>();
-  for (const file of files) {
-    if (!file.path.endsWith(".spec.md")) continue;
-    const folder = dirname(file.path);
-    if (resolve(folder) === resolve(root)) continue;
-    names.add(basename(folder));
-  }
-  return [...names];
+/** The component a file belongs to: the deepest folder holding a spec above it, as coverage assigns one. */
+function componentsOf(files: CorpusFile[]): (rel: string) => string {
+  const folders = files
+    .filter((f) => f.rel.endsWith(".spec.md"))
+    .map((f) => dirname(f.rel))
+    .sort((a, b) => b.length - a.length);
+  return (rel) => folders.find((c) => c === "." || rel.startsWith(c + "/")) ?? "(no declared component)";
 }
 
 function acceptedTerms(options: CheckOptions): Set<string> {
@@ -681,11 +704,13 @@ function acceptedTerms(options: CheckOptions): Set<string> {
 /**
  * A term is counted where prose uses it as a name, not wherever the word
  * occurs: "the Structure view" twice is a name, "evidence" sixty times in
- * ordinary sentences is English. A component name counts wherever it
- * appears, since the folder is already using it as a name.
+ * ordinary sentences is English. It stands by coverage's recurrence: written
+ * as a name on three prose lines, or on two across two components. A
+ * component folder's name is not a candidate: its spec defines it.
  */
-function unknownNouns(files: CorpusFile[], options: CheckOptions, accepted: Set<string>, rejected: Set<string>): UnknownFinding[] {
+function unknownNouns(files: CorpusFile[], accepted: Set<string>, rejected: Set<string>, famous: WellKnown): UnknownFinding[] {
   const prose = files.filter((f) => f.kind === "prose");
+  const componentOf = componentsOf(files);
   const candidates = new Map<string, Candidate>();
   const add = (term: string, location: Location): void => {
     const existing = candidates.get(term);
@@ -705,25 +730,15 @@ function unknownNouns(files: CorpusFile[], options: CheckOptions, accepted: Set<
         return;
       }
       if (fenced || /^\s*#/.test(line)) return;
-      for (const term of candidatesOnLine(line, accepted, rejected)) add(term, { file: file.rel, line: i + 1 });
+      for (const term of candidatesOnLine(line, accepted, rejected, famous)) add(term, { file: file.rel, line: i + 1 });
     });
-  }
-  for (const name of componentNames(files, options.root)) {
-    const term = nominate(name, accepted, rejected);
-    if (term === undefined || candidates.has(term)) continue;
-    const regex = phraseRegex([term])!;
-    const locations: Location[] = [];
-    for (const file of prose) {
-      file.lines.forEach((line, i) => {
-        for (const _ of line.matchAll(regex)) locations.push({ file: file.rel, line: i + 1 });
-      });
-    }
-    candidates.set(term, { term, locations });
   }
 
   const findings: UnknownFinding[] = [];
   for (const candidate of candidates.values()) {
-    if (candidate.locations.length < 2) continue;
+    const lines = new Set(candidate.locations.map((l) => `${l.file}:${l.line}`)).size;
+    const spread = new Set(candidate.locations.map((l) => componentOf(l.file))).size;
+    if (!(lines >= 3 || (lines >= 2 && spread >= 2))) continue;
     findings.push({
       term: candidate.term,
       count: candidate.locations.length,
@@ -751,44 +766,84 @@ export function rejectedNamesInForce(coherence: Lexicon, project: Lexicon | unde
 }
 
 export async function runCheck(options: CheckOptions): Promise<CheckReport> {
+  const root = resolve(options.root);
   const { files, unreadable } = await readCorpus(options);
+  const own = options.coherenceItself ?? (await isCoherenceItself(root));
   const inForce = rejectedNamesInForce(options.coherence, options.project);
-  // One table for every kind: a name the project did not take for its own is refused in its identifiers as much as in its prose.
-  const names = nameTable([...inForce.coherence, ...inForce.project]);
+  // In Coherence's own repository its names bind everywhere; in an adopter only the project's names do, and Coherence's are read in the text written to Coherence, advisory there.
+  const projectNames = new Set(inForce.project.map((n) => normalizeTerm(n.name)));
+  const names = nameTable(own ? [...inForce.coherence, ...inForce.project] : inForce.project);
+  const tool = own ? undefined : nameTable(inForce.coherence.filter((n) => !projectNames.has(normalizeTerm(n.name))));
   const accepted = acceptedTerms(options);
   const guard = guardTable(accepted);
   const rejected: RejectedFinding[] = [];
+  const advisory = (found: RejectedFinding[]): RejectedFinding[] => found.map((f) => ({ ...f, advisory: true as const }));
   for (const file of files) {
     if (file.kind === "prose") rejected.push(...rejectedInProse(file, names, guard));
     else if (file.kind === "code") rejected.push(...rejectedInCode(file, names, guard));
     else if (file.kind === "data") rejected.push(...rejectedInData(file, names, guard));
     else rejected.push(...rejectedInRecord(file, names, guard));
+    if (tool === undefined) continue;
+    if (file.kind === "record") rejected.push(...advisory(rejectedInRecord(file, tool, guard)));
+    else if (file.rel === CONFIG_FILE) rejected.push(...advisory(rejectedInData(file, tool, guard)));
+    else if (file.kind === "prose" && file.rel.endsWith(".spec.md")) rejected.push(...advisory(rejectedInSpecGrammar(file, tool, guard)));
   }
   // A well-known name (Python, Pyright, the project's own name) needs no definition, so it is never an unknown noun.
-  const famous = wellKnown(await vocabularyFacts(options.root), [options.coherence.project, options.project?.project].filter((n): n is string => n !== undefined));
-  const unknown = unknownNouns(files, options, new Set([...accepted, ...famous.any, ...famous.cased.keys()]), new Set(names.byPhrase.keys()));
-  return { files: files.length, rejected, unknown, unreadable };
+  const famous = wellKnown(await vocabularyFacts(root), [options.coherence.project, options.project?.project].filter((n): n is string => n !== undefined));
+  const everyRejected = new Set([...names.byPhrase.keys(), ...(tool?.byPhrase.keys() ?? [])]);
+  const unknown = unknownNouns(files, new Set([...accepted, ...famous.any]), everyRejected, famous);
+  const report: CheckReport = { files: files.length, rejected, unknown, unreadable };
+  const baseline = own ? undefined : readBaseline(root);
+  if (baseline !== undefined) {
+    const byFile = new Map(files.map((f) => [f.rel, f.lines]));
+    const whole = options.paths === undefined || options.paths.length === 0;
+    report.baseline = applyBaseline(report, baseline, (file, line) => byFile.get(file)?.[line - 1] ?? "", whole);
+  }
+  return report;
+}
+
+/** The rejected-name findings that fail the check: editable, binding here, and not in the baseline. */
+export function failingRejected(report: CheckReport): RejectedFinding[] {
+  return report.rejected.filter((f) => f.repair === "edit" && f.advisory !== true && f.baselined !== true);
+}
+
+/** The rejected-name findings in the append-only store that bind here: printed, never failing, since no edit can repair a record. */
+function recordedRejected(report: CheckReport): RejectedFinding[] {
+  return report.rejected.filter((f) => f.repair === "record" && f.advisory !== true);
 }
 
 export function formatReport(report: CheckReport): string {
   const lines: string[] = [];
-  for (const f of report.rejected.filter((f) => f.repair === "edit")) {
+  for (const f of failingRejected(report)) {
     lines.push(`REJECTED NAME  ${f.file}:${f.line}  "${f.text}"  rejected for ${f.concept}${f.because ? `: ${f.because}` : ""}`);
   }
-  for (const f of report.rejected.filter((f) => f.repair === "record")) {
+  for (const f of recordedRejected(report)) {
     lines.push(`RECORDED NAME  ${f.file}:${f.line}  "${f.text}"  rejected for ${f.concept}; the store is append-only, so the repair is a later record, never an edit`);
   }
-  for (const f of report.unknown) {
+  const unknown = report.unknown.filter((f) => f.baselined !== true);
+  for (const f of unknown) {
     const where = f.locations.map((l) => `${l.file}:${l.line}`).join(", ");
     lines.push(`UNKNOWN NOUN   "${f.term}" (${f.count})  ${where}`);
     lines.push(`               declare: ${f.options.declare} | map: ${f.options.map} | fix: ${f.options.fix}`);
   }
   for (const u of report.unreadable) lines.push(`UNREADABLE     ${u.file}  ${u.reason}`);
   const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const advisory = report.rejected.filter((f) => f.advisory === true);
+  if (advisory.length > 0) {
+    const byName = new Map<string, number>();
+    for (const f of advisory) byName.set(f.name.toLowerCase(), (byName.get(f.name.toLowerCase()) ?? 0) + 1);
+    const top = [...byName].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5).map(([n, c]) => `${n} ${c}`).join(", ");
+    lines.push(`ADVISORY       ${plural(advisory.length, "Coherence name")} in text written to Coherence (records, spec grammar, ${CONFIG_FILE}): ${top}; reported, never failing, since inside the project its sense wins (--json lists each)`);
+  }
+  const b = report.baseline;
+  if (b !== undefined) {
+    const gone = b.gone ? `; ${b.gone} no longer in the text, dropped at the next lexicon baseline` : "";
+    lines.push(`BASELINED      ${plural(b.rejected, "rejected name")}, ${plural(b.unknown, "unknown noun")} held since adoption (${b.id}); not failing${gone}`);
+  }
   const missed = report.unreadable.length === 0 ? "" : `, ${plural(report.unreadable.length, "unreadable path")}`;
-  const inRecords = report.rejected.filter((f) => f.repair === "record").length;
+  const inRecords = recordedRejected(report).length;
   const recorded = inRecords === 0 ? "" : `, ${inRecords} in records`;
-  lines.push(`${plural(report.rejected.filter((f) => f.repair === "edit").length, "rejected name")}, ${plural(report.unknown.length, "unknown noun")} (${plural(report.files, "file")})${recorded}${missed}`);
+  lines.push(`${plural(failingRejected(report).length, "rejected name")}, ${plural(unknown.length, "unknown noun")} (${plural(report.files, "file")})${recorded}${missed}`);
   return lines.join("\n") + "\n";
 }
 
@@ -796,8 +851,8 @@ export function formatReport(report: CheckReport): string {
  * Whether the check found anything the project can still settle. A path it
  * could not read counts: a corpus it did not see is a verdict it cannot
  * honestly give. A name in the append-only store does not, because no edit
- * can repair a record; it is printed, counted, and left to the reader.
+ * can repair a record; nor does an advisory name or a baselined finding.
  */
 export function hasFindings(report: CheckReport): boolean {
-  return report.rejected.some((f) => f.repair === "edit") || report.unknown.length > 0 || report.unreadable.length > 0;
+  return failingRejected(report).length > 0 || report.unknown.some((f) => f.baselined !== true) || report.unreadable.length > 0;
 }

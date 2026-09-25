@@ -46,7 +46,7 @@ import { fileURLToPath } from "node:url";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
+import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
@@ -394,13 +394,14 @@ export function specStopText(root: string, changed: readonly string[] = [], wall
 export function lexiconStopText(report: CheckReport | undefined, walls: readonly Unable[] = []): { text: string; owed: number } {
   if (report === undefined || !hasFindings(report)) return { text: "", owed: 0 };
   const lines = formatReport(report).trimEnd().split("\n");
+  const failing = failingRejected(report);
   let owed = 0;
   const out: string[] = [];
   let next = 0;
   for (const line of lines) {
     out.push(line);
     if (!line.startsWith("REJECTED NAME")) continue;
-    const finding = report.rejected[next];
+    const finding = failing[next];
     next += 1;
     if (finding === undefined) continue;
     const wall = excusedBy(walls, [finding.file, finding.name]);

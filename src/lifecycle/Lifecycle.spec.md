@@ -55,12 +55,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: removed the prose pass from rejectedInProse -> "rejected names are found as whole words in prose, with concept and because" went red in check.test.ts; restored, green (2026-09-17)
   kinds: none
-- both layers reach identifiers: Both lexicon layers' rejected names are matched in identifiers as well as in prose; only a name the project declares as its own concept or alias is silent there.
+- both layers reach identifiers: Wherever a lexicon layer's rejected names bind, they are matched in identifiers as well as in prose; only a name the project declares as its own concept or alias is silent there.
   over: every rejected name of both layers against every identifier token in the corpus, in a project with its own lexicon and in one without
-  via: in code, both layers' rejected names match identifier tokens, Coherence's too in an adopter, unless the project declares the name as its own; language globals and module specifiers never match
-  because: the cross-lexicon rule is about sense, not about where a word sits: a project that means something of its own by a word declares it and is left alone, and a project that has not declared it is drifting whether the word is in a sentence or in a symbol. Holding Coherence's names against prose only let an adopter's code carry them untouched, which is where naming drift actually lives
+  via: in code, both layers' rejected names match identifier tokens where both bind, unless the project declares the name as its own; language globals and module specifiers never match
+  because: where a name binds is decided once, by whose text it is (Coherence's rejected names bind only in Coherence's own text), never by where the word sits: a project that has not declared a word its lexicon refuses is drifting whether the word is in a sentence or in a symbol, and a symbol is where naming drift actually lives
   crossing: project-source -> reading
-  refuted: held Coherence's rejected names against an adopter's prose only, so the name in an adopter identifier went unreported -> "in code, both layers' rejected names match identifier tokens, Coherence's too in an adopter, unless the project declares the name as its own; language globals and module specifiers never match" went red in check.test.ts, the identifier hit missing from the expected list; restored, green (2026-09-18)
+  refuted: held rejected names against prose only, so the names in identifiers went unreported -> "in code, both layers' rejected names match identifier tokens where both bind, unless the project declares the name as its own; language globals and module specifiers never match" went red in check.test.ts, the identifier hits missing from the expected list; restored, green (2026-09-25)
   kinds: none
 - the corpus is every text kind: The check reads every text file kind the project holds, the journal's and work's own records included, and leaves out what is written in another vocabulary on purpose, what no rename can repair, and what is not text.
   over: every file under the project root, by kind: prose, code, data, dotfiles, records, lockfiles, binaries, the retired inventories, the reference docs and the reviews
@@ -91,6 +91,34 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: Coherence's names describe the tool and a project's names describe its domain; a domain that legitimately uses a word the tool refuses must not be made to rename its own things
   crossing: project-source -> reading
   refuted: dropped the project's own accepted phrases from the guard, so a Coherence rejection spoke over the project's sense -> the totality oracle went red, then green once restored (2026-09-18)
+  kinds: none
+- Coherence's rejected names bind only in Coherence's own text: In Coherence's own repository its rejected names bind in every text; in an adopter they are never matched in the project's code or domain prose, and a hit in the text written to Coherence (records, spec grammar, coherence.config.json) is advisory, counted and never failing.
+  over: every Coherence rejected name against an adopter's prose, code, spec grammar and sentences, records and config, and against the same text read as Coherence's own repository, detected by its package name
+  via: Coherence's rejected names bind only in Coherence's own text: in an adopter its code and domain prose are the project's words, and the text written to Coherence is advisory
+  because: Coherence's names describe the tool and a project's names describe its domain; two adoptions arrived with 289 and 918 failing hits of words the tool refused for its own concepts, used in the project's own sense, so a fresh adoption could not pass and the check taught agents to rename the domain. Coherence's concepts are named only where the project writes to Coherence, and even there a word can be the domain's, so there it is reported and never refused
+  crossing: project-source -> reading
+  refuted: matched Coherence's rejected names in every text of an adopter, as if it were Coherence's own repository -> the via went red in check.test.ts, the adopter's prose and identifier hits enforced; restored, green (2026-09-25)
+  kinds: none
+- a project's claim wins inside it: A Coherence rejected name the project declares in its own lexicon, as a concept, alias, or instance, is no finding anywhere in that project, advisory or enforced.
+  over: every Coherence rejected name the project's lexicon declares, against the adopter's records, where Coherence's names are still read
+  via: a project's claim wins inside it: a Coherence rejected name the project declares is no finding, advisory or enforced
+  because: a project claims a word through the lexicon workflow it already has, and the claim must reach every text the check still reads Coherence's names in; the claim is the existing declaration, not a parallel list, so a word is claimed exactly when the project has defined it
+  crossing: project-source -> reading
+  refuted: kept every Coherence rejected name in force, ignoring the names the project's lexicon declares -> the via went red in check.test.ts, the claimed word reported in the record; restored, green (2026-09-25)
+  kinds: none
+- the baseline only shrinks: A project's lexicon check fails only on findings outside its baseline, the findings recorded when it adopted Coherence and counted on one line; a later baseline record is intersected with the earlier ones so it can drop findings and never add one, a fixed finding stops matching at once, and Coherence's own repository keeps none.
+  over: every rejected-name finding and unknown noun of an adopter's whole-project check, across a first baseline, an edit, a fix, a second baseline, and a hand-written record with more in it, and the same record in Coherence's own repository
+  via: the baseline only shrinks: a fresh adoption passes once baselined, a new finding fails, a fixed one drops out, a later record never adds, and Coherence's own repository keeps none
+  because: an adoption inherits findings it did not write, and a check red on arrival is skipped from then on; but an excuse that can grow is a way to stop checking. The retired growth-failure mechanisms fell because growth was not the danger; here the danger is a new finding, so the known residual is excluded from the check's named set and can only get smaller
+  crossing: project-source -> reading
+  refuted: let the newest baseline record replace the earlier ones instead of being intersected with them -> the via went red in check.test.ts, a hand-written record widening the baseline; restored, green (2026-09-25)
+  kinds: none
+- the check's unknown nouns are coverage's names: An unknown noun is a proper noun coverage's nomination reads in prose, never the tail of an acronym, a word English always capitalizes, a well-known name in its well-known spelling, a backticked identifier, or a component folder's name, and it stands only by coverage's recurrence: three prose lines, or two across two components.
+  over: every prose line of the corpus, with component folder names, acronym tails, well-known names, backticked words and single-line repeats
+  via: unknown nouns: Title Case away from a sentence start, on three lines or two across two components, with three closed options; a component folder's name is its spec's
+  because: the check and coverage disagreed about what a name is, so two adoptions got 89 and 103 unknown nouns, the most frequent being component folders (core, scripts) counted wherever the word appeared and the tail of the project's own name; one nomination for both keeps the failing check a subset of the reading that explains it
+  crossing: project-source -> reading
+  refuted: dropped the acronym-tail rule from the shared nomination, so the capitalized tail of a product name was nominated -> the via went red in check.test.ts; restored, green (2026-09-25)
   kinds: none
 - regulate refuses only what it can prove: A subagent stop is refused for a rejected name in a changed file, a spec problem, or a structural defect, and never for an open requirement.
   protects: REFUSE_EXIT

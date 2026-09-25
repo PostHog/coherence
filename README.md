@@ -102,7 +102,11 @@ report what each one found.
    chokepoint is a finding, not a failure: report its bypass sites. Continue
    until `coherence spec --check` reports 0 problems.
 
-7. Record and show. Commit coherence.config.json, lexicon.json, the specs, the
+7. Baseline, record and show. Run `coherence lexicon --check`, declare what it
+   names that carries the project's meaning, then run `coherence lexicon
+   baseline --session <id> --agent <name>`: the findings the project already
+   held are recorded in the journal, and the check fails only on new ones.
+   Commit coherence.config.json, lexicon.json, the specs, the
    hook settings, and .coherence/journal, .coherence/runs and .coherence/work.
    Run `coherence scope` and report what the reading shows: health, broken
    chokepoints, entrances whose trust comes from outside with no control on
@@ -110,8 +114,9 @@ report what each one found.
 
 Record every non-obvious choice with `coherence decide "<chose>" --over
 "<rejected>" --because "<why>" --session <id> --agent <name>`. Never use a name
-the lexicon rejects: the hook lists them, and `coherence lexicon --check`
-finds them.
+the project's lexicon rejects, nor one Coherence rejects where you name
+Coherence's own concepts (records, spec grammar); the project's own words keep
+the project's sense. `coherence lexicon --check` finds them.
 ```
 
 The vocabulary is settled in `docs/lexicon.json`. Every concept there carries its

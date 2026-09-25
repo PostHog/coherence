@@ -119,7 +119,7 @@ test("Stop and SubagentStop with a clean working tree are silent", async () => {
 
 test("with defects in changed files: Stop reports and exits 0; SubagentStop refuses with exit 2 and the reason on stderr", async () => {
   await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
-  await writeFile(join(root, "new.md"), "The Sprocket Wheel turns. It turns the Sprocket Wheel again.\n");
+  await writeFile(join(root, "new.md"), "The Sprocket Wheel turns.\nIt turns the Sprocket Wheel again.\nAsk the Sprocket Wheel.\n");
   assert.deepEqual((await changedFiles(root)).files.sort(), ["clean.md", "new.md"]);
 
   const stop = await runHook("Stop", { cwd: root }, root);
@@ -127,7 +127,7 @@ test("with defects in changed files: Stop reports and exits 0; SubagentStop refu
   assert.equal(stop.stderr, "");
   const message = (JSON.parse(stop.stdout) as { systemMessage: string }).systemMessage;
   assert.match(message, /REJECTED NAME  clean\.md:1  "doohickey"  rejected for widgetry: retired surface/);
-  assert.match(message, /UNKNOWN NOUN   "sprocket wheel" \(2\)  new\.md:1, new\.md:1/);
+  assert.match(message, /UNKNOWN NOUN   "sprocket wheel" \(3\)  new\.md:1, new\.md:2, new\.md:3/);
   assert.match(message, /1 rejected name, 1 unknown noun \(2 files\)/);
 
   const subagent = await runHook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
@@ -144,12 +144,12 @@ test("with defects in changed files: Stop reports and exits 0; SubagentStop refu
 test("an unknown noun in a changed file is advisory: Stop reports it and SubagentStop never refuses on it", async () => {
   // Its own starting tree: a totality oracle must hold when its test runs alone.
   await writeFile(join(root, "clean.md"), "The widget is fine.\n");
-  await writeFile(join(root, "new.md"), "The Sprocket Wheel turns. It turns the Sprocket Wheel again.\n");
+  await writeFile(join(root, "new.md"), "The Sprocket Wheel turns.\nIt turns the Sprocket Wheel again.\nAsk the Sprocket Wheel.\n");
   assert.deepEqual((await changedFiles(root)).files, ["new.md"], "only the file with the unknown noun is changed");
   const subagent = await runHook("SubagentStop", { cwd: root, stop_hook_active: false }, root);
   assert.equal(subagent.exit, 0, `an unknown noun is a nomination, not a proof: ${subagent.stderr}`);
   const message = (JSON.parse(subagent.stdout) as { systemMessage: string }).systemMessage;
-  assert.match(message, /UNKNOWN NOUN   "sprocket wheel" \(2\)/, "it is still reported");
+  assert.match(message, /UNKNOWN NOUN   "sprocket wheel" \(3\)/, "it is still reported");
   await writeFile(join(root, "clean.md"), "The doohickey is back.\n");
 });
 

@@ -98,12 +98,33 @@ definition changes reopen it. Old decisions remain readable history.
 ## Incremental work
 
 ```sh
-node src/cli.ts lexicon baseline --session <session>
+node src/cli.ts lexicon baseline --session <session> --agent <name>
 node src/cli.ts lexicon changes --session <session>
 node src/cli.ts lexicon changes --session <session> --json
 ```
 
 A baseline suppresses repeated change notifications; it **does not confirm meaning**.
+In an adopter, the same command also records the lexicon check's baseline: the
+rejected names and unknown nouns the project already held, as a `lexicon baseline`
+decision in the journal (a rejected-name finding is kept as a digest of its file,
+name and line, so the record never spells what it excuses). The check then counts
+those findings on one `BASELINED` line and fails only on others. The baseline only
+shrinks: every baseline record is intersected with the ones before it, so running
+the command again drops what was fixed and never adds; retracting a baseline record
+is the one recorded way to take it afresh. Coherence's own repository keeps no
+baseline, and its text is enforced whole.
+
+## Whose rejected names bind where
+
+Coherence's rejected names bind only where Coherence's concepts are named. In this
+repository that is everywhere. In an adopter, the project's code and domain prose
+are its own words and Coherence's names are never matched there; the text written
+to Coherence (journal and work records, a spec's section headings, property keys
+and checklist shapes with their state words, and `coherence.config.json`) is
+matched, and a hit there is advisory: one `ADVISORY` line, never a failure. The
+project's own lexicon's rejected names bind in all of its text, as before. A project
+claims a word Coherence refused by declaring it in its own lexicon (a concept,
+alias, or instance); the claim silences that name everywhere in the project.
 Start hooks explain the current unresolved population and maintenance commands.
 After delivery, they establish the session's baseline. Later tool/prompt boundaries
 show bounded new or changed contexts, and advance only after the host receives the

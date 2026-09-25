@@ -9,7 +9,9 @@ import {
 import { dirname, relative } from "node:path";
 import { parseFlags, type Parsed } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
-import { loadProjectLexicons } from "./project.ts";
+import { isCoherenceItself, loadProjectLexicons } from "./project.ts";
+import { runCheck } from "./check.ts";
+import { recordBaseline } from "./lexicon-baseline.ts";
 import {
   attention,
   coverageText,
@@ -36,7 +38,9 @@ export const LEXICON_WORK_USAGE = `  lexicon coverage [--json]              recu
   lexicon apply <proposal-id> --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>] [--work <id>] [--cite <id>]
   lexicon recover                        finish an interrupted application without overwriting intervening edits
   lexicon draft [--out <file>]            unsettled candidates, collisions and review questions; never overwrites
-  lexicon baseline --session <id>         remember observed uses for this session; no meaning is marked covered
+  lexicon baseline --session <id> --agent <name> [--because <reason>] [--cite <id>]
+                                          remember what is here now: this session's observed uses (no meaning is marked covered) and, in an adopter,
+                                          the lexicon check's findings as a journal record the check then fails only beyond; that record only shrinks
   lexicon changes [--session <id>] [--json] new undefined terms and senses at risk relative to that session's baseline
   lexicon ready --terms <a,b,...> [--json] explicit vocabulary prerequisites for a named slice; not host-delivery proof
   lexicon similar <text> [--json]         optional offline suggestions; model absence leaves exact checks available
@@ -364,10 +368,27 @@ export async function lexiconWorkCommand(
       return 0;
     }
     if (verb === "baseline") {
-      saveBaseline(io.cwd, need(p, "session"), report);
+      const writer = who(p);
+      saveBaseline(io.cwd, writer.session, report);
       io.out(
-        `Baseline saved for ${need(p, "session")}; no sense ruling was created.`,
+        `Baseline saved for ${writer.session}; no sense ruling was created.`,
       );
+      if (await isCoherenceItself(io.cwd)) {
+        io.out("Coherence's own text is enforced whole: the lexicon check keeps no baseline here.");
+        return 0;
+      }
+      const { coherence, project } = await loadProjectLexicons(io.cwd);
+      const check = await runCheck({ root: io.cwd, coherence, project, coherenceItself: false });
+      const files = new Map<string, string[]>();
+      const lineOf = (file: string, line: number): string => {
+        let lines = files.get(file);
+        if (lines === undefined) {
+          lines = readFileSync(confined(io.cwd, file), "utf8").split(/\r?\n/);
+          files.set(file, lines);
+        }
+        return lines[line - 1] ?? "";
+      };
+      io.out(recordBaseline(io.cwd, check, lineOf, writer, get(p, "because")));
       return 0;
     }
     if (verb === "changes") {
