@@ -1,7 +1,37 @@
 # Coherence
 
 Coherence keeps a project's invariants explicit and enforced while agents write
-the code. It settles the project's vocabulary in a lexicon, declares each
+the code.
+
+## Quick setup: paste this into your agent
+
+```text
+Set up Coherence (github.com/PostHog/coherence) in this project, then tell me
+what it found.
+
+1. Clone git@github.com:PostHog/coherence.git beside this project, run
+   `npm ci` in the clone, then run `npm link ../coherence` from this project.
+   The command is node_modules/.bin/coherence.
+2. Write coherence.config.json at the root with "name" and "language"
+   ("typescript" or "python"), plus "ignore", "typecheck" and "test" if the
+   project has them.
+3. Run `node_modules/.bin/coherence hooks install --host claude`
+   (use `--host codex` on Codex).
+4. Run `node_modules/.bin/coherence scaffold component . "<what this project
+   does>"`, then scaffold one spec per major component folder.
+5. Run `node_modules/.bin/coherence spec --check` and
+   `node_modules/.bin/coherence scope`, and report what they show.
+
+Then continue with "Full setup" in the Coherence README: the lexicon, trust
+levels, invariants and enforcement.
+```
+
+It needs Node 22.18 or newer on Apple Silicon. Coherence is not on npm
+yet, so this installs a linked checkout.
+
+## What it is
+
+Coherence settles the project's vocabulary in a lexicon, declares each
 component's invariants in a spec, checks them through the language server,
 records every decision in a journal, and shows the whole system live in Scope.
 
@@ -11,10 +41,10 @@ commit 645d928 on the reference branch named in `docs/retired.md`; it was used
 as a check against the new work and a source of rejected alternatives, never
 as a source of code.
 
-## Set up Coherence in a project: paste this into your agent
+## Full setup: paste this into your agent
 
 Coherence is not on npm yet, so this installs a linked checkout. It needs
-Node 22.18 or newer on an Apple Silicon Mac, and access to
+Node 22.18 or newer on Apple Silicon, and access to
 `github.com/PostHog/coherence`.
 
 ```text
