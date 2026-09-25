@@ -59,16 +59,17 @@ export async function scopeCommand(argv: string[], io: Io): Promise<number> {
   const { values, switches } = parsed;
   const given = values.get("root");
   const root = given === undefined ? resolve(io.cwd) : resolve(io.cwd, given);
-  if (switches.has("snapshot") || values.has("out")) return snapshot(root, given !== undefined, values, switches, io);
+  if (switches.has("snapshot") || values.has("out")) return snapshot(root, values, switches, io);
   return openLive(root, !switches.has("no-open"), io);
 }
 
-async function snapshot(root: string, rootGiven: boolean, values: Map<string, string>, switches: Set<string>, io: Io): Promise<number> {
+async function snapshot(root: string, values: Map<string, string>, switches: Set<string>, io: Io): Promise<number> {
   const out = values.get("out") ?? DEFAULTS.outPath;
   const options: BuildOptions = {
     root,
-    lexiconPath: values.get("lexicon") ?? (rootGiven ? COHERENCE_LEXICON : resolve(io.cwd, DEFAULTS.lexiconPath)),
-    project: values.get("project") ?? (rootGiven ? projectNameOf(root) : DEFAULTS.project),
+    // Coherence's own lexicon always comes from this installation, never from the project's folder: an adopter has no docs/lexicon.json of Coherence's.
+    lexiconPath: values.get("lexicon") ?? COHERENCE_LEXICON,
+    project: values.get("project") ?? projectNameOf(root),
   };
   // Structure reads every component interface through the language adapter; --no-interfaces writes without the instrument.
   if (!switches.has("no-interfaces")) {
