@@ -34,7 +34,7 @@ p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch
 <div class="wrap">
   <header>
     <div class="eyebrow">Coherence promo · scene 4 · cut corners</div>
-    <h1>“of course bro. why would I deceive you?”</h1>
+    <h1>“of course. why would I deceive you?”</h1>
   </header>
 
   <div class="stage" id="stage">
@@ -52,7 +52,7 @@ p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch
   <section class="box">
     <h2>Beats (about 18 s; scene 3's white world, into scene 5's production line)</h2>
     <ol class="beats">
-      <li><span class="t">0.0</span><div><q>The systems at our disposal are trained to finish the job at any cost, so they cut subtle corners where we can’t see.</q><span>Left: a chat. You: “did you build it to the spec?” The agent types, then: “of course bro. why would I deceive you?” Right: black boxes start falling out of the sky and tumbling into a heap. Now and then one has a corner sliced off, its cut face flashing orange, then red, before the next boxes bury it.</span></div></li>
+      <li><span class="t">0.0</span><div><q>The systems at our disposal are trained to finish the job at any cost, so they cut subtle corners where we can’t see.</q><span>Left: a chat. You: “did you build it to the spec?” The agent types, then: “of course. why would I deceive you?” Right: black boxes start falling out of the sky and tumbling into a heap. Now and then one has a corner sliced off, its cut face flashing orange, then red, before the next boxes bury it.</span></div></li>
       <li><span class="t">7.0</span><div><q>Understanding it all requires reading code and reasoning about its consequences, but every day there’s just more.</q><span>At the halfway mark the reviewers pile in: qa-agent, “actually...”, then review-droid, CRITICAL, 5 findings. The fall gets faster. The heap spreads and climbs past the chat.</span></div></li>
       <li><span class="t">13.8</span><div><q>More complexity than we can possibly get our arms around.</q><span>The camera pulls up and back: the heap is a hill, the chat is a speck beside it, and the boxes keep coming.</span></div></li>
     </ol>
@@ -104,7 +104,8 @@ function wrap(ctx, text, maxW) {
 // ---------- renderer ----------
 const stage = document.getElementById("stage");
 const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("gl"), antialias: true });
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+// a final render asks for more (?maxdpr=4 draws a 1920×1080 layout at 8K); on screen, 2× is plenty
+renderer.setPixelRatio(Math.min(+new URLSearchParams(location.search).get("maxdpr") || 2, window.devicePixelRatio || 1));
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(C.bg);
 scene.fog = new THREE.FogExp2(C.fog, 0.042);
@@ -184,6 +185,8 @@ function applyClarity(c) {
 // ---------- driven: a review player can set the scene's time from outside, with postMessage({ t }) ----------
 // (t, playing and T are the scene's own; this runs later, once they exist)
 window.addEventListener("message", (e) => { const d = e.data || {}; if (typeof d.t === "number") { t = Math.min(T, Math.max(0, d.t)); playing = false; } });
+// a final render sets the time and draws at once, so the frame it captures is exactly this t (review/render.mjs)
+window.renderAt = (x) => { t = Math.min(T, Math.max(0, x)); playing = false; render(t); };
 
 
 // scene 3's white world: a white plane, black boxes, soft light, almost no glow
@@ -233,7 +236,7 @@ const CHAT_RIGHT = -.7, CHAT_LEFT = -6.7, CHAT_TOP = 6.1, CHAT_GAP = .12;
 // the thread, top to bottom, and when each message lands
 const THREAD = [
   { at: .5, lines: ["did you build it to the spec?"], name: "you", dark: true, avatar: "user", side: "right" },
-  { at: 2.35, lines: ["of course bro.", "why would I deceive you?"], name: "agent", avatar: "robot", side: "left" },
+  { at: 2.35, lines: ["of course.", "why would I deceive you?"], name: "agent", avatar: "robot", side: "left" },
   { at: T / 2, lines: ["actually..."], name: "qa-agent", avatar: "clipboard-check", side: "left" },
   { at: T / 2 + .8, lines: ["5 findings"], name: "review-droid", avatar: "git-merge", side: "left", tag: { text: "CRITICAL", color: C.red } },
 ];

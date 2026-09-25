@@ -55,7 +55,7 @@ p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch
       <li><span class="t">0.0</span><div><q>OpenRouter does twenty trillion tokens a day.</q><span>Left: OpenRouter's daily token totals for 2026, top 50 models and the rest stacked, drawing itself from 1 January and going vertical by August. 25× counts up beside it.</span></div></li>
       <li><span class="t">4.5</span><div><q>GitHub struggles to stay online.</q><span>Right: GitHub's uptime for April 2026, played day by day as a calendar. Days land green, orange, red.</span></div></li>
       <li><span class="t">7.1</span><div><q>Software staggers under this scale of motion.</q><span>The number drains as April's downtime adds up: through 88.8% on the 22nd, down to the month's 78.33%.</span></div></li>
-      <li><span class="t">9.4</span><div><q>Because we don't yet have the tools to make sense of this new world.</q><span>Fog rolls in across both panels and the camera drifts back until almost nothing is left but dark: straight into scene 7's black.</span></div></li>
+      <li><span class="t">9.4</span><div><q>Because we don't yet have the tools to make sense of this new world.</q><span>Fog rolls in across both panels and the camera drifts back; the picture turns out to be on a tube: scanlines, then static eats it, and it collapses to a line, a dot, and dies. Scene 7 powers the tube back on.</span></div></li>
     </ol>
     <p class="note" id="dataNote"></p>
   </section>
@@ -218,6 +218,44 @@ veil.renderOrder = 60; camera.add(veil);
 const dark = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthTest: false, depthWrite: false, fog: false }));
 dark.renderOrder = 61; camera.add(dark);
 
+// ---------- the tube: the picture turns out to be on a screen, and the screen gives out ----------
+// scene 7 picks up from its black: the same tube, powering back on
+const tube = new THREE.ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uCrt: { value: 0 }, uStatic: { value: 0 }, uSX: { value: 1 }, uSY: { value: 1 }, uGain: { value: 1 }, uLift: { value: 0 } },
+  vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uTime, uCrt, uStatic, uSX, uSY, uGain, uLift; varying vec2 vUv;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main() {
+      vec2 p = vUv - .5;
+      p *= 1. + .07 * uCrt * dot(p, p);                  // the glass bulges
+      vec2 q = p / vec2(uSX, uSY);                        // the power dying squeezes the picture
+      if (abs(q.x) > .5 || abs(q.y) > .5) { gl_FragColor = vec4(0., 0., 0., 1.); return; }
+      vec2 uv = q + .5;
+      float row = floor(uv.y * 270.), tear = step(.93, hash(vec2(floor(uTime * 12.), floor(uv.y * 18.)))) * uStatic;
+      uv.x += tear * (hash(vec2(row, floor(uTime * 24.))) - .5) * .03;   // the picture slips, a band at a time
+      float ca = .0014 * uCrt;
+      vec3 c = vec3(texture2D(tDiffuse, uv + vec2(ca, 0.)).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - vec2(ca, 0.)).b);
+      float n = hash(floor(uv * vec2(480., 270.)) + floor(uTime * 30.) * 7.13);
+      c = mix(c, vec3(.02 + .16 * n), uStatic);
+      c *= mix(1., .4 + .6 * pow(abs(sin(uv.y * 180. * 3.14159)), 1.4), uCrt);   // scanlines
+      c *= 1. + .05 * uCrt * sin(uv.y * 5. - uTime * 1.7);                       // a slow rolling band
+      c *= mix(1., smoothstep(.78, .28, length(p * vec2(1., 1.25))), uCrt);      // vignette
+      gl_FragColor = vec4(c * uGain + uLift * vec3(.8, 1., .92), 1.);   // the collapsing beam burns bright
+    }`,
+});
+composer.addPass(tube);
+const MIN = .004;
+function power(t) {
+  const u = tube.uniforms, a = smooth(15.55, 15.85, t), b = smooth(15.85, 16.05, t);
+  u.uTime.value = t;
+  u.uCrt.value = ease(smooth(11.6, 13.8, t));
+  u.uStatic.value = .9 * smooth(13.4, 15.2, t) * (.85 + .15 * Math.sin(t * 41));   // the static eats the picture, flickering
+  u.uSY.value = 1 - a * (1 - MIN); u.uSX.value = 1 - b * (1 - MIN);                // a line, a dot
+  const die = 1 - smooth(16.05, 16.25, t);
+  u.uGain.value = (1 + 3.5 * a + 5 * b) * die; u.uLift.value = (.35 * a + .45 * b) * die;   // and it dies
+}
+
 // ---------- camera ----------
 const KEYS = [
   [0, [-3.0, .45, 7.2], [-3.4, .35, 0]],
@@ -248,16 +286,17 @@ function render(t) {
   drawChart(t); drawUptime(t);
   uptime.material.opacity = smooth(4.3, 4.9, t);
   // incoherent: the panels dim and the fog takes over; then the dark
-  const fog = smooth(9.4, 14.5, t), end = smooth(14.2, 16.6, t);
-  chart.material.opacity = 1 - .75 * fog; uptime.material.opacity *= 1 - .75 * fog; uptime.visible = uptime.material.opacity > .01;
+  const fog = smooth(9.4, 14.5, t), end = smooth(12.5, 15.5, t);
+  chart.material.opacity = 1 - .5 * fog; uptime.material.opacity *= 1 - .5 * fog; uptime.visible = uptime.material.opacity > .01;
   const d = 2, hh = 2 * d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.25;
-  veil.position.set(Math.sin(t * .2) * .3, 0, -d); veil.scale.set(hh * camera.aspect * 1.4, hh * 1.4, 1); veil.material.opacity = .85 * fog;
+  veil.position.set(Math.sin(t * .2) * .3, 0, -d); veil.scale.set(hh * camera.aspect * 1.4, hh * 1.4, 1); veil.material.opacity = .6 * fog;
   fogTex.offset.set(t * .015, 0);
-  dark.position.set(0, 0, -1); dark.scale.set(3, 3, 1); dark.material.opacity = .92 * end;
+  dark.position.set(0, 0, -1); dark.scale.set(3, 3, 1); dark.material.opacity = .35 * end;
   sheets.forEach((s, i) => { s.position.x = s.userData.base.x + Math.sin(t * .15 + i) * 2 + t * s.userData.speed; s.material.opacity = s.userData.o * (.4 + 1.2 * fog); });
   const line = LINES.find(([a, b]) => t >= a && t < b);
   cap.hidden = !captions; cap.textContent = line ? line[2] : "";
   tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  power(t);
   composer.render();
 }
 

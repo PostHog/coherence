@@ -1,0 +1,203 @@
+{
+ "20": {
+  "takes": [
+   {
+    "source": "take-wcmu7jng.webm",
+    "folder": "20260924-220512-take-wcmu7jng",
+    "file": "20.wav",
+    "start": 2.38,
+    "end": 4.6,
+    "cut": [
+     2.2,
+     4.9
+    ],
+    "heard": "We start with clear definitions.",
+    "recorded": "20260924-220512",
+    "place": 107.574
+   },
+   {
+    "source": "take-7a7d_yq9.webm",
+    "folder": "20260924-220607-take-7a7d-yq9",
+    "file": "20.wav",
+    "start": 2.48,
+    "end": 4.72,
+    "cut": [
+     2.3,
+     5.07
+    ],
+    "heard": "We start with clear definitions.",
+    "recorded": "20260924-220607",
+    "place": 107.499
+   },
+   {
+    "source": "take-7ur831b6.webm",
+    "folder": "20260924-220702-take-7ur831b6",
+    "file": "20.wav",
+    "start": 1.9,
+    "end": 3.94,
+    "cut": [
+     1.72,
+     4.26
+    ],
+    "heard": "We start with clear definitions.",
+    "recorded": "20260924-220702",
+    "place": 107.303
+   }
+  ],
+  "use": 2
+ },
+ "21": {
+  "takes": [
+   {
+    "source": "take-wcmu7jng.webm",
+    "folder": "20260924-220512-take-wcmu7jng",
+    "file": "21.wav",
+    "start": 5.2,
+    "end": 14.44,
+    "cut": [
+     5.02,
+     14.76
+    ],
+    "heard": "Language models are built out of language. Clearly defining your terms changes their behavior. Agents start to do what you meant, not just what you said.",
+    "recorded": "20260924-220512",
+    "place": 110.394
+   },
+   {
+    "source": "take-7a7d_yq9.webm",
+    "folder": "20260924-220607-take-7a7d-yq9",
+    "file": "21.wav",
+    "start": 5.48,
+    "end": 14.96,
+    "cut": [
+     5.3,
+     15.31
+    ],
+    "heard": "Language models are built out of language. Clearly defining your terms changes their behavior. Agents start to do what you meant, not just what you said.",
+    "recorded": "20260924-220607",
+    "place": 110.499
+   }
+  ]
+ },
+ "22": {
+  "takes": [
+   {
+    "source": "take-7a7d_yq9.webm",
+    "folder": "20260924-220607-take-7a7d-yq9",
+    "file": "22.wav",
+    "start": 15.72,
+    "end": 20.62,
+    "cut": [
+     15.54,
+     20.97
+    ],
+    "heard": "This impacts the integrity of what gets built, making bugs easier for agents to detect.",
+    "recorded": "20260924-220607",
+    "place": 120.739
+   }
+  ]
+ },
+ "29": {
+  "takes": [
+   {
+    "source": "take-gnuaruw8.webm",
+    "folder": "20260924-221344-take-gnuaruw8",
+    "file": "29.wav",
+    "start": 2.22,
+    "end": 12.32,
+    "cut": [
+     2.04,
+     12.67
+    ],
+    "heard": "Coherence uses your language server to detect security bypasses. The moment an agent writes code that touches something sensitive without routing through a choke point, the project goes red.",
+    "recorded": "20260924-221344",
+    "place": 158.026
+   },
+   {
+    "source": "take-rslydvhg.webm",
+    "folder": "20260924-221435-take-rslydvhg",
+    "file": "29.wav",
+    "start": 2.5,
+    "end": 13.54,
+    "cut": [
+     2.32,
+     13.89
+    ],
+    "heard": "Coherence uses your language server to detect security bypasses. The moment an agent writes code that touches something sensitive without routing through a designated choke point, the project goes red.",
+    "recorded": "20260924-221435",
+    "place": 157.876
+   }
+  ]
+ },
+ "37": {
+  "takes": [
+   {
+    "source": "take-mlv718qj.webm",
+    "folder": "20260924-221619-take-mlv718qj",
+    "file": "37.wav",
+    "start": 1.68,
+    "end": 4.82,
+    "cut": [
+     1.5,
+     5.06
+    ],
+    "heard": "These are the kinds of tools we need to clear the fog.",
+    "recorded": "20260924-221619",
+    "place": 209.558
+   }
+  ]
+ },
+ "38": {
+  "takes": [
+   {
+    "source": "take-mlv718qj.webm",
+    "folder": "20260924-221619-take-mlv718qj",
+    "file": "38.wav",
+    "start": 5.3,
+    "end": 13.94,
+    "cut": [
+     5.12,
+     14.18
+    ],
+    "heard": "Spend less inference on code that doesn't work, less inference detecting bugs, less inference investigating the decisions that went into your changes.",
+    "recorded": "20260924-221619",
+    "place": 213.178
+   }
+  ]
+ },
+ "41": {
+  "takes": [
+   {
+    "source": "take-3_vc4kh9.webm",
+    "folder": "20260924-222519-take-3-vc4kh9",
+    "file": "41.wav",
+    "start": 1.82,
+    "end": 7.4,
+    "cut": [
+     1.64,
+     7.75
+    ],
+    "heard": "So, if you're ready to try a new way of working with agents, come join us building the software of 2030.",
+    "recorded": "20260924-222519",
+    "place": 222.058
+   }
+  ]
+ },
+ "19": {
+  "takes": [
+   {
+    "source": "take-jc00z2u0.webm",
+    "folder": "20260924-230300-take-jc00z2u0",
+    "file": "19.wav",
+    "start": 1.5,
+    "end": 5.26,
+    "cut": [
+     1.32,
+     5.61
+    ],
+    "heard": "The race is on to deliver. Coherence lets us compete.",
+    "recorded": "20260924-230300",
+    "place": 102.265
+   }
+  ]
+ }
+}

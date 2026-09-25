@@ -148,7 +148,8 @@ function wrap(ctx, text, maxW) {
 // ---------- renderer ----------
 const stage = document.getElementById("stage");
 const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("gl"), antialias: true });
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+// a final render asks for more (?maxdpr=4 draws a 1920×1080 layout at 8K); on screen, 2× is plenty
+renderer.setPixelRatio(Math.min(+new URLSearchParams(location.search).get("maxdpr") || 2, window.devicePixelRatio || 1));
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(C.bg);
 scene.fog = new THREE.FogExp2(C.fog, 0.042);
@@ -549,6 +550,8 @@ let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now()
 // ---------- driven: a review player can set the scene's time from outside, with postMessage({ t }) ----------
 // (t, playing and T are the scene's own; this runs later, once they exist)
 window.addEventListener("message", (e) => { const d = e.data || {}; if (typeof d.t === "number") { t = Math.min(T, Math.max(0, d.t)); playing = false; } });
+// a final render sets the time and draws at once, so the frame it captures is exactly this t (review/render.mjs)
+window.renderAt = (x) => { t = Math.min(T, Math.max(0, x)); playing = false; render(t); };
 const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;

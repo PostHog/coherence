@@ -46,6 +46,11 @@ class Studio(SimpleHTTPRequestHandler):
                     lines = json.loads(data)["lines"]
                     (PROMO / "review/overrides.json").write_text(json.dumps(lines, indent=1))
                     return self.reply(200, {"saved": len(lines)})
+                if u.path == "/settings":
+                    sp = PROMO / "review/settings.json"
+                    cur = json.loads(sp.read_text()) if sp.exists() else {}
+                    cur.update(json.loads(data)); sp.write_text(json.dumps(cur, indent=1) + "\n")
+                    return self.reply(200, cur)
                 if u.path == "/take":
                     at = float(q["at"][0])
                     with tempfile.NamedTemporaryFile(suffix=".webm", prefix="take-", delete=False) as f: f.write(data)

@@ -1,7 +1,9 @@
 # Voice processing: every narration clip passes through here on its way into the mix, so a read, a retake,
 # and a line recorded on another day all come out sounding like one session.
 #
-#   1. tone: a high-pass at 80 Hz takes out rumble and plosive thumps (no de-esser: nothing here changes the voice itself)
+#   1. tone: a high-pass at 80 Hz takes out rumble and plosive thumps (no de-esser: nothing here changes the voice itself);
+#      retakes recorded in the studio (audio/adr/) come in 3-5 dB more forward at 2-5 kHz than the reads, so they get a
+#      gentle presence cut to sit with them (STUDIO_EQ)
 #   2. evenness: no compressor — after a loud peak it dipped the next soft syllable, and the read is already even
 #   3. breaths: OFF (see BREATHS) — softening by word timings clipped syllables
 #   4. level: each clip is measured (EBU R128) and set to the same loudness, TARGET; a limiter keeps peaks under -1.5 dBFS
@@ -20,7 +22,8 @@ GAP_DB, EDGE_DB = -14.0, -18.0
 # syllables. Breaths need an energy-based detector, not word timings, before this comes back.
 BREATHS = False
 RAMP = .02              # seconds, the fade into and out of each softened gap
-VERSION = "voice-6"     # bump when the chain changes, so every clip is redone
+STUDIO_EQ = "equalizer=f=3400:t=q:w=0.8:g=-3.5"   # retakes only: matches their presence to the reads
+VERSION = "voice-7"     # bump when the chain changes, so every clip is redone
 
 def _read(path):
     raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"], capture_output=True, check=True).stdout
@@ -60,7 +63,7 @@ def process(clip, words):
     if out.exists(): return out
     stage = OUT / f"_stage-{key}.wav"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(clip), "-ac", "1", "-ar", str(SR), "-af",
-                    "highpass=f=80",
+                    "highpass=f=80" + ("," + STUDIO_EQ if "adr" in clip.parts else ""),
                     "-c:a", "pcm_s24le", str(stage)], check=True)
     x = _read(stage)
     if BREATHS: x *= _breath_gain(len(x), words)

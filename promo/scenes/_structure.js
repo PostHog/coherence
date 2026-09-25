@@ -21,9 +21,9 @@ const CARD = { w: 330, h: 118 };
 const STATIONS = {
   API: { x: 600, y: 360, name: "API (root)", role: "HTTP entry: routes and jobs", dir: "project root" },
   Jobs: { x: 600, y: 900, name: "Jobs", role: "Scheduled and queued work", dir: "src/jobs" },
-  Sessions: { x: 1160, y: 230, name: "Sessions", role: "One session store behind sessions.get()", dir: "src/sessions" },
+  Sessions: { x: 1160, y: 230, name: "Sessions", role: "Read through sessions.get()", dir: "src/sessions" },
   Admin: { x: 1160, y: 520, name: "Admin", role: "Dashboards and staff tools", dir: "src/admin" },
-  Billing: { x: 1160, y: 810, name: "Billing", role: "Ledger writes behind billing.guard()", dir: "src/billing" },
+  Billing: { x: 1160, y: 810, name: "Billing", role: "Ledger via billing.guard()", dir: "src/billing" },
   Auth: { x: 1720, y: 230, name: "Auth", role: "Credentials and trust levels", dir: "src/auth" },
   Storage: { x: 1720, y: 540, name: "Storage", role: "Objects and exports", dir: "src/storage" },
   Webhooks: { x: 1720, y: 850, name: "Webhooks", role: "Outbound and inbound hooks", dir: "src/webhooks" },
@@ -142,8 +142,13 @@ function drawMap(S, piece) {
     if (broken > 0) { g.globalAlpha = k * broken; g.fillStyle = RED; g.beginPath(); g.roundRect(st.x + CARD.w - 150, st.y - 40, 150, 40, 6); g.fill(); }
     g.restore();
     x.save(); x.translate(cx, cy); x.scale(s, s); x.translate(-cx, -cy); x.globalAlpha = k * dim;
-    x.fillStyle = INKc; x.font = `600 30px "Instrument Sans"`; x.fillText(st.name, st.x + 30, st.y + 38);
-    x.fillStyle = "#B5C0C9"; x.font = `400 21px "Instrument Sans"`; x.fillText(st.role, st.x + 30, st.y + 70);
+    x.fillStyle = INKc; let ns = 30; x.font = `600 ${ns}px "Instrument Sans"`;
+    while (x.measureText(st.name).width > CARD.w - (broken > 0 ? 190 : 44) && ns > 20) { ns -= .5; x.font = `600 ${ns}px "Instrument Sans"`; }
+    x.fillText(st.name, st.x + 30, st.y + 38);
+    // the role line shrinks to fit its card, so no card's text runs off its edge
+    x.fillStyle = "#B5C0C9"; let rs = 21; x.font = `400 ${rs}px "Instrument Sans"`;
+    while (x.measureText(st.role).width > CARD.w - 44 && rs > 14) { rs -= .5; x.font = `400 ${rs}px "Instrument Sans"`; }
+    x.fillText(st.role, st.x + 30, st.y + 70);
     x.fillStyle = MUTED; x.font = `400 20px "IBM Plex Mono", "JetBrains Mono"`; x.fillText(st.dir, st.x + 30, st.y + 100);
     if (broken > 0) { x.globalAlpha = k * broken; x.fillStyle = "#fff"; x.font = `700 24px "Instrument Sans"`; x.fillText("✕ 1 broken", st.x + CARD.w - 138, st.y - 12); }
     x.restore();
@@ -283,5 +288,5 @@ scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false;
 $("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
 document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); $("play").click(); } });
 
-Promise.all(["500 1em 'Instrument Sans'", "600 1em 'Instrument Sans'", "700 1em 'Instrument Sans'", "400 1em 'IBM Plex Mono'", "700 1em 'IBM Plex Mono'", "600 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
+Promise.all(["200 1em 'Inter'", "500 1em 'Inter'", "500 1em 'Instrument Sans'", "600 1em 'Instrument Sans'", "700 1em 'Instrument Sans'", "400 1em 'IBM Plex Mono'", "700 1em 'IBM Plex Mono'", "600 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
   .finally(() => { size(); last = performance.now(); requestAnimationFrame(frame); });

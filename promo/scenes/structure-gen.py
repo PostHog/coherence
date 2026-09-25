@@ -55,7 +55,7 @@ const SCENE = {n}, T = {T};
 """
 
 def beat(t, q, span):
-    return f'      <li><span class="t">{t}</span><div><q>{q}</q><span>{span}</span></div></li>'
+    return f'      <li><span class="t">{t}</span><div>{f'<q>{q}</q>' if q else ''}<span>{span}</span></div></li>'
 
 ALL = "Object.fromEntries(Object.keys(STATIONS).map((k) => [k, 1]))"
 
@@ -152,15 +152,14 @@ function timeline(t) {
 S15 = page(15, "Coherent", "The structure view pulls back into a field of views, the field goes coherent, and the mint becomes the title", 22.6, "\n".join([
     beat("0.0", "These are the kinds of tools we need to clear the fog.", "The structure view, verified, in clear air. The camera starts to pull straight up, and at 3:31 the view is the first to go coherent: its detail gives way to a flat mint abstraction of the same structure."),
     beat("4.0", "Spend less inference on code that doesn't work, less inference detecting bugs, less inference investigating the decisions that went into your changes.", "More structure views surround it, tile by tile, each more abstract the further out it sits: cards and lines, then bare blocks. Each view moves one way along grey, amber, red, starting at its own point and never stepping back; from about 5 s, green trickles outward from the centre, cell by cell."),
-    beat("12.8", "You get a more stable, coherent project, steadily driving toward the floor of irreducible complexity.", "A wave of mint rolls outward from the centre until every view is uniform mint; the tiles close ranks into one surface."),
-    beat("18.9", "The software of 2030 is waiting for us.", "Pull back far enough and it is solid mint (under the end of the line before). The wordmark, coherence, lowercase and black, its c slightly tilted. A scan line passes, a reticle locks onto the c and tilts it back into place, and everything fades to black just after the last word."),
+    beat("13.4", "So if you're ready to try a new way of working with agents, come join us building the software of 2030.", "A wave of mint rolls outward from the centre until every view is uniform mint; the tiles close ranks into one surface."),
+    beat("14.7", "", "Pull back far enough and it is solid mint (3:44), under the end of the line before. The features Coherence names pile up as chips, hold to be read, then pour into the wordmark: coherence, lowercase and black, its c slightly tilted. A scan line passes, a reticle locks onto the c and tilts it back into place, and everything fades to black with the music."),
 ])) + """const CLARITY = [.95, 1];
 const C = { bg: 0x07090C, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2" };
 const LINES = [
   [0.6, 3.4, "These are the kinds of tools we need to clear the fog."],
   [3.9, 12.4, "Spend less inference on code that doesn’t work, less inference detecting bugs, less inference investigating the decisions that went into your changes."],
-  [12.8, 18.5, "You get a more stable, coherent project, steadily driving toward the floor of irreducible complexity."],
-  [18.9, 22.0, "The software of 2030 is waiting for us."],
+  [13.4, 21.0, "So if you’re ready to try a new way of working with agents, come join us building the software of 2030."],
 ];
 """ + engine + r"""
 const KEYS = [[0, [0, MAP_Y + 13.4, 3.2], [0, MAP_Y, -2.3]], [T, [0, MAP_Y + 13.4, 3.2], [0, MAP_Y, -2.3]]];
@@ -234,7 +233,15 @@ const fields = [...groups.entries()].map(([key, list]) => {
   const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(16, 9), new THREE.MeshBasicMaterial({ map: tileTex(layouts[v], level), toneMapped: false }), list.length);
   m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m);
   list.forEach((_, k) => m.setColorAt(k, new THREE.Color(0x7E93A3)));
-  return { m, list };
+  // a tint can turn the structure mint but never light the dark ground between its pieces; as a view goes coherent,
+  // aFill floods that ground with its colour too, so green views read as solid green, the structure only a trace
+  const fill = new THREE.InstancedBufferAttribute(new Float32Array(list.length), 1); fill.setUsage(THREE.DynamicDrawUsage);
+  m.geometry.setAttribute("aFill", fill);
+  m.material.onBeforeCompile = (sh) => {
+    sh.vertexShader = "attribute float aFill;\nvarying float vFill;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n  vFill = aFill;");
+    sh.fragmentShader = "varying float vFill;\n" + sh.fragmentShader.replace("#include <dithering_fragment>", "#include <dithering_fragment>\n  gl_FragColor.rgb = mix(gl_FragColor.rgb, vColor * .92, vFill);");
+  };
+  return { m, list, fill };
 });
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
 const STEEL = new THREE.Color(0x7E93A3), REDc = new THREE.Color(C.red), AMBERc = new THREE.Color(C.orange), MINTc = new THREE.Color(C.mint);
@@ -247,7 +254,7 @@ const wave = (t) => (t - 12.4) * 11;               // the mint wave's radius, in
 const FIRST_GREEN = 1.95 / PACE;                     // 1.95 s into the scene, in the choreography's own time
 const firstFlat = new THREE.Mesh(new THREE.PlaneGeometry(16, 9), new THREE.MeshBasicMaterial({ color: C.mint, transparent: true, opacity: 0, depthWrite: false, toneMapped: false,
   map: canvasTex(480, 270, (g) => {
-    g.fillStyle = "#0B0F16"; g.fillRect(0, 0, 480, 270);
+    g.fillStyle = "#BDBDBD"; g.fillRect(0, 0, 480, 270);            // the ground flooded, as the green views' is
     const k = 480 / MW, box = (x, y, w, h) => { g.fillStyle = "#EEF3F6"; g.fillRect(x * k, y * k, w * k, h * k); };
     g.strokeStyle = "rgba(238,243,246,.55)"; g.lineWidth = 3;
     for (const r of ROUTES) { if (r.id === "R5") continue; g.beginPath(); r.pts.forEach(([x, y], i) => (i ? g.lineTo(x * k, y * k) : g.moveTo(x * k, y * k))); g.stroke(); }
@@ -264,33 +271,95 @@ surface.rotation.x = -Math.PI / 2; surface.position.set(0, MAP_Y + .05, -1); sur
 // ---------- the title: a 2D layer over the stage ----------
 const title = document.createElement("canvas"); title.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none";
 $("stage").insertBefore(title, $("mast"));
+// the features this film names, pinned in promo/features.md
+const FEATURES = [["Lexicon"], ["Spec"], ["Invariant"], ["Chokepoint check"], ["Totality oracle"], ["Journal"], ["Work order"], ["Peer feed"],
+  ["Orient"], ["Regulate"], ["Hook install"], ["Scope"], ["Structure view"], ["Change comparison"], ["Lexicon view"], ["Components view"],
+  ["Invariants view"], ["Journal view"], ["Language adapter"], ["TypeScript support"], ["Python support"]];
+const CHIPS_AT = 17.9, CHIPS_SPAN = 2.7, FLOOD_AT = 22.4;           // choreography time (3:44 in the cut); they arrive quicker as they go, then hold to be read
+// the maker's mark under the word, black on the mint (PostHog's logomark, from the owner's file)
+const HOG = ["M.87 19.13a.5.5 0 0 0-.87.34v5.94a2.6 2.6 0 0 0 2.59 2.58H7.8a.5.5 0 0 0 .37-.84zM.86 8.4c-.3-.32-.86-.1-.86.36v6.73q0 .2.13.34l8.81 9.68 1.8 2.06v-8.82zM4.59.82A2.67 2.67 0 0 0 0 2.68v1.93q0 .4.27.69l10.47 10.95v-9.1z",
+  "M11.36 28h7.08a.5.5 0 0 0 .36-.85l-8.05-8.4v8.8l.23.28q.16.17.38.17m-.61-11.76 8.84 9.25 2.1 2.33q.1.11.27.14V18.7L10.75 7.15zm0-13.7v1.41a2 2 0 0 0 .55 1.28L21.96 16.2V7.65L15.32.8a2.67 2.67 0 0 0-4.57 1.71z",
+  "M22.06 28h7.76a.5.5 0 0 0 .36-.86l-8.22-8.45v9.27l.09.02zM31 25.49l1.13 1.14c.32.31.85.09.85-.35v-7.3l-.49-.51L21.96 7.64v8.55zM22.52 5.73l9.62 9.89c.3.32.86.1.86-.35V7.46L26.56.82a2.67 2.67 0 0 0-4.59 1.84v1.7c0 .51.2 1 .57 1.37z",
+  "m50 23.34-.35-.05A4.5 4.5 0 0 1 47 21.97L35.56 10.1c-.3-.33-.86-.1-.86.35V27.5c0 .27.22.5.5.5h13.78c1.48 0 2.67-1.2 2.67-2.67v-.1a1.9 1.9 0 0 0-1.67-1.89zm-10.81.2a1.8 1.8 0 1 1 0-3.58 1.8 1.8 0 0 1 0 3.58"].map((d) => new Path2D(d));
+const HOG_W = 52, HOG_H = 28;                           // the mark's own extent, in its units
+function drawSubtitle(g, W, cx, y, a) {
+  // thin for the claim, medium for the maker
+  const fs = W * .0145, track = fs * .32, thin = "SALVATION FOR EVERY AGENT ", reg = "BY POSTHOG";
+  g.letterSpacing = `${track}px`;
+  g.font = `200 ${fs}px "Inter"`; const w1 = g.measureText(thin).width;
+  g.font = `500 ${fs}px "Inter"`; const w2 = g.measureText(reg).width - track;
+  const tw = w1 + w2, markH = fs * .78, markW = markH * HOG_W / HOG_H, gap = fs * .55;
+  const x0 = cx - (tw + gap + markW) / 2;
+  g.globalAlpha = a; g.fillStyle = "#07090C"; g.textBaseline = "alphabetic";
+  g.font = `200 ${fs}px "Inter"`; g.fillText(thin, x0, y);
+  g.font = `500 ${fs}px "Inter"`; g.fillText(reg, x0 + w1, y);
+  g.save(); g.translate(x0 + tw + gap, y - markH); g.scale(markH / HOG_H, markH / HOG_H); HOG.forEach((p) => g.fill(p)); g.restore();
+  g.letterSpacing = "0px"; g.globalAlpha = 1;
+}
+const chipAt = i => CHIPS_AT + CHIPS_SPAN * Math.pow(i / FEATURES.length, .8);
 function drawTitle(t) {
   const W = title.width = title.clientWidth * devicePixelRatio, Hh = title.height = title.clientHeight * devicePixelRatio, g = title.getContext("2d");
   const mint = smooth(17.9, 19.1, t), black = smooth(26.2, 27.4, t);
   g.clearRect(0, 0, W, Hh);
   if (mint > 0) { g.fillStyle = `rgba(84,232,176,${mint})`; g.fillRect(0, 0, W, Hh); }
-  const word = smooth(19.45, 20.85, t);                     // 3:45 in the cut
+  const size = W * .135, y = Hh * .5 + size * .32, wcx = W / 2, wcy = Hh * .5;
+  // the chips: they pile up in centred rows, then pour into the word
+  if (t > CHIPS_AT && t < FLOOD_AT + 1.6) {
+    const fs = W * .0165, padX = fs * .9, h = fs * 2.1, gap = fs * .6, maxW = W * .74;
+    g.font = `500 ${fs}px "Instrument Sans"`;
+    const rows = [[]]; let rw = 0;
+    for (const [i, [name]] of FEATURES.entries()) {
+      const w = g.measureText(name).width + padX * 2;
+      if (rw + w > maxW && rows.at(-1).length) { rows.push([]); rw = 0; }
+      rows.at(-1).push({ i, w }); rw += w + gap;
+    }
+    const top = wcy - (rows.length * h + (rows.length - 1) * gap) / 2;
+    rows.forEach((row, r) => {
+      let x = wcx - (row.reduce((s, c) => s + c.w, 0) + gap * (row.length - 1)) / 2;
+      for (const c of row) {
+        const [name] = FEATURES[c.i], cx0 = x + c.w / 2, cy0 = top + r * (h + gap) + h / 2; x += c.w + gap;
+        const inn = smooth(chipAt(c.i), chipAt(c.i) + .32, t);
+        if (inn <= 0) continue;
+        // the flood: outer chips leave first, each accelerating into the middle of the word
+        const d = Math.hypot(cx0 - wcx, (cy0 - wcy) * 2.5) / (W * .4);
+        const go = smooth(FLOOD_AT + (1 - Math.min(1, d)) * .45, FLOOD_AT + (1 - Math.min(1, d)) * .45 + .75, t), f = go * go;
+        if (f >= 1) continue;
+        const pop = .82 + .18 * ease(inn) + Math.sin(inn * Math.PI) * .05, sc = pop * (1 - .85 * f);
+        g.save(); g.translate(cx0 + (wcx - cx0) * f, cy0 + (wcy - cy0) * f); g.scale(sc, sc);
+        g.globalAlpha = inn * mint * (1 - smooth(.7, 1, f));
+        g.beginPath(); g.roundRect(-c.w / 2, -h / 2, c.w, h, h / 2);
+        g.fillStyle = "#07090C"; g.fill(); g.fillStyle = "rgb(84,232,176)";
+        g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(name, 0, fs * .04);
+        g.restore();
+      }
+    });
+    g.globalAlpha = 1; g.textAlign = "start"; g.textBaseline = "alphabetic";
+  }
+  // the word: it fills in as the chips land in it
+  const word = smooth(FLOOD_AT + .55, FLOOD_AT + 1.25, t);
   if (word > 0) {
-    const size = W * .135, y = Hh * .5 + size * .32;
+    const grow = .9 + .1 * ease(word) + Math.sin(smooth(FLOOD_AT + .9, FLOOD_AT + 1.6, t) * Math.PI) * .012;
+    g.save(); g.translate(wcx, wcy); g.scale(grow, grow); g.translate(-wcx, -wcy);
     g.font = `600 ${size}px "Instrument Sans"`; g.letterSpacing = `${-size * .03}px`;
     const rest = "oherence", cw = g.measureText("c").width, rw = g.measureText(rest).width, x0 = W / 2 - (cw + rw) / 2;
     g.globalAlpha = word; g.fillStyle = "#07090C";
     // the c: tilted, until the reticle sets it straight (a little overshoot, then still)
-    const fix = smooth(23.15, 23.85, t), over = Math.sin(smooth(23.15, 24.15, t) * Math.PI) * .08 * (1 - smooth(23.85, 24.25, t));
+    const fix = smooth(24.5, 25.1, t), over = Math.sin(smooth(24.5, 25.35, t) * Math.PI) * .08 * (1 - smooth(25.1, 25.45, t));
     const tilt = (-10 * (1 - fix) + over * 10) * Math.PI / 180;
     g.save(); g.translate(x0 + cw / 2, y - size * .26); g.rotate(tilt); g.fillText("c", -cw / 2, size * .26); g.restore();
     g.fillText(rest, x0 + cw, y);
+    drawSubtitle(g, W, W / 2, y + size * .42, word * smooth(FLOOD_AT + 1.0, FLOOD_AT + 1.6, t));   // it settles in just after the word
     // the scan line: one pass across the word
-    const sp = smooth(22.25, 23.25, t);
+    const sp = smooth(23.75, 24.55, t);
     if (sp > 0 && sp < 1) { const sy = Hh * .5 - size * .6 + sp * size * 1.2; g.fillStyle = "rgba(7,9,12,.55)"; g.fillRect(x0 - size * .3, sy, cw + rw + size * .6, Math.max(2, W * .0016)); }
     // the reticle: brackets closing on the c, holding while it turns, then letting go
-    const lock = smooth(22.55, 23.15, t), let_ = smooth(24.15, 24.65, t);
+    const lock = smooth(24.0, 24.5, t), let_ = smooth(25.45, 25.9, t);
     if (lock > 0 && let_ < 1) {
       const cx = x0 + cw / 2, cy = y - size * .26, r = size * (.42 + .5 * (1 - ease(lock))), L = size * .14;
       g.globalAlpha = word * (1 - let_); g.strokeStyle = "#07090C"; g.lineWidth = Math.max(2, W * .003); g.lineCap = "square";
       for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { g.beginPath(); g.moveTo(cx + sx * r, cy + sy * (r - L)); g.lineTo(cx + sx * r, cy + sy * r); g.lineTo(cx + sx * (r - L), cy + sy * r); g.stroke(); }
     }
-    g.globalAlpha = 1; g.letterSpacing = "0px";
+    g.globalAlpha = 1; g.letterSpacing = "0px"; g.restore();
   }
   if (black > 0) { g.fillStyle = `rgba(0,0,0,${black})`; g.fillRect(0, 0, W, Hh); }
 }
@@ -305,21 +374,22 @@ function EXTRA(t) {
   camera.lookAt(FROM14.q[0] * from, MAP_Y + FROM14.q[1] * 0 + (FROM14.q[1] - MAP_Y) * from, (-1 - 1.3 * (1 - smooth(.8, 5, t))) * (1 - from) + FROM14.q[2] * from);
   // the field grows outward, flickers red and amber, then goes mint in a wave from the centre; late, the tiles close ranks
   const close = smooth(13.7, 18.2, t), rch = reach(t) * smooth(.5, 1.3, t * PACE), wv = wave(t);   // the field waits for the pull-back, so the cut from 14 is clean
-  fields.forEach(({ m, list }) => {
+  fields.forEach(({ m, list, fill }) => {
     list.forEach((tl, k) => {
       const on = smooth(tl.d - 1.2, tl.d, rch) * smooth(.5, 1.1, t * PACE);
       if (on <= 0) { m.setMatrixAt(k, _m.makeScale(0, 0, 0)); return; }
-      const sc = (.94 + .12 * close) * (.85 + .15 * ease(on));
+      const green = Math.max(smooth(tl.d - .8, tl.d + .4, wv), smooth(tl.tGreen, tl.tGreen + .35, t));
+      const sc = (.94 + .12 * close) * (.85 + .15 * ease(on)) * (1 + .075 * smooth(.3, 1, green));   // green views butt together: no dark seams
       _p.set(tl.x, MAP_Y - .02, tl.z); _s.set(sc * (1 + close * .06), sc * (1 + close * .11), 1);
       m.setMatrixAt(k, _m.compose(_p, _q, _s));
       // one way only: grey, then amber, then red, then mint as the wave passes; each cell starts at its own point and moves at its own moments
       _c.copy(STEEL);
       _c.lerp(AMBERc, tl.startAmber ? 1 : smooth(tl.tAmber, tl.tAmber + .3, t));
       _c.lerp(REDc, smooth(tl.tRed, tl.tRed + .3, t));
-      _c.lerp(MINTc, Math.max(smooth(tl.d - .8, tl.d + .4, wv), smooth(tl.tGreen, tl.tGreen + .35, t)));
-      m.setColorAt(k, _c);
+      _c.lerp(MINTc, green);
+      m.setColorAt(k, _c); fill.array[k] = .8 * smooth(.3, 1, green);
     });
-    m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true;
+    m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; fill.needsUpdate = true;
   });
   // the centre map goes mint with them, then gives way to the surface
   const turn = smooth(FIRST_GREEN - .45, FIRST_GREEN + .45, t);

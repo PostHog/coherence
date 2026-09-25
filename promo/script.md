@@ -43,7 +43,7 @@ Agents are writing good code by accident.
 ***4
 at:
 sync:
-picture: LOCKED (scenes/04-corners.src.html). Scene 3's white world. Left, a chat: you ask "did you build it to the spec?", the agent types, "of course bro. why would I deceive you?" At the halfway mark: qa-agent, "actually...", then review-droid, "CRITICAL: 5 findings" (red chip). Right, black boxes fall from the sky and tumble into a messy heap (a recorded rigid-body simulation), faster and faster. A few boxes have a corner sliced off, the cut face orange then red, soon buried. Pull back: the heap is a hill beside a speck of chat, and the boxes keep coming.
+picture: LOCKED (scenes/04-corners.src.html). Scene 3's white world. Left, a chat: you ask "did you build it to the spec?", the agent types, "of course. why would I deceive you?" At the halfway mark: qa-agent, "actually...", then review-droid, "CRITICAL: 5 findings" (red chip). Right, black boxes fall from the sky and tumble into a messy heap (a recorded rigid-body simulation), faster and faster. A few boxes have a corner sliced off, the cut face orange then red, soon buried. Pull back: the heap is a hill beside a speck of chat, and the boxes keep coming.
 supers:
 source: motion graphics (three.js, Rapier)
 transition:
@@ -102,7 +102,7 @@ supers: Delivered through your agent's own hooks
 source: motion graphics (three.js)
 transition:
 
-Starts with clear definitions.
+We start with clear definitions.
 
 Language models are built out of language. Clearly defining your terms changes their behavior. Agents start to do what you meant, not just what you said.
 
@@ -196,6 +196,4 @@ These are the kinds of tools we need to clear the fog.
 
 Spend less inference on code that doesn’t work, less inference detecting bugs, less inference investigating the decisions that went into your changes.
 
-You get a more stable, coherent project, steadily driving toward the floor of irreducible complexity.
-
-The software of 2030 is waiting for us.
+So if you’re ready to try a new way of working with agents, come join us building the software of 2030.

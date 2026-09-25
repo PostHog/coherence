@@ -27,6 +27,8 @@ def script_lines():
         for o in json.load(open(HERE / folder / "segments.json")):
             k = str(o["i"])
             if k.isdigit() and (folder == "read2" or k not in lines): lines[k] = {"scene": o["scene"], "text": o["text"]}
+    # lines written after the reads: in the script, waiting for their first take
+    for k, o in json.load(open(HERE / "unrecorded.json")).items(): lines.setdefault(k, o)
     return lines
 
 norm = lambda w: re.sub(r"[^a-z0-9]", "", w.lower().replace("choke point", "chokepoint").replace("open router", "openrouter"))
@@ -103,6 +105,17 @@ def main():
         print("no script line found in this take. What was heard:\n  " + " ".join(h["raw"] for h in heard)); shutil.rmtree(folder)
         if a.json: print(json.dumps({"takes": [], "heard": " ".join(h["raw"] for h in heard)}))
         return
+    # a reworded line can open or close with words the script lacks ("We start…" for "Starts…"): words said in the
+    # same breath, up to three, belong to the take, unless another line claimed them
+    taken = {n for _, (i, j, _) in found for n in range(i, j + 1)}
+    grown = []
+    for k, (i, j, r) in found:
+        for _ in range(3):
+            if i > 0 and i - 1 not in taken and heard[i]["start"] - heard[i - 1]["end"] < .3: i -= 1
+        for _ in range(3):
+            if j + 1 < len(heard) and j + 1 not in taken and heard[j + 1]["start"] - heard[j]["end"] < .3: j += 1
+        grown.append((k, (i, j, r)))
+    found = grown
     # cut each take with a breath before and a short tail after, never into a neighbouring take
     spans = sorted((heard[i]["start"], heard[j]["end"], k, i, j) for k, (i, j, _) in found)
     summary = []

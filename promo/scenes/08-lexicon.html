@@ -125,7 +125,8 @@ function wrap(ctx, text, maxW) {
 // ---------- renderer ----------
 const stage = document.getElementById("stage");
 const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("gl"), antialias: true });
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+// a final render asks for more (?maxdpr=4 draws a 1920×1080 layout at 8K); on screen, 2× is plenty
+renderer.setPixelRatio(Math.min(+new URLSearchParams(location.search).get("maxdpr") || 2, window.devicePixelRatio || 1));
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(C.bg);
 scene.fog = new THREE.FogExp2(C.fog, 0.042);
@@ -205,6 +206,8 @@ function applyClarity(c) {
 // ---------- driven: a review player can set the scene's time from outside, with postMessage({ t }) ----------
 // (t, playing and T are the scene's own; this runs later, once they exist)
 window.addEventListener("message", (e) => { const d = e.data || {}; if (typeof d.t === "number") { t = Math.min(T, Math.max(0, d.t)); playing = false; } });
+// a final render sets the time and draws at once, so the frame it captures is exactly this t (review/render.mjs)
+window.renderAt = (x) => { t = Math.min(T, Math.max(0, x)); playing = false; render(t); };
 
 
 // ---------- the crisp pass: text on bright shapes is drawn after the bloom ----------
@@ -307,6 +310,18 @@ const cardTex = new THREE.CanvasTexture(cardCanvas);
 const card = new THREE.Mesh(new THREE.PlaneGeometry(WIDE, FULL_H), new THREE.MeshBasicMaterial({ map: cardTex, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
 card.position.set(-TILE.w / 2 + WIDE / 2, TILE.h / 2 - FULL_H / 2, 0); card.renderOrder = 5; pat.holder.add(card);
 crispOver(card, ...CARD_PX, (g) => chip(g, C.mint, "books", "DEFINITION", true, .9), () => pat.alpha || 0);
+// the crisp pass draws after the scene, so the text of tiles behind the open card would show through it: the card
+// stands in the crisp pass too, as depth only, sized to the frame drawn this frame (pushed back a hair so its own text passes)
+const cardDepth = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ colorWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 4 }));
+cardDepth.matrixAutoUpdate = false; overlay.add(cardDepth);
+const cardRect = new THREE.Matrix4(), cardMove = new THREE.Matrix4();
+function syncCardDepth(w, h) {
+  const ww = (w - 8) / PXW, hh = (h - 8) / PXW;
+  cardMove.makeTranslation(-WIDE / 2 + 4 / PXW + ww / 2, FULL_H / 2 - 4 / PXW - hh / 2, 0);
+  cardRect.makeScale(ww, hh, 1);
+  cardDepth.matrix.copy(card.matrixWorld).multiply(cardMove).multiply(cardRect);
+  cardDepth.visible = card.material.opacity > .5;
+}
 const DEF_LINES = [
   { y: 374, fade: 0, draw: (g) => { g.fillStyle = C.ink; g.font = `600 54px "Instrument Sans"`; g.fillText("The billing entity: one per company.", 40, 374); } },
   { y: 536, fade: 1, draw: (g) => { g.fillStyle = C.ink; g.font = `400 38px "Instrument Sans"`; g.fillText("Owns the plan, the seats and the invoices.", 40, 536); } },
@@ -322,12 +337,14 @@ const CARD_ANCHOR = [0, 0];
 const hex = (c) => "#" + c.getHexString();
 // open: the card grows from tile size to its full size; its contents fade in once there
 const OPEN = [8.7, 9.45], SHUT = [19.4, 20.1];
+let cardSize = [TILE.px[0], TILE.px[1]];
 function drawCard(t, col) {
   const g = cardCanvas.getContext("2d"), [W, H] = CARD_PX;
   const grow = ease(smooth(...OPEN, t) * (1 - smooth(...SHUT, t)));
   const w = TILE.px[0] + (W - TILE.px[0]) * grow, h = TILE.px[1] + (H - TILE.px[1]) * grow;
+  cardSize = [w, h];
   g.clearRect(0, 0, W, H);
-  g.fillStyle = "rgba(10,14,18,.95)"; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 20); g.fill();
+  g.fillStyle = "rgb(10,14,18)"; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 20); g.fill();   // opaque: nothing behind reads through the definition
   g.strokeStyle = col; g.lineWidth = 3; g.stroke();
   chip(g, col, "books", "DEFINITION", false, .9);
   g.fillStyle = C.ink; fitFont(g, "account", 600, 68, 560, "Instrument Sans"); g.fillText("account", 36, 186);
@@ -580,7 +597,7 @@ function render(t) {
   cap.hidden = !captions; cap.textContent = line ? line[2] : "";
   tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
   composer.render();
-  syncCrisp();
+  syncCrisp(); syncCardDepth(...cardSize);
   renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
 }
 

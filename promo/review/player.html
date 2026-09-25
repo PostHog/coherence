@@ -56,6 +56,7 @@ label.toggle { display: inline-flex; align-items: center; gap: 6px; color: var(-
 .clip.clash { background: var(--red); }
 .clip.moved::after { content: ""; position: absolute; right: 2px; top: 2px; width: 5px; height: 5px; border-radius: 50%; background: var(--orange); }
 .clip.adr { background: #2E5A4C; }
+.clip.unread { background: transparent; outline: 1px dashed #8B98A2; outline-offset: -1px; }
 .studio[hidden], .hint[hidden], .gate[hidden] { display: none !important; }
 .studio { display: inline-flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
 #rec.on { background: var(--red); border-color: var(--red); color: #fff; }
@@ -185,13 +186,13 @@ async function decode(url, tries = 4) {
 async function loadAudio() {
   status("loading music…");
   music = await decode("music.mp3");
-  const queue = [...TL.lines], failed = [];
+  const queue = TL.lines.filter((l) => l.src), failed = [];
   let n = 0;
   async function worker() {
     while (queue.length) {
       const l = queue.shift();
       try { buffers.set(l.src, await decode(l.src)); } catch (e) { failed.push(l.line); console.warn("narration clip failed", l.src, e); }
-      status(`loading narration… ${++n}/${TL.lines.length}`);
+      status(`loading narration… ${++n}/${TL.lines.filter((l) => l.src).length}`);
     }
   }
   await Promise.all([worker(), worker(), worker(), worker()]);
@@ -236,7 +237,19 @@ async function playPause() {
   if (playing) { t0 = now(); playing = false; stopAll(); $("play").textContent = "Play"; }
   else { playing = true; startAt(t0); $("play").textContent = "Pause"; $("gate").hidden = true; }
 }
-$("mvol").oninput = (e) => musicGain.gain.setTargetAtTime(+e.target.value, ctx.currentTime, .05);
+function setMusic(v) { $("mvol").value = v; musicGain.gain.setTargetAtTime(v, ctx.currentTime, .05); }
+if (TL.settings && TL.settings.music != null) setMusic(TL.settings.music);
+// the music level is saved like the placements: to review/settings.json in the studio, to the page's database here
+let levelTimer = null;
+$("mvol").oninput = (e) => {
+  setMusic(+e.target.value); clearTimeout(levelTimer);
+  levelTimer = setTimeout(async () => {
+    try {
+      if (STUDIO) { const r = await fetch("/settings", { method: "POST", body: JSON.stringify({ music: +e.target.value }) }); if (!r.ok) throw new Error(r.status); }
+      else if (db) await db.doc("cut/settings").set({ music: +e.target.value, savedAt: new Date().toISOString() });
+    } catch (err) { status(`music level not saved: ${err && err.message ? err.message : "refused"}`, "warn"); }
+  }, 400);
+};
 $("play").onclick = playPause; $("start").onclick = playPause;
 $("back").onclick = () => seek(now() - 5); $("fwd").onclick = () => seek(now() + 5);
 document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); playPause(); } });
@@ -276,6 +289,7 @@ function layout() {
     const next = TL.lines[i + 1], prev = TL.lines[i - 1];
     l.el.classList.toggle("clash", (next && next.start < l.end - .03) || (prev && prev.end > l.start + .03));
     l.el.classList.toggle("moved", Math.abs(base.get(l.line) - l.start) > .01);
+    l.el.classList.toggle("unread", !!l.unread); if (l.unread) l.el.title = `${l.text}\n(not recorded yet: record it here)`;
     l.el.classList.toggle("adr", !!l.adr); if (l.adr) l.el.title = `${l.text}\n(retake ${l.adr})`;
   });
 }
@@ -333,6 +347,8 @@ $("reset").onclick = () => {
     if (STUDIO) return;                  // the studio's placements are the ones baked into this page
     db = await window.claude?.use?.("db");
     if (!db) return;
+    const lv = await db.doc("cut/settings").get().catch(() => null);
+    if (lv && lv.exists && lv.data().music != null) setMusic(lv.data().music);
     const snap = await db.doc("cut/placements").get();
     const saved = snap.exists ? snap.data().lines : null;
     if (saved) { for (const l of TL.lines) if (saved[l.line] != null) moveLine(l, saved[l.line]); $("tip").hidden = true; status(music ? "ready · your saved placements" : $("status").textContent, "saved"); }
@@ -344,9 +360,9 @@ const CHROME = ".wrap>header,.transport,.box,.caption{display:none!important}.wr
 const loaded = new Map();
 function load(frame, file) {
   if (frame.dataset.file === file) return;
-  frame.dataset.file = file; loaded.delete(frame);
+  frame.dataset.file = file; frame.dataset.primed = 0; frame.style.opacity = 0; loaded.delete(frame);
   frame.onload = () => { try { const st = frame.contentDocument.createElement("style"); st.textContent = CHROME; frame.contentDocument.head.append(st); } catch (e) {} loaded.set(frame, file); };
-  frame.src = `scenes/${file}.html`;
+  frame.src = `scenes/${file}.html${RENDER ? `?maxdpr=${RENDER_DPR}` : ""}`;
 }
 // a scene's clock past either end of its window runs on at the window's own rate (a dissolve needs both scenes moving)
 function localExt(s, t) {
@@ -384,9 +400,11 @@ async function record() {
 }
 async function stopRecording() {
   const { rec, stream, chunks } = recording, end = now();
+  // the picture stops at once, but the mic runs on a moment: the last word's tail is still in flight when Stop is pressed
+  playing = false; stopAll(); t0 = end; $("play").textContent = "Play"; $("rec").textContent = "…";
+  await new Promise((r) => setTimeout(r, 600));
   const stopped = new Promise((r) => (rec.onstop = r)); rec.stop(); await stopped;
   stream.getTracks().forEach((tr) => tr.stop());
-  playing = false; stopAll(); t0 = end; $("play").textContent = "Play";
   voiceGain.gain.value = 1; $("rec").textContent = "● Record"; $("rec").classList.remove("on");
   const at = recording.at ?? end, lines = TL.lines.filter((l) => l.end > at - .5 && l.start < end + .5).map((l) => l.line);
   recording = null;
@@ -412,13 +430,19 @@ function show(scene, t) {
     let f = frames.find((x) => x.dataset.file === s.file && !used.has(x));
     if (!f) { f = frames.find((x) => !used.has(x) && !shown.some(([o]) => o.file === x.dataset.file)) || frames.find((x) => !used.has(x)); load(f, s.file); }
     used.add(f);
-    f.style.opacity = alpha; f.style.zIndex = 1 + k;
-    if (loaded.get(f) === s.file) f.contentWindow.postMessage({ t: localExt(s, t) }, "*");
+    f.style.zIndex = 1 + k;
+    // a frame shows only once it has been sent this scene's time and has had a frame to draw it: no stale state flashes up
+    if (loaded.get(f) === s.file) { f.contentWindow.postMessage({ t: localExt(s, t) }, "*"); f.dataset.primed = +(f.dataset.primed || 0) + 1; }
+    f.style.opacity = +(f.dataset.primed || 0) >= 2 ? alpha : 0;
   });
   frames.forEach((f) => { if (!used.has(f)) f.style.opacity = 0; });
-  // the next scene loads in the free frame a few seconds ahead
+  // the next scene loads in the free frame a few seconds ahead, and is held on its first frame while it waits
   const next = TL.scenes[TL.scenes.indexOf(scene) + 1];
-  if (next && next.file && scene.end - t < 5 && shown.length === 1) { const other = frames.find((x) => !used.has(x)); if (other && other.dataset.file !== next.file) load(other, next.file); }
+  if (next && next.file && scene.end - t < 5 && shown.length === 1) {
+    const other = frames.find((x) => !used.has(x));
+    if (other && other.dataset.file !== next.file) load(other, next.file);
+    if (other && loaded.get(other) === next.file) { other.contentWindow.postMessage({ t: localExt(next, next.start - (next.dissolve || 0) / 2) }, "*"); other.dataset.primed = 2; }
+  }
 }
 
 // ---------- the clock ----------
@@ -466,10 +490,39 @@ function notes() {
   const li = document.createElement("li"); li.innerHTML = "Line 15, “this scale of motion”, is a stand-in until the re-record"; $("notes").append(li);
 }
 
+// ---------- the final render: ?render (review/render.mjs) ----------
+// Only the stage, full window; no clock, no audio. renderAt(T) puts the cut's frame at T on screen, exactly: each visible
+// scene is loaded if it isn't, set to its own time and drawn at once, dissolves at their opacity; then the driver captures it.
+const RENDER = new URLSearchParams(location.search).has("render"), RENDER_DPR = +new URLSearchParams(location.search).get("maxdpr") || 4;
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+async function renderAt(T) {
+  const shown = visible(T), used = new Set();
+  for (const [k, [s, alpha]] of shown.entries()) {
+    let f = frames.find((x) => x.dataset.file === s.file && !used.has(x)) || frames.find((x) => !used.has(x) && !shown.some(([o]) => o.file === x.dataset.file)) || frames.find((x) => !used.has(x));
+    if (loaded.get(f) !== s.file) {
+      load(f, s.file);
+      for (let n = 0; !(loaded.get(f) === s.file && f.contentWindow.renderAt); n++) { if (n > 600) throw new Error(`scene ${s.file} did not load`); await new Promise((r) => setTimeout(r, 50)); }
+      await f.contentWindow.document.fonts.ready; await new Promise((r) => setTimeout(r, 800));   // its fonts, its first size() and frame
+    }
+    used.add(f); f.style.zIndex = 1 + k; f.style.opacity = alpha;
+    f.contentWindow.renderAt(localExt(s, T));
+  }
+  frames.forEach((f) => { if (!used.has(f)) f.style.opacity = 0; });
+  await nextFrame(); await nextFrame();
+  return shown.map(([s, a]) => `${s.n}@${a.toFixed(2)}`).join(" ");
+}
+if (RENDER) {
+  const st = document.createElement("style");
+  st.textContent = "body>*:not(.wrap),.wrap>*:not(.stage),.stage>*:not(iframe){display:none!important}body,.wrap{margin:0!important;padding:0!important;max-width:none!important;background:#000!important;overflow:hidden!important}.stage{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;aspect-ratio:auto!important;border-radius:0!important}";
+  document.head.append(st);
+}
+
 $("studio").hidden = !STUDIO; $("studioHint").hidden = STUDIO;
 $("rec").onclick = record;
 try { const ph = sessionStorage.getItem("playhead"); if (ph) { t0 = +ph; sessionStorage.removeItem("playhead"); } } catch (e) {}
-guard("setup", () => { reflow(); buildStrip(); notes(); load(frames[0], TL.scenes[0].file); });
-loadAudio().catch((e) => { console.warn(e); status("the music didn’t load; reload the page", "warn"); });
-requestAnimationFrame(tick);
+if (!RENDER) {
+  guard("setup", () => { reflow(); buildStrip(); notes(); load(frames[0], TL.scenes[0].file); });
+  loadAudio().catch((e) => { console.warn(e); status("the music didn’t load; reload the page", "warn"); });
+  requestAnimationFrame(tick);
+}
 </script>

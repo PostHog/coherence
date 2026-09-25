@@ -1,0 +1,39 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Master Mix</title>
+<!-- The final mix, rendered offline by the browser's audio engine through the graph the review page plays
+     (review/player.html: the music's limiter, the output limiter, the fade), so it sounds like what was approved.
+     Driven by review/render.mjs mix; inputs come from review/master.py prep. -->
+<script>
+async function mixdown() {
+  const plan = await (await fetch("master/plan.json", { cache: "no-store" })).json();
+  const SR = 48000, ctx = new OfflineAudioContext(2, Math.ceil(plan.track * SR), SR);
+  const load = async (f) => ctx.decodeAudioData(await (await fetch("master/" + f, { cache: "no-store" })).arrayBuffer());
+  // the graph, as the review page builds it
+  const out = ctx.createDynamicsCompressor(); out.threshold.value = -3; out.ratio.value = 12; out.connect(ctx.destination);
+  const musicLimit = ctx.createDynamicsCompressor();
+  musicLimit.threshold.value = -22; musicLimit.knee.value = 6; musicLimit.ratio.value = 12; musicLimit.attack.value = .005; musicLimit.release.value = .3;
+  musicLimit.connect(out);
+  const musicGain = ctx.createGain(); musicGain.connect(musicLimit);
+  musicGain.gain.setValueCurveAtTime(Float32Array.from(plan.curve), 0, (plan.curve.length - 1) / plan.rate);   // the studio level, easing down at the climax
+  const voiceGain = ctx.createGain(); voiceGain.gain.value = 1; voiceGain.connect(out);
+  const fade = ctx.createGain(); fade.connect(musicGain);
+  fade.gain.setValueAtTime(1, plan.track - 1.5); fade.gain.linearRampToValueAtTime(0, plan.track);
+  const m = ctx.createBufferSource(); m.buffer = await load("music.wav"); m.connect(fade); m.start(0);
+  for (const l of plan.lines) {
+    const s = ctx.createBufferSource(); s.buffer = await load(l.file); s.connect(voiceGain);
+    s.start(Math.max(0, l.at), Math.max(0, -l.at));
+  }
+  const buf = await ctx.startRendering();
+  window.MIX = [buf.getChannelData(0), buf.getChannelData(1)];
+  return { seconds: buf.duration, frames: buf.length };
+}
+// the rendered channels, interleaved, a slice at a time, as base64 (the driver fetches it piece by piece)
+function slice(start, count) {
+  const [L, R] = window.MIX, n = Math.min(count, L.length - start), f = new Float32Array(n * 2);
+  for (let i = 0; i < n; i++) { f[2 * i] = L[start + i]; f[2 * i + 1] = R[start + i]; }
+  let s = ""; const b = new Uint8Array(f.buffer);
+  for (let i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768));
+  return btoa(s);
+}
+</script>

@@ -1,5 +1,8 @@
 {
- "track": 231.938,
+ "settings": {
+  "music": 0.05
+ },
+ "track": 231.71,
  "trackFull": 236.5,
  "hardCut": 212.8,
  "beats": [
@@ -540,7 +543,7 @@
    "file": "11-bypass",
    "length": 17,
    "start": 153.168,
-   "end": 168.487,
+   "end": 168.966,
    "hits": [
     9.6,
     12.5
@@ -550,7 +553,7 @@
    "n": 12,
    "file": "12-reduce",
    "length": 13,
-   "start": 168.487,
+   "start": 168.966,
    "end": 179.977,
    "hits": [
     2.2,
@@ -562,7 +565,7 @@
    "file": "13-structure",
    "length": 12,
    "start": 179.977,
-   "end": 193.381,
+   "end": 193.65,
    "hits": [
     9.6
    ]
@@ -571,8 +574,8 @@
    "n": 14,
    "file": "14-structure",
    "length": 15,
-   "start": 193.381,
-   "end": 209.338,
+   "start": 193.65,
+   "end": 209.11,
    "hits": [
     1.0,
     12.0
@@ -582,8 +585,8 @@
    "n": 15,
    "file": "15-structure",
    "length": 22.6,
-   "start": 209.338,
-   "end": 231.938,
+   "start": 209.11,
+   "end": 231.71,
    "hits": []
   }
  ],
@@ -596,8 +599,9 @@
    "at": 0.52,
    "start": 0.7,
    "end": 2.98,
-   "src": "clips/read2-01-01-6e9f36f18e83.mp3",
+   "src": "clips/read2-01-01-d92b6fd3a23c.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -608,8 +612,9 @@
    "at": 2.98,
    "start": 2.98,
    "end": 5.58,
-   "src": "clips/read2-01-02-d02c3e2cc6c6.mp3",
+   "src": "clips/read2-01-02-66dbff8e4dd8.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.0
   },
   {
@@ -620,8 +625,9 @@
    "at": 6.84,
    "start": 7.02,
    "end": 9.04,
-   "src": "clips/read2-02-03-0a497bbffc7d.mp3",
+   "src": "clips/read2-02-03-1307f241a6d3.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -632,8 +638,9 @@
    "at": 9.56,
    "start": 9.74,
    "end": 14.24,
-   "src": "clips/read2-02-04-57660ec5fa47.mp3",
+   "src": "clips/read2-02-04-20a5c6390202.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -644,8 +651,9 @@
    "at": 14.34,
    "start": 14.52,
    "end": 24.72,
-   "src": "clips/read2-02-05-376f2057a248.mp3",
+   "src": "clips/read2-02-05-e8766ddb2af1.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -656,8 +664,9 @@
    "at": 25.22,
    "start": 25.4,
    "end": 30.98,
-   "src": "clips/read2-03-06-8b80f4c70a1c.mp3",
+   "src": "clips/read2-03-06-0de5d352edad.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -668,8 +677,9 @@
    "at": 31.38,
    "start": 31.56,
    "end": 38.6,
-   "src": "clips/read2-03-07-5e7a6c9800de.mp3",
+   "src": "clips/read2-03-07-f892f83e6e55.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -680,8 +690,9 @@
    "at": 39.22,
    "start": 39.4,
    "end": 42.2,
-   "src": "clips/read2-03-08-bc010e7a2e7c.mp3",
+   "src": "clips/read2-03-08-0515a67fed0e.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -692,8 +703,9 @@
    "at": 43.42,
    "start": 43.6,
    "end": 50.34,
-   "src": "clips/read2-04-09-6e721bbaa52c.mp3",
+   "src": "clips/read2-04-09-bfa5dbcf7fd9.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -704,8 +716,9 @@
    "at": 51.67,
    "start": 51.85,
    "end": 57.15,
-   "src": "clips/read2-04-10-d42e1bab0204.mp3",
+   "src": "clips/read2-04-10-193f60028b85.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -716,8 +729,9 @@
    "at": 57.81,
    "start": 57.95,
    "end": 61.07,
-   "src": "clips/read2-04-11-80f789642d5f.mp3",
+   "src": "clips/read2-04-11-903b81f0eef1.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.14
   },
   {
@@ -728,8 +742,9 @@
    "at": 61.87,
    "start": 62.05,
    "end": 69.59,
-   "src": "clips/read2-05-12-54927a7128f0.mp3",
+   "src": "clips/read2-05-12-7284b6a2935b.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -740,8 +755,9 @@
    "at": 70.92,
    "start": 71.1,
    "end": 76.76,
-   "src": "clips/read2-05-13-e1ce9fd56601.mp3",
+   "src": "clips/read2-05-13-c686ee581145.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -752,8 +768,9 @@
    "at": 77.52,
    "start": 77.7,
    "end": 82.98,
-   "src": "clips/read2-06-14-ce7b595be846.mp3",
+   "src": "clips/read2-06-14-3e5242b4371a.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -764,8 +781,9 @@
    "at": 83.53,
    "start": 83.7,
    "end": 86.26,
-   "src": "clips/read2-06-15-7c5f5f81f2c8.mp3",
+   "src": "clips/read2-06-15-1d89a57b96a6.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.17
   },
   {
@@ -773,11 +791,12 @@
    "scene": 6,
    "text": "Because we don\u2019t yet have the tools to make sense of this new world.",
    "clip": "audio/read2/06-16.wav",
-   "at": 87.47,
-   "start": 87.65,
-   "end": 91.57,
-   "src": "clips/read2-06-16-d4416e67655f.mp3",
+   "at": 87.22,
+   "start": 87.4,
+   "end": 91.32,
+   "src": "clips/read2-06-16-06c315dc153d.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -788,8 +807,9 @@
    "at": 94.12,
    "start": 94.3,
    "end": 97.42,
-   "src": "clips/read2-07-17-abbfdeb340f1.mp3",
+   "src": "clips/read2-07-17-319af7f6e1b5.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -800,56 +820,61 @@
    "at": 98.37,
    "start": 98.55,
    "end": 101.93,
-   "src": "clips/read1-07-18-37f99bc324dd.mp3",
+   "src": "clips/read1-07-18-8a188d8d01cb.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
    "line": "19",
    "scene": 7,
    "text": "The race is on to deliver. Coherence lets us compete.",
-   "clip": "audio/read1/07-19.wav",
-   "at": 102.62,
-   "start": 102.8,
-   "end": 107.1,
-   "src": "clips/read1-07-19-6f59dafe6b89.mp3",
-   "adr": 0,
+   "clip": "audio/adr/20260924-230300-take-jc00z2u0/19.wav",
+   "at": 102.085,
+   "start": 102.265,
+   "end": 106.025,
+   "src": "clips/20260924-230300-take-jc00z2u0-19-a8dbdccd98f4.mp3",
+   "adr": 1,
+   "unread": false,
    "lead": 0.18
   },
   {
    "line": "20",
    "scene": 8,
-   "text": "Starts with clear definitions.",
-   "clip": "audio/read1/08-20.wav",
-   "at": 107.57,
-   "start": 107.75,
-   "end": 109.45,
-   "src": "clips/read1-08-20-972be23488ee.mp3",
-   "adr": 0,
+   "text": "We start with clear definitions.",
+   "clip": "audio/adr/20260924-220607-take-7a7d-yq9/20.wav",
+   "at": 107.319,
+   "start": 107.499,
+   "end": 109.739,
+   "src": "clips/20260924-220607-take-7a7d-yq9-20-485c8ef0743a.mp3",
+   "adr": 2,
+   "unread": false,
    "lead": 0.18
   },
   {
    "line": "21",
    "scene": 8,
    "text": "Language models are built out of language. Clearly defining your terms changes their behavior. Agents start to do what you meant, not just what you said.",
-   "clip": "audio/read1/08-21.wav",
-   "at": 110.01,
-   "start": 110.19,
-   "end": 119.09,
-   "src": "clips/read1-08-21-50fb168b41a9.mp3",
-   "adr": 0,
+   "clip": "audio/adr/20260924-220607-take-7a7d-yq9/21.wav",
+   "at": 110.319,
+   "start": 110.499,
+   "end": 119.979,
+   "src": "clips/20260924-220607-take-7a7d-yq9-21-a4c2327ae21c.mp3",
+   "adr": 2,
+   "unread": false,
    "lead": 0.18
   },
   {
    "line": "22",
    "scene": 8,
    "text": "This impacts the integrity of what gets built, making bugs easier for agents to detect.",
-   "clip": "audio/read1/08-22.wav",
-   "at": 119.55,
-   "start": 119.73,
-   "end": 124.61,
-   "src": "clips/read1-08-22-4bdb66aa2fad.mp3",
-   "adr": 0,
+   "clip": "audio/adr/20260924-220607-take-7a7d-yq9/22.wav",
+   "at": 120.559,
+   "start": 120.739,
+   "end": 125.639,
+   "src": "clips/20260924-220607-take-7a7d-yq9-22-b710908191d0.mp3",
+   "adr": 1,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -860,8 +885,9 @@
    "at": 126.152,
    "start": 126.332,
    "end": 127.552,
-   "src": "clips/read1-09-23-ec97ec7a12ba.mp3",
+   "src": "clips/read1-09-23-603de3a5f30f.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -872,8 +898,9 @@
    "at": 127.892,
    "start": 128.072,
    "end": 133.392,
-   "src": "clips/read1-09-24-bd0c42c713d2.mp3",
+   "src": "clips/read1-09-24-3093a3944014.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -884,8 +911,9 @@
    "at": 133.632,
    "start": 133.812,
    "end": 138.732,
-   "src": "clips/read1-09-25-d3ae5c345cd4.mp3",
+   "src": "clips/read1-09-25-75a2c4208e82.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -896,8 +924,9 @@
    "at": 140.793,
    "start": 140.973,
    "end": 147.893,
-   "src": "clips/read1-10-26-a928604af277.mp3",
+   "src": "clips/read1-10-26-ec42da34851d.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -908,8 +937,9 @@
    "at": 148.493,
    "start": 148.673,
    "end": 151.293,
-   "src": "clips/read1-10-27-4c4d34afdde0.mp3",
+   "src": "clips/read1-10-27-adbe8a943294.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -917,23 +947,25 @@
    "scene": 11,
    "text": "We also need constant confidence that our code matches our intentions.",
    "clip": "audio/read1/11-28.wav",
-   "at": 153.555,
-   "start": 153.735,
-   "end": 157.475,
-   "src": "clips/read1-11-28-423ac376d5f8.mp3",
+   "at": 153.27,
+   "start": 153.45,
+   "end": 157.19,
+   "src": "clips/read1-11-28-21c24762de4d.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
    "line": "29",
    "scene": 11,
    "text": "Coherence uses your language server to detect security bypasses. The moment an agent writes code that touches something sensitive without routing through a designated chokepoint, the project goes red.",
-   "clip": "audio/read1/11-29.wav",
-   "at": 157.995,
-   "start": 158.175,
-   "end": 168.475,
-   "src": "clips/read1-11-29-a1510241b6c4.mp3",
-   "adr": 0,
+   "clip": "audio/adr/20260924-221435-take-rslydvhg/29.wav",
+   "at": 157.696,
+   "start": 157.876,
+   "end": 168.916,
+   "src": "clips/20260924-221435-take-rslydvhg-29-8cf80f452746.mp3",
+   "adr": 2,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -944,8 +976,9 @@
    "at": 168.98,
    "start": 169.15,
    "end": 171.81,
-   "src": "clips/read1-12-30-b2c9023516f7.mp3",
+   "src": "clips/read1-12-30-92d318a7d06e.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.17
   },
   {
@@ -956,8 +989,9 @@
    "at": 172.37,
    "start": 172.55,
    "end": 179.75,
-   "src": "clips/read1-12-31-e997a20f7f42.mp3",
+   "src": "clips/read1-12-31-69a6663ff1fe.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -968,8 +1002,9 @@
    "at": 180.12,
    "start": 180.3,
    "end": 182.76,
-   "src": "clips/read1-13-32-a26a55f34e57.mp3",
+   "src": "clips/read1-13-32-d5e9ff685193.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -980,8 +1015,9 @@
    "at": 183.07,
    "start": 183.25,
    "end": 193.45,
-   "src": "clips/read1-13-33-465ad76aad6e.mp3",
+   "src": "clips/read1-13-33-b4149fb2c387.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -992,8 +1028,9 @@
    "at": 194.07,
    "start": 194.25,
    "end": 197.09,
-   "src": "clips/read1-14-34-2777910db66a.mp3",
+   "src": "clips/read1-14-34-eaecfbc4a71d.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -1004,8 +1041,9 @@
    "at": 197.57,
    "start": 197.75,
    "end": 201.87,
-   "src": "clips/read1-14-35-946b16a2cea9.mp3",
+   "src": "clips/read1-14-35-a940cafb1780.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
@@ -1016,57 +1054,49 @@
    "at": 202.02,
    "start": 202.2,
    "end": 209.06,
-   "src": "clips/read1-14-36-36bcd6155ba2.mp3",
+   "src": "clips/read1-14-36-aba3b275698a.mp3",
    "adr": 0,
+   "unread": false,
    "lead": 0.18
   },
   {
    "line": "37",
    "scene": 15,
    "text": "These are the kinds of tools we need to clear the fog.",
-   "clip": "audio/read1/15-37.wav",
-   "at": 209.47,
-   "start": 209.65,
-   "end": 212.41,
-   "src": "clips/read1-15-37-b1cede6c6d8e.mp3",
-   "adr": 0,
+   "clip": "audio/adr/20260924-221619-take-mlv718qj/37.wav",
+   "at": 209.378,
+   "start": 209.558,
+   "end": 212.698,
+   "src": "clips/20260924-221619-take-mlv718qj-37-0d5bbf75717e.mp3",
+   "adr": 1,
+   "unread": false,
    "lead": 0.18
   },
   {
    "line": "38",
    "scene": 15,
    "text": "Spend less inference on code that doesn\u2019t work, less inference detecting bugs, less inference investigating the decisions that went into your changes.",
-   "clip": "audio/read1/15-38.wav",
-   "at": 212.82,
-   "start": 213.0,
-   "end": 221.42,
-   "src": "clips/read1-15-38-604f506f0703.mp3",
-   "adr": 0,
+   "clip": "audio/adr/20260924-221619-take-mlv718qj/38.wav",
+   "at": 212.998,
+   "start": 213.178,
+   "end": 221.818,
+   "src": "clips/20260924-221619-take-mlv718qj-38-c612852c5799.mp3",
+   "adr": 1,
+   "unread": false,
    "lead": 0.18
   },
   {
-   "line": "39",
+   "line": "41",
    "scene": 15,
-   "text": "You get a more stable, coherent project, steadily driving toward the floor of irreducible complexity.",
-   "clip": "audio/read1/15-39.wav",
-   "at": 221.67,
-   "start": 221.85,
-   "end": 227.52,
-   "src": "clips/read1-15-39-a544476bcae7.mp3",
-   "adr": 0,
+   "text": "So if you\u2019re ready to try a new way of working with agents, come join us building the software of 2030.",
+   "clip": "audio/adr/20260924-222519-take-3-vc4kh9/41.wav",
+   "at": 222.57,
+   "start": 222.75,
+   "end": 228.33,
+   "src": "clips/20260924-222519-take-3-vc4kh9-41-668b951685de.mp3",
+   "adr": 1,
+   "unread": false,
    "lead": 0.18
-  },
-  {
-   "line": "40",
-   "scene": 15,
-   "text": "The software of 2030 is waiting for us.",
-   "clip": "audio/read1/15-40.wav",
-   "at": 227.23,
-   "start": 227.95,
-   "end": 231.03,
-   "src": "clips/read1-15-40-b075bb388665.mp3",
-   "adr": 0,
-   "lead": 0.72
   }
  ]
 }

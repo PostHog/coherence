@@ -3,12 +3,12 @@
  "io": {
   "1": {
    "out": 13.0,
-   "why": "match cut on action: the wall is mid-tip, about 41 degrees back"
+   "why": "scene 1 hands over mid-tip, under the dissolve"
   },
   "2": {
    "in": 1.82,
    "dissolve": 1.2,
-   "why": "the page picks up the wall's tip at the same angle; a 1.2 s dissolve melts one grid into the other mid-fall"
+   "why": "a plain 1.2 s dissolve as the page starts to tip"
   }
  },
  "hits": {

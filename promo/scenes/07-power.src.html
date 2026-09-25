@@ -52,7 +52,7 @@ p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch
   <section class="box">
     <h2>Beats (about 14.5 s; lands on the first act break, hard cut to black)</h2>
     <ol class="beats">
-      <li><span class="t">0.0</span><div><span>Out of scene 6's dark: the last of the picture is static on a tube. It collapses to a bright line, then a dot, and the dot dies.</span></div></li>
+      <li><span class="t">0.0</span><div><span>Black: scene 6's tube has just died.</span></div></li>
       <li><span class="t">1.6</span><div><span>A beat of black, then the tube comes back on: a dot, a line, a flash, and a dark phosphor screen with scanlines and a blinking cursor.</span></div></li>
       <li><span class="t">2.3</span><div><q>It’s time to build the next generation of tools.</q><span>Typed in mint as it's said.</span></div></li>
       <li><span class="t">5.4</span><div><q>Developers need clarity and confidence, not just speed.</q><span>Typed below it.</span></div></li>
@@ -157,11 +157,7 @@ const MIN = .004;
 function power(t) {
   const u = tube.uniforms;
   u.uTime.value = t; u.uFlash.value = 0; u.uStatic.value = 0;
-  if (t < 1.0) {           // off: the static collapses to a line, the line to a dot, the dot dies
-    const a = smooth(.3, .58, t), b = smooth(.58, .8, t);
-    u.uStatic.value = 1; u.uSY.value = 1 - a * (1 - MIN); u.uSX.value = 1 - b * (1 - MIN);
-    u.uGain.value = (1 + 3.5 * a + 5 * b) * (1 - smooth(.8, .98, t));
-  } else if (t < 1.6) {    // black
+  if (t < 1.6) {           // black: scene 6's tube has just died
     u.uGain.value = 0;
   } else if (t < T - .1) { // on: a dot, a line, a flash, then the phosphor settles
     u.uSX.value = MIN + (1 - MIN) * ease(smooth(1.6, 1.76, t));

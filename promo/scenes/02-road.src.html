@@ -267,7 +267,7 @@ function updateWisps(t) {
 
 // ---------- camera: down out of the fog onto the road, then lower and wider as we speed up ----------
 const fogDark = new THREE.Color(C.fog), fogPale = new THREE.Color("#1C252D"), fogCol = new THREE.Color();
-const WIDE_Z = 5.5, WIDE_Y = .5;
+const WIDE_Z = 0, WIDE_Y = 0;   // was a wide entry matching scene 1's wall; the cut is a plain dissolve now
 function cameraAt(t) {
   // facing the upright page at first; as it tips down, we drop onto it and the road comes up to meet us
   const z = -dist(t), land = ease(smooth(.3, 3.6, t)), k = rush(t);

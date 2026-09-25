@@ -1,3 +1,9 @@
+revisits:
+
+8
+11
+15
+
 # Coherence promo — narration
 
 What if the best way to save tokens
@@ -38,7 +44,7 @@ Developers need clarity and confidence, not just speed.
 
 The race is on to deliver. Coherence lets us compete.
 
-Starts with clear definitions.
+We start with clear definitions.
 
 Language models are built out of language. Clearly defining your terms changes their behavior. Agents start to do what you meant, not just what you said.
 
@@ -76,10 +82,8 @@ These are the kinds of tools we need to clear the fog.
 
 Spend less inference on code that doesn’t work, less inference detecting bugs, less inference investigating the decisions that went into your changes.
 
-You get a more stable, coherent project, steadily driving toward the floor of irreducible complexity.
-
-The software of 2030 is waiting for us.
+So if you’re ready to try a new way of working with agents, come join us building the software of 2030.
 
 ---
 
-584 words.
+588 words.
