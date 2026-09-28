@@ -467,9 +467,21 @@ The reading: one surface projecting the model for a human, in six views: Structu
 - recorded reading stands only for its tree: The Structure reading a hook reads is kept only when complete and when the tree it read is still the tree, and it stands only while its fingerprint holds: a changed source file, handler, guard, chokepoint or config makes it stale and the gaps unknown, while a spec line the reading never reads leaves it standing.
   over: a partial and an unread reading, an edit made while a reading ran, a changed source file, entrance handler and config, and a control: none added to a spec
   via: a recorded Structure reading stands for the tree only while its fingerprint holds: a partial one is never kept, an edit made while it ran leaves nothing, a changed source file, handler or config makes it stale, and a spec line the reading never reads leaves it standing
-  because: a hook cannot take a reading (a minute on Coherence, three on a large adopter), so it reads the last one; a reading that no longer describes the tree would name gaps that are gone or miss new ones, and saying nothing is better than a guess (d-a1095ef2)
+  because: a hook cannot take a reading (a minute on Coherence, three on a large adopter), so it reads the last one; a reading that no longer describes the tree would name gaps that are gone or miss new ones, so it is never taken for a fresh one: orient names it only labeled as the last reading, less what the current spec closes (d-a1095ef2, df-84db9e4f)
   crossing: record -> reading
   refuted: made freshReading ignore the fingerprint, so a reading of an older tree stood for the current one -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- one structure refresh at a time: A background Structure reading starts detached and the caller returns at once; it never starts twice for one tree, a live one of an older tree is superseded, since its reading could never be kept, and a live process whose command line is not a structure query is never signalled.
+  over: a first refresh, the same tree again, a newer tree, and a live mark naming a process that is no structure query
+  via: one refresh at a time, started detached without waiting: never twice for one tree, a live refresh of an older tree is superseded, and a process that is not a structure query is never signalled
+  because: a reading takes a minute to three and holds a language server, so two at once only compete; the tree a session leaves at its stop is the one the next starts on, and a reading of an older tree is refused when it finishes (df-84db9e4f); a pid can be reused, so only a structure query is ever stopped
+  crossing: record -> reading
+  kinds: none
+- a session start waits only for a nearly done refresh: A session start that finds the reading stale waits for a refresh of this very tree only when the last reading's duration says it finishes within the wait limit, fifteen seconds, and stops waiting when the reading is kept; it never waits on one that will not, nor on a refresh of another tree.
+  over: a refresh of this tree that finishes in under a second, one the last reading's three minutes say will not, and a refresh of another tree
+  via: a session start waits a bounded moment for a refresh of this tree the last reading's duration says is nearly done, and not at all for one that is not
+  because: a session started seconds after the last one stopped would otherwise read the labeled last reading when the fresh one is moments away; the hook's timeout is 60 s and a reading on a large adopter takes three minutes, so a wait is spent only where it is likely to pay (df-84db9e4f)
+  crossing: record -> reading
   kinds: none
 - gap baseline only shrinks: The adoption baseline of spec gaps is a journal decision: the first holds every gap the reading shows, a later one only intersects it, so it never grows.
   over: a first baseline, a smaller one, and a later one naming a gap the baseline never held

@@ -366,12 +366,23 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: dropped the function-word refusal from nominate in lexicon-coverage.ts, so a function word written capitalized mid-sentence was nominated as a proper noun -> "function words are never candidates: every preposition, conjunction, determiner, pronoun and auxiliary is refused however prose writes it" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
   kinds: none
-- orient names spec gaps: Orient names the spec gaps, entrances carrying outside or unknown trust in with no traced control, in one line under the spec block, read from the recorded Structure reading only while it still describes the tree; when it does not, orient says nothing and, at a session start, starts one reading in the background and never waits on it; it names no gap the adoption baseline holds.
+- orient names spec gaps: Orient names the spec gaps, entrances carrying outside or unknown trust in with no traced control, in one line under the spec block, from the recorded Structure reading while it still describes the tree; when it is stale or absent, a session start starts one reading in the background; when no reading was ever kept, orient says only that the gaps are not read yet and which command reads them, never a count; it names no gap the adoption baseline holds.
   over: no reading, a fresh reading, a stale one, and a baselined one, at SessionStart
-  via: orient names the spec gaps in one bounded line from a recorded reading that still describes the tree, says nothing and starts one background reading when it is stale or absent, and names none the adoption baseline holds
-  because: both outside adoptions left their route gaps open because nothing in the session's loop showed them (d-a1095ef2); a reading takes minutes, so a session start may never wait on one, and a stale reading could name gaps that are gone
+  via: orient names the spec gaps in one bounded line from a recorded reading that still describes the tree, starts one background reading when it is stale or absent, says only that the gaps are not read yet when no reading was ever kept, and names none the adoption baseline holds
+  because: both outside adoptions left their route gaps open because nothing in the session's loop showed them (d-a1095ef2); with no reading nothing was traced, so a count would be a guess, but silence hid the gaps from every session that started before one was kept (df-84db9e4f)
   crossing: project-source -> reading
-  refuted: left the gap block out of the start injection in startReading -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- orient names the last reading's gaps when it is stale: When the recorded Structure reading no longer describes the tree, orient names the gaps as that reading had them, derived with the current spec and runs, labeled as the reading before the latest changes with when it was taken, and never a gap the current spec visibly closes: an entrance that now declares guard: or control: none, carries trusted work in, or is no longer declared; the injection holds its budget.
+  over: a reading made stale by a source edit, then a control: none, a guard:, a trusted trust: and a removed entrance in the current spec, and all of them closed, at SessionStart
+  via: orient names the gaps as the last reading had them when it no longer describes the tree, labeled as the reading before the latest changes, with the current trust, and never one the current spec visibly closes by guard:, control: none or removing the entrance, within the start budget
+  because: an adopting session ends by committing spec changes, so the next session always started on a stale reading and orient said nothing; the line never reached an agent in the A/B test (df-84db9e4f). The reading's component interfaces change slowly and the spec is read now, so the last reading with the current spec names what is still open, and a gap the spec answers is never named
+  crossing: project-source -> reading
+  kinds: none
+- a session's stop refreshes the structure reading: At a session's Stop, when the recorded Structure reading no longer describes the tree, one reading of the tree the session leaves is started in the background and never waited on, even when nothing is left uncommitted; a SubagentStop starts none.
+  over: a fresh reading at Stop, a committed spec change at SubagentStop, then at Stop
+  via: the session's stop starts one background reading of the tree it leaves when the recorded one no longer describes it, and returns without waiting; a subagent stop starts none
+  because: the tree a session leaves is the tree the next one starts on, so reading it at the stop gives the next session a fresh reading whenever it starts a reading's length later (df-84db9e4f); a subagent stops while its session still edits, and each of its stops would supersede the last one's reading
+  crossing: project-source -> reading
   kinds: none
 - a spec gap never refuses a stop: Regulate names the spec gaps a session touched, the handler files it changed and the untrusted entrances it declared with neither guard: nor control: none, and never refuses a stop for them.
   over: a session that changed nothing, one that changed a handler file of two gaps and declared an untrusted entrance, at Stop and at SubagentStop

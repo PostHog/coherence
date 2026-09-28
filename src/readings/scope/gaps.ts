@@ -16,9 +16,15 @@
  * only while that fingerprint holds; the gaps are then derived from it with
  * the current spec and the current runs, so a verified run or a new
  * control: none shows at once. A reading whose fingerprint no longer holds
- * is stale, and a hook says nothing rather than guess: orient then starts one
- * reading in the background (one at a time, never twice for the same tree)
- * so a later session has it, and returns at once.
+ * is stale. A session's stop starts one reading of the tree it leaves in the
+ * background (one at a time, a refresh of an older tree superseded, never
+ * twice for the same tree), so the next session starts on a fresh one
+ * (df-84db9e4f). A session start that finds the reading stale waits a
+ * bounded moment for a refresh of this tree that is nearly done; otherwise it
+ * names the gaps as the last reading had them, derived with the current spec,
+ * less every gap the spec now visibly closes, and labeled as from the reading
+ * before the latest changes. With no reading ever kept it says only that the
+ * gaps are not read yet and how to read them.
  *
  * Regulate names the gaps this session touched: a handler file it changed,
  * as the current reading has the gaps or, when the session's own edits made
@@ -170,6 +176,8 @@ interface Recorded {
   at: string;
   fingerprint: string;
   reading: InterfaceReading;
+  /** How long the reading took, in milliseconds: what a session start weighs a wait against (df-84db9e4f). */
+  ms?: number;
 }
 
 function readingPath(root: string): string {
@@ -188,28 +196,34 @@ function writeAtomically(path: string, text: string): void {
  * adapter, no budget spent), and only when the tree it read is still the tree
  * (`before`, the fingerprint taken as it started, holds now). True when kept.
  */
-export function recordReading(root: string, reading: InterfaceReading, before: string): boolean {
+export function recordReading(root: string, reading: InterfaceReading, before: string, ms?: number): boolean {
   if (reading.kind !== "read" || reading.partial !== undefined) return false;
   try {
     if (structureFingerprint(root) !== before) return false;
-    writeAtomically(readingPath(root), JSON.stringify({ version: RECORD_VERSION, at: new Date().toISOString(), fingerprint: before, reading } satisfies Recorded));
+    writeAtomically(readingPath(root), JSON.stringify({ version: RECORD_VERSION, at: new Date().toISOString(), fingerprint: before, reading, ...(ms === undefined ? {} : { ms }) } satisfies Recorded));
     return true;
   } catch {
     return false;
   }
 }
 
-/** The recorded reading when it still describes the tree, with when it was taken; undefined when there is none or it is stale. */
-export function freshReading(root: string, fingerprint: string = structureFingerprint(root)): { reading: InterfaceReading; at: string } | undefined {
+/** The last complete reading kept, whatever tree it read; undefined when none was ever kept (or it is unreadable). */
+export function lastReading(root: string): Recorded | undefined {
   const path = readingPath(root);
   if (!existsSync(path)) return undefined;
   try {
     const recorded = JSON.parse(readFileSync(path, "utf8")) as Recorded;
-    if (recorded.version !== RECORD_VERSION || recorded.fingerprint !== fingerprint) return undefined;
-    return { reading: recorded.reading, at: recorded.at };
+    return recorded.version === RECORD_VERSION ? recorded : undefined;
   } catch {
     return undefined;
   }
+}
+
+/** The recorded reading when it still describes the tree, with when it was taken; undefined when there is none or it is stale. */
+export function freshReading(root: string, fingerprint: string = structureFingerprint(root)): { reading: InterfaceReading; at: string } | undefined {
+  const recorded = lastReading(root);
+  if (recorded === undefined || recorded.fingerprint !== fingerprint) return undefined;
+  return { reading: recorded.reading, at: recorded.at };
 }
 
 /**
@@ -238,6 +252,33 @@ export function currentGaps(root: string, fingerprint?: string): (GapState & { a
   return { ...gapsOf(state, flowOf(state)), at: fresh.at };
 }
 
+/**
+ * The gaps as the last reading had them when it no longer describes the tree
+ * (df-84db9e4f): derived from it with the current spec and runs, as a fresh
+ * one is, so a current trust:, crossing, totality oracle or run applies; then
+ * every gap the current spec visibly closes is dropped: an entrance no longer
+ * declared where the reading placed it, or one that now declares guard: (a
+ * stale reading cannot confirm a new registration, so the declaration is
+ * taken at its word here) or control: none. Never names a gap the specs
+ * answer; may miss one the reading never saw. Undefined when no reading was
+ * ever kept.
+ */
+export function lastGaps(root: string): (GapState & { at: string }) | undefined {
+  const recorded = lastReading(root);
+  if (recorded === undefined) return undefined;
+  try {
+    const state = structureState(root, recorded.reading);
+    const derived = gapsOf(state, flowOf(state));
+    const gaps = derived.gaps.filter((g) => {
+      const e = state.spec.components.find((c) => c.folder === g.component)?.entrances.find((x) => x.name === g.name);
+      return e !== undefined && e.guard === undefined && e.noControl === undefined;
+    });
+    return { ...derived, gaps, at: recorded.at };
+  } catch {
+    return undefined;
+  }
+}
+
 /* ------------------------------------------------ background refresh */
 
 interface RefreshMark {
@@ -258,22 +299,68 @@ function alive(pid: number): boolean {
   }
 }
 
+function refreshPath(root: string): string {
+  return join(root, STRUCTURE_DIR, "refresh.json");
+}
+
+function readMark(root: string): RefreshMark | undefined {
+  try {
+    return JSON.parse(readFileSync(refreshPath(root), "utf8")) as RefreshMark;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The refresh under way, when one is alive and young enough to still count; undefined otherwise. */
+export function refreshUnderWay(root: string, now: () => number = Date.now): RefreshMark | undefined {
+  const mark = readMark(root);
+  if (mark === undefined) return undefined;
+  return alive(mark.pid) && now() - Date.parse(mark.at) < REFRESH_STALE_MS ? mark : undefined;
+}
+
+/**
+ * Stop a refresh reading a tree that is no longer the tree: its reading could
+ * never be kept (recordReading refuses a tree that moved), so it only holds
+ * the one slot. Only a process whose command line is a structure query is
+ * signalled, so a reused pid is never touched; its whole group goes, the
+ * language server with it.
+ */
+function supersede(pid: number): boolean {
+  try {
+    const command = execFileSync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 2000 });
+    if (!/\bquery\s+structure\b/.test(command)) return false;
+  } catch {
+    return false;
+  }
+  try {
+    process.kill(-pid, "SIGTERM");
+  } catch {
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Start one reading in the background so a later session has the gaps:
- * detached, its output discarded, never waited on. Nothing starts while
- * another refresh is alive, nor twice for the same tree (a reading that
- * could not finish is not retried until the tree changes). `command` is the
- * argv that records a reading (the CLI's query structure). Returns whether
- * one started.
+ * detached, its output discarded, never waited on. One at a time: nothing
+ * starts while a refresh of this same tree is alive, and a live refresh of an
+ * older tree is superseded (df-84db9e4f: the tree a session leaves at its stop
+ * is the one the next session starts on). Never twice for the same tree (a
+ * reading that could not finish is not retried until the tree changes).
+ * `command` is the argv that records a reading (the CLI's query structure).
+ * Returns whether one started.
  */
 export function refreshInBackground(root: string, command: readonly string[], fingerprint: string, now: () => number = Date.now): boolean {
-  const path = join(root, STRUCTURE_DIR, "refresh.json");
+  const path = refreshPath(root);
   try {
-    if (existsSync(path)) {
-      const mark = JSON.parse(readFileSync(path, "utf8")) as RefreshMark;
-      const age = now() - Date.parse(mark.at);
-      if (alive(mark.pid) && age < REFRESH_STALE_MS) return false;
+    const mark = readMark(root);
+    if (mark !== undefined) {
       if (mark.fingerprint === fingerprint) return false;
+      if (refreshUnderWay(root, now) !== undefined && !supersede(mark.pid)) return false;
     }
     const [program, ...args] = command;
     if (program === undefined) return false;
@@ -406,7 +493,7 @@ function quoted(name: string): string {
  * count, and the three ways to close one. Nothing when there are none.
  * Bounded: one line, names cut at forty characters.
  */
-export function orientGapText(state: GapState, baseline: GapBaseline | undefined, cli: string): string {
+export function orientGapText(state: GapState, baseline: GapBaseline | undefined, cli: string, asOf?: { at: string; refreshing: boolean }): string {
   const open = state.gaps.filter((g) => baseline === undefined || !baseline.entrances.has(key(g.component, g.name)));
   if (open.length === 0) return "";
   const routes = new Map<string, { gap: Gap; count: number }>();
@@ -420,7 +507,21 @@ export function orientGapText(state: GapState, baseline: GapBaseline | undefined
   const where = `${short(busiest.gap.name)}${others > 0 ? ` and ${others} more` : ""} (${busiest.gap.route.stops.join(" -> ")})`;
   const scope = baseline === undefined ? "" : ", beyond the adoption baseline";
   const count = open.length === 1 ? "1 entrance carries" : `${open.length} entrances carry`;
-  return `Spec gaps: ${count} outside or unknown trust in with no traced control on ${open.length === 1 ? "its" : "their"} route${scope}; busiest: ${where}. To close one, ${CLOSE_WAYS}; ${cli} scaffold control ${quoted(short(busiest.gap.name))} proposes it.`;
+  const label = asOf === undefined ? "" : ` (as of the reading before the latest changes, taken ${utc(asOf.at)}${asOf.refreshing ? "; a new one is under way" : ""})`;
+  return `Spec gaps${label}: ${count} outside or unknown trust in with no traced control on ${open.length === 1 ? "its" : "their"} route${scope}; busiest: ${where}. To close one, ${CLOSE_WAYS}; ${cli} scaffold control ${quoted(short(busiest.gap.name))} proposes it.`;
+}
+
+function utc(at: string): string {
+  return `${at.slice(0, 16).replace("T", " ")} UTC`;
+}
+
+/**
+ * Orient's line when no reading was ever kept but an entrance may be a gap
+ * (df-84db9e4f): the gaps are not known, one reading is under way or not, and
+ * the command that reads them now. Never a count: nothing was traced.
+ */
+export function unreadGapText(cli: string, refreshing: boolean): string {
+  return `Spec gaps: not read yet; no structure reading has been kept${refreshing ? ", one is under way in the background, and the next session start names them" : ""}; ${cli} scaffold control --all reads them now (a minute or more).`;
 }
 
 /* --------------------------------------------------- regulate's lines */
@@ -493,7 +594,7 @@ export function regulateGapText(input: {
     return flowUntrusted(e.trust === undefined ? [] : [e.trust], levels, outside);
   });
   if (byFile.size === 0 && fresh.length === 0) return "";
-  const when = now !== undefined || start === undefined ? "" : ` (as the reading at this session's start had it, taken ${start.at.slice(0, 16).replace("T", " ")} UTC)`;
+  const when = now !== undefined || start === undefined ? "" : ` (as the reading at this session's start had it, taken ${utc(start.at)})`;
   const lines = ["Spec gaps this session touched; advisory, never a reason to refuse the stop:"];
   const fileLines = [...byFile.entries()].map(([file, gaps]) => {
     const names = gaps.map((g) => g.name);
@@ -524,7 +625,32 @@ export async function readAndRecord(root: string, read: () => Promise<InterfaceR
   } catch {
     before = undefined;
   }
+  const started = Date.now();
   const reading = await read();
-  if (before !== undefined) recordReading(root, reading, before);
+  if (before !== undefined) recordReading(root, reading, before, Date.now() - started);
   return reading;
+}
+
+/**
+ * A bounded wait at a session start for a refresh of this very tree that the
+ * last reading's duration says will finish within `limitMs` (df-84db9e4f): a
+ * session started seconds after the last one stopped gets the fresh reading
+ * when it is nearly done, and never waits on one that is not. Resolves to
+ * the fresh reading's gaps, or undefined at the deadline.
+ */
+export async function awaitRefresh(root: string, fingerprint: string, limitMs: number, now: () => number = Date.now): Promise<(GapState & { at: string }) | undefined> {
+  const mark = refreshUnderWay(root, now);
+  const took = lastReading(root)?.ms;
+  if (mark === undefined || mark.fingerprint !== fingerprint || took === undefined) return undefined;
+  const remaining = Date.parse(mark.at) + took - now();
+  if (remaining > limitMs) return undefined;
+  // A little slack past the expected finish, never past the limit.
+  const deadline = now() + Math.min(limitMs, Math.max(0, remaining) + 2000);
+  while (now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const fresh = currentGaps(root, fingerprint);
+    if (fresh !== undefined) return fresh;
+    if (refreshUnderWay(root, now) === undefined) return currentGaps(root, fingerprint);
+  }
+  return undefined;
 }

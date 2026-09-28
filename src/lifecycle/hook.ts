@@ -39,8 +39,11 @@
  * Spec gaps (d-a1095ef2) ride with both: orient adds one bounded line when
  * entrances outside the adoption baseline carry untrusted work in with no
  * traced control, read from the last complete Structure reading while it
- * still describes the tree (gaps.ts), and nothing when it does not; at a
- * session start a stale reading starts one refresh in the background, never waited on. Regulate
+ * still describes the tree (gaps.ts); when it does not, from that reading
+ * with the current spec, labeled as the reading before the latest changes,
+ * after a bounded wait at a session start for a refresh of this tree that is
+ * nearly done. A stop, and a session start that finds the reading stale,
+ * starts one refresh in the background, never waited on there (df-84db9e4f). Regulate
  * names the gaps this session touched, advisory: no traced control is not a
  * demonstrated bypass, so a gap never refuses a stop.
  * The root of every event is confined to the project the hook was installed
@@ -68,7 +71,7 @@ import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, t
 import { COHERENCE_LEXICON, installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
-import { currentGaps, declaredThisSession, orientGapText, readGapBaseline, refreshInBackground, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, type GapState } from "../readings/scope/gaps.ts";
+import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
 
@@ -512,11 +515,25 @@ export async function editContext(root: string, input: HookInput, options: HookO
   return lines.join("\n") + "\n";
 }
 
-/** What orient knows of the spec gaps: the gaps now, when the recorded reading still describes the tree, and the fingerprint it was checked against. */
+/**
+ * What orient knows of the spec gaps: the gaps now, when the recorded reading
+ * still describes the tree, and the fingerprint it was checked against; when
+ * it does not, the gaps as the last reading had them with the current spec
+ * (`last`, undefined when none was ever kept) and whether a refresh is under way.
+ */
 export interface GapReading {
   fingerprint: string | undefined;
   now: (GapState & { at: string }) | undefined;
+  last?: (GapState & { at: string }) | undefined;
+  refreshing?: boolean;
 }
+
+/**
+ * The longest a session start waits for a refresh of this very tree that the
+ * last reading's duration says is nearly done: well inside the 60 s hook
+ * timeout with the rest of the start's work (df-84db9e4f).
+ */
+export const START_WAIT_MS = 15_000;
 
 /**
  * Whether any declared entrance could be a gap: one that declares no
@@ -531,21 +548,34 @@ function mayHaveGaps(root: string): boolean {
   return model.components.some((c) => c.entrances.some((e) => e.noControl === undefined && (e.trust === undefined || !trusted.has(e.trust))));
 }
 
-/** The gaps as orient reads them, never guessing: undefined `now` when there is no reading or it is stale. Cheap: a content fingerprint and a parse. */
-export function gapReading(root: string): GapReading {
+/**
+ * The gaps as orient reads them: `now` from a reading that still describes
+ * the tree; else `last`, the last reading's gaps with the current spec, less
+ * those it visibly closes. Cheap: a content fingerprint and a parse. With
+ * `waitMs`, a stale reading first waits that long at most for a refresh of
+ * this tree the last reading's duration says is nearly done.
+ */
+export async function gapReading(root: string, options: { waitMs?: number } = {}): Promise<GapReading> {
   if (!mayHaveGaps(root)) return { fingerprint: undefined, now: undefined };
   try {
     const fingerprint = structureFingerprint(root);
-    return { fingerprint, now: currentGaps(root, fingerprint) };
+    const now = currentGaps(root, fingerprint) ?? (options.waitMs ? await awaitRefresh(root, fingerprint, options.waitMs) : undefined);
+    if (now !== undefined) return { fingerprint, now };
+    return { fingerprint, now: undefined, last: lastGaps(root), refreshing: refreshUnderWay(root) !== undefined };
   } catch {
     return { fingerprint: undefined, now: undefined };
   }
 }
 
 /** Orient's gap line under the spec block, or nothing. */
-export async function gapBlock(root: string, reading: GapReading = gapReading(root)): Promise<string> {
-  if (reading.now === undefined) return "";
-  const text = orientGapText(reading.now, readGapBaseline(root), await cliName(root));
+export async function gapBlock(root: string, reading?: GapReading): Promise<string> {
+  const gaps = reading ?? (await gapReading(root));
+  if (gaps.fingerprint === undefined) return "";
+  const cli = await cliName(root);
+  let text: string;
+  if (gaps.now !== undefined) text = orientGapText(gaps.now, readGapBaseline(root), cli);
+  else if (gaps.last !== undefined) text = orientGapText(gaps.last, readGapBaseline(root), cli, { at: gaps.last.at, refreshing: gaps.refreshing === true });
+  else text = unreadGapText(cli, gaps.refreshing === true);
   return text === "" ? "" : `${text}\n\n`;
 }
 
@@ -633,6 +663,25 @@ export interface HookOptions {
   refresh?: ((root: string, fingerprint: string) => void) | undefined;
   /** The door to the warm instrument; enforcement's own by default. */
   door?: WarmDoor | undefined;
+  /** How long a session start may wait for a nearly done refresh; START_WAIT_MS by default. */
+  startWaitMs?: number | undefined;
+}
+
+/**
+ * At a session's stop, start one reading of the tree it leaves when the
+ * recorded one no longer describes it, so the next session starts on a fresh
+ * one (df-84db9e4f). Detached and never waited on: the stop returns at once.
+ * Only the session's own stop: a subagent stops while its session still
+ * edits, and each stop would supersede the last one's reading.
+ */
+export function refreshAtStop(root: string, options: HookOptions): void {
+  if (options.refresh === undefined || !mayHaveGaps(root)) return;
+  try {
+    const fingerprint = structureFingerprint(root);
+    if (currentGaps(root, fingerprint) === undefined) options.refresh(root, fingerprint);
+  } catch {
+    // A refresh that cannot start only means the next session reads the last reading, labeled.
+  }
 }
 
 /**
@@ -684,10 +733,14 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     case "SessionStart":
     case "SubagentStart": {
       const reading=await lexiconCoverage(root);
-      const gaps = gapReading(root);
-      // A stale or absent reading says nothing now and starts one in the background for a later session; never waited on.
+      // Only a session start waits, and only for a refresh of this tree that is nearly done; a subagent starts at once.
+      let gaps = await gapReading(root, event === "SessionStart" ? { waitMs: options.startWaitMs ?? START_WAIT_MS } : {});
+      // A stale or absent reading starts one in the background (a no-op while one of this tree runs), then orient reads the last one, labeled.
       // Only a session start: a subagent inherits the session's reading, and one refresh per tree is enough.
-      if (event === "SessionStart" && gaps.now === undefined && gaps.fingerprint !== undefined) options.refresh?.(root, gaps.fingerprint);
+      if (event === "SessionStart" && gaps.now === undefined && gaps.fingerprint !== undefined) {
+        options.refresh?.(root, gaps.fingerprint);
+        gaps = { ...gaps, refreshing: refreshUnderWay(root) !== undefined };
+      }
       const context = (await startReading(root, input, reading, gaps)).text;
       const session = sessionOf(input);
       if (session !== undefined) openFeed(root, session);
@@ -695,7 +748,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const commit = (): void => {
         saveBaseline(root, session!, reading);
         // The gaps as this session found them, for regulate once its own edits make the reading stale.
-        if (gaps.now !== undefined) saveSessionGaps(root, session!, gaps.now);
+        const found = gaps.now ?? gaps.last;
+        if (found !== undefined) saveSessionGaps(root, session!, found);
       };
       return { stdout: stdout + "\n", stderr: "", exit: 0, ...(session ? { commit } : {}) };
     }
@@ -716,6 +770,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     }
     case "Stop":
     case "SubagentStop": {
+      // The tree this session leaves is the one the next starts on: read it now, in the background, never waited on (df-84db9e4f).
+      if (event === "Stop") refreshAtStop(root, options);
       const changed = await changedFiles(root);
       const report = await checkChanged(root, changed.files);
       const session=sessionOf(input);

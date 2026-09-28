@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { CLOSE_WAYS, STRUCTURE_DIR, currentGaps, freshReading, gapsOf, orientGapText, readAndRecord, readGapBaseline, recordGapBaseline, recordReading, structureFingerprint, type GapState } from "./gaps.ts";
+import { CLOSE_WAYS, STRUCTURE_DIR, awaitRefresh, currentGaps, freshReading, gapsOf, orientGapText, readAndRecord, readGapBaseline, recordGapBaseline, recordReading, refreshInBackground, refreshUnderWay, structureFingerprint, type GapState } from "./gaps.ts";
 import type { InterfaceReading } from "./model.ts";
 import { gapProject } from "./gaps-fixture.ts";
 
@@ -90,4 +90,91 @@ test("orient's gap line is one bounded line naming the count, the busiest route 
   const fresh = orientGapText({ ...state, gaps: [...state.gaps, gap("new", "r3", 1)] }, baseline, "coherence");
   assert.match(fresh, /^Spec gaps: 1 entrance carries [^]*beyond the adoption baseline; busiest: new \(/, "a new uncontrolled entrance is always named");
   assert.equal(gapsOf({ spec: { components: [], trustLevels: [] } } as never, { routes: [], entrances: [] } as never).gaps.length, 0);
+});
+
+/* ---------------------------------------- the refresh (df-84db9e4f) */
+
+function running(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function until(check: () => boolean, ms: number): Promise<boolean> {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    if (check()) return true;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return check();
+}
+
+function mark(root: string): { pid: number; at: string; fingerprint: string } {
+  return JSON.parse(readFileSync(join(root, STRUCTURE_DIR, "refresh.json"), "utf8")) as { pid: number; at: string; fingerprint: string };
+}
+
+test("one refresh at a time, started detached without waiting: never twice for one tree, a live refresh of an older tree is superseded, and a process that is not a structure query is never signalled", async () => {
+  const { root, remove } = gapProject();
+  // A stand-in for query structure: it sleeps, and its command line names the question as the real one does.
+  const command = [process.execPath, "-e", "setTimeout(() => {}, 30000)", "query", "structure"];
+  const pids: number[] = [];
+  try {
+    const began = Date.now();
+    assert.equal(refreshInBackground(root, command, "tree-a"), true);
+    assert.ok(Date.now() - began < 1000, `the start returns at once: ${Date.now() - began} ms`);
+    const first = mark(root).pid;
+    pids.push(first);
+    assert.ok(running(first), "the reading runs on after the start returned");
+    assert.ok(refreshUnderWay(root) !== undefined);
+    assert.equal(refreshInBackground(root, command, "tree-a"), false, "never twice for one tree");
+    assert.equal(refreshInBackground(root, command, "tree-b"), true, "a newer tree supersedes");
+    const second = mark(root).pid;
+    pids.push(second);
+    assert.notEqual(second, first);
+    assert.ok(await until(() => !running(first), 3000), "the refresh of the older tree is stopped: its reading could never be kept");
+    assert.ok(running(second));
+    // A mark whose pid is alive but no structure query (here, this test's own process) is never signalled, and holds the slot.
+    writeFileSync(join(root, STRUCTURE_DIR, "refresh.json"), JSON.stringify({ pid: process.pid, at: new Date().toISOString(), fingerprint: "tree-c" }));
+    assert.equal(refreshInBackground(root, command, "tree-d"), false, "an unrecognized live process is left alone");
+    assert.equal(mark(root).pid, process.pid);
+  } finally {
+    for (const pid of pids) if (running(pid)) process.kill(pid, "SIGKILL");
+    remove();
+  }
+});
+
+test("a session start waits a bounded moment for a refresh of this tree the last reading's duration says is nearly done, and not at all for one that is not", async () => {
+  const { root, reading, remove } = gapProject();
+  try {
+    await readAndRecord(root, async () => reading);
+    writeFileSync(join(root, "src", "look.ts"), "export function look(): void { return; }\nexport function peek(): void {}\nexport function ping(): void {}\n");
+    const fingerprint = structureFingerprint(root);
+    assert.equal(currentGaps(root, fingerprint), undefined, "stale");
+    // A refresh of this tree under way (this process stands for it: alive), begun just now; the last reading took moments.
+    const refreshing = (tree: string): void => writeFileSync(join(root, STRUCTURE_DIR, "refresh.json"), JSON.stringify({ pid: process.pid, at: new Date().toISOString(), fingerprint: tree }));
+    refreshing(fingerprint);
+    const done = setTimeout(() => void readAndRecord(root, async () => reading), 600);
+    const began = Date.now();
+    const fresh = await awaitRefresh(root, fingerprint, 15_000);
+    clearTimeout(done);
+    assert.ok(fresh !== undefined, "the nearly done refresh was waited for");
+    assert.deepEqual(fresh.gaps.map((g) => g.name).sort(), ["look", "peek"]);
+    assert.ok(Date.now() - began < 5000, `and the wait ended when it finished: ${Date.now() - began} ms`);
+
+    writeFileSync(join(root, "src", "look.ts"), "export function look(): void {}\nexport function peek(): void { return; }\nexport function ping(): void {}\n");
+    const next = structureFingerprint(root);
+    const recorded = join(root, STRUCTURE_DIR, "reading.json");
+    writeFileSync(recorded, JSON.stringify({ ...JSON.parse(readFileSync(recorded, "utf8")), ms: 180_000 }));
+    refreshing(next);
+    const slow = Date.now();
+    assert.equal(await awaitRefresh(root, next, 15_000), undefined, "a reading that takes three minutes is not waited on");
+    assert.ok(Date.now() - slow < 500, `not at all: ${Date.now() - slow} ms`);
+    refreshing("another tree");
+    assert.equal(await awaitRefresh(root, next, 15_000), undefined, "nor a refresh of another tree");
+  } finally {
+    remove();
+  }
 });

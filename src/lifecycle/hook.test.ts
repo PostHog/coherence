@@ -17,7 +17,7 @@ import { TRACES_DIR, recordReadTrace } from "../economy/trace.ts";
 import { COHERENCE_LEXICON, installedRoot } from "./project.ts";
 import { loadLexicon, rejectedNames } from "./lexicon.ts";
 import { gapProject } from "../readings/scope/gaps-fixture.ts";
-import { currentGaps, readAndRecord, recordGapBaseline } from "../readings/scope/gaps.ts";
+import { currentGaps, readAndRecord, recordGapBaseline, structureFingerprint } from "../readings/scope/gaps.ts";
 
 /** Coherence's own rejected names, drawn from its lexicon so this file never spells one. */
 async function coherenceRejected(concept: string): Promise<string> {
@@ -649,30 +649,98 @@ test("the feed cursor advances only after the feed is printed: rendering moves n
 
 /* ------------------------------------------------ spec gaps (d-a1095ef2) */
 
-test("orient names the spec gaps in one bounded line from a recorded reading that still describes the tree, says nothing and starts one background reading when it is stale or absent, and names none the adoption baseline holds", async () => {
+/** Orient's start injection for a SessionStart on `project`, with a refresh that only counts what it was asked to start. */
+function gapStarter(project: string, session: string): { start: () => Promise<string>; started: string[] } {
+  const started: string[] = [];
+  const refresh = (_root: string, fingerprint: string): void => void started.push(fingerprint);
+  const start = async (): Promise<string> => {
+    const result = await runHook("SessionStart", { session_id: session, cwd: project }, project, { refresh, startWaitMs: 0 });
+    return (JSON.parse(result.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext;
+  };
+  return { start, started };
+}
+
+function gapLine(text: string): string | undefined {
+  return text.split("\n").find((l) => l.startsWith("Spec gaps"));
+}
+
+test("orient names the spec gaps in one bounded line from a recorded reading that still describes the tree, starts one background reading when it is stale or absent, says only that the gaps are not read yet when no reading was ever kept, and names none the adoption baseline holds", async () => {
   const { root: project, reading, remove } = gapProject();
   try {
-    const started: string[] = [];
-    const refresh = (_root: string, fingerprint: string): void => void started.push(fingerprint);
-    const start = async (): Promise<string> => {
-      const result = await runHook("SessionStart", { session_id: "gap-orient", cwd: project }, project, { refresh });
-      return (JSON.parse(result.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext;
-    };
-    assert.doesNotMatch(await start(), /Spec gaps/, "no reading: nothing is said, never guessed");
+    const { start, started } = gapStarter(project, "gap-orient");
+    const unread = gapLine(await start());
+    assert.ok(unread !== undefined, "no reading ever kept: a pointer, never silence");
+    assert.match(unread, /^Spec gaps: not read yet; no structure reading has been kept; node \S+ scaffold control --all reads them now \(a minute or more\)\.$/, "and never a count: nothing was traced");
     assert.equal(started.length, 1, "and one reading is started in the background");
     await readAndRecord(project, async () => reading);
     const text = await start();
-    const line = text.split("\n").find((l) => l.startsWith("Spec gaps"));
+    const line = gapLine(text);
     assert.ok(line !== undefined, text);
     assert.match(line, /^Spec gaps: 2 entrances carry outside or unknown trust in with no traced control on their route; busiest: look and 1 more \(\.\)\. To close one, declare guard: <chokepoint>[^]*control: none — <reason>; node \S+ scaffold control look proposes it\.$/);
     assert.ok(text.length <= CONTEXT_BUDGET, "the injection holds the budget");
     assert.equal(started.length, 1, "a fresh reading starts nothing");
     writeFileSync(join(project, "src", "look.ts"), "export function look(): void { return; }\nexport function peek(): void {}\nexport function ping(): void {}\n");
-    assert.doesNotMatch(await start(), /Spec gaps/, "a stale reading says nothing");
-    assert.equal(started.length, 2);
+    assert.match(gapLine(await start()) ?? "", /^Spec gaps \(as of the reading before the latest changes/, "a stale reading is named as the last one");
+    assert.equal(started.length, 2, "and a stale reading starts one refresh");
     await readAndRecord(project, async () => reading);
     recordGapBaseline(project, currentGaps(project)!, { session: "gap-orient", agent: "test" });
     assert.doesNotMatch(await start(), /Spec gaps/, "gaps present at adoption do not nag orient");
+  } finally {
+    remove();
+  }
+});
+
+test("orient names the gaps as the last reading had them when it no longer describes the tree, labeled as the reading before the latest changes, with the current trust, and never one the current spec visibly closes by guard:, control: none or removing the entrance, within the start budget", async () => {
+  const { root: project, reading, remove } = gapProject();
+  try {
+    await readAndRecord(project, async () => reading);
+    const { start } = gapStarter(project, "gap-stale");
+    const spec = readFileSync(join(project, "Gappy.spec.md"), "utf8");
+    // The adoption hand-off: the session's last act changes a source file, so the reading no longer describes the tree.
+    writeFileSync(join(project, "src", "look.ts"), "export function look(): void { return; }\nexport function peek(): void {}\nexport function ping(): void {}\n");
+    assert.equal(currentGaps(project), undefined, "the reading is stale");
+    const text = await start();
+    const line = gapLine(text);
+    assert.ok(line !== undefined, text);
+    assert.match(line, /^Spec gaps \(as of the reading before the latest changes, taken [0-9-]+ [0-9:]+ UTC\): 2 entrances carry outside or unknown trust in with no traced control on their route; busiest: look and 1 more/);
+    assert.ok(text.length <= CONTEXT_BUDGET, "the labeled line keeps the injection within the budget");
+    const lookNone = spec.replace("  trust: public\n- peek", "  trust: public\n  control: none — the same page for every caller\n- peek");
+    const peekGuard = (from: string): string => from.replace("handler: peek in src/look.ts\n  trust: public", "handler: peek in src/look.ts\n  trust: public\n  guard: door");
+    const cases: [string, string, RegExp][] = [
+      ["control: none", lookNone, /: 1 entrance carries[^]*busiest: peek/],
+      ["guard:", peekGuard(spec), /: 1 entrance carries[^]*busiest: look/],
+      ["the current trust", spec.replace("handler: peek in src/look.ts\n  trust: public", "handler: peek in src/look.ts\n  trust: inside"), /: 1 entrance carries[^]*busiest: look/],
+      ["removing the entrance", spec.replace("- peek: a caller peeks\n  handler: peek in src/look.ts\n  trust: public\n", ""), /: 1 entrance carries[^]*busiest: look/],
+    ];
+    for (const [what, changed, expected] of cases) {
+      assert.notEqual(changed, spec, what);
+      writeFileSync(join(project, "Gappy.spec.md"), changed);
+      const shown = gapLine(await start()) ?? "";
+      assert.match(shown, expected, `${what}: the gap the current spec closes is not named: ${shown}`);
+    }
+    writeFileSync(join(project, "Gappy.spec.md"), peekGuard(lookNone));
+    assert.equal(gapLine(await start()), undefined, "every gap closed by the current spec: nothing is said");
+  } finally {
+    remove();
+  }
+});
+
+test("the session's stop starts one background reading of the tree it leaves when the recorded one no longer describes it, and returns without waiting; a subagent stop starts none", async () => {
+  const { root: project, reading, remove } = gapProject();
+  try {
+    await readAndRecord(project, async () => reading);
+    const started: string[] = [];
+    const refresh = (_root: string, fingerprint: string): void => void started.push(fingerprint);
+    await runHook("Stop", { session_id: "gap-leave", cwd: project }, project, { refresh });
+    assert.equal(started.length, 0, "a reading that describes the tree starts nothing");
+    const spec = readFileSync(join(project, "Gappy.spec.md"), "utf8");
+    // The adoption hand-off: the session commits a spec change the reading depends on as its last act.
+    writeFileSync(join(project, "Gappy.spec.md"), spec.replace("handler: peek in src/look.ts", "handler: look in src/look.ts"));
+    execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-qam", "adopt"], { cwd: project });
+    await runHook("SubagentStop", { agent_id: "gap-leave-sub", hook_event_name: "SubagentStop", cwd: project }, project, { refresh });
+    assert.equal(started.length, 0, "a subagent stops while its session still edits: no refresh");
+    await runHook("Stop", { session_id: "gap-leave", cwd: project }, project, { refresh });
+    assert.deepEqual(started, [structureFingerprint(project)], "the stop starts one reading, of the tree it leaves, even with nothing uncommitted");
   } finally {
     remove();
   }
