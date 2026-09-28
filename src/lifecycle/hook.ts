@@ -53,7 +53,7 @@
 
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
@@ -305,7 +305,8 @@ export function workStopText(root: string, input: HookInput): string {
  * target).
  */
 const OWN_CLI = ((): string => {
-  const own = fileURLToPath(new URL("../cli.ts", import.meta.url));
+  // Compiled, this module is .js and so is the cli beside it.
+  const own = fileURLToPath(new URL(`../cli${extname(fileURLToPath(import.meta.url))}`, import.meta.url));
   const invoked = process.argv[1];
   try {
     if (invoked !== undefined && realpathSync(invoked) === realpathSync(own)) return resolve(invoked);

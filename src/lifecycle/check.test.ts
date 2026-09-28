@@ -7,7 +7,7 @@ import { after, before, test } from "node:test";
 import { failingRejected, formatReport, hasFindings, identifierWords, normalizeTerm, runCheck, type CheckReport } from "./check.ts";
 import { findingDigest, readBaseline, recordBaseline } from "./lexicon-baseline.ts";
 import { loadLexicon, parseLexicon, rejectedNames, type Lexicon } from "./lexicon.ts";
-import { COHERENCE_LEXICON } from "./project.ts";
+import { COHERENCE_LEXICON, PACKAGE_NAME } from "./project.ts";
 
 let root: string;
 let coherence: Lexicon;
@@ -306,7 +306,7 @@ test("Coherence's rejected names bind only in Coherence's own text: in an adopte
     assert.ok(!/REJECTED NAME .*(src\/|spec|config|journal)/.test(text), "no advisory hit is printed as a failure");
     assert.equal(hasFindings({ ...out, rejected: out.rejected.filter((f) => f.advisory === true) }), false, "an advisory hit never fails the check");
     // Detected, not assumed: the same text in a folder whose package is Coherence binds everywhere.
-    await writeFile(join(dir, "package.json"), JSON.stringify({ name: "coherence" }));
+    await writeFile(join(dir, "package.json"), JSON.stringify({ name: PACKAGE_NAME }));
     const own = await runCheck({ root: dir, ...lexicons });
     assert.ok(own.rejected.some((f) => f.file === "notes.md" && f.name === REJ && f.advisory !== true), "in Coherence's own repository its names bind in prose");
     assert.ok(own.rejected.some((f) => f.file === "src/a.ts" && f.advisory !== true), "and in identifiers");
@@ -386,7 +386,7 @@ test("the baseline only shrinks: a fresh adoption passes once baselined, a new f
 
 /** In Coherence's own repository a baseline record excuses nothing: its text is enforced whole. */
 async function ownRepositoryKeepsNoBaseline(): Promise<void> {
-  const dir = await adopter({ "package.json": JSON.stringify({ name: "coherence" }), "notes.md": `The ${REJ} is here.\n` });
+  const dir = await adopter({ "package.json": JSON.stringify({ name: PACKAGE_NAME }), "notes.md": `The ${REJ} is here.\n` });
   try {
     const key = findingDigest("notes.md", REJ, `The ${REJ} is here.`);
     await mkdir(join(dir, ".coherence", "journal"), { recursive: true });

@@ -14,7 +14,7 @@ import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
 import { BOUNDARY_RULE, CONTEXT_BUDGET, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, adopterExample, adopterInstruction, runHook, sessionBlock, type WarmDoor } from "./hook.ts";
 import { withWarmAdapter } from "../enforcement/run.ts";
 import { TRACES_DIR, recordReadTrace } from "../economy/trace.ts";
-import { COHERENCE_LEXICON, installedRoot } from "./project.ts";
+import { COHERENCE_LEXICON, installedRoot, PACKAGE_NAME } from "./project.ts";
 import { loadLexicon, rejectedNames } from "./lexicon.ts";
 import { gapProject } from "../readings/scope/gaps-fixture.ts";
 import { currentGaps, readAndRecord, recordGapBaseline, structureFingerprint } from "../readings/scope/gaps.ts";
@@ -107,7 +107,7 @@ test("SessionStart and SubagentStart inject both lexicons and the instruction as
 test("Coherence's own start hooks name its source-tree journal command", async () => {
   const dir = await freshRoot();
   try {
-    await writeFile(join(dir, "package.json"), JSON.stringify({ name: "coherence" }));
+    await writeFile(join(dir, "package.json"), JSON.stringify({ name: PACKAGE_NAME }));
     for (const event of ["SessionStart", "SubagentStart"] as const) {
       const result = await runHook(event, { cwd: dir, session_id: "s-journal" }, dir);
       assert.equal(result.exit, 0);

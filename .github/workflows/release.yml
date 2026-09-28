@@ -1,0 +1,56 @@
+# Publishes @posthog/coherence to npm through trusted publishing: npm trusts
+# this workflow file, in PostHog/coherence, running in the Release
+# environment, and no token is stored anywhere. Run it by hand from the
+# Actions tab after the version in package.json is bumped on main; it
+# refuses a version npm already has.
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: Release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm 11.5.1 or newer.
+      - run: npm install --global npm@11
+
+      # No dependency's install script runs here: the font package's is telemetry.
+      - run: npm ci --ignore-scripts
+
+      - name: Refuse a version npm already has
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "@posthog/coherence@$version" version >/dev/null 2>&1; then
+            echo "::error::@posthog/coherence@$version is already on npm; bump the version in package.json"
+            exit 1
+          fi
+
+      - run: npm run typecheck
+
+      # prepack builds dist; the tarball is checked before it is published.
+      - run: npm pack
+      - name: Check the tarball runs
+        run: |
+          mkdir "$RUNNER_TEMP/smoke" && cd "$RUNNER_TEMP/smoke"
+          npm init -y >/dev/null
+          npm install --ignore-scripts "$GITHUB_WORKSPACE"/posthog-coherence-*.tgz
+          npx coherence spec --check
+
+      - run: npm publish posthog-coherence-*.tgz --access public --provenance

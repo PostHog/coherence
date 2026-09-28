@@ -7,6 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { cliName, HOOK_EVENTS, REFUSE_EXIT } from "./hook.ts";
+import { PACKAGE_NAME } from "./project.ts";
 import { driftOf, formatCheck, formatStatus, install, LOCATED_PREFIX, locate, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
@@ -399,6 +400,23 @@ test("a hook without Coherence installed is silent but for one line", async () =
     for (const host of ["claude", "codex"] as const) assert.equal((await uninstall(project, host)).removed.length, HOOK_EVENTS.length);
   } finally {
     await rm(parent, { recursive: true, force: true });
+  }
+});
+
+test("an installed package is located by its own cli before the project's bin, which a package manager may write as a shim node cannot run", async () => {
+  const project = await mkdtemp(join(tmpdir(), "coherence-package-"));
+  try {
+    await install({ root: project, host: "codex", command: LOCATED_PREFIX });
+    const cli = join(project, "node_modules", PACKAGE_NAME, "dist", "cli.js");
+    const bin = join(project, "node_modules", ".bin", "coherence");
+    await mkdir(dirname(cli), { recursive: true });
+    await mkdir(dirname(bin), { recursive: true });
+    await writeFile(bin, "#!/bin/sh\nexec node \"$(dirname \"$0\")/../@posthog/coherence/dist/cli.js\" \"$@\"\n");
+    assert.equal(locate(project, hostEnv("codex", project)), bin, "with only the bin, the bin is found");
+    await writeFile(cli, "");
+    assert.equal(locate(project, hostEnv("codex", project)), cli, "the package's own cli comes first");
+  } finally {
+    await rm(project, { recursive: true, force: true });
   }
 });
 
