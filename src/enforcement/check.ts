@@ -92,11 +92,11 @@ export function classifySite(site: ReferenceSite, protectedThing: Definition, ch
   // A re-export widens the thing's reach with no call at all, so it is a bypass wherever it stands.
   if (site.form === "re-export") return "bypass";
   // A plain import specifier is how the chokepoint's own module reaches the thing, not a place the thing is used.
-  const inChokepointModule = chokepoint.kind === "module" ? withinModule(site.file, chokepoint.file) : site.file === chokepoint.file;
+  const inChokepointModule = chokepoint.kind === "module" ? withinModule(site.file, chokepoint) : site.file === chokepoint.file;
   if (site.form === "import" && inChokepointModule) return "inside";
   if (chokepoint.kind === "module" ? inChokepointModule : site.file === chokepoint.file && rangeContains(chokepoint.range, position)) return "inside";
-  if (protectedThing.kind === "module" && withinModule(site.file, protectedThing.file)) return "inside";
-  if (isTestPath(site.file, testFolders)) return "test";
+  if (protectedThing.kind === "module" && withinModule(site.file, protectedThing)) return "inside";
+  if (site.testResource === true || isTestPath(site.file, testFolders)) return "test";
   return "bypass";
 }
 
@@ -110,13 +110,15 @@ export function classifySite(site: ReferenceSite, protectedThing: Definition, ch
 export function classifyChokepointSite(site: ReferenceSite, chokepoint: Definition): "inside" | "chokepoint-reference" {
   const position = { line: site.line - 1, character: site.character };
   const inChokepoint = chokepoint.kind === "module"
-    ? withinModule(site.file, chokepoint.file)
+    ? withinModule(site.file, chokepoint)
     : site.file === chokepoint.file && rangeContains(chokepoint.range, position);
   return inChokepoint ? "inside" : "chokepoint-reference";
 }
 
-/** Whether a file is the module, or, when the module is a package's __init__, one of the package's own files. */
-function withinModule(file: string, moduleFile: string): boolean {
+/** Whether a file is the module, one of a folder module's members, or, when the module is a package's __init__, one of the package's own files. */
+function withinModule(file: string, module: Definition): boolean {
+  if (module.members !== undefined) return module.members.includes(file);
+  const moduleFile = module.file;
   if (file === moduleFile) return true;
   const init = /^(.*)\/__init__\.py$/.exec(moduleFile);
   return init !== null && file.startsWith(init[1] + "/");
@@ -165,7 +167,8 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
   const chokepoint = chokepointResolved.definition;
   // A definition outside the project's files is no answer about this project: an instrument that indexed a nested
   // checkout (a warm server started before the rule) resolved the name to that checkout's copy. Nothing is graded on it.
-  const foreign = [protectedThing, chokepoint].filter((d) => projectSites(input.root, [d]).length === 0);
+  // A folder module is the project's when one of its member files is.
+  const foreign = [protectedThing, chokepoint].filter((d) => projectSites(input.root, (d.members ?? [d.file]).map((file) => ({ file }))).length === 0);
   if (foreign.length > 0) {
     return {
       ...base,
@@ -187,8 +190,8 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
   const protectedReferences = projectSites(input.root, await adapter.references(protectedThing));
   const chokepointReferences = projectSites(input.root, await adapter.references(chokepoint));
   const sites: ClassifiedSite[] = [
-    ...protectedReferences.map((site) => ({ ...site, of: "protected" as const, test: isTestPath(site.file, input.testFolders), class: classifySite(site, protectedThing, chokepoint, input.testFolders) })),
-    ...chokepointReferences.map((site) => ({ ...site, of: "chokepoint" as const, test: isTestPath(site.file, input.testFolders), class: classifyChokepointSite(site, chokepoint) })),
+    ...protectedReferences.map((site) => ({ ...site, of: "protected" as const, test: site.testResource === true || isTestPath(site.file, input.testFolders), class: classifySite(site, protectedThing, chokepoint, input.testFolders) })),
+    ...chokepointReferences.map((site) => ({ ...site, of: "chokepoint" as const, test: site.testResource === true || isTestPath(site.file, input.testFolders), class: classifyChokepointSite(site, chokepoint) })),
   ].sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.character - b.character || a.of.localeCompare(b.of));
   const counts: Record<Exclude<SiteClass, "chokepoint-reference">, number> = { inside: 0, test: 0, bypass: 0 };
   for (const site of sites) if (site.of === "protected" && site.class !== "chokepoint-reference") counts[site.class] += 1;
