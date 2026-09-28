@@ -490,12 +490,18 @@ function quoted(name: string): string {
 /**
  * Orient's line: how many entrances outside the adoption baseline carry
  * untrusted work in with no traced control, the busiest route by entrance
- * count, and the three ways to close one. Nothing when there are none.
+ * count, and the three ways to close one; and how many the baseline holds
+ * that are still open, counted, never named. Nothing when there are none.
  * Bounded: one line, names cut at forty characters.
  */
 export function orientGapText(state: GapState, baseline: GapBaseline | undefined, cli: string, asOf?: { at: string; refreshing: boolean }): string {
-  const open = state.gaps.filter((g) => baseline === undefined || !baseline.entrances.has(key(g.component, g.name)));
-  if (open.length === 0) return "";
+  const held = (g: Gap): boolean => baseline !== undefined && baseline.entrances.has(key(g.component, g.name));
+  const open = state.gaps.filter((g) => !held(g));
+  // Gaps held by the adoption baseline stop counting as new, but they are still open: orient keeps their count in view, never their names.
+  const baselined = state.gaps.length - open.length;
+  const label = asOf === undefined ? "" : ` (as of the reading before the latest changes, taken ${utc(asOf.at)}${asOf.refreshing ? "; a new one is under way" : ""})`;
+  const still = baselined === 0 ? "" : `${baselined === 1 ? "1 gap" : `${baselined} gaps`} baselined at adoption ${baselined === 1 ? "remains" : "remain"} open`;
+  if (open.length === 0) return baselined === 0 ? "" : `Spec gaps${label}: none new since adoption; ${still}; ${cli} scaffold control --all proposes how to close them.`;
   const routes = new Map<string, { gap: Gap; count: number }>();
   for (const g of open) {
     const known = routes.get(g.route.id);
@@ -507,8 +513,7 @@ export function orientGapText(state: GapState, baseline: GapBaseline | undefined
   const where = `${short(busiest.gap.name)}${others > 0 ? ` and ${others} more` : ""} (${busiest.gap.route.stops.join(" -> ")})`;
   const scope = baseline === undefined ? "" : ", beyond the adoption baseline";
   const count = open.length === 1 ? "1 entrance carries" : `${open.length} entrances carry`;
-  const label = asOf === undefined ? "" : ` (as of the reading before the latest changes, taken ${utc(asOf.at)}${asOf.refreshing ? "; a new one is under way" : ""})`;
-  return `Spec gaps${label}: ${count} outside or unknown trust in with no traced control on ${open.length === 1 ? "its" : "their"} route${scope}; busiest: ${where}. To close one, ${CLOSE_WAYS}; ${cli} scaffold control ${quoted(short(busiest.gap.name))} proposes it.`;
+  return `Spec gaps${label}: ${count} outside or unknown trust in with no traced control on ${open.length === 1 ? "its" : "their"} route${scope}; busiest: ${where}. To close one, ${CLOSE_WAYS}; ${cli} scaffold control ${quoted(short(busiest.gap.name))} proposes it.${still === "" ? "" : ` Also, ${still}.`}`;
 }
 
 function utc(at: string): string {

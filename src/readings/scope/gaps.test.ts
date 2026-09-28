@@ -74,7 +74,7 @@ test("the gaps derive from the recorded reading with the current runs and spec, 
   }
 });
 
-test("orient's gap line is one bounded line naming the count, the busiest route by entrance count and the three ways to close one; nothing when none is outside the baseline", () => {
+test("orient's gap line is one bounded line naming the count, the busiest route by entrance count and the three ways to close one; gaps the baseline holds stay counted as open, never named; nothing when there are none", () => {
   const gap = (name: string, route: string, entrances: number): GapState["gaps"][number] => ({ component: ".", name, specPath: "Gappy.spec.md", handler: undefined, file: undefined, trust: ["public"], route: { id: route, first: name, entrances, stops: [".", "src/db"] } });
   const long = "x".repeat(200);
   const state: GapState = { gaps: [gap("a", "r1", 1), gap(long, "r2", 3), gap("c", "r2", 3), gap("d", "r2", 3)], entrances: [], noControl: 0 };
@@ -86,9 +86,11 @@ test("orient's gap line is one bounded line naming the count, the busiest route 
   assert.ok(line.length < 500, `bounded (${line.length})`);
   assert.equal(orientGapText({ ...state, gaps: [] }, undefined, "coherence"), "", "nothing when there are none");
   const baseline = { id: "d-1", entrances: new Set(state.gaps.map((g) => `${g.component}\u0000${g.name}`)) };
-  assert.equal(orientGapText(state, baseline, "coherence"), "", "nothing when every gap predates the adoption");
+  assert.equal(orientGapText(state, baseline, "coherence"), "Spec gaps: none new since adoption; 4 gaps baselined at adoption remain open; coherence scaffold control --all proposes how to close them.", "gaps held by the baseline stay counted, never named, when none is new");
   const fresh = orientGapText({ ...state, gaps: [...state.gaps, gap("new", "r3", 1)] }, baseline, "coherence");
   assert.match(fresh, /^Spec gaps: 1 entrance carries [^]*beyond the adoption baseline; busiest: new \(/, "a new uncontrolled entrance is always named");
+  assert.match(fresh, / Also, 4 gaps baselined at adoption remain open\.$/, "and the baselined ones are still counted");
+  assert.ok(!fresh.includes(long.slice(0, 39)), "a baselined gap is never named");
   assert.equal(gapsOf({ spec: { components: [], trustLevels: [] } } as never, { routes: [], entrances: [] } as never).gaps.length, 0);
 });
 

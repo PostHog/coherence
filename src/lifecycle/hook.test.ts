@@ -664,7 +664,7 @@ function gapLine(text: string): string | undefined {
   return text.split("\n").find((l) => l.startsWith("Spec gaps"));
 }
 
-test("orient names the spec gaps in one bounded line from a recorded reading that still describes the tree, starts one background reading when it is stale or absent, says only that the gaps are not read yet when no reading was ever kept, and names none the adoption baseline holds", async () => {
+test("orient names the spec gaps in one bounded line from a recorded reading that still describes the tree, starts one background reading when it is stale or absent, says only that the gaps are not read yet when no reading was ever kept, and counts, without naming, the gaps the adoption baseline holds", async () => {
   const { root: project, reading, remove } = gapProject();
   try {
     const { start, started } = gapStarter(project, "gap-orient");
@@ -684,7 +684,9 @@ test("orient names the spec gaps in one bounded line from a recorded reading tha
     assert.equal(started.length, 2, "and a stale reading starts one refresh");
     await readAndRecord(project, async () => reading);
     recordGapBaseline(project, currentGaps(project)!, { session: "gap-orient", agent: "test" });
-    assert.doesNotMatch(await start(), /Spec gaps/, "gaps present at adoption do not nag orient");
+    const held = await start();
+    assert.match(held, /Spec gaps: none new since adoption; \d+ gaps? baselined at adoption remains? open;/, "gaps present at adoption stay counted as open");
+    assert.doesNotMatch(held, /busiest:/, "but are not named");
   } finally {
     remove();
   }
