@@ -328,33 +328,21 @@ function embedJson(value: unknown): string {
 /** The Latin range of IBM Plex Mono's split build: every character a path, a symbol, or an identifier on the map uses. */
 const PLEX_LATIN = "U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+20AC, U+2122, U+2212, U+FB01-FB02";
 
-/** The first of these files that can be read. */
-async function readFirst(paths: string[]): Promise<Buffer> {
-  for (const path of paths.slice(0, -1)) {
-    try {
-      return await readFile(path);
-    } catch {
-      // Not here; try the next place.
-    }
-  }
-  return readFile(paths[paths.length - 1]!);
-}
-
 /**
  * IBM Plex Mono for code-ish text (paths, symbols, identifiers), embedded as
  * base64 woff2 so the page stays self-contained: the regular weight of the
  * Latin subset the package ships (17.5 KB, 23.4 KB as base64), the only
  * weight the map and the page set mono text in; the medium weight would push
- * the page with a domain lexicon past its 2 MB budget. The published package
- * carries the file beside this module; a checkout reads it from the font
- * package. Without either the page falls back to the monospace stack it names
- * after Plex.
+ * the page with a domain lexicon past its 2 MB budget. The file sits beside
+ * this module with its license, copied from the font package once, because
+ * that package's install script is telemetry. Without it the page falls back
+ * to the monospace stack it names after Plex.
  */
 async function plexMono(): Promise<string> {
   const faces: string[] = [];
   for (const [weight, file] of [[400, "Regular"]] as const) {
     try {
-      const bytes = await readFirst([resolve(here, `IBMPlexMono-${file}-Latin1.woff2`), resolve(here, `../../../node_modules/@ibm/plex-mono/fonts/split/woff2/IBMPlexMono-${file}-Latin1.woff2`)]);
+      const bytes = await readFile(resolve(here, `IBMPlexMono-${file}-Latin1.woff2`));
       faces.push(`@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: ${weight}; font-display: swap; src: url(data:font/woff2;base64,${bytes.toString("base64")}) format("woff2"); unicode-range: ${PLEX_LATIN}; }`);
     } catch {
       return "";
