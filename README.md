@@ -217,10 +217,12 @@ runs as `prepare`, so `npm ci`, `npm pack` and an install from the git
 repository all build. `node-llama-cpp` is an optional peer: a project that
 wants the local embedding pass installs it beside Coherence.
 
-To release, bump `version` in package.json on main, then run the Release
-workflow from the Actions tab. It publishes through npm trusted publishing
-from `.github/workflows/release.yml` in the `Release` environment, with
-provenance and no stored token, and refuses a version npm already has.
+To release, merge a change that bumps `version` in package.json into main.
+The Release workflow sees a version npm does not have, publishes it through
+npm trusted publishing from `.github/workflows/release.yml` in the `Release`
+environment, with provenance and no stored token, and tags it as a GitHub
+release with generated notes. Any other change to package.json releases
+nothing. The workflow can also be run by hand from the Actions tab.
 
 ## Settled before code
 
