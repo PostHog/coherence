@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after, before, test } from "node:test";
@@ -769,5 +769,111 @@ test("regulate names the gaps a session touched, a changed handler file and an u
     assert.match((JSON.parse(sub.stdout) as { systemMessage: string }).systemMessage, /Spec gaps this session touched/);
   } finally {
     remove();
+  }
+});
+
+function systemMessageOf(result: { stdout: string }): string {
+  return (JSON.parse(result.stdout) as { systemMessage: string }).systemMessage;
+}
+
+test("a project's hook voice composes over what each event says: an override replaces it, an empty one silences it, an append follows it, an event with nothing to say speaks a declared file, and a refusal keeps its reason", async () => {
+  const dir = await freshRoot();
+  const hooks = join(dir, ".coherence", "hooks");
+  const say = (name: string, text: string): Promise<void> => writeFile(join(hooks, name), text);
+  const start = { cwd: dir, session_id: "s-voice", agent_type: "Plan" };
+  try {
+    await writeFile(join(dir, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, concepts: [], rejected: [{ concept: "doohickey", because: "retired surface" }] }));
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "seed"], { cwd: dir });
+    execFileSync("git", ["add", "."], { cwd: dir });
+    execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-q", "-m", "lexicon"], { cwd: dir });
+    await mkdir(hooks, { recursive: true });
+    verb(dir, "decide", "before the session began", "--because", "old", "--session", "main-1", "--agent", "main");
+    const cli = await cliName(dir);
+
+    const plain = contextOf(await runHook("SessionStart", start, dir));
+    await say("SessionStart.append.md", "\nHouse rule: {{agent}} leaves migrations alone; read {{cli}} journal first. {{scope}} is not a token.\n\n");
+    const rule = `House rule: Plan leaves migrations alone; read ${cli} journal first. {{scope}} is not a token.`;
+    assert.equal(contextOf(await runHook("SessionStart", start, dir)), `${plain}\n\n${rule}`, "the append follows the canonical text whole, its tokens filled and an unknown one left literal");
+    assert.equal(contextOf(await runHook("SubagentStart", start, dir)), plain, "a file names one event and no other");
+
+    await say("SessionStart.override.md", "Only this, {{session}}.");
+    assert.equal(contextOf(await runHook("SessionStart", start, dir)), `Only this, s-voice.\n\n${rule}`, "the override replaces the canonical text and the append follows it");
+    await rm(join(hooks, "SessionStart.append.md"));
+    await say("SessionStart.override.md", "  \n");
+    const silent = await runHook("SessionStart", start, dir);
+    assert.equal(silent.stdout, "", "an empty override is a deliberate silence");
+    assert.equal(silent.exit, 0);
+
+    assert.deepEqual(await runHook("PostToolUse", { cwd: dir }, dir), { stdout: "", stderr: "", exit: 0 }, "nothing declared, nothing to say");
+    await say("PostToolUse.append.md", "After each tool: {{session}}.");
+    assert.equal(contextOf(await runHook("PostToolUse", { cwd: dir }, dir)), "After each tool: {{session}}.", "an event with nothing to say speaks a declared file; an unsupplied token stays literal");
+    verb(dir, "decide", "keep widgets round", "--over", "square widgets", "--because", "knobs fit", "--session", "s-peer", "--agent", "peer");
+    const fed = await runHook("UserPromptSubmit", { cwd: dir, session_id: "s-voice" }, dir);
+    assert.match(contextOf(fed), /keep widgets round/);
+    assert.notEqual(fed.commit, undefined);
+    await say("UserPromptSubmit.override.md", "The owner reads every prompt.");
+    const overridden = await runHook("UserPromptSubmit", { cwd: dir, session_id: "s-voice" }, dir);
+    assert.equal(contextOf(overridden), "The owner reads every prompt.");
+    assert.equal(overridden.commit, undefined, "the feed the override replaced never reached the host, so its cursor stays");
+
+    await rm(hooks, { recursive: true, force: true });
+    execFileSync("git", ["add", "."], { cwd: dir });
+    execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "clean"], { cwd: dir });
+    assert.deepEqual(await runHook("Stop", { cwd: dir }, dir), { stdout: "", stderr: "", exit: 0 });
+    await mkdir(hooks, { recursive: true });
+    await say("Stop.append.md", "Before stopping, say what you left.");
+    assert.equal(systemMessageOf(await runHook("Stop", { cwd: dir }, dir)), "Before stopping, say what you left.");
+
+    await writeFile(join(dir, "notes.md"), "The doohickey is back.\n");
+    await say("SubagentStop.override.md", "Nothing to see.");
+    await say("SubagentStop.append.md", "Ask the owner about widgets.");
+    const refused = await runHook("SubagentStop", { cwd: dir, stop_hook_active: false }, dir);
+    assert.equal(refused.exit, REFUSE_EXIT, "no override silences a refusal");
+    assert.match(refused.stderr, /^Regulate found what this session owes/);
+    assert.match(refused.stderr, /REJECTED NAME  notes\.md:1/);
+    assert.ok(refused.stderr.endsWith("\n\nAsk the owner about widgets."), "an append follows the refusal's reason");
+    assert.doesNotMatch(refused.stderr, /Nothing to see/);
+    const reported = await runHook("SubagentStop", { cwd: dir, stop_hook_active: true }, dir);
+    assert.equal(reported.exit, 0);
+    assert.equal(systemMessageOf(reported), "Nothing to see.\n\nAsk the owner about widgets.", "a report that refuses nothing is the project's to replace");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("a hook voice file whose real path leaves the project root is named as not read and never followed", async () => {
+  const dir = await freshRoot();
+  const outside = await mkdtemp(join(tmpdir(), "coherence-hook-outside-"));
+  const hooks = join(dir, ".coherence", "hooks");
+  const start = { cwd: dir, session_id: "s-link" };
+  try {
+    await writeFile(join(outside, "SessionStart.append.md"), "OUTSIDE APPEND");
+    await writeFile(join(outside, "SessionStart.override.md"), "OUTSIDE OVERRIDE");
+    await mkdir(hooks, { recursive: true });
+    await symlink(join(outside, "SessionStart.append.md"), join(hooks, "SessionStart.append.md"));
+    const linked = contextOf(await runHook("SessionStart", start, dir));
+    assert.doesNotMatch(linked, /OUTSIDE/);
+    assert.match(linked, /\nSession: s-link\n/, "the canonical text stands");
+    assert.ok(linked.endsWith("\n\nHook voice: .coherence/hooks/SessionStart.append.md leads outside the project root; not read"), linked);
+
+    await rm(hooks, { recursive: true, force: true });
+    await symlink(outside, hooks);
+    const folder = contextOf(await runHook("SessionStart", start, dir));
+    assert.doesNotMatch(folder, /OUTSIDE/, "a linked folder above the file is followed only to see where it leads");
+    assert.match(folder, /Hook voice: \.coherence\/hooks\/SessionStart\.override\.md leads outside the project root; not read/);
+
+    await rm(hooks);
+    await mkdir(join(dir, "house"), { recursive: true });
+    await mkdir(hooks, { recursive: true });
+    await writeFile(join(dir, "house", "rule.md"), "The house rule.");
+    await symlink(join(dir, "house", "rule.md"), join(hooks, "SessionStart.append.md"));
+    await mkdir(join(hooks, "SessionStart.override.md"));
+    const inside = contextOf(await runHook("SessionStart", start, dir));
+    assert.match(inside, /\nSession: s-link\n/, "an unreadable override leaves the canonical text");
+    assert.match(inside, /\n\nThe house rule\.\n\nHook voice: \.coherence\/hooks\/SessionStart\.override\.md not read: /, "a link that stays inside the root is read");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+    await rm(outside, { recursive: true, force: true });
   }
 });

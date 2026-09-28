@@ -49,6 +49,13 @@
  * The root of every event is confined to the project the hook was installed
  * for: the harness names the working directory on stdin, and a cwd outside
  * that tree is refused with exit 78 rather than read or written.
+ * The hook voice is the project's own text at each event (d-d884e343, in the
+ * reference): `.coherence/hooks/<Event>.override.md` replaces what the event
+ * would say, an empty one is a deliberate silence, and
+ * `.coherence/hooks/<Event>.append.md` follows it; an event with nothing of
+ * its own to say still speaks a declared file. A refusal is enforcement, so
+ * no override reaches its reason; an append follows it. A file whose real
+ * path leaves the project root is named as not read, never followed.
  */
 
 import { existsSync, readFileSync, realpathSync } from "node:fs";
@@ -724,6 +731,74 @@ export async function gapStopText(root: string, input: HookInput, changed: reado
   }
 }
 
+/** Where a project keeps its hook voice: `<Event>.override.md` and `<Event>.append.md` under the root. */
+export const HOOK_VOICE_DIR = join(".coherence", "hooks");
+
+/** What a project declared for one event. */
+export interface HookVoice {
+  /** The text in place of what the event would say; "" is a deliberate silence. Absent when none is declared. */
+  override?: string;
+  /** The text that follows what the event says, or follows the override. */
+  append?: string;
+  /** A declared file that was not read, and why: outside the root, or unreadable. */
+  problems: string[];
+}
+
+/** One declared file, trimmed, read where it really is and only when that is inside the root; undefined when absent. */
+function voiceFile(root: string, event: HookEvent, kind: "override" | "append", problems: string[]): string | undefined {
+  const name = join(HOOK_VOICE_DIR, `${event}.${kind}.md`);
+  const path = join(root, name);
+  if (!existsSync(path)) return undefined;
+  try {
+    // A link, of the file or of a folder above it, is followed only to see where it leads; a file outside the project is not read.
+    const real = realpathSync(path);
+    if (!within(root, real)) {
+      problems.push(`${name} leads outside the project root; not read`);
+      return undefined;
+    }
+    return readFileSync(real, "utf8").trim();
+  } catch (error) {
+    // A torn file costs the project its text for this event, never the session.
+    problems.push(`${name} not read: ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  }
+}
+
+/** The project's hook voice for one event: two stat calls when nothing is declared. */
+export function readHookVoice(root: string, event: HookEvent): HookVoice {
+  const problems: string[] = [];
+  const override = voiceFile(root, event, "override", problems);
+  const append = voiceFile(root, event, "append", problems);
+  return { ...(override === undefined ? {} : { override }), ...(append === undefined ? {} : { append }), problems };
+}
+
+/** The values a voice file may name as {{session}}, {{agent}} and {{cli}}. */
+export interface VoiceTokens {
+  session?: string | undefined;
+  agent?: string | undefined;
+  cli?: string | undefined;
+}
+
+/**
+ * The override in place of the canonical text, or the canonical text, then
+ * the append, then a line for each declared file that was not read. Only the
+ * three tokens are substituted, and only when a value was supplied: an
+ * unsupplied one stays literal so the reader sees it was never filled.
+ */
+export function composeVoice(canonical: string, voice: HookVoice, tokens: VoiceTokens): string {
+  const fill = (text: string): string => text.replace(/\{\{(session|agent|cli)\}\}/g, (whole, key: keyof VoiceTokens) => tokens[key] ?? whole);
+  const base = voice.override === undefined ? canonical : fill(voice.override);
+  const append = voice.append === undefined ? "" : fill(voice.append);
+  const problems = voice.problems.map((p) => `Hook voice: ${p}`).join("\n");
+  return [base, append, problems].filter((part) => part !== "").join("\n\n");
+}
+
+/** The canonical text with the project's voice over it; the canonical text alone, unchanged, when nothing is declared. */
+async function voiced(root: string, input: HookInput, canonical: string, voice: HookVoice): Promise<string> {
+  if (voice.override === undefined && voice.append === undefined && voice.problems.length === 0) return canonical;
+  return composeVoice(canonical, voice, { session: sessionOf(input), agent: agentOf(input), cli: await cliName(root) });
+}
+
 /** Run one event. `input` is the parsed stdin the host sent; `root` defaults to its cwd. */
 export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: string, options: HookOptions = {}): Promise<HookResult> {
   const project = installedRoot(fallbackRoot);
@@ -733,6 +808,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     return { stdout: "", stderr: `hook ${event}: the working directory "${given}" is not inside the project root this hook was installed for (${project}); nothing was read and nothing was written\n`, exit: OUTSIDE_ROOT_EXIT };
   }
   const root = project ?? given;
+  const voice = readHookVoice(root, event);
   switch (event) {
     case "SessionStart":
     case "SubagentStart": {
@@ -745,17 +821,18 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         options.refresh?.(root, gaps.fingerprint);
         gaps = { ...gaps, refreshing: refreshUnderWay(root) !== undefined };
       }
-      const context = (await startReading(root, input, reading, gaps)).text;
+      const context = await voiced(root, input, (await startReading(root, input, reading, gaps)).text, voice);
       const session = sessionOf(input);
       if (session !== undefined) openFeed(root, session);
-      const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
+      // An empty override silences the start; the session still began, so its baseline is still kept.
+      const stdout = context === "" ? "" : JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
       const commit = (): void => {
         saveBaseline(root, session!, reading);
         // The gaps as this session found them, for regulate once its own edits make the reading stale.
         const found = gaps.now ?? gaps.last;
         if (found !== undefined) saveSessionGaps(root, session!, found);
       };
-      return { stdout: stdout + "\n", stderr: "", exit: 0, ...(session ? { commit } : {}) };
+      return { stdout, stderr: "", exit: 0, ...(session ? { commit } : {}) };
     }
     case "UserPromptSubmit":
     case "PostToolUse": {
@@ -766,11 +843,13 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
       const changes=reading && session ? coverageChanges(reading,priorBaseline(root,session)) : [];
       const vocabulary=changes.length ? await vocabularyAtEdit(root, changes) : "";
-      const context = [feed.text,edit,vocabulary].filter(Boolean).join("\n");
+      const context = await voiced(root, input, [feed.text,edit,vocabulary].filter(Boolean).join("\n"), voice);
       if (context === "") return { stdout: "", stderr: "", exit: 0 };
       const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
+      // An override took the feed's and the vocabulary line's place, so neither reached the host and neither advances.
+      const delivered = voice.override === undefined && (feed.text !== "" || changes.length > 0);
       const commit=()=> { if(feed.text) feed.commit(); if(changes.length && reading && session) saveBaseline(root,session,reading); };
-      return {stdout:stdout+"\n",stderr:"",exit:0,...(feed.text || changes.length ? {commit} : {})};
+      return {stdout:stdout+"\n",stderr:"",exit:0,...(delivered ? {commit} : {})};
     }
     case "Stop":
     case "SubagentStop": {
@@ -788,7 +867,6 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const coverageText=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : "";
       const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the lexicon check ran over nothing`;
       const gapText = await gapStopText(root, input, changed.files);
-      if (lexicon.text === "" && spec.text === "" && workText === "" && changedText === "" && coverageText === "" && gapText === "") return { stdout: "", stderr: "", exit: 0 };
       const parts: string[] = [];
       if (changedText !== "") parts.push(changedText);
       if (lexicon.text !== "") parts.push(`Lexicon check:\n${lexicon.text}`);
@@ -801,9 +879,13 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       // A spec gap is not among them: no traced control is not a demonstrated bypass, so gapText never counts toward the refusal.
       const refuse = event === "SubagentStop" && input.stop_hook_active !== true && lexicon.owed + spec.owed > 0;
       if (refuse) {
-        return { stdout: "", stderr: `Regulate found what this session owes; settle it before stopping.\n${text}`, exit: REFUSE_EXIT };
+        // The refusal is enforcement: no override reaches its reason, and an append only follows it.
+        const { override: _unheard, ...heard } = voice;
+        const reason = await voiced(root, input, `Regulate found what this session owes; settle it before stopping.\n${text}`, heard);
+        return { stdout: "", stderr: reason, exit: REFUSE_EXIT };
       }
-      const message = `Regulate (${event}):\n${text}`;
+      const message = await voiced(root, input, parts.length === 0 ? "" : `Regulate (${event}):\n${text}`, voice);
+      if (message === "") return { stdout: "", stderr: "", exit: 0 };
       return { stdout: JSON.stringify({ systemMessage: message }) + "\n", stderr: "", exit: 0 };
     }
   }

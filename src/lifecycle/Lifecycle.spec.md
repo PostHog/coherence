@@ -392,3 +392,24 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: counted a touched spec gap as owed, so SubagentStop refused with exit 2 -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
+- the project's hook voice composes over what each event says: A project's .coherence/hooks/<Event>.override.md replaces what that event would say and an empty one silences it, its <Event>.append.md follows the canonical text or the override, and an event with nothing of its own to say still speaks a declared file; no override reaches a refusal's reason, which an append only follows.
+  over: every hook event, with nothing declared, an append, an override, both, an empty override, an override in place of the peer feed, and an override and an append on a refused subagent stop
+  via: a project's hook voice composes over what each event says: an override replaces it, an empty one silences it, an append follows it, an event with nothing to say speaks a declared file, and a refusal keeps its reason
+  because: text only one project can say (a house rule, a build hazard, how that project wants a session to start) belongs in the project's own files, not in the canonical text every adopter receives (d-d884e343, in the reference); the reference let a project shape each event this way and the rebuild dropped it without a record. A refusal is enforcement, so a project may speak after it but never replace or silence it, and a feed the override replaced never reached the host, so its cursor stays
+  crossing: project-source -> reading
+  refuted: made composeVoice ignore the override, so the canonical text was always the base -> the totality oracle went red in hook.test.ts; restored, green (2026-09-28)
+  kinds: output
+  checklist: destination-confinement dismissed: the text goes to one destination, the host's additionalContext, systemMessage or stderr, and follows no redirect
+  checklist: redaction dismissed: the project's own text is shown as the project wrote it; nothing in it is designated sensitive
+  checklist: commit-ordered-effects declared as cursor advances after the print
+  checklist: circuit-breaker-policy dismissed: two local files are read; no dependency is sampled
+  checklist: declared-target-coverage dismissed: one file of each kind per event, not a registry of targets
+- a hook voice file stays inside the root: A hook voice file is read only where its real path lies inside the project root; a file, or a folder above it, that links outside is named as not read and never followed, an unreadable one is named, and in both cases the event's canonical text stands.
+  over: a file linked outside the root, the hooks folder linked outside it, a link that stays inside it, and a folder where the file should be, at SessionStart
+  via: a hook voice file whose real path leaves the project root is named as not read and never followed
+  because: the hook reads these files inside every session from the tree it was installed for, and a link can point anywhere; a hook that followed one would inject a neighbouring tree's text, or a secret, as the project's own words. A torn file costs the project its text for that event, never the session, and the line saying so keeps the loss from being silent
+  crossing: project-source -> reading
+  refuted: dropped the within check in voiceFile, so a file whose real path left the project root was read -> the totality oracle went red in hook.test.ts; restored, green (2026-09-28)
+  kinds: read
+  checklist: scoped-reads declared as a hook voice file stays inside the root
+  checklist: redaction dismissed: a file that is not read is named by its path under the root alone, never its target or contents

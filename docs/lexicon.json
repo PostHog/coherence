@@ -1310,6 +1310,14 @@
         "regulate",
         "scaffold"
       ]
+    },
+    {
+      "name": "hook voice",
+      "definition": "A project's own text at a hook event, in place of or after what the hook says. The override file, .coherence/hooks/<Event>.override.md, replaces the event's canonical text (an empty one is a deliberate silence), and the append file, .coherence/hooks/<Event>.append.md, follows it; a refusal's reason is never replaced.",
+      "provenance": {
+        "defined_by": "agent hook-voice (session c1db1b63-f5b7-4dc3-94a8-3c324ee41fcb), 2026-09-28 (journal d-9a9d08cb), restoring the reference per-event override and append files (fb445b2)",
+        "owner_words": "yeah, have a subagent restore hook overrides and addenda"
+      }
     }
   ],
   "metaphors": {

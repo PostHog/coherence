@@ -75,6 +75,13 @@ report what each one found.
    Coherence at $COHERENCE_HOME, then ../coherence (also beside the main
    checkout of a git worktree), then node_modules/.bin/coherence; where none
    is found, each hook prints one line saying how to install it and exits 0.
+   To add the project's own words to an event, write
+   `.coherence/hooks/<Event>.append.md` (it follows what the hook says) or
+   `.coherence/hooks/<Event>.override.md` (it replaces it; an empty one
+   silences the event), where `<Event>` is SessionStart, SubagentStart,
+   UserPromptSubmit, PostToolUse, Stop or SubagentStop. `{{session}}`,
+   `{{agent}}` and `{{cli}}` are filled in; a refused subagent stop keeps its
+   reason whatever the override says.
 
 4. Lexicon. Run `coherence lexicon coverage` to see the recurring terms that
    lack a definition. Declare the ones that carry the project's domain
