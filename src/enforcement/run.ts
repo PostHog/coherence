@@ -12,9 +12,15 @@
  * run now keeps the instrument alive across the test pass with a heartbeat and
  * asks it again afterwards; a run whose instrument died says so in every entry
  * and in `instrumentDied`, and the command exits non-zero.
+ *
+ * A project with a dbt instrument has two runners: a via the dbt manifest
+ * names as a test runs in one dbt invocation, every other via in one
+ * invocation of the project-wide runner. A via the manifest names more than
+ * once is not run, with the unique ids it matched.
  */
 
 import type { LanguageAdapter } from "../adapters/adapter.ts";
+import { dbtTestIds } from "../adapters/dbt.ts";
 import { gitState } from "../journal/store.ts";
 import { workBinding } from "../journal/work.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
@@ -52,6 +58,35 @@ export interface RunOptions {
 
 /** How often the run touches the instrument while the test suite holds the floor. */
 export const HEARTBEAT_MS = 20_000;
+
+/** Which runner a via goes to: the dbt runner for a test the manifest holds once, else the project-wide one, or no runner with a reason. */
+export type Route = { runner: "dbt" | "project"; config: EnforcementConfig } | { runner: "none"; reason: string };
+
+/** The dbt runner as a config of its own: dbt's command keys, dbt test names as the filter form. */
+export function dbtRunner(config: EnforcementConfig): EnforcementConfig | undefined {
+  const dbt = config.dbt;
+  if (dbt === undefined) return undefined;
+  return { ...config, test: dbt.test, testJson: dbt.testJson, testMatch: dbt.testMatch, testFilterForm: "dbt", testTimeoutMs: dbt.testTimeoutMs ?? config.testTimeoutMs };
+}
+
+/** The route for every via, decided once per run from the manifest on disk. */
+export function routesFor(root: string, config: EnforcementConfig, vias: readonly string[]): Map<string, Route> {
+  const runner = dbtRunner(config);
+  let tests: Map<string, string[]> | undefined;
+  try {
+    tests = config.dbt === undefined ? undefined : dbtTestIds(root, config.dbt);
+  } catch {
+    tests = undefined;
+  }
+  const routes = new Map<string, Route>();
+  for (const via of vias) {
+    const ids = tests?.get(via);
+    if (runner === undefined || ids === undefined) routes.set(via, { runner: "project", config });
+    else if (ids.length > 1) routes.set(via, { runner: "none", reason: `the dbt manifest holds ${ids.length} tests named "${via}" (${ids.join(", ")}); name one` });
+    else routes.set(via, { runner: "dbt", config: runner });
+  }
+  return routes;
+}
 
 export interface EntryDetail {
   entry: RunEntry;
@@ -127,15 +162,24 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   let batchLatency = 0;
   // An observed run rides the same one invocation: the observer only adds coverage to it.
   const observing = options.observe === true && wantTotality && config.testJson !== undefined ? createObserver(root, config) : undefined;
-  const vias: TotalityVia[] = selected.flatMap(({ component, invariant }) => totalityEnforcements(invariant).map(({ via }) => ({ component, name: invariant.name, filter: adapter?.testFilter(via) ?? via })));
+  const routes = routesFor(root, config, selected.flatMap(({ invariant }) => totalityEnforcements(invariant).map(({ via }) => via)));
+  const filterOf = (via: string): string => (routes.get(via)?.runner === "dbt" ? via : (adapter?.testFilter(via) ?? via));
+  // Observation maps coverage per test of the project-wide runner; a dbt test has no coverage to map.
+  const vias: TotalityVia[] = selected.flatMap(({ component, invariant }) =>
+    totalityEnforcements(invariant).flatMap(({ via }) => (routes.get(via)?.runner === "project" ? [{ component, name: invariant.name, filter: filterOf(via) }] : [])),
+  );
   if (wantTotality) {
-    const filters = vias.map((o) => o.filter);
     const t0 = Date.now();
     // The test suite can outlast the warm server's idle timeout, and its timer only resets on a request line.
     const beat = adapter === undefined || (!needsAdapter && observing === undefined) ? undefined : setInterval(() => void adapter.ready().catch(() => {}), options.heartbeatMs ?? HEARTBEAT_MS);
     beat?.unref();
     try {
-      batched = await runTotalityBatch(root, config, filters, options.timeoutMs, observing?.observer);
+      // One invocation per runner: the project-wide one (observed, when the run is), then dbt's.
+      const project = await runTotalityBatch(root, config, vias.map((o) => o.filter), options.timeoutMs ?? config.testTimeoutMs, observing?.observer);
+      const runner = dbtRunner(config);
+      const dbtFilters = [...routes].flatMap(([via, route]) => (route.runner === "dbt" ? [via] : []));
+      const dbt = runner === undefined ? undefined : await runTotalityBatch(root, runner, dbtFilters, options.timeoutMs ?? runner.testTimeoutMs);
+      batched = project === undefined && dbt === undefined ? undefined : new Map([...(project ?? []), ...(dbt ?? [])]);
     } finally {
       if (beat !== undefined) clearInterval(beat);
     }
@@ -218,9 +262,13 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     if (wantTotality) {
       for (const { via } of totalityEnforcements(invariant)) {
         const t0 = Date.now();
-        const filter = adapter?.testFilter(via) ?? via;
-        const fromBatch = batched?.get(filter);
-        const result = fromBatch ?? (await runTotalityOracle(root, config, filter, options.timeoutMs));
+        const route = routes.get(via) ?? { runner: "project", config };
+        const filter = filterOf(via);
+        const fromBatch = route.runner === "none" ? undefined : batched?.get(filter);
+        const result: TotalityResult =
+          route.runner === "none"
+            ? { verdict: "not run", reason: route.reason, command: undefined, tail: "", matched: 0 }
+            : (fromBatch ?? (await runTotalityOracle(root, route.config, filter, options.timeoutMs ?? route.config.testTimeoutMs)));
         details.push({
           entry: {
             ...entryOf(component, invariant.name, "totality oracle", {
@@ -284,7 +332,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   };
 
   if ((needsAdapter || options.observe === true) && options.adapter === undefined && options.server !== false) {
-    return withWarmAdapter(root, (remote, server, reason) => pass(remote, { language: remote?.language ?? config.language, server: server ?? "none" }, reason), {
+    return withWarmAdapter(root, (remote, server, reason) => pass(remote, { language: remote?.language ?? config.instruments.join("+"), server: server ?? "none" }, reason), {
       refresh: options.refresh ?? [],
       idleMs: options.idleMs,
     });
@@ -295,7 +343,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     await given.forget(options.refresh ?? []);
     return pass(given, { language: given.language, server: "cold" }, undefined);
   }
-  return pass(undefined, { language: config.language, server: "none" }, undefined);
+  return pass(undefined, { language: config.instruments.join("+"), server: "none" }, undefined);
 }
 
 /**

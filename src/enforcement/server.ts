@@ -458,7 +458,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   let adapter: LanguageAdapter;
   try {
     config = readEnforcementConfig(root);
-    adapter = adapterFor(config.language, root);
+    adapter = adapterFor(config.instruments, root);
   } catch (error) {
     if (owns()) rmSync(paths.lock, { force: true });
     heldHere.delete(paths.lock);
@@ -468,13 +468,13 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   let warm = false;
   void adapter.ready().then((state) => {
     warm = state.ok;
-    log(state.ok ? `${config.language} adapter ready` : `${config.language} adapter not ready: ${state.reason}`);
+    log(state.ok ? `${adapter.language} adapter ready` : `${adapter.language} adapter not ready: ${state.reason}`);
     // An adapter whose instrument enumerates the workspace (Pyright) reports when that is done, for the measurement.
     const enumerating = (adapter as { indexed?: () => Promise<unknown>; enumeration?: { sourceFiles: number; latency: number } }).indexed;
     if (state.ok && typeof enumerating === "function") {
       void enumerating.call(adapter).then(() => {
         const e = (adapter as { enumeration?: { sourceFiles: number; latency: number } }).enumeration;
-        if (e !== undefined) log(`${config.language} instrument enumerated ${e.sourceFiles} source files in ${e.latency} ms`);
+        if (e !== undefined) log(`${adapter.language} instrument enumerated ${e.sourceFiles} source files in ${e.latency} ms`);
       }, () => {});
     }
   });
@@ -502,7 +502,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   let http: HttpServer | undefined;
   let app: HttpApp | undefined;
   let opening: Promise<{ port: number; url: string }> | undefined;
-  let pointer: Pointer = { pid: process.pid, socket: paths.socket, language: config.language, startedAt, fingerprint, token };
+  let pointer: Pointer = { pid: process.pid, socket: paths.socket, language: adapter.language, startedAt, fingerprint, token };
 
   const stop = async (): Promise<void> => {
     if (stopping) return;

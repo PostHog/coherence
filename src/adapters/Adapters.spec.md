@@ -92,3 +92,47 @@ The language adapter seam: how to ask a language's server for definitions, refer
   because: agents work in git worktrees under .claude/worktrees, inside the main checkout, and each worktree's copy of a file reads to a language server as more of the project; a reference in an agent's copy of verbs.ts graded attributed writes broken in the main checkout, the edit hook reported the same false bypasses to several agents, and the Structure map shown to reviewers carried the false broken (conjecture c-16d2f394, resolution rs-b4cf50f6). Git's own ignore rules already say what is not the project's, and a folder holding a .git is another checkout even when git cannot follow its gitdir, so both halves are one rule
   crossing: instrument -> reading
   kinds: none
+- every manifest edge is a reference: Every depends_on edge into a resolved dbt model is reported as one site, whether or not the text that writes it is found; a computed ref sits at line 1 of the reading file.
+  over: every depends_on edge of every resource in the dbt manifest
+  via: every manifest edge is a reference: one site per edge, at the ref call, at line 1 when no literal call writes it, and a YAML test at its name line
+  because: dbt resolves what a model depends on, including a ref the template computes that no text search finds; an edge dropped because its call could not be located is a bypass nobody sees, so the text only places the site and never decides whether it exists
+  crossing: instrument -> reading
+  refuted: skipped every edge whose ref call the text search could not locate -> the totality oracle went red in dbt.test.ts; restored, green (2026-09-28)
+  kinds: none
+- a stale manifest answers nothing: When any dbt file is newer than the manifest and no configured parse makes it current, the dbt adapter is not ready and every question it is asked throws, so the run records not run.
+  over: every question the dbt adapter answers and every dbt file under the paths dbt_project.yml names
+  via: a stale manifest answers nothing: a dbt file newer than the manifest makes ready fail and every question throw, until a configured parse makes it current
+  because: the manifest is the instrument; one older than the text describes a project that no longer exists, and a check answered from it could pass with a bypass on disk, the one answer revelation at the edit must never give
+  crossing: instrument -> reading
+  refuted: let refresh read a manifest older than a dbt file without parsing or refusing -> the totality oracle went red in dbt.test.ts; restored, green (2026-09-28)
+  kinds: none
+- a module is its folder: A folder named as a module is every dbt model file under it and nothing else, and a site in any of those files is within the module.
+  over: every folder a spec names as a dbt module and every site the check classifies against one
+  via: a module is its folder: a site in any member file is inside, a site beside the folder is not
+  because: the entry families, the staging models, and the diagnostics are folders, not files; a prefix match would put a sibling folder whose name merely starts the same inside the module and hide its bypasses
+  crossing: instrument -> reading
+  refuted: matched a folder module by path prefix instead of its member files -> the totality oracle went red in dbt.test.ts; restored, green (2026-09-28)
+  kinds: none
+- a test resource is a test site: A site whose referencing resource is a dbt test carries the instrument's test mark wherever its file lies, and the check classifies it a test.
+  over: every reference site the dbt adapter reports from a dbt test, singular or declared in a model folder's YAML
+  via: a test resource is a test site wherever its file lies: the adapter marks a YAML test under a model folder, and the check classifies it a test
+  because: a dbt test declared in YAML lives in a model folder, so no test-folder rule can see it; without the instrument's word every such test reads as a bypass of the model it tests
+  crossing: instrument -> reading
+  refuted: dropped the test mark for tests declared in YAML -> the totality oracle went red in dbt.test.ts; restored, green (2026-09-28)
+  kinds: none
+- dbt results mapped by unique id: The batched totality pass reads dbt's run_results.json, names each result by the test-name segment of its unique id, passes a test at severity warn with the warning in its reason, and reports a via that matches no result as matched 0.
+  protects: reportFromDbtRunResults
+  chokepoint: parseReport
+  over: every result in the run_results.json the dbt runner writes and every via a dbt totality oracle names
+  via: a dbt result maps by unique id: one invocation's run_results.json gives each test its verdict, a warning passes and says so, and a name matching no result reports matched 0
+  because: dbt writes its report only into its target folder and names each test by unique id; a mapping by prefix or by the whole id would give one bullet another test's verdict or none, and a warning the ruling declared acceptable must not read as a failure
+  crossing: instrument -> record
+  refuted: named each result by everything after the package, hash included -> the totality oracle went red in dbt.test.ts; restored, green (2026-09-28)
+  kinds: none
+- two instruments, one owner: In a project with several instruments, the one that resolves a name answers every later question about it, a name more than one resolves is ambiguous with every answer listed, and the composite is ready only when every member is.
+  over: every member of the composite adapter and every name a spec gives it
+  via: two instruments in one project: the member that resolves a name answers every question about it, a name two members resolve is ambiguous, and one member down makes the composite not ready
+  because: a dbt model and a Python symbol may share a name; a silent pick would grade one of them on the other's references, and a composite that answered with a member down would report a clean check the missing member never made
+  crossing: instrument -> reading
+  refuted: let the first member that resolves a name own it, however many resolve it -> the totality oracle went red in dbt.test.ts; restored, green (2026-09-28)
+  kinds: none

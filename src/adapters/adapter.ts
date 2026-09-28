@@ -50,6 +50,11 @@ export interface Definition {
   range: Range;
   /** The name itself, where a references query starts (a module: the first export's name, if any). */
   selection: Position;
+  /**
+   * A module that is a folder of files rather than one file (a dbt model folder): every file it
+   * holds, project-relative. A site in any of them is within the module; `file` names the folder.
+   */
+  members?: string[];
 }
 
 /**
@@ -77,6 +82,11 @@ export interface ReferenceSite {
   symbol: string | undefined;
   /** The syntactic form the adapter read at the site, when the site has one. */
   form?: SiteForm;
+  /**
+   * The instrument knows the referencing thing is a test whatever its path says (a dbt test
+   * declared in a model folder's YAML). Only an adapter whose instrument says so sets it.
+   */
+  testResource?: true;
 }
 
 /**
