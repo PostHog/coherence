@@ -333,8 +333,8 @@ const PLEX_LATIN = "U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02D
  * base64 woff2 so the page stays self-contained: the regular weight of the
  * Latin subset the package ships (17.5 KB, 23.4 KB as base64), the only
  * weight the map and the page set mono text in; the medium weight would push
- * the page with a domain lexicon past its 2 MB budget. The file sits beside
- * this module with its license, copied from the font package once, because
+ * the page with a domain lexicon past its 2 MB budget. The file sits in fonts/
+ * beside this module with its license, copied from the font package once, because
  * that package's install script is telemetry. Without it the page falls back
  * to the monospace stack it names after Plex.
  */
@@ -342,7 +342,7 @@ async function plexMono(): Promise<string> {
   const faces: string[] = [];
   for (const [weight, file] of [[400, "Regular"]] as const) {
     try {
-      const bytes = await readFile(resolve(here, `IBMPlexMono-${file}-Latin1.woff2`));
+      const bytes = await readFile(resolve(here, "fonts", `IBMPlexMono-${file}-Latin1.woff2`));
       faces.push(`@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: ${weight}; font-display: swap; src: url(data:font/woff2;base64,${bytes.toString("base64")}) format("woff2"); unicode-range: ${PLEX_LATIN}; }`);
     } catch {
       return "";

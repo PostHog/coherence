@@ -9,26 +9,29 @@ the code.
 Set up Coherence (github.com/PostHog/coherence) in this project, then tell me
 what it found.
 
-1. Clone git@github.com:PostHog/coherence.git beside this project as
-   ../coherence and run `npm ci` in the clone. Do not link or add it to this
-   project's packages. The command is `node ../coherence/src/cli.ts`.
+1. Run `npm install -D github:PostHog/coherence` (with pnpm, first add
+   `onlyBuiltDependencies: ["@posthog/coherence"]` to pnpm-workspace.yaml so
+   it may build, then `pnpm add -D github:PostHog/coherence`). The command is
+   `npx --no coherence`.
 2. Write coherence.config.json at the root with "name" and "language"
    ("typescript" or "python"), plus "ignore", "typecheck" and "test" if the
    project has them.
-3. Run `node ../coherence/src/cli.ts hooks install --host claude`
+3. Run `npx --no coherence hooks install --host claude`
    (use `--host codex` on Codex).
-4. Run `node ../coherence/src/cli.ts scaffold component . "<what this project
-   does>"`, then scaffold one spec per major component folder.
-5. Run `node ../coherence/src/cli.ts spec --check` and
-   `node ../coherence/src/cli.ts scope`, and report what they show.
+4. Run `npx --no coherence scaffold component . "<what this project does>"`,
+   then scaffold one spec per major component folder.
+5. Run `npx --no coherence spec --check` and `npx --no coherence scope`, and
+   report what they show.
 
 Then continue with "Full setup" in the Coherence README: the lexicon, trust
 levels, invariants and enforcement.
 ```
 
-It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux. Coherence is not on npm
-yet, so this runs a checkout beside the project and never touches the
-project's node_modules or lockfile.
+It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux. Until
+`@posthog/coherence` is on npm, this installs from the GitHub repository,
+which builds the package as it installs. A checkout kept beside the project
+as ../coherence (or named by COHERENCE_HOME) also works, and the hooks prefer
+it.
 
 ## What it is
 
@@ -44,21 +47,21 @@ as a source of code.
 
 ## Full setup: paste this into your agent
 
-Coherence is not on npm yet, so this runs a checkout kept beside the project.
-It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux, and access to
-`github.com/PostHog/coherence`.
+Until `@posthog/coherence` is on npm, this installs from the GitHub
+repository. It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux.
 
 ```text
 Set up Coherence in this project. Work through these steps in order, and
 report what each one found.
 
-1. Install. Clone git@github.com:PostHog/coherence.git beside this project as
-   ../coherence and run `npm ci` in the clone. Do not `npm link` it or add it
-   to this project's dependencies: that installs a second dependency tree
-   over this project's lockfile (in a pnpm project it broke the build). The
-   command is `node ../coherence/src/cli.ts` (call it `coherence` below).
-   Check it with `coherence spec --check`. Teammates clone the same way; one
-   who keeps the checkout elsewhere sets COHERENCE_HOME to it.
+1. Install. Run `npm install -D github:PostHog/coherence`, which builds the
+   package as it installs. With pnpm, first add `onlyBuiltDependencies:
+   ["@posthog/coherence"]` to pnpm-workspace.yaml (pnpm runs no dependency's
+   build script without it), then `pnpm add -D github:PostHog/coherence`. Do
+   not `npm link` a checkout into the project. The command is
+   `npx --no coherence` (call it `coherence` below); `--no` keeps npx from
+   fetching an unrelated package if the install is missing. Check it with
+   `coherence spec --check`. Teammates get it from the lockfile.
 
 2. Config. Write coherence.config.json at the project root with: "name";
    "language" ("typescript" or "python"); "ignore" (folders that are not this
@@ -73,7 +76,7 @@ report what each one found.
    the project's open requirements, and the exact journal command, including
    the session id to pass with --session. The installed hooks look for
    Coherence at $COHERENCE_HOME, then ../coherence (also beside the main
-   checkout of a git worktree), then node_modules/.bin/coherence; where none
+   checkout of a git worktree), then the installed package; where none
    is found, each hook prints one line saying how to install it and exits 0.
    To add the project's own words to an event, write
    `.coherence/hooks/<Event>.append.md` (it follows what the hook says) or
@@ -227,9 +230,10 @@ During `test:setup`, the same variable selects the Python that creates `.venv`.
 The package is `@posthog/coherence` on npm. `npm run build` compiles `src`
 into `dist` (Node will not strip types under node_modules) and carries the
 files the compiled modules read: data, the stylesheet, the Scope browser
-sources already stripped, and the one font file with its license. `npm pack`
-runs the build. `node-llama-cpp` is an optional peer: a project that wants the
-local embedding pass installs it beside Coherence.
+sources already stripped, and the one font file with its license. The build
+runs as `prepare`, so `npm ci`, `npm pack` and an install from the git
+repository all build. `node-llama-cpp` is an optional peer: a project that
+wants the local embedding pass installs it beside Coherence.
 
 To release, bump `version` in package.json on main, then run the Release
 workflow from the Actions tab. It publishes through npm trusted publishing

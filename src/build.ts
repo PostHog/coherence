@@ -41,7 +41,7 @@ if (tsc.status !== 0) process.exit(tsc.status ?? 1);
 
 for (const file of files(src)) {
   const at = relative(src, file);
-  if (/\.(json|css|woff2)$/.test(file) || file.endsWith("-LICENSE.txt")) copy(file, join(dist, at));
+  if (/\.(json|css)$/.test(file) || dirname(at) === join(scope, "fonts")) copy(file, join(dist, at));
 }
 for (const name of BROWSER_SOURCES) {
   const source = readFileSync(join(src, scope, name), "utf8");
