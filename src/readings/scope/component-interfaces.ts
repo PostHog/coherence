@@ -73,6 +73,7 @@ import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite } from "../../adapters/adapter.ts";
+import { detectEntranceCandidates, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 import { configIgnore, projectFiles, projectSites, underIgnored } from "../../adapters/project-files.ts";
 import { adapterFor, type Language } from "../../adapters/index.ts";
 import { resolveDotted } from "../../adapters/python.ts";
@@ -506,6 +507,24 @@ interface Declared extends ReachNode {
   isDefault: boolean;
 }
 
+/** The symbol names declared entrances give as their handlers and guards: what an entrance may be created or registered through. */
+export function entranceWrappers(model: Pick<SpecModel, "components">): string[] {
+  const names = model.components.flatMap((c) => c.entrances.flatMap((e) => [e.handler, e.guard]));
+  return [...new Set(names.flatMap((v) => (v === undefined || isModuleHandler(v) ? [] : [/^([A-Za-z_$][\w$]*)/.exec(v.trim())?.[1] ?? ""]).filter((n) => n !== "")))].sort();
+}
+
+/**
+ * The entrances the language's rules detect inside the config's bounds, test
+ * files excepted, kept with the reading so Structure, the query and orient
+ * measure the declared entrances against the same set (c-3760638e). A plain
+ * scan: it asks the language server nothing and costs a read of the tree.
+ */
+export function detectedEntrances(root: string, model: Pick<SpecModel, "components">, language: Language, testFolders: readonly string[], ignore: readonly string[] = configIgnore(root)): EntranceCandidate[] {
+  const skip = boundsOf(ignore);
+  const files = projectFiles(root).filter((file) => withinBounds(file, skip));
+  return detectEntranceCandidates(root, { language, files, wrappers: entranceWrappers(model), testFolders });
+}
+
 /** Read every component interface of the project at `root` through `adapter` (started here when not given). */
 export async function readComponentInterfaces(root: string, given?: LanguageAdapter, options: ReadOptions = {}): Promise<InterfaceReading> {
   const config = readEnforcementConfig(root);
@@ -806,6 +825,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
       into: [...outsideInto].map(([component, sites]) => ({ component, sites })).sort((a, b) => a.component.localeCompare(b.component)),
     };
     const bounds = { components: model.components.length, files: code.size, candidates: interfacePass.length, asked: asked.size };
+    const candidates = detectedEntrances(root, model, language, testFolders, ignore);
     if (stop !== undefined) {
       // Whose declarations were not all read: a component with a declaration the reading meant to ask and never
       // had answered, and, when the reach was cut short, every component an entrance with a handler is declared in.
@@ -821,6 +841,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
         unowned,
         bounds,
         outside,
+        candidates,
         partial: {
           limit: stop.limit,
           budget: stop.limit === "time" ? `${budget.seconds} s` : `${budget.memoryMB} MB`,
@@ -830,7 +851,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
         },
       };
     }
-    return { kind: "read", language, declarations, symbols, entrances, unowned, bounds, outside };
+    return { kind: "read", language, declarations, symbols, entrances, unowned, bounds, outside, candidates };
   } catch (error) {
     return { kind: "unread", because: `the ${config.language} instrument failed: ${error instanceof Error ? error.message : String(error)}` };
   } finally {

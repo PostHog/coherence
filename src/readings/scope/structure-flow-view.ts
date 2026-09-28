@@ -42,6 +42,7 @@
  */
 
 import { componentId, invariantId, latestOf, plural, relianceOf, type RelianceSite } from "./derive.ts";
+import { CANDIDATE_RULES, NOT_DETECTED, groupLine } from "./entrance-coverage.ts";
 import { html, join, raw, slug, type Markup } from "./html.ts";
 import { renderEnforcement, renderRefutation } from "./invariants-view.ts";
 import type { ShellState, StructurePreview } from "./model.ts";
@@ -2048,7 +2049,30 @@ function renderHealthStrip(model: FlowModel, selected: string | undefined): Mark
       <p class="flow-trust-key-title">Trust levels <span class="flow-meta">the tag beneath each entrance route's token says which it carries in; select one to see where its crossings stand</span></p>
       <ul>${model.levels.map((level) => html`<li><button type="button" class="flow-trust-level" data-structure-select="${level.id}" aria-pressed="${selected === level.id ? "true" : "false"}" title="${level.meaning}"><code>${level.name}</code></button> <span>${levelLine(level.meaning)}</span>${level.outside ? html` <span class="flow-meta" data-outside="true">outside the system's control</span>` : null}</li>`)}${derived ? html`<li data-level="derived"><span class="flow-trust-tag"><code>(derived)</code></span> <span>read from the crossing on its handler</span></li><li data-level="unknown"><span class="flow-trust-tag flow-trust-unknown"><code>unknown</code></span> <span>neither declared nor derived: untrusted</span></li><li data-level="no-traced-control"><span class="flow-trust-tag flow-trust-untraced"><code>no traced control</code></span> <span>untrusted, and no verified chokepoint or totality oracle was traced on the route; not a demonstrated bypass</span></li>` : null}${renderNoControlKey(model)}</ul>
     </div>`}
+    ${renderCoverage(model)}
   </div>`;
+}
+
+/**
+ * Entrance coverage beneath the trust key (c-3760638e): one line, how many
+ * entrances are declared and how much of the detected surface they cover,
+ * the undeclared count in attention, and, opened, each grouped entrance with
+ * what it stands for, every undeclared detected entrance with why it was
+ * detected, and what the rules do not see. Nothing when the reading detected
+ * nothing to measure against.
+ */
+function renderCoverage(model: FlowModel): Markup {
+  const coverage = model.coverage;
+  if (coverage === undefined) return html``;
+  const covered = coverage.individually + coverage.grouped;
+  const language = model.language ?? "";
+  const rules = CANDIDATE_RULES[language] ?? [];
+  return html`<details class="flow-coverage" data-field="entrance-coverage" data-detected="${String(coverage.detected)}" data-covered="${String(covered)}" data-undeclared="${String(coverage.uncovered.length)}">
+    <summary><span class="flow-coverage-title">Entrances</span> ${String(coverage.declared)} declared, covering ${String(covered)} of ${plural(coverage.detected, "detected entrance", "detected entrances")}${coverage.groups.length === 0 ? "" : `, ${coverage.grouped} of them through ${plural(coverage.groups.length, "grouped entrance", "grouped entrances")}`}; <span class="${coverage.uncovered.length === 0 ? "flow-meta" : "flow-attention"}" data-field="undeclared">${String(coverage.uncovered.length)} undeclared</span></summary>
+    ${coverage.groups.length === 0 ? null : html`<ul class="flow-rows" data-field="coverage-groups">${coverage.groups.map((g) => html`<li class="flow-row" data-entrance="${g.name}" data-covers="${String(g.covers)}"><span>${groupLine(g)}</span></li>`)}</ul>`}
+    ${coverage.uncovered.length === 0 ? null : html`<ul class="flow-rows" data-field="coverage-undeclared">${coverage.uncovered.map((c) => html`<li class="flow-row" data-rule="${c.rule}"><code>${c.file}:${String(c.line)}</code>${c.symbol === "" ? null : html` <span>${c.symbol}</span>`}<span class="flow-meta">${c.rule}: ${c.why}</span></li>`)}</ul>`}
+    <p class="flow-meta" data-field="coverage-rules">${coverage.beyond === 0 ? "" : `${plural(coverage.beyond, "declared entrance covers", "declared entrances cover")} nothing detected: declared where the rules do not reach, or finer than they detect. `}Detected by ${rules.length === 0 ? "no rule for this language" : rules.map((r) => r.rule).join(", ")}; ${NOT_DETECTED[language] ?? ""}.</p>
+  </details>`;
 }
 
 /**

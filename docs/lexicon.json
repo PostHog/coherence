@@ -1212,6 +1212,10 @@
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-0db9b17b)",
         "owner_words": "Declared and checked for entrypoints is good."
+      },
+      "properties": {
+        "entrance coverage": "How much of the surface the reading detects the declared entrances cover: each detected entrance is covered individually (an entrance's handler names it and nothing else), through a grouped entrance (one entrance stands for every detected entrance registered through its handler or detected in its module), or undeclared. A spec-gap count speaks only for the covered part.",
+        "detected entrance": "An entrance the reading finds by one of the rules its language lists (a server function, a server route, a URL pattern, a package script, a top-level script), with the rule and why it matched; never a guess presented as fact."
       }
     },
     {

@@ -70,6 +70,7 @@
  */
 
 import { allInvariants, componentOfFile, flowChokepointId, flowLevelId, invariantVerdict, latestOf, openEscalations, plural, subjectOf, type InvariantVerdict, type RelianceSite } from "./derive.ts";
+import { coverageOf, type EntranceCoverage } from "./entrance-coverage.ts";
 import { slug } from "./html.ts";
 import type { EntranceGuard, InterfacePartial, InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, ShellState, SpecComponent, SpecInvariant } from "./model.ts";
 
@@ -476,6 +477,8 @@ export interface FlowModel {
   /** Every crossing, and where the map draws it. */
   crossings: FlowCrossingPlace[];
   health: FlowHealth;
+  /** How much of the surface the reading detected the declared entrances cover; absent when the reading detected nothing (unread, or taken before detection). */
+  coverage: EntranceCoverage | undefined;
 }
 
 /* ------------------------------------------------------ interface symbols */
@@ -1056,6 +1059,7 @@ export function flowOf(state: ShellState): FlowModel {
     partial: reading.kind === "read" ? reading.partial : undefined,
     crossings,
     health,
+    coverage: reading.kind === "read" ? coverageOf(state.spec.components, reading.candidates) : undefined,
   };
 }
 

@@ -88,6 +88,13 @@ export interface GapState {
   entrances: [string, string][];
   /** How many entrances declare control: none. */
   noControl: number;
+  /**
+   * The declared entrances' coverage of what the reading detected, in counts
+   * and the first few undeclared by place (c-3760638e): what the gap count
+   * speaks for. Absent when the reading detected nothing (taken before
+   * detection).
+   */
+  coverage?: { declared: number; detected: number; covered: number; undeclared: number; first: string[] };
 }
 
 function key(component: string, name: string): string {
@@ -118,10 +125,14 @@ export function gapsOf(state: Pick<ShellState, "spec">, model: FlowModel): GapSt
     }
   }
   // An entrance with no drawn route (unresolved, unreachable) is no gap here: the spec check already names it.
+  const c = model.coverage;
   return {
     gaps,
     entrances: state.spec.components.flatMap((c) => c.entrances.map((e): [string, string] => [c.folder, e.name])),
     noControl: model.entrances.filter((e) => e.noControl !== undefined).length,
+    ...(c === undefined
+      ? {}
+      : { coverage: { declared: c.declared, detected: c.detected, covered: c.individually + c.grouped, undeclared: c.uncovered.length, first: c.uncovered.slice(0, COVERAGE_NAMES).map((u) => (u.symbol === "" ? u.file : `${u.symbol} (${u.file})`)) } }),
   };
 }
 
@@ -146,11 +157,14 @@ function specShape(root: string): string {
   );
 }
 
+/** The root files a reading reads besides source: the config, and the manifests whose runners and bins are detected entrances. */
+const MANIFESTS: ReadonlySet<string> = new Set(["coherence.config.json", "package.json", "pyproject.toml"]);
+
 /**
  * The fingerprint of what a reading reads: every source file of the
- * project's language and the config, inside the config's bounds, by path
- * and content, and the specs' shape as the reading depends on it. Equal
- * fingerprints mean the reading still describes the tree.
+ * project's language inside the config's bounds, the config and the
+ * manifests, by path and content, and the specs' shape as the reading
+ * depends on it. Equal fingerprints mean the reading still describes the tree.
  */
 export function structureFingerprint(root: string): string {
   const language = readEnforcementConfig(root).language;
@@ -158,7 +172,8 @@ export function structureFingerprint(root: string): string {
   const hash = createHash("sha256");
   hash.update(specShape(root)).update("\u0000");
   for (const file of projectFiles(root)) {
-    const counted = file === "coherence.config.json" || (withinBounds(file, skip) && isSourceFile(file, language));
+    // The manifests too: the entrances the reading detects include what package.json and pyproject.toml run.
+    const counted = MANIFESTS.has(file) || (withinBounds(file, skip) && isSourceFile(file, language));
     if (!counted) continue;
     let text: Buffer;
     try {
@@ -475,6 +490,24 @@ export function recordGapBaseline(root: string, state: GapState, who: Who, becau
 }
 
 /* ------------------------------------------------------ orient's line */
+
+/** The most undeclared entrances orient names; the rest are counted. */
+const COVERAGE_NAMES = 3;
+
+/**
+ * Orient's coverage line (c-3760638e): how many detected entrances the
+ * declared ones cover and how many are undeclared, naming at most three, so a
+ * gap count is read against the surface it speaks for. Nothing when every
+ * detected entrance is covered, or nothing was detected to measure against.
+ */
+export function orientCoverageText(state: GapState, cli: string, asOf?: { at: string }): string {
+  const c = state.coverage;
+  if (c === undefined || c.undeclared === 0) return "";
+  const label = asOf === undefined ? "" : ` (as of ${utc(asOf.at)})`;
+  const names = c.first.map((n) => short(n)).join(", ");
+  const more = c.undeclared > c.first.length ? ` and ${c.undeclared - c.first.length} more` : "";
+  return `Entrance coverage${label}: ${c.declared} declared ${c.declared === 1 ? "entrance covers" : "entrances cover"} ${c.covered} of ${c.detected} detected; ${c.undeclared} undeclared, the gap count says nothing of ${c.undeclared === 1 ? "it" : "them"}: ${names}${more}. ${cli} query structure lists each with why it was detected.`;
+}
 
 /** The most characters a quoted entrance or route name takes in orient's one line. */
 const NAME_CHARS = 40;

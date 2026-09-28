@@ -393,6 +393,7 @@ export type JournalRecord =
  * the raw store.
  */
 import type { WorkOrder } from "../../journal/work.ts";
+import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 export type { WorkOrder };
 
 /** The work orders under .coherence/work, or their absence with the reason. */
@@ -531,6 +532,8 @@ export type InterfaceReading =
       outside?: { sites: number; files: number; into: { component: string; sites: number }[] };
       /** Present when a budget stopped the reading: which budget, its size, and the components whose declarations were not all read. */
       partial?: InterfacePartial;
+      /** The entrances the language's rules detect in the tree, each with its rule and why: what the declared entrances' coverage is measured against. Absent from a reading taken before detection. */
+      candidates?: EntranceCandidate[];
     }
   | { kind: "unread"; because: string };
 

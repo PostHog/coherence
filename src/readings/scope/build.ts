@@ -51,6 +51,7 @@ const BROWSER_SOURCES = [
   "html.ts",
   "model.ts",
   "derive.ts",
+  "entrance-coverage.ts",
   "structure-flow.ts",
   "lexicon-view.ts",
   "components-view.ts",

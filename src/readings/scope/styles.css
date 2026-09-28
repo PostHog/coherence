@@ -1290,6 +1290,37 @@ code {
   font-weight: 600;
 }
 
+/* Entrance coverage beneath the trust key: one line of counts, the undeclared in attention, the lists one click away. */
+.flow-coverage {
+  flex-basis: 100%;
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.flow-coverage > summary {
+  cursor: pointer;
+}
+
+.flow-coverage-title {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.flow-coverage .flow-rows {
+  margin: 0.25rem 0 0;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.flow-coverage code {
+  overflow-wrap: anywhere;
+}
+
+.flow-coverage > p.flow-meta {
+  margin: 0.375rem 0 0;
+}
+
 /* The trust-level key beside the health counts: each level a selection, defined in one line. */
 .flow-trust-key {
   flex-basis: 100%;
