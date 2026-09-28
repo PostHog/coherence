@@ -490,11 +490,13 @@ export class DbtAdapter implements LanguageAdapter {
     const folder = beside.members !== undefined ? posix.dirname(beside.file.replace(/\/+$/, "")) : posix.dirname(beside.file);
     const name = `coherence_refutation_${randomBytes(4).toString("hex")}`;
     const file = folder === "." ? `${name}.sql` : `${folder}/${name}.sql`;
-    const reads = [...door.slice(0, 1), target];
+    // A chokepoint that is also the protected thing (a folder of diagnostics nothing may read) has no door to read first.
+    const through = door[0] !== undefined && door[0].id !== target.id ? door[0] : undefined;
+    const reads = through === undefined ? [target] : [through, target];
     const body = `-- staged by a Coherence refutation; never written to disk\n${reads.map((r, i) => `${i === 0 ? "select * from" : "union all select * from"} {{ ref('${r.name}') }}`).join("\n")}\n`;
     const synthetic: DbtResource = { id: `model.${manifest.project}.${name}`, type: "model", name, file, dependsOn: reads.map((r) => r.id), code: body };
     const site = this.sitesInto([target], [synthetic], new Map([[file, body]])).find((s) => s.file === file);
-    const what = `a model at ${file}${door[0] === undefined ? "" : ` downstream of ${door[0].name}`} that refs ${target.name} directly`;
+    const what = `a model at ${file}${through === undefined ? "" : ` downstream of ${through.name}`} that refs ${target.name} directly`;
     return {
       seen: site !== undefined,
       staged: [{ what, ...(site === undefined ? {} : { site }) }],

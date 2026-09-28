@@ -332,7 +332,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   };
 
   if ((needsAdapter || options.observe === true) && options.adapter === undefined && options.server !== false) {
-    return withWarmAdapter(root, (remote, server, reason) => pass(remote, { language: remote?.language ?? config.language, server: server ?? "none" }, reason), {
+    return withWarmAdapter(root, (remote, server, reason) => pass(remote, { language: remote?.language ?? config.instruments.join("+"), server: server ?? "none" }, reason), {
       refresh: options.refresh ?? [],
       idleMs: options.idleMs,
     });
@@ -343,7 +343,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     await given.forget(options.refresh ?? []);
     return pass(given, { language: given.language, server: "cold" }, undefined);
   }
-  return pass(undefined, { language: config.language, server: "none" }, undefined);
+  return pass(undefined, { language: config.instruments.join("+"), server: "none" }, undefined);
 }
 
 /**
