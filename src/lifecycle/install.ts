@@ -19,13 +19,13 @@
  * and uninstall keep the file's indentation and final newline and write
  * nothing when nothing changed, so a round trip gives back the adopter's file.
  *
- * An adopter's hook finds Coherence rather than depending on it: Coherence is
- * a checkout run from outside the project, never a package in the project's
- * node_modules, so a pnpm lockfile and its tree are never touched (an `npm
- * link` there installed a second dependency tree and broke a pnpm build).
- * The command walks up to the project root and looks, in order, at
- * $COHERENCE_HOME, a `coherence` folder beside the project, one beside the
- * main checkout when the project is a git worktree, and last the project's
+ * An adopter's hook finds Coherence rather than naming one path to it:
+ * Coherence is the package in the project's node_modules, or a checkout run
+ * from outside the project (never `npm link`ed in: that installed a second
+ * dependency tree and broke a pnpm build). The command walks up to the
+ * project root and looks, in order, at $COHERENCE_HOME, a `coherence` folder
+ * beside the project, one beside the main checkout when the project is a git
+ * worktree, the installed package's own cli, and last the project's
  * node_modules/.bin/coherence. The committed command names no one's absolute
  * path, so it is the same on every teammate's machine and the check agrees
  * across them. When nothing is found, or node is not on the PATH, the hook
@@ -118,7 +118,7 @@ export const LOCATE = [
 ].join("; ");
 
 /** The one line a hook prints when it cannot reach Coherence. No apostrophes: it sits in single quotes. */
-export const NOT_INSTALLED = `Coherence is not installed for this project, so this hook did nothing. To install it, run npm install -D github:PostHog/coherence in the project, clone the repository beside the project as ../${SIBLING} and run npm ci in the clone, or set ${HOME_VAR} to a checkout.`;
+export const NOT_INSTALLED = `Coherence is not installed for this project, so this hook did nothing. To install it, run npm install -D @posthog/coherence in the project, clone the repository beside the project as ../${SIBLING} and run npm ci in the clone, or set ${HOME_VAR} to a checkout.`;
 
 /** The one line a hook prints when Coherence is there but node is not. */
 export const NO_NODE = "Coherence was found but node is not on the PATH this hook runs with, so this hook did nothing. Install Node 22.18 or newer.";

@@ -9,10 +9,8 @@ the code.
 Set up Coherence (github.com/PostHog/coherence) in this project, then tell me
 what it found.
 
-1. Run `npm install -D github:PostHog/coherence` (with pnpm, first add
-   `onlyBuiltDependencies: ["@posthog/coherence"]` to pnpm-workspace.yaml so
-   it may build, then `pnpm add -D github:PostHog/coherence`). The command is
-   `npx --no coherence`.
+1. Run `npm install -D @posthog/coherence` (or `pnpm add -D
+   @posthog/coherence`). The command is `npx --no coherence`.
 2. Write coherence.config.json at the root with "name" and "language"
    ("typescript" or "python"), plus "ignore", "typecheck" and "test" if the
    project has them.
@@ -27,11 +25,11 @@ Then continue with "Full setup" in the Coherence README: the lexicon, trust
 levels, invariants and enforcement.
 ```
 
-It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux. Until
-`@posthog/coherence` is on npm, this installs from the GitHub repository,
-which builds the package as it installs. A checkout kept beside the project
-as ../coherence (or named by COHERENCE_HOME) also works, and the hooks prefer
-it.
+It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux. The package
+is [`@posthog/coherence`](https://www.npmjs.com/package/@posthog/coherence)
+on npm, published from this repository with provenance. A checkout kept
+beside the project as ../coherence (or named by COHERENCE_HOME) also works,
+and the hooks prefer it.
 
 ## What it is
 
@@ -47,18 +45,15 @@ as a source of code.
 
 ## Full setup: paste this into your agent
 
-Until `@posthog/coherence` is on npm, this installs from the GitHub
-repository. It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux.
+It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux.
 
 ```text
 Set up Coherence in this project. Work through these steps in order, and
 report what each one found.
 
-1. Install. Run `npm install -D github:PostHog/coherence`, which builds the
-   package as it installs. With pnpm, first add `onlyBuiltDependencies:
-   ["@posthog/coherence"]` to pnpm-workspace.yaml (pnpm runs no dependency's
-   build script without it), then `pnpm add -D github:PostHog/coherence`. Do
-   not `npm link` a checkout into the project. The command is
+1. Install. Run `npm install -D @posthog/coherence` (or `pnpm add -D
+   @posthog/coherence`). Do not `npm link` a checkout into the project. The
+   command is
    `npx --no coherence` (call it `coherence` below); `--no` keeps npx from
    fetching an unrelated package if the install is missing. Check it with
    `coherence spec --check`. Teammates get it from the lockfile.
