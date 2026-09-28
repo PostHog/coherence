@@ -1,7 +1,7 @@
 {
   "name": "coherence",
   "entryDir": ".",
-  "ignore": ["node_modules", "promo"],
+  "ignore": ["node_modules", "promo", "src/readings/scope/fonts"],
   "language": "typescript",
   "wellKnown": ["Mnemion", "Sol"],
   "typecheck": ["npm", "run", "typecheck"],

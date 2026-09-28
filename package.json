@@ -1,6 +1,6 @@
 {
   "name": "@posthog/coherence",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A prosthetic for proprioception: specs, invariants, and the readings that keep an agent balanced.",
   "type": "module",
   "license": "MIT",
@@ -29,12 +29,10 @@
     "test:setup": "\"${COHERENCE_PYTHON:-python3}\" -m venv .venv && .venv/bin/python -m pip install --requirement requirements-test.txt",
     "test:python": "node --disable-warning=ExperimentalWarning --test src/adapters/python.test.ts",
     "build": "node --disable-warning=ExperimentalWarning src/build.ts",
-    "prepack": "npm run build"
+    "prepare": "npm run build"
   },
   "devDependencies": {
-    "@ibm/plex-mono": "2.5.0",
     "@types/node": "^22.20.3",
-    "node-llama-cpp": "3.21.1",
     "typescript": "^5.9.3"
   },
   "bin": {

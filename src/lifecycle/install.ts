@@ -118,7 +118,7 @@ export const LOCATE = [
 ].join("; ");
 
 /** The one line a hook prints when it cannot reach Coherence. No apostrophes: it sits in single quotes. */
-export const NOT_INSTALLED = `Coherence is not installed for this project, so this hook did nothing. To install it, clone github.com/PostHog/coherence beside the project as ../${SIBLING} and run npm ci in the clone, or set ${HOME_VAR} to a checkout.`;
+export const NOT_INSTALLED = `Coherence is not installed for this project, so this hook did nothing. To install it, run npm install -D github:PostHog/coherence in the project, clone the repository beside the project as ../${SIBLING} and run npm ci in the clone, or set ${HOME_VAR} to a checkout.`;
 
 /** The one line a hook prints when Coherence is there but node is not. */
 export const NO_NODE = "Coherence was found but node is not on the PATH this hook runs with, so this hook did nothing. Install Node 22.18 or newer.";

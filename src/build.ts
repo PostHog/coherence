@@ -6,8 +6,8 @@
  * resolves the same compiled as in a checkout. Beside the JavaScript go the
  * files modules read at run time: the data files, the stylesheet, the Scope
  * browser sources stripped by the same stripper a checkout runs when it
- * builds a page, and the one font file the page embeds with its license, so
- * no font package, and no install script of its own, is needed.
+ * builds a page, and the one font file the page embeds with its license.
+ * npm runs this as prepare, so an install from the git repository builds too.
  */
 
 import { spawnSync } from "node:child_process";
@@ -41,13 +41,9 @@ if (tsc.status !== 0) process.exit(tsc.status ?? 1);
 
 for (const file of files(src)) {
   const at = relative(src, file);
-  if (/\.(json|css)$/.test(file)) copy(file, join(dist, at));
+  if (/\.(json|css)$/.test(file) || dirname(at) === join(scope, "fonts")) copy(file, join(dist, at));
 }
 for (const name of BROWSER_SOURCES) {
   const source = readFileSync(join(src, scope, name), "utf8");
   writeFileSync(join(dist, scope, strippedName(name)), stripTypeScriptTypes(source, { mode: "strip" }));
 }
-
-const plex = join(root, "node_modules", "@ibm", "plex-mono");
-copy(join(plex, "fonts", "split", "woff2", "IBMPlexMono-Regular-Latin1.woff2"), join(dist, scope, "IBMPlexMono-Regular-Latin1.woff2"));
-copy(join(plex, "LICENSE.txt"), join(dist, scope, "IBMPlexMono-LICENSE.txt"));
