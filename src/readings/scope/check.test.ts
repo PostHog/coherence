@@ -132,12 +132,15 @@ test("the embedded state is the loaded lexicon, unchanged", async () => {
     metaphors: Record<string, string>;
     shape: object;
     version: number;
+    rejected?: object[];
+    retired?: { name: string }[];
   };
   assert.equal(lexicon.concepts.length, file.concepts.length);
   assert.equal(lexicon.version, file.version);
   assert.deepEqual(Object.keys(lexicon.metaphors), Object.keys(file.metaphors));
   assert.deepEqual(lexicon.shape, file.shape, "the file's shape key is kept in the model");
-  assert.equal(lexicon.rejected_names, undefined, "Coherence's lexicon has no top-level rejected names");
+  assert.deepEqual(lexicon.rejected_names, file.rejected, "the lexicon's top-level rejected names are kept whole");
+  assert.deepEqual(lexicon.retired?.map((c) => c.name), file.retired?.map((c) => c.name), "every retired concept is kept");
   assert.deepEqual(lexicon.record, {}, "every top-level key of the file has a place in the model");
   for (const [i, concept] of lexicon.concepts.entries()) {
     const entry = file.concepts[i]!;

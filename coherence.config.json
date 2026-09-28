@@ -3,7 +3,6 @@
   "entryDir": ".",
   "ignore": ["node_modules", "promo"],
   "language": "typescript",
-  "platform": "apple silicon",
   "wellKnown": ["Mnemion", "Sol"],
   "typecheck": ["npm", "run", "typecheck"],
   "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 --test-name-pattern={filter} 'src/**/*.test.ts'",

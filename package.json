@@ -8,6 +8,10 @@
   "engines": {
     "node": ">=22.18"
   },
+  "os": [
+    "darwin",
+    "linux"
+  ],
   "scripts": {
     "scope": "node --disable-warning=ExperimentalWarning src/cli.ts scope",
     "scope:check": "node --disable-warning=ExperimentalWarning --test src/readings/scope/check.test.ts",
