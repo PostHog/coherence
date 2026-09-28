@@ -12,11 +12,18 @@
  * every test the bullets name runs in one invocation with a combined name pattern and
  * a jest-shaped JSON report, and the results map back by test name. The
  * one-at-a-time path remains for runners that cannot report per test.
+ *
+ * dbt writes no report where it is told to, only a `run_results.json` in its
+ * target folder: its command takes `{outdir}`, a fresh folder it may write
+ * its whole target into (`--target-path {outdir}`), and the report is read
+ * from there. Each result's unique id (`test.<package>.<name>[.<hash>]`)
+ * names the test; a test at severity warn passes, and its reason says it
+ * warned.
  */
 
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { EnforcementConfig } from "./config.ts";
@@ -52,7 +59,7 @@ function shellQuote(value: string): string {
 }
 
 export async function runTotalityOracle(root: string, config: EnforcementConfig, filter: string, timeoutMs = TOTALITY_TIMEOUT_MS): Promise<TotalityResult> {
-  const spec = commandFor(config, config.testFilterForm === "pytest" ? filter : escapeRegExp(filter));
+  const spec = commandFor(config, config.testFilterForm === "pytest" || config.testFilterForm === "dbt" ? filter : escapeRegExp(filter));
   if (spec === undefined) {
     return { verdict: "not run", reason: "no test command configured; set test in coherence.config.json (an argv array the filter is appended to, or a string with {filter})", command: undefined, tail: "" };
   }
@@ -117,9 +124,10 @@ export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** The combined name pattern one invocation takes: every filter, escaped, as regex alternatives; or, for pytest's -k, the names as written joined with `or`. */
-export function combinedFilter(filters: readonly string[], form: "regex" | "pytest" = "regex"): string {
+/** The combined name pattern one invocation takes: every filter, escaped, as regex alternatives; for pytest's -k, the names as written joined with `or`; for dbt's --select, the names as written joined with spaces. */
+export function combinedFilter(filters: readonly string[], form: "regex" | "pytest" | "dbt" = "regex"): string {
   const unique = [...new Set(filters)];
+  if (form === "dbt") return unique.join(" ");
   return form === "pytest" ? unique.join(" or ") : unique.map(escapeRegExp).join("|");
 }
 
@@ -166,11 +174,28 @@ function reportFromPytestJson(report: { tests?: { nodeid?: string; outcome?: str
   return { testResults: [{ assertionResults: results }] };
 }
 
-/** Whatever report the runner wrote, as the jest shape: JUnit XML, pytest-json-report, or jest itself. */
+/** A dbt result status as the jest shape's: warn is its own status, a pass the reason names. */
+const DBT_STATUS: Record<string, string> = { pass: "passed", success: "passed", warn: "warned", fail: "failed", error: "failed", "runtime error": "failed" };
+
+/** dbt's `run_results.json` as the jest shape: each test's name is the third segment of its unique id. */
+export function reportFromDbtRunResults(report: { results?: { unique_id?: string; status?: string; message?: string | null; failures?: number | null }[] }): JsonReport {
+  const results: AssertionResult[] = (report.results ?? []).map((r) => {
+    const id = r.unique_id ?? "";
+    const title = id.split(".")[2] ?? id;
+    const status = DBT_STATUS[r.status ?? ""] ?? "skipped";
+    const message = typeof r.message === "string" && r.message !== "" ? r.message : r.failures !== undefined && r.failures !== null ? `${r.failures} failing rows` : undefined;
+    return { ancestorTitles: [], title, fullName: id, status, ...(status === "failed" || status === "warned") && message !== undefined ? { failureMessages: [message] } : {} };
+  });
+  return { testResults: [{ assertionResults: results }] };
+}
+
+/** Whatever report the runner wrote, as the jest shape: JUnit XML, pytest-json-report, dbt's run_results.json, or jest itself. */
 export function parseReport(text: string): JsonReport {
   const trimmed = text.trimStart();
   if (trimmed.startsWith("<")) return reportFromJunit(trimmed);
   const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+  const schema = (parsed["metadata"] as { dbt_schema_version?: unknown } | undefined)?.dbt_schema_version;
+  if (Array.isArray(parsed["results"]) && typeof schema === "string" && schema.includes("run-results")) return reportFromDbtRunResults(parsed as { results?: [] });
   if (Array.isArray(parsed["tests"]) && !("testResults" in parsed)) return reportFromPytestJson(parsed as { tests?: { nodeid?: string; outcome?: string }[] });
   return parsed as JsonReport;
 }
@@ -210,11 +235,14 @@ export function verdictsFromReport(report: JsonReport, filters: readonly string[
       continue;
     }
     const failed = mine.filter((r) => r.status === "failed");
-    const passed = mine.filter((r) => r.status === "passed");
+    // A dbt test at severity warn found rows and passed by its own declaration: a pass, said so.
+    const warned = mine.filter((r) => r.status === "warned");
+    const passed = mine.filter((r) => r.status === "passed" || r.status === "warned");
     if (failed.length > 0) {
       out.set(via, { verdict: "fail", reason: `${failed.length} of ${mine.length} tests under "${via}" failed: ${failed.map((r) => r.fullName ?? r.title ?? "?").slice(0, 3).join("; ")}`, command, tail: "", matched: mine.length });
     } else if (passed.length === mine.length) {
-      out.set(via, { verdict: "pass", reason: `${passed.length} test${passed.length === 1 ? "" : "s"} under "${via}" passed in one invocation of ${command}`, command, tail: "", matched: mine.length });
+      const warning = warned.length === 0 ? "" : `; ${warned.length} warned at severity warn${warned[0]!.failureMessages?.[0] === undefined ? "" : ` (${warned[0]!.failureMessages[0]})`}`;
+      out.set(via, { verdict: "pass", reason: `${passed.length} test${passed.length === 1 ? "" : "s"} under "${via}" passed in one invocation of ${command}${warning}`, command, tail: "", matched: mine.length });
     } else {
       out.set(via, { verdict: "not run", reason: `${mine.length - passed.length} of ${mine.length} tests under "${via}" were skipped or pending`, command, tail: "", matched: mine.length });
     }
@@ -249,17 +277,22 @@ export interface BatchObserver {
 
 export async function runTotalityBatch(root: string, config: EnforcementConfig, filters: readonly string[], timeoutMs = TOTALITY_TIMEOUT_MS, observer?: BatchObserver): Promise<Map<string, TotalityResult> | undefined> {
   if (config.testJson === undefined || filters.length === 0) return undefined;
-  const out = join(tmpdir(), `coherence-totality-${randomBytes(4).toString("hex")}.${config.testFilterForm === "pytest" ? "xml" : "json"}`);
+  // A fresh folder per invocation: the report lands in it, or, for a runner that writes a whole target folder, under {outdir}.
+  const outdir = mkdtempSync(join(tmpdir(), `coherence-totality-${randomBytes(4).toString("hex")}-`));
+  const out = join(outdir, `report.${config.testFilterForm === "pytest" ? "xml" : "json"}`);
+  const reportAt = (): string => (existsSync(out) ? out : join(outdir, "run_results.json"));
   const filter = combinedFilter(filters, config.testFilterForm);
-  const substitute = (arg: string): string => arg.split("{filter}").join(filter).split("{out}").join(out);
+  const substitute = (arg: string): string => arg.split("{filter}").join(filter).split("{outdir}").join(outdir).split("{out}").join(out);
   const plain: CommandSpec = Array.isArray(config.testJson)
     ? { command: config.testJson[0]!, args: config.testJson.slice(1).map(substitute), shell: false }
-    : { command: config.testJson.split("{filter}").join(shellQuote(filter)).split("{out}").join(shellQuote(out)), args: [] as string[], shell: true };
+    : { command: config.testJson.split("{filter}").join(shellQuote(filter)).split("{outdir}").join(shellQuote(outdir)).split("{out}").join(shellQuote(out)), args: [] as string[], shell: true };
   const spec = observer === undefined ? plain : observer.wrap(plain);
   // The combined pattern and the report path are long and the same for every entry: shown collapsed.
   const shown = (Array.isArray(config.testJson) ? config.testJson.join(" ") : config.testJson)
     .split("{filter}")
     .join(`<${filters.length} names>`)
+    .split("{outdir}")
+    .join("<report folder>")
     .split("{out}")
     .join("<report>");
   const notRun = (reason: string, tail = "", unfinished = false): Map<string, TotalityResult> =>
@@ -289,18 +322,18 @@ export async function runTotalityBatch(root: string, config: EnforcementConfig, 
         resolve({ code, text });
       });
     });
-    if (!existsSync(out)) return notRun(`${shown} exited ${output.code} and wrote no report at {out}`, tailOf(output.text));
+    if (!existsSync(reportAt())) return notRun(`${shown} exited ${output.code} and wrote no report at {out} or {outdir}/run_results.json`, tailOf(output.text));
     try {
-      parsed = parseReport(readFileSync(out, "utf8"));
+      parsed = parseReport(readFileSync(reportAt(), "utf8"));
     } catch (error) {
-      return notRun(`the report ${shown} wrote is neither jest-shaped JSON, JUnit XML, nor pytest-json-report (${error instanceof Error ? error.message : String(error)})`, tailOf(output.text));
+      return notRun(`the report ${shown} wrote is neither jest-shaped JSON, JUnit XML, pytest-json-report, nor dbt run results (${error instanceof Error ? error.message : String(error)})`, tailOf(output.text));
     }
     return verdictsFromReport(parsed, filters, shown);
   } catch (error) {
     if (unfinished !== undefined) return notRun(unfinished, tailOf(heard), true);
     return notRun(`test command could not run: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
-    rmSync(out, { force: true });
+    rmSync(outdir, { recursive: true, force: true });
     observer?.report(parsed);
   }
 }
