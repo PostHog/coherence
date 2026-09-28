@@ -181,11 +181,13 @@ test("locate: a ref with a package, a double-quoted ref, and a source call", () 
   assert.deepEqual(locate("from {{ source('stripe', 'charges') }}", source, false), { line: 1, character: 8 });
 });
 
-test("a test resource is a test site wherever its file lies: the check classifies a YAML test under a model folder as a test", async () => {
+test("a test resource is a test site wherever its file lies: the adapter marks a YAML test under a model folder, and the check classifies it a test", async () => {
   const adapter = new DbtAdapter(root);
   const entries = await resolved(adapter, "models/book/entries/");
   const book = await resolved(adapter, "book");
-  const yaml: ReferenceSite = { file: "models/book/schema.yml", line: 6, character: 4, symbol: "not_null_revenue_entries_entry_id", testResource: true };
+  const yaml = (await adapter.references(entries)).find((s) => s.file === "models/book/schema.yml");
+  assert.ok(yaml !== undefined);
+  assert.equal(yaml.testResource, true, "the manifest says the referencing resource is a test");
   assert.equal(classifySite(yaml, entries, book, ["tests"]), "test");
   const { testResource: _, ...plain } = yaml;
   assert.equal(classifySite(plain, entries, book, ["tests"]), "bypass", "without the instrument's word the same site is a bypass");
