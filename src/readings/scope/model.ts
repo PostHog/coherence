@@ -254,8 +254,14 @@ export interface SpecEntrance {
   /** The trust level it declares it carries in; absent when it declares none, and its trust is derived. */
   trust?: string | undefined;
   trustLine?: number | undefined;
+  /** The chokepoint it declares its handler is registered through (a guard: line); absent when it declares none. */
+  guard?: string | undefined;
+  guardLine?: number | undefined;
+  /** Why it needs no control (a control: none — <reason> line); absent when it declares none. */
+  noControl?: string | undefined;
+  controlLine?: number | undefined;
   component: string;
-  /** The file whose top level declares the handler, as the spec model found it. */
+  /** The file whose top level declares the handler (a module handler: the module itself), as the spec model found it. */
   file: string | undefined;
 }
 
@@ -462,6 +468,26 @@ export interface EntranceResolution {
   reason?: string;
   /** The component interfaces the handler's static reach uses, through value references only; absent from a reading taken before reach was read. */
   reach?: ReachReference[];
+  /**
+   * The chokepoints the handler passes, as the reading traced them: `wrapper`
+   * when the handler's own declaration references the chokepoint and its reach
+   * reaches the protected thing (the handler is wrapped by it); `declared` when
+   * the entrance's guard: line names it and a reference to the handler at its
+   * registration spells it; `reach` when the reach reaches the protected thing
+   * further on. Only chokepoints whose protected thing the reach reaches count
+   * (a declared guard's is reached through the chokepoint itself). Absent from
+   * a reading taken before guards were traced.
+   */
+  guards?: EntranceGuard[];
+  /** Why a declared guard did not count, when it did not: no registration of the handler spells it. */
+  guardUnconfirmed?: string;
+}
+
+/** One chokepoint an entrance's handler passes, by its invariant, and how the reading traced it. */
+export interface EntranceGuard {
+  component: string;
+  name: string;
+  how: "wrapper" | "declared" | "reach";
 }
 
 /**

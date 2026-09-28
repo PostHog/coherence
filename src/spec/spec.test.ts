@@ -452,3 +452,63 @@ test("a long refuted value parses in linear time, and three digit groups that na
   assert.deepEqual(good.problems, []);
   assert.deepEqual({ broke: good.invariants[0]?.refutations[0]?.broke, date: good.invariants[0]?.refutations[0]?.date }, { broke: "broke it", date: "2026-09-18" });
 });
+
+test("the model: an entrance's handler may be a module file whose top-level script receives the work, and it must exist", () => {
+  const door = trustedDoor({});
+  const withJob = (handler: string): Record<string, string> => ({
+    ...door,
+    "Widgetry.spec.md": door["Widgetry.spec.md"]!.replace("\n## invariants\n", `- job: an operator runs the nightly job\n  handler: ${handler}\n\n## invariants\n`),
+    "scripts/nightly.ts": "import { take } from \"../src/door/door.ts\";\ntake();\n",
+  });
+  withModel(withJob("scripts/nightly.ts"), (model) => {
+    assert.deepEqual(model.problems, []);
+    assert.deepEqual(model.components.find((c) => c.folder === ".")!.entrances.find((e) => e.name === "job")!.file, "scripts/nightly.ts", "resolved to the module itself");
+  });
+  withModel(withJob("scripts/missing.ts"), (model) => {
+    assert.deepEqual(model.problems.map((p) => p.message), ["entrance job: handler module scripts/missing.ts does not exist (read under . and under the root)"]);
+  });
+  withModel(withJob("scripts/notes.md"), (model) => {
+    assert.deepEqual(model.problems.map((p) => p.message), ["entrance job: handler scripts/notes.md names a file that is not source code"]);
+  });
+});
+
+test("the model: an entrance's guard: line names a chokepoint an invariant declares, or a symbol of a chokepoint module", () => {
+  const door = trustedDoor({});
+  const guarded = (guard: string, chokepoint = "take"): Record<string, string> => ({
+    ...door,
+    "Widgetry.spec.md": door["Widgetry.spec.md"]!.replace("  handler: peek in src/door/door.ts\n", `  handler: peek in src/door/door.ts\n  guard: ${guard}\n`),
+    "src/door/Door.spec.md": door["src/door/Door.spec.md"]!.replace("chokepoint: take", `chokepoint: ${chokepoint}`),
+  });
+  withModel(guarded("take"), (model) => {
+    assert.deepEqual(model.problems, []);
+    assert.equal(model.components.find((c) => c.folder === ".")!.entrances.find((e) => e.name === "peek")!.guard, "take");
+  });
+  withModel(guarded("peek", "src/door/door.ts"), (model) => assert.deepEqual(model.problems, [], "a symbol declared in a chokepoint module"));
+  withModel({ ...guarded("mutate", "src/door/door.ts"), "src/door/door.ts": "export function take(): void {}\nexport function peek(): void {}\nexport const { read, mutate } = makeRpc();\n" }, (model) => assert.deepEqual(model.problems, [], "a factory's destructured product in a chokepoint module"));
+  withModel(guarded("nobody"), (model) => {
+    assert.deepEqual(model.problems.map((p) => `${p.file}:${p.line} ${p.message}`), ["Widgetry.spec.md:15 entrance peek: guard nobody is no chokepoint an invariant declares, nor a symbol of a chokepoint module; declared chokepoints: take"]);
+  });
+  const twice = parseSpec("# A\n\nAn a.\n\n## entrances\n- in: work enters\n  handler: x\n  guard:\n  guard: y\n", "A.spec.md");
+  assert.ok(twice.problems.some((p) => p.line === 8 && p.message === "guard: on entrance in names no chokepoint"));
+  assert.ok(twice.problems.some((p) => p.line === 9 && p.message === "entrance in names its guard twice"));
+});
+
+test("the grammar: an entrance's control: none carries a non-empty reason and never stands beside a guard:", () => {
+  const entrance = (lines: string): ReturnType<typeof parseSpec> => parseSpec(`# A\n\nAn a.\n\n## entrances\n- in: work enters\n  handler: x\n${lines}`, "A.spec.md");
+  const waived = entrance("  control: none — static files, the same bytes for every caller\n");
+  assert.deepEqual(waived.problems, []);
+  assert.equal(waived.entrances[0]!.noControl, "static files, the same bytes for every caller");
+  assert.equal(waived.entrances[0]!.controlLine, 8);
+  assert.equal(entrance("  control: none - a health check\n").entrances[0]!.noControl, "a health check", "a plain hyphen separates the reason too");
+  const unfilled = entrance("  control: none — <why this entrance needs no control>\n");
+  assert.deepEqual([unfilled.problems, unfilled.entrances[0]!.noControl], [[], undefined], "a scaffolded placeholder parses and claims nothing, as an unfilled slot does");
+  for (const bare of ["  control: none\n", "  control: none —\n"]) {
+    const parsed = entrance(bare);
+    assert.equal(parsed.entrances[0]!.noControl, undefined, `${bare.trim()}: no reason, no claim`);
+    assert.deepEqual(parsed.problems.map((p) => `${p.line} ${p.message}`), ["8 control: none on entrance in needs a reason: control: none — <why this entrance needs no control>"], bare.trim());
+  }
+  assert.match(entrance("  control: auth\n").problems[0]!.message, /control: on entrance in takes only none and a reason/, "any other value is refused: a control is traced, never declared");
+  const both = entrance("  guard: door\n  control: none — public\n");
+  assert.deepEqual(both.problems.map((p) => `${p.line} ${p.message}`), ["9 entrance in names a guard: and control: none; a guard is a control, so keep one of them"]);
+  assert.ok(entrance("  control: none — a\n  control: none — b\n").problems.some((p) => p.line === 9 && p.message === "entrance in names its control twice"));
+});

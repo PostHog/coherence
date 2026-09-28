@@ -1123,7 +1123,7 @@ code {
   --flow-key-verified: #1f3a5f;
   /* Broken is filled dark enough that white text on it reaches 4.5:1. */
   --flow-key-broken: #c32836;
-  /* Attention that is not breakage (nothing enforced, no control, not covered): amber, never red. */
+  /* Attention that is not breakage (nothing enforced, no traced control, not covered): amber, never red. */
   --flow-key-attention: #945400;
   --flow-key-halo: rgb(23 32 51 / 0.2);
   /* The map's pane, opaque: what the fade at its scrolling edge fades to. */
@@ -1339,13 +1339,13 @@ code {
   box-shadow: var(--glass-edge), 0 0 0 3px var(--flow-key-halo);
 }
 
-/* Unknown and no control read in the key as they read on the map: the tag beneath a token, words alone. */
+/* Unknown and no traced control read in the key as they read on the map: the tag beneath a token, words alone. */
 .flow-trust-tag {
   flex: none;
   color: var(--ink-quiet);
 }
 
-.flow-trust-tag.flow-trust-nocontrol {
+.flow-trust-tag.flow-trust-untraced {
   color: var(--flow-key-attention);
 }
 

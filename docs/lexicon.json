@@ -459,7 +459,7 @@
     {
       "name": "trust level",
       "status": "settled",
-      "definition": "One entry in the short list the entry spec declares for crossings and entrances: a name and a one-line meaning for a class of data or caller. A level marked (outside) comes from outside the system's control; an entrance carrying it with no control on its route is marked no control. Declared order carries no meaning. Not a place in the code and not a container of components.",
+      "definition": "One entry in the short list the entry spec declares for crossings and entrances: a name and a one-line meaning for a class of data or caller. A level marked (outside) comes from outside the system's control; an entrance carrying it with no control traced on its route is marked no traced control. Declared order carries no meaning. Not a place in the code and not a container of components.",
       "rejected": [
         {
           "alternative": "zones as a topology with residence (lives in) and nesting (inside)",
@@ -888,7 +888,7 @@
     {
       "name": "orient",
       "status": "settled",
-      "definition": "The start-of-cycle reading. Before acting, the session sees where the project stands and what heading follows from it: escalations awaiting a human, structural defects, requirements stuck short of invariant, unreached mass, the session's own work order, and what peers recorded. One heading, derived from state.",
+      "definition": "The start-of-cycle reading. Before acting, the session sees where the project stands and what heading follows from it: escalations awaiting a human, structural defects, requirements stuck short of invariant, unreached mass, the session's own work order, and what peers recorded. One heading, derived from state; it also names the spec gaps beyond the adoption baseline.",
       "rejected": [
         {
           "alternative": "orient and regulate as two competing machines over the same ledgers",
@@ -908,7 +908,7 @@
     {
       "name": "regulate",
       "status": "settled",
-      "definition": "The end-of-cycle reading. Before the session stops, it supplies the balance: what this session owes so that it leaves the project no less coherent than it found it. Candidates: an invariant touched without a run, a requirement declared without its checklist, a structural defect revealed and not acknowledged or repaired, a decision made and not recorded.",
+      "definition": "The end-of-cycle reading: what the session owes at its stop, to leave the project no less coherent than it found it. Candidates: an invariant touched without a run, a requirement declared without its checklist, a structural defect revealed and not acknowledged or repaired, a decision made and not recorded, and, advisory, a spec gap the session touched.",
       "related": [
         "gyroscope",
         "orient",
@@ -1035,7 +1035,7 @@
     {
       "name": "scaffold",
       "status": "settled",
-      "definition": "The command that makes the complete shape the cheapest thing to ship. Two shapes: a component (folder plus spec with intent and empty invariants) and an invariant (bullet with slots for enforcement, because, crossing, refutation, and the decomposition checklist printed beside it as declare-or-dismiss lines). The agent fills slots instead of recalling rules. Scope shows a visual preview of the proposed structure before it is written, so a human can see the new vertebra in place.",
+      "definition": "The command that makes the complete shape the cheapest thing to ship. Two shapes: a component (folder plus spec with intent and empty invariants) and an invariant (bullet with slots for enforcement, because, crossing, refutation, and the decomposition checklist printed beside it as declare-or-dismiss lines). The agent fills slots instead of recalling rules. For a spec gap it proposes the closure in those same terms: a guard: line, an invariant bullet whose crossing enters from the entrance's trust, or control: none with a reason. Scope shows a visual preview of the proposed structure before it is written, so a human can see the new vertebra in place.",
       "rejected": [
         {
           "alternative": "four kinds (component, invariant, boundary, parity)",
@@ -1208,7 +1208,7 @@
     },
     {
       "name": "entrance",
-      "definition": "Where work enters the system from outside it: a command, a host event, a route, a tool. Declared in the owning component's spec and checked against the code: the named handler must resolve and be reachable, so a declared entrance cannot rot unseen. It declares the trust level it carries in with a trust: line; without one, its trust is derived from the crossings on its handler.",
+      "definition": "Where work enters the system from outside it: a command, a host event, a route, a tool. Declared in the owning component's spec and checked against the code: the named handler (a symbol, or a module file whose top-level script receives the work) must resolve and be reachable, so a declared entrance cannot rot unseen. It declares the trust level it carries in with a trust: line; without one, its trust is derived from the crossings on its handler. A guard: line names the chokepoint its handler is registered through, counted once the reading confirms the registration. A control: none line with its reason says it needs no control: a stated claim Scope shows for a human to challenge, never beside a guard:.",
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-0db9b17b)",
         "owner_words": "Declared and checked for entrypoints is good."
@@ -1237,7 +1237,7 @@
     },
     {
       "name": "structural route",
-      "definition": "The path one entrance takes through the components it reaches, in the order work flows, drawn as one line of its own color. Computed from the entrance and the component interfaces, never declared. Components on more than one structural route are where those routes meet.",
+      "definition": "The path one entrance takes through the components it reaches, in the order work flows, as one line of its own color. Computed from the entrance and the component interfaces, never declared. Components on more than one structural route are where those routes meet; entrances share one only when they share its stops, its trust, and what they declare of their control. Its controls are traced, never declared: the interface identifiers on its lines, and the verified chokepoints wrapping its handler or standing inside a component on it, and verified totality oracles on it covering its trust. An untrusted route with none is marked no traced control, which is not a demonstrated bypass, unless its entrances declare control: none, which it shows as no control needed.",
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-e4cd0983)",
         "owner_words": "structural route. not utility, core dependency. not tag. interface identifier"
@@ -1308,6 +1308,22 @@
       "provenance": {
         "defined_by": "agent relations (session a40acfaebbf15f7f7), 2026-09-23, on the owner-approved approach for relationships between journal and work records"
       }
+    },
+    {
+      "name": "spec gap",
+      "definition": "An untrusted entrance with no traced control. Its trust is a level from outside the system's control, or unknown, no control is traced on its structural route, and it declares no control: none. It closes three ways: a guard: line, an invariant whose crossing enters from its trust, or control: none with a reason. Orient names the gaps beyond the adoption baseline and regulate the ones a session touched; neither is a demonstrated bypass.",
+      "provenance": {
+        "defined_by": "agent gaps (session a3238ebe9efd46ba5), 2026-09-25 (journal d-a1095ef2)",
+        "owner_words": "let's do 1-3, and then test the results on a pre-Coherence commit from both of those projects to see if the behavior change is effective"
+      },
+      "related": [
+        "entrance",
+        "structural route",
+        "trust level",
+        "orient",
+        "regulate",
+        "scaffold"
+      ]
     }
   ],
   "metaphors": {

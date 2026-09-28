@@ -19,6 +19,7 @@ import { lexiconCoverage } from "../../lifecycle/lexicon-coverage.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { buildScopePage } from "../scope/build.ts";
 import { budgetFlags, readComponentInterfaces } from "../scope/component-interfaces.ts";
+import { readAndRecord } from "../scope/gaps.ts";
 import { observedCommand } from "../../observation/observed.ts";
 import { answer, answerLexicon, QUERY_USAGE } from "./query.ts";
 
@@ -109,7 +110,8 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
     project: basename(root),
     window: false,
     // Only the Structure question needs every component interface, read through the language adapter.
-    ...(question === "structure" ? { componentInterfaces: await (deps.interfaces ?? readComponentInterfaces)(root, undefined, { budget }) } : {}),
+    // The real reading is kept for the hooks (gaps.ts); an injected one is a test's, and never kept.
+    ...(question === "structure" ? { componentInterfaces: deps.interfaces !== undefined ? await deps.interfaces(root, undefined, { budget }) : await readAndRecord(root, () => readComponentInterfaces(root, undefined, { budget })) } : {}),
   });
   const result = answer(state, question, args, { session: parsed.session });
   if (result.code === 0) io.out(result.text);

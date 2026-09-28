@@ -39,7 +39,7 @@ import { ENFORCEMENT_USAGE, refuteCommand, runCommand, serveCommand } from "./en
 import { JOURNAL_USAGE, journalVerbs, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, runCheck } from "./lifecycle/check.ts";
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
-import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook } from "./lifecycle/hook.ts";
+import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
 import { check, formatCheck, formatStatus, formatUninstall, HOME_VAR, HOSTS, install, isHost, LOCATED_PREFIX, locate, SIBLING, status, uninstall } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectLexicons } from "./lifecycle/project.ts";
@@ -188,7 +188,7 @@ async function hookCommand(args: string[], root: string): Promise<number> {
   const event = args[0];
   if (event === undefined || !isHookEvent(event)) fail(`hook: expected one of ${HOOK_EVENTS.join(", ")}\n${USAGE}`);
   const input = await readStdinJson(process.stdin);
-  const result = await runHook(event, input, root);
+  const result = await runHook(event, input, root, { refresh: STRUCTURE_REFRESH });
   if (result.stderr !== "") process.stderr.write(result.stderr);
   if (result.stdout !== "") {
     try {

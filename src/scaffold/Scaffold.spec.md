@@ -43,3 +43,24 @@ The command that makes the complete shape the cheapest thing to produce: a compo
   crossing: project-source -> reading
   refuted: inverted the preview branch so a preview request only printed the bullet and wrote no page -> the focused scaffold preview detector failed because no preview path was printed; restored, green (2026-09-18)
   kinds: none
+- a gap's closure is proposed: For each entrance with no traced control the scaffold proposes a ranked closure in the spec's terms: the exact guard: line where its handler calls or passes a verified chokepoint its route-mates do not, else an invariant bullet in the scaffold shape whose crossing enters from its trust, and control: none first where it plausibly needs none.
+  over: a handler calling a verified chokepoint, one the reading traced passing it while a route-mate does not, one whose reach meets no control, and a health check reaching no component beyond its own
+  via: scaffold control proposes each gap's closure: a guard: line where its handler calls or passes a verified chokepoint its route-mates do not, else an invariant whose crossing enters from its trust, and control: none first where it plausibly needs none
+  because: both outside adoptions left their gaps open (d-a1095ef2); the closure must be the cheapest thing to write, printed from what the reading already knows, not recalled from the grammar
+  crossing: record -> reading
+  refuted: stopped reading which verified chokepoint symbol a handler's declaration calls, so no guard: line was proposed for it -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- a closure is written only where safe: The scaffold writes a guard: line under the entrance's bullet, never a second one nor one beside control: none; control: none only with a real reason, never a placeholder; and an invariant bullet as a requirement with its placeholders; what it writes still parses.
+  over: a guard: written, written again, a control: none without a reason, with a placeholder reason, with a reason, beside a guard, and an invariant appended
+  via: scaffold control writes only where safe: a guard: line under the entrance's bullet, never twice nor beside control: none; control: none only with a real reason; an invariant as a requirement with its placeholders
+  because: a waiver without a reason is a silent one, and a guard beside control: none contradicts itself; a write that left the spec unparseable would cost more than it saved
+  crossing: project-source -> reading
+  refuted: let writeClosure write control: none without a reason or with a placeholder one -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- scaffold control reads the recorded reading: The scaffold control command proposes from the recorded Structure reading while it describes the tree, reading only when it does not, and prints one entrance's closure or every gap's, writes on --write, and records the adoption baseline on --baseline.
+  over: one entrance, a control: none written and read back without a new reading, every gap, an unknown entrance, and the baseline
+  via: the scaffold control command reads the recorded reading, prints one entrance's closure or every gap's, writes on --write, and records the adoption baseline
+  because: a reading takes minutes on a large project; a closure the agent writes one entrance at a time must not cost a reading each, and a spec line the reading never reads leaves it standing
+  crossing: record -> reading
+  refuted: made the control verb ignore the recorded reading and read the component interfaces every time -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none

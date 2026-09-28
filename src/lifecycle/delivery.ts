@@ -16,7 +16,8 @@ import { loadJournal } from "../journal/store.ts";
 import { openEscalations } from "../journal/read.ts";
 import { loadOrders } from "../journal/work.ts";
 import { loadSpecModel } from "../spec/model.ts";
-import { CONTEXT_BUDGET, HOOK_EVENTS, changedFiles, startReading, type HookEvent } from "./hook.ts";
+import { CONTEXT_BUDGET, HOOK_EVENTS, changedFiles, gapReading, startReading, type GapReading, type HookEvent } from "./hook.ts";
+import { readGapBaseline } from "../readings/scope/gaps.ts";
 import type { HostStatus } from "./install.ts";
 import { loadProjectLexicons } from "./project.ts";
 import { attention, type Coverage } from "./lexicon-coverage.ts";
@@ -68,6 +69,21 @@ function vocabularySignal(coverage: Coverage): string {
   return `vocabulary signal, named and ranked: ${terms.length ? `undefined ${terms.join(", ")}` : "no undefined term"}; ${risky.length ? `sense at risk ${risky.join(", ")}` : "no sense at risk"}`;
 }
 
+/** What orient says of the spec gaps now: how many it would name, or why it says nothing. */
+function gapSignal(root: string, gaps: GapReading): string {
+  if (gaps.fingerprint === undefined) return "spec gaps: nothing (no entrance could be one)";
+  if (gaps.now === undefined && gaps.last === undefined) return `spec gaps: not read yet (no Structure reading was ever kept; a stop or session start begins one in the background${gaps.refreshing ? ", one is under way" : ""})`;
+  if (gaps.now === undefined) {
+    const last = gaps.last!;
+    const baseline = readGapBaseline(root);
+    const open = last.gaps.filter((g) => baseline === undefined || !baseline.entrances.has(`${g.component}\u0000${g.name}`)).length;
+    return `spec gaps: ${plural(open, "entrance")} with no traced control named from the reading before the latest changes (${last.at.slice(0, 16).replace("T", " ")} UTC), less those the spec now closes${gaps.refreshing ? "; a new reading is under way" : ""}`;
+  }
+  const baseline = readGapBaseline(root);
+  const open = gaps.now.gaps.filter((g) => baseline === undefined || !baseline.entrances.has(`${g.component}\u0000${g.name}`)).length;
+  return `spec gaps: ${plural(open, "entrance")} with no traced control named${baseline === undefined ? "" : `, ${plural(gaps.now.gaps.length - open, "more")} held by the adoption baseline`} (reading of ${gaps.now.at.slice(0, 16).replace("T", " ")} UTC)`;
+}
+
 /** Every event's delivery for the project at `root`, measured now. */
 export async function deliveries(root: string): Promise<Delivery[]> {
   const records = loadJournal(root).records;
@@ -75,7 +91,8 @@ export async function deliveries(root: string): Promise<Delivery[]> {
   const orders = loadOrders(root).filter((o) => o.state === "open" || o.state === "active").length;
   const spec = specFigures(root);
   const { coherence, project } = await loadProjectLexicons(root);
-  const start = await startReading(root, {});
+  const gaps = await gapReading(root);
+  const start = await startReading(root, {}, undefined, gaps);
   const changed = await changedFiles(root);
 
   const specLine = "error" in spec
@@ -90,6 +107,7 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     `the session's own work order, when it owns one (${plural(orders, "order")} open or active in the project)`,
     `${vocabulary}, delivered at detail "${start.detail}"`,
     vocabularySignal(start.coverage),
+    gapSignal(root, gaps),
     "the session id with the decide and journal commands, and the rule",
     `size now: ${start.text.length.toLocaleString("en-US")} of ${CONTEXT_BUDGET.toLocaleString("en-US")} characters`,
   ];
@@ -104,7 +122,7 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     ? `the lexicon check over the changed files (${changed.files.length} now)`
     : `the lexicon check over the changed files (not known now: ${changed.failure})`;
   const debt = "error" in spec ? specLine : `spec: ${plural(spec.problems, "problem")}, ${plural(spec.defects, "structural defect")}, ${plural(spec.open, "open requirement")}`;
-  const regulate = [changedLine, debt, "the reminder that an active work order is closed with work close", "the read trace snapshotted for calibrate"];
+  const regulate = [changedLine, debt, "the reminder that an active work order is closed with work close", "the spec gaps this session touched, advisory", "the read trace snapshotted for calibrate"];
 
   const carries: Record<HookEvent, string[]> = {
     SessionStart: orient,

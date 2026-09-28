@@ -270,10 +270,10 @@ The reading: one surface projecting the model for a human, in six views: Structu
   crossing: record -> reading
   refuted: tinted the light origin token 90% toward its route color in FLOW_TOKEN_TINT, so the dark token ink sat on a nearly solid route fill -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
-- the trust tag sits outside its token: Each entrance route's trust tag (its trust level, unknown, or no control) is set beneath its origin token, outside it, right-aligned under the base of the token's point, where the route leaves, in the map's monospace face, amber for no control and neutral for a trust level; it is placed like any text on the map, so it never overlaps text or a station, no token or tag touches another whichever station their routes begin at, and it never widens the map: a trust level too wide for the margin is dropped and the route's inspector still states the route's trust and controls.
-  over: every entrance route of the flow, trust, no-control, crowded, shared and broken fixtures and of one whose stacked stations' blocks of tokens would meet, at rest and under every route, component and trust level selection, and a trust level wider than the margin
+- the trust tag sits outside its token: Each entrance route's trust tag (its trust level, unknown, or no traced control) is set beneath its origin token, outside it, right-aligned under the base of the token's point, where the route leaves, in the map's monospace face, amber for no traced control and neutral for a trust level; it is placed like any text on the map, so it never overlaps text or a station, no token or tag touches another whichever station their routes begin at, and it never widens the map: a trust level too wide for the margin is dropped and the route's inspector still states the route's trust and controls.
+  over: every entrance route of the flow, trust, untraced, crowded, shared and broken fixtures and of one whose stacked stations' blocks of tokens would meet, at rest and under every route, component and trust level selection, and a trust level wider than the margin
   via: the trust tag sits outside its token, right-aligned beneath it, and never overlaps
-  because: the owner found the no-control pill inside the token "just looks jammed in there" and asked that "that tag should live as a subscript outside the token, on the bottom, aligned to the right edge" (d-a5c6442d). Placing it by the map's own text placement keeps the rule that text is dropped, never overlapped; the margin is only ever as narrow as the words no control and unknown allow, so the attention signal is never the tag that drops
+  because: the owner found the no-control pill inside the token "just looks jammed in there" and asked that "that tag should live as a subscript outside the token, on the bottom, aligned to the right edge" (d-a5c6442d). Placing it by the map's own text placement keeps the rule that text is dropped, never overlapped; the margin is only ever as narrow as the words no traced control and unknown allow, so the attention signal is never the tag that drops
   crossing: record -> reading
   refuted: stopped moving apart the blocks of tokens of stations one above the other in flowLayout, so a tag hung onto the next station's token -> the totality oracle went red; restored, green (2026-09-23). Before: set each trust tag 10 px left of its token's right edge in flowLayout, so it no longer hangs from the edge the route leaves by -> red; restored, green (2026-09-23)
   kinds: none
@@ -312,10 +312,10 @@ The reading: one surface projecting the model for a human, in six views: Structu
   crossing: record -> reading
   refuted: skipped the broken branch of flowVerdict, so a broken project's masthead read as verified -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
-- trust shows where work enters: Each entrance route's origin token carries, in the tag beneath it, the trust its entrances carry in (the level they declare, else derived as decision d-a5e5c691 derives it and labeled derived), unknown when neither is known, and no control when that trust is untrusted and no identifier stands where its work enters, on an interface it takes, or on the stub to its rail; the trust-level key beside the health strip makes each level a selection defined in one line, and the route's inspector and the query say the same.
-  over: every route of the flow, trust, crowded, shared and no-control fixtures, its controls, its trust tag, the key's levels, and the query's route lines
-  via: trust shows where work enters: each entrance route's token carries the trust its entrances carry in, or unknown, or no control when nothing on the route controls it, and a trust-level key sits with the health strip
-  because: the security reader could not tell which inputs were untrusted without reading inspector prose, and unprotected untrusted routes (document upload to IO, OAuth to Auth, the scope page to Scope) looked the same as protected ones (docs/reviews/2026-09-23-structure-map-synthesis.md, item 5). Unknown trust is treated as untrusted (d-6df8d09a), and one tag says both facts (d-7d36881b), beneath the token (d-a5c6442d)
+- trust shows where work enters: Each entrance route's origin token carries, in the tag beneath it, the trust its entrances carry in (the level they declare, else derived as decision d-a5e5c691 derives it and labeled derived), unknown when neither is known, and no traced control when that trust is untrusted and no control is traced on it; the trust-level key beside the health strip makes each level a selection defined in one line, and the route's inspector and the query say the same.
+  over: every route of the flow, trust, crowded, shared and untraced fixtures, its controls, its trust tag, the key's levels, and the query's route lines
+  via: trust shows where work enters: each entrance route's token carries the trust its entrances carry in, or unknown, or no traced control when no control is traced on it, and a trust-level key sits with the health strip
+  because: the security reader could not tell which inputs were untrusted without reading inspector prose, and unprotected untrusted routes (document upload to IO, OAuth to Auth, the scope page to Scope) looked the same as protected ones (docs/reviews/2026-09-23-structure-map-synthesis.md, item 5). Unknown trust is treated as untrusted (d-6df8d09a), and one tag says both facts (d-7d36881b), beneath the token (d-a5c6442d); it reads no traced control, not no control, since the map shows what it traced, not a demonstrated bypass (d-127ab8e4)
   crossing: record -> reading
   refuted: marked no route as having no control in flowOf, so an uncontrolled route's token read unknown -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
@@ -333,12 +333,40 @@ The reading: one surface projecting the model for a human, in six views: Structu
   crossing: project-source -> reading
   refuted: made trustInWords return the level alone, so a derived level read as a declared one in the tag and the query -> the totality oracle went red; restored, green (2026-09-23)
   kinds: none
-- no control marks only the untrusted: No control marks an entrance route only when nothing controls it and its trust is unknown, undeclared, or a level marked outside the system's control; a route carrying an inside level shows that level, neutral.
-  over: the reader's uncontrolled route carrying unknown, outside, undeclared, inside, and an unmarked level named outside; its tag, inspector, query line, and the key
-  via: no control marks only an untrusted route with nothing on it: unknown trust or a level from outside the system's control, never a trusted one
+- no traced control marks only the untrusted: No traced control marks an entrance route only when no control is traced on it and its trust is unknown, undeclared, or a level marked outside the system's control; a route carrying an inside level shows that level, neutral.
+  over: the reader's untraced route carrying unknown, outside, undeclared, inside, and an unmarked level named outside; its tag, inspector, query line, and the key
+  via: no traced control marks only an untrusted route with nothing traced on it: unknown trust or a level from outside the system's control, never a trusted one
   because: the ruling d-ba18b0fd: marking the owner's own commands beside the warm server's port made one exposure look like nine; unknown stays untrusted (d-6df8d09a)
   crossing: project-source -> reading
-  refuted: marked every uncontrolled entrance route no control in flowOf, whatever trust it carries in -> the totality oracle went red; restored, green (2026-09-23)
+  refuted: marked every untraced entrance route no traced control in flowOf, whatever trust it carries in -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- controls are traced four ways: A route's controls are the identifiers on its lines (any verdict, which the identifier wears) and, verified only, a chokepoint wrapping its entrances' handler (its own declaration references the chokepoint and its reach reaches the protected thing, or its guard: line names the chokepoint and a registration of the handler spells it), a chokepoint whose invariant a component on the route owns and whose protected thing the handler's reach reaches, and an invariant enforced by a totality oracle alone, owned by the component that declares or handles the entrance, whose crossing enters from the trust the route carries in; a control beyond the lines counts on a route only when every entrance on it passes it, one only some pass is listed apart and never counted, and the inspector names each with its kind and invariant, and the query says the same.
+  over: the untraced reader route with a wrapper, a declared guard, a chokepoint inside a component on it and off it, an invariant enforced by a totality oracle alone entering from its trust and from another, one enforced by a chokepoint too, and each unverified, and a route of two entrances only one of which is wrapped
+  via: a route's controls are traced four ways, verified only: an identifier on its lines, a chokepoint its handler is registered through, a chokepoint inside a component on it whose protected thing its reach reaches, and a totality oracle on it whose crossing enters from its trust
+  because: the owner's ruling d-127ab8e4: stl.quest's verified totality oracles, praetorium.gg's shared RPC wrapper (179 routes read no control), and the tenant guard inside a HogQL component (posthog/hogql/printer) all controlled routes the map called uncontrolled, because only identifiers on inter-component lines counted
+  crossing: project-source -> reading
+  refuted: counted a wrapper chokepoint in flowOf whatever its verdict, so an unverified one controlled the route -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- a test-backed control is the entrance's own: A verified invariant enforced by a totality oracle alone counts as a control on an entrance only when the component that owns it declares or handles that entrance, compared unfolded, never merely because the route passes it or because a child component is folded into a stop at the current zoom.
+  over: the reader route with the same verified totality oracle owned by the reader, which handles its entrance, and by the store, which the route passes but which neither declares nor handles it
+  via: a test-backed control is the entrance's own: a verified totality oracle further along the route, in a component that neither declares nor handles the entrance, never stands in for a check on it
+  because: the owner ruled on 2026-09-25 that real gaps are a great start: on praetorium.gg's own code an unrelated database test (stale command stays out of log) stood as the control for 120 entrances, read-only calls among them, and on stl.quest an asset totality oracle in a child folder counted for page routes that never reach it
+  crossing: project-source -> reading
+  refuted: counted a totality oracle owned by any component the route passes, in flowOf -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- the reading traces what a handler passes: The interface reading records, per entrance, each chokepoint whose protected thing the handler's static reach reaches, as a wrapper when the handler's own declaration references the chokepoint; a guard: line is confirmed only when the handler's declaration or a statement referencing the handler spells the guard; and a module handler's reach starts from its file's top-level script: every declaration of the file and every reference a top-level statement makes (a variable inside a top-level block counting as its statement), an import excepted.
+  over: a wrapped handler, one reaching the chokepoint through another, one registered through the guard in another file, one no registration guards, and a script whose call sits in a top-level try block, read by the TypeScript adapter
+  via: the reading traces the chokepoints a handler passes: a wrapper around it, one further along its reach, a declared guard at its registration, and a module handler's top-level script
+  because: praetorium.gg registers its handlers through mutationRpc, whose origin check the trace never saw because it started at the handler, and module-top-level scripts had no way to declare a command entrance (d-127ab8e4)
+  crossing: project-source -> reading
+  refuted: marked every chokepoint a handler passes as further along its reach in guardsOf, never a wrapper -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- a registry entry is its declaration's use: A reference the language server encloses in no symbol, inside a top-level statement that declares a name (a multi-line registry dict, a factory call's arguments), is that declaration's own use, so a handler's reach follows a registry to what it registers; an import or a statement that declares nothing stays unattributed.
+  over: a Python handler that dispatches through a module-level registry dict whose entry is a guarded function, read by the Python adapter
+  via: a reference inside a multi-line top-level initializer is that declaration's own use, so a handler's reach follows a registry to the guard inside
+  because: HogQL chooses its SQL writer class from PRINTER_CLASSES, a module-level dict; Pyright names no symbol for the dict's lines, so every route stopped short of posthog/hogql/printer and the tenant guard inside it read as untraced (d-127ab8e4)
+  crossing: project-source -> reading
+  refuted: dropped the enclosing top-level declaration for a site the server names no symbol for, in readComponentInterfaces -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
 - a component selection shows direction: Selecting a component draws its callers and its callees apart (solid and dashed, as stations and as lines, with or without motion), and its inspector gives its verdict, then who depends on it, then what it uses, then its invariants, the first few shown and the rest folded.
   over: the callers, callees and lines of a selected component in the flow and broken fixtures, and the order of its inspector for a component with more invariants than it shows
@@ -421,4 +449,51 @@ The reading: one surface projecting the model for a human, in six views: Structu
   via: Structure is the first view: the strip leads with Structure then Lexicon, and a page whose address names no view opens on it
   because: the owner ruled it (d-bf90cb79): the map is what a reader comes to Scope for, and the lexicon is the vocabulary beneath it. The first tab is the one a page opens on, so a reader who chooses nothing sees what the strip says comes first, and a deep link still opens the view it names
   refuted: opened a page whose address names no view on Lexicon in loadState, the strip still leading with Structure -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none
+- control none is never marked: An entrance that declares control: none with its reason is never marked no traced control: its route and tag say no control needed, never in the attention color, the route and entrance inspectors and the query give the reason, the trust key lists every such entrance with its reason, and it never shares a route with an entrance that does not declare it.
+  over: an untrusted untraced entrance with and without control: none, alone and beside a route-mate that declares nothing, in the model, the map's tag, both inspectors, the trust key and query structure
+  via: an entrance that declares control: none with its reason is never marked no traced control: its route and tag say no control needed, neutral, the inspector and the query give the reason, the trust key lists every one, and it never shares a line with an entrance that does not declare it
+  because: a gap closed by saying no control is needed must stay visible and challengeable (d-a1095ef2); marked amber it would read as a gap still open, and hidden it would be a waiver nobody sees
+  crossing: project-source -> reading
+  refuted: dropped the control: none exemption from noTracedControl in flowOf, so a declared entrance was marked no traced control -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- declared guards split routes: Entrances that declare different guard: lines never share a structural route, so a guard declared on some of a route's entrances counts for the ones it names.
+  over: two entrances on the same stops and trust, one declaring a confirmed guard: and one declaring none
+  via: entrances that declare different guard: lines never share a line, so a guard declared on some of a route's entrances counts for those it names
+  because: a control counts on a route only when every entrance on it passes it (d-127ab8e4); without the split, the guard the scaffold proposes for the entrances that pass a chokepoint (praetorium's mutationRpc on 40 of 101) could never close their gap
+  crossing: project-source -> reading
+  refuted: left the declared guard out of the route grouping key in flowOf, so a guarded entrance shared its route with an unguarded one -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- recorded reading stands only for its tree: The Structure reading a hook reads is kept only when complete and when the tree it read is still the tree, and it stands only while its fingerprint holds: a changed source file, handler, guard, chokepoint or config makes it stale and the gaps unknown, while a spec line the reading never reads leaves it standing.
+  over: a partial and an unread reading, an edit made while a reading ran, a changed source file, entrance handler and config, and a control: none added to a spec
+  via: a recorded Structure reading stands for the tree only while its fingerprint holds: a partial one is never kept, an edit made while it ran leaves nothing, a changed source file, handler or config makes it stale, and a spec line the reading never reads leaves it standing
+  because: a hook cannot take a reading (a minute on Coherence, three on a large adopter), so it reads the last one; a reading that no longer describes the tree would name gaps that are gone or miss new ones, so it is never taken for a fresh one: orient names it only labeled as the last reading, less what the current spec closes (d-a1095ef2, df-84db9e4f)
+  crossing: record -> reading
+  refuted: made freshReading ignore the fingerprint, so a reading of an older tree stood for the current one -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- one structure refresh at a time: A background Structure reading starts detached and the caller returns at once; it never starts twice for one tree, a live one of an older tree is superseded, since its reading could never be kept, and a live process whose command line is not a structure query is never signalled.
+  over: a first refresh, the same tree again, a newer tree, and a live mark naming a process that is no structure query
+  via: one refresh at a time, started detached without waiting: never twice for one tree, a live refresh of an older tree is superseded, and a process that is not a structure query is never signalled
+  because: a reading takes a minute to three and holds a language server, so two at once only compete; the tree a session leaves at its stop is the one the next starts on, and a reading of an older tree is refused when it finishes (df-84db9e4f); a pid can be reused, so only a structure query is ever stopped
+  crossing: record -> reading
+  kinds: none
+- a session start waits only for a nearly done refresh: A session start that finds the reading stale waits for a refresh of this very tree only when the last reading's duration says it finishes within the wait limit, fifteen seconds, and stops waiting when the reading is kept; it never waits on one that will not, nor on a refresh of another tree.
+  over: a refresh of this tree that finishes in under a second, one the last reading's three minutes say will not, and a refresh of another tree
+  via: a session start waits a bounded moment for a refresh of this tree the last reading's duration says is nearly done, and not at all for one that is not
+  because: a session started seconds after the last one stopped would otherwise read the labeled last reading when the fresh one is moments away; the hook's timeout is 60 s and a reading on a large adopter takes three minutes, so a wait is spent only where it is likely to pay (df-84db9e4f)
+  crossing: record -> reading
+  kinds: none
+- gap baseline only shrinks: The adoption baseline of spec gaps is a journal decision: the first holds every gap the reading shows, a later one only intersects it, so it never grows.
+  over: a first baseline, a smaller one, and a later one naming a gap the baseline never held
+  via: the gaps derive from the recorded reading with the current runs and spec, and the adoption baseline only shrinks
+  because: gaps present at adoption should not nag every session start, but a baseline that could grow would let a new uncontrolled entrance be excused by recording it; like the lexicon baseline, it is shrunk by work and widened only by a retraction a human can read
+  crossing: record -> reading
+  refuted: made recordGapBaseline record every gap held now instead of intersecting with the prior baseline -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- orient's gap line is bounded: Orient's spec gap line is one line of bounded length: the count of gaps outside the adoption baseline, the busiest route by entrance count, and the three ways to close one; nothing when there are none, and a gap outside the baseline is always named.
+  over: gaps on several routes with an over-long entrance name, none, all baselined, and one new beside a baseline
+  via: orient's gap line is one bounded line naming the count, the busiest route by entrance count and the three ways to close one; nothing when none is outside the baseline
+  because: the start injection shares a fixed budget with the vocabulary and the escalations (CONTEXT_BUDGET), so the line must not grow with the project; one line that names where to start and how to close a gap is what an agent can act on
+  crossing: project-source -> reading
+  refuted: stopped cutting entrance names in orient's gap line, so a long name grew the line without bound -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none

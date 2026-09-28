@@ -46,7 +46,15 @@
  * (its name or an alias), since a reference enclosed by a reached
  * declaration sits in that declaration's file. A private declaration is
  * resolved only for the reach: it is referenced from its own file and is
- * never an interface.
+ * never an interface. A handler named as a module file starts from the
+ * module's top-level script: every declaration of the file, and every
+ * reference its top-level statements make (an import is not a use).
+ *
+ * Each entrance's reach is then read for the chokepoints it passes
+ * (d-127ab8e4): one whose protected thing the reach reaches, marked a wrapper
+ * when the handler's own declaration references the chokepoint, and one its
+ * guard: line declares, confirmed when a reference to the handler at its
+ * registration spells the guard. The Structure map counts only verified ones.
  *
  * The reading is bounded in time and in the language server's memory. When
  * either budget is spent it stops asking, keeps what it read, and says it is
@@ -64,15 +72,16 @@
 import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Definition, LanguageAdapter, ReferenceSite } from "../../adapters/adapter.ts";
+import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite } from "../../adapters/adapter.ts";
 import { configIgnore, projectFiles, projectSites, underIgnored } from "../../adapters/project-files.ts";
 import { adapterFor, type Language } from "../../adapters/index.ts";
 import { resolveDotted } from "../../adapters/python.ts";
 import { resolveSpecifier } from "../../adapters/typescript.ts";
 import { EXCLUDED_FOLDERS, componentOf, declarationsOf, isSourceFile, isTest } from "../../economy/source.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
-import { loadSpecModel, type SpecModel } from "../../spec/model.ts";
-import type { EntranceResolution, InterfaceReading, InterfaceSymbol, ReachReference } from "./model.ts";
+import { isModuleHandler } from "../../spec/grammar.ts";
+import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
+import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, ReachReference } from "./model.ts";
 
 /** Whether a declaration line declares a type only (an interface or a type alias): a route never follows one. */
 export function isTypeDeclaration(line: string, language: string): boolean {
@@ -130,6 +139,58 @@ export function reachOf(start: string, nodes: ReadonlyMap<string, ReachNode>, ca
     }
   }
   return [...used.values()].sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to) || a.symbol.localeCompare(b.symbol) || a.file.localeCompare(b.file));
+}
+
+/** A spec value as a symbol and an optional file, or a module file; undefined for prose. */
+function namedValue(value: string): { symbol?: string; file?: string } | undefined {
+  const named = /^([A-Za-z_$][\w$]*)(?:\s+in\s+(\S+))?$/.exec(value.trim());
+  if (named !== null) return named[2] === undefined ? { symbol: named[1]! } : { symbol: named[1]!, file: named[2]! };
+  if (isModuleHandler(value)) return { file: value.trim() };
+  return undefined;
+}
+
+/** Whether a reach node is the named thing: the symbol (in the named file, relative to its component or the root), or any declaration of a named module. */
+function nodeIs(node: ReachNode, named: { symbol?: string; file?: string }, folder: string): boolean {
+  const inFile = named.file === undefined || node.file === named.file || node.file === `${folder}/${named.file}` || node.file.endsWith(`/${named.file}`);
+  return named.symbol === undefined ? inFile && node.name !== "" : node.name === named.symbol && inFile;
+}
+
+interface ChokepointTarget {
+  component: string;
+  name: string;
+  chokepoint: { symbol?: string; file?: string };
+  protects: { symbol?: string; file?: string };
+}
+
+/** Every chokepoint an invariant declares, with its protected thing, as reach nodes can be matched against. */
+function chokepointTargets(model: SpecModel): ChokepointTarget[] {
+  return model.components.flatMap((component) =>
+    component.invariants.flatMap((invariant) =>
+      invariant.enforcements.flatMap((e): ChokepointTarget[] => {
+        if (e.form !== "chokepoint") return [];
+        const chokepoint = namedValue(e.chokepoint);
+        const protects = namedValue(e.protects);
+        return chokepoint === undefined || protects === undefined ? [] : [{ component: component.folder, name: invariant.name, chokepoint, protects }];
+      }),
+    ),
+  );
+}
+
+/**
+ * The chokepoints a handler's reach passes (see the file comment): each whose
+ * protected thing the reach reaches, a wrapper when the handler's own
+ * declaration references the chokepoint directly.
+ */
+export function guardsOf(start: string, nodes: ReadonlyMap<string, ReachNode>, calls: ReadonlyMap<string, ReadonlyMap<string, number>>, targets: readonly ChokepointTarget[]): EntranceGuard[] {
+  const reached = [...reachedFrom(start, nodes, calls)].map((id) => nodes.get(id)).filter((n): n is ReachNode => n !== undefined);
+  const direct = [...(calls.get(start) ?? new Map<string, number>()).keys()].map((id) => nodes.get(id)).filter((n): n is ReachNode => n !== undefined);
+  const guards: EntranceGuard[] = [];
+  for (const target of targets) {
+    if (!reached.some((node) => nodeIs(node, target.protects, target.component))) continue;
+    const wrapped = direct.some((node) => nodeIs(node, target.chokepoint, target.component));
+    guards.push({ component: target.component, name: target.name, how: wrapped ? "wrapper" : "reach" });
+  }
+  return guards;
 }
 
 /* ------------------------------------------------------------ the bounds */
@@ -530,6 +591,10 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
         if (declaration.exported) declarations += 1;
       }
     }
+    // A module handler's top-level script: a node of its own that enters every declaration of its file.
+    const moduleFiles = new Set(
+      model.components.flatMap((component) => component.entrances.filter((e) => e.handler !== undefined && isModuleHandler(e.handler) && e.file !== undefined && code.has(e.file)).map((e) => e.file!)),
+    );
     const index = wordIndex(root, code, language);
     const fileIndex = new Map(index.files.map((file, i) => [file, i]));
 
@@ -543,6 +608,25 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
       const out = calls.get(from) ?? new Map<string, number>();
       calls.set(from, out);
       out.set(to, (out.get(to) ?? 0) + 1);
+    };
+    for (const file of moduleFiles) {
+      nodes.set(`${file}#`, { component: code.get(file)!, name: "", file, type: false });
+      for (const d of declared) if (d.file === file && !d.type) call(`${file}#`, d.id);
+    }
+    /**
+     * The top-level declaration whose statement holds a line the server named no symbol for: a multi-line initializer (a
+     * registry dict, a destructured factory call) is the declaration's own code, so what it references is what the
+     * declaration uses. Undefined when the statement declares nothing (an import, a bare call).
+     */
+    const statements = new Map<string, { lines: string[]; at: Map<number, string> }>();
+    const declarationAt = (file: string, line: number): string | undefined => {
+      let known = statements.get(file);
+      if (known === undefined) {
+        const text = code.has(file) && existsSync(join(root, file)) ? readFileSync(join(root, file), "utf8") : "";
+        known = { lines: text.split("\n"), at: new Map(declarationsOf(text, language).map((d) => [d.line, d.name])) };
+        statements.set(file, known);
+      }
+      return known.at.get(statementStartLine(known.lines, line - 1) + 1);
     };
     const asked = new Set<string>();
     const answered = new Set<string>();
@@ -573,8 +657,13 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
           outsideInto.set(d.component, (outsideInto.get(d.component) ?? 0) + 1);
           continue;
         }
-        const enclosing = site.symbol?.split(".")[0];
+        // A symbol the server names that no top-level declaration is (a variable inside a top-level block) is read as the
+        // statement it sits in, like a site the server names nothing for.
+        const named = site.symbol?.split(".")[0];
+        const enclosing = named !== undefined && named !== "" && (nodes.has(`${site.file}#${named}`) || !code.has(site.file)) ? named : site.form === undefined ? declarationAt(site.file, site.line) : undefined;
         if (enclosing !== undefined && enclosing !== "" && !(site.file === d.file && enclosing === d.name)) call(`${site.file}#${enclosing}`, d.id);
+        // A top-level statement of a module handler's script uses what it references; an import names it and uses nothing.
+        else if ((enclosing === undefined || enclosing === "") && moduleFiles.has(site.file) && site.form === undefined) call(`${site.file}#`, d.id);
         if (from === d.component || !d.exported) continue;
         const key = `${from}\u0000${d.component}\u0000${d.name}\u0000${d.file}`;
         const known = tally.get(key);
@@ -596,8 +685,39 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
       }
     }
 
+    /**
+     * Whether an entrance's declared guard is where its handler is registered: the chokepoints it names (by symbol, or a
+     * declaration of a chokepoint module), confirmed when the handler's own declaration references one of them or a
+     * reference to the handler sits in a statement that spells the guard. A reason when it is not confirmed.
+     */
+    const confirmGuard = async (guard: string, start: string, definition: Definition | undefined): Promise<ChokepointTarget[] | string | typeof STOPPED> => {
+      const symbol = namedValue(guard)?.symbol;
+      if (symbol === undefined) return `guard ${guard} names no symbol`;
+      // A chokepoint module's symbol may be a binding no declaration line names (a factory's destructured products), so its text is read too.
+      const moduleDeclares = (t: ChokepointTarget): boolean =>
+        [...code.keys()].some((file) => nodeIs({ component: t.component, name: "x", file, type: false }, t.chokepoint, t.component) && declaresAtTop(readFileSync(join(root, file), "utf8"), symbol));
+      const named = targets.filter((t) => (t.chokepoint.symbol !== undefined ? t.chokepoint.symbol === symbol : [...nodes.values()].some((n) => n.name === symbol && nodeIs(n, t.chokepoint, t.component)) || moduleDeclares(t)));
+      if (named.length === 0) return `guard ${symbol} is no chokepoint an invariant declares`;
+      const wraps = [...(calls.get(start) ?? new Map<string, number>()).keys()].some((id) => nodes.get(id)?.name === symbol);
+      if (wraps) return named;
+      const spelled = new RegExp(`(^|[^\\w$])${symbol.replace(/\$/g, "\\$")}([^\\w$]|$)`);
+      // The handler's own declaration, whole: a handler written as guard(async () => ...) is registered through it where it is declared.
+      const startFile = start.slice(0, start.lastIndexOf("#"));
+      const own = readFileSync(join(root, startFile), "utf8").split("\n");
+      if (definition === undefined) return spelled.test(own.join("\n")) ? named : `the handler's top-level script does not reference ${symbol}`;
+      if (spelled.test(own.slice(definition.range.start.line, definition.range.end.line + 1).join("\n"))) return named;
+      const sites = await within(() => adapter.references(definition));
+      if (sites === STOPPED) return STOPPED;
+      for (const site of projectSites(root, sites) as ReferenceSite[]) {
+        if (isTest(site.file, testFolders) || !existsSync(join(root, site.file))) continue;
+        const lines = readFileSync(join(root, site.file), "utf8").split("\n");
+        const from = statementStartLine(lines, site.line - 1);
+        if (spelled.test(lines.slice(from, site.line).join("\n"))) return named;
+      }
+      return `no registration of the handler spells ${symbol}: no statement referencing it calls the guard`;
+    };
     const entrances: EntranceResolution[] = [];
-    const starts: { at: number; start: string }[] = [];
+    const starts: { at: number; start: string; definition?: Definition }[] = [];
     for (const component of model.components) {
       for (const entrance of component.entrances) {
         if (entrance.handler === undefined) {
@@ -606,6 +726,16 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
         }
         if (!reading) {
           entrances.push({ component: component.folder, name: entrance.name, reason: stoppedBefore(stop, budget, "this handler was resolved") });
+          continue;
+        }
+        if (isModuleHandler(entrance.handler)) {
+          // A module handler: the spec model found the file; it must be component code for its script to be read.
+          if (entrance.file === undefined || !moduleFiles.has(entrance.file)) {
+            entrances.push({ component: component.folder, name: entrance.name, reason: entrance.file === undefined ? `the module ${entrance.handler} was not found` : `the module ${entrance.file} is not component code the reading reads` });
+            continue;
+          }
+          starts.push({ at: entrances.length, start: `${entrance.file}#` });
+          entrances.push({ component: component.folder, name: entrance.name, file: entrance.file });
           continue;
         }
         const name = entrance.handler.split(/\s+in\s+/)[0]!;
@@ -620,7 +750,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
           entrances.push({ component: component.folder, name: entrance.name, reason: resolved.reason });
           continue;
         }
-        starts.push({ at: entrances.length, start: `${resolved.definition.file}#${name}` });
+        starts.push({ at: entrances.length, start: `${resolved.definition.file}#${name}`, definition: resolved.definition });
         entrances.push({ component: component.folder, name: entrance.name, file: resolved.definition.file });
       }
     }
@@ -650,6 +780,22 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
       reachRead = reading;
     }
     for (const { at, start } of starts) entrances[at]!.reach = reachOf(start, nodes, calls);
+
+    // The chokepoints each handler passes, traced; then each declared guard, confirmed at the handler's registration.
+    const targets = chokepointTargets(model);
+    const declaredEntrances = model.components.flatMap((component) => component.entrances.map((entrance) => ({ component: component.folder, entrance })));
+    for (const { at, start, definition } of starts) {
+      const resolution = entrances[at]!;
+      const guards = guardsOf(start, nodes, calls, targets);
+      const guard = declaredEntrances.find((d) => d.component === resolution.component && d.entrance.name === resolution.name)?.entrance.guard;
+      if (guard !== undefined && reading) {
+        const confirmed = await confirmGuard(guard, start, definition);
+        if (confirmed === STOPPED) reading = false;
+        else if (typeof confirmed === "string") resolution.guardUnconfirmed = confirmed;
+        else for (const target of confirmed) if (!guards.some((g) => g.component === target.component && g.name === target.name && g.how === "wrapper")) guards.push({ component: target.component, name: target.name, how: "declared" });
+      }
+      if (guards.length > 0) resolution.guards = guards;
+    }
 
     const symbols = [...tally.values()].sort(
       (a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to) || a.symbol.localeCompare(b.symbol) || a.file.localeCompare(b.file),
