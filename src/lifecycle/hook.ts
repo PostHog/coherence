@@ -45,7 +45,11 @@
  * nearly done. A stop, and a session start that finds the reading stale,
  * starts one refresh in the background, never waited on there (df-84db9e4f). Regulate
  * names the gaps this session touched, advisory: no traced control is not a
- * demonstrated bypass, so a gap never refuses a stop.
+ * demonstrated bypass, so a gap never refuses a stop. Undeclared entrances
+ * ride with both too (undeclared.ts), detected now by a scan that needs no
+ * reading: orient's one line counts them against what was detected and names
+ * the folder holding the most with the scaffold command that proposes their
+ * bullets; regulate names those in the files the session changed, advisory.
  * The root of every event is confined to the project the hook was installed
  * for: the harness names the working directory on stdin, and a cwd outside
  * that tree is refused with exit 78 rather than read or written.
@@ -78,8 +82,9 @@ import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, t
 import { COHERENCE_LEXICON, installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
-import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientCoverageText, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
+import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
+import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
 import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
 
 const run = promisify(execFile);
@@ -575,17 +580,21 @@ export async function gapReading(root: string, options: { waitMs?: number } = {}
   }
 }
 
-/** Orient's gap line under the spec block, or nothing. */
+/**
+ * Orient's gap line under the spec block, and the entrance coverage line
+ * beneath it, or nothing. The coverage line is detected now (undeclared.ts),
+ * so it needs neither a reading nor an entrance that could be a gap.
+ */
 export async function gapBlock(root: string, reading?: GapReading): Promise<string> {
   const gaps = reading ?? (await gapReading(root));
-  if (gaps.fingerprint === undefined) return "";
   const cli = await cliName(root);
-  let text: string;
-  if (gaps.now !== undefined) text = orientGapText(gaps.now, readGapBaseline(root), cli);
+  let text = "";
+  if (gaps.fingerprint === undefined) text = "";
+  else if (gaps.now !== undefined) text = orientGapText(gaps.now, readGapBaseline(root), cli);
   else if (gaps.last !== undefined) text = orientGapText(gaps.last, readGapBaseline(root), cli, { at: gaps.last.at, refreshing: gaps.refreshing === true });
   else text = unreadGapText(cli, gaps.refreshing === true);
-  // What the gap count speaks for, from the same reading: one line, a few names at most.
-  const coverage = gaps.now !== undefined ? orientCoverageText(gaps.now, cli) : gaps.last !== undefined ? orientCoverageText(gaps.last, cli, { at: gaps.last.at }) : "";
+  // What the gap count speaks for: one line, the busiest folder of undeclared entrances and the command that proposes them.
+  const coverage = orientUndeclaredText(undeclaredNow(root), cli);
   const lines = [text, coverage].filter((line) => line !== "");
   return lines.length === 0 ? "" : `${lines.join("\n")}\n\n`;
 }
@@ -731,6 +740,12 @@ export async function gapStopText(root: string, input: HookInput, changed: reado
   }
 }
 
+/** Regulate's coverage lines: the undeclared entrances in the files this session changed, advisory, or nothing. */
+export async function undeclaredStopText(root: string, changed: readonly string[]): Promise<string> {
+  if (changed.length === 0) return "";
+  return regulateUndeclaredText(changed, undeclaredNow(root), await cliName(root));
+}
+
 /** Where a project keeps its hook voice: `<Event>.override.md` and `<Event>.append.md` under the root. */
 export const HOOK_VOICE_DIR = join(".coherence", "hooks");
 
@@ -867,6 +882,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const coverageText=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : "";
       const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the lexicon check ran over nothing`;
       const gapText = await gapStopText(root, input, changed.files);
+      const undeclaredText = await undeclaredStopText(root, changed.files);
       const parts: string[] = [];
       if (changedText !== "") parts.push(changedText);
       if (lexicon.text !== "") parts.push(`Lexicon check:\n${lexicon.text}`);
@@ -874,9 +890,10 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       if (workText !== "") parts.push(`Work:\n${workText}`);
       if (coverageText) parts.push(coverageText);
       if (gapText !== "") parts.push(gapText);
+      if (undeclaredText !== "") parts.push(undeclaredText);
       const text = parts.join("\n");
       // A refusal is spent only on what the tool can prove is owed and no recorded wall excuses: a rejected name in a changed file, a spec problem, a structural defect.
-      // A spec gap is not among them: no traced control is not a demonstrated bypass, so gapText never counts toward the refusal.
+      // A spec gap is not among them: no traced control is not a demonstrated bypass, so gapText never counts toward the refusal; nor does an undeclared entrance.
       const refuse = event === "SubagentStop" && input.stop_hook_active !== true && lexicon.owed + spec.owed > 0;
       if (refuse) {
         // The refusal is enforcement: no override reaches its reason, and an append only follows it.

@@ -82,7 +82,12 @@ report what each one found.
    `- name (outside): meaning` for a level whose data or caller comes from
    outside the system's control. Scaffold one spec per component folder.
    Declare each entrance (command, route, event, tool) in the spec of the
-   component that owns its handler, with `trust: <level>`. Add the few
+   component that owns its handler, with `trust: <level>`. Then run
+   `coherence scaffold entrances`: it prints an `## entrances` bullet for every
+   route, server function, command and script it detects that no spec
+   declares, under the spec that owns it; declare each, writing its meaning
+   and trust, or record with `coherence decide` why one is not an entrance.
+   Add the few
    invariants that matter most (security, tenant isolation, data integrity)
    with `coherence scaffold invariant <folder> "<sentence>" --kinds <a,b|none>
    --chokepoint` (or `--totality-oracle`) `--write`, fill every placeholder,

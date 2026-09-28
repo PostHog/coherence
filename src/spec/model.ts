@@ -264,8 +264,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
 }
 
 /** The component whose folder holds a project-relative file: the deepest component folder above it. */
-function componentHolding(components: readonly Component[], file: string): Component | undefined {
-  let best: Component | undefined;
+export function componentHolding<C extends Pick<Component, "folder">>(components: readonly C[], file: string): C | undefined {
+  let best: C | undefined;
   for (const component of components) {
     const inside = component.folder === "." || file.startsWith(`${component.folder}/`);
     if (inside && (best === undefined || component.folder.length > best.folder.length || best.folder === ".")) best = component;

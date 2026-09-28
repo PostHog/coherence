@@ -5,6 +5,7 @@
  *   node src/cli.ts scaffold invariant <componentFolder> "<sentence>" [--name "<name>"] --kinds a,b [--chokepoint|--totality-oracle] [--crossing "a -> b"] [--preview] [--write]
  *   node src/cli.ts scaffold control "<entrance>" | --all [--as guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write]
  *   node src/cli.ts scaffold control --baseline --session <id> --agent <name>
+ *   node src/cli.ts scaffold entrances [<folder or file>]
  *
  * The control verb proposes the closure for an entrance with no traced
  * control (control.ts) from the recorded Structure reading when it still
@@ -12,6 +13,10 @@
  *
  * The invariant bullet prints on stdout with every absent slot as a
  * placeholder; the applicable checklist shapes print on stderr as guidance.
+ * The entrances verb prints the ## entrances bullets for the detected
+ * entrances no declared entrance covers (entrances.ts), from a scan of the
+ * tree that needs no reading; it never writes.
+ *
  * --preview writes an ephemeral Scope page in the system temporary directory;
  * --write independently appends the bullet to the component's spec.
  */
@@ -30,6 +35,10 @@ import { BUDGET_FLAGS, budgetFlags, readComponentInterfaces } from "../readings/
 import { freshReading, gapsOf, readAndRecord, recordGapBaseline, structureState } from "../readings/scope/gaps.ts";
 import { flowOf, flowPartialText } from "../readings/scope/structure-flow.ts";
 import { proposeClosures, renderAll, renderProposal, writeClosure, type Closure, type Proposal } from "./control.ts";
+import { proposeEntrances, renderEntrances, under } from "./entrances.ts";
+import { undeclaredOf } from "../readings/scope/undeclared.ts";
+import { loadSpecModel } from "../spec/model.ts";
+import { existsSync } from "node:fs";
 import { appendInvariant, componentDir, parseCrossing, renderGuidance, renderInvariant, scaffoldComponent, ScaffoldError, specsIn, type Form } from "./scaffold.ts";
 
 export const SCAFFOLD_USAGE = [
@@ -37,6 +46,7 @@ export const SCAFFOLD_USAGE = [
   '  scaffold invariant <componentFolder> "<sentence>" [--name "<name>"] --kinds <a,b|none> [--chokepoint|--totality-oracle] [--crossing "<level> -> <level>"] [--preview] [--write]',
   `  scaffold control "<entrance>" | --all [--component <folder>] [--as guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write] ${BUDGET_FLAGS}   the closure for an entrance with no traced control: a guard: line, an invariant, or control: none`,
   "  scaffold control --baseline --session <id> --agent <name>   record the entrances with no traced control at adoption, so orient names only new ones",
+  "  scaffold entrances [<folder or file>]   the ## entrances bullets for the detected entrances no spec declares, by the component that owns each; printed, never written",
 ].join("\n");
 
 function usage(message: string): never {
@@ -230,6 +240,25 @@ async function controlVerb(argv: string[], io: Io): Promise<void> {
   io.out(`wrote ${writeClosure(root, p, chosen(p, as, guard), parsed.one.get("reason"))}`);
 }
 
+async function entrancesVerb(argv: string[], io: Io): Promise<void> {
+  const parsed = parseFlags(argv, {});
+  const [target, ...rest] = parsed.positionals;
+  if (rest.length > 0) usage(`unexpected argument "${rest[0]}"; scaffold entrances takes one folder or file`);
+  const root = io.cwd;
+  let within: string | undefined;
+  if (target !== undefined) {
+    const path = resolve(root, target);
+    within = relative(resolve(root), path).split(sep).join("/") || ".";
+    if (within === ".." || within.startsWith("../") || !existsSync(path)) throw new ScaffoldError(`${target} is no folder or file inside the project`);
+  }
+  const model = loadSpecModel(root, { runs: false });
+  if (model.components.length === 0) throw new ScaffoldError(`no component has a spec yet; scaffold component . "<intent>" first`);
+  const measured = undeclaredOf(root, model);
+  const undeclared = (measured?.undeclared ?? []).filter((c) => under(c.file, within));
+  const groups = proposeEntrances(undeclared, model.components);
+  io.out(renderEntrances({ groups, detected: measured?.detected ?? 0, declared: measured?.declared ?? 0, target: within, levels: model.trustLevels, cli: await cliName(root) }));
+}
+
 function scaffoldFailure(error: unknown, io: Io): number {
   if (error instanceof ScaffoldError || error instanceof JournalError) {
     io.err(`scaffold: ${error.message}`);
@@ -251,7 +280,8 @@ export function scaffoldCommand(argv: string[], io: Io): number | Promise<number
       return result === undefined ? 0 : result.then(() => 0, (error: unknown) => scaffoldFailure(error, io));
     }
     if (shape === "control") return controlVerb(rest, io).then(() => 0, (error: unknown) => scaffoldFailure(error, io));
-    usage('scaffold takes "component", "invariant" or "control"');
+    if (shape === "entrances") return entrancesVerb(rest, io).then(() => 0, (error: unknown) => scaffoldFailure(error, io));
+    usage('scaffold takes "component", "invariant", "control" or "entrances"');
   } catch (error) {
     return scaffoldFailure(error, io);
   }

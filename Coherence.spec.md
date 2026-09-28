@@ -50,6 +50,9 @@ A prosthetic for proprioception: specs, invariants, and the readings that keep a
 - hooks install: a human installs, removes, checks, or inspects Coherence's hooks for an agent host
   handler: hooksCommand in src/cli.ts
   trust: project-source
+- build: a maintainer, or npm as prepare, compiles the published package from src into dist
+  handler: src/build.ts
+  trust: project-source
 
 ## invariants
 - grammar carries no rejected name: A spec written in Coherence's grammar with every shape name carries no rejected name.

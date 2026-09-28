@@ -64,3 +64,10 @@ The command that makes the complete shape the cheapest thing to produce: a compo
   crossing: record -> reading
   refuted: made the control verb ignore the recorded reading and read the component interfaces every time -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
+- undeclared entrances are proposed in the spec grammar: For every detected entrance no declared entrance covers, scaffold entrances prints one ## entrances bullet in the spec grammar under the spec of the component whose folder holds its file, named apart from that spec's entrances, its handler resolving to that entrance, and its meaning and trust as placeholders, the trust listing the entry spec's levels; filled and pasted where it says, each bullet parses and covers the entrance it was proposed for; it never writes.
+  over: the undeclared server functions, server route and package script of a project with a component of its own for its server functions, pasted with the meaning and trust filled, and the specs before and after the command
+  via: scaffold entrances proposes a bullet in the spec grammar for every undeclared entrance, under the spec of the component owning its file, that covers it once its meaning and trust are filled, and writes nothing
+  because: c-9941b95e: coverage stayed at 11 to 14 percent on praetorium.gg in both arms of the replicated A/B, about 100 server functions and routes never declared; declaring one by hand means recalling the grammar and how the spec resolves a handler, so the complete bullet must be the cheapest thing to write. Only the agent knows what work enters and whose trust it carries, so those stay placeholders and nothing is written, as control: none is never written with a placeholder reason
+  crossing: project-source -> reading
+  refuted: proposed every symbol handler as a bare name, dropping in <file>, in entranceHandler -> the totality oracle went red; restored, green (2026-09-28)
+  kinds: none

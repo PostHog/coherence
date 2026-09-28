@@ -18,6 +18,7 @@ import { loadOrders } from "../journal/work.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { CONTEXT_BUDGET, HOOK_EVENTS, changedFiles, gapReading, startReading, type GapReading, type HookEvent } from "./hook.ts";
 import { readGapBaseline } from "../readings/scope/gaps.ts";
+import { busiestFolder, undeclaredNow } from "../readings/scope/undeclared.ts";
 import type { HostStatus } from "./install.ts";
 import { loadProjectLexicons } from "./project.ts";
 import { attention, type Coverage } from "./lexicon-coverage.ts";
@@ -69,6 +70,14 @@ function vocabularySignal(coverage: Coverage): string {
   return `vocabulary signal, named and ranked: ${terms.length ? `undefined ${terms.join(", ")}` : "no undefined term"}; ${risky.length ? `sense at risk ${risky.join(", ")}` : "no sense at risk"}`;
 }
 
+/** What orient says of entrance coverage now: how many detected entrances are undeclared and the folder it names, or that it says nothing. */
+function undeclaredSignal(root: string): string {
+  const state = undeclaredNow(root);
+  if (state === undefined) return "entrance coverage: nothing (no spec yet, or nothing detected)";
+  if (state.undeclared.length === 0) return `entrance coverage: nothing (all ${state.detected} detected entrances declared)`;
+  return `entrance coverage: ${state.undeclared.length} of ${state.detected} detected entrances undeclared, most in ${busiestFolder(state.undeclared)!.folder}`;
+}
+
 /** What orient says of the spec gaps now: how many it would name, or why it says nothing. */
 function gapSignal(root: string, gaps: GapReading): string {
   if (gaps.fingerprint === undefined) return "spec gaps: nothing (no entrance could be one)";
@@ -108,6 +117,7 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     `${vocabulary}, delivered at detail "${start.detail}"`,
     vocabularySignal(start.coverage),
     gapSignal(root, gaps),
+    undeclaredSignal(root),
     "the session id with the decide and journal commands, and the rule",
     `size now: ${start.text.length.toLocaleString("en-US")} of ${CONTEXT_BUDGET.toLocaleString("en-US")} characters`,
   ];
@@ -122,7 +132,7 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     ? `the lexicon check over the changed files (${changed.files.length} now)`
     : `the lexicon check over the changed files (not known now: ${changed.failure})`;
   const debt = "error" in spec ? specLine : `spec: ${plural(spec.problems, "problem")}, ${plural(spec.defects, "structural defect")}, ${plural(spec.open, "open requirement")}`;
-  const regulate = [changedLine, debt, "the reminder that an active work order is closed with work close", "the spec gaps this session touched, advisory", "the read trace snapshotted for calibrate"];
+  const regulate = [changedLine, debt, "the reminder that an active work order is closed with work close", "the spec gaps this session touched, advisory", "the undeclared entrances in the files it changed, advisory", "the read trace snapshotted for calibrate"];
 
   const carries: Record<HookEvent, string[]> = {
     SessionStart: orient,

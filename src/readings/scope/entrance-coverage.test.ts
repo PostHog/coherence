@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
-import { orientCoverageText, gapsOf } from "./gaps.ts";
+import { orientUndeclaredText } from "./undeclared.ts";
 import { coverageLine, coverageOf, groupLine } from "./entrance-coverage.ts";
 import type { InterfaceReading, ShellState, SpecComponent, SpecEntrance } from "./model.ts";
 import { answerStructure } from "../query/query.ts";
@@ -94,14 +94,8 @@ describe("entrance coverage", () => {
     const html = String(renderFlowSection(withCoverage));
     assert.match(html, new RegExp(`data-field="entrance-coverage" data-detected="${coverage.detected}" data-covered="${coverage.individually + coverage.grouped}" data-undeclared="${coverage.uncovered.length}"`), "the health strip carries the same counts");
     assert.ok(html.includes("scripts/forgotten.ts:1"), "and lists the undeclared, one click away");
-    const orient = orientCoverageText(gapsOf(withCoverage, model), "coherence");
+    const orient = orientUndeclaredText({ declared: coverage.declared, detected: coverage.detected, covered: coverage.individually + coverage.grouped, undeclared: coverage.uncovered }, "coherence");
     assert.match(orient, new RegExp(`^Entrance coverage: ${coverage.declared} declared entrances cover ${coverage.individually + coverage.grouped} of ${coverage.detected} detected; ${coverage.uncovered.length} undeclared`), "orient says the same counts");
-    assert.ok(orient.includes("scripts/forgotten.ts"));
-    const nine = { ...withCoverage, componentInterfaces: { ...base, candidates: Array.from({ length: 9 }, (_, i): EntranceCandidate => ({ file: `scripts/s${i}.ts`, line: 1, symbol: "", rule: "script", why: "w" })) } } as ShellState;
-    const many = gapsOf(nine, flowOf(nine));
-    const bounded = orientCoverageText(many, "coherence");
-    assert.equal((bounded.match(/scripts\/s\d\.ts/g) ?? []).length, 3, "orient names at most three");
-    assert.match(bounded, /and 6 more/);
-    assert.equal(orientCoverageText({ ...many, coverage: { ...many.coverage!, undeclared: 0, first: [] } }, "coherence"), "", "nothing when every detected entrance is declared");
+    assert.ok(orient.includes("scaffold entrances"), "and names the command that proposes them");
   });
 });
