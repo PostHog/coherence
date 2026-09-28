@@ -34,6 +34,8 @@ import {
   type RelianceSite,
 } from "../scope/derive.ts";
 import { CORE_RULE, DEFAULT_RULE, NO_CONTROL_NEEDED, NO_TRACED_CONTROL, ROUTE_RULE, CONTROL_WORDS, controlInWords, flowBoundsText, flowDefaultSelection, flowLabelLines, flowOf, flowPartialText, routeName, trustInWords } from "../scope/structure-flow.ts";
+import type { FlowModel } from "../scope/structure-flow.ts";
+import { CANDIDATE_RULES, NOT_DETECTED, coverageLine, groupLine } from "../scope/entrance-coverage.ts";
 import { renderOrder } from "../../journal/workVerbs.ts";
 import { lexiconReviewCommand } from "../scope/model.ts";
 import type { LexiconCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
@@ -245,12 +247,33 @@ export function answerStructure(state: ShellState): Answer {
   for (const entrance of model.entrances) {
     lines.push(`  ${entrance.declaredBy}/${entrance.name}  ${entrance.handler ?? "no handler"}  ${entrance.reachable ? `starts in ${entrance.start}` : entrance.reason ?? "unreachable"}${entrance.noControl === undefined ? "" : `  ${NO_CONTROL_NEEDED}: ${entrance.noControl}`}`);
   }
+  lines.push(...coverageLines(model));
   lines.push("placement, row (rows keep routes straight; folder order within a column)  column (true distance from where work enters):");
   for (const node of model.nodes) lines.push(`  ${node.core ? "rail" : node.row}  ${node.core ? "rail" : node.column}  ${node.folder}${node.span > 1 ? `  spans ${node.span} rows` : ""}${node.unconnected ? "  no component interface" : ""}`);
   if (model.unowned !== undefined && model.unowned.files > 0) lines.push(`  no component  ${model.unowned.files} files, ${model.unowned.lines} lines`);
   const broken = model.nodes.flatMap((node) => node.defects.map((d) => `  ${node.folder}/${d.name}  ${d.state}; ${d.bypasses} bypasses, ${d.internal} inside ${node.folder}: ${d.sites.map((s) => `${s.file}:${s.line}`).join(", ")}`));
   if (broken.length > 0) lines.push("broken chokepoints, each marked on its component:", ...broken);
   return { text: lines.join("\n"), code: 0 };
+}
+
+/**
+ * The entrance coverage section (c-3760638e): the summary line the map's
+ * health strip shows, each grouped entrance and what it stands for, how many
+ * declared entrances cover nothing detected, every undeclared detected
+ * entrance with its rule and why, and the rules with what they cannot see.
+ */
+function coverageLines(model: FlowModel): string[] {
+  const coverage = model.coverage;
+  if (coverage === undefined) return model.evidence === "language adapter" ? ["entrance coverage: not measured; the reading kept no detected entrances (taken before detection)"] : [];
+  const lines = [`entrance coverage: ${coverageLine(coverage)}`];
+  for (const group of coverage.groups) lines.push(`  ${groupLine(group)}`);
+  if (coverage.beyond > 0) lines.push(`  ${coverage.beyond} declared ${coverage.beyond === 1 ? "entrance covers" : "entrances cover"} nothing detected: declared where the rules do not reach, or finer than they detect`);
+  lines.push(`  undeclared (${coverage.uncovered.length})${coverage.uncovered.length === 0 ? "" : ", each detected and covered by no declared entrance:"}`);
+  for (const c of coverage.uncovered) lines.push(`    ${c.file}:${c.line}  ${c.symbol === "" ? "(the file)" : c.symbol}  ${c.rule}: ${c.why}`);
+  const language = model.language ?? "";
+  const rules = CANDIDATE_RULES[language] ?? [];
+  if (rules.length > 0) lines.push(`  detected by (${language}): ${rules.map((r) => `${r.rule}, ${r.detects}`).join("; ")}; ${NOT_DETECTED[language]}`);
+  return lines;
 }
 
 function answerStatus(state: ShellState): Answer {

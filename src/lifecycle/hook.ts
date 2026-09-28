@@ -71,7 +71,7 @@ import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, t
 import { COHERENCE_LEXICON, installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
-import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
+import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientCoverageText, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
 
@@ -576,7 +576,10 @@ export async function gapBlock(root: string, reading?: GapReading): Promise<stri
   if (gaps.now !== undefined) text = orientGapText(gaps.now, readGapBaseline(root), cli);
   else if (gaps.last !== undefined) text = orientGapText(gaps.last, readGapBaseline(root), cli, { at: gaps.last.at, refreshing: gaps.refreshing === true });
   else text = unreadGapText(cli, gaps.refreshing === true);
-  return text === "" ? "" : `${text}\n\n`;
+  // What the gap count speaks for, from the same reading: one line, a few names at most.
+  const coverage = gaps.now !== undefined ? orientCoverageText(gaps.now, cli) : gaps.last !== undefined ? orientCoverageText(gaps.last, cli, { at: gaps.last.at }) : "";
+  const lines = [text, coverage].filter((line) => line !== "");
+  return lines.length === 0 ? "" : `${lines.join("\n")}\n\n`;
 }
 
 /**

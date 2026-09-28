@@ -26,7 +26,7 @@ Then continue with "Full setup" in the Coherence README: the lexicon, trust
 levels, invariants and enforcement.
 ```
 
-It needs Node 22.18 or newer on Apple Silicon. Coherence is not on npm
+It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux. Coherence is not on npm
 yet, so this runs a checkout beside the project and never touches the
 project's node_modules or lockfile.
 
@@ -45,7 +45,7 @@ as a source of code.
 ## Full setup: paste this into your agent
 
 Coherence is not on npm yet, so this runs a checkout kept beside the project.
-It needs Node 22.18 or newer on Apple Silicon, and access to
+It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux, and access to
 `github.com/PostHog/coherence`.
 
 ```text
@@ -218,8 +218,9 @@ During `test:setup`, the same variable selects the Python that creates `.venv`.
 ## Settled before code
 
 - Runtime and language are preserved from the reference: TypeScript on Node.
-- Supported platform is Apple Silicon (M-series) only. That makes a local embedding
-  service practical with no API key and no network.
+- macOS on Apple Silicon is the primary platform and Linux is supported; Windows
+  is not. The optional local embedding service runs on Apple Silicon only, with
+  no API key and no network; elsewhere exact matching still works.
 - The drift check matches exact strings first. A similarity seam stays open for a
   local embedding pass (alias suggestion, overload detection); similarity improves
   the question, never decides it. Backend options are under survey.

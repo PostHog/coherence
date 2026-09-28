@@ -115,6 +115,8 @@ export interface Lexicon {
   shape?: Fields;
   /** Undefined when the file does not speak of them; empty when it says there are none. */
   rejected_names?: RejectedName[];
+  /** Concepts the lexicon retired, each as it stood, with why it left. */
+  retired?: Concept[];
   trust_levels?: TrustLevel[];
   rulings?: Ruling[];
   candidate_overloads?: Overload[];
@@ -393,6 +395,7 @@ export type JournalRecord =
  * the raw store.
  */
 import type { WorkOrder } from "../../journal/work.ts";
+import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 export type { WorkOrder };
 
 /** The work orders under .coherence/work, or their absence with the reason. */
@@ -531,6 +534,8 @@ export type InterfaceReading =
       outside?: { sites: number; files: number; into: { component: string; sites: number }[] };
       /** Present when a budget stopped the reading: which budget, its size, and the components whose declarations were not all read. */
       partial?: InterfacePartial;
+      /** The entrances the language's rules detect in the tree, each with its rule and why: what the declared entrances' coverage is measured against. Absent from a reading taken before detection. */
+      candidates?: EntranceCandidate[];
     }
   | { kind: "unread"; because: string };
 
@@ -628,6 +633,7 @@ const LEXICON_KEYS = new Set([
   "metaphors",
   "shape",
   "rejected",
+  "retired",
   "trust_levels",
   "rulings",
   "candidate_overloads",
@@ -823,6 +829,8 @@ export function parseLexicon(input: unknown, where: string): Lexicon {
   if (input["shape"] !== undefined) lexicon.shape = fieldsAt(input, "shape", where);
   const rejectedNames = optionalListAt(input, "rejected", where, parseRejectedName);
   if (rejectedNames !== undefined) lexicon.rejected_names = rejectedNames;
+  const retired = optionalListAt(input, "retired", where, parseConcept);
+  if (retired !== undefined) lexicon.retired = retired;
   const trustLevels = optionalListAt(input, "trust_levels", where, parseTrustLevel);
   if (trustLevels !== undefined) lexicon.trust_levels = trustLevels;
   const rulings = optionalListAt(input, "rulings", where, parseRuling);

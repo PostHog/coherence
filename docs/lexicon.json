@@ -944,7 +944,7 @@
     {
       "name": "config",
       "status": "settled",
-      "definition": "The list of project facts the tool cannot derive: name, entry dir, output dir, ignore patterns, language, platform, how to typecheck, how to run tests and match their names, where tests live, the well-known names the project vouches for (wellKnown), and the interface reading's budget (interfaceBudget). Every key that configures a mechanism leaves with the mechanism.",
+      "definition": "The list of project facts the tool cannot derive: name, entry dir, output dir, ignore patterns, language, how to typecheck, how to run tests and match their names, where tests live, the well-known names the project vouches for (wellKnown), and the interface reading's budget (interfaceBudget). Every key that configures a mechanism leaves with the mechanism.",
       "rejected": [
         {
           "alternative": "mass, conventions, sinks, atlas keys",
@@ -1151,24 +1151,6 @@
       }
     },
     {
-      "name": "platform",
-      "definition": "The only supported platform is Apple Silicon, the M-series Macs. Metal is its GPU interface. This is what makes a local embedding service practical with no API key and no network.",
-      "status": "settled",
-      "aliases": [
-        "apple silicon",
-        "m-series",
-        "metal"
-      ],
-      "related": [
-        "lexicon",
-        "language adapter"
-      ],
-      "provenance": {
-        "defined_by": "owner, 2026-09-17",
-        "owner_words": "supporting M-series processors only means we can easily run the embeddings service locally"
-      }
-    },
-    {
       "status": "proposed",
       "aliases": [],
       "instances": [
@@ -1212,6 +1194,10 @@
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-0db9b17b)",
         "owner_words": "Declared and checked for entrypoints is good."
+      },
+      "properties": {
+        "entrance coverage": "How much of the surface the reading detects the declared entrances cover: each detected entrance is covered individually (an entrance's handler names it and nothing else), through a grouped entrance (one entrance stands for every detected entrance registered through its handler or detected in its module), or undeclared. A spec-gap count speaks only for the covered part.",
+        "detected entrance": "An entrance the reading finds by one of the rules its language lists (a server function, a server route, a URL pattern, a package script, a top-level script), with the rule and why it matched; never a guess presented as fact."
       }
     },
     {
@@ -1347,5 +1333,32 @@
     "detail": "definitional sub-structure the injection omits and Scope shows",
     "provenance": "owner_words, metaphor, evidence, defined_by and similar: history, never injected",
     "retired_mechanisms": "docs/retired.md"
-  }
+  },
+  "retired": [
+    {
+      "name": "supported platform",
+      "definition": "Apple Silicon Macs, the primary target, and Linux; not Windows. Metal is Apple Silicon's GPU interface, which makes the optional local embedding service fast there with no API key and no network; on Linux it runs on the CPU or another GPU, more slowly.",
+      "status": "settled",
+      "aliases": [
+        "apple silicon",
+        "m-series",
+        "metal"
+      ],
+      "related": [
+        "lexicon",
+        "language adapter"
+      ],
+      "provenance": {
+        "defined_by": "owner, 2026-09-17",
+        "owner_words": "supporting M-series processors only means we can easily run the embeddings service locally"
+      },
+      "because": "nothing reads a platform setting; the supported platforms are an install fact enforced by package.json's os field and stated in the README, not vocabulary agents use, and the concept cost injected tokens every session"
+    }
+  ],
+  "rejected": [
+    {
+      "concept": "supported platform",
+      "because": "nothing reads a platform setting; the supported platforms are an install fact enforced by package.json's os field and stated in the README, not vocabulary agents use, and the concept cost injected tokens every session"
+    }
+  ]
 }

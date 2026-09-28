@@ -18,6 +18,7 @@ import { workBinding } from "../journal/work.ts";
 import { digest, lexiconCoverage } from "./lexicon-coverage.ts";
 import { parseLexicon, rejectedNames } from "./lexicon.ts";
 import { isCoherenceItself, projectLexiconPath } from "./project.ts";
+import { parseLexicon as parseScopeLexicon } from "../readings/scope/model.ts";
 
 export interface Who {
   session: string;
@@ -88,6 +89,8 @@ function body(path: string): string {
 }
 function validate(value: Record<string, unknown>, path: string): void {
   const parsed = parseLexicon(value, path);
+  // Scope reads the same file strictly; a change it would refuse never reaches disk.
+  parseScopeLexicon(value, path);
   const names = new Set<string>();
   for (const entry of value["concepts"] as Record<string, unknown>[]) {
     for (const key of [
@@ -278,7 +281,7 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
     ];
     value["rejected"] = [
       ...((value["rejected"] as unknown[]) ?? []),
-      { alternative: change.name, because: change.because },
+      { concept: change.name, because: change.because },
     ];
   }
   // Human-only actions are flagged at proposal time, not guessed from a success message after a write.

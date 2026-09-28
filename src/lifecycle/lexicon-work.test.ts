@@ -25,6 +25,7 @@ import {
   saveBaseline,
 } from "./lexicon-cli.ts";
 import { loadJournal } from "../journal/store.ts";
+import { parseLexicon as parseScopeLexicon } from "../readings/scope/model.ts";
 
 const who = { session: "lexicon-test", agent: "test" };
 function fixture(): string {
@@ -181,6 +182,25 @@ test("lexicon maintenance preserves full entries, records actual effects, and re
       /changed since preview/,
     );
     assert.equal(loadJournal(root).records.length, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+test("an acknowledged retirement writes a lexicon Scope reads: the name is refused at the top level as a concept", async () => {
+  const root = fixture();
+  try {
+    const retire = await propose(root, {
+      action: "retire",
+      name: "exposure",
+      because: "moved out of the vocabulary",
+    });
+    applyProposal(root, retire.id, who, "moved out", ["keeping it"], "owner approved");
+    const raw = readFileSync(join(root, "lexicon.json"), "utf8");
+    const lexicon = parseScopeLexicon(JSON.parse(raw), "lexicon.json");
+    assert.deepEqual(lexicon.rejected_names, [
+      { concept: "exposure", because: "moved out of the vocabulary" },
+    ]);
+    assert.equal(lexicon.concepts.length, 0);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

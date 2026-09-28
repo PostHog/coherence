@@ -257,7 +257,7 @@ test("the map's type is a product UI scale: one system family, three sizes, two 
   const style = /<style>([^]*?)<\/style>/.exec(renderFlowSvg(flowOf(projectState()), undefined).text)![1]!;
   assert.match(style, /\.flow-svg text \{ font-family: system-ui, -apple-system/, "the map is set in the page's system family");
   assert.doesNotMatch(style, /text-transform|letter-spacing|font-style: italic|font-weight: 700/, "no capitals, tracking, italics or heavy weight on the map");
-  // Widths Chrome reported for the system face on the supported platform (SF Pro, tabular numerals): the embedded metrics must never be narrower.
+  // Widths Chrome reported for the system face on macOS (SF Pro, tabular numerals): the embedded metrics must never be narrower.
   for (const [text, size, bold, measured] of [["Coherence (root)", 13, true, 108.5], ["src/readings/scope", 11, false, 99.96], ["X13", 11, true, 22.5], ["Adapters: core dependency, called by 5 of 9", 12, false, 249.55]] as const) {
     assert.ok(textWidth(text, size, bold) >= measured, `${text} at ${size}px: ${textWidth(text, size, bold).toFixed(1)} covers the rendered ${measured}`);
   }
