@@ -264,9 +264,14 @@ export interface FlowRoute {
  *              owns, whose protected thing the handler's reach reaches: it
  *              stands inside that component, on no line of the map
  *   totality   a verified invariant enforced only by a totality oracle, owned
- *              by the component that declares or handles the entrance, whose
- *              crossing enters from the trust the route carries in:
+ *              by the component that declares or handles the entrance:
  *              test-backed, not structural
+ *
+ * Every kind but the wrapper counts only when its invariant's crossing
+ * checks what the route's trust sends: it enters from a level the route
+ * carries in, or enters one (c-9941b95e). A chokepoint guarding another
+ * boundary, or declaring none, is no check on this caller however far the
+ * handler's reach runs; a wrapper's handler is registered through it.
  */
 export const CONTROL_KINDS = ["interface", "wrapper", "inside", "totality"] as const;
 export type FlowControlKind = (typeof CONTROL_KINDS)[number];
@@ -925,12 +930,20 @@ export function flowOf(state: ShellState): FlowModel {
 
   // What controls each route: every identifier where work enters, on an interface it takes, or on the stub to its rail;
   // then what the reading traced beyond the lines (d-127ab8e4), verified only: a chokepoint its handler is registered
-  // through, a chokepoint inside a component its work passes whose protected thing the reach reaches, and a totality oracle there
-  // whose crossing enters from the trust it carries in. No traced control marks only an untrusted route with none
+  // through, a chokepoint inside a component its work passes whose protected thing the reach reaches, and a totality oracle there;
+  // each but the wrapper only when its crossing enters from the trust it carries in or enters it. No traced control marks only an untrusted route with none
   // (d-ba18b0fd): its trust unknown (treated as untrusted, d-6df8d09a), a level the entry spec does not declare, or a
   // level from outside the system's control.
   const outsideLevels = new Set(state.spec.trustLevels.filter((level) => level.outside === true).map((level) => level.name));
   const verified = (component: string, name: string): boolean => verdictOf(component, name).state === "verified";
+  // A control stands for a route only when it checks what crosses from the route's trust: its crossing enters from a
+  // level the route carries in, or enters one, turning an outside caller into it. A chokepoint guarding some other
+  // boundary (a data-write log, a migration registry, an egress filter for another reader) is no check on this caller,
+  // however far the handler's reach runs (c-9941b95e). A wrapper is exempt: its handler is registered through it.
+  const crossesTrust = (component: string, name: string, trust: readonly string[]): boolean => {
+    const crossing = invariants.find((invariant) => invariant.component === component && invariant.name === name)?.crossing;
+    return crossing !== undefined && (trust.includes(crossing.from) || trust.includes(crossing.to));
+  };
   for (const route of routes) {
     const railStub = route.rail === undefined ? undefined : edges.find((edge) => edge.from === route.stops[route.stops.length - 1] && edge.to === route.rail);
     route.controls = [...new Set([...route.entry, ...route.edges.flatMap((id) => edges.find((edge) => edge.id === id)!.identifiers), ...(railStub?.identifiers ?? [])])];
@@ -941,6 +954,7 @@ export function flowOf(state: ShellState): FlowModel {
     };
     for (const text of route.controls) {
       const identifier = identifiers.find((i) => i.text === text)!;
+      if (!crossesTrust(identifier.component, identifier.name, route.trust)) continue;
       add({ kind: "interface", component: identifier.component, name: identifier.name, identifier: text, declared: false });
     }
     // Beyond the lines, a control is each entrance's own: it counts on the route only when every entrance on it passes it,
@@ -955,14 +969,14 @@ export function flowOf(state: ShellState): FlowModel {
       for (const guard of entrance?.guards ?? []) {
         if (!verified(guard.component, guard.name)) continue;
         if (guard.how === "wrapper" || guard.how === "declared") found.push({ kind: "wrapper", component: guard.component, name: guard.name, identifier: undefined, declared: guard.how === "declared" });
-        else if (on.has(guard.component)) found.push({ kind: "inside", component: guard.component, name: guard.name, identifier: undefined, declared: false });
+        else if (on.has(guard.component) && crossesTrust(guard.component, guard.name, route.trust)) found.push({ kind: "inside", component: guard.component, name: guard.name, identifier: undefined, declared: false });
       }
       // A test-backed control is the entrance's own: owned where the entrance is declared or handled, never merely somewhere
       // its work passes, so an unrelated test further along cannot stand in for a check on this entrance (owner, d-127ab8e4).
       // Compared unfolded: a child component folded into a stop at this zoom does not own its parent's entrances.
       const own = new Set(entrance?.owners ?? []);
       for (const invariant of invariants) {
-        if (invariant.crossing === undefined || !route.trust.includes(invariant.crossing.from) || !own.has(invariant.component)) continue;
+        if (!crossesTrust(invariant.component, invariant.name, route.trust) || !own.has(invariant.component)) continue;
         // An invariant with a chokepoint is traced by its chokepoint; only one enforced by a totality oracle alone is test-backed here.
         if (invariant.enforcements.some((e) => e.form === "chokepoint") || !invariant.enforcements.some((e) => e.form === "totality oracle")) continue;
         if (verified(invariant.component, invariant.name)) found.push({ kind: "totality", component: invariant.component, name: invariant.name, identifier: undefined, declared: false });
