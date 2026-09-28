@@ -64,8 +64,9 @@ export interface DetectOptions {
 const TS_CODE = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
 const RUNNABLE = /\.(ts|tsx|mts|cts|js|mjs|cjs|py)$/;
 
+/** A name as a regular expression that matches it literally, whatever characters it holds. */
 function escape(name: string): string {
-  return name.replace(/[$]/g, "\\$");
+  return name.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&");
 }
 
 /** The lines of the statement or definition that starts at `start` (zero-based): until the next line at or left of its indentation that begins something new. */

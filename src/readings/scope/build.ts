@@ -25,7 +25,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { stripTypeScriptTypes } from "node:module";
-import { basename, dirname, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { adapterFor } from "../../adapters/index.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
@@ -47,7 +47,7 @@ const here = dirname(fileURLToPath(import.meta.url));
  * before it; the relative imports are removed when the files are joined into
  * one inline module, and types are stripped by Node's own stripper.
  */
-const BROWSER_SOURCES = [
+export const BROWSER_SOURCES = [
   "html.ts",
   "model.ts",
   "derive.ts",
@@ -274,9 +274,23 @@ export function windowState(state: ShellState): ShellState {
   };
 }
 
-/** Strip one source file to JavaScript and drop its relative imports. */
-function toBrowserModule(source: string, name: string): string {
-  const stripped = stripTypeScriptTypes(source, { mode: "strip" });
+/** One browser source stripped to JavaScript, as the published package carries it beside its compiled modules. */
+export function strippedName(name: string): string {
+  return name.replace(/\.ts$/, ".browser.js");
+}
+
+/**
+ * One browser source as JavaScript: stripped here in a checkout, and read
+ * already stripped in the published package, whose build ran the same
+ * stripper, so an installed Coherence never calls the experimental API.
+ */
+async function browserSource(name: string): Promise<string> {
+  if (extname(fileURLToPath(import.meta.url)) === ".js") return readFile(resolve(here, strippedName(name)), "utf8");
+  return stripTypeScriptTypes(await readFile(resolve(here, name), "utf8"), { mode: "strip" });
+}
+
+/** Drop a stripped source's relative imports. */
+function toBrowserModule(stripped: string, name: string): string {
   // A relative import may span several lines; `[^;]` crosses them.
   return stripped.replace(/^import\s[^;]*from\s+["']\.\/[^"']*["'];[^\S\n]*$/gm, "").concat(`\n// end of ${name}\n`);
 }
@@ -295,8 +309,7 @@ async function browserScript(): Promise<string> {
   const parts: string[] = [];
   const declared = new Map<string, string>();
   for (const name of BROWSER_SOURCES) {
-    const source = await readFile(resolve(here, name), "utf8");
-    const module = toBrowserModule(source, name);
+    const module = toBrowserModule(await browserSource(name), name);
     for (const declaredName of topLevelNames(module)) {
       const earlier = declared.get(declaredName);
       if (earlier !== undefined) throw new Error(`Scope: ${name} declares ${declaredName} at top level, which ${earlier} already declares; the inline module has one name space`);
@@ -315,19 +328,33 @@ function embedJson(value: unknown): string {
 /** The Latin range of IBM Plex Mono's split build: every character a path, a symbol, or an identifier on the map uses. */
 const PLEX_LATIN = "U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+20AC, U+2122, U+2212, U+FB01-FB02";
 
+/** The first of these files that can be read. */
+async function readFirst(paths: string[]): Promise<Buffer> {
+  for (const path of paths.slice(0, -1)) {
+    try {
+      return await readFile(path);
+    } catch {
+      // Not here; try the next place.
+    }
+  }
+  return readFile(paths[paths.length - 1]!);
+}
+
 /**
  * IBM Plex Mono for code-ish text (paths, symbols, identifiers), embedded as
  * base64 woff2 so the page stays self-contained: the regular weight of the
  * Latin subset the package ships (17.5 KB, 23.4 KB as base64), the only
  * weight the map and the page set mono text in; the medium weight would push
- * the page with a domain lexicon past its 2 MB budget. Without the package
- * the page falls back to the monospace stack it names after Plex.
+ * the page with a domain lexicon past its 2 MB budget. The published package
+ * carries the file beside this module; a checkout reads it from the font
+ * package. Without either the page falls back to the monospace stack it names
+ * after Plex.
  */
 async function plexMono(): Promise<string> {
   const faces: string[] = [];
   for (const [weight, file] of [[400, "Regular"]] as const) {
     try {
-      const bytes = await readFile(resolve(here, `../../../node_modules/@ibm/plex-mono/fonts/split/woff2/IBMPlexMono-${file}-Latin1.woff2`));
+      const bytes = await readFirst([resolve(here, `IBMPlexMono-${file}-Latin1.woff2`), resolve(here, `../../../node_modules/@ibm/plex-mono/fonts/split/woff2/IBMPlexMono-${file}-Latin1.woff2`)]);
       faces.push(`@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: ${weight}; font-display: swap; src: url(data:font/woff2;base64,${bytes.toString("base64")}) format("woff2"); unicode-range: ${PLEX_LATIN}; }`);
     } catch {
       return "";

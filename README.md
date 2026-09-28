@@ -215,6 +215,20 @@ working directory differs. Set `COHERENCE_PYTHON` to use another interpreter
 with pytest; an invalid override fails instead of falling back silently.
 During `test:setup`, the same variable selects the Python that creates `.venv`.
 
+## Releasing
+
+The package is `@posthog/coherence` on npm. `npm run build` compiles `src`
+into `dist` (Node will not strip types under node_modules) and carries the
+files the compiled modules read: data, the stylesheet, the Scope browser
+sources already stripped, and the one font file with its license. `npm pack`
+runs the build. `node-llama-cpp` is an optional peer: a project that wants the
+local embedding pass installs it beside Coherence.
+
+To release, bump `version` in package.json on main, then run the Release
+workflow from the Actions tab. It publishes through npm trusted publishing
+from `.github/workflows/release.yml` in the `Release` environment, with
+provenance and no stored token, and refuses a version npm already has.
+
 ## Settled before code
 
 - Runtime and language are preserved from the reference: TypeScript on Node.

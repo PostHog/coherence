@@ -38,7 +38,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
-import { HOSTS, SETTINGS_FILE, isHost, type Host } from "./project.ts";
+import { HOSTS, PACKAGE_NAME, SETTINGS_FILE, isHost, type Host } from "./project.ts";
 
 // Where each host keeps its settings, and which hosts there are, live in the project
 // layer: the hook reads them to know which tree it was installed for.
@@ -105,14 +105,16 @@ const ROOT_WALK =
 
 /**
  * Shell that sets `$coherence` to the cli to run, or to nothing: $COHERENCE_HOME,
- * the sibling folder, the sibling of a worktree's main checkout, then the
- * project's own bin. Nothing here names a path on one machine.
+ * the sibling folder, the sibling of a worktree's main checkout, the installed
+ * package's own cli, then the project's own bin. The package's cli comes
+ * before the bin because a package manager may write the bin as a shell shim
+ * that node cannot run. Nothing here names a path on one machine.
  */
 export const LOCATE = [
   ROOT_WALK,
   'main=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)',
   "coherence=",
-  `for c in "\${${HOME_VAR}:+\$${HOME_VAR}/src/cli.ts}" "$root/../${SIBLING}/src/cli.ts" "\${main:+\${main%/*}/../${SIBLING}/src/cli.ts}" "$root/node_modules/.bin/coherence"; do if [ -n "$c" ] && [ -f "$c" ]; then coherence=$c; break; fi; done`,
+  `for c in "\${${HOME_VAR}:+\$${HOME_VAR}/src/cli.ts}" "$root/../${SIBLING}/src/cli.ts" "\${main:+\${main%/*}/../${SIBLING}/src/cli.ts}" "$root/node_modules/${PACKAGE_NAME}/dist/cli.js" "$root/node_modules/.bin/coherence"; do if [ -n "$c" ] && [ -f "$c" ]; then coherence=$c; break; fi; done`,
 ].join("; ");
 
 /** The one line a hook prints when it cannot reach Coherence. No apostrophes: it sits in single quotes. */

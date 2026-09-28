@@ -25,6 +25,7 @@ import {
   saveBaseline,
 } from "./lexicon-cli.ts";
 import { loadJournal } from "../journal/store.ts";
+import { PACKAGE_NAME } from "./project.ts";
 import { parseLexicon as parseScopeLexicon } from "../readings/scope/model.ts";
 
 const who = { session: "lexicon-test", agent: "test" };
@@ -543,7 +544,7 @@ test("an installed hook command locates its project from a non-git subdirectory 
   try {
     writeFileSync(
       join(root, "package.json"),
-      JSON.stringify({ name: "coherence" }),
+      JSON.stringify({ name: PACKAGE_NAME }),
     );
     symlinkSync(
       fileURLToPath(new URL("..", import.meta.url)),

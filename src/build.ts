@@ -1,0 +1,53 @@
+/**
+ * The published package's build: `npm run build`. Node will not strip types
+ * from a file under node_modules, so the package ships JavaScript compiled
+ * from src into dist, at the same depth, so every path a module takes from
+ * its own location (the lexicon and checklist seed in docs, the package.json)
+ * resolves the same compiled as in a checkout. Beside the JavaScript go the
+ * files modules read at run time: the data files, the stylesheet, the Scope
+ * browser sources stripped by the same stripper a checkout runs when it
+ * builds a page, and the one font file the page embeds with its license, so
+ * no font package, and no install script of its own, is needed.
+ */
+
+import { spawnSync } from "node:child_process";
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { stripTypeScriptTypes } from "node:module";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { BROWSER_SOURCES, strippedName } from "./readings/scope/build.ts";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const src = join(root, "src");
+const dist = join(root, "dist");
+const scope = join("readings", "scope");
+
+function files(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return entry.name === "__pycache__" ? [] : files(path);
+    return [path];
+  });
+}
+
+function copy(from: string, to: string): void {
+  mkdirSync(dirname(to), { recursive: true });
+  copyFileSync(from, to);
+}
+
+rmSync(dist, { recursive: true, force: true });
+const tsc = spawnSync(join(root, "node_modules", ".bin", "tsc"), ["-p", join(root, "tsconfig.build.json")], { stdio: "inherit" });
+if (tsc.status !== 0) process.exit(tsc.status ?? 1);
+
+for (const file of files(src)) {
+  const at = relative(src, file);
+  if (/\.(json|css)$/.test(file)) copy(file, join(dist, at));
+}
+for (const name of BROWSER_SOURCES) {
+  const source = readFileSync(join(src, scope, name), "utf8");
+  writeFileSync(join(dist, scope, strippedName(name)), stripTypeScriptTypes(source, { mode: "strip" }));
+}
+
+const plex = join(root, "node_modules", "@ibm", "plex-mono");
+copy(join(plex, "fonts", "split", "woff2", "IBMPlexMono-Regular-Latin1.woff2"), join(dist, scope, "IBMPlexMono-Regular-Latin1.woff2"));
+copy(join(plex, "LICENSE.txt"), join(dist, scope, "IBMPlexMono-LICENSE.txt"));

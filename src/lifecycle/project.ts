@@ -165,11 +165,14 @@ export async function vocabularyFacts(root: string): Promise<VocabularyFacts> {
   return facts;
 }
 
+/** Coherence's own package name: a root whose package.json carries it is Coherence's own checkout. */
+export const PACKAGE_NAME = "@posthog/coherence";
+
 /** Whether the project at `root` is Coherence itself, whose CLI is its own source tree rather than an installed bin. */
 export async function isCoherenceItself(root: string): Promise<boolean> {
   try {
     const pkg: unknown = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
-    return typeof pkg === "object" && pkg !== null && (pkg as Record<string, unknown>)["name"] === "coherence";
+    return typeof pkg === "object" && pkg !== null && (pkg as Record<string, unknown>)["name"] === PACKAGE_NAME;
   } catch {
     return false;
   }
