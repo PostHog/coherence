@@ -224,16 +224,15 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> harness
   refuted: made the check compare only the command, so a changed timeout, a dropped Codex context limit, a shared entry, or a matcher passed as clean -> "the check names every drift from what install would write: missing, stale, and extra" went red in install.test.ts; restored, green (2026-09-23)
   kinds: none
-- a hook without Coherence is silent but for one line: A hook installed for an adopter, run where Coherence cannot be found or node is not on the PATH, exits 0 and hands the agent host one line as a systemMessage saying Coherence is not installed and how to install it; no shell error reaches the host and the session goes on.
+- a hook without Coherence tells the agent how to supply it: A hook installed for an adopter, run where Coherence cannot be found or node is not on the PATH, exits 0 with no shell error on every event; at the session start it shows the user one line, and when Coherence is missing it tells the agent every way to supply it and that changing the project's dependencies is the user's decision, so the agent makes the call; every other event is silent.
   over: every event install wires, for both agent hosts, with no checkout anywhere the command looks and with a checkout but no node; and uninstall still owns the command
-  via: a hook without Coherence installed is silent but for one line
-  because: a teammate who opens the project without the sibling checkout, or a session in a fresh clone, would otherwise see a stack of shell errors on every event and a SubagentStop that fails for a reason that has nothing to do with the work; a hook that does nothing must say so once, in the place the host shows, with the fix
+  via: a hook without Coherence installed tells the user once and the agent how to supply it, and is otherwise silent
+  because: a teammate who opens the project without Coherence, or a session in a fresh clone, would otherwise see a stack of shell errors on every event and a SubagentStop that fails for a reason that has nothing to do with the work; a line only the user sees leaves the agent unaware, and a hook that installed Coherence itself would change the project's dependencies and lockfile mid-session without anyone deciding to; the agent knows whether the user asked for Coherence and which package manager the project uses, so it is told and decides
   crossing: project-source -> harness
-  refuted: made the soft exit of the located command exit 1 instead of 0 when Coherence is not found -> "a hook without Coherence installed is silent but for one line" went red in install.test.ts; restored, green (2026-09-25)
   kinds: deploy
   checklist: graceful-drain dismissed: nothing is shut down; the hook exits at once without having accepted any work
-  checklist: readiness-evidence dismissed: the line claims only that Coherence was not found, which is what the command just observed
-  checklist: declared-target-coverage declared as a hook without Coherence is silent but for one line
+  checklist: readiness-evidence dismissed: the line and the context claim only that Coherence was not found, which is what the command just observed
+  checklist: declared-target-coverage declared as a hook without Coherence tells the agent how to supply it
 - a located Coherence answers as a direct command does: An adopter's hook finds Coherence outside the project ($COHERENCE_HOME, a sibling checkout, the sibling of a worktree's main checkout, then the project's own bin) and, once found, answers and refuses exactly as a direct command would; the committed command names no path on one machine and never touches the project's node_modules or lockfile.
   over: both agent hosts, the start injection and a refused subagent stop, and each place the command looks
   via: a located Coherence answers, and refuses, as a direct command does

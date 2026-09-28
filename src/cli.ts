@@ -42,7 +42,7 @@ import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/l
 import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
 import { check, formatCheck, formatStatus, formatUninstall, HOME_VAR, HOSTS, install, isHost, LOCATED_PREFIX, locate, SIBLING, status, uninstall } from "./lifecycle/install.ts";
-import { isCoherenceItself, loadProjectLexicons } from "./lifecycle/project.ts";
+import { isCoherenceItself, loadProjectLexicons, PACKAGE_NAME } from "./lifecycle/project.ts";
 import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
 import { SCOPE_USAGE, scopeCommand } from "./readings/scope/cli.ts";
 import { scopeApp } from "./readings/scope/live.ts";
@@ -130,8 +130,8 @@ function locateNote(root: string): string {
   if (real === THIS_CLI) return `the hooks reach this checkout (${dirname(dirname(THIS_CLI))})\n`;
   if (real !== undefined) return `note: the hooks will run the Coherence at ${real}, not this checkout (${THIS_CLI})\n`;
   return (
-    `note: the hooks cannot find Coherence from here; they look at $${HOME_VAR}, then ../${SIBLING} beside the project (or beside its main checkout), then node_modules/.bin/coherence.\n` +
-    `  Clone Coherence beside the project as ../${SIBLING}, or set ${HOME_VAR}=${dirname(dirname(THIS_CLI))} where your agent host starts. Until then each hook prints one line and does nothing.\n`
+    `note: the hooks cannot find Coherence from here; they look at $${HOME_VAR}, then ../${SIBLING} beside the project (or beside its main checkout), then the project's installed ${PACKAGE_NAME}.\n` +
+    `  Run npm install -D ${PACKAGE_NAME} in the project, clone Coherence beside it as ../${SIBLING}, or set ${HOME_VAR}=${dirname(dirname(THIS_CLI))} where your agent host starts. Until then each session start tells the agent it is missing, and the other events do nothing.\n`
   );
 }
 

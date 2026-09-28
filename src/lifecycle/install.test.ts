@@ -8,7 +8,7 @@ import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { cliName, HOOK_EVENTS, REFUSE_EXIT } from "./hook.ts";
 import { PACKAGE_NAME } from "./project.ts";
-import { driftOf, formatCheck, formatStatus, install, LOCATED_PREFIX, locate, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
+import { driftOf, formatCheck, formatStatus, install, LOCATED_PREFIX, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
@@ -143,7 +143,7 @@ test("the CLI installs into the current directory and reports status", async () 
 
     const shown = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", "status"], { cwd: dir, encoding: "utf8" });
     assert.equal(shown.status, 0, shown.stderr);
-    assert.match(shown.stdout, /claude: .*\n  SessionStart: .*exec node "\$coherence" hook SessionStart/);
+    assert.match(shown.stdout, /claude: .*\n  SessionStart: .*exec node "\$coherence" "\$@"; }; coherence hook SessionStart/);
     assert.match(shown.stdout, /codex: .*\(absent\)/);
 
     const noHost = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", "install"], { cwd: dir, encoding: "utf8" });
@@ -321,7 +321,7 @@ test("the CLI checks, uninstalls, and exits by what it found", async () => {
 
     const other = cli("--check", "--host", "claude", "--command", "npx coherence");
     assert.equal(other.status, 1);
-    assert.match(other.stdout, /SessionStart: stale\n    command: installed ".*exec node \\"\$coherence\\" hook SessionStart"; install would write "npx coherence hook SessionStart"/);
+    assert.match(other.stdout, /SessionStart: stale\n    command: installed ".*exec node \\"\$coherence\\" \\"\$@\\"; }; coherence hook SessionStart"; install would write "npx coherence hook SessionStart"/);
 
     const gone = cli("uninstall", "--host", "claude");
     assert.equal(gone.status, 0, gone.stderr);
@@ -370,7 +370,7 @@ function git(cwd: string, ...args: string[]): void {
   assert.equal(run.status, 0, run.stderr);
 }
 
-test("a hook without Coherence installed is silent but for one line", async () => {
+test("a hook without Coherence installed tells the user once and the agent how to supply it, and is otherwise silent", async () => {
   const parent = await mkdtemp(join(tmpdir(), "coherence-absent-"));
   const project = join(parent, "project");
   try {
@@ -386,7 +386,13 @@ test("a hook without Coherence installed is silent but for one line", async () =
         const run = await runInstalled(project, host, event, { session_id: "s1", stop_hook_active: false });
         assert.equal(run.status, 0, `${host} ${event}: never blocks the session`);
         assert.equal(run.stderr, "", `${host} ${event}: no shell errors`);
-        assert.equal(run.stdout, JSON.stringify({ systemMessage: NOT_INSTALLED }) + "\n", `${host} ${event}: one line the host shows`);
+        if (event === "SessionStart") {
+          const out = JSON.parse(run.stdout) as { systemMessage: string; hookSpecificOutput: { hookEventName: string; additionalContext: string } };
+          assert.equal(out.systemMessage, NOT_INSTALLED, `${host}: one line the user is shown`);
+          assert.deepEqual(out.hookSpecificOutput, { hookEventName: "SessionStart", additionalContext: MISSING_CONTEXT }, `${host}: the agent is told how to supply Coherence`);
+          assert.match(MISSING_CONTEXT, /npm install -D @posthog\/coherence/, "the agent is given the install command");
+          assert.match(MISSING_CONTEXT, /ask before installing/, "and told the dependency change is the user's call");
+        } else assert.equal(run.stdout, "", `${host} ${event}: nothing after the session start`);
       }
     }
 
@@ -395,6 +401,8 @@ test("a hook without Coherence installed is silent but for one line", async () =
     const noNode = (process.env["PATH"] ?? "").split(":").filter((dir) => dir !== "" && !existsSync(join(dir, "node"))).join(":");
     const bare = await runInstalled(project, "claude", "SessionStart", {}, { PATH: noNode });
     assert.deepEqual([bare.status, bare.stderr, bare.stdout], [0, "", JSON.stringify({ systemMessage: NO_NODE }) + "\n"]);
+    const quiet = await runInstalled(project, "claude", "Stop", { stop_hook_active: false }, { PATH: noNode });
+    assert.deepEqual([quiet.status, quiet.stderr, quiet.stdout], [0, "", ""], "without node, only the session start speaks");
 
     // Uninstall still knows the located command as ours and removes all of it.
     for (const host of ["claude", "codex"] as const) assert.equal((await uninstall(project, host)).removed.length, HOOK_EVENTS.length);

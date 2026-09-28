@@ -6,23 +6,8 @@ the code.
 ## Quick setup: paste this into your agent
 
 ```text
-Set up Coherence (github.com/PostHog/coherence) in this project, then tell me
-what it found.
-
-1. Run `npm install -D @posthog/coherence` (or `pnpm add -D
-   @posthog/coherence`). The command is `npx --no coherence`.
-2. Write coherence.config.json at the root with "name" and "language"
-   ("typescript" or "python"), plus "ignore", "typecheck" and "test" if the
-   project has them.
-3. Run `npx --no coherence hooks install --host claude`
-   (use `--host codex` on Codex).
-4. Run `npx --no coherence scaffold component . "<what this project does>"`,
-   then scaffold one spec per major component folder.
-5. Run `npx --no coherence spec --check` and `npx --no coherence scope`, and
-   report what they show.
-
-Then continue with "Full setup" in the Coherence README: the lexicon, trust
-levels, invariants and enforcement.
+Install @posthog/coherence as a dev dependency and run `npx --no coherence hooks install --host claude` (or `--host codex`).
+Then continue from step 2 of "Full setup" in node_modules/@posthog/coherence/README.md, and tell me what each step found.
 ```
 
 It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux. The package
@@ -71,8 +56,10 @@ report what each one found.
    the project's open requirements, and the exact journal command, including
    the session id to pass with --session. The installed hooks look for
    Coherence at $COHERENCE_HOME, then ../coherence (also beside the main
-   checkout of a git worktree), then the installed package; where none
-   is found, each hook prints one line saying how to install it and exits 0.
+   checkout of a git worktree), then the installed package. Where none is
+   found, the session start tells the user in one line and tells the agent
+   how to supply Coherence and to ask before changing dependencies; every
+   other event exits 0 in silence.
    To add the project's own words to an event, write
    `.coherence/hooks/<Event>.append.md` (it follows what the hook says) or
    `.coherence/hooks/<Event>.override.md` (it replaces it; an empty one
