@@ -499,7 +499,7 @@ The reading: one surface projecting the model for a human, in six views: Structu
   kinds: none
 - orient's gap line is bounded: Orient's spec gap line is one line of bounded length: the count of gaps outside the adoption baseline, the busiest route by entrance count, and the three ways to close one; nothing when there are none, and a gap outside the baseline is always named.
   over: gaps on several routes with an over-long entrance name, none, all baselined, and one new beside a baseline
-  via: orient's gap line is one bounded line naming the count, the busiest route by entrance count and the three ways to close one; nothing when none is outside the baseline
+  via: orient's gap line is one bounded line naming the count, the busiest route by entrance count and the three ways to close one; gaps the baseline holds stay counted as open, never named; nothing when there are none
   because: the start injection shares a fixed budget with the vocabulary and the escalations (CONTEXT_BUDGET), so the line must not grow with the project; one line that names where to start and how to close a gap is what an agent can act on
   crossing: project-source -> reading
   refuted: stopped cutting entrance names in orient's gap line, so a long name grew the line without bound -> the totality oracle went red; restored, green (2026-09-25)

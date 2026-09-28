@@ -117,22 +117,34 @@ export const LOCATE = [
   `for c in "\${${HOME_VAR}:+\$${HOME_VAR}/src/cli.ts}" "$root/../${SIBLING}/src/cli.ts" "\${main:+\${main%/*}/../${SIBLING}/src/cli.ts}" "$root/node_modules/${PACKAGE_NAME}/dist/cli.js" "$root/node_modules/.bin/coherence"; do if [ -n "$c" ] && [ -f "$c" ]; then coherence=$c; break; fi; done`,
 ].join("; ");
 
-/** The one line a hook prints when it cannot reach Coherence. No apostrophes: it sits in single quotes. */
-export const NOT_INSTALLED = `Coherence is not installed for this project, so this hook did nothing. To install it, run npm install -D @posthog/coherence in the project, clone the repository beside the project as ../${SIBLING} and run npm ci in the clone, or set ${HOME_VAR} to a checkout.`;
+/** The one line the user is shown at session start when Coherence cannot be reached. No apostrophes: it sits in single quotes. */
+export const NOT_INSTALLED = "Coherence is configured for this project but not installed, so its hooks do nothing this session; the agent has been told how to install it.";
 
-/** The one line a hook prints when Coherence is there but node is not. */
-export const NO_NODE = "Coherence was found but node is not on the PATH this hook runs with, so this hook did nothing. Install Node 22.18 or newer.";
+/**
+ * What the agent is told at session start when Coherence cannot be reached:
+ * that it is missing, every way to supply it, and that changing the
+ * project's dependencies is the user's decision. The agent makes the call.
+ * No apostrophes: it sits in single quotes.
+ */
+export const MISSING_CONTEXT = `Coherence is configured for this project (its hooks are in the agent host settings) but is not installed where the hooks look, so they do nothing this session: no vocabulary, specs, journal or checks. Ways to supply it: add ${PACKAGE_NAME} as a dev dependency with the package manager this project uses (npm install -D ${PACKAGE_NAME}, pnpm add -D ${PACKAGE_NAME}, or yarn add -D ${PACKAGE_NAME}), which changes package.json and the lockfile; clone github.com/PostHog/coherence beside the project as ../${SIBLING} and run npm ci in the clone; or set ${HOME_VAR} to a checkout. Changing the project dependencies is for the user to decide: unless the user asked for Coherence in this session, tell them it is missing and ask before installing it. Once it is installed, npx --no coherence spec --check confirms it, and the hooks answer from their next event.`;
 
-function softExit(message: string): string {
-  return `printf '%s\\n' '${JSON.stringify({ systemMessage: message })}'; exit 0`;
+/** The one line the user is shown at session start when Coherence is there but node is not. */
+export const NO_NODE = "Coherence was found but node is not on the PATH its hooks run with, so they do nothing this session. Install Node 22.18 or newer.";
+
+/** Shell that prints `output` as JSON when the event, the function's second argument, is SessionStart, and nothing otherwise, then exits 0. */
+function atSessionStart(output: object): string {
+  return `if [ "$2" = SessionStart ]; then printf '%s\\n' '${JSON.stringify(output)}'; fi; exit 0`;
 }
 
 /**
- * The default prefix for an adopter: locate Coherence, fail softly when it is
- * not there, and otherwise run it as before (`hook <Event>` follows), so a
- * found Coherence answers, and refuses, exactly as a direct command would.
+ * The default prefix for an adopter: locate Coherence, and otherwise run it
+ * as before (`hook <Event>` follows, the arguments of the shell function
+ * named for it), so a found Coherence answers, and refuses, exactly as a
+ * direct command would. Where it is not found, or node is not, every event
+ * exits 0 in silence but the session start, which tells the user in one line
+ * and, when Coherence is missing, tells the agent how to supply it.
  */
-export const LOCATED_PREFIX = `${LOCATE}; if [ -z "$coherence" ]; then ${softExit(NOT_INSTALLED)}; fi; if ! command -v node >/dev/null 2>&1; then ${softExit(NO_NODE)}; fi; exec node "$coherence"`;
+export const LOCATED_PREFIX = `${LOCATE}; coherence() { if [ -z "$coherence" ]; then ${atSessionStart({ systemMessage: NOT_INSTALLED, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: MISSING_CONTEXT } })}; fi; if ! command -v node >/dev/null 2>&1; then ${atSessionStart({ systemMessage: NO_NODE })}; fi; exec node "$coherence" "$@"; }; coherence`;
 
 /** Where the located command would find Coherence from `root`, under `env`; undefined when it would find nothing. */
 export function locate(root: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
