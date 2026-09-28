@@ -95,7 +95,7 @@ The language adapter seam: how to ask a language's server for definitions, refer
 - every manifest edge is a reference: Every depends_on edge into a resolved dbt model is reported as one site, whether or not the text that writes it is found; a computed ref sits at line 1 of the reading file.
   over: every depends_on edge of every resource in the dbt manifest
   via: every manifest edge is a reference: one site per edge, at the ref call, at line 1 when no literal call writes it, and a YAML test at its name line
-  because: dbt resolves what a model depends on, including a ref built by Jinja that no text search finds; an edge dropped because its call could not be located is a bypass nobody sees, so the text only places the site and never decides whether it exists
+  because: dbt resolves what a model depends on, including a ref the template computes that no text search finds; an edge dropped because its call could not be located is a bypass nobody sees, so the text only places the site and never decides whether it exists
   crossing: instrument -> reading
   refuted: skipped every edge whose ref call the text search could not locate -> the totality oracle went red in dbt.test.ts; restored, green (2026-09-28)
   kinds: none

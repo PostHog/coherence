@@ -156,6 +156,54 @@ The totality oracle pass runs pytest with `--junitxml={out}` and
 `testFilterForm: "pytest"`: names go to `-k` joined with `or`, and the
 JUnit report (or pytest-json-report's JSON) maps back by test name.
 
+## dbt
+
+dbt's parsed manifest is the instrument: dbt already resolves every `ref`,
+`source`, and test attachment, so the adapter reads `depends_on` rather than
+parsing SQL. A name resolves as a model (`orders`), a model in its file, a
+model file as a module, or a folder of models as a module whose members are
+every model file under it. Every `depends_on` edge into the definition is one
+reference site, at the `ref(...)` or `source(...)` call that writes it, or at
+the `name:` line of a test declared in YAML; an edge whose call no text search
+finds (a ref the template computes) sits at line 1 and is never dropped. A site whose
+referencing resource is a dbt test carries the instrument's test mark
+(`testResource`), so a YAML test under a model folder is a test reference
+wherever its file lies.
+
+The ladder has one rung. A model whose access is protected or public may be
+read by any model in the project, so **reference-choked** (Coherence's own
+check) is the top. dbt's parser refuses a `ref` to a private model from
+outside its group, which would be the dbt counterpart of `visibility-choked`;
+that rung is not built.
+
+The refutation stages one model the manifest does not hold, in memory,
+beside the chokepoint (in the folder above a folder chokepoint): it reads
+the chokepoint and the protected thing directly, so it is downstream of the
+chokepoint and bypasses it, and its site comes from the same edge reading
+every other site does. Nothing is written.
+
+The manifest must be current. When a dbt file under the paths
+dbt_project.yml names is newer than the manifest, the adapter runs the
+configured `dbt.parse` command; when none is configured or the parse fails,
+`ready` reports why and every question throws, so the run records not run.
+On revenue-model a partial parse takes 1.5 s and a full one 3.3 s.
+
+A project may name several instruments (`"language": ["dbt", "python"]`).
+One composite adapter asks each member to resolve a name; the one that
+answers owns every later question about it, and a name two members resolve
+is ambiguous with both answers listed. The composite is ready only when
+every member is.
+
+The totality oracle pass has a runner per instrument. A `via` the dbt
+manifest names as a test runs in one invocation of the `dbt` runner
+(`dbt.testJson`, with the names joined by spaces for `--select` and
+`{outdir}` a fresh folder for `--target-path`); its `run_results.json` maps
+back by the name segment of each unique id, and a test at severity warn
+passes with the warning in its reason. Every other `via` runs through the
+project-wide runner. `dbt test` reads the relations as last built, so a
+break staged in a model's SQL for `refute` needs that model built before
+the refutation runs.
+
 ## The run and its view
 
 A run appends one line to `.coherence/runs/<session>.jsonl`: time, session,
