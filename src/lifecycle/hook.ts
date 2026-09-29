@@ -357,9 +357,11 @@ export async function sessionBlock(root: string, input: HookInput): Promise<stri
   const agent = agentOf(input);
   const cli = await cliName(root);
   const id = session ?? "<the id your harness shows>";
+  const coordinator = !isMainThread(input) && typeof input.session_id === "string" && input.session_id !== "" && input.session_id !== session ? input.session_id : undefined;
   return [
     `Session: ${session ?? "unknown"}`,
     `Every journal write needs --session ${id} --agent ${agent}. Record a choice as:`,
+    ...(coordinator === undefined ? [] : [`This is your own session, not your coordinator's (${coordinator}): never write under that one, even when a prompt passes it on; what you record reaches the coordinator on its own when you stop.`]),
     `  ${cli} decide "<chose>" --over "<rejected>" --because "<why>" --session ${id} --agent ${agent}`,
     "Read the project journal from the project root:",
     `  ${cli} journal`,

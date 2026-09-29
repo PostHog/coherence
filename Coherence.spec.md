@@ -55,6 +55,12 @@ A prosthetic for proprioception: specs, invariants, and the readings that keep a
   trust: project-source
 
 ## invariants
+- commands act on the project root: A command run from any folder inside a project acts on that project: the nearest folder up to the top of its git checkout that holds coherence.config.json, else the nearest that holds .coherence, else the folder it ran in; a write from a subfolder never makes a second store there.
+  over: a journal write run from a folder two levels below a project's root, in a git checkout
+  via: the command line acts on the project from any subfolder, and vets a record against the project's rejected names
+  because: a subagent ran a journal verb from src/ and its records landed in src/.coherence, where no reader looks (df-30b500ca)
+  crossing: project-source -> record
+  kinds: none
 - grammar carries no rejected name: A spec written in Coherence's grammar with every shape name carries no rejected name.
   over: every key of the grammar, every shape of the checklist seed, and every rejected name of Coherence's lexicon
   via: a spec written in the grammar with every shape name carries no rejected name

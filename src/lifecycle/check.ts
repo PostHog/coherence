@@ -802,6 +802,25 @@ export async function runCheck(options: CheckOptions): Promise<CheckReport> {
   return report;
 }
 
+/**
+ * The check a record gets before it is written: the rejected names that bind
+ * in the words a record carries, read as the check reads the store (its
+ * bookkeeping and the names its over turns away are left alone). The store is
+ * append-only, so a name caught here costs a rewording; caught after, it
+ * costs a retraction and a second record.
+ */
+export async function recordVetter(root: string, coherence: Lexicon, project: Lexicon | undefined): Promise<(record: object) => RejectedFinding[]> {
+  const own = await isCoherenceItself(root);
+  const inForce = rejectedNamesInForce(coherence, project);
+  const names = nameTable(own ? [...inForce.coherence, ...inForce.project] : inForce.project);
+  const guard = guardTable(acceptedTerms({ root, coherence, project }));
+  return (record) => {
+    const texts: string[] = [];
+    recordStrings(record, texts);
+    return texts.flatMap((text) => rejectedInLine("(the new record)", text, 1, names, guard, true, "record"));
+  };
+}
+
 /** The rejected-name findings that fail the check: editable, binding here, and not in the baseline. */
 export function failingRejected(report: CheckReport): RejectedFinding[] {
   return report.rejected.filter((f) => f.repair === "edit" && f.advisory !== true && f.baselined !== true);

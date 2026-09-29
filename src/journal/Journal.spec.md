@@ -3,6 +3,18 @@
 Compression: one append-only file per session of attributed, durable outcomes, read back as one timeline.
 
 ## invariants
+- a flag's value from a file: Every journal and lexicon flag that takes a value also takes it from a file named by its -file form, or from standard input for -, whole but for one trailing newline; a file that cannot be read is named, and only a flag the verb takes has a -file form.
+  over: a because with an apostrophe, double quotes and a dollar sign read from a file, a missing file, and a -file form of a flag the verb does not take
+  via: a flag's value may come from a file or standard input, so long text never meets the shell
+  because: agents writing long becauses through the shell kept losing text to apostrophes, quotes and dollar signs, and rewriting the record to route around the quoting
+  crossing: project-source -> record
+  kinds: none
+- a record is vetted before it is written: A journal or work record whose own words use a name the lexicon rejects where it binds is refused before anything reaches the store, naming each name and what it was rejected for; a name a decision's over turns away is the record doing its job and passes.
+  over: a decision and a work order carrying a rejected name, and a decision naming the same name in its over, through the verb table and through the command line
+  via: a record the vet stands against is refused before anything is written
+  because: the store is append-only, so a rejected name found after a write costs a retraction and a second record; one session paid that twice, for a word the lexicon had refused all along
+  crossing: project-source -> record
+  kinds: none
 - append-only store: A journal file is only appended: a second write never changes the first line, and no path rewrites or deletes a record.
   protects: journalDir
   chokepoint: src/journal/store.ts

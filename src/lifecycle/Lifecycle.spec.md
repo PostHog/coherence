@@ -23,6 +23,18 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   trust: harness
 
 ## invariants
+- a subagent is told its own session: A subagent's start names its own session for every journal write and names its coordinator's session as one it never writes under; the main thread's start names no coordinator.
+  over: a subagent start carrying the host's agent id beside its coordinator's session, and a main-thread start
+  via: a subagent's start names its own session and its coordinator's, and says never to write under the coordinator's
+  because: coordinators passed their own session id into subagent prompts, and subagents wrote under it: their decisions then read as the coordinator's own
+  crossing: harness -> reading
+  kinds: none
+- a proposal prints as a reader needs it: lexicon propose prints the proposal's id first, what it changes, the entry as it would stand and the apply command; the whole lexicon after the change is printed only with --json.
+  over: a define proposal printed plainly and with --json
+  via: lexicon propose prints the proposal as a reader needs it, id first, and the whole lexicon only with --json
+  because: every proposal printed the whole lexicon after the change, 87 KB, into the agent's context, and agents scraped the id out of it
+  crossing: record -> reading
+  kinds: none
 - compact injection: The injection at session start carries the vocabulary only: nothing from detail, provenance, or metaphors.
   over: every concept of both lexicon layers
   via: renderCompact: header, one line per concept, rejected in brackets, nothing from detail, provenance or metaphors

@@ -27,6 +27,7 @@ import {
   recoverLexicon,
   reviewLexicon,
   type Change,
+  type Proposal,
   type Who,
 } from "./lexicon-maintain.ts";
 
@@ -61,6 +62,25 @@ Run lexicon help for every workflow.`
 }
 
 const get = (p: Parsed, name: string): string | undefined => p.one.get(name);
+/**
+ * A proposal as a reader needs it: its id first, what it changes, the entry
+ * as it would stand, and the apply command to run. The whole lexicon after
+ * the change is the proposal file's, printed only with --json.
+ */
+export function proposalSummary(proposal: Proposal): string[] {
+  const { change } = proposal;
+  const target = change.action === "rename" && change.value ? change.value : change.name;
+  const after = JSON.parse(proposal.after) as { concepts?: { name?: string }[] };
+  const entry = after.concepts?.find((c) => c.name === target);
+  const what = `${change.action} ${JSON.stringify(change.name)}${change.value ? ` -> ${JSON.stringify(change.value)}` : ""}`;
+  return [
+    `${proposal.id}  proposes ${what} in ${proposal.target}`,
+    ...(entry === undefined ? [`  the concept leaves the lexicon`] : [`  entry after: ${JSON.stringify(entry)}`]),
+    `  apply: lexicon apply ${proposal.id} --because "<why>" --over "<the alternative>" --session <id> --agent <name>${proposal.humanRequired ? ' --human "<what the human said>"' : ""}`,
+    ...(proposal.humanRequired ? ["  a human must acknowledge it: apply refuses without --human"] : []),
+  ];
+}
+
 function need(p: Parsed, name: string): string {
   const s = get(p, name);
   if (!s?.trim()) throw new Error(`missing --${name}`);
@@ -237,19 +257,20 @@ export async function lexiconWorkCommand(
             readFileSync(confined(io.cwd, get(p, "entry")!), "utf8"),
           ) as Record<string, unknown>)
         : undefined;
-      print(
-        await propose(io.cwd, {
-          action: action as Change["action"],
-          name,
-          ...(value ? { value } : {}),
-          ...(get(p, "definition") !== undefined
-            ? { definition: get(p, "definition")! }
-            : {}),
-          ...(entry ? { entry } : {}),
-          ...(p.switches.has("qualify") ? { qualify: true } : {}),
-          because: need(p, "because"),
-        }),
-      );
+      const proposal = await propose(io.cwd, {
+        action: action as Change["action"],
+        name,
+        ...(value ? { value } : {}),
+        ...(get(p, "definition") !== undefined
+          ? { definition: get(p, "definition")! }
+          : {}),
+        ...(entry ? { entry } : {}),
+        ...(p.switches.has("qualify") ? { qualify: true } : {}),
+        because: need(p, "because"),
+      });
+      // The whole proposal carries the whole lexicon after the change; only --json prints it.
+      if (json) print(proposal);
+      else for (const line of proposalSummary(proposal)) io.out(line);
       return 0;
     }
     if (verb === "apply") {

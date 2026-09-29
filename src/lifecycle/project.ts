@@ -7,7 +7,8 @@
  * exists. Coherence's own lexicon travels with this package.
  */
 
-import { existsSync, realpathSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -163,6 +164,42 @@ export async function vocabularyFacts(root: string): Promise<VocabularyFacts> {
   const named = record["wellKnown"];
   if (Array.isArray(named)) facts.wellKnown = named.filter((n): n is string => typeof n === "string" && n.trim() !== "").map((n) => n.trim());
   return facts;
+}
+
+/**
+ * The project a command run from `cwd` acts on: the nearest folder, up to the
+ * top of the git checkout it is in, that holds coherence.config.json; failing
+ * that, the nearest that holds .coherence; failing both, `cwd` itself. A
+ * command run from a subfolder then reads and writes the project's records,
+ * never a second store it would create where it stood.
+ */
+export function projectRoot(cwd: string): string {
+  const start = resolve(cwd);
+  const top = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: start, encoding: "utf8" });
+  const ceiling = top.status === 0 && top.stdout.trim() !== "" ? realpathOr(top.stdout.trim()) : undefined;
+  const ancestors: string[] = [];
+  for (let dir = start; ; dir = dirname(dir)) {
+    ancestors.push(dir);
+    if ((ceiling !== undefined && realpathOr(dir) === ceiling) || dirname(dir) === dir) break;
+  }
+  const holding = (name: string, folder: boolean): string | undefined =>
+    ancestors.find((dir) => {
+      try {
+        const stat = statSync(join(dir, name));
+        return folder ? stat.isDirectory() : stat.isFile();
+      } catch {
+        return false;
+      }
+    });
+  return holding(CONFIG_FILE, false) ?? holding(".coherence", true) ?? start;
+}
+
+function realpathOr(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
 }
 
 /** Coherence's own package name: a root whose package.json carries it is Coherence's own checkout. */

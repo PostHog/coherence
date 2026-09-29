@@ -546,6 +546,20 @@ test("the peer feed injects a peer's decisions and escalations and no other kind
   }
 });
 
+test("a subagent's start names its own session and its coordinator's, and says never to write under the coordinator's", async () => {
+  const dir = await freshRoot();
+  try {
+    const child = await runHook("SubagentStart", { cwd: dir, session_id: "coord", agent_id: "sub1", agent_type: "general-purpose", hook_event_name: "SubagentStart" }, dir);
+    const context = contextOf(child);
+    assert.match(context, /Every journal write needs --session sub1 --agent general-purpose\./);
+    assert.match(context, /This is your own session, not your coordinator's \(coord\): never write under that one/);
+    const main = contextOf(await runHook("SessionStart", { cwd: dir, session_id: "coord" }, dir));
+    assert.doesNotMatch(main, /your coordinator's/, "the main thread has no coordinator");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("the main thread's feed counts a record of its own session under another agent's name as a peer's", async () => {
   const dir = await freshRoot();
   try {

@@ -9,7 +9,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -632,5 +632,78 @@ test("the command line dispatches to the journal verbs", () => {
     assert.throws(() => execFileSync(node, [cli, "decide", "x", "--because", "b"], { cwd, encoding: "utf8", stdio: "pipe" }));
   } finally {
     rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("a flag's value may come from a file or standard input, so long text never meets the shell", () => {
+  const root = scratch();
+  try {
+    const text = join(root, "because.txt");
+    writeFileSync(text, `the user's words, "quoted", with $HOME left as written\n`);
+    const run = runIn(root, clock());
+    const id = idOf(run("decide", "keep the text whole", "--because-file", text, "--session", "s1", "--agent", "main"));
+    const record = loadJournal(root).records.find((r) => r.id === id) as { because?: string } | undefined;
+    assert.equal(record?.because, `the user's words, "quoted", with $HOME left as written`, "read whole, one trailing newline dropped");
+    const missing = run("decide", "x", "--because-file", join(root, "nope.txt"), "--session", "s1", "--agent", "main");
+    assert.equal(missing.code, 1);
+    assert.match(missing.err.join("\n"), /--because-file .*nope\.txt/, "a file that cannot be read is named");
+    const unknown = run("decide", "x", "--because", "b", "--nonsense-file", text, "--session", "s1", "--agent", "main");
+    assert.match(unknown.err.join("\n"), /unknown flag --nonsense/, "only a flag the verb takes has a -file form");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a record the vet stands against is refused before anything is written", () => {
+  const root = scratch();
+  try {
+    const run = (...argv: string[]): Run => {
+      const [verb, ...rest] = argv;
+      const out: Run = { code: 0, out: [], err: [] };
+      const io: Io = { cwd: root, now: clock(), out: (l) => out.out.push(l), err: (l) => out.err.push(l), vet: (record) => (JSON.stringify(record).includes("doohickey") ? [`"doohickey" is rejected for widget: retired surface`] : []) };
+      out.code = journalVerbs[verb!]!(rest, io);
+      return out;
+    };
+    const refused = run("decide", "we keep the doohickey", "--because", "b", "--session", "s1", "--agent", "main");
+    assert.equal(refused.code, 1);
+    assert.match(refused.err.join("\n"), /nothing was written; the store is append-only, so reword this record first:\n {2}"doohickey" is rejected for widget/);
+    assert.equal(loadJournal(root).records.length, 0, "nothing reached the store");
+    const work = run("work", "create", "turn the doohickey", "--success", "s", "--boundary", "b", "--session", "s1", "--agent", "main");
+    assert.equal(work.code, 1, "a work record is vetted too");
+    idOf(run("decide", "we keep the widget", "--because", "b", "--session", "s1", "--agent", "main"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the command line acts on the project from any subfolder, and vets a record against the project's rejected names", () => {
+  const root = scratch();
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ name: "widgetry", language: "typescript" }));
+    writeFileSync(join(root, "lexicon.json"), JSON.stringify({ version: 1, project: "widgetry", concepts: [{ name: "widget", definition: "A thing with a knob." }], rejected: [{ concept: "doohickey", because: "retired surface" }] }));
+    const sub = join(root, "src", "deep");
+    mkdirSync(sub, { recursive: true });
+    const cli = fileURLToPath(new URL("../cli.ts", import.meta.url));
+    const node = (...argv: string[]) => {
+      try {
+        return { code: 0, out: execFileSync("node", ["--disable-warning=ExperimentalWarning", cli, ...argv], { cwd: sub, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }), err: "" };
+      } catch (error) {
+        const e = error as { status: number; stdout: string; stderr: string };
+        return { code: e.status, out: e.stdout, err: e.stderr };
+      }
+    };
+    const written = node("decide", "from a subfolder", "--because", "b", "--session", "s1", "--agent", "main");
+    assert.equal(written.code, 0, written.err);
+    assert.equal(loadJournal(root).records.length, 1, "the record is the project's");
+    assert.ok(!existsSync(join(sub, ".coherence")) && !existsSync(join(root, "src", ".coherence")), "no second store where the command stood");
+    const refused = node("decide", "keep the doohickey", "--because", "b", "--session", "s1", "--agent", "main");
+    assert.equal(refused.code, 1);
+    assert.match(refused.err, /"doohickey" is rejected for widgetry: retired surface/);
+    assert.equal(loadJournal(root).records.length, 1, "the refused record never reached the store");
+    const quoted = node("decide", "keep the widget", "--over", "the doohickey", "--because", "b", "--session", "s1", "--agent", "main");
+    assert.equal(quoted.code, 0, "a name a decision turns away, in its over, is the record doing its job");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
