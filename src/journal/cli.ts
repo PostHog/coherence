@@ -51,13 +51,15 @@ export interface Io {
   out: (line: string) => void;
   err: (line: string) => void;
   now?: () => Date;
+  /** What stands against a record before it is written; see Context.vet. */
+  vet?: (record: object) => string[];
 }
 
 /** A command prints through its Io and returns the exit code. */
 export type Command = (argv: string[], io: Io) => number;
 
 function context(io: Io): Context {
-  return { cwd: io.cwd, now: io.now ?? (() => new Date()) };
+  return { cwd: io.cwd, now: io.now ?? (() => new Date()), ...(io.vet === undefined ? {} : { vet: io.vet }) };
 }
 
 function guarded(run: (argv: string[], io: Io) => void): Command {

@@ -37,12 +37,12 @@ import { LEXICON_WORK_USAGE, lexiconWorkCommand } from "./lifecycle/lexicon-cli.
 import { ECONOMY_USAGE, calibrateCommand, economyCommand, massCommand } from "./economy/cli.ts";
 import { ENFORCEMENT_USAGE, refuteCommand, runCommand, serveCommand } from "./enforcement/cli.ts";
 import { JOURNAL_USAGE, journalVerbs, type Io } from "./journal/cli.ts";
-import { formatReport, hasFindings, runCheck } from "./lifecycle/check.ts";
+import { formatReport, hasFindings, recordVetter, runCheck } from "./lifecycle/check.ts";
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
 import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
 import { check, formatCheck, formatStatus, formatUninstall, HOME_VAR, HOSTS, install, isHost, LOCATED_PREFIX, locate, SIBLING, status, uninstall } from "./lifecycle/install.ts";
-import { isCoherenceItself, loadProjectLexicons, PACKAGE_NAME } from "./lifecycle/project.ts";
+import { isCoherenceItself, loadProjectLexicons, PACKAGE_NAME, projectRoot } from "./lifecycle/project.ts";
 import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
 import { SCOPE_USAGE, scopeCommand } from "./readings/scope/cli.ts";
 import { scopeApp } from "./readings/scope/live.ts";
@@ -251,15 +251,24 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   return 0;
 }
 
+/** The journal's check before a write: a rejected name that binds here, named with what it was rejected for. */
+async function journalVet(root: string): Promise<(record: object) => string[]> {
+  const { coherence, project } = await loadProjectLexicons(root);
+  const vet = await recordVetter(root, coherence, project);
+  return (record) => vet(record).map((f) => `"${f.text}" is rejected for ${f.concept}: ${f.because}`);
+}
+
 async function main(argv: string[]): Promise<number> {
   const [verb, ...rest] = argv;
-  const root = process.cwd();
+  // Every command acts on the project, wherever in it the command was run.
+  const root = projectRoot(process.cwd());
   const command = verb === undefined ? undefined : commands[verb];
   if (command !== undefined) {
     const io: Io = {
       cwd: root,
       out: (line) => process.stdout.write(`${line}\n`),
       err: (line) => process.stderr.write(`${line}\n`),
+      ...(verb !== undefined && verb in journalVerbs ? { vet: await journalVet(root) } : {}),
     };
     return command(rest, io);
   }

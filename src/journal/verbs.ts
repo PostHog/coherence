@@ -48,6 +48,17 @@ import { describeBinding, loadWork } from "./work.ts";
 export interface Context {
   cwd: string;
   now: () => Date;
+  /**
+   * What stands against a record before it is written, one line each: the
+   * command line supplies the lexicon's rejected names; none when absent.
+   */
+  vet?: (record: object) => string[];
+}
+
+/** Refuse a record the vet stands against, before anything is written: the store is append-only. */
+export function vetted(ctx: Context, record: object): void {
+  const problems = ctx.vet?.(record) ?? [];
+  if (problems.length > 0) throw new JournalError(`nothing was written; the store is append-only, so reword this record first:\n${problems.map((p) => `  ${p}`).join("\n")}`);
 }
 
 export interface Written {
@@ -118,6 +129,7 @@ function humanWords(parsed: Parsed): { human?: string } {
 }
 
 function write(ctx: Context, record: JournalRecord, extra: string[] = []): Written {
+  vetted(ctx, record);
   const written = appendRecord(ctx.cwd, record);
   return {
     record: written,

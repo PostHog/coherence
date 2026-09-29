@@ -756,3 +756,22 @@ test("rulings recorded under the retired verb still count: the journal is read a
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("lexicon propose prints the proposal as a reader needs it, id first, and the whole lexicon only with --json", async () => {
+  const root = fixture();
+  try {
+    const summary = await run(root, ["propose", "define", "exposure", "--definition", "Money at risk, in USD.", "--because", "tighter"]);
+    assert.equal(summary.code, 0, summary.err);
+    const lines = summary.out.split("\n");
+    assert.match(lines[0]!, /^lp-[0-9a-f]+ {2}proposes define "exposure" in lexicon\.json$/, "the id leads the first line");
+    assert.match(summary.out, /entry after: \{"name":"exposure".*"definition":"Money at risk, in USD\."/);
+    assert.match(summary.out, /apply: lexicon apply lp-[0-9a-f]+ --because "<why>"/);
+    assert.ok(!summary.out.includes('"after"') && summary.out.length < 2000, "the lexicon after the change is not printed");
+    const whole = await run(root, ["propose", "define", "exposure", "--definition", "Money at risk.", "--because", "tighter", "--json"]);
+    const parsed = JSON.parse(whole.out) as { id: string; after: string };
+    assert.match(parsed.id, /^lp-/);
+    assert.ok(parsed.after.includes("Money at risk."), "--json keeps the whole proposal");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
