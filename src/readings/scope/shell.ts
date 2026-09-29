@@ -74,7 +74,8 @@ export function renderConnection(state: ShellState): Markup | null {
  * The lexicon and the record counts are demoted to one small line.
  */
 export function renderMasthead(state: ShellState): Markup {
-  const first = state.lexicon.layers[0];
+  // The project's own lexicon when it has one: the masthead counts the project, not the tool.
+  const first = state.lexicon.layers.find((layer) => layer.id !== "coherence" && layer.kind === "present") ?? state.lexicon.layers[0];
   const counts =
     first !== undefined && first.kind === "present"
       ? lexiconCounts(first.lexicon)

@@ -2,17 +2,13 @@
  * The Scope check: builds the reading and asserts what the page must hold.
  *
  *   npm run scope:check
- *
- * The Mnemion assertion reads the first adopter's domain lexicon from its own
- * repository (COHERENCE_DOMAIN_LEXICON overrides the path) and is skipped,
- * visibly, when that file is not on this machine.
  */
 
 import assert from "node:assert/strict";
-import { appendFileSync } from "node:fs";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { appendFileSync, writeFileSync } from "node:fs";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
@@ -23,18 +19,13 @@ import { CITED_WINDOW, windowJournal, allReliance, componentId, defectsOf, flowC
 import { escapeHtml } from "./html.ts";
 import type { Lexicon, LexiconCoverage, RecordedSite, ShellState, StructurePreview, WorkOrder } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
-import { flowOf } from "./structure-flow.ts";
 
 const options: BuildOptions = {
   lexiconPath: DEFAULTS.lexiconPath,
   project: DEFAULTS.project,
 };
 
-const MNEMION_LEXICON =
-  process.env["COHERENCE_DOMAIN_LEXICON"] ?? "/Users/daniloc/Documents/Dev/mnemion/mnemion-js/lexicon.json";
-const MNEMION_ROOT = dirname(MNEMION_LEXICON);
 
-const TWO_MB = 2 * 1024 * 1024;
 const THREE_MB = 3 * 1024 * 1024;
 
 let fixture: Fixture;
@@ -70,26 +61,11 @@ function firstLexicon(state: ShellState): Lexicon {
   return layer.lexicon;
 }
 
-function secondLexicon(state: ShellState): Lexicon {
-  const layer = state.lexicon.layers[1];
-  assert.ok(layer !== undefined && layer.kind === "present", "the domain layer is present");
-  return layer.lexicon;
-}
-
 /** The JSON the page embeds, read back out of the file. */
 function embeddedState(html: string): ShellState {
   const match = /<script type="application\/json" id="scope-state">([\s\S]*?)<\/script>/.exec(html);
   assert.ok(match !== null && match[1] !== undefined, "the page embeds its state");
   return JSON.parse(match[1]) as ShellState;
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 test("the page builds to the default path and stays under 3 MB with Coherence's own data", async () => {
@@ -362,6 +338,27 @@ test("an absent domain lexicon is rendered as a placeholder, a present one as a 
   assert.ok(presentRendered.includes("Stand-in domain"));
   assert.equal([...presentRendered.matchAll(/class="layer"/g)].length, 2);
   assert.ok(presentRendered.includes('id="domain-invariant"'), "domain layer cards carry their own ids");
+});
+
+test("the project's vocabulary comes first and Coherence's terms follow in a section of their own, titled as Coherence's whatever the project is called", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "coherence-widgetry-"));
+  const domainPath = join(dir, "lexicon.json");
+  writeFileSync(domainPath, JSON.stringify({ version: 7, project: "widgetry", concepts: [{ name: "widget", definition: "A thing with a knob." }] }));
+  const { state } = await buildScopePage({ ...options, project: "Widgetry", domainPath });
+  await rm(dir, { recursive: true, force: true });
+  const rendered = renderView(state, "lexicon").text;
+  const layers = [...rendered.matchAll(/id="layer-(\w+)"/g)].map((m) => m[1]);
+  assert.deepEqual(layers, ["domain", "coherence"], "the project's layer first, Coherence's after");
+  const section = rendered.indexOf('<section class="coherence-terms"');
+  assert.ok(section > rendered.indexOf('id="layer-domain"') && section < rendered.indexOf('id="layer-coherence"'), "Coherence's layer sits inside its own section, after the project's");
+  assert.match(rendered, /<h2 class="coherence-terms-heading"[^>]*>Coherence's terms<\/h2>/);
+  assert.equal(state.lexicon.layers.find((l) => l.id === "coherence")?.title, "Coherence lexicon", "Coherence's layer is never titled with the project's name");
+  const domain = state.lexicon.layers.find((l) => l.id === "domain");
+  assert.ok(domain?.kind === "present");
+  assert.match(renderShell(state).text, /1 concept, lexicon version 7/, "the masthead counts the project's lexicon, not Coherence's");
+
+  const absent = renderView((await buildScopePage({ ...options, project: "Widgetry" })).state, "lexicon").text;
+  assert.ok(absent.indexOf("No domain lexicon is present.") < absent.indexOf('<section class="coherence-terms"'), "with no project lexicon, the note that says so comes before Coherence's terms");
 });
 
 test("related names that resolve become links; the rest are marked unresolved", async () => {
@@ -691,32 +688,29 @@ test("deep links resolve: every card id on every view resolves to that view", ()
   for (const link of links) assert.ok(resolveHash(state, `#${link}`) !== undefined, `link #${link} resolves`);
 });
 
-test("the first adopter's tree builds as a second root: its lexicon is the domain layer and its run records show its structural defects", {
-  skip: (await exists(MNEMION_LEXICON)) ? false : `${MNEMION_LEXICON} is not on this machine`,
-}, async () => {
-  const { html, state } = await buildScopePage({ root: MNEMION_ROOT, lexiconPath: DEFAULTS.lexiconPath, project: "Mnemion" });
-  assert.ok(Buffer.byteLength(html, "utf8") < THREE_MB);
-  assert.ok(state.lexicon.layers[1]?.kind === "present" && state.lexicon.layers[1].title === "Mnemion lexicon", "Mnemion's lexicon.json is located from its root");
-  assert.ok(state.spec.components.length > 1 && state.runs.records.length > 0, "Mnemion's specs and runs are loaded");
-  const invariants = renderView(state, "invariants").text;
-  const defects = state.spec.components.flatMap((c) => c.invariants.filter((i) => i.state === "structural defect"));
-  assert.equal([...invariants.matchAll(/<article class="entry invariant" id="[^"]+" data-state="structural defect"/g)].length, defects.length, "every structural defect the model derives is a defect card");
-  for (const defect of defects) {
-    const c = card(invariants, invariantId(defect.component, defect.name));
-    assert.ok(c.includes('data-option="route"') && c.includes('data-option="retire"'), `${defect.name} shows both options`);
-    for (const site of defectsOf(defect, state.runs.records).flatMap((d) => d.bypasses)) {
-      assert.ok(c.includes(`<code>${escapeHtml(site.file)}:${site.line}</code>`), `${defect.name} shows bypass ${site.file}:${site.line}`);
+test("another project's tree builds as a second root: its lexicon is the domain layer and its run records show its structural defects", async () => {
+  const other = makeFixture();
+  try {
+    writeFileSync(join(other.root, "lexicon.json"), JSON.stringify({ version: 1, project: "widgetry", concepts: [{ name: "widget", definition: "A thing with a knob." }] }));
+    const { state } = await buildScopePage({ root: other.root, lexiconPath: DEFAULTS.lexiconPath, project: "Widgetry" });
+    const domain = state.lexicon.layers.find((l) => l.id === "domain");
+    assert.ok(domain?.kind === "present" && domain.title === "Widgetry lexicon", "the other project's lexicon.json is located from its root");
+    assert.deepEqual(state.spec.components.map((c) => c.folder).sort(), [...other.names.components].sort(), "its specs, not Coherence's, are the tree");
+    assert.equal(state.runs.records.length, other.names.runAts.length, "its runs are loaded");
+    const invariants = renderView(state, "invariants").text;
+    const defects = state.spec.components.flatMap((c) => c.invariants.filter((i) => i.state === "structural defect"));
+    assert.ok(defects.length > 0, "the fixture's run records hold a structural defect");
+    assert.equal([...invariants.matchAll(/<article class="entry invariant" id="[^"]+" data-state="structural defect"/g)].length, defects.length, "every structural defect the model derives is a defect card");
+    for (const defect of defects) {
+      const c = card(invariants, invariantId(defect.component, defect.name));
+      assert.ok(c.includes('data-option="route"') && c.includes('data-option="retire"'), `${defect.name} shows both options`);
+      for (const site of defectsOf(defect, state.runs.records).flatMap((d) => d.bypasses)) {
+        assert.ok(c.includes(`<code>${escapeHtml(site.file)}:${site.line}</code>`), `${defect.name} shows bypass ${site.file}:${site.line}`);
+      }
     }
+  } finally {
+    other.remove();
   }
-  const writer = selectedOn(state, flowChokepointId("entities/Hive", "kernel write boundary"));
-  assert.ok(writer.includes('data-kind="chokepoint"') && writer.includes("<code>writeClass</code>"), "Mnemion's kernel write chokepoint is one selection on the map");
-  const map = flowOf(state);
-  assert.equal(map.levels.length, 6, "Mnemion declares six trust levels, each a selection");
-  const hive = map.nodes.find((node) => node.folder === "entities/Hive");
-  assert.ok(hive !== undefined && hive.defects.some((d) => d.name === "kernel write boundary" && d.bypasses === 5 && d.internal === 5), "the kernel write boundary's five bypasses sit inside entities/Hive, on the component");
-  const svg = renderView(state, "structure").text;
-  assert.equal(svg, renderView(JSON.parse(JSON.stringify(state)) as ShellState, "structure").text, "Mnemion's read-only state renders byte-identically");
-  for (const node of map.nodes) assert.ok(svg.includes(`id="${node.id}"`), `${node.folder} is on the map`);
 });
 
 test("the page's run window keeps every latest entry whole and drops reference sites only from superseded entries", async () => {
@@ -732,67 +726,3 @@ test("the page's run window keeps every latest entry whole and drops reference s
   });
 });
 
-test("the Mnemion domain lexicon renders beneath Coherence's with every concept, ruling, rejected name and trust level", {
-  skip: (await exists(MNEMION_LEXICON)) ? false : `${MNEMION_LEXICON} is not on this machine`,
-}, async () => {
-  const { html, state } = await buildScopePage({ ...options, domainPath: MNEMION_LEXICON });
-  assert.ok(Buffer.byteLength(html, "utf8") < TWO_MB);
-  assert.deepEqual(embeddedState(html), state);
-  const mnemion = secondLexicon(state);
-  const rendered = renderView(state, "lexicon").text;
-
-  const layers = [...rendered.matchAll(/id="layer-(\w+)"/g)].map((m) => m[1]);
-  assert.deepEqual(layers, ["coherence", "domain"], "Coherence's layer comes first, the domain layer beneath");
-  assert.ok(rendered.includes("Mnemion lexicon"), "the layer is titled from the file's project name");
-  assert.ok(mnemion.purpose !== undefined && rendered.includes(escapeHtml(mnemion.purpose)));
-
-  assert.ok(mnemion.concepts.length > 0);
-  for (const concept of mnemion.concepts) {
-    assert.ok(rendered.includes(`id="domain-${concept.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}"`), `Mnemion concept ${concept.name} has a card`);
-    assert.ok(rendered.includes(escapeHtml(concept.definition)), `definition of ${concept.name} is on the page`);
-    for (const alias of concept.aliases) {
-      assert.ok(rendered.includes(escapeHtml(alias)), `alias ${alias} of ${concept.name} is on the page`);
-    }
-    for (const distinction of concept.not_to_be_confused_with) {
-      assert.ok(rendered.includes(escapeHtml(distinction)), `distinction for ${concept.name} is on the page`);
-    }
-  }
-  assert.ok(mnemion.rulings !== undefined && mnemion.rulings.length > 0, "Mnemion carries rulings");
-  for (const ruling of mnemion.rulings) {
-    assert.ok(rendered.includes(escapeHtml(ruling.ruling)), `ruling on ${ruling.term} is on the page`);
-  }
-  assert.ok(mnemion.uncertain !== undefined && mnemion.uncertain.length > 0, "Mnemion carries uncertain terms");
-  for (const item of mnemion.uncertain) {
-    assert.ok(rendered.includes(escapeHtml(item.term)), "uncertain term is on the page in full");
-  }
-  assert.ok(mnemion.candidate_overloads !== undefined && mnemion.candidate_overloads.length > 0);
-  for (const overload of mnemion.candidate_overloads) {
-    for (const sense of overload.senses) assert.ok(rendered.includes(escapeHtml(sense)));
-  }
-  assert.ok(mnemion.rejected_names !== undefined && mnemion.rejected_names.length > 0, "Mnemion carries rejected names");
-  for (const rejected of mnemion.rejected_names) {
-    assert.ok(rendered.includes(escapeHtml(rejected.concept)), `rejected name ${rejected.concept} is on the page`);
-    assert.ok(rendered.includes(escapeHtml(rejected.because)));
-    assert.ok(rejected.decided_by !== undefined && rendered.includes(`decided by ${escapeHtml(rejected.decided_by)}`));
-  }
-  assert.ok(rendered.includes(">Rejected names</h2>"), "rejected names have their own section");
-  for (const concept of mnemion.concepts) {
-    for (const text of stringsIn(concept.properties)) {
-      assert.ok(rendered.includes(escapeHtml(text)), `property of ${concept.name} is on the page`);
-    }
-    for (const text of stringsIn(concept.record)) {
-      assert.ok(rendered.includes(escapeHtml(text)), `record of ${concept.name} is on the page`);
-    }
-  }
-  assert.ok(mnemion.trust_levels !== undefined && mnemion.trust_levels.length > 0, "Mnemion declares trust levels");
-  for (const level of mnemion.trust_levels) {
-    assert.ok(rendered.includes(escapeHtml(level.name)) && rendered.includes(escapeHtml(level.meaning)));
-  }
-  assert.ok(
-    rendered.includes('instance of Coherence\'s concept <a class="related-link" href="#coherence-trust-level">trust level</a>'),
-    "trust levels are presented as instances of Coherence's concept, linked to its card",
-  );
-  for (const key of Object.keys(mnemion.record)) {
-    assert.ok(rendered.includes(escapeHtml(key.replace(/_/g, " "))), `top-level field ${key} is on the page`);
-  }
-});
