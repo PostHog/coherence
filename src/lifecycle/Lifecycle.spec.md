@@ -391,6 +391,20 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: counted a touched spec gap as owed, so SubagentStop refused with exit 2 -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
+- orient names undeclared entrances: Orient names the detected entrances no spec declares in one line beneath the spec gaps, detected now from the tree and the current spec, with no Structure reading and whether or not any entrance could be a gap: the count against what is detected, the folder holding the most with their rules, and the scaffold entrances command that proposes their bullets; never a list, and nothing when every detected entrance is declared.
+  over: a project whose declared entrance carries an inside level and that never kept a reading, the same after one more entrance is declared, one with 400 undeclared server functions in one folder, and one with none undeclared
+  via: orient names the undeclared entrances in one bounded line: the count against what is detected now, the folder holding the most, and the scaffold command that proposes their bullets, with no reading and no gap needed
+  because: c-9941b95e: the replicated A/B adoption test (12 adoptions) showed the gap treatment closing gaps, while entrance coverage on praetorium.gg stayed at 11 to 14 percent in both arms, about 100 server functions and routes never declared, and no session transcript mentions an undeclared entrance; the only nudge was a passive count that named the first three by file order and rode on the recorded reading. No adoption baseline: the line is one bounded line whatever the count, and a baseline taken on day one would silence exactly the surface that stayed undeclared (as the owner ruled for baselined gaps on 2026-09-28)
+  crossing: project-source -> reading
+  refuted: made orient's entrance coverage line ride on the spec gaps again, silent when no entrance could be a gap, in gapBlock -> the totality oracle went red; restored, green (2026-09-28)
+  kinds: none
+- an undeclared entrance never refuses a stop: Regulate names the detected entrances no spec declares in the files the session changed, by file with three names at most and the scaffold entrances command for them, and never refuses a stop for them.
+  over: a session that changed nothing, and one that added a server function to a file holding four undeclared, at Stop and at SubagentStop
+  via: regulate names the undeclared entrances in the files a session changed, by file, and never refuses a subagent stop for them
+  because: the session that writes an entrance holds what it means and who calls it, so its stop is when declaring it is cheapest, the in-loop nudge the gaps got (d-a1095ef2); detection is a scan and some of what it finds is no entrance, so an undeclared one is not proven owed and is left advisory
+  crossing: project-source -> reading
+  refuted: counted an undeclared entrance in a changed file as owed, so SubagentStop refused with exit 2 -> the totality oracle went red; restored, green (2026-09-28)
+  kinds: none
 - the project's hook voice composes over what each event says: A project's .coherence/hooks/<Event>.override.md replaces what that event would say and an empty one silences it, its <Event>.append.md follows the canonical text or the override, and an event with nothing of its own to say still speaks a declared file; no override reaches a refusal's reason, which an append only follows.
   over: every hook event, with nothing declared, an append, an override, both, an empty override, an override in place of the peer feed, and an override and an append on a refused subagent stop
   via: a project's hook voice composes over what each event says: an override replaces it, an empty one silences it, an append follows it, an event with nothing to say speaks a declared file, and a refusal keeps its reason

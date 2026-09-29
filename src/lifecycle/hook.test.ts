@@ -17,6 +17,8 @@ import { TRACES_DIR, recordReadTrace } from "../economy/trace.ts";
 import { COHERENCE_LEXICON, installedRoot, PACKAGE_NAME } from "./project.ts";
 import { loadLexicon, rejectedNames } from "./lexicon.ts";
 import { gapProject } from "../readings/scope/gaps-fixture.ts";
+import { undeclaredProject } from "../readings/scope/undeclared-fixture.ts";
+import { orientUndeclaredText } from "../readings/scope/undeclared.ts";
 import { currentGaps, readAndRecord, recordGapBaseline, structureFingerprint } from "../readings/scope/gaps.ts";
 
 /** Coherence's own rejected names, drawn from its lexicon so this file never spells one. */
@@ -767,6 +769,61 @@ test("regulate names the gaps a session touched, a changed handler file and an u
     const sub = await runHook("SubagentStop", { agent_id: "gap-stop", hook_event_name: "SubagentStop", cwd: project }, project);
     assert.equal(sub.exit, 0, "advisory: a gap never refuses a subagent stop");
     assert.match((JSON.parse(sub.stdout) as { systemMessage: string }).systemMessage, /Spec gaps this session touched/);
+  } finally {
+    remove();
+  }
+});
+
+function coverageLine(text: string): string | undefined {
+  return text.split("\n").find((l) => l.startsWith("Entrance coverage"));
+}
+
+test("orient names the undeclared entrances in one bounded line: the count against what is detected now, the folder holding the most, and the scaffold command that proposes their bullets, with no reading and no gap needed", async () => {
+  // Every declared entrance carries an inside level: nothing could be a gap, and no reading was ever kept.
+  const { root: project, remove } = undeclaredProject({ trust: "operator" });
+  try {
+    const { start, started } = gapStarter(project, "cov-orient");
+    const text = await start();
+    assert.equal(gapLine(text), undefined, "no entrance could be a gap");
+    assert.equal(started.length, 0, "and no reading is started for one");
+    const line = coverageLine(text);
+    assert.ok(line !== undefined, text);
+    assert.match(line, /^Entrance coverage: 1 declared entrance covers 1 of 7 detected; 6 undeclared, which the gap count says nothing of; most in src\/server \(4 server functions\)\. node \S+ scaffold entrances src\/server proposes their ## entrances bullets; declare each in the spec that owns it\.$/);
+    const spec = readFileSync(join(project, "Shelf.spec.md"), "utf8");
+    writeFileSync(join(project, "Shelf.spec.md"), spec.replace("\n## invariants", "- write thing: a visitor writes a thing\n  handler: writeThing in src/server/fns.ts\n  trust: operator\n\n## invariants"));
+    assert.match(coverageLine(await start()) ?? "", /cover 2 of 7 detected; 5 undeclared/, "detected now: a declaration counts at the next start");
+    assert.equal(orientUndeclaredText({ declared: 7, detected: 7, covered: 7, undeclared: [] }, "coherence"), "", "nothing when every detected entrance is declared");
+  } finally {
+    remove();
+  }
+  const { root: crowded, remove: gone } = undeclaredProject({ functions: 400 });
+  try {
+    const text = await gapStarter(crowded, "cov-crowded").start();
+    const line = coverageLine(text)!;
+    assert.match(line, /covers 1 of 402 detected; 401 undeclared, [^]*most in src\/server \(399 server functions\)/);
+    const own = line.length - /node \S+/.exec(line)![0].length;
+    assert.ok(own < 300, `one bounded line whatever the count (${own} characters besides the command's path)`);
+    assert.doesNotMatch(line, /extraThing/, "a folder, never a list");
+    assert.ok(text.length <= CONTEXT_BUDGET, "the injection holds the budget");
+  } finally {
+    gone();
+  }
+});
+
+test("regulate names the undeclared entrances in the files a session changed, by file, and never refuses a subagent stop for them", async () => {
+  const { root: project, remove } = undeclaredProject();
+  try {
+    const opened = await runHook("SessionStart", { session_id: "cov-stop", cwd: project }, project);
+    opened.commit?.();
+    assert.doesNotMatch((await runHook("Stop", { session_id: "cov-stop", cwd: project }, project)).stdout, /Undeclared entrances/, "nothing changed: nothing named");
+    const fns = readFileSync(join(project, "src", "server", "fns.ts"), "utf8");
+    writeFileSync(join(project, "src", "server", "fns.ts"), `${fns}export const hideThing = createServerFn({ method: 'POST' })\n  .handler(async () => null)\n`);
+    const message = systemMessageOf(await runHook("Stop", { session_id: "cov-stop", cwd: project }, project));
+    assert.match(message, /Undeclared entrances in files this session changed; advisory, never a reason to refuse the stop:\n  src\/server\/fns\.ts \(5 server functions\): writeThing, deleteThing, listThings and 2 more\n  node \S+ scaffold entrances src\/server\/fns\.ts proposes their ## entrances bullets/);
+    assert.doesNotMatch(message, /users\.\$id|seed\.ts/, "an unchanged file's entrances are orient's, not regulate's");
+    const sub = await runHook("SubagentStop", { agent_id: "cov-stop", hook_event_name: "SubagentStop", cwd: project }, project);
+    assert.equal(sub.exit, 0, "advisory: an undeclared entrance never refuses a subagent stop");
+    assert.match(systemMessageOf(sub), /Undeclared entrances in files this session changed/);
   } finally {
     remove();
   }

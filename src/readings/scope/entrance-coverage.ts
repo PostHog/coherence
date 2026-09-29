@@ -150,7 +150,7 @@ export function coverageLine(coverage: EntranceCoverage): string {
   return `entrances: ${coverage.declared} declared, covering ${covered} of ${coveragePlural(coverage.detected, "detected entrance")}${grouping}; ${coverage.uncovered.length} undeclared`;
 }
 
-const RULE_PLURALS: Record<string, string> = {
+export const RULE_PLURALS: Record<string, string> = {
   "server function": "server functions",
   "wrapped export": "wrapped exports",
   "server route": "server routes",

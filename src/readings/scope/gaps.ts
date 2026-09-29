@@ -88,13 +88,6 @@ export interface GapState {
   entrances: [string, string][];
   /** How many entrances declare control: none. */
   noControl: number;
-  /**
-   * The declared entrances' coverage of what the reading detected, in counts
-   * and the first few undeclared by place (c-3760638e): what the gap count
-   * speaks for. Absent when the reading detected nothing (taken before
-   * detection).
-   */
-  coverage?: { declared: number; detected: number; covered: number; undeclared: number; first: string[] };
 }
 
 function key(component: string, name: string): string {
@@ -125,14 +118,11 @@ export function gapsOf(state: Pick<ShellState, "spec">, model: FlowModel): GapSt
     }
   }
   // An entrance with no drawn route (unresolved, unreachable) is no gap here: the spec check already names it.
-  const c = model.coverage;
+  // Entrance coverage is not carried here: orient and regulate detect it now (undeclared.ts), needing no reading.
   return {
     gaps,
     entrances: state.spec.components.flatMap((c) => c.entrances.map((e): [string, string] => [c.folder, e.name])),
     noControl: model.entrances.filter((e) => e.noControl !== undefined).length,
-    ...(c === undefined
-      ? {}
-      : { coverage: { declared: c.declared, detected: c.detected, covered: c.individually + c.grouped, undeclared: c.uncovered.length, first: c.uncovered.slice(0, COVERAGE_NAMES).map((u) => (u.symbol === "" ? u.file : `${u.symbol} (${u.file})`)) } }),
   };
 }
 
@@ -490,24 +480,6 @@ export function recordGapBaseline(root: string, state: GapState, who: Who, becau
 }
 
 /* ------------------------------------------------------ orient's line */
-
-/** The most undeclared entrances orient names; the rest are counted. */
-const COVERAGE_NAMES = 3;
-
-/**
- * Orient's coverage line (c-3760638e): how many detected entrances the
- * declared ones cover and how many are undeclared, naming at most three, so a
- * gap count is read against the surface it speaks for. Nothing when every
- * detected entrance is covered, or nothing was detected to measure against.
- */
-export function orientCoverageText(state: GapState, cli: string, asOf?: { at: string }): string {
-  const c = state.coverage;
-  if (c === undefined || c.undeclared === 0) return "";
-  const label = asOf === undefined ? "" : ` (as of ${utc(asOf.at)})`;
-  const names = c.first.map((n) => short(n)).join(", ");
-  const more = c.undeclared > c.first.length ? ` and ${c.undeclared - c.first.length} more` : "";
-  return `Entrance coverage${label}: ${c.declared} declared ${c.declared === 1 ? "entrance covers" : "entrances cover"} ${c.covered} of ${c.detected} detected; ${c.undeclared} undeclared, the gap count says nothing of ${c.undeclared === 1 ? "it" : "them"}: ${names}${more}. ${cli} query structure lists each with why it was detected.`;
-}
 
 /** The most characters a quoted entrance or route name takes in orient's one line. */
 const NAME_CHARS = 40;
