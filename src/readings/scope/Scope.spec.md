@@ -102,12 +102,11 @@ The reading: one surface projecting the model for a human, in six views: Structu
   crossing: reading -> reading
   refuted: gave run cards a prefix no view claims in runId -> "deep links resolve: every card id on every view resolves to that view" went red in check.test.ts; restored, green (2026-09-17)
   kinds: none
-- second root: With --root the page is built over another project: its spec tree, runs, journal, and lexicon become the domain layer beneath Coherence's own, and its run records show its structural defects.
-  over: every structural defect the first adopter's model derives from its run records, and every bypass site each carries
-  via: the first adopter's tree builds as a second root: its lexicon is the domain layer and its run records show its structural defects
-  because: a reading that rendered only Coherence's own tree would never have shown the two broken chokepoints the first adopter's runs recorded
+- second root: With --root the page is built over another project: its spec tree, runs, journal, and lexicon become the domain layer beside Coherence's own, and its run records show its structural defects.
+  over: every structural defect another project's model derives from its run records, and every bypass site each carries, for a project holding its own lexicon, specs and runs
+  via: another project's tree builds as a second root: its lexicon is the domain layer and its run records show its structural defects
+  because: a reading that rendered only Coherence's own tree would never have shown the two broken chokepoints the first adopter's runs recorded; the check reads a fixture project, so it runs on every machine rather than only where the first adopter's checkout sits
   crossing: record -> reading
-  refuted: made the build ignore --root, so the first adopter's tree could not be a second root -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
 - structure draws every component interface: Every component interface, every pair of components one of which references the other's symbols in non-test code, is on the Structure map from caller to callee: along a structural route, as a stub to a core dependency, at rest when a chokepoint, a crossing or a bypass stands on it, and otherwise drawn faint when a selection reaches it; none is removed because a path of other interfaces implies it.
   over: every component pair the flow fixture's reading resolves, including pairs a path through another component implies, and no pair in the callee-to-caller direction, at rest, with its caller selected, and with itself selected
@@ -416,6 +415,12 @@ The reading: one surface projecting the model for a human, in six views: Structu
   because: the page and the query still opened on the old reading's counts (candidate terms, uses, contexts awaiting review) after the hooks had stopped injecting them, and counted every unconfirmed context as awaiting review, so an ordinary use of a defined word read as work; a count nobody can act on trains a reader to skip the section, and the ranked names are what a reader can act on (decisions d-7b070fc6, d-a77be28f)
   crossing: record -> reading
   refuted: put the old Full observed population totals line back at the head of the vocabulary section in lexicon-view.ts, ahead of the ranked signal -> the totality oracle went red; restored, green (2026-09-23)
+  kinds: none
+- the project's vocabulary comes first: The Lexicon view shows the project's vocabulary first, its signal and then its lexicon or the note that it has none, and Coherence's own terms after it, in a section of their own under a heading that names them as Coherence's; Coherence's layer is titled as Coherence's whatever the project is called, and the masthead counts the project's lexicon when it has one.
+  over: a project with its own lexicon and one without, under a project name other than Coherence
+  via: the project's vocabulary comes first and Coherence's terms follow in a section of their own, titled as Coherence's whatever the project is called
+  because: the owner ruled it: a reader opens the Lexicon for the project's words, and Coherence's concepts led the page ahead of them; and an adopter's page titled Coherence's layer with the project's own name (Praetorium lexicon beside Praetorium.gg lexicon), so the tool's terms read as the project's
+  crossing: record -> reading
   kinds: none
 - citations linked in the Journal view: Each journal record on the page lists what it cites and what cites it as in-page links to those records' cards, with kind and subject; each work order lists what its records cite, what cites it, and the journal records bound to it; a cited record the page does not embed is an id with the command that shows it, never a dead link.
   over: every journal record and work order of the fixture, a record citing a work order, a work order's close citing a decision, a pinned escalation, and a state that leaves a cited record out

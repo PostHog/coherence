@@ -255,7 +255,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: commit-ordered-effects declared as cursor advances after the print
   checklist: circuit-breaker-policy dismissed: the feed reads local files; no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
-- feed carries two kinds: The feed injects a peer's decisions and a peer's escalations, and no other verb.
+- feed carries two kinds: The feed's peer lines inject a peer's decisions and a peer's escalations, and no other verb; a stopped subagent's return is the one block that lists every kind its subagent recorded.
   over: every record kind a peer can write, at every boundary event
   via: the peer feed injects a peer's decisions and escalations and no other kind
   because: the lexicon names decision subjects, and an escalation heads every read: a question standing before a human changes what a peer should do next, so a session that met one only at its own start would act past it for a whole cycle. Every other verb is the journal, one command away, and injecting all eleven at every tool use spends the session's budget on what nobody asked for
@@ -266,6 +266,23 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: redaction declared as feed injects subjects only
   checklist: commit-ordered-effects declared as cursor advances after the print
   checklist: circuit-breaker-policy dismissed: the feed reads local files; no dependency is sampled
+  checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
+- another agent under the session is a peer: For the main thread, a record of its own session written under another agent's name is a peer's, so a subagent that wrote under its coordinator's session id still reaches the coordinator's feed; the main thread's own records never do, and a subagent's reader keeps the session rule.
+  over: the coordinator's feed with records of its own session under its own name and under another agent's name
+  via: the main thread's feed counts a record of its own session under another agent's name as a peer's
+  because: subagents in one coordinated session wrote their decisions under the coordinator's session id, as the prompt that spawned them said to, and the feed filtered every one out as the coordinator's own; the coordinator saw them only because each subagent's report happened to list them
+  crossing: record -> reading
+  kinds: none
+- a stopped subagent returns what it recorded: When a subagent's stop goes through, every record it made (under its own session, or under its coordinator's session and another agent's name since it began) is listed, whole list, uncapped, at the coordinator's next prompt or tool boundary, once: the block leaves only after it reached the host, and the peer lines that follow never repeat a record it showed.
+  over: a subagent that recorded more decisions than the feed's cap, a conjecture, and a record under its coordinator's session, stopping, then the coordinator's boundaries before and after a print
+  via: a subagent that stops returns every record it made to its coordinator's next boundary, once, uncapped
+  because: a coordinator that spawns subagents answers for what they decided, and a subagent's report is prose that can leave a decision out; the return is the journal's own account of what the subagent recorded, put before the coordinator whether or not the report named it
+  crossing: record -> reading
+  kinds: output
+  checklist: destination-confinement dismissed: one destination, the coordinator's additionalContext, and no redirect
+  checklist: redaction dismissed: subjects only, as the feed, never a full record
+  checklist: commit-ordered-effects declared as a stopped subagent returns what it recorded
+  checklist: circuit-breaker-policy dismissed: the return reads local files; no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
 - cursor advances after the print: The feed cursor moves past the records a feed covered only after that feed was handed to the host: rendering alone moves nothing, the hook hands the advance back to the command line, which commits it only once its stdout write succeeded, and an unprinted feed is shown again.
   over: every feed rendered for a session, at every boundary event, through the library and through the command line that prints it

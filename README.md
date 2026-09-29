@@ -147,7 +147,6 @@ Third slice: enforcement (`docs/enforcement.md`): the language adapter seam
 over the language server protocol, the chokepoint check with its grade
 ladder and automatic refutation, the totality oracle pass, the run, and
 revelation at the edit through a warm per-project server.
-Mnemion is the first adopter.
 
 ```sh
 node src/cli.ts journal                   # merged project history across every session
@@ -238,4 +237,3 @@ nothing. The workflow can also be run by hand from the Actions tab.
 - The drift check matches exact strings first. A similarity seam stays open for a
   local embedding pass (alias suggestion, overload detection); similarity improves
   the question, never decides it. Backend options are under survey.
-- Mnemion is the first adopter; its domain lexicon lives in its own repository.

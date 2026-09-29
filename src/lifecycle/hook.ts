@@ -71,7 +71,7 @@ import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport 
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
-import { openFeed, peerFeed } from "../journal/feed.ts";
+import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
 import { recordReadTrace, snapshotTrace } from "../economy/trace.ts";
 import { loadSpecModel, type SpecModel } from "../spec/model.ts";
@@ -650,11 +650,25 @@ async function vocabularyAtStop(root: string, reading: Coverage, prior: Record<s
   return lines.join("\n");
 }
 
-/** The feed for a boundary event: the text to inject and the advance to commit once it is in the host's hands. */
+/** Whether the event comes from the main thread rather than a subagent. */
+function isMainThread(input: HookInput): boolean {
+  return ![input.agent_id, input.agentId].some((id) => typeof id === "string" && id !== "");
+}
+
+/**
+ * The feed for a boundary event: the returns of subagents that stopped since
+ * (every record each made), then what peers recorded, less what the returns
+ * showed; the text to inject and the advance to commit once it is in the
+ * host's hands. The main thread counts a record of its own session under
+ * another agent's name as a peer's.
+ */
 export function feedContext(root: string, input: HookInput): { text: string; commit: () => void } {
   const session = sessionOf(input);
   if (session === undefined) return { text: "", commit: () => {} };
-  return peerFeed(root, session);
+  const returns = returnFeed(root, session);
+  const peers = peerFeed(root, session, isMainThread(input) ? agentOf(input) : undefined, returns.ids);
+  const text = [returns.text, peers.text].filter((t) => t !== "").join("");
+  return { text, commit: text === "" ? () => {} : () => { returns.commit(); peers.commit(); } };
 }
 
 async function checkChanged(root: string, paths: readonly string[]): Promise<CheckReport | undefined> {
@@ -839,6 +853,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const context = await voiced(root, input, (await startReading(root, input, reading, gaps)).text, voice);
       const session = sessionOf(input);
       if (session !== undefined) openFeed(root, session);
+      // A subagent's start is kept so its stop can find what it wrote under the coordinator's session.
+      if (event === "SubagentStart" && session !== undefined && !isMainThread(input)) markChildStart(root, session);
       // An empty override silences the start; the session still began, so its baseline is still kept.
       const stdout = context === "" ? "" : JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
       const commit = (): void => {
@@ -901,6 +917,9 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const reason = await voiced(root, input, `Regulate found what this session owes; settle it before stopping.\n${text}`, heard);
         return { stdout: "", stderr: reason, exit: REFUSE_EXIT };
       }
+      // The stop goes through: what this subagent recorded waits for its coordinator's next boundary.
+      const parent = typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
+      if (event === "SubagentStop" && session !== undefined && parent !== undefined && !isMainThread(input)) leaveReturn(root, parent, session, agentOf(input));
       const message = await voiced(root, input, parts.length === 0 ? "" : `Regulate (${event}):\n${text}`, voice);
       if (message === "") return { stdout: "", stderr: "", exit: 0 };
       return { stdout: JSON.stringify({ systemMessage: message }) + "\n", stderr: "", exit: 0 };

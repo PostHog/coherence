@@ -17,7 +17,7 @@
  * With --root the state is read over another project: its spec tree, its
  * .coherence/runs, .coherence/journal and .coherence/work, and its lexicon
  * (named in coherence.config.json under `lexicon`, else lexicon.json at
- * its root) as the domain layer beneath Coherence's own. The command line is
+ * its root) as the domain layer beside Coherence's own. The command line is
  * cli.ts.
  */
 
@@ -203,7 +203,7 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
   const coherence: Layer = {
     kind: "present",
     id: "coherence",
-    title: `${options.project} lexicon`,
+    title: "Coherence lexicon",
     lexicon: await readLexicon(options.lexiconPath),
   };
   const domainPath = await domainPathFor(options, root);
@@ -215,7 +215,7 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
           id: "domain",
           title: domainTitle(options, undefined),
           because:
-            "No domain lexicon is present. Supply a second lexicon file of the same shape to read the project's own vocabulary beneath Coherence's.",
+            "No domain lexicon is present. Supply a second lexicon file of the same shape to read the project's own vocabulary here, ahead of Coherence's terms.",
         }
       : {
           kind: "present",

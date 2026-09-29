@@ -546,6 +546,54 @@ test("the peer feed injects a peer's decisions and escalations and no other kind
   }
 });
 
+test("the main thread's feed counts a record of its own session under another agent's name as a peer's", async () => {
+  const dir = await freshRoot();
+  try {
+    const coordinator = { cwd: dir, session_id: "coord" };
+    verb(dir, "decide", "before the session began", "--because", "old", "--session", "earlier", "--agent", "main");
+    assert.equal((await runHook("SessionStart", coordinator, dir)).exit, 0);
+    const own = idOf(verb(dir, "decide", "the coordinator's own choice", "--because", "b", "--session", "coord", "--agent", "main"));
+    const misattributed = idOf(verb(dir, "decide", "a subagent wrote under the coordinator's session", "--because", "b", "--session", "coord", "--agent", "nominal-control"));
+    const tool = await runHook("PostToolUse", { ...coordinator, tool_name: "Read", tool_input: { file_path: "x" } }, dir);
+    tool.commit?.();
+    const feed = contextOf(tool);
+    assert.match(feed, new RegExp(`${misattributed} nominal-control: a subagent wrote under the coordinator's session`), "another agent under this session is a peer");
+    assert.doesNotMatch(feed, new RegExp(own), "the main thread's own records are not its peers'");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("a subagent that stops returns every record it made to its coordinator's next boundary, once, uncapped", async () => {
+  const dir = await freshRoot();
+  try {
+    const coordinator = { cwd: dir, session_id: "coord" };
+    const child = { cwd: dir, session_id: "coord", agent_id: "sub1", agent_type: "general-purpose" };
+    assert.equal((await runHook("SessionStart", coordinator, dir)).exit, 0);
+    assert.equal((await runHook("SubagentStart", { ...child, hook_event_name: "SubagentStart" }, dir)).exit, 0);
+    const made: string[] = [];
+    for (let n = 0; n < FEED_CAP + 2; n += 1) made.push(idOf(verb(dir, "decide", `subagent decision ${n}`, "--because", "b", "--session", "sub1", "--agent", "general-purpose")));
+    made.push(idOf(verb(dir, "conjecture", "a surprise worth keeping", "--could-be", "a", "--discriminated-by", "t", "--session", "sub1", "--agent", "general-purpose")));
+    made.push(idOf(verb(dir, "decide", "written under the coordinator's session", "--because", "b", "--session", "coord", "--agent", "nominal-control")));
+    const stop = await runHook("SubagentStop", { ...child, hook_event_name: "SubagentStop", stop_hook_active: false }, dir);
+    assert.equal(stop.exit, 0, stop.stderr);
+
+    const unprinted = contextOf(await runHook("UserPromptSubmit", coordinator, dir));
+    assert.match(unprinted, /^Subagent general-purpose \(sub1\) finished and recorded/, "the return leads the coordinator's next boundary");
+    const prompt = await runHook("UserPromptSubmit", coordinator, dir);
+    assert.equal(contextOf(prompt), unprinted, "a block that never reached the host is shown again");
+    prompt.commit?.();
+    const block = contextOf(prompt);
+    assert.match(block, new RegExp(`^Subagent general-purpose \\(sub1\\) finished and recorded ${made.length};`));
+    for (const id of made) assert.equal(block.split(id).length - 1, 1, `${id} is shown once, in the return, never again in the peer lines`);
+    assert.doesNotMatch(block, /and \d+ more/, "a return is never capped");
+
+    assert.deepEqual(await runHook("PostToolUse", { ...coordinator, tool_name: "Read", tool_input: { file_path: "x" } }, dir), { stdout: "", stderr: "", exit: 0 }, "once printed, the return and those records are gone from the feed");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("the peer feed injects subjects of other sessions' records since the cursor, capped, never full records", async () => {
   const dir = await freshRoot();
   try {
@@ -553,7 +601,7 @@ test("the peer feed injects subjects of other sessions' records since the cursor
     const start = await runHook("SubagentStart", { cwd: dir, session_id: "child", agent_type: "Plan" }, dir);
     assert.equal(start.exit, 0);
     assert.notEqual(readCursor(dir, "child"), null, "the start sets the cursor at the latest record");
-    assert.deepEqual(await runHook("UserPromptSubmit", { cwd: dir, session_id: "child" }, dir), { stdout: "", stderr: "", exit: 0 }, "nothing new since the start");
+    assert.deepEqual(await runHook("UserPromptSubmit", { cwd: dir, session_id: "child", agent_type: "Plan" }, dir), { stdout: "", stderr: "", exit: 0 }, "nothing new since the start");
 
     const mine = idOf(verb(dir, "decide", "my own", "--because", "b", "--session", "child", "--agent", "Plan"));
     const subject = "peer chose JSONL because it needs no dependencies and the reference proved a native module is a wall for a subagent in a fresh worktree";
@@ -561,7 +609,7 @@ test("the peer feed injects subjects of other sessions' records since the cursor
     const peer = idOf(verb(dir, "decide", subject, "--over", "sqlite", "--because", "the long because that must never be injected", "--session", "peer-1", "--agent", "scope"));
     const escalation = idOf(verb(dir, "escalate", "retire an invariant", "--because", "only a human", "--session", "peer-2", "--agent", "economy"));
 
-    const prompt = await runHook("UserPromptSubmit", { cwd: dir, session_id: "child" }, dir);
+    const prompt = await runHook("UserPromptSubmit", { cwd: dir, session_id: "child", agent_type: "Plan" }, dir);
     assert.equal(prompt.exit, 0);
     prompt.commit?.(); // the command line commits once its print succeeded; here the print is the assertion below
     const parsed = JSON.parse(prompt.stdout) as { hookSpecificOutput: { hookEventName: string; additionalContext: string } };
@@ -575,10 +623,10 @@ test("the peer feed injects subjects of other sessions' records since the cursor
     assert.doesNotMatch(feed, /the long because|over:|sqlite/, "subjects only, never a full record");
     assert.doesNotMatch(feed, new RegExp(mine), "a session's own records are not its peers'");
 
-    assert.deepEqual(await runHook("PostToolUse", { cwd: dir, session_id: "child", tool_name: "Read", tool_input: { file_path: "x" } }, dir), { stdout: "", stderr: "", exit: 0 }, "the cursor advanced: the same records are not shown twice");
+    assert.deepEqual(await runHook("PostToolUse", { cwd: dir, session_id: "child", agent_type: "Plan", tool_name: "Read", tool_input: { file_path: "x" } }, dir), { stdout: "", stderr: "", exit: 0 }, "the cursor advanced: the same records are not shown twice");
 
     for (let n = 0; n < FEED_CAP + 3; n += 1) verb(dir, "decide", `peer decision ${n}`, "--because", "b", "--session", "peer-1", "--agent", "scope");
-    const tool = await runHook("PostToolUse", { cwd: dir, session_id: "child", tool_name: "Read", tool_input: { file_path: "x" } }, dir);
+    const tool = await runHook("PostToolUse", { cwd: dir, session_id: "child", agent_type: "Plan", tool_name: "Read", tool_input: { file_path: "x" } }, dir);
     tool.commit?.();
     const capped = contextOf(tool).trimEnd().split("\n");
     assert.match(capped[0]!, new RegExp(`^Peers recorded ${FEED_CAP + 3} since your last look`));
@@ -588,7 +636,7 @@ test("the peer feed injects subjects of other sessions' records since the cursor
     const whole: string[] = [];
     journalVerbs["journal"]!(["--since", since], { cwd: dir, out: (l) => whole.push(l), err: () => {} });
     assert.equal(whole.filter((l) => /peer decision/.test(l)).length, FEED_CAP + 3, "the named command shows every record the cap hid");
-    assert.deepEqual(await runHook("UserPromptSubmit", { cwd: dir, session_id: "child" }, dir), { stdout: "", stderr: "", exit: 0 });
+    assert.deepEqual(await runHook("UserPromptSubmit", { cwd: dir, session_id: "child", agent_type: "Plan" }, dir), { stdout: "", stderr: "", exit: 0 });
     assert.deepEqual(await runHook("UserPromptSubmit", { cwd: dir }, dir), { stdout: "", stderr: "", exit: 0 }, "no session, no cursor, no feed");
     assert.ok(!existsSync(join(dir, ".coherence", "journal", "child.cursor")), "the cursor lives under the feed directory, not the journal");
     assert.ok(existsSync(join(dir, FEED_DIR, "child.cursor")));
