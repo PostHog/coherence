@@ -707,3 +707,36 @@ test("the command line acts on the project from any subfolder, and vets a record
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("a record committed on another branch may be cited and read, and says where it is; an id found nowhere is still refused", () => {
+  const root = scratch();
+  try {
+    const git = (...args: string[]) => execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false", ...args], { cwd: root, encoding: "utf8" });
+    git("init", "-q", "-b", "main");
+    git("commit", "-q", "--allow-empty", "-m", "start");
+    git("checkout", "-q", "-b", "side");
+    const run = runIn(root, clock());
+    const away = idOf(run("decide", "chosen on the side branch", "--because", "a parallel session", "--session", "side-1", "--agent", "helper"));
+    git("add", "-A");
+    git("commit", "-q", "-m", "side record");
+    git("checkout", "-q", "main");
+    assert.equal(loadJournal(root).records.length, 0, "main does not hold the side branch's record");
+
+    const citing = run("decide", "builds on the side branch", "--because", "b", "--cite", away, "--session", "main-1", "--agent", "main");
+    assert.equal(citing.code, 0, citing.err.join("\n"));
+    assert.match(citing.out.join("\n"), new RegExp(`cites ${away} \\(on branch side, not in this checkout\\)`));
+
+    const read = runIn(root, clock())("journal", away);
+    assert.equal(read.code, 0, read.err.join("\n"));
+    assert.match(read.out.join("\n"), /chosen on the side branch/);
+    assert.match(read.out.join("\n"), /on branch side \(\.coherence\/journal\/side-1\.jsonl\), not in this checkout/);
+    const citer = idOf(citing);
+    assert.match(runIn(root, clock())("journal", citer).out.join("\n"), new RegExp(`${away} {2}\\(on branch side, not in this checkout\\)`), "a citation of it names the branch");
+
+    const typo = run("decide", "x", "--because", "b", "--cite", "d-00000000", "--session", "main-1", "--agent", "main");
+    assert.equal(typo.code, 1);
+    assert.match(typo.err.join("\n"), /--cite d-00000000: no journal or work record has that id, here or committed on another branch/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

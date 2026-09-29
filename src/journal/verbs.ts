@@ -44,6 +44,7 @@ import {
 } from "./record.ts";
 import { JOURNAL_DIR, appendRecord, gitState, loadJournal, type Loaded } from "./store.ts";
 import { describeBinding, loadWork } from "./work.ts";
+import { recordsOnOtherBranches } from "./branches.ts";
 
 export interface Context {
   cwd: string;
@@ -97,8 +98,9 @@ export const CITE: Record<string, FlagShape> = { cite: "many" };
 
 /**
  * The records a write cites, checked against both stores: each --cite must
- * name a record already in the journal or the work store, of any kind, and
- * none may be given twice. Returns the field to spread into the record,
+ * name a record already in the journal or the work store, of any kind, or
+ * one another branch has committed (a parallel session's, before it merges),
+ * and none may be given twice. An id found nowhere is refused: that is a typo. Returns the field to spread into the record,
  * empty when nothing is cited, so a record that cites nothing looks exactly
  * like one written before citations existed. This is the one site that
  * accepts a citation.
@@ -115,9 +117,22 @@ export function citations(parsed: Parsed, cwd: string): { cites?: string[] } {
     if (id.trim() === "") throw new JournalError("--cite needs a record id");
     if (seen.has(id)) throw new JournalError(`--cite ${id} given twice`);
     seen.add(id);
-    if (!known.has(id)) throw new JournalError(`--cite ${id}: no journal or work record has that id; cite a record that exists (journal, work inspect)`);
   }
+  const unknown = given.filter((id) => !known.has(id));
+  const elsewhere = unknown.length === 0 ? new Map() : recordsOnOtherBranches(cwd, unknown);
+  const missing = unknown.find((id) => !elsewhere.has(id));
+  if (missing !== undefined) throw new JournalError(`--cite ${missing}: no journal or work record has that id, here or committed on another branch; cite a record that exists (journal, work inspect)`);
   return { cites: given };
+}
+
+/** Each cited id, with the branch that holds it when this checkout does not. */
+function citedWhere(cwd: string, ids: readonly string[]): string[] {
+  const local = new Set<string>([...loadJournal(cwd).records.map((r) => r.id), ...loadWork(cwd).records.map((r) => r.id)]);
+  const elsewhere = recordsOnOtherBranches(cwd, ids.filter((id) => !local.has(id)));
+  return ids.map((id) => {
+    const found = elsewhere.get(id);
+    return found === undefined ? id : `${id} (on branch ${found.branch}, not in this checkout)`;
+  });
 }
 
 /** The words a human said, as the agent attributes them; refused when given blank. */
@@ -136,7 +151,7 @@ function write(ctx: Context, record: JournalRecord, extra: string[] = []): Writt
     lines: [
       `${written.id}  ${written.kind} recorded in ${JOURNAL_DIR}/${written.session}.jsonl`,
       `  ${describeBinding({ binding: written.binding ?? "none: unsettled", ...(written.work === undefined ? {} : { work: written.work }) })}`,
-      ...(citesOf(written).length > 0 ? [`  cites ${citesOf(written).join(", ")}`] : []),
+      ...(citesOf(written).length > 0 ? [`  cites ${citedWhere(ctx.cwd, citesOf(written)).join(", ")}`] : []),
       ...extra,
     ],
   };

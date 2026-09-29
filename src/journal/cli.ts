@@ -45,6 +45,7 @@ import {
   type Written,
 } from "./verbs.ts";
 import { WORK_USAGE, work } from "./workVerbs.ts";
+import { recordsOnOtherBranches } from "./branches.ts";
 
 export interface Io {
   cwd: string;
@@ -98,7 +99,7 @@ const read: Command = guarded((argv, io) => {
     const [id, ...rest] = parsed.positionals;
     if (rest.length > 0) throw new JournalError(`journal takes at most one record id; got "${rest[0]}"`);
     if (parsed.one.size > 0 || parsed.switches.size > 0) throw new JournalError("journal <id> takes no filter; it shows one record and its citations both ways");
-    for (const line of renderOne(id!, loaded, work)) io.out(line);
+    for (const line of renderOne(id!, loaded, work, (ids) => recordsOnOtherBranches(io.cwd, ids))) io.out(line);
     for (const line of renderDamaged(loaded.damaged)) io.err(line);
     return;
   }
@@ -146,7 +147,7 @@ export const journalVerbs: Record<string, Command> = {
 export const JOURNAL_USAGE = [
   WORK_USAGE,
   "journal verbs (each needs --session <id> --agent <name>; a write binds to the one active order its session owns, or to --work <id>):",
-  "  (--cite <id>, repeatable, names an earlier journal or work record this one rests on or is about; an unknown id refuses the write)",
+  "  (--cite <id>, repeatable, names an earlier journal or work record this one rests on or is about, here or committed on another branch; an id found nowhere refuses the write)",
   "  (--human records words the agent attributes to a human, apart from its own because; it is not proof a human wrote them)",
   '  decide "<chose>" [--over "<rejected>"]... --because "<why>" [--human "<what the human said>"] [--cite <id>]...',
   '  retract <id> --because "<what refuted it>"',

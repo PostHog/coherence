@@ -3,6 +3,12 @@
 Compression: one append-only file per session of attributed, durable outcomes, read back as one timeline.
 
 ## invariants
+- a citation reaches another branch: A --cite of a record another branch has committed is accepted and printed with that branch, journal <id> shows such a record as it stands there and says where, and a citation of it names its branch; an id found neither in the stores nor on any branch is still refused.
+  over: a record committed on a side branch, cited and read from the main branch, and a citation of an id no branch holds
+  via: a record committed on another branch may be cited and read, and says where it is; an id found nowhere is still refused
+  because: subagents on their own branches cited each other's records before those branches merged, the check refused every one, and the ids went into prose where nothing checks or links them
+  crossing: record -> reading
+  kinds: none
 - a flag's value from a file: Every journal and lexicon flag that takes a value also takes it from a file named by its -file form, or from standard input for -, whole but for one trailing newline; a file that cannot be read is named, and only a flag the verb takes has a -file form.
   over: a because with an apostrophe, double quotes and a dollar sign read from a file, a missing file, and a -file form of a flag the verb does not take
   via: a flag's value may come from a file or standard input, so long text never meets the shell

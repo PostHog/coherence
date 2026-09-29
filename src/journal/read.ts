@@ -19,6 +19,7 @@
  */
 
 import { JournalError } from "./args.ts";
+import type { Elsewhere } from "./branches.ts";
 import { GLYPH, anySubjectOf, citedBy, citesOf, isKind, kindLabel, pointsAt, subjectOf, type AnyRecord, type Escalation, type JournalRecord, type Kind } from "./record.ts";
 import { compareRecords, type Damaged, type Loaded } from "./store.ts";
 
@@ -206,23 +207,29 @@ export function namedLine(record: AnyRecord): string {
  * journal record prints as the timeline prints it; a work record prints its
  * one line (work inspect shows an order whole). Refused for an unknown id.
  */
-export function renderOne(id: string, loaded: Loaded, work: readonly AnyRecord[]): string[] {
+export function renderOne(id: string, loaded: Loaded, work: readonly AnyRecord[], elsewhere: (ids: readonly string[]) => Map<string, Elsewhere> = () => new Map()): string[] {
   const everything: AnyRecord[] = [...loaded.records, ...work];
-  const found = everything.find((record) => record.id === id);
-  if (found === undefined) throw new JournalError(`no journal or work record has id ${id}`);
+  const local = everything.find((record) => record.id === id);
+  // A record another branch committed is shown as it stands there, and said to be there.
+  const away = local === undefined ? elsewhere([id]).get(id) : undefined;
+  const found = local ?? (away === undefined ? undefined : (JSON.parse(away.line) as AnyRecord));
+  if (found === undefined) throw new JournalError(`no journal or work record has id ${id}, here or committed on another branch`);
   const byId = new Map(everything.map((record) => [record.id, record]));
   const status = statuses(loaded.records);
   const head = isKind(found.kind) ? renderBody(found as JournalRecord, status.get(found.id)) : [`${stamp(found.at)} ${namedLine(found)}`];
   const human = (found as { human?: unknown }).human;
   const cites = citesOf(found);
   const citers = citedBy(everything).get(found.id) ?? [];
+  const citedAway = elsewhere(cites.filter((cited) => !byId.has(cited)));
   return [
     ...head,
+    ...(away === undefined ? [] : [`    on branch ${away.branch} (${away.file}), not in this checkout`]),
     ...(typeof human === "string" ? [`    human (as the agent attributes): ${human}`] : []),
     `  cites (${cites.length}):`,
     ...cites.map((cited) => {
       const record = byId.get(cited);
-      return `    ${record === undefined ? `${cited}  (not in the stores read)` : namedLine(record)}`;
+      const branch = citedAway.get(cited)?.branch;
+      return `    ${record !== undefined ? namedLine(record) : branch !== undefined ? `${cited}  (on branch ${branch}, not in this checkout)` : `${cited}  (not in the stores read)`}`;
     }),
     `  cited by (${citers.length}):`,
     ...citers.map((citer) => `    ${namedLine(citer)}`),
