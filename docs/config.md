@@ -43,7 +43,9 @@ for one) works through `test` and `testMatch` alone, one test per invocation.
 
 ## Not read
 
-`typecheck` is named by older setup text but read by nothing yet (defect
-df-b8084178); writing it does no harm and has no effect.
+`typecheck` is part of the config concept, for a tree-wide check whose
+enforcement is the compiler, but nothing reads it yet (defect df-b8084178,
+escalation e-3bf51fcc); writing it does no harm and has no effect, and no
+setup step asks for it.
 
 The spec grammar is in [spec.md](spec.md).

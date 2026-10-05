@@ -47,7 +47,7 @@
   step: baseline what the project already held: coherence lexicon baseline, and coherence scaffold control --baseline for entrances with no traced control
     leaves: the baseline records in the journal
   step: find the methods the project already has (the practice harvest practices)
-  step: commit coherence.config.json, the lexicon, the specs and practice files, the hook settings, and .coherence/journal, .coherence/runs and .coherence/work
+  step: commit coherence.config.json, the lexicon, the specs and practice files, the hook settings, .coherence/.gitignore (hooks install wrote it so git sees nothing Coherence regenerates), and .coherence/journal, .coherence/runs and .coherence/work
     leaves: the commit
   step: from the project's own root, run coherence scope and report what the reading shows: health, broken chokepoints, entrances with no traced control, and components no enforcement covers
   pitfall: both outside adopters' checks were red on arrival from Coherence's rejected names in their own prose, and npm link broke a pnpm build; install as a dev dependency and baseline what was already there (d-127ab8e4)
