@@ -229,6 +229,16 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: graceful-drain dismissed: nothing is shut down by an uninstall; a session already running keeps the hooks its agent host loaded
   checklist: readiness-evidence dismissed: uninstall reports what it removed from the settings file and claims nothing about a running process
   checklist: declared-target-coverage dismissed: one host's one settings file per call, not a registry of targets
+- install keeps regenerated state out of git: Installing the hook writes .coherence/.gitignore once, so the project's git sees only the durable folders (journal, runs, work) and the project's hook voice under .coherence, never the state Coherence regenerates, and the project's own .gitignore is never edited; a .coherence/.gitignore with any other text is the adopter's and is kept, and uninstall removes the file only when it is exactly what install wrote and no agent host keeps a hook of ours.
+  over: every folder Coherence writes under .coherence (journal, runs, work, hooks, feed, lexicon, models, observations, practices, run, structure, traces), in a fresh git project, across both agent hosts installed and uninstalled in turn, a fresh tree, and an ignore file of the adopter's
+  via: install keeps Coherence's regenerated state out of the project's git, and uninstall removes only the ignore file it wrote
+  because: a fresh adoption saw feed cursors, read traces, readings and a language model's weights as untracked files and had to guess what to ignore (df-35f4975d); Coherence's own .gitignore kept them out, but an adopter never receives that. The file sits in Coherence's own folder, so install never edits a file the adopter wrote and uninstall can remove it whole; while another host still runs our hooks the state keeps being written, so the file stays (d-e2cff03c)
+  crossing: project-source -> harness
+  refuted: made removeIgnore stop asking whether another agent host keeps our hooks, so uninstalling Claude Code took the ignore file while Codex still ran ours -> "install keeps Coherence's regenerated state out of the project's git, and uninstall removes only the ignore file it wrote" went red in install.test.ts on "codex still holds our hooks"; restored, green (2026-10-05)
+  kinds: deploy
+  checklist: graceful-drain dismissed: nothing is shut down by an install or an uninstall
+  checklist: readiness-evidence dismissed: install and uninstall report what they wrote or removed and claim nothing about a running process
+  checklist: declared-target-coverage dismissed: one ignore file in one folder per project, not a registry of targets
 - check fails on any drift: The hook check exits non-zero, naming the event and the kind, whenever an agent host's installed hooks differ from what install would write: an event missing, an entry of ours stale in any field or shape, or an extra entry of ours; another tool's hook is never drift.
   over: every event install wires, every field and the shape of the entry install writes, and every entry of ours under any event, for both agent hosts
   via: the check names every drift from what install would write: missing, stale, and extra
