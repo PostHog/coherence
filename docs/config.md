@@ -41,11 +41,4 @@ A totality oracle names a test (its `via:` line); these keys say how to run one.
 A runner whose report is in none of those shapes (Playwright's JSON report,
 for one) works through `test` and `testMatch` alone, one test per invocation.
 
-## Not read
-
-`typecheck` is part of the config concept, for a tree-wide check whose
-enforcement is the compiler, but nothing reads it yet (defect df-b8084178,
-escalation e-3bf51fcc); writing it does no harm and has no effect, and no
-setup step asks for it.
-
 The spec grammar is in [spec.md](spec.md).
