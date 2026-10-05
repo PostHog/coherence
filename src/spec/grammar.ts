@@ -124,9 +124,14 @@ export const NO_CONTROL = /^none(?:\s*(?:—|–|--?)\s*(.*))?$/s;
 /** How the control: line is written, for the problems that name it. */
 export const NO_CONTROL_FORM = "control: none — <why this entrance needs no control>";
 
-/** A handler named as a module file (a path with an extension): the module's top-level script receives the work. */
+/**
+ * A handler named as a module file (a path with an extension): the module's
+ * top-level script receives the work. A path may carry a framework's route
+ * segments, as every Next.js App Router route does: [slug], [...slug],
+ * [[...slug]], (group), (.)intercepted and @slot.
+ */
 export function isModuleHandler(handler: string): boolean {
-  return /^[A-Za-z0-9_./@-]+\.[A-Za-z]+$/.test(handler.trim()) && !/\s/.test(handler.trim());
+  return /^[A-Za-z0-9_./@()[\]-]+\.[A-Za-z]+$/.test(handler.trim()) && !/\s/.test(handler.trim());
 }
 
 export type Enforcement =

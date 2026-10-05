@@ -162,7 +162,43 @@ function typescriptCandidates(file: string, text: string, wrappers: readonly str
   const pagesApi = /(^|\/)pages\/api\/.+\.(ts|tsx|js|mjs)$/.test(file);
   const remixRoute = /(^|\/)app\/routes\/.+\.(ts|tsx|js|jsx)$/.test(file);
   const useServer = /^["']use server["']/.test(leadingCode(text));
+  // Next.js's request proxy (proxy.ts since Next.js 16, middleware.ts before it), at the project root or under src/.
+  const proxyFile = /^(?:src\/)?(proxy|middleware)\.(ts|js|mjs)$/.exec(file)?.[1];
+  const nextPage = /(^|\/)app\/(.+\/)?page\.(tsx|jsx|ts|js)$/.test(file) && !remixRoute;
+  if (nextRoute || proxyFile !== undefined) {
+    // What a route or proxy file exports by name without declaring it: an export list, re-exported or local, or a destructuring
+    // (export { GET, POST } from "@/app/(auth)/auth", export { auth as proxy }, export const { GET, POST } = handlers).
+    const wanted = (name: string): boolean => (nextRoute ? TS_METHODS.has(name) : name === proxyFile);
+    for (const m of text.matchAll(/^export\s*\{([^}]*)\}|^export\s+(?:const|let|var)\s*\{([^}]*)\}\s*=/gm)) {
+      const listed = m[1] !== undefined;
+      const reexported = listed && /^\s*from\s*["']/.test(text.slice(m.index + m[0].length));
+      for (const item of (m[1] ?? m[2]!).split(",")) {
+        const named = listed ? /^\s*([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?\s*$/.exec(item) : /^\s*(?:[A-Za-z_$][\w$]*\s*:\s*)?([A-Za-z_$][\w$]*)\s*$/.exec(item);
+        const name = named === null ? undefined : (named[2] ?? named[1]!);
+        if (name === undefined || !wanted(name)) continue;
+        const line = lineOf(text, m.index);
+        const how = reexported ? "re-exported" : "exported by name";
+        const c = nextRoute
+          ? { file, line, symbol: name, rule: "route handler", why: `${name} ${how} in a Next.js route file: answers ${name} requests` }
+          : { file, line, symbol: name, rule: "request proxy", why: `${name} ${how} in ${file}: Next.js runs it before every request it matches` };
+        add(c, spanOf(lines, line - 1, "typescript"));
+      }
+    }
+    if (proxyFile !== undefined) {
+      const at = lines.findIndex((l) => /^export\s+default\b/.test(l));
+      if (at >= 0) add({ file, line: at + 1, symbol: "", rule: "request proxy", why: `the default export of ${file}: Next.js runs it before every request it matches` }, spanOf(lines, at, "typescript"));
+    }
+  }
+  const at = nextPage ? lines.findIndex((l) => /^export\s+default\b/.test(l)) : -1;
+  if (at >= 0) {
+    add({ file, line: at + 1, symbol: "", rule: "page route", why: "the default export of a Next.js app/**/page file: renders its route on the server for every visitor" }, spanOf(lines, at, "typescript"));
+  }
   lines.forEach((line, i) => {
+    const declared = proxyFile === undefined ? null : /^export\s+(?:async\s+)?(?:function\s*\*?\s*|const\s+|let\s+|var\s+)([A-Za-z_$][\w$]*)/.exec(line);
+    if (declared !== null && declared[1] === proxyFile) {
+      add({ file, line: i + 1, symbol: proxyFile!, rule: "request proxy", why: `export ${proxyFile} in ${file}: Next.js runs it before every request it matches` }, spanOf(lines, i, "typescript"));
+      return;
+    }
     const exported = /^export\s+const\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(?:await\s+)?([A-Za-z_$][\w$]*)\s*(?:<[^()]*>)?\s*\(/.exec(line);
     if (exported !== null) {
       const [, name, callee] = exported as unknown as [string, string, string];

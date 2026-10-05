@@ -84,6 +84,20 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: returned a module handler's first candidate path in handlerFile without checking the file exists -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
+- a module handler may carry route segments: An entrance's handler naming a module file resolves as a module file when its path carries a framework's route segments ([slug], [...slug], [[...slug]], (group), (.)intercepted, @slot), and a spec in such a folder is a component; such a file that does not exist is still a problem.
+  over: every route segment form in a module handler's path, a spec in a (group) folder, and a missing file under such segments, against a symbol in a file and a path without an extension, which stay no module
+  via: the model: a module handler's path may carry route segments, [slug], [...slug], [[...slug]], (group), (.)intercepted and @slot, and it must still exist
+  because: every Next.js App Router route lives under such segments, so handler: api/auth/[...nextauth]/route.ts was refused as neither a symbol nor a module file at a real adoption (df-0a67c462)
+  crossing: project-source -> reading
+  refuted: narrowed isModuleHandler's path characters back to letters, digits and _./@-, refusing [ ] ( ) -> "the model: a module handler's path may carry route segments, [slug], [...slug], [[...slug]], (group), (.)intercepted and @slot, and it must still exist" went red in src/spec/spec.test.ts; restored, green (2026-10-05)
+  kinds: none
+- a re-exported or destructured handler is declared: A handler name is declared at the top level of a file that exports it in an export list, with or without a from and under its alias when it has one, or binds it in an object destructuring on one line or across several, nested or not; a key the destructuring reads through, an imported name and the name a re-export renames are not.
+  over: every export list shape (re-export from a module, renamed, local, type) and every destructuring shape (one line, several lines, nested, typed), against a destructuring key, an import, a renamed source name and braces that assign nothing
+  via: the model: a handler an export list re-exports, or a destructuring across lines declares, is declared at the top level of its file
+  because: a Next.js route file re-exports NextAuth's GET and POST, which a multi-line destructuring declares, so handler: GET in api/auth/[...nextauth]/route.ts was not found at a real adoption (df-a0e893af); the re-exporting file is where the framework finds the name and the source is not followed (d-7155e46f)
+  crossing: project-source -> reading
+  refuted: made declaresAtTop ignore export lists, so a name a route file re-exports was not declared there -> "the model: a handler an export list re-exports, or a destructuring across lines declares, is declared at the top level of its file" went red in src/spec/spec.test.ts; restored, green (2026-10-05)
+  kinds: none
 - an entrance guard names a chokepoint: An entrance's guard: line names a chokepoint some invariant declares, by its symbol, or a symbol declared in a chokepoint that is a module; any other name, an empty line, or a second guard line is a problem.
   over: every guard: line: a chokepoint's symbol, a symbol of a chokepoint module, a name no invariant declares, an empty and a second line
   via: the model: an entrance's guard: line names a chokepoint an invariant declares, or a symbol of a chokepoint module

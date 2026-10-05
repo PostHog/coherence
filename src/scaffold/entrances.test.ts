@@ -5,8 +5,10 @@
  */
 
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import type { Io } from "../journal/cli.ts";
 import { loadSpecModel } from "../spec/model.ts";
@@ -92,5 +94,46 @@ test("scaffold entrances narrows to a folder or file inside the project, and nam
     assert.equal(entranceName({ file: "scripts/sync:all.ts", symbol: "", rule: "script" }), "sync all", "never a colon, which would end the name");
   } finally {
     remove();
+  }
+});
+
+test("scaffold entrances on a Next.js app shaped like ai-chatbot proposes the request proxy, the GET and POST its NextAuth route re-exports, and its page routes, and the filled bullets resolve and cover them", async () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-nextapp-"));
+  const files: Record<string, string> = {
+    "coherence.config.json": JSON.stringify({ name: "Chatbot", language: "typescript" }),
+    "package.json": JSON.stringify({ name: "chatbot", private: true }),
+    "Chatbot.spec.md": "# Chatbot\n\nA chat app.\n\n## trust levels\n- visitor (outside): anyone on the network\n\n## invariants\n",
+    "proxy.ts": "import type { NextRequest } from 'next/server'\n\nexport async function proxy(request: NextRequest) {\n  return null\n}\n",
+    "app/(auth)/(auth).spec.md": "# Auth\n\nSigning in.\n\n## invariants\n",
+    "app/(auth)/auth.ts": "import NextAuth from 'next-auth'\n\nexport const {\n  handlers: { GET, POST },\n  auth,\n  signIn,\n  signOut,\n} = NextAuth({\n  providers: [],\n})\n",
+    "app/(auth)/api/auth/[...nextauth]/route.ts": 'export { GET, POST } from "@/app/(auth)/auth";\n',
+    "app/(chat)/page.tsx": "export default async function Page() {\n  return null\n}\n",
+    "app/(chat)/chat/[id]/page.tsx": "export default async function Page() {\n  return null\n}\n",
+  };
+  for (const [file, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, file)), { recursive: true });
+    writeFileSync(join(root, file), text);
+  }
+  const git = (...args: string[]): void => void execFileSync("git", args, { cwd: root, stdio: "ignore" });
+  git("init", "-q");
+  git("add", ".");
+  git("-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-q", "-m", "seed");
+  try {
+    const out = io(root);
+    assert.equal(await scaffoldCommand(["entrances"], out), 0, out.errors.join("\n"));
+    const text = out.lines.join("\n");
+    assert.match(text, /^5 undeclared entrances \(5 detected in the project, 0 declared\)\./);
+    const groups = groupsOf(text);
+    const auth = groups.get("app/(auth)/(auth).spec.md") ?? "";
+    assert.ok(auth.includes("  handler: GET in api/auth/[...nextauth]/route.ts") && auth.includes("  handler: POST in api/auth/[...nextauth]/route.ts"), auth);
+    const entry = groups.get("Chatbot.spec.md") ?? "";
+    assert.ok(entry.includes("- proxy: ") && entry.includes("  handler: proxy in proxy.ts"), entry);
+    assert.ok(entry.includes("- page (chat): ") && entry.includes("  handler: app/(chat)/page.tsx"), entry);
+    assert.ok(entry.includes("- page (chat)/chat/[id]: ") && entry.includes("  handler: app/(chat)/chat/[id]/page.tsx"), entry);
+    for (const [spec, body] of groups) paste(join(root, spec), body.replaceAll(MEANING_PLACEHOLDER, "work enters").replace(/<trust level: [^>]*>/g, "visitor"));
+    assert.deepEqual(loadSpecModel(root, { runs: false }).problems, [], "the filled bullets parse and every handler resolves");
+    assert.equal(undeclaredNow(root)?.undeclared.length, 0, "and cover every entrance they were proposed for");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
