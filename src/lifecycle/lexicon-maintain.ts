@@ -16,8 +16,13 @@ import { decide } from "../journal/verbs.ts";
 import { loadJournal, sessionFile } from "../journal/store.ts";
 import { workBinding } from "../journal/work.ts";
 import { digest, lexiconCoverage } from "./lexicon-coverage.ts";
-import { parseLexicon, rejectedNames } from "./lexicon.ts";
-import { isCoherenceItself, projectLexiconPath } from "./project.ts";
+import { aliasNames, parseLexicon, rejectedNames } from "./lexicon.ts";
+import { normalizeTerm, runCheck } from "./check.ts";
+import {
+  isCoherenceItself,
+  loadProjectLexicons,
+  projectLexiconPath,
+} from "./project.ts";
 import { parseLexicon as parseScopeLexicon } from "../readings/scope/model.ts";
 
 export interface Who {
@@ -28,14 +33,28 @@ export interface Who {
   cite?: string[];
 }
 export interface Change {
-  action: "declare" | "define" | "alias" | "reject" | "rename" | "retire";
+  action: "declare" | "define" | "alias" | "reject" | "lift" | "rename" | "retire";
   name: string;
   value?: string;
   definition?: string;
   entry?: Record<string, unknown>;
   /** rename only: the old name keeps other senses (a keyword, another layer's term), so it is not rejected. */
   qualify?: boolean;
+  /** define only: the properties.<key> and detail.<key> to remove. Nothing else is ever dropped (DROPPABLE). */
+  drop?: string[];
+  /**
+   * Filled by propose, never given: the text each removed key or lifted
+   * rejection carried. It rides in the change, so the applying decision keeps
+   * what the lexicon no longer holds.
+   */
+  removed?: Record<string, unknown>;
   because: string;
+}
+/** A dropped property key that the unknown-noun check would no longer accept: the uses that would become findings. */
+export interface DropFindings {
+  drop: string;
+  uses: number;
+  terms: string[];
 }
 export interface Proposal {
   id: string;
@@ -44,7 +63,18 @@ export interface Proposal {
   after: string;
   change: Change;
   humanRequired: boolean;
+  /** define with a properties drop only: what the drop would turn into unknown-noun findings, counted before apply. */
+  findings?: DropFindings[];
 }
+/**
+ * The change rule for each field of a concept. definition: replaced by
+ * define. properties, detail: merged; a key leaves only by an explicit drop.
+ * aliases, instances: added freely; one leaves only by reject, with a human.
+ * rejected: append-only; one leaves only by lift, with a human and a cite of
+ * the decision that rejected it. provenance: append-only; never dropped, never
+ * rewritten. name: rename or retire, with a human.
+ */
+const DROPPABLE = ["properties", "detail"] as const;
 interface Transaction {
   proposal: Proposal;
   who: Who;
@@ -62,16 +92,16 @@ const STATE = ".coherence/lexicon";
 const APPLIED = /^[a-z]+ apply [a-z]p-[a-f0-9]{24} /;
 
 /** Confine even through existing symlinked parents; a configured lexicon cannot write outside its project. */
-export function confined(root: string, name: string): string {
+export function confined(root: string, name: string, what = "lexicon path"): string {
   const path = resolve(root, name);
   const rel = relative(resolve(root), path);
   if (isAbsolute(rel) || rel === ".." || rel.startsWith("../"))
-    throw new Error("lexicon path is outside the project root");
+    throw new Error(`${what} is outside the project root`);
   let existing = path;
   while (!existsSync(existing)) existing = dirname(existing);
   const actual = relative(realpathSync(root), realpathSync(existing));
   if (isAbsolute(actual) || actual === ".." || actual.startsWith("../"))
-    throw new Error("lexicon path follows a link outside the project root");
+    throw new Error(`${what} follows a link outside the project root`);
   return path;
 }
 function atomic(path: string, text: string): void {
@@ -138,6 +168,50 @@ export async function lexiconTarget(root: string): Promise<string> {
         : "lexicon.json"),
   );
 }
+/**
+ * A property key is accepted vocabulary (d-3283157b), so dropping one can turn
+ * its current uses into unknown-noun findings. The check runs twice, over the
+ * lexicon as it stands and as the proposal leaves it; each new finding is
+ * charged to the dropped key it spells.
+ */
+async function dropFindings(
+  root: string,
+  target: string,
+  after: Record<string, unknown>,
+  drops: string[],
+): Promise<DropFindings[]> {
+  const { coherence, project } = await loadProjectLexicons(root);
+  const changed = parseLexicon(after, target);
+  const ownLayer = resolve(target) === resolve(coherence.path);
+  if (ownLayer) changed.project ??= "coherence";
+  const coherenceItself = await isCoherenceItself(root);
+  const before = await runCheck({ root, coherence, project, coherenceItself });
+  const afterReport = await runCheck({
+    root,
+    coherence: ownLayer ? changed : coherence,
+    project: ownLayer ? project : changed,
+    coherenceItself,
+  });
+  const held = new Set(
+    before.unknown.filter((f) => f.baselined !== true).map((f) => f.term),
+  );
+  const fresh = afterReport.unknown.filter(
+    (f) => f.baselined !== true && !held.has(f.term),
+  );
+  return drops
+    .filter((d) => d.startsWith("properties."))
+    .map((drop) => {
+      const names = aliasNames(drop.slice("properties.".length)).map(normalizeTerm);
+      const mine = fresh.filter((f) =>
+        names.some((n) => f.term === n || f.term === n + "s" || f.term === n + "es"),
+      );
+      return {
+        drop,
+        uses: mine.reduce((n, f) => n + f.count, 0),
+        terms: mine.map((f) => f.term),
+      };
+    });
+}
 export async function propose(root: string, change: Change): Promise<Proposal> {
   if (!change.name.trim() || !change.because.trim())
     throw new Error("a proposal needs a name and because");
@@ -182,7 +256,10 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
   );
   if (change.action !== "declare" && !existing)
     throw new Error(`no concept named ${change.name}`);
+  if (change.drop?.length && change.action !== "define")
+    throw new Error("--drop applies only to define");
   let acceptedRemoval = false;
+  const removed: Record<string, unknown> = {};
   if (change.action === "declare") {
     if (existing) throw new Error(`concept already exists: ${change.name}`);
     concepts.push({
@@ -192,7 +269,7 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
     });
   } else if (change.action === "define") {
     const entry = change.entry ?? {};
-    const merged = {
+    const merged: Record<string, unknown> = {
       ...existing,
       ...entry,
       name: change.name,
@@ -207,8 +284,16 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
           Array.isArray(entry[key])
         )
           throw new Error(`${key} must be an object`);
-        (merged as Record<string, unknown>)[key] = {
-          ...((existing![key] as Record<string, unknown>) ?? {}),
+        const prior = (existing![key] as Record<string, unknown>) ?? {};
+        // Provenance is append-only: a key it already holds keeps its text.
+        if (key === "provenance")
+          for (const [k, v] of Object.entries(entry[key] as Record<string, unknown>))
+            if (k in prior && JSON.stringify(prior[k]) !== JSON.stringify(v))
+              throw new Error(
+                `provenance is append-only: ${change.name} already records provenance.${k}; add a new key instead`,
+              );
+        merged[key] = {
+          ...prior,
           ...(entry[key] as Record<string, unknown>),
         };
       }
@@ -216,7 +301,7 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
       if (entry[key] !== undefined) {
         if (!Array.isArray(entry[key]))
           throw new Error(`${key} must be a list`);
-        (merged as Record<string, unknown>)[key] = [
+        merged[key] = [
           ...new Map(
             [...((existing![key] as unknown[]) ?? []), ...entry[key]].map(
               (v) => [JSON.stringify(v), v],
@@ -224,7 +309,47 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
           ).values(),
         ];
       }
-    Object.assign(existing!, merged);
+    for (const path of change.drop ?? []) {
+      const dot = path.indexOf(".");
+      const field = dot === -1 ? path : path.slice(0, dot);
+      const key = dot === -1 ? "" : path.slice(dot + 1);
+      if (field === "provenance")
+        throw new Error(
+          `provenance is append-only: ${path} cannot be dropped`,
+        );
+      if (!(DROPPABLE as readonly string[]).includes(field) || !key)
+        throw new Error(
+          `--drop takes properties.<key> or detail.<key>, not ${path}; an alias or instance leaves by reject, a rejected name by lift, a concept by rename or retire`,
+        );
+      if (
+        entry[field] !== undefined &&
+        key in (entry[field] as Record<string, unknown>)
+      )
+        throw new Error(`${path} is both set and dropped`);
+      const current = merged[field] as Record<string, unknown> | undefined;
+      if (!current || !(key in current))
+        throw new Error(`${change.name} has no ${path} to drop`);
+      removed[path] = current[key];
+      const { [key]: _gone, ...rest } = current;
+      if (Object.keys(rest).length > 0) merged[field] = rest;
+      else delete merged[field];
+    }
+    // Replaced, not assigned over: a dropped key must leave the entry.
+    concepts[concepts.indexOf(existing!)] = merged;
+  } else if (change.action === "lift") {
+    if (!change.value?.trim())
+      throw new Error("a lift needs the rejected name to lift");
+    const rejected = (existing!["rejected"] as Record<string, unknown>[]) ?? [];
+    const lifted = rejected.find(
+      (r) =>
+        String(r["alternative"]).toLowerCase() === change.value!.toLowerCase(),
+    );
+    if (!lifted)
+      throw new Error(`${change.name} rejects no name ${change.value}`);
+    removed[`rejected.${lifted["alternative"]}`] = lifted;
+    existing!["rejected"] = rejected.filter((r) => r !== lifted);
+    if ((existing!["rejected"] as unknown[]).length === 0)
+      delete existing!["rejected"];
   } else if (change.action === "alias") {
     if (!change.value?.trim()) throw new Error("an alias needs a value");
     existing!["aliases"] = [
@@ -286,14 +411,18 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
   }
   // Human-only actions are flagged at proposal time, not guessed from a success message after a write.
   const humanRequired =
-    acceptedRemoval || ["rename", "retire"].includes(change.action);
+    acceptedRemoval || ["lift", "rename", "retire"].includes(change.action);
   validate(value, target);
+  const findings = Object.keys(removed).some((k) => k.startsWith("properties."))
+    ? await dropFindings(root, target, value, Object.keys(removed))
+    : undefined;
   const draft = {
     target: relative(root, target),
     before: digest(raw),
     after: JSON.stringify(value, null, 2) + "\n",
-    change,
+    change: Object.keys(removed).length > 0 ? { ...change, removed } : change,
     humanRequired,
+    ...(findings ? { findings } : {}),
   };
   const proposal: Proposal = {
     id: "lp-" + digest(draft).slice(0, 24),
@@ -330,6 +459,29 @@ function appliedDecision(root: string, id: string): string | undefined {
   return loadJournal(root).records.find(
     (r) => r.kind === "decision" && APPLIED.test(r.chose) && r.chose.includes(` apply ${id} `),
   )?.id;
+}
+/**
+ * The applied decisions that put a name into a concept's rejected list: a
+ * reject of that name, or a rename away from it that did not qualify. A
+ * rejection older than the journal has none, and its lift carries the lifted
+ * entry, reason and all, in its own decision.
+ */
+function rejectingDecisions(root: string, concept: string, name: string): string[] {
+  const same = (a: unknown, b: string): boolean =>
+    String(a).toLowerCase() === b.toLowerCase();
+  return loadJournal(root).records.flatMap((r) => {
+    if (r.kind !== "decision" || !APPLIED.test(r.chose)) return [];
+    let change: Change;
+    try {
+      change = (JSON.parse(r.chose.replace(APPLIED, "")) as { change: Change }).change;
+    } catch {
+      return [];
+    }
+    const rejected =
+      (change.action === "reject" && same(change.name, concept) && same(change.value, name)) ||
+      (change.action === "rename" && !change.qualify && same(change.name, name) && same(change.value, concept));
+    return rejected ? [r.id] : [];
+  });
 }
 /** The same path finishes a fresh application and an interrupted one; it never overwrites concurrent edits. */
 function finish(root: string, tx: Transaction): string {
@@ -395,8 +547,18 @@ export function applyProposal(
     const p = readProposal(root, id);
     if (p.humanRequired && !human?.trim())
       throw new Error(
-        "rename/retire needs an explicit --human acknowledgement; no change applied",
+        `${p.change.action === "reject" ? "removing an accepted name" : p.change.action} needs an explicit --human acknowledgement; no change applied`,
       );
+    if (p.change.action === "lift") {
+      const originals = rejectingDecisions(root, p.change.name, p.change.value ?? "");
+      if (
+        originals.length > 0 &&
+        !originals.some((id) => (who.cite ?? []).includes(id))
+      )
+        throw new Error(
+          `lifting a rejection cites the decision that made it: --cite ${originals.join(" or --cite ")}; no change applied`,
+        );
+    }
     if (existsSync(confined(root, `${STATE}/pending.json`)))
       throw new Error(
         "an application is pending: run lexicon recover before another apply",

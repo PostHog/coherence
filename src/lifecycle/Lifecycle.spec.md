@@ -35,6 +35,51 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: every proposal printed the whole lexicon after the change, 87 KB, into the agent's context, and agents scraped the id out of it
   crossing: record -> reading
   kinds: none
+- a dropped lexicon key stays on record: A define keeps every property and detail key it does not name; a key leaves only by an explicit --drop of properties.<key> or detail.<key>, and the decision that applies the drop carries the removed key and its text.
+  over: a define that adds a property, a define that drops a property and a detail key, a drop of another field, and a drop on another action
+  via: a define keeps every property and detail key unless one is dropped by name, and the applying decision carries the dropped text
+  because: define could only merge, so a retired key could never leave and was rewritten in place as a note that it was former (d-e5a064e3); a drop that deleted the text with the key would lose the meaning a later reader of the journal needs to see what the lexicon once said
+  crossing: harness -> project-source
+  refuted: deleted the line in propose's define branch that records a dropped key's text, so the drop still removed the key but the decision no longer carried its text -> "a define keeps every property and detail key unless one is dropped by name, and the applying decision carries the dropped text" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: revision
+  checklist: revision-preservation declared as a dropped lexicon key stays on record
+- a property drop counts its findings before apply: The preview of a define that drops a property key prints, before anything is applied, how many current uses of that key in the corpus would become unknown-noun findings, from the lexicon check run over the lexicon as it stands and as the drop leaves it.
+  over: a dropped property key the prose writes as a name on three lines, and one it never writes
+  via: a property drop's preview counts the current uses that would become unknown-noun findings, before apply
+  because: a property key counts as accepted vocabulary (d-3283157b), so dropping one can turn every use of it into a finding, as a bare rejection once turned 227 uses of a keyword into findings (rt-cdcf2a29); the count belongs in the preview, where the drop can still be withdrawn
+  crossing: harness -> project-source
+  refuted: made dropFindings run the after-check over the project lexicon as it stands, so the preview counted no new finding -> "a property drop's preview counts the current uses that would become unknown-noun findings, before apply" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- lexicon provenance is append-only: A define adds a provenance key and never rewrites one the concept already records, and a drop of provenance.<key> is refused.
+  over: a drop of a provenance key, a define rewriting an existing provenance key, and a define adding a new one
+  via: provenance is append-only: a drop of a provenance key and a define that rewrites one are refused, a new key is added
+  because: provenance is who defined a concept and in whose words; a merge that let a later define overwrite it would erase the owner's ruling under an agent's, with nothing in the lexicon to show it happened
+  crossing: harness -> project-source
+  refuted: made define's provenance guard test a key no field has, so a define rewrote an existing provenance key -> "provenance is append-only: a drop of a provenance key and a define that rewrites one are refused, a new key is added" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: revision
+  checklist: revision-preservation declared as lexicon provenance is append-only
+- a lifted rejection cites the decision that made it: A rejected name leaves a concept's rejected list only by lift, never by define; applying a lift needs a human acknowledgement and a cite of the applied decision that rejected the name when the journal holds one, and the lift's decision carries the lifted entry with its reason.
+  over: a define carrying an empty rejected list, a lift applied without a human, with a human and no cite, and with both
+  via: a rejection is lifted only with a human acknowledgement and a cite of the decision that rejected it
+  because: a rejection is a ruling a human or an agent made with a reason; taking it back without citing it would let a later session undo the ruling without reading why it was made, and the name would drift back in
+  crossing: harness -> project-source
+  refuted: made rejectingDecisions find no decision for any rejection, so a lift applied with a human and no cite -> "a rejection is lifted only with a human acknowledgement and a cite of the decision that rejected it" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: revision
+  checklist: revision-preservation declared as a lifted rejection cites the decision that made it
+- no project lexicon before a project makes one: Before a project has its own lexicon, lexicon coverage names no project lexicon even when Coherence's lexicon is installed under the project root, and lexicon review prints every live use of a term too rare to be a candidate yet; only Coherence's own checkout reads Coherence's lexicon as its project lexicon.
+  over: an adopter with Coherence's lexicon installed under its root and no lexicon.json, reviewing a term written in its code and prose below the candidate threshold
+  via: before a project lexicon exists, coverage names no project lexicon even with Coherence installed inside the project, and review reads a term's live uses
+  because: at adoption coverage named node_modules/@posthog/coherence/docs/lexicon.json as the project's, and review showed no live use of the project's domain terms, so the first step of settle a domain term could not be done and the agent read the schema directly (df-0d4e5065)
+  crossing: project-source -> reading
+  refuted: restored the old fallback in lexiconCoverage, naming Coherence's lexicon as the project's whenever it lies under the root -> the totality oracle went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- an outside entry file is named as outside: lexicon propose --entry with a file outside the project is refused with a message that names that entry file, never the lexicon.
+  over: an entry file in another folder outside the project root
+  via: an entry file outside the project is refused naming that entry file, not the lexicon
+  because: the refusal said the lexicon path was outside the project, naming the wrong thing, and the adopting agent copied its entries into a folder inside the project to get past a wall it could not read (df-292f9083)
+  crossing: harness -> reading
+  refuted: dropped the entry-file label from the confinement call in lexicon propose, so the refusal again named the lexicon path -> "an entry file outside the project is refused naming that entry file, not the lexicon" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
 - compact injection: The injection at session start carries the vocabulary only: nothing from detail, provenance, or metaphors.
   over: every concept of both lexicon layers
   via: renderCompact: header, one line per concept, rejected in brackets, nothing from detail, provenance or metaphors
