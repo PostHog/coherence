@@ -220,10 +220,15 @@ function hooksOf(settings: Record<string, unknown>): HooksByEvent {
   return out;
 }
 
+/** The tools whose use can fire a practice: a command, or a file written. */
+export const PRACTICE_TOOLS = "Bash|Edit|Write|MultiEdit|NotebookEdit";
+
 /** The one entry install writes for an event: the merge writes it and the check compares against it. */
 export function installedEntry(options: Pick<InstallOptions, "command" | "host">, event: HookEvent): HookEntry {
   const handler: HookCommand = { type: "command", command: hookCommand(options.command, event), timeout: TIMEOUT_SECONDS };
   if (options.host === "codex" && START_EVENTS.has(event)) handler["additionalContextLimit"] = CODEX_CONTEXT_LIMIT;
+  // Practices fire on a command or a written file; Claude Code runs the hook for those tools only.
+  if (options.host === "claude" && event === "PreToolUse") return { matcher: PRACTICE_TOOLS, hooks: [handler] };
   return { hooks: [handler] };
 }
 

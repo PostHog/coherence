@@ -216,3 +216,35 @@ export function appendInvariant(specPath: string, bullet: string): string {
   writeFileSync(specPath, final, "utf8");
   return final;
 }
+
+/**
+ * A practice bullet with every slot to fill: the trigger, two steps (the
+ * first naming what it leaves), a pitfall with the record that witnessed it,
+ * what it was learned from, and why. A practice is learned, not wished, so
+ * the slots for evidence come printed and the check refuses them empty.
+ */
+export function renderPractice(name: string, sentence: string, when: string | undefined): string {
+  return [
+    `- ${name}: ${sentence.trim()}`,
+    `  when: ${when ?? "<command <words> | edit <glob> [adding <text>] | explicit>"}`,
+    "  step: <what to do first>",
+    "    leaves: <the evidence this step leaves; delete the line when it leaves none>",
+    "  step: <what to do next>",
+    "  pitfall: <a way this has gone wrong> (<the record id or commit that witnessed it>)",
+    "  learned: <the record ids or commits this practice was learned from>",
+    "  because: <why the practice exists: what slipped without it>",
+    "",
+  ].join("\n");
+}
+
+/** The practice file paired with a component's spec: the spec's stem, beside it. */
+export function practiceFileFor(dir: string, spec: string): string {
+  return join(dir, `${spec.slice(0, -SPEC_SUFFIX.length)}.practice.md`);
+}
+
+/** Append a practice bullet to the component's practice file, creating the file beside its spec. */
+export function appendPractice(path: string, bullet: string): void {
+  const before = existsSync(path) ? readFileSync(path, "utf8") : "";
+  const body = before === "" || before.endsWith("\n") ? before : `${before}\n`;
+  writeFileSync(path, body + bullet, "utf8");
+}

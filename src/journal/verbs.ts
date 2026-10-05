@@ -20,6 +20,7 @@ import { JournalError, onePositional, parseFlags, required, type FlagShape, type
 import {
   INSTRUMENT_IS_WRONG,
   deriveOutcome,
+  enactmentTally,
   citesOf,
   pointsAt,
   recordId,
@@ -40,8 +41,12 @@ import {
   type StepResult,
   type Unable,
   type Dismissal,
+  type Enactment,
+  type StepOutcome,
   type WorkKind,
 } from "./record.ts";
+import { projectPractices } from "../spec/model.ts";
+import type { ModelPractice } from "../spec/practices.ts";
 import { JOURNAL_DIR, appendRecord, gitState, loadJournal, type Loaded } from "./store.ts";
 import { describeBinding, loadWork } from "./work.ts";
 import { recordsOnOtherBranches } from "./branches.ts";
@@ -372,4 +377,78 @@ export function acknowledge(argv: string[], ctx: Context): Written {
   refuseIfAnswered(loaded, of, "acknowledge", ["acknowledgement"]);
   const record: Acknowledgement = { ...head("acknowledgement", who, ctx, `${of}\n${because}`), of, because, ...humanWords(parsed) };
   return write(ctx, record);
+}
+
+/** The practice an id names: its full id, or its bare name when one practice alone carries it. */
+export function findPractice(practices: readonly ModelPractice[], given: string): ModelPractice {
+  const exact = practices.find((p) => p.id === given);
+  if (exact !== undefined) return exact;
+  const named = practices.filter((p) => p.name === given);
+  if (named.length === 1) return named[0]!;
+  const known = practices.length === 0 ? "this project declares no practice (a practice file beside a spec)" : `known: ${practices.map((p) => p.id).join("; ")}`;
+  if (named.length > 1) throw new JournalError(`enact: "${given}" names ${named.length} practices; give the id: ${named.map((p) => p.id).join("; ")}`);
+  throw new JournalError(`enact: no practice "${given}"; ${known}`);
+}
+
+/** The command that enacts a practice, one --step line per step, for a session to fill in. */
+export function enactTemplate(practice: ModelPractice, cli: string, session: string, agent: string, trigger?: string): string {
+  return [
+    `${cli} enact "${practice.id}"${trigger === undefined ? "" : ` --trigger "${trigger}"`} --session ${session} --agent ${agent}`,
+    ...practice.steps.map((step) => `  --step ${step.n}=done${step.leaves === undefined ? "" : `:"<the evidence: ${step.leaves}>"`}`),
+  ].join(" \\\n") + "\n  (a step not done as written: --step <n>=deviated:<why> or --step <n>=skipped:<why>)";
+}
+
+/** One --step value: <n>=done[:<evidence>], <n>=deviated:<because>, or <n>=skipped:<because>. */
+function stepOutcome(pair: string): { n: string; outcome: StepOutcome } {
+  const match = /^(\d+)=(done|deviated|skipped)(?::([\s\S]*))?$/.exec(pair);
+  if (match === null) throw new JournalError(`--step "${pair}" reads <n>=done[:<evidence>], <n>=deviated:<why>, or <n>=skipped:<why>`);
+  const [, n, result, text] = match as unknown as [string, string, StepOutcome["result"], string | undefined];
+  const said = text?.trim() ?? "";
+  if (result === "done") return { n, outcome: said === "" ? { result } : { result, evidence: said } };
+  if (said === "") throw new JournalError(`--step ${n}=${result} needs a because: a ${result} step says why, so the practice can learn from it`);
+  return { n, outcome: { result, because: said } };
+}
+
+/**
+ * Record a practice carried out. Every step needs an outcome: done, with its
+ * evidence where the step names what it leaves, or deviated or skipped with
+ * a because. The record keeps the text of the steps and pitfalls enacted, so
+ * a later change to the practice is read against what was carried out.
+ */
+export function enact(argv: string[], ctx: Context): Written {
+  const parsed = parseFlags(argv, withCommon({ step: "many", trigger: "one", ...CITE }));
+  const who = attribution(parsed);
+  const given = onePositional(parsed, "the practice (its id, or its name when only one practice carries it)");
+  const practice = findPractice(projectPractices(ctx.cwd), given);
+  const results: Record<string, StepOutcome> = {};
+  for (const pair of parsed.many.get("step") ?? []) {
+    const { n, outcome } = stepOutcome(pair);
+    if (Object.hasOwn(results, n)) throw new JournalError(`--step ${n} given twice`);
+    if (!practice.steps.some((s) => String(s.n) === n)) throw new JournalError(`enact: ${practice.id} has steps 1 to ${practice.steps.length}; there is no step ${n}`);
+    results[n] = outcome;
+  }
+  const missing = practice.steps.filter((s) => !Object.hasOwn(results, String(s.n)));
+  if (missing.length > 0) {
+    throw new JournalError(
+      `enact: every step needs an outcome; missing ${missing.map((s) => s.n).join(", ")}. The practice, version ${practice.version}:\n` +
+        practice.steps.map((s) => `  ${s.n}. ${s.text}${s.leaves === undefined ? "" : `\n     leaves: ${s.leaves}`}`).join("\n"),
+    );
+  }
+  const trigger = parsed.one.get("trigger") ?? "explicit";
+  const record: Enactment = {
+    ...head("enactment", who, ctx, `${practice.id}\n${practice.version}\n${JSON.stringify(results)}`),
+    practice: practice.id,
+    version: practice.version,
+    trigger,
+    steps: practice.steps.map((s) => (s.leaves === undefined ? { text: s.text } : { text: s.text, leaves: s.leaves })),
+    pitfalls: practice.pitfalls.map((p) => p.text),
+    results,
+    ...citations(parsed, ctx.cwd),
+  };
+  // A step that names its evidence and was marked done without it is claimed, not shown: said now, and again at the stop.
+  const unshown = practice.steps.filter((s) => s.leaves !== undefined && results[String(s.n)]?.result === "done" && (results[String(s.n)] as { evidence?: string }).evidence === undefined);
+  return write(ctx, record, [
+    `  version ${practice.version}, ${enactmentTally(record)}`,
+    ...unshown.map((s) => `  step ${s.n} names its evidence (${s.leaves}) and none was given: claimed, not shown`),
+  ]);
 }

@@ -139,6 +139,13 @@ function renderBody(record: JournalRecord): Markup {
       return html`<p class="definition" data-field="what">${record.what}</p>${renderBecause(record.because)}`;
     case "acknowledgement":
       return html`<p class="definition">acknowledged ${renderPointer(record.of)}</p>${renderBecause(record.because)}`;
+    case "enactment":
+      return html`<p class="definition" data-field="practice">enacted <code>${record.practice}</code> <span class="label">version</span> ${record.version} <span class="label">fired by</span> ${record.trigger}</p>
+        <section class="steps"><h4>Steps</h4><ol>${record.steps.map((s, i) => {
+          const o = record.results[String(i + 1)];
+          const said = o === undefined ? "no outcome" : o.result === "done" ? (o.evidence ? `done: ${o.evidence}` : "done") : `${o.result}: ${o.because}`;
+          return html`<li>${s.text} <span class="label">${said}</span></li>`;
+        })}</ol></section>`;
   }
 }
 

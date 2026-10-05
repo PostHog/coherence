@@ -22,6 +22,7 @@ export const KINDS = {
   unable: "u",
   escalation: "e",
   acknowledgement: "ak",
+  enactment: "en",
 } as const;
 
 export type Kind = keyof typeof KINDS;
@@ -45,6 +46,7 @@ export const GLYPH: Record<Kind, string> = {
   unable: "⊘",
   escalation: "▲",
   acknowledgement: "△",
+  enactment: "◇",
 };
 
 /** The candidate every conjecture carries whether or not the caller named it. */
@@ -209,6 +211,30 @@ export interface Acknowledgement extends Head, HumanWords {
   because: string;
 }
 
+/** What one step of an enacted practice came to: done with its evidence, or deviated or skipped with why. */
+export type StepOutcome =
+  | { result: "done"; evidence?: string }
+  | { result: "deviated"; because: string }
+  | { result: "skipped"; because: string };
+
+/**
+ * A practice carried out: which practice, the version enacted, what fired it,
+ * the text of its steps and pitfalls as they stood (so a later change can be
+ * read against what was enacted), and an outcome for every step, keyed by the
+ * step's number.
+ */
+export interface Enactment extends Head, Citing {
+  kind: "enactment";
+  /** The practice's id: its component folder and name, "coherence:" first for Coherence's layer in an adopter. */
+  practice: string;
+  version: string;
+  /** What fired it: a trigger as the hook described it, or explicit. */
+  trigger: string;
+  steps: { text: string; leaves?: string }[];
+  pitfalls: string[];
+  results: Record<string, StepOutcome>;
+}
+
 export type JournalRecord =
   | Decision
   | Retraction
@@ -220,7 +246,8 @@ export type JournalRecord =
   | Close
   | Unable
   | Escalation
-  | Acknowledgement;
+  | Acknowledgement
+  | Enactment;
 
 /**
  * An id is the kind's prefix and eight hex digits of a hash over session,
@@ -264,7 +291,19 @@ export function subjectOf(record: JournalRecord): string {
       return `closed ${record.of}: ${record.outcome}`;
     case "acknowledgement":
       return `acknowledged ${record.of}`;
+    case "enactment":
+      return `enacted ${record.practice}: ${enactmentTally(record)}`;
   }
+}
+
+/** How an enactment's steps came out, as one phrase: "5 of 6 done, 1 deviated". */
+export function enactmentTally(record: Enactment): string {
+  const outcomes = Object.values(record.results);
+  const count = (result: StepOutcome["result"]): number => outcomes.filter((o) => o.result === result).length;
+  const parts = [`${count("done")} of ${outcomes.length} done`];
+  if (count("deviated") > 0) parts.push(`${count("deviated")} deviated`);
+  if (count("skipped") > 0) parts.push(`${count("skipped")} skipped`);
+  return parts.join(", ");
 }
 
 /** The states a work order moves through; completed and cancelled end it. */

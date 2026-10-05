@@ -60,6 +60,10 @@
  * its own to say still speaks a declared file. A refusal is enforcement, so
  * no override reaches its reason; an append follows it. A file whose real
  * path leaves the project root is named as not read, never followed.
+ * Practices ride with three events (practice-delivery.ts): orient names each
+ * with what fires it; PreToolUse delivers a practice whole when the tool use
+ * about to run fires it, before the act rather than after; regulate names one
+ * that fired and has no enactment since, advisory, never refused.
  */
 
 import { existsSync, readFileSync, realpathSync } from "node:fs";
@@ -86,6 +90,7 @@ import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText
 import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
 import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
+import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
 
 const run = promisify(execFile);
 
@@ -93,6 +98,7 @@ export const HOOK_EVENTS = [
   "SessionStart",
   "SubagentStart",
   "UserPromptSubmit",
+  "PreToolUse",
   "PostToolUse",
   "Stop",
   "SubagentStop",
@@ -621,7 +627,9 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
   const signal=attentionText(reading, commands);
   const coverage=signal ? `\n${signal}\n` : "";
-  const tail = coverage + `\n${await sessionBlock(root, input)}`;
+  // The practices ride beside the commands that record them, after the vocabulary.
+  const practices = practiceOrientText(root, commands);
+  const tail = coverage + (practices === "" ? "" : `\n${practices.trimEnd()}\n`) + `\n${await sessionBlock(root, input)}`;
   const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root));
   return { text: head + text + tail, detail, coverage: reading };
 }
@@ -867,6 +875,15 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       };
       return { stdout, stderr: "", exit: 0, ...(session ? { commit } : {}) };
     }
+    case "PreToolUse": {
+      // Before the act: a practice whose trigger this tool use fires is delivered now, when its first steps can still be taken.
+      const session = sessionOf(input);
+      const practice = practiceContext(root, session, toolUseOf(input, writtenFiles(root, input)), await cliName(root), agentOf(input));
+      const context = await voiced(root, input, practice.text, voice);
+      if (context === "") return { stdout: "", stderr: "", exit: 0 };
+      const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
+      return { stdout, stderr: "", exit: 0, ...(practice.text !== "" && voice.override === undefined ? { commit: practice.commit } : {}) };
+    }
     case "UserPromptSubmit":
     case "PostToolUse": {
       const feed = feedContext(root, input);
@@ -901,6 +918,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the lexicon check ran over nothing`;
       const gapText = await gapStopText(root, input, changed.files);
       const undeclaredText = await undeclaredStopText(root, changed.files);
+      const practiceText = practiceStopText(root, session, await cliName(root), agentOf(input));
       const parts: string[] = [];
       if (changedText !== "") parts.push(changedText);
       if (lexicon.text !== "") parts.push(`Lexicon check:\n${lexicon.text}`);
@@ -909,6 +927,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       if (coverageText) parts.push(coverageText);
       if (gapText !== "") parts.push(gapText);
       if (undeclaredText !== "") parts.push(undeclaredText);
+      if (practiceText !== "") parts.push(practiceText);
       const text = parts.join("\n");
       // A refusal is spent only on what the tool can prove is owed and no recorded wall excuses: a rejected name in a changed file, a spec problem, a structural defect.
       // A spec gap is not among them: no traced control is not a demonstrated bypass, so gapText never counts toward the refusal; nor does an undeclared entrance.

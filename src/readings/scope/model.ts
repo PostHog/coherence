@@ -353,7 +353,8 @@ export type JournalKind =
   | "close"
   | "unable"
   | "escalation"
-  | "acknowledgement";
+  | "acknowledgement"
+  | "enactment";
 
 export interface JournalHead {
   id: string;
@@ -386,7 +387,11 @@ export type JournalRecord =
   | (JournalHead & { kind: "close"; of: string; results: Record<string, "pass" | "fail" | "unknown">; outcome: "success" | "failure" | "inconclusive" })
   | (JournalHead & { kind: "unable"; what: string; because: string })
   | (JournalHead & { kind: "escalation"; what: string; because: string })
-  | (JournalHead & { kind: "acknowledgement"; of: string; because: string });
+  | (JournalHead & { kind: "acknowledgement"; of: string; because: string })
+  | (JournalHead & { kind: "enactment"; practice: string; version: string; trigger: string; steps: { text: string; leaves?: string }[]; pitfalls: string[]; results: Record<string, JournalStepOutcome> });
+
+/** What one step of an enacted practice came to. */
+export type JournalStepOutcome = { result: "done"; evidence?: string } | { result: "deviated"; because: string } | { result: "skipped"; because: string };
 
 /**
  * One work order as the journal folds it from its records: the order's

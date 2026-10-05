@@ -298,11 +298,12 @@
     {
       "name": "component",
       "status": "settled",
-      "definition": "Any folder with a spec file. A component is the aggregate of an implementation and its spec definition. Subcomponents are declared by specs in child folders; folders without a spec are transparent. A super folder becomes a component when a relationship invariant about its children needs a home there.",
+      "definition": "Any folder with a spec file. A component is the aggregate of an implementation, its spec definition, and the practice file paired with that spec when it has one. Subcomponents are declared by specs in child folders; folders without a spec are transparent. A super folder becomes a component when a relationship invariant about its children needs a home there.",
       "related": [
         "invariant",
-        "zone",
-        "crossing"
+        "trust level",
+        "crossing",
+        "practice"
       ],
       "rejected": [
         {
@@ -489,14 +490,15 @@
     {
       "name": "spec",
       "status": "settled",
-      "definition": "The file that makes a folder a component. Contains: a one-line intent; the invariants, each with its enforcement (chokepoint with protected thing, or totality oracle over a named set), its because, its crossing where security-relevant, and its refutation; and, in the entry spec only, the list of trust levels. One bullet grammar: every bullet is an invariant with enforcement.",
+      "definition": "The file that makes a folder a component. Contains: a one-line intent; the invariants, each with its enforcement (chokepoint with protected thing, or totality oracle over a named set), its because, its crossing where security-relevant, and its refutation; and, in the entry spec only, the list of trust levels. One bullet grammar: every bullet is an invariant with enforcement. Its sister is the practice file, which holds the component's practices in the same bullet grammar and never exists without it.",
       "related": [
         "component",
         "invariant",
         "enforcement",
         "refutation",
         "crossing",
-        "trust level"
+        "trust level",
+        "practice"
       ],
       "rejected": [],
       "provenance": {
@@ -797,7 +799,7 @@
     {
       "name": "agent query",
       "status": "settled",
-      "definition": "CLI access for the agent to what Scope shows a human, as a small fixed set of questions with plain-text answers: which invariants touch these files, who relies on this chokepoint, what must be loaded to change this safely (the economy prediction), and what does my work order say. Fixed questions first; a query language only if the fixed set proves insufficient.",
+      "definition": "CLI access for the agent to what Scope shows a human. It is a small fixed set of questions with plain-text answers: which invariants touch these files, who relies on this chokepoint, what must be loaded to change this safely (the economy prediction), and what does my work order say. Fixed questions first; a query language only if the fixed set proves insufficient.",
       "related": [
         "scope",
         "economy"
@@ -944,7 +946,7 @@
     {
       "name": "config",
       "status": "settled",
-      "definition": "The list of project facts the tool cannot derive: name, entry dir, output dir, ignore patterns, language, how to typecheck, how to run tests and match their names, where tests live, the well-known names the project vouches for (wellKnown), and the interface reading's budget (interfaceBudget). Every key that configures a mechanism leaves with the mechanism.",
+      "definition": "The list of project facts the tool cannot derive. They are: name, entry dir, output dir, ignore patterns, language, how to typecheck, how to run tests and match their names, where tests live, the well-known names the project vouches for (wellKnown), and the interface reading's budget (interfaceBudget). Every key that configures a mechanism leaves with the mechanism.",
       "rejected": [
         {
           "alternative": "mass, conventions, sinks, atlas keys",
@@ -1318,6 +1320,110 @@
         "defined_by": "agent hook-voice (session c1db1b63-f5b7-4dc3-94a8-3c324ee41fcb), 2026-09-28 (journal d-9a9d08cb), restoring the reference per-event override and append files (fb445b2)",
         "owner_words": "yeah, have a subagent restore hook overrides and addenda"
       }
+    },
+    {
+      "definition": "A component's recorded method for a kind of work, kept in the practice file paired with its spec. A spec and a practice file are always paired: no practice file stands without a sister spec, and project-wide practices sit beside the entry spec. Each practice is one bullet in the spec grammar naming its trigger (when), ordered steps with the evidence each leaves, pitfalls citing the records that witnessed them, the records it was learned from, and its because; an invariant named in a step resolves against the sister spec. Adding a step or a pitfall is free; removing one needs a cited record. A practice is a candidate until its first enactment in which every step that names its evidence produced it; then it is established. The hook delivers a practice when its trigger fires.",
+      "status": "settled",
+      "related": [
+        "spec",
+        "component",
+        "enactment",
+        "journal",
+        "hook",
+        "refutation"
+      ],
+      "rejected": [
+        {
+          "alternative": "process as the name of this concept",
+          "because": "pulls toward the operating-system sense, which the tool's own text and code already use (subprocess, process tree)"
+        },
+        {
+          "alternative": "a practices section inside the spec",
+          "because": "a spec says what must hold and a practice says how work is done; a sister file gives the practice its own history, its own check rules, and a load the hook can make without parsing invariants"
+        },
+        {
+          "alternative": "practice files in folders without a spec",
+          "because": "pairing keeps the component the unit, so a folder never becomes half a component"
+        },
+        {
+          "alternative": "skills or memory files as the store for method",
+          "because": "a skill loads when the model judges it relevant, with no trigger guarantee, no record that it was carried out, and one host only; memory files are where these methods went unreviewed and outside the project"
+        }
+      ],
+      "provenance": {
+        "owner_words": "There are processes that are implicit to every project but right now there's nowhere to store and maintain their integrity. ... spec and practice must be paired.",
+        "metaphor": "Cultural ratcheting (Tomasello): culture accumulates when innovation is joined by faithful transmission that keeps a gain from slipping back. Every agent session is a new generation with no memory; a practice is the transmission, and its pitfalls are the teeth.",
+        "defined_by": "owner, 2026-10-05 (session 8efd6465; the name proposed by main)"
+      },
+      "name": "practice",
+      "properties": {
+        "trigger": "What fires a practice, on its when: line: a command's words, an edited path's glob with the text the edit adds, or explicit. The hook reads it before the tool runs.",
+        "step": "One thing the practice says to do, numbered from one in the order written; an enactment gives every step an outcome.",
+        "leaves": "The evidence a step leaves behind, named under it: a run record, a journal record, a file state. A step that names one is auditable; one that does not is taken at its word.",
+        "pitfall": "A way the practice has failed, citing the record or commit that witnessed it. Delivered with the practice, after its steps.",
+        "learned": "The records and commits the practice was learned from. A practice that cites nothing is a problem: it is learned, not wished.",
+        "layer": "Former key that marked a kernel practice (layer: coherence), replaced by reach on 2026-10-05; the practice grammar refuses it.",
+        "version": "A fingerprint of the triggers, steps and pitfalls; an enactment binds to the version it carried out.",
+        "reach": "How far one of Coherence's own practices goes, on its reach: line: kernel (every adopter receives it) or internal (it never leaves Coherence's tree). Required in Coherence's tree, refused elsewhere."
+      }
+    },
+    {
+      "definition": "The journal record that a session carried out a practice: the practice, the version enacted, what triggered it, and a result for each step. A practice is enacted. Each step is done, with its evidence where the step names one, or deviated or skipped, each with a because. A deviation is how a practice improves; a step left out silently is how it decays. Enactments are what the practice's integrity is read from: a step removed without a cited record, a step claimed done whose evidence is missing, and a trigger with no enactment by stop.",
+      "status": "settled",
+      "related": [
+        "practice",
+        "journal",
+        "run",
+        "experiment",
+        "regulate"
+      ],
+      "rejected": [
+        {
+          "alternative": "follow as the verb and the record",
+          "because": "owner: a little opaque"
+        },
+        {
+          "alternative": "exercise as the verb",
+          "because": "the journal already says exercised to mean tested, which blurs into refutation"
+        },
+        {
+          "alternative": "observance as the record",
+          "because": "observation is already a concept: a record of runtime behavior"
+        }
+      ],
+      "provenance": {
+        "owner_words": "follow doesn't feel right. a little opaque, but we do need a verb for it. ... yes, a practice is enacted, proceed",
+        "defined_by": "owner, 2026-10-05 (session 8efd6465)"
+      },
+      "name": "enactment"
+    },
+    {
+      "definition": "A practice Coherence ships that every adopter receives beside its own. In Coherence's own tree each practice declares its reach: reach: kernel ships it to every adopter, where its id is led by coherence: and its steps arrive when its trigger fires; reach: internal keeps it in Coherence's tree, an internal practice, because its steps are about Coherence itself. The reach is a value set rather than yes or no, so a later reach is one more value. A project's own practices carry no reach.",
+      "status": "settled",
+      "related": [
+        "practice",
+        "enactment",
+        "lexicon"
+      ],
+      "rejected": [
+        {
+          "alternative": "layer: coherence as the line that marks one",
+          "because": "the lexicon's layers are Coherence's vocabulary and the project's; this is how far a practice goes, a different question"
+        },
+        {
+          "alternative": "a yes or no flag for whether a practice ships",
+          "because": "owner: an enum-like value set, in case of future cases"
+        },
+        {
+          "alternative": "shipping by default, with internal marked",
+          "because": "a practice whose reach was never decided would put Coherence's own steps into every adopter's sessions; the reach is said for every practice instead"
+        }
+      ],
+      "provenance": {
+        "owner_words": "lexicon: \"kernel practice,\" practices Coherence ships that fall through into user projects. but do we have a distinction flag for internal practices which DO NOT? ... I don't like yes/no values, we should have an enum-like value set here in case we have future cases",
+        "defined_by": "owner, 2026-10-05 (session 8efd6465)"
+      },
+      "name": "kernel practice"
     }
   ],
   "metaphors": {

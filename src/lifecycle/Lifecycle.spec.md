@@ -455,3 +455,21 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   kinds: read
   checklist: scoped-reads declared as a hook voice file stays inside the root
   checklist: redaction dismissed: a file that is not read is named by its path under the root alone, never its target or contents
+- a fired practice is delivered before the act: When the tool use about to run fires a practice's trigger, PreToolUse delivers the practice whole on its first firing at that version in the session and one line after, and never blocks the tool.
+  over: a command that fires a practice, the same command again, another session, and a command that fires nothing
+  via: PreToolUse delivers a fired practice whole once per version per session, then one line, and never blocks
+  because: the steps that slip come first (count the stores before a merge, measure the budget before applying), so delivery after the act is too late; whole once and one line after keeps the injection affordable; a refusal would train a session to route around the practice
+  crossing: project-source -> reading
+  refuted: made practiceContext forget earlier firings, so every firing delivered the practice whole -> "PreToolUse delivers a fired practice whole once per version per session, then one line, and never blocks" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: output
+  checklist: destination-confinement dismissed: the practice goes to one destination, the host's additionalContext
+  checklist: redaction dismissed: a practice is the project's own method, shown whole by design
+  checklist: commit-ordered-effects declared as cursor advances after the print
+  checklist: circuit-breaker-policy dismissed: practice files are read locally; no dependency is sampled
+  checklist: declared-target-coverage dismissed: one host reads the delivery, not a registry of targets
+- a fired practice not enacted is owed: Regulate names each practice that fired in the session with no enactment since, with the command that records it, and never refuses a stop for it.
+  over: a subagent stop after a firing, and a stop after the enactment
+  via: regulate names a practice that fired with no enactment since, advisory, and never refuses a subagent stop for it
+  because: advisory for the reason d-f780c7b9 gives for open requirements: refusing the stop would train a session to fabricate an enactment; naming it at the stop with the shape filled in makes the honest record the cheapest one
+  refuted: made practiceStopText treat every firing as enacted, so regulate named nothing owed -> "regulate names a practice that fired with no enactment since, advisory, and never refuses a subagent stop for it" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none

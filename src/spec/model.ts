@@ -21,6 +21,8 @@ import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type Latest } from "../enforcement/record.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
 import { projectFiles, underIgnored } from "../adapters/project-files.ts";
+import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
+import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPractice, practiceProblems, stemOf, type ModelPractice } from "./practices.ts";
 
 export const SPEC_SUFFIX = ".spec.md";
 export const CONFIG_FILE = "coherence.config.json";
@@ -55,6 +57,10 @@ export interface Component {
   /** Where work enters through this component, as its spec declares; each handler was found declared in the code. */
   entrances: ModelEntrance[];
   invariants: ModelInvariant[];
+  /** The practice file paired with the spec, when there is one. */
+  practicePath: string | undefined;
+  /** The component's practices, from its practice file. */
+  practices: ModelPractice[];
   parent: string | undefined;
   children: string[];
 }
@@ -180,6 +186,30 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
     byFolder.set(folder, { folder, specPath: rel, parsed });
   }
 
+  // A practice file stands beside its folder's spec, with the spec's stem (d-861e8319).
+  const practiceFiles = new Map<string, { file: string; parsed: ReturnType<typeof parsePractices> }>();
+  for (const rel of walkedFiles(root, ".", config.ignore).filter((f) => f.endsWith(PRACTICE_SUFFIX)).sort()) {
+    const folder = folderOf(root, join(root, rel));
+    const spec = byFolder.get(folder);
+    if (spec === undefined) {
+      problems.push({ file: rel, line: 1, message: `a practice file is paired with a spec; ${folder === "." ? "the root" : folder} has none (a spec and its practice file are always paired)` });
+      continue;
+    }
+    if (stemOf(rel) !== stemOf(spec.specPath)) {
+      problems.push({ file: rel, line: 1, message: `a practice file takes its spec's stem: ${stemOf(spec.specPath)}${PRACTICE_SUFFIX} beside ${spec.specPath}` });
+      continue;
+    }
+    if (practiceFiles.has(folder)) {
+      problems.push({ file: rel, line: 1, message: `a folder holds one practice file; ${practiceFiles.get(folder)!.file} is already this component's` });
+      continue;
+    }
+    const parsed = parsePractices(readFileSync(join(root, rel), "utf8"), rel);
+    problems.push(...parsed.problems);
+    practiceFiles.set(folder, { file: rel, parsed });
+  }
+  const records = practiceFiles.size === 0 ? [] : journalRecords(root);
+  const enactments = enactmentsIn(records);
+
   const folders = new Set(byFolder.keys());
   const entryFolder = folderOf(root, join(resolve(root, config.entryDir), "x"));
   const entry = byFolder.get(entryFolder);
@@ -238,6 +268,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       }
       return { ...entrance, component: folder, file: found };
     });
+    const paired = practiceFiles.get(folder);
+    const practices = (paired?.parsed.practices ?? []).map((practice) => modelPractice(practice, `${folder}/${practice.name}`, folder, paired!.file, enactments));
     components.push({
       folder,
       name: parsed.title ?? basename(folder === "." ? root : folder),
@@ -246,6 +278,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       trustLevels: parsed.trustLevels,
       entrances,
       invariants,
+      practicePath: paired?.file,
+      practices,
       parent: parentOf(folder, folders),
       children: [],
     });
@@ -253,6 +287,15 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   components.sort((a, b) => a.folder.localeCompare(b.folder));
   problems.push(...entranceTrustProblems(components, trustLevels));
   problems.push(...entranceGuardProblems(root, components));
+  problems.push(
+    ...practiceProblems({
+      root,
+      practices: components.flatMap((c) => c.practices),
+      invariantsByFolder: new Map(components.map((c) => [c.folder, new Set(c.invariants.map((i) => i.name))])),
+      coherenceTree: practiceFiles.size === 0 ? true : isCoherenceTree(root),
+      records,
+    }),
+  );
   const byName = new Map(components.map((c) => [c.folder, c]));
   for (const component of components) {
     if (component.parent !== undefined) byName.get(component.parent)!.children.push(component.folder);
@@ -421,4 +464,15 @@ function countModel(components: Component[], problems: Problem[]): Counts {
     }
   }
   return { components: components.length, bullets, invariants, requirements: bullets - invariants - structuralDefects, structuralDefects, lacking, unfilled, problems: problems.length };
+}
+
+/**
+ * Every practice a session at this root may enact: the project's own, from
+ * its practice files, and in an adopter the practices of Coherence's own
+ * kernel practices, read from where Coherence is installed, their ids led by coherence:.
+ */
+export function projectPractices(root: string, model: SpecModel = loadSpecModel(root, { runs: false })): ModelPractice[] {
+  const own = model.components.flatMap((c) => c.practices);
+  if (isCoherenceTree(root)) return own;
+  return [...own, ...kernelPractices(enactmentsIn(journalRecords(root)))];
 }

@@ -98,3 +98,34 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: made the grammar accept control: none with an empty reason, dropping the problem -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
+- a practice is paired with its spec: A practice file stands only in a folder whose spec shares its stem; one beside no spec, under another stem, or second in its folder is a problem.
+  over: every practice file under the root: beside no spec, under another stem, and paired
+  via: a practice file stands only beside its folder's spec, with the spec's stem
+  because: owner ruling d-861e8319: a spec and its practice file are always paired, so the component stays the unit; a practice file alone would make a folder half a component, and one under another stem would read as a second component's
+  refuted: dropped the problem for a practice file beside no spec, so a loose practice file was skipped silently -> "a practice file stands only beside its folder's spec, with the spec's stem" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- an enacted practice keeps what it taught: Once a practice is enacted, a step or pitfall that its latest enactment carried out and the practice no longer holds is a problem until a decision cites an enactment of it; adding is free, and a practice never enacted changes freely.
+  over: every practice with an enactment, against the text its latest enactment carried out
+  via: a step enacted and since removed is a problem until a decision cites an enactment of the practice
+  because: this is what keeps a gain from slipping back: a method decays by losing steps silently, and its pitfalls each cost a defect to learn; a removal must say why and cite what was carried out, while additions and candidates stay cheap so that practices get written at all
+  refuted: made practiceProblems treat every enacted practice as amended, so a removed step passed without a citing decision -> "a step enacted and since removed is a problem until a decision cites an enactment of the practice" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: revision
+  checklist: revision-preservation declared as an enacted practice keeps what it taught
+- a practice rests on evidence that exists: Every record or commit a practice cites resolves, here or on another branch, every invariant it names is declared, and a practice that cites nothing is a problem.
+  over: every citation in learned: and pitfall: lines and every name in invariants: lines across the project's practice files
+  via: every record a practice cites must exist, and every invariant it names must be declared
+  because: a practice is learned, not wished: what makes it binding is the record of the failure it prevents, and a citation of nothing would make an invented step read as witnessed
+  refuted: made practiceProblems accept a cited record id that no store holds -> "every record a practice cites must exist, and every invariant it names must be declared" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- kernel practices reach adopters: In an adopter, the practices whose reach is kernel are delivered beside the project's own with their ids led by coherence:, and an internal practice never leaves Coherence's tree.
+  over: Coherence's practice files as an adopter reads them: kernel and internal
+  via: in an adopter, the kernel practices are delivered beside the project's own, their ids led by coherence:, and an internal practice is not
+  because: a practice for using Coherence's own commands (witnessing a refutation) applies in every adopter from the first session, so adoption starts with the method already learned; a practice about Coherence's own tree (its lexicon budget) would be noise anywhere else
+  refuted: made kernelPractices take every practice with a reach, so an internal one reached adopters -> "in an adopter, the kernel practices are delivered beside the project's own, their ids led by coherence:, and an internal practice is not" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- every Coherence practice declares its reach: In Coherence's own tree each practice declares reach: kernel or reach: internal, an unknown value is a problem, and a reach line in any other project is a problem.
+  over: a practice in Coherence's tree with no reach, with each value, with an unknown value, and an adopter's practice with one
+  via: in Coherence's own tree every practice declares its reach, kernel or internal; anywhere else a reach line is a problem
+  because: a practice whose reach was never decided either fails silently to reach adopters or puts Coherence's own steps into every adopter's sessions; never examined and examined are different facts (d-8ed21083), so the reach is said, and as a value set so a later reach is one more value (owner, 2026-10-05)
+  refuted: dropped the problem for a practice in Coherence's tree with no reach line -> "in Coherence's own tree every practice declares its reach, kernel or internal; anywhere else a reach line is a problem" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none

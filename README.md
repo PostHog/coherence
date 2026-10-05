@@ -27,7 +27,7 @@ work itself.
 
 ```text
 Install @posthog/coherence as a dev dependency and run `npx --no coherence hooks install --host claude` (or `--host codex`).
-Then continue from step 2 of "Full setup" in node_modules/@posthog/coherence/README.md, and tell me what each step found.
+Then run `npx --no coherence query practice "adopt Coherence"`, work through it, record it with `enact`, and tell me what each step found.
 ```
 
 It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux. The package
@@ -139,6 +139,36 @@ earlier decision it builds on.
 
 ![A decision record in the Journal view: the choice, two rejected alternatives, the reason, the human's words as the agent attributes them, and a citation of an earlier decision.](docs/images/scope-journal.jpg)
 
+### Methods are kept, not rediscovered
+
+Every project has ways of working that live only in someone's head or a
+scrollback: how to witness a refutation, how to carry a lexicon change
+through, how to merge a parallel worktree without losing records. Each agent
+session starts with none of them. A **practice** keeps one: a file beside a
+component's spec (`Enforcement.practice.md` beside `Enforcement.spec.md`)
+lists the steps, the evidence each step leaves, and the pitfalls, each citing
+the record that witnessed it.
+
+```markdown
+- witness a refutation: A refutation counts only when the detector went red because of the staged break.
+  when: command refute | edit **/*.spec.md adding refuted:
+  step: run the bullet's test alone, by its filter, and see it green
+    leaves: run record for the bullet, pass
+  step: stage the smallest break that changes the behavior the bullet claims
+  pitfall: a sed matched two lines, so the test hung and went red only when killed (d-828ddc83)
+  learned: d-4dafa61b, df-b9b2711b
+  because: the step that slips is the one no command checks: that the red came from the break
+```
+
+When a tool use is about to fire a practice's trigger, the hook delivers the
+practice whole, before the act. The session records what it did with
+`enact`: every step done, deviated, or skipped, with why. Once a practice has
+been enacted, a step can only leave it with a decision that says why, so a
+method improves through recorded deviations instead of eroding through
+silent ones. Coherence ships **kernel practices** for its own commands and
+for adoption itself, so an adopter starts with them; each of Coherence's
+practices declares `reach: kernel` or `reach: internal`.
+
 ### Many agents, one picture
 
 Move between conversations and agents without writing summary files for the
@@ -159,93 +189,42 @@ how much code no invariant's enforcement reaches yet.
 It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux.
 
 ```text
-Set up Coherence in this project. Work through these steps in order, and
-report what each one found.
+Set up Coherence in this project, and report what each step found.
 
 1. Install. Run `npm install -D @posthog/coherence` (or `pnpm add -D
    @posthog/coherence`). Do not `npm link` a checkout into the project. The
-   command is
-   `npx --no coherence` (call it `coherence` below); `--no` keeps npx from
-   fetching an unrelated package if the install is missing. Check it with
-   `coherence spec --check`. Teammates get it from the lockfile.
+   command is `npx --no coherence` (call it `coherence` below); `--no` keeps
+   npx from fetching an unrelated package if the install is missing.
+   Teammates get it from the lockfile.
 
-2. Config. Write coherence.config.json at the project root with: "name";
-   "language" ("typescript" or "python"); "ignore" (folders that are not this
-   project's code or prose: vendored code, generated output, fixtures, promo
-   material); and, where the project has them, "typecheck" and "test" (an argv
-   array the test-name filter is appended to, or a string containing
-   {filter}), "testMatch" and "testJson". Read the usage that any unknown
-   `coherence` command prints for the full surface.
+2. Hooks. Run `coherence hooks install --host claude` (or `--host codex`).
+   From the next session on, every session starts with Coherence's
+   vocabulary, the project's standing, and the exact journal commands.
 
-3. Hooks. Run `coherence hooks install --host claude` (or `--host codex`).
-   From the next session on, every session starts with Coherence's vocabulary,
-   the project's open requirements, and the exact journal command, including
-   the session id to pass with --session. The installed hooks look for
-   Coherence at $COHERENCE_HOME, then ../coherence (also beside the main
-   checkout of a git worktree), then the installed package. Where none is
-   found, the session start tells the user in one line and tells the agent
-   how to supply Coherence and to ask before changing dependencies; every
-   other event exits 0 in silence.
-   To add the project's own words to an event, write
-   `.coherence/hooks/<Event>.append.md` (it follows what the hook says) or
-   `.coherence/hooks/<Event>.override.md` (it replaces it; an empty one
-   silences the event), where `<Event>` is SessionStart, SubagentStart,
-   UserPromptSubmit, PostToolUse, Stop or SubagentStop. `{{session}}`,
-   `{{agent}}` and `{{cli}}` are filled in; a refused subagent stop keeps its
-   reason whatever the override says.
-
-4. Lexicon. Run `coherence lexicon coverage` to see the recurring terms that
-   lack a definition. Declare the ones that carry the project's domain
-   meaning: `coherence lexicon propose declare <term> --definition "<one
-   sentence>" --because "<why>"`, then `coherence lexicon apply <proposal id>
-   --because "<why>" --over "<the alternative>" --session <id> --agent <your
-   name>`. The first apply creates lexicon.json. Settle contested terms from
-   the project's own history (commit messages and pull request discussions),
-   and record your tie-breaks with `coherence decide`.
-
-5. Specs. Run `coherence scaffold component . "<one-line intent>"` for the
-   entry spec, then add its `## trust levels`: one bullet per level, written
-   `- name (outside): meaning` for a level whose data or caller comes from
-   outside the system's control. Scaffold one spec per component folder.
-   Declare each entrance (command, route, event, tool) in the spec of the
-   component that owns its handler, with `trust: <level>`. Then run
-   `coherence scaffold entrances`: it prints an `## entrances` bullet for every
-   route, server function, command and script it detects that no spec
-   declares, under the spec that owns it; declare each, writing its meaning
-   and trust, or record with `coherence decide` why one is not an entrance.
-   Add the few
-   invariants that matter most (security, tenant isolation, data integrity)
-   with `coherence scaffold invariant <folder> "<sentence>" --kinds <a,b|none>
-   --chokepoint` (or `--totality-oracle`) `--write`, fill every placeholder,
-   and answer the decomposition checklist it prints.
-
-6. Enforce. Run `coherence run --session <id> --agent <name>`. For each
-   bullet, stage a real break, run `coherence refute <component>/<name>
-   --broke "<what you changed>"`, restore the code, and run again. A broken
-   chokepoint is a finding, not a failure: report its bypass sites. Continue
-   until `coherence spec --check` reports 0 problems.
-
-7. Baseline, record and show. Run `coherence lexicon --check`, declare what it
-   names that carries the project's meaning, then run `coherence lexicon
-   baseline --session <id> --agent <name>`: the findings the project already
-   held are recorded in the journal, and the check fails only on new ones.
-   Commit coherence.config.json, lexicon.json, the specs, the
-   hook settings, and .coherence/journal, .coherence/runs and .coherence/work.
-   Run `coherence scope` and report what the reading shows: health, broken
-   chokepoints, entrances whose trust comes from outside with no traced
-   control on their route, and components no enforcement covers. "No traced
-   control" means Coherence could not trace one, not that none exists: close
-   each with `guard:` where a verified chokepoint wraps its handler, an
-   invariant whose crossing enters from its trust, or `control: none —
-   <reason>` where it needs none (`coherence scaffold control <entrance>`
-   proposes which).
+3. Adopt. Run `coherence query practice "adopt Coherence"` and work through
+   it: config, vocabulary, specs and entrances, the invariants that matter
+   most, refutations, baselines, and the methods the project already has.
+   Each step names the practice or command that carries it; a practice is
+   delivered whole when its command is about to run. When done, record it:
+   `coherence enact "adopt Coherence" --step <n>=done|deviated:<why>|skipped:<why> ...`.
 
 Record every non-obvious choice with `coherence decide "<chose>" --over
-"<rejected>" --because "<why>" --session <id> --agent <name>`. Never use a name
-the project's lexicon rejects, nor one Coherence rejects where you name
-Coherence's own concepts (records, spec grammar); the project's own words keep
-the project's sense. `coherence lexicon --check` finds them.
+"<rejected>" --because "<why>" --session <id> --agent <name>`.
 ```
+
+Adoption is a practice rather than prose so that its steps arrive where
+their commands run, its pitfalls cite what went wrong in earlier adoptions,
+and the enactment is a durable record of how the project was adopted
+(`coherence query practice` lists every practice).
+
+The installed hooks look for Coherence at `$COHERENCE_HOME`, then
+`../coherence` (also beside the main checkout of a git worktree), then the
+installed package; where none is found, the session start says so in one line.
+To add the project's own words to an event, write
+`.coherence/hooks/<Event>.append.md` (it follows what the hook says) or
+`.coherence/hooks/<Event>.override.md` (it replaces it; an empty one silences
+the event). `{{session}}`, `{{agent}}` and `{{cli}}` are filled in; a refused
+subagent stop keeps its reason whatever the override says.
 
 ## Platform
 
@@ -266,6 +245,7 @@ node src/cli.ts spec --check [root]       # components, invariants with state, p
 node src/cli.ts spec --json [root]        # the spec model
 node src/cli.ts scaffold component <folder> "<intent>"
 node src/cli.ts scaffold invariant <folder> "<sentence>" --kinds a,b [--chokepoint|--totality-oracle] [--write]
+node src/cli.ts enact "<practice>" --step <n>=done[:<evidence>]|deviated:<why>|skipped:<why>...   # record a practice carried out
 node src/cli.ts run [--session --agent]   # the chokepoint check and the totality oracle pass, one run appended; exit 1 on a structural defect
 node src/cli.ts run --status              # the latest verdict per enforcement, a view over every run
 node src/cli.ts serve                     # the warm language server for this project (spawned on demand otherwise)
@@ -286,7 +266,7 @@ both layers with a short instruction, the journal read command, and a decision
 write template. This checkout carries hooks for both Claude Code and Codex;
 `node src/cli.ts hooks status` reports their installation and what each event
 carries here (orient at the starts, the peer feed at prompt and tool boundaries,
-regulate at the stops), and `hooks --check` is the CI form. Stop reports the check
+a practice before a tool use that fires it, regulate at the stops), and `hooks --check` is the CI form. Stop reports the check
 over changed files; SubagentStop refuses the stop (exit 2, reason on stderr) while findings remain.
 
 ## Lexicon workflow

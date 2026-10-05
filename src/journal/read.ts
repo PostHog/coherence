@@ -20,7 +20,7 @@
 
 import { JournalError } from "./args.ts";
 import type { Elsewhere } from "./branches.ts";
-import { GLYPH, anySubjectOf, citedBy, citesOf, isKind, kindLabel, pointsAt, subjectOf, type AnyRecord, type Escalation, type JournalRecord, type Kind } from "./record.ts";
+import { GLYPH, enactmentTally, anySubjectOf, citedBy, citesOf, isKind, kindLabel, pointsAt, subjectOf, type AnyRecord, type Escalation, type JournalRecord, type Kind } from "./record.ts";
 import { compareRecords, type Damaged, type Loaded } from "./store.ts";
 
 export interface Filters {
@@ -138,6 +138,14 @@ function renderBody(record: JournalRecord, status: string | undefined): string[]
     case "close":
       for (const [id, result] of Object.entries(record.results)) detail.push(`${id}=${result}`);
       return [line(`closed ${record.of}: ${record.outcome}`), ...indent(detail)];
+    case "enactment":
+      detail.push(`version ${record.version}, fired by ${record.trigger}`);
+      record.steps.forEach((step, index) => {
+        const outcome = record.results[String(index + 1)];
+        const said = outcome === undefined ? "no outcome" : outcome.result === "done" ? `done${outcome.evidence ? `: ${outcome.evidence}` : ""}` : `${outcome.result}: ${outcome.because}`;
+        detail.push(`${index + 1}. ${said}  (${step.text})`);
+      });
+      return [line(`enacted ${record.practice}: ${enactmentTally(record)}`), ...indent(detail)];
     case "unable":
     case "escalation":
       return [line(record.what), ...indent([`because: ${record.because}`])];

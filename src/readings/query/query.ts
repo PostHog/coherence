@@ -57,6 +57,7 @@ export const QUERY_USAGE = [
   "  query component <folder>       one component: intent, counts, bullets",
   "  query order [--session <id>]   the active work order the session owns, folded from its records, with what it cites, what binds to it, and what cites it",
   "  query economy <path...> | --changed [--since <commit>]   what must be loaded to change these files safely: the economy prediction, through the instrument; --changed reads the working change from git (staged, unstaged, untracked), --since widens it from the merge base of <commit> and HEAD (--since main: this branch's whole change set)",
+  "  query practice [<practice>]     every practice with its trigger, state and enactments; with one named, the whole practice as the hook delivers it",
   "  query observed [<component>] [--failures [--since <commit>]]   each component interface exercised by N tests or never observed, from the latest observation, fresh or stale; failing tests with what broke, the likely site, and the region",
 ].join("\n");
 

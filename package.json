@@ -41,7 +41,8 @@
   "files": [
     "dist",
     "docs/lexicon.json",
-    "docs/checklist-seed.json"
+    "docs/checklist-seed.json",
+    "src/*/*.practice.md"
   ],
   "optionalDependencies": {
     "pyright": "^1.1.414",
