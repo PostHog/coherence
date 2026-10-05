@@ -1362,7 +1362,6 @@
         "leaves": "The evidence a step leaves behind, named under it: a run record, a journal record, a file state. A step that names one is auditable; one that does not is taken at its word.",
         "pitfall": "A way the practice has failed, citing the record or commit that witnessed it. Delivered with the practice, after its steps.",
         "learned": "The records and commits the practice was learned from. A practice that cites nothing is a problem: it is learned, not wished.",
-        "layer": "Former key that marked a kernel practice (layer: coherence), replaced by reach on 2026-10-05; the practice grammar refuses it.",
         "version": "A fingerprint of the triggers, steps and pitfalls; an enactment binds to the version it carried out.",
         "reach": "How far one of Coherence's own practices goes, on its reach: line: kernel (every adopter receives it) or internal (it never leaves Coherence's tree). Required in Coherence's tree, refused elsewhere."
       }

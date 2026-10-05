@@ -356,8 +356,55 @@ interface ProseLine {
   runs: Word[][];
 }
 
-export async function lexiconCoverage(root: string): Promise<Coverage> {
+/**
+ * Every line of the project's own files that writes the term, as a word or
+ * inside an identifier, whether or not it recurs enough to be a candidate. A
+ * term a project has not declared yet is read here before it is named (step
+ * one of settle a domain term); coverage's terms hold only what recurs.
+ */
+export async function liveUses(
+  root: string,
+  term: string,
+  limit = 40,
+): Promise<{ uses: VocabularyUse[]; total: number }> {
   const { coherence, project } = await loadProjectLexicons(root);
+  const corpus = await readCorpus({ root, coherence, project });
+  const wanted = " " + clean(term).replace(/[^a-z0-9 ]/g, " ").trim() + " ";
+  if (wanted.trim() === "") return { uses: [], total: 0 };
+  const components = corpus.files
+    .filter((f) => f.rel.endsWith(".spec.md"))
+    .map((f) => dirname(f.rel))
+    .sort((a, b) => b.length - a.length);
+  const found: VocabularyUse[] = [];
+  for (const f of corpus.files) {
+    const secret = /(^|\/)\.env(?:$|\.)/.test(f.rel);
+    f.lines.forEach((source, n) => {
+      if (f.kind === "record" && isLexiconDecision(source)) return;
+      const observed = secret ? source.replace(/=.*/, "") : source;
+      const normalized = " " + clean(observed).replace(/[^a-z0-9 ]/g, " ") + " ";
+      if (!normalized.replace(/\s+/g, " ").includes(wanted)) return;
+      found.push({
+        file: f.rel,
+        line: n + 1,
+        component:
+          components.find((c) => c === "." || f.rel.startsWith(c + "/")) ??
+          "(no declared component)",
+        text: (secret ? source.replace(/=.*/, "=<redacted>") : source).trim().slice(0, 360),
+        kind: f.kind,
+        fingerprint: digest(source),
+      });
+    });
+  }
+  return { uses: found.slice(0, limit), total: found.length };
+}
+
+export async function lexiconCoverage(
+  root: string,
+  layers?: { coherence: Lexicon; project: Lexicon | undefined },
+): Promise<Coverage> {
+  const { coherence, project } = layers ?? (await loadProjectLexicons(root));
+  // Coherence's own lexicon is the project's only in Coherence's own checkout; an adopter without lexicon.json has none yet.
+  const own = await isCoherenceItself(root);
   const rawEntries = new Map<string, Record<string, unknown>>();
   for (const g of [coherence, ...(project ? [project] : [])]) {
     const raw = JSON.parse(await readFile(g.path, "utf8")) as {
@@ -394,7 +441,6 @@ export async function lexiconCoverage(root: string): Promise<Coverage> {
     : new Set<string>();
   for (const name of projectNames) rejected.delete(name);
   // Only a name that binds here marks a sense at risk beside it: Coherence's rejected names bind in an adopter's prose never, the project's own always (check.ts).
-  const own = await isCoherenceItself(root);
   const binding = new Set(
     own ? rejected.keys() : (project ? rejectedNames(project) : []).map((r) => clean(r.name)).filter((n) => rejected.has(n)),
   );
@@ -717,9 +763,7 @@ export async function lexiconCoverage(root: string): Promise<Coverage> {
   };
   return {
     version: 1,
-    projectLexicon:
-      project?.path ??
-      (coherence.path.startsWith(root + "/") ? coherence.path : null),
+    projectLexicon: project?.path ?? (own ? coherence.path : null),
     fingerprint: digestAll([population.extraction, ...population.limits, ...population.files, ...population.excluded, ...population.unreadable, ...terms]),
     population,
     terms,
@@ -815,13 +859,25 @@ export function attentionText(report: Coverage, cli = "coherence", limit = 5): s
   return lines.join("\n");
 }
 
-export function coverageText(report: Coverage, term?: string): string {
+export function coverageText(
+  report: Coverage,
+  term?: string,
+  live?: { uses: VocabularyUse[]; total: number },
+): string {
   if (term) {
     const entries = report.terms.filter(
       (t) => t.term === clean(term) || clean(t.concept ?? "") === clean(term),
     );
+    const below =
+      live && live.total > 0
+        ? [
+            `"${term}" is written on ${live.total} ${live.total === 1 ? "line" : "lines"}, below the recurrence a candidate needs; its live uses:`,
+            ...live.uses.map((u) => `  ${u.file}:${u.line} ${u.text}`),
+            ...(live.total > live.uses.length ? [`  ${live.total - live.uses.length} more in --json.`] : []),
+          ]
+        : [`No observed use of "${term}" in this reading.`];
     return [
-      ...(entries.length ? [] : [`No observed use of "${term}" in this reading.`]),
+      ...(entries.length ? [] : below),
       ...entries.flatMap((t) => [
         `${t.term} [${t.state}${t.concept ? "; " + t.concept : ""}] ${t.count} uses${t.recurrence ? `; recurs on ${t.recurrence.prose} prose lines across ${t.recurrence.components} components` : ""}`,
         t.definition ?? "No settled definition.",
