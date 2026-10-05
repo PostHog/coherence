@@ -18,15 +18,17 @@
 - declare a requirement: A requirement is written as behavior that must hold, with an enforcement the instrument can resolve, an honest checklist, and its because, so that the refutation that follows has something real to break.
   when: command scaffold invariant
   step: write the sentence as behavior that must hold whatever the implementation, not as the mechanism that holds it today
+  step: when the code already breaks it, keep the sentence as it must hold: record a defect for each site that breaks it and escalate whether to fix them; the bullet stays a requirement until the fix, never an invariant by weakening the sentence to match the code
   step: name the enforcement as something the instrument resolves: a bare identifier, an identifier in a file, or a module path; prose there grades not chokeable
   step: choose the chokepoint form when one site guards the protected thing, and the totality oracle form when a detector checks the whole set; a detector is never itself the chokepoint
   step: name the kinds honestly and answer every checklist shape printed, declared as an invariant or dismissed with a reason; leave kinds out of a bullet you did not examine, so the lack stays visible
   step: write the because: what the invariant protects against, and what broke without it
-  step: run, then witness its refutation (the practice witness a refutation)
-    leaves: spec --check lists the bullet as an invariant
+  step: run, then witness its refutation (the practice witness a refutation); when no test can run here (it needs a database, keys, or a running server), record unable naming the wall instead, and the bullet stays a requirement
+    leaves: spec --check lists the bullet as an invariant, or the unable record
   pitfall: fourteen prose protects: values graded not chokeable, with the fix named (d-4d96c8d7)
   pitfall: claims whose chokepoint was their own detector named a symbol with nothing protected behind it (d-3459e43b)
   pitfall: refuted: lines written by hand read as witnessed, so 32 of 52 invariants rested on nothing that went red (df-b9b2711b)
+  pitfall: at a fresh adoption both requirements were already false and the only tests needed a database, keys and a running server, and the practice said nothing of either (df-8ac95c4d)
   learned: d-8ed21083, d-362ee727, d-b30cb995
   invariants: src/spec/requirement until complete, src/spec/refutation is a recorded event
   reach: kernel

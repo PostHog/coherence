@@ -38,11 +38,11 @@
   when: explicit
   step: confirm the hooks are wired as install would write them: coherence hooks --check --host <claude or codex>
     leaves: hooks --check exits 0
-  step: write coherence.config.json at the root: name, language, the folders that are not this project's code or prose under ignore (vendored code, generated output, fixtures), and, where the project has them, typecheck and test (an argv array the test-name filter is appended to, or a string containing {filter}) with testMatch and testJson; any unknown coherence command prints the full surface
+  step: write coherence.config.json at the root: name, language, the folders that are not this project's code or prose under ignore (vendored code, generated output, fixtures), and, where the project has tests, test with testMatch and testJson; every key is in docs/config.md in the installed package
   step: settle the vocabulary: coherence lexicon coverage, then declare the terms that carry the project's meaning (the practice settle a domain term)
-  step: declare the components and where work enters them: the entry spec with its trust levels, one spec per component folder, then every entrance (the practice declare entrances)
+  step: declare the components and where work enters them: the entry spec with its trust levels, one spec per component folder, then every entrance (the practice declare entrances); the grammar is in docs/spec.md in the installed package
   step: declare the few invariants that matter most (security, tenant isolation, data integrity), each through the practice declare a requirement
-  step: run, then witness each refutation (the practice witness a refutation); a broken chokepoint is a finding to report with its bypass sites, not a failure to hide
+  step: run, then witness each refutation (the practice witness a refutation); a broken chokepoint is a finding to report with its bypass sites, not a failure to hide; a requirement the code already breaks stays a requirement, with a defect per site and an escalation, and a test that cannot run here is recorded as unable
     leaves: spec --check with 0 problems
   step: baseline what the project already held: coherence lexicon baseline, and coherence scaffold control --baseline for entrances with no traced control
     leaves: the baseline records in the journal
@@ -54,6 +54,7 @@
   pitfall: Scope failed when run from an adopter's own folder, because every page until then had been built from Coherence's checkout with --root (d-01976691)
   pitfall: a coverage report redirected into the adopter's root was read back as its source and grew on every run (df-79ac2d4e)
   pitfall: both outside adoptions left their route gaps open because nothing in the session's loop showed them (d-a1095ef2)
+  pitfall: a fresh adoption found its first requirements already false and its tests unable to run unattended, and had to improvise what to record (df-8ac95c4d)
   learned: d-96eb6814, d-127ab8e4, d-a1095ef2, f658594
   reach: kernel
   because: the setup prompt was a method kept in prose, carried out once and reported in a chat reply that no later session reads; as a practice each step is delivered where its commands run, and the enactment is the durable record of how the project was adopted

@@ -205,7 +205,9 @@ Set up Coherence in this project, and report what each step found.
    it: config, vocabulary, specs and entrances, the invariants that matter
    most, refutations, baselines, and the methods the project already has.
    Each step names the practice or command that carries it; a practice is
-   delivered whole when its command is about to run. When done, record it:
+   delivered whole when its command is about to run. The references it
+   points at ship with the package: docs/config.md (every config key) and
+   docs/spec.md (the spec and practice grammar). When done, record it:
    `coherence enact "adopt Coherence" --step <n>=done|deviated:<why>|skipped:<why> ...`.
 
 Record every non-obvious choice with `coherence decide "<chose>" --over
