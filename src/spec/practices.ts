@@ -7,9 +7,10 @@
  * (Enforcement.spec.md, Enforcement.practice.md). Every record or commit a
  * practice cites must exist. An invariant it names must be one its sister
  * spec, or the component it names, declares. And once a practice has been
- * enacted, the text that enactment carried out is the floor: a step or a
- * pitfall that has since left the practice is a problem until a decision
- * cites an enactment of it and says why. Adding a step or a pitfall is free;
+ * enacted, the text every enactment carried out is the floor: a step or a
+ * pitfall that has since left the practice is a problem until a decision,
+ * recorded at or after the latest enactment that carried it out, cites an
+ * enactment of the practice, names the practice, and says why. Adding a step or a pitfall is free;
  * a candidate (never enacted) may change freely.
  */
 
@@ -132,8 +133,7 @@ export interface PracticeChecks {
 /**
  * The model-level problems of a project's practices: a citation found nowhere,
  * an invariant no spec declares, a reach missing in Coherence's tree or written outside it,
- * and a step or pitfall gone from an enacted practice with no decision citing
- * an enactment of it.
+ * and a step or pitfall gone from an enacted practice with no decision amending it (floorGaps).
  */
 export function practiceProblems(checks: PracticeChecks): Problem[] {
   const { root, practices, invariantsByFolder, coherenceTree, records } = checks;
@@ -173,32 +173,59 @@ export function practiceProblems(checks: PracticeChecks): Problem[] {
     }
   }
 
-  // The floor: what the latest enactment carried out may leave the practice only with a decision citing an enactment of it.
-  const enactments = enactmentsIn(records);
-  const decisions = records.filter((r): r is Decision => r.kind === "decision");
+  // The floor: what any enactment carried out may leave the practice only with a decision that amends it.
   for (const p of practices) {
-    const mine = enactments.filter((e) => e.practice === p.id);
-    const latest = mine[mine.length - 1];
-    if (latest === undefined || latest.version === p.version) continue;
-    const steps = new Set(p.steps.map((s) => normalize(s.text)));
-    const pitfalls = new Set(p.pitfalls.map((pf) => normalize(pf.text)));
-    const gone = [
-      ...latest.steps.filter((s) => !steps.has(normalize(s.text))).map((s) => `step "${s.text}"`),
-      ...latest.pitfalls.filter((pf) => !pitfalls.has(normalize(pf))).map((pf) => `pitfall "${pf}"`),
-    ];
-    if (gone.length === 0) continue;
-    const ids = new Set(mine.map((e) => e.id));
-    const amended = decisions.some((d) => d.at >= latest.at && (d.cites ?? []).some((id) => ids.has(id)));
-    if (amended) continue;
-    for (const what of gone) {
+    for (const gap of floorGaps(p, records)) {
       problems.push({
         file: p.file,
         line: p.line,
-        message: `practice ${p.name}: ${what} was enacted in ${latest.id} and is gone; a practice keeps what it taught unless a decision says why: decide "amend ${p.id}: <what changed>" --because "<why>" --cite ${latest.id}`,
+        message: `practice ${p.name}: ${gap.what} was enacted in ${gap.taughtIn.id} and is gone; a practice keeps what it taught unless a decision says why: ${amendCommand(p.id, gap.taughtIn.id)}`,
       });
     }
   }
   return problems;
+}
+
+/** A step or pitfall an enactment taught that has left the practice with no decision amending it. */
+export interface FloorGap {
+  /** step "<text>" or pitfall "<text>". */
+  what: string;
+  /** The latest enactment that still carried it out. */
+  taughtIn: Enactment;
+}
+
+/** The decide command that records an amendment of a practice, citing the enactment that taught what left it. */
+export function amendCommand(id: string, enactment: string): string {
+  return `decide "amend ${id}: <what changed>" --because "<why>" --cite ${enactment}`;
+}
+
+function namesPractice(chose: string, id: string): boolean {
+  const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^\\w/-])${escaped}($|[^\\w/-])`).test(chose);
+}
+
+/**
+ * The floor of one practice: every step and pitfall that any of its
+ * enactments carried out, of any version, and the practice no longer holds,
+ * unless a decision recorded at or after the latest enactment that still
+ * carried it out cites an enactment of the practice and names the practice's
+ * id in what it chose. Re-enacting the edited practice never clears it.
+ */
+export function floorGaps(practice: Pick<Practice, "steps" | "pitfalls"> & { id: string }, records: readonly JournalRecord[]): FloorGap[] {
+  const mine = enactmentsIn(records).filter((e) => e.practice === practice.id);
+  if (mine.length === 0) return [];
+  const steps = new Set(practice.steps.map((s) => normalize(s.text)));
+  const pitfalls = new Set(practice.pitfalls.map((pf) => normalize(pf.text)));
+  // Each text gone, keyed by kind and text, with the latest enactment that carried it out (enactments are oldest first).
+  const gone = new Map<string, FloorGap>();
+  for (const e of mine) {
+    for (const s of e.steps) if (!steps.has(normalize(s.text))) gone.set(`step ${normalize(s.text)}`, { what: `step "${s.text}"`, taughtIn: e });
+    for (const pf of e.pitfalls) if (!pitfalls.has(normalize(pf))) gone.set(`pitfall ${normalize(pf)}`, { what: `pitfall "${pf}"`, taughtIn: e });
+  }
+  if (gone.size === 0) return [];
+  const ids = new Set(mine.map((e) => e.id));
+  const amendments = records.filter((r): r is Decision => r.kind === "decision" && (r.cites ?? []).some((id) => ids.has(id)) && namesPractice(r.chose, practice.id));
+  return [...gone.values()].filter((gap) => !amendments.some((d) => d.at >= gap.taughtIn.at));
 }
 
 /** The journal's records for the checks, or none when the journal cannot be read: the spec check never fails on the journal. */
