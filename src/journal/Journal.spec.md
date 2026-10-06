@@ -155,3 +155,19 @@ Compression: one append-only file per session of attributed, durable outcomes, r
   checklist: durable-dispatch-intent dismissed: nothing is dispatched after the append
   checklist: declared-target-coverage dismissed: one session file, no fan-out
   checklist: completion-evidence dismissed: the append is complete when the call returns
+- an enactment waits for the amendment: enact refuses a practice that has lost a step or pitfall an enactment taught until a decision amends it, naming what is gone and the decide command to record first.
+  over: every enact write of a practice with an enactment: one missing a step an enactment taught, before and after the decision that amends it
+  via: enact refuses a practice that has lost a step an enactment taught until a decision amends it
+  because: an enactment of the edited practice used to stand in for the reason: remove a step, enact once, and the removal needed no decision (df-c2662b43); refusing the write keeps the floor from being cleared by the very record it is read from
+  crossing: project-source -> record
+  refuted: made the floor check in enact never true, so the edited practice was enacted with its step gone and no decision -> "enact refuses a practice that has lost a step an enactment taught until a decision amends it" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-06)
+  kinds: storage
+  checklist: scoped-reads dismissed: every reader sees every enactment; there is no scope to narrow
+  checklist: encrypted-storage dismissed: the journal is plain text by design
+  checklist: key-rotation-compatibility dismissed: no key exists
+  checklist: input-validation declared as an enactment answers every step
+  checklist: revision-preservation declared as append-only store
+  checklist: commit-ordered-effects dismissed: the append is the only effect, and a refusal writes nothing
+  checklist: durable-dispatch-intent dismissed: nothing is dispatched after the append
+  checklist: declared-target-coverage dismissed: one session file, no fan-out
+  checklist: completion-evidence dismissed: the append is complete when the call returns, or nothing is written
