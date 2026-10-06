@@ -45,11 +45,11 @@ export interface ModelPractice extends Practice {
   enactments: number;
 }
 
-export const SPEC_STEM = /\.spec\.md$/;
-
 /** The stem a spec and its practice file share: Enforcement for Enforcement.spec.md. */
 export function stemOf(path: string): string {
-  return basename(path).replace(SPEC_STEM, "").replace(new RegExp(`${PRACTICE_SUFFIX.replace(/\./g, "\\.")}$`), "");
+  const name = basename(path);
+  for (const suffix of [".spec.md", PRACTICE_SUFFIX]) if (name.endsWith(suffix)) return name.slice(0, -suffix.length);
+  return name;
 }
 
 /** Whether the root is Coherence's own tree, read from its package name: there its practices are the project's own. */
