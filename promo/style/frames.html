@@ -1,0 +1,510 @@
+<title>Coherence Style Frames</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@500;700&family=Barlow+Condensed:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Sans:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --ground: #E9EBE8; --panel: #F7F8F5; --ink: #1A1E1D; --muted: #5D6661; --line: #CCD2CC; --focus: #D2461B;
+  --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { color-scheme: dark; --ground: #121514; --panel: #1A1E1D; --ink: #E4E8E4; --muted: #98A19C; --line: #2D3431; --focus: #FF7A45; }
+}
+:root[data-theme="dark"] { color-scheme: dark; --ground: #121514; --panel: #1A1E1D; --ink: #E4E8E4; --muted: #98A19C; --line: #2D3431; --focus: #FF7A45; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+h1 { margin: 0; font: 600 13px var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.lede { margin: 4px 0 0; max-width: 68ch; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.seg button { font: 500 13px var(--sans); color: var(--ink); background: none; border: 0; padding: 8px 14px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
+.seg button:focus-visible, .ctl:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.label { font: 600 11px var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.ctl { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; background: #000; box-shadow: 0 20px 50px -24px rgb(0 0 0 / .5); }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.stage .grain { pointer-events: none; mix-blend-mode: overlay; }
+.tc { position: absolute; right: 12px; bottom: 10px; font: 500 11px var(--mono); color: rgb(255 255 255 / .55); mix-blend-mode: difference; }
+.spec { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px 24px; }
+.spec h2 { margin: 0 0 4px; font-size: 26px; line-height: 1.15; text-wrap: balance; }
+.spec .pitch { margin: 0 0 14px; color: var(--muted); max-width: 60ch; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.sw { display: grid; gap: 4px; font: 11px var(--mono); color: var(--muted); }
+.sw i { display: block; width: 58px; height: 36px; border-radius: 4px; border: 1px solid var(--line); }
+dl { margin: 0; display: grid; grid-template-columns: 92px 1fr; gap: 8px 14px; font-size: 14px; }
+dt { font: 600 11px/1.9 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+dd { margin: 0; }
+.risk { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
+.risk b { font-weight: 600; }
+.foot { color: var(--muted); font-size: 13px; max-width: 80ch; }
+@media (max-width: 820px) { .spec { grid-template-columns: 1fr; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Coherence promo · style frames</h1>
+    <p class="lede">Three candidate looks, each rendering the same two test shots with the same camera moves: act one's chaos and act two's Structure map. Flat 2D layers, set in real depth, filmed by a moving 3D camera.</p>
+  </header>
+
+  <div class="bar">
+    <span class="label">Direction</span>
+    <div class="seg" id="dirs" role="group" aria-label="Direction"></div>
+    <span class="label">Shot</span>
+    <div class="seg" id="shots" role="group" aria-label="Shot">
+      <button data-shot="chaos" aria-pressed="true">Act I · the sea of code</button>
+      <button data-shot="order" aria-pressed="false">Act II · the Structure map</button>
+    </div>
+    <button class="ctl" id="pause">Pause</button>
+  </div>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <canvas class="grain" id="grain" width="320" height="180"></canvas>
+    <div class="tc" id="tc">00:00</div>
+  </div>
+
+  <section class="spec" id="spec"></section>
+
+  <p class="foot">The product in act two is redrawn, not captured: the component names, interface identifiers (C3, X7) and the broken chokepoint come from Coherence's own Structure view, drawn in each direction's language. Everything here is three.js with canvas-drawn planes, the same stack the production would use.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const W = 1920, H = 1080;
+
+// ---------- directions ----------
+const DIRS = {
+  white: {
+    name: "Control room",
+    kind: "white",
+    pitch: "After the dock-control interface in The Matrix Reloaded: a white room of glass, where fine grey linework, vast concentric rings and tiny annotations float in layers at every depth. The chaos is that room overloaded; the order is the same room with every layer aligned and quiet.",
+    bg: "#F6F7F7", fog: [10, 46],
+    ink: "#2A2F32", dim: "rgba(42,47,50,.32)", fill: "rgba(255,255,255,.78)", red: "#E0463A",
+    routes: ["#2A2F32", "#8A949A", "#3C9CC6"],
+    display: "Barlow Condensed", body: "IBM Plex Mono",
+    grain: { alpha: .05, mode: "paper" },
+    palette: [["#F6F7F7", "white room"], ["#2A2F32", "graphite"], ["#8A949A", "hairline"], ["#3C9CC6", "one signal"], ["#E0463A", "alert"]],
+    spec: {
+      Type: "Barlow Condensed in small caps for labels, set tiny and tracked wide, the way the film's readouts are; IBM Plex Mono for data. Oversized outline numerals as ghost layers.",
+      Line: "1px graphite hairlines; notched tab boxes with a chamfered corner; concentric arcs and tick rings far larger than the frame. Almost no fill: layers are glass.",
+      Texture: "None to speak of: white, clean, precise. Density is the texture, with dozens of tiny annotations at different depths.",
+      Depth: "Many translucent planes at real distances, so everything is seen through something else. Fog is white, so far layers pale out rather than darken.",
+      Camera: "Slow orbits and top-down rotations around a center, like the film's overhead ring of operators. Parallax does the work; nothing snaps.",
+      Transitions: "Rings rotate into alignment; tab boxes type on; the act break turns an overloaded room silent, leaving only the aligned layers.",
+    },
+    risk: "Almost monochrome, so color has to be rationed: one signal blue and one alert red. Density must stay tuned, or act two looks as busy as act one.",
+  },
+  fog: {
+    kind: "fog",
+    name: "Signal in the fog",
+    pitch: "The script's own metaphor, shot literally. Act one lives inside a haze: glowing fragments that blur with distance and never resolve. Coherence is the moment the air clears and lines of light hold their shape.",
+    bg: "#0B0E12", fog: [3, 24],
+    ink: "#E8EDF1", dim: "rgba(232,237,241,.35)", fill: "rgba(255,255,255,.05)", red: "#FF5B5B",
+    routes: ["#FFFFFF", "#FFB36B", "#9FC6FF"],
+    display: "Instrument Sans", body: "JetBrains Mono",
+    grain: { alpha: .16, mode: "film" },
+    palette: [["#0B0E12", "ground"], ["#E8EDF1", "light"], ["#FFB36B", "warm signal"], ["#9FC6FF", "cool signal"], ["#FF5B5B", "broken"]],
+    spec: {
+      Type: "Instrument Sans for statements, in light weights with generous tracking; JetBrains Mono for code and figures.",
+      Line: "Light itself: strokes carry a bloom, and brightness means certainty. An unsure thing is dim; a verified thing glows.",
+      Texture: "Film grain over everything; depth of field, where far planes are drawn soft and near ones sharp.",
+      Depth: "Dense fog with a short range: the camera can only ever see a few planes clearly. Clarity is literally distance-limited until act two.",
+      Camera: "Floating and searching in act one, with slow drift and slight roll. In act two it locks off: steady pushes, level horizon.",
+      Transitions: "Rack focus between planes; the act break burns off the fog in one move and the far planes snap sharp.",
+    },
+    risk: "Dark fields with glowing type are common in tech launch videos. It carries the story best, but the fog work must be excellent to avoid looking generic.",
+  },
+  print: {
+    kind: "print",
+    name: "Overprint",
+    pitch: "Printed matter in space: flat spot-color sheets, heavy type, misregistered overprint and halftone. Loud and graphic. The chaos is a pile of flyers; the order is a transit poster.",
+    bg: "#F4F4EF", fog: [12, 48],
+    ink: "#111111", dim: "rgba(17,17,17,.35)", fill: "#FFFFFF", red: "#F2542D",
+    routes: ["#2346B0", "#F2542D", "#FFC53D"],
+    display: "Archivo Black", body: "IBM Plex Mono",
+    grain: { alpha: .08, mode: "paper" },
+    palette: [["#F4F4EF", "stock"], ["#111111", "black"], ["#2346B0", "cobalt"], ["#F2542D", "signal red"], ["#FFC53D", "yellow"]],
+    spec: {
+      Type: "Archivo Black for headlines, set tight and big enough to crop off the frame; IBM Plex Mono for data.",
+      Line: "Thick, flat strokes at transit-poster weight. Color is ink: three spot colors plus black, overprinting where they cross.",
+      Texture: "Halftone dots in the shadows, a two-pixel misregistration on colored plates, paper stock grain.",
+      Depth: "Sheets of paper at real distances, with fog as paper white so the far pile fades out like a light print.",
+      Camera: "Bold and graphic: fast snap zooms that ease hard into place, 90° spins that land square, whip-pans between sheets.",
+      Transitions: "Sheets slap onto the plane on the beat; plates slide into registration; the act break is one sheet pulled away to reveal the map.",
+    },
+    risk: "The cobalt matches Scope's own accent, which ties it to the product. It's the most distinctive of the three and the least like a developer-tool video, which is either the point or a problem.",
+  },
+};
+
+// ---------- test content ----------
+const CARDS = [
+  { k: "pr", a: "#4812", b: "Fix session refresh race", c: "+312 −48 · review requested" },
+  { k: "pr", a: "#4815", b: "Refactor auth middleware", c: "+1,204 −977 · 38 files" },
+  { k: "tokens", a: "1,284,003", b: "tokens this session" },
+  { k: "code", lines: ["const s = db.sessions", "  .find(id) // TODO auth?", "return s.user"] },
+  { k: "review", a: "Nit:", b: "this bypasses the session check" },
+  { k: "bug", a: "Reopened", b: "#3977 token leak", c: "third time" },
+  { k: "pr", a: "#4821", b: "Retry flaky webhook tests", c: "+44 −12 · bot" },
+  { k: "review", a: "LGTM", b: "ship it" },
+  { k: "tokens", a: "2,507,318", b: "tokens · subagent run" },
+  { k: "code", lines: ["if (user?.admin)", "  return cache.raw()", "// fast path"] },
+  { k: "pr", a: "#4830", b: "Revert “Refactor auth”", c: "+977 −1,204" },
+  { k: "bug", a: "Regression", b: "#4102 double charge", c: "seen again" },
+];
+
+const MAP = {
+  stations: {
+    hook: { x: 190, y: 300, w: 200, label: "harness hook", entrance: true },
+    cli: { x: 190, y: 760, w: 170, label: "cli", entrance: true },
+    life: { x: 600, y: 300, w: 200, label: "lifecycle" },
+    journal: { x: 1030, y: 200, w: 190, label: "journal" },
+    enf: { x: 1030, y: 580, w: 230, label: "enforcement" },
+    lex: { x: 1470, y: 200, w: 180, label: "lexicon" },
+    scope: { x: 1470, y: 580, w: 170, label: "scope" },
+  },
+  routes: [
+    { pts: [[190, 290], [600, 290], [800, 290], [880, 200], [1470, 200]], t: [0.6, 3.2] },
+    { pts: [[190, 310], [600, 310], [760, 310], [860, 580], [1470, 580]], t: [1.8, 4.6] },
+    { pts: [[190, 760], [700, 760], [880, 590], [1470, 590]], t: [3.2, 6.0] },
+  ],
+  rail: { y: 930, x0: 480, x1: 1700, label: "spec" },
+  tags: [{ id: "C3", x: 1150, y: 545 }, { id: "X7", x: 720, y: 262 }],
+  broken: "enf",
+};
+
+// ---------- three setup ----------
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("gl"), antialias: true });
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.1, 200);
+const maxAniso = renderer.capabilities.getMaxAnisotropy();
+let scene, updaters = [], state = { dir: "white", shot: "chaos", paused: false, t: 0 };
+
+function sizeStage() {
+  const r = stage.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+}
+new ResizeObserver(sizeStage).observe(stage);
+
+function surface(w, h) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const tex = new THREE.CanvasTexture(c);
+  tex.encoding = THREE.sRGBEncoding; tex.anisotropy = maxAniso;
+  return { c, ctx: c.getContext("2d"), tex };
+}
+function plane(surf, wu, hu) {
+  const m = new THREE.MeshBasicMaterial({ map: surf.tex, transparent: true, depthWrite: false, fog: true });
+  return new THREE.Mesh(new THREE.PlaneGeometry(wu, hu), m);
+}
+const rr = (ctx, x, y, w, h, r) => { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); };
+function tab(ctx, x, y, w, h, c) {
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + w * .42, y); ctx.lineTo(x + w * .42 + c * .6, y + c * .6);
+  ctx.lineTo(x + w, y + c * .6); ctx.lineTo(x + w, y + h - c); ctx.lineTo(x + w - c, y + h); ctx.lineTo(x, y + h); ctx.closePath();
+}
+const rand = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+
+// ---------- card drawing per direction ----------
+function drawCard(ctx, w, h, card, D, depth) {
+  ctx.clearRect(0, 0, w, h);
+  const hot = card.k === "bug" || card.k === "tokens";
+  ctx.save();
+  if (D === DIRS.fog && depth > 0.35) ctx.filter = `blur(${Math.round((depth - 0.35) * 14)}px)`;
+
+  if (D === DIRS.white) {
+    tab(ctx, 8, 8, w - 16, h - 16, 26);
+    ctx.fillStyle = D.fill; ctx.fill();
+    ctx.strokeStyle = card.k === "bug" ? D.red : D.ink; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.strokeStyle = D.dim; ctx.lineWidth = 1;
+    ctx.strokeRect(w - 118, 22, 90, 26);
+    for (let i = 0; i < 6; i++) ctx.strokeRect(w - 114 + i * 14, 28, 10, 14);
+    ctx.fillStyle = D.dim; ctx.font = `500 15px "${D.body}"`;
+    ctx.fillText(card.k.toUpperCase() + " · GATE 0" + (10 + card.i % 80), 30, h - 26);
+  } else if (D === DIRS.fog) {
+    ctx.shadowColor = "rgba(255,255,255,.18)"; ctx.shadowBlur = 30;
+    rr(ctx, 10, 10, w - 20, h - 20, 18); ctx.fillStyle = D.fill; ctx.fill();
+    ctx.shadowBlur = 0; ctx.strokeStyle = "rgba(255,255,255,.10)"; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.shadowColor = hot ? "rgba(255,179,107,.7)" : "rgba(255,255,255,.45)"; ctx.shadowBlur = 16;
+  } else {
+    const plate = card.k === "bug" ? D.red : card.k === "tokens" ? D.routes[2] : card.k === "review" ? D.routes[0] : "#FFFFFF";
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = D.routes[(card.i + 1) % 3]; ctx.fillRect(22, 22, w - 34, h - 34);
+    ctx.fillStyle = plate; ctx.fillRect(10, 10, w - 34, h - 34);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(17,17,17,.9)";
+    for (let y = h - 90; y < h - 26; y += 9) for (let x = w - 150; x < w - 30; x += 9) {
+      const r = ((x - (w - 150)) / 120) * 2.6; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    }
+  }
+
+  const ink = D === DIRS.fog ? (card.k === "bug" ? D.red : hot ? D.routes[1] : D.ink)
+    : D === DIRS.print ? (card.k === "review" ? "#FFFFFF" : D.ink) : (card.k === "bug" ? D.red : D.ink);
+  ctx.fillStyle = ink;
+  const disp = D === DIRS.print ? `"${D.display}"` : `700 x "${D.display}"`.replace(" x", "");
+  if (card.k === "tokens") {
+    ctx.font = D === DIRS.print ? `76px "${D.display}"` : D === DIRS.fog ? `400 80px "${D.display}"` : `700 96px "${D.display}"`;
+    ctx.fillText(card.a, 34, 128);
+    ctx.font = `500 22px "${D.body}"`; ctx.fillText(card.b, 38, 172);
+  } else if (card.k === "code") {
+    ctx.font = `500 26px "${D.body}"`;
+    card.lines.forEach((l, i) => ctx.fillText(l, 36, 74 + i * 40));
+  } else {
+    ctx.font = D === DIRS.print ? `44px "${D.display}"` : D === DIRS.fog ? `600 44px "${D.display}"` : `700 50px "${D.display}"`;
+    ctx.fillText(D === DIRS.white ? card.a.toUpperCase() : card.a, 36, 78);
+    ctx.font = D === DIRS.print ? `700 30px "Archivo"` : `500 27px "${D.body}"`;
+    ctx.fillText(card.b, 36, 128);
+    if (card.c) { ctx.font = `400 21px "${D.body}"`; ctx.globalAlpha = .7; ctx.fillText(card.c, 36, 172); }
+  }
+  ctx.restore();
+}
+
+// ---------- shot: chaos ----------
+function buildChaos(D) {
+  const cards = [];
+  for (let i = 0; i < 64; i++) {
+    let x = (rand() * 2 - 1) * 9, y = (rand() * 2 - 1) * 5;
+    if (Math.abs(x) < 1.8 && Math.abs(y) < 1.1) x += Math.sign(x || 1) * 2.4;
+    const z = 6 - rand() * 50;
+    const card = { ...CARDS[i % CARDS.length], i };
+    const surf = surface(512, 224);
+    const depth = Math.min(1, Math.max(0, (6 - z) / 50));
+    drawCard(surf.ctx, 512, 224, card, D, depth);
+    surf.tex.needsUpdate = true;
+    const m = plane(surf, 3.2, 1.4);
+    const drift = { x: (rand() - .5) * .25, y: (rand() - .5) * .18, r: (rand() - .5) * .08 };
+    m.position.set(x, y, z); m.rotation.z = (rand() - .5) * (D === DIRS.print ? .5 : .16);
+    if (D === DIRS.print) m.rotation.y = (rand() - .5) * .5;
+    scene.add(m); cards.push({ m, base: { x, y, z, rz: m.rotation.z }, drift });
+  }
+  if (D === DIRS.white) addRings(D, [-50, -30, -12], updaters);
+  const dur = 9;
+  updaters.push((t) => {
+    const u = (t % dur) / dur, e = u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    const z = 8 - 26 * (D === DIRS.print ? e : u);
+    const sway = D === DIRS.fog ? 0.9 : D === DIRS.white ? 0.35 : 0.2;
+    camera.position.set(Math.sin(t * .31) * sway, Math.cos(t * .23) * sway * .6, z);
+    camera.up.set(Math.sin(t * .2) * (D === DIRS.fog ? .06 : .015), 1, 0);
+    camera.lookAt(Math.sin(t * .31 + .6) * sway * .6, Math.cos(t * .23 + .6) * sway * .4, z - 12);
+    for (const c of cards) {
+      c.m.position.x = c.base.x + Math.sin(t * .4 + c.base.z) * c.drift.x * 4;
+      c.m.position.y = c.base.y + Math.cos(t * .35 + c.base.x) * c.drift.y * 4;
+      c.m.rotation.z = c.base.rz + Math.sin(t * .3 + c.base.y) * c.drift.r;
+    }
+    return dur;
+  });
+}
+
+function addGrid(D, z, wu, hu) {
+  const s = surface(2048, 1152), g = s.ctx;
+  g.strokeStyle = D.dim; g.globalAlpha = .35; g.lineWidth = 1;
+  for (let x = 0; x <= 2048; x += 64) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 1152); g.stroke(); }
+  for (let y = 0; y <= 1152; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(2048, y); g.stroke(); }
+  s.tex.needsUpdate = true;
+  const m = plane(s, wu, hu); m.position.z = z; scene.add(m);
+}
+
+function addRings(D, zs, ups) {
+  zs.forEach((z, n) => {
+    const s = surface(2048, 2048), g = s.ctx, c = 1024;
+    g.strokeStyle = D.ink; g.lineWidth = 1.2;
+    for (let r = 180 + n * 40; r < 1020; r += 70 + ((r * 7 + n * 13) % 90)) {
+      g.globalAlpha = .18 + ((r % 3) * .08);
+      const a0 = (r * 0.37 + n) % 6.28, span = 1.4 + (r % 5) * .9;
+      g.beginPath(); g.arc(c, c, r, a0, a0 + span); g.stroke();
+      if (r % 2) { g.globalAlpha = .25; for (let a = a0; a < a0 + span; a += .035) { g.beginPath(); g.moveTo(c + Math.cos(a) * r, c + Math.sin(a) * r); g.lineTo(c + Math.cos(a) * (r - 12), c + Math.sin(a) * (r - 12)); g.stroke(); } }
+    }
+    g.globalAlpha = .12; g.lineWidth = 3; g.font = `700 520px "${D.display}"`;
+    g.strokeText(["03", "3G", "17"][n], 180 + n * 300, 1500 - n * 260);
+    g.globalAlpha = .45; g.fillStyle = D.ink; g.font = `500 22px "${D.body}"`;
+    ["PROXIMITY ALERT", "NS GRID", "GATE 031", "DOCK 7 · SEQ", "APU TRACK"].forEach((l, i) => g.fillText(l + " " + (n * 5 + i), 300 + ((i * 331 + n * 97) % 1400), 260 + ((i * 263 + n * 151) % 1500)));
+    s.tex.needsUpdate = true;
+    const m = plane(s, 34 + n * 6, 34 + n * 6); m.position.z = z; scene.add(m);
+    ups.push((t) => { m.rotation.z = t * (n % 2 ? .03 : -.022) + n; });
+  });
+}
+
+// ---------- shot: order ----------
+const toW = (x, y) => [x / 1920 * 16 - 8, 4.5 - y / 1080 * 9];
+function polyLen(pts) { let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return L; }
+
+function buildOrder(D) {
+  const layer = (z, draw, live) => {
+    const s = surface(W, H); const m = plane(s, 16, 9); m.position.z = z; scene.add(m);
+    const redraw = (t) => { s.ctx.clearRect(0, 0, W, H); draw(s.ctx, t); s.tex.needsUpdate = true; };
+    redraw(0); if (live) updaters.push((t) => { redraw(t); });
+  };
+  // ground
+  layer(-0.8, (g) => {
+    if (D === DIRS.print) { g.fillStyle = "#FFFFFF"; g.fillRect(60, 60, W - 120, H - 120); g.fillStyle = D.ink; g.font = `120px "${D.display}"`; g.globalAlpha = .06; g.fillText("STRUCTURE", 90, H - 110); return; }
+    if (D === DIRS.white) { g.strokeStyle = D.ink; g.lineWidth = 1; for (let r = 120; r < 1100; r += 90) { g.globalAlpha = .07 + (r % 4) * .02; g.beginPath(); g.arc(W / 2, H / 2, r, 0, 7); g.stroke(); } g.globalAlpha = .1; g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.moveTo(W / 2, 0); g.lineTo(W / 2, H); g.stroke(); return; }
+    g.strokeStyle = D.dim; g.globalAlpha = D === DIRS.fog ? .25 : .5; g.lineWidth = 1;
+    const step = D === DIRS.fog ? 120 : 48;
+    for (let x = 0; x <= W; x += step) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+    for (let y = 0; y <= H; y += step) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+  });
+  // routes (drawn on over time) and the core rail
+  layer(0, (g, t) => {
+    const R = MAP.rail, width = D === DIRS.print ? 18 : D === DIRS.fog ? 5 : 6;
+    g.lineCap = "round"; g.lineJoin = "round";
+    g.strokeStyle = D.dim; g.lineWidth = width + 6; g.beginPath(); g.moveTo(R.x0, R.y); g.lineTo(R.x1, R.y); g.stroke();
+    for (const [key, s] of Object.entries(MAP.stations)) {
+      if (s.entrance) continue;
+      g.lineWidth = 2; g.setLineDash([6, 8]); g.beginPath(); g.moveTo(s.x, s.y + 40); g.lineTo(s.x, R.y); g.stroke(); g.setLineDash([]);
+    }
+    g.fillStyle = D.dim; g.font = `500 22px "${D.body}"`; g.fillText("core dependency · " + R.label, R.x0, R.y + 44);
+    MAP.routes.forEach((r, i) => {
+      const p = Math.max(0, Math.min(1, (t - r.t[0]) / (r.t[1] - r.t[0])));
+      if (p <= 0) return;
+      const L = polyLen(r.pts);
+      g.setLineDash([L * p, L]);
+      g.strokeStyle = D.routes[i]; g.lineWidth = width;
+      if (D === DIRS.fog) { g.shadowColor = D.routes[i]; g.shadowBlur = 26; }
+      if (D === DIRS.print) g.globalCompositeOperation = "multiply";
+      g.beginPath(); r.pts.forEach(([x, y], j) => j ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke();
+      g.shadowBlur = 0; g.globalCompositeOperation = "source-over"; g.setLineDash([]);
+    });
+    // crossing: a dashed red trust boundary across the pipe at X7
+    const x7 = MAP.tags[1];
+    if (t > 2.6) { g.strokeStyle = D.red; g.lineWidth = 4; g.setLineDash([12, 9]); g.beginPath(); g.moveTo(x7.x + 30, 250); g.lineTo(x7.x + 30, 350); g.stroke(); g.setLineDash([]); }
+  }, true);
+  // stations, tags, broken state
+  layer(0.35, (g, t) => {
+    const brokenOn = t > 6.4, pulse = brokenOn ? .5 + .5 * Math.sin((t - 6.4) * 5) : 0;
+    for (const [key, s] of Object.entries(MAP.stations)) {
+      const hS = 80, x = s.x - s.w / 2, y = s.y - hS / 2, broken = key === MAP.broken && brokenOn;
+      if (D === DIRS.print) {
+        g.fillStyle = broken ? D.red : D.ink; g.fillRect(x, y, s.w, hS);
+        g.fillStyle = "#FFFFFF"; g.font = `30px "${D.display}"`; g.fillText(s.label.toUpperCase(), x + 16, y + 52);
+      } else if (D === DIRS.fog) {
+        g.shadowColor = broken ? D.red : "rgba(255,255,255,.5)"; g.shadowBlur = broken ? 20 + 30 * pulse : 18;
+        rr(g, x, y, s.w, hS, 16); g.fillStyle = "rgba(14,18,24,.92)"; g.fill();
+        g.strokeStyle = broken ? D.red : "rgba(255,255,255,.55)"; g.lineWidth = 2; g.stroke(); g.shadowBlur = 0;
+        g.fillStyle = D.ink; g.font = `600 30px "${D.display}"`; g.fillText(s.label, x + 18, y + 51);
+      } else {
+        tab(g, x, y, s.w, hS, 18); g.fillStyle = D.fill; g.fill();
+        g.strokeStyle = broken ? D.red : D.ink; g.lineWidth = broken ? 3 : 1.5; g.stroke();
+        g.fillStyle = D.ink; g.font = `500 30px "${D.display}"`; g.fillText(s.label.toUpperCase().split("").join(String.fromCharCode(8202)), x + 16, y + 54);
+        g.fillStyle = D.dim; g.font = `500 14px "${D.body}"`; g.fillText("CMP " + (key.length * 7 + 11) + " · " + s.w + "U", x + 16, y + hS + 22);
+      }
+      if (s.entrance) {
+        g.fillStyle = D === DIRS.print ? D.routes[1] : D.routes[1];
+        g.font = `500 18px "${D.body}"`; g.fillText("ENTRANCE", x, y - 14);
+      }
+      if (broken) {
+        const bx = x + s.w + 14, by = y + 16;
+        g.globalAlpha = .75 + .25 * pulse;
+        g.fillStyle = D.red; rr(g, bx, by, 150, 48, D === DIRS.print ? 0 : 8); g.fill();
+        g.fillStyle = D === DIRS.fog ? "#1A0708" : "#FFFFFF"; g.font = `700 24px "${D.body}"`; g.fillText("✕ 2 broken", bx + 14, by + 32);
+        g.globalAlpha = 1;
+      }
+    }
+    for (const tag of MAP.tags) {
+      const red = tag.id.startsWith("X");
+      g.fillStyle = red ? D.red : D === DIRS.print ? D.routes[0] : D.ink;
+      if (D === DIRS.white) { g.strokeStyle = g.fillStyle; g.lineWidth = 2; g.strokeRect(tag.x - 4, tag.y - 30, 62, 40); g.font = `500 26px "${D.body}"`; g.fillText(tag.id, tag.x + 6, tag.y); }
+      else { rr(g, tag.x - 4, tag.y - 30, 62, 40, D === DIRS.print ? 0 : 20); g.fill(); g.fillStyle = D === DIRS.fog && !red ? D.bg : "#FFFFFF"; g.font = `700 24px "${D.body}"`; g.fillText(tag.id, tag.x + 10, tag.y - 2); }
+    }
+  }, true);
+  // annotation layer, nearest the lens
+  layer(0.8, (g, t) => {
+    const a = Math.max(0, Math.min(1, (t - 6.6) * 1.5));
+    if (!a) return;
+    g.globalAlpha = a;
+    const s = MAP.stations[MAP.broken];
+    g.strokeStyle = D.red; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(s.x + 60, s.y + 44); g.lineTo(s.x + 150, s.y + 190); g.lineTo(s.x + 420, s.y + 190); g.stroke();
+    g.fillStyle = D === DIRS.print ? D.ink : D.ink;
+    g.font = D === DIRS.print ? `34px "${D.display}"` : `600 32px "${D.display}"`;
+    g.fillText(D === DIRS.white ? "BYPASS · SESSION STORE" : "bypass: session store", s.x + 160, s.y + 176);
+    g.font = `400 21px "${D.body}"`; g.fillText("src/api/admin.ts:88 reaches past the chokepoint", s.x + 160, s.y + 222);
+  }, true);
+
+  if (D === DIRS.white) {
+    updaters.unshift((t) => {
+      const u = (t % 10) / 10, e = u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+      const ang = -0.45 + e * 0.45, dist = 8 + e * 4.6, lift = 3.6 * (1 - e);
+      camera.position.set(Math.sin(ang) * lift * 1.4, -lift, dist);
+      camera.up.set(Math.sin(ang * .35), Math.cos(ang * .35), 0);
+      camera.lookAt(-1.8 * (1 - e), 0.6 * (1 - e), 0);
+      return 10;
+    });
+    return;
+  }
+  const keys = D === DIRS.print
+    ? [[0, [-5.6, -1.2, 2.6], [-5.6, 1.6, 0]], [2.2, [-5.6, -1.2, 2.6], [-5.6, 1.6, 0]], [2.7, [0, 0, 12.6], [0, 0, 0]], [6.2, [0, 0, 12.6], [0, 0, 0]], [6.7, [2.2, -1.2, 5.2], [2.4, -1.2, 0]], [10, [2.4, -1.4, 4.9], [2.4, -1.2, 0]]]
+    : [[0, [-6.4, -4.4, 3.0], [-5.8, 1.6, 0]], [4, [-1.2, -5.2, 6.4], [0, 0.4, 0]], [7.6, [0, -0.2, 12.6], [0, 0, 0]], [10, [0, 0, 12.6], [0, 0, 0]]];
+  const dur = 10;
+  updaters.unshift((t) => {
+    const u = t % dur;
+    let i = 0; while (i < keys.length - 2 && u > keys[i + 1][0]) i++;
+    const [t0, p0, q0] = keys[i], [t1, p1, q1] = keys[i + 1];
+    let k = Math.max(0, Math.min(1, (u - t0) / (t1 - t0)));
+    k = D === DIRS.print ? 1 - Math.pow(1 - k, 4) : k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+    const L = (a, b) => a.map((v, j) => v + (b[j] - v) * k);
+    camera.position.set(...L(p0, p1)); camera.up.set(0, 1, 0); camera.lookAt(...L(q0, q1));
+    return dur;
+  });
+}
+
+// ---------- grain ----------
+const grain = document.getElementById("grain"), gctx = grain.getContext("2d");
+const gimg = gctx.createImageData(320, 180);
+function drawGrain(D) {
+  const d = gimg.data;
+  for (let i = 0; i < d.length; i += 4) { const v = Math.random() * 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+  gctx.putImageData(gimg, 0, 0);
+  grain.style.opacity = D.grain.alpha;
+}
+
+// ---------- scene lifecycle ----------
+function build() {
+  const D = DIRS[state.dir];
+  scene = new THREE.Scene(); updaters = [];
+  scene.background = new THREE.Color(D.bg);
+  scene.fog = new THREE.Fog(D.bg, D.fog[0], state.shot === "order" ? D.fog[1] + 20 : D.fog[1]);
+  (state.shot === "chaos" ? buildChaos : buildOrder)(D);
+  state.t = 0;
+  renderSpec(D);
+}
+
+function renderSpec(D) {
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  document.getElementById("spec").innerHTML = `
+    <div>
+      <h2>${esc(D.name)}</h2>
+      <p class="pitch">${esc(D.pitch)}</p>
+      <div class="label">Palette</div>
+      <div class="swatches">${D.palette.map(([c, n]) => `<div class="sw"><i style="background:${c}"></i>${c}<br>${esc(n)}</div>`).join("")}</div>
+      <div class="risk"><b>Risk.</b> ${esc(D.risk)}</div>
+    </div>
+    <dl>${Object.entries(D.spec).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>`;
+}
+
+const dirsEl = document.getElementById("dirs");
+dirsEl.innerHTML = Object.entries(DIRS).map(([k, d]) => `<button data-dir="${k}" aria-pressed="${k === state.dir}">${d.name}</button>`).join("");
+dirsEl.onclick = (e) => { const b = e.target.closest("button"); if (!b) return; state.dir = b.dataset.dir; press(dirsEl, b); build(); };
+const shotsEl = document.getElementById("shots");
+shotsEl.onclick = (e) => { const b = e.target.closest("button"); if (!b) return; state.shot = b.dataset.shot; press(shotsEl, b); build(); };
+function press(group, btn) { group.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === btn))); }
+document.getElementById("pause").onclick = (e) => { state.paused = !state.paused; e.target.textContent = state.paused ? "Play" : "Pause"; };
+
+let last = performance.now(), grainTick = 0;
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (!state.paused && !matchMedia("(prefers-reduced-motion: reduce)").matches) state.t += dt;
+  let dur = 10;
+  const local = state.t;
+  for (const u of updaters) { const r = u(local); if (typeof r === "number") dur = r; }
+  if (state.t > dur) state.t -= dur;
+  renderer.render(scene, camera);
+  if ((grainTick++ & 1) === 0) drawGrain(DIRS[state.dir]);
+  const s = Math.floor(state.t), f = Math.floor((state.t - s) * 24);
+  document.getElementById("tc").textContent = `00:${String(s).padStart(2, "0")}:${String(f).padStart(2, "0")}`;
+  requestAnimationFrame(frame);
+}
+
+const fonts = ["Archivo Black", "700 1em Archivo", "700 1em 'Barlow Condensed'", "500 1em 'IBM Plex Mono'", "600 1em 'Instrument Sans'", "400 1em 'Instrument Sans'", "500 1em 'JetBrains Mono'"];
+Promise.all(fonts.map((f) => document.fonts.load(f.includes("1em") ? f : `1em "${f}"`).catch(() => {})))
+  .finally(() => { sizeStage(); build(); requestAnimationFrame(frame); });
+</script>

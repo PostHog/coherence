@@ -1,0 +1,412 @@
+<title>Coherence Promo Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+:root {
+  --ground: #EDEFEA; --panel: #F8F9F5; --ink: #1B211F; --muted: #5C6660; --line: #CBD1C9;
+  --wave: #8A958E; --wave-played: #3C4541;
+  --head: #D2461B; --act-I: #3E6B8A; --act-II: #A8701A; --act-III: #6B5A8E;
+  --ok: #2F7A4F; --warn: #A8701A; --bad: #B63A2A;
+  --display: "Big Shoulders Display", "Arial Narrow", sans-serif;
+  --sans: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #111513; --panel: #191E1C; --ink: #E4E8E3; --muted: #97A19A; --line: #2C3431;
+    --wave: #56615B; --wave-played: #C9D0CA;
+    --head: #FF7A45; --act-I: #6FA3C7; --act-II: #D9A247; --act-III: #A592CC;
+    --ok: #5DBB85; --warn: #D9A247; --bad: #F0735F;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #111513; --panel: #191E1C; --ink: #E4E8E3; --muted: #97A19A; --line: #2C3431;
+  --wave: #56615B; --wave-played: #C9D0CA;
+  --head: #FF7A45; --act-I: #6FA3C7; --act-II: #D9A247; --act-III: #A592CC;
+  --ok: #5DBB85; --warn: #D9A247; --bad: #F0735F;
+}
+body { background: var(--ground); color: var(--ink); font: 15px/1.5 var(--sans); }
+.wrap { max-width: 1280px; margin: 0 auto; padding-inline: 20px; padding-block: 20px 64px; display: grid; gap: 20px; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, .scene-chip:focus-visible, .card:focus-visible { outline: 2px solid var(--head); outline-offset: 2px; }
+button.primary { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+button.armed { background: var(--head); color: #fff; border-color: var(--head); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* transport */
+header.transport { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--ground); padding-block: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; border-bottom: 1px solid var(--line); }
+.title { font: 800 26px/1 var(--display); letter-spacing: .02em; text-transform: uppercase; margin: 0; }
+.title small { display: block; font: 500 11px var(--sans); letter-spacing: .08em; color: var(--muted); margin-top: 4px; }
+.tc { font: 500 28px/1 var(--mono); font-variant-numeric: tabular-nums; min-width: 7ch; }
+.tc span { color: var(--muted); font-size: 15px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-left: auto; }
+.play { width: 44px; height: 44px; border-radius: 50%; padding: 0; display: grid; place-items: center; }
+.play svg { width: 16px; height: 16px; fill: currentColor; }
+
+/* timeline */
+.timeline-scroll { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.timeline { position: relative; min-width: 960px; padding: 12px 14px 10px; cursor: pointer; user-select: none; }
+.row { position: relative; }
+.acts { height: 24px; }
+.act { position: absolute; top: 0; bottom: 0; border-top: 3px solid var(--c); padding: 3px 6px 0; font: 600 11px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--c); white-space: nowrap; overflow: hidden; }
+.markers { height: 30px; }
+.marker { position: absolute; bottom: 0; transform: translateX(-1px); font: 500 11px var(--mono); color: var(--muted); white-space: nowrap; }
+.marker::after { content: ""; position: absolute; left: 0; bottom: -118px; height: 118px; border-left: 1px dashed var(--line); }
+.marker.major { color: var(--ink); }
+.marker.major::after { border-left-color: var(--muted); opacity: .6; }
+.marker .lab { position: absolute; bottom: 2px; left: 4px; }
+.wave { display: block; width: 100%; height: 96px; }
+.scenes { height: 36px; margin-top: 6px; }
+.scene-chip { position: absolute; top: 0; height: 32px; border-radius: 5px; background: color-mix(in srgb, var(--c) 18%, var(--panel)); border: 1.5px solid var(--c); color: var(--ink); font: 700 15px/30px var(--display); text-align: center; overflow: hidden; cursor: pointer; }
+.scene-chip.est { border-style: dashed; background: transparent; color: var(--muted); }
+.scene-chip.now { background: var(--c); color: var(--panel); }
+.playhead { position: absolute; top: 8px; bottom: 6px; width: 2px; background: var(--head); pointer-events: none; }
+.playhead::before { content: ""; position: absolute; top: -2px; left: -5px; border: 6px solid transparent; border-top-color: var(--head); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: var(--muted); padding: 0 14px 12px; }
+.legend i { display: inline-block; width: 18px; height: 10px; border: 1.5px solid var(--muted); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.dash { border-style: dashed; }
+
+/* prompter */
+.prompter { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
+.now-read { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 22px; }
+.eyebrow { font: 600 11px var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+.eyebrow b { color: var(--c, var(--ink)); }
+.now-read .lines { font-size: 21px; line-height: 1.45; max-width: 62ch; margin-top: 10px; text-wrap: pretty; }
+.now-read .lines p { margin: 0 0 .6em; }
+.now-read .next { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 6px; }
+.side { display: grid; gap: 10px; font-size: 13px; }
+.side .box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; }
+.side p { margin: 0; color: var(--muted); }
+kbd { font: 500 11px var(--mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--ground); }
+
+/* cards */
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
+.card.now { border-color: var(--c); box-shadow: 0 0 0 1px var(--c); }
+.slate { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.slate .num { font: 800 34px/1 var(--display); color: var(--c); min-width: 1.6ch; }
+.slate .meta { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
+.slate .meta .when { color: var(--ink); font-size: 13px; }
+.slate .meta .est { font-style: italic; }
+.pill { font: 600 11px var(--sans); letter-spacing: .04em; border-radius: 99px; padding: 2px 8px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); } .pill.dim { color: var(--muted); opacity: .7; }
+.body { padding: 12px 14px; display: grid; gap: 12px; align-content: start; }
+.note { font: 600 11px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--c); }
+.vo { font-size: 14px; line-height: 1.55; }
+.vo p { margin: 0 0 .5em; }
+dl { margin: 0; display: grid; grid-template-columns: 78px 1fr; gap: 6px 10px; font-size: 13px; }
+dt { font: 600 10.5px/1.9 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+dd { margin: 0; }
+dd.empty { color: var(--muted); opacity: .6; }
+.card footer { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--line); }
+.card footer button { padding: 4px 8px; font-size: 12px; }
+.card footer a.open { margin-left: auto; font: 600 12px var(--sans); color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; background: var(--panel); }
+.card footer a.open:hover { border-color: var(--muted); }
+.stills { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; margin: -2px 0 2px; }
+.stills figure { margin: 0; position: relative; }
+.stills img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 4px; background: #000; }
+.stills figcaption { position: absolute; left: 4px; bottom: 4px; font: 500 10px var(--mono); color: #fff; background: rgb(0 0 0 / .55); padding: 1px 4px; border-radius: 3px; }
+
+.export { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; }
+.export textarea { width: 100%; height: 220px; font: 12px/1.5 var(--mono); background: var(--ground); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 10px; box-sizing: border-box; }
+.toast { font-size: 13px; color: var(--ok); }
+
+@media (max-width: 820px) {
+  .prompter { grid-template-columns: 1fr; }
+  .now-read .lines { font-size: 18px; }
+  .controls { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+  <header class="transport">
+    <h1 class="title">Coherence promo<small>Storyboard · “Black Hole” · 3:56</small></h1>
+    <div class="tc mono" id="tc">0:00.0 <span>/ 3:56.5</span></div>
+    <div class="controls">
+      <button class="play primary" id="play" aria-label="Play"><svg viewBox="0 0 16 16"><path d="M3 1.5v13l11-6.5z"/></svg></button>
+      <button id="back">−5 s</button>
+      <button id="fwd">+5 s</button>
+      <button id="mark" title="Sets the next unplaced scene's start to the playhead">Mark scene starts</button>
+    </div>
+  </header>
+
+  <div class="timeline-scroll">
+    <div class="timeline" id="timeline" aria-label="Track timeline; click to seek">
+      <div class="row acts" id="acts"></div>
+      <div class="row markers" id="markers"></div>
+      <canvas class="wave" id="wave"></canvas>
+      <div class="row scenes" id="chips"></div>
+      <div class="playhead" id="playhead"></div>
+    </div>
+    <div class="legend">
+      <span><i></i>scene placed at your timing</span>
+      <span><i class="dash"></i>scene estimated from word count between anchors</span>
+      <span>dashed lines: music events measured from the track</span>
+    </div>
+  </div>
+
+  <section class="prompter">
+    <div class="now-read" id="now"></div>
+    <div class="side">
+      <div class="box">
+        <p><b style="color:var(--ink)">Placing scenes.</b> Turn on <em>Mark scene starts</em>, play the track, read along, and press <kbd>M</kbd> as each scene begins. Each press places the next unplaced scene. Fine-tune on any card with <kbd>−0.1</kbd> / <kbd>+0.1</kbd>.</p>
+        <p><kbd>Space</kbd> play · <kbd>←</kbd> <kbd>→</kbd> 5 s · click the timeline to seek.</p>
+      </div>
+      <div class="box">
+        <p>Timings stay in this browser. When they're set, copy the script with its <code>at:</code> lines filled and paste it over <code>promo/script.md</code>, or hand it to Claude.</p>
+        <button id="copy">Copy script with timings</button>
+        <span class="toast" id="toast" role="status"></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="board" id="board" aria-label="Scenes"></section>
+
+  <section class="export" id="exportBox" hidden>
+    <p style="margin:0">The clipboard wasn't available. The text below is selected; copy it with your keyboard.</p>
+    <textarea id="exportText" readonly></textarea>
+  </section>
+
+  <audio id="audio" src="mix.mp3" preload="auto"></audio>
+</div>
+
+<script>
+const D = {"duration":231.71,"acts":[{"id":"I","name":"Introduction","from":0,"to":96.3},{"id":"II","name":"Rising action · climax","from":96.3,"to":212.8},{"id":"III","name":"Resolution","from":212.8,"to":231.71}],"markers":[{"t":4,"label":"music in","major":false},{"t":19.2,"label":"bass enters","major":true},{"t":42.2,"label":"bass shift","major":true},{"t":49.9,"label":"","major":false},{"t":65.2,"label":"","major":false},{"t":72.7,"label":"","major":false},{"t":80.7,"label":"","major":false},{"t":96.3,"label":"the drop","major":true},{"t":130.2,"label":"full return","major":true},{"t":160,"label":"bright plateau","major":false},{"t":187.8,"label":"texture shift","major":true},{"t":205,"label":"peak","major":false},{"t":212.8,"label":"hard cut","major":true},{"t":225,"label":"fade","major":false}],"anchors":{"1":4,"8":96.3,"15":212.8,"end":231.71},"scenes":[{"n":1,"note":"","fields":{"at":"0:00.00","sync":"","picture":"LOCKED, LIKELY REVISIT (scenes/01-opening.src.html). The review gauge (git-merge, REVIEW, white when clean, red with defects) sits centered under the build. A build, drawn like a graphic bar EQ but only ever growing. Black, then one column of mint segments builds upward, then a tidy handful: small, steady, satisfying. Columns keep arriving and building faster until they run past both edges. Ranges of built segments go red, defective: rare at first, then everywhere, with a defects counter in the corner climbing from 0 to about 250. The build completes a wall; it tips back into fog, the mint fading to grey as the unexamined floor, the reds staying red.","supers":"","source":"motion graphics (three.js)","transition":""},"paras":["What if the best way to save tokens","Is to stop writing bad code?"],"words":14,"render":{"url":"https://claude.ai/artifact/4xdeDEfDYiCXYF1WoQXaSu","stills":[{"t":2.4,"src":"frames/01-0.jpg"},{"t":6.4,"src":"frames/01-1.jpg"},{"t":9.4,"src":"frames/01-2.jpg"},{"t":11.2,"src":"frames/01-3.jpg"}]}},{"n":2,"note":"","fields":{"at":"0:06.36","sync":"","picture":"LOCKED (scenes/02-road.src.html). The scene-9 transcript stands upright before us like a page, then tips back on its bottom edge (echoing scene 1's wall) into a road running to the horizon, rising to meet us as we drop onto it: prose rows across it like lines of text, tool-call chips that swing up to face us like signposts as we pass. We fly along it, slowly, then faster and faster: tokens smear into streaks, the lens widens, the token count spins up. The faster we go, the thicker the fog, and we're inside it. Top left, the session readout grows from one thread to a coordinator with ten subagents, into the millions of tokens; on the right, review-bot notifications from several (invented) vendors slide down and stack, faster than anyone could read.","supers":"","source":"motion graphics (three.js)","transition":""},"paras":["Our industry is lost in a fog.","We have completely new tools for building software, and we can build it faster than ever.","But our processes have never been more confused. The work we do is more opaque, more complex, more difficult to reason about than at any point in our careers."],"words":52,"render":{"url":"https://claude.ai/artifact/Gi2XaGPZxGewr8BaXx1uFM","stills":[{"t":0.3,"src":"frames/02-0.jpg"},{"t":2.4,"src":"frames/02-1.jpg"},{"t":10,"src":"frames/02-2.jpg"},{"t":22.5,"src":"frames/02-3.jpg"}]}},{"n":3,"note":"","fields":{"at":"0:24.87","sync":"\"accident\" → 0:44 bass hit (the field of black boxes rises)","picture":"LOCKED (scenes/03-specs.src.html). One spec sprouts a tree of sixteen grey-white file cards (SPECIFICATIONS label, live count); an Agent Skills folder, qa-review, sprouts its own tree facing it. Then the film's one inversion: the ground goes white, the camera swings isometric, each spec card thickens into a black box on a white plane, more black boxes stack, and the skill's cards assemble into an arcade machine labeled CODE REVIEW. Gold tokens stamped with the merge glyph drop into the slot on its top; each turns one box to glass, full of fog. On \"accident\" the camera pulls away as black boxes rise to the horizon: 4 of thousands reviewed.","supers":"","source":"motion graphics (three.js)","transition":""},"paras":["We can imagine new code, we can describe thoughtful architecture, we can specify sturdy systems.","But we have no idea how faithfully our robots are building for us. The more complex our designs, the more challenging they are to validate.","Agents are writing good code by accident."],"words":47,"render":{"url":"https://claude.ai/artifact/B1vrPx97YZ9PH8PoDKYref","stills":[{"t":2.5,"src":"frames/03-0.jpg"},{"t":8.2,"src":"frames/03-1.jpg"},{"t":17.4,"src":"frames/03-2.jpg"},{"t":20.6,"src":"frames/03-3.jpg"}]}},{"n":4,"note":"","fields":{"at":"0:42.74","sync":"","picture":"LOCKED (scenes/04-corners.src.html). Scene 3's white world. Left, a chat: you ask \"did you build it to the spec?\", the agent types, \"of course. why would I deceive you?\" At the halfway mark: qa-agent, \"actually...\", then review-droid, \"CRITICAL: 5 findings\" (red chip). Right, black boxes fall from the sky and tumble into a messy heap (a recorded rigid-body simulation), faster and faster. A few boxes have a corner sliced off, the cut face orange then red, soon buried. Pull back: the heap is a hill beside a speck of chat, and the boxes keep coming.","supers":"","source":"motion graphics (three.js, Rapier)","transition":""},"paras":["The systems at our disposal are trained to finish the job at any cost, so they cut subtle corners where we can’t see.","Understanding it all requires reading code and reasoning about its consequences, but every day there’s just more.","More complexity than we can possibly get our arms around."],"words":50,"render":{"url":"https://claude.ai/artifact/KYGoAjyD2vPNHuMdwa3zjS","stills":[{"t":3.5,"src":"frames/04-0.jpg"},{"t":10.3,"src":"frames/04-1.jpg"},{"t":13,"src":"frames/04-2.jpg"},{"t":18.4,"src":"frames/04-3.jpg"}]}},{"n":5,"note":"","fields":{"at":"1:01.25","sync":"","picture":"DRAFT (scenes/05-machines.src.html). Scene 3's white world as a production line: small platinum code-asterisk tokens pour into an AGENT machine that extrudes black boxes onto a conveyor; gold merge tokens pour into the CODE REVIEW machine they pass through. Boxes exit with a lamp: mint ships; red is diverted to a return belt, back into the agent, and out again. Red lamps pop up along the line and get struck down (whack-a-mole) while the token counters race. Behind the line stand two miniature art deco banks, ANTHROPIC TREASURY and OPENAI TREASURY (names only, no logos). Smoked-glass pipes run from beneath both machines, arch over the return belt into a header, and branch to each bank's door; Cherenkov-blue pulses flow through them at one steady pace, brightening as the tokens pour in, and the doors glow blue.","supers":"","source":"motion graphics (three.js)","transition":""},"paras":["Our solution? Throw more inference at the problem. We use inference to write code, then we use more inference to ask if the code we wrote was good.","So what do we get for all this? Bugs that recur. Endless whack a mole adversarial reviews."],"words":45,"render":{"url":"https://claude.ai/artifact/UW9zghJ854oGfPRPpr5hDe","stills":[{"t":2,"src":"frames/05-0.jpg"},{"t":7.5,"src":"frames/05-1.jpg"},{"t":16.5,"src":"frames/05-2.jpg"},{"t":19.5,"src":"frames/05-3.jpg"}]}},{"n":6,"note":"","fields":{"at":"1:17.21","sync":"","picture":"DRAFT (scenes/06-result.src.html). Two panels in fog: left, OpenRouter's daily token totals for 2026 drawing themselves and going vertical, 25× counting up; right, GitHub's uptime for April 2026 as a calendar, draining to 78.33%. The fog rolls in, then the picture turns out to be on a tube: scanlines and a slight bulge, then static eats it, bands slipping, the boards still faintly there; it collapses to a bright line, a dot, and dies.","supers":"25× tokens used in 2026","source":"motion graphics (OpenRouter daily token totals; mrshu.github.io/github-statuses for April)","transition":"the tube dies; scene 7 powers it back on"},"paras":["OpenRouter does twenty trillion tokens a day. GitHub struggles to stay online.","Software staggers under this scale of motion.","Because we don’t yet have the tools to make sense of this new world."],"words":33,"render":{"url":"https://claude.ai/artifact/D1ZdZDPDvw8EbT7CmLke6M","stills":[{"t":3,"src":"frames/06-0.jpg"},{"t":6,"src":"frames/06-1.jpg"},{"t":8.5,"src":"frames/06-2.jpg"},{"t":12,"src":"frames/06-3.jpg"}]}},{"n":7,"note":"to land at first act break","fields":{"at":"1:33.81","sync":"","picture":"DRAFT (scenes/07-power.src.html). Like a CRT going black, then turning back on, typing the script. Scene 6's tube has just died; a beat of black, then the tube powers on (dot, line, flash) to a phosphor screen with scanlines, and the narration's three lines type out in mint under a block cursor. Hard cut to black.","supers":"","source":"motion graphics","transition":"hard cut to black"},"paras":["It's time to build the next generation of tools.","Developers need clarity and confidence, not just speed.","The race is on to deliver. Coherence lets us compete."],"words":27,"render":{"url":"https://claude.ai/artifact/21Lhvh5V5DnS8MkXoL5Yhv","stills":[{"t":0.2,"src":"frames/07-0.jpg"},{"t":0.7,"src":"frames/07-1.jpg"},{"t":1.85,"src":"frames/07-2.jpg"},{"t":13.6,"src":"frames/07-3.jpg"}]}},{"n":8,"note":"","fields":{"at":"1:47.21","sync":"","picture":"LOCKED, REVISIT (scenes/08-lexicon.src.html). Revisit: a lot of talking and reading at once; the plan, the definition card and the narration compete for the eye. A tilted table of settled terms (API key and project token side by side) resolves from the dark. A subagent starts: its SubagentStart hook pulses and streams the lexicon into its context (super: \"Delivered through your agent's own hooks\"). Its plan types \"deactivate their account\"; the word and the account tile go orange, then red as the definition in its context says no. The tile scales outward into its full definition card and the definition fades in (the billing entity; not a person's access, that is a membership). The plan revises to \"membership\", SubagentStop runs regulate clean, everything folds away and the camera pulls out.","supers":"Delivered through your agent's own hooks","source":"motion graphics (three.js)","transition":""},"paras":["We start with clear definitions.","Language models are built out of language. Clearly defining your terms changes their behavior. Agents start to do what you meant, not just what you said.","This impacts the integrity of what gets built, making bugs easier for agents to detect."],"words":46,"render":{"url":"https://claude.ai/artifact/VEs62895rnKvApSHcyxGY1","stills":[{"t":4.6,"src":"frames/08-0.jpg"},{"t":8.2,"src":"frames/08-1.jpg"},{"t":12.4,"src":"frames/08-2.jpg"},{"t":18.8,"src":"frames/08-3.jpg"}]}},{"n":9,"note":"","fields":{"at":"2:05.72","sync":"","picture":"LOCKED (scenes/09-journal.src.html). Left, an endless transcript with tool calls; stretches are selected in place and their lit tokens stream right, materializing a stack of five orange decision records. A reticle inspects each record and it goes mint; the last one stalls and goes red. We push in to read it, then a red thread drops through the fog to the buried cell in the code.","supers":"","source":"motion graphics (three.js), the style reference for every scene","transition":""},"paras":["But we can do more.","The Coherence decision journal compresses hundreds of thousands of tokens into a handful of decisions.","If a bad call happened in the process, it’s right there in the history, instead of buried in code."],"words":39,"render":{"url":"https://claude.ai/artifact/HLEpcqFZq3KGAYWyg6AroD","stills":[{"t":5,"src":"frames/09-0.jpg"},{"t":8.8,"src":"frames/09-1.jpg"},{"t":10.5,"src":"frames/09-2.jpg"},{"t":17.8,"src":"frames/09-3.jpg"}]}},{"n":10,"note":"","fields":{"at":"2:20.40","sync":"","picture":"LOCKED (scenes/10-switchboard.src.html). A switchboard: transcript lanes, one per session, on either side of a short spine of scene 9's decision records. The coordinator's session ends; a new one opens where it was, its SessionStart hook pulses (orient) and three records thread into it by subject. subagent-a records \"Route admin reads through the session store\", reversing scene 9's bad call, which steps back. The peer feed drops only that subject into subagent-b and -c; c's next edit turns from the cache to the session store. Every session adds its decisions to the one spine as it works: a decide tool call appears in its transcript in orange, and the record lifts out of it, flies in, lands orange at the top of the stream, settles mint, and the stream flows down. Pull back: lanes multiply and rush to texture, all feeding the spine, which pours down into the ground as one crisp stream. Fog clarity 0.20 to 0.35.","supers":"","source":"motion graphics (three.js)","transition":""},"paras":["Quickly move between different conversations and agents without costly handoff files, while letting subagents compare notes.","And decisions are never buried in a long transcript."],"words":25,"render":{"url":"https://claude.ai/artifact/NzmCdB9gg4416rZ59LXudg","stills":[{"t":2.6,"src":"frames/10-0.jpg"},{"t":4.2,"src":"frames/10-1.jpg"},{"t":6.5,"src":"frames/10-2.jpg"},{"t":11.8,"src":"frames/10-3.jpg"}]}},{"n":11,"note":"","fields":{"at":"2:33.17","sync":"","picture":"LOCKED (scenes/11-bypass.src.html). The Deus Ex: Human Revolution hacking board, on the half-cleared ground: components as nodes, references as links, entrances (routes, a cron job) at the near edge, the flag (the session store) at the far end, held in a lock-on reticle tagged PROTECTED, behind one gate, the chokepoint sessions.get(). Every node's name stands on a translucent sign just off the board, tilted toward the camera, so links pass beneath the labels. Paths capture in mint through the gate to the flag; invariant enforced. The language server runs its pass like a compiler: a cursor visits each reference in turn at a fixed step, each blinks white as checked, and the panel logs one terse line per reference (12 references, 0 bypasses). An agent edits admin/dashboard.ts and a link draws straight to the flag, orange, around the gate; the PostToolUse hook re-checks in the same turn, the same machine walking the references into the flag, the last line logged BYPASS. The link goes red, every path that now reaches the flag without the gate is marked red (GET /admin, GET /stats), the flag goes red and its PROTECTED tag swells into a larger BYPASS DETECTED tag with the warning triangle, and the hook's message lands: structural defect revealed at this edit, the bypass by file and line, the two honest options. Fog clarity 0.35 to 0.5.","supers":"","source":"motion graphics (three.js); the message quotes the hook's real output format","transition":""},"paras":["We also need constant confidence that our code matches our intentions.","Coherence uses your language server to detect security bypasses. The moment an agent writes code that touches something sensitive without routing through a designated chokepoint, the project goes red."],"words":40,"render":{"url":"https://claude.ai/artifact/HaW6wrTJoJ5fQCKosbugcM","stills":[{"t":3.4,"src":"frames/11-0.jpg"},{"t":6,"src":"frames/11-1.jpg"},{"t":10.8,"src":"frames/11-2.jpg"},{"t":14.2,"src":"frames/11-3.jpg"}]}},{"n":12,"note":"","fields":{"at":"2:48.97","sync":"","picture":"LOCKED (scenes/12-reduce.src.html). Scene 11's board, still red: the agent edits admin/dashboard.ts again, the bypass retracts, a new link draws into the gate, the PostToolUse check passes silently, the re-check logs ok, and the red walks back to mint; BYPASS DETECTED folds back into PROTECTED. The camera glides across the board to another system: a billing ledger, not yet locked on, with six call sites wired straight to it, each carrying its own copy of the guard (one drifted, role === \"admin\"; one missing). The agent's reduce pass finds them one by one, removes every copy, and they converge into one gate, the chokepoint billing.guard(), and only then does the ledger get its lock-on reticle and PROTECTED tag; the direct links retract, every site routes through the gate, all mint. The agent finalizes with one more tool call on the board, Edit Billing.spec.md, adding one line in the real spec format: chokepoint: billing.guard in billing/guard.ts; only then does it read enforced and the ledger turn mint. The PostToolUse card carried over from scene 11 turns over as the error clears: the red report dissolves into the pass, the border blends to mint, and the card shrinks down onto its two-line pass before it goes. Pull back: both systems, the same shape, one door each. Fog clarity 0.5 to 0.65.","supers":"","source":"motion graphics (three.js)","transition":""},"paras":["The agent discovers the violation immediately.","Instead of enforcing security through implicit conventions, we know our intentions are represented in the structure of our projects themselves."],"words":26,"render":{"url":"https://claude.ai/artifact/MvC3YE81c9FS3RCntWReCu","stills":[{"t":1.5,"src":"frames/12-0.jpg"},{"t":6.4,"src":"frames/12-1.jpg"},{"t":10.2,"src":"frames/12-2.jpg"},{"t":12.9,"src":"frames/12-3.jpg"}]}},{"n":13,"note":"","fields":{"at":"2:59.98","sync":"","picture":"LOCKED (scenes/13-structure.src.html, from structure-gen.py). A stylized Scope Structure view settles on the ground as a map over the territory, in Scope's real grammar, on the app from scenes 11-12: entrance tokens with trust tags slide in (webhook in: no control, amber), stations appear by column (where work enters, 1 step, 2 steps), structural routes light one at a time in their own colours, C and X interface identifiers settle on the lines, core dependencies run along the bottom as rails, and the masthead lands: All 24 invariants verified, live. As the map assembles, the ground's noise gives way to a ruled order spreading out from under it. Fog clarity 0.65 to 0.75.","supers":"","source":"motion graphics (three.js), after Scope's Structure view","transition":""},"paras":["But how do we check that the agent did what we want?","The Coherence structure view shows you the entrypoints into your project, its major components, and how those components interact with each other. Always accurate and up to date."],"words":40,"render":{"url":"https://claude.ai/artifact/74XNGFxiMynJrDsAjXPEit","stills":[{"t":3.6,"src":"frames/13-0.jpg"},{"t":5.6,"src":"frames/13-1.jpg"},{"t":8,"src":"frames/13-2.jpg"},{"t":11.8,"src":"frames/13-3.jpg"}]}},{"n":14,"note":"to land at climax","fields":{"at":"3:13.65","sync":"","picture":"LOCKED (scenes/14-structure.src.html). The map, live, on ruled ground. A red dashed reference from Admin into Sessions; Sessions' verdict bar goes red with ✕ 1 broken, C1 goes red, the rest dims, and the inspector names the chokepoint and the bypass site (admin/dashboard.ts:42). The fix clears it. Then a change: a new entrance POST /export and its route through Admin to Webhooks; the old Jobs → Webhooks route ghosts and withdraws; a strip names the change since the last commit (Scope computes these differences today; this view of them is the planned design). The ground fills with streaming code, which dissolves; the map returns, verified; in the last stretch its pieces (stations, entrance tokens, tags) rise off it to 45 degrees in a cascade, like the signs, the lines and rails staying flat, and the camera comes down low to see them standing, in nearly clear air. Fog clarity 0.75 to 0.9.","supers":"","source":"motion graphics (three.js), after Scope's Structure view","transition":""},"paras":["When chokepoints are violated, you’ll see it.","When a major change alters the relationships between components, you’ll see that too.","No more sifting through thousands of lines of code to understand what was built or changed. See your project as it is right now."],"words":44,"render":{"url":"https://claude.ai/artifact/DuauW9sFv6rrTPksFWNea1","stills":[{"t":2.4,"src":"frames/14-0.jpg"},{"t":6.4,"src":"frames/14-1.jpg"},{"t":9.8,"src":"frames/14-2.jpg"},{"t":14.9,"src":"frames/14-3.jpg"}]}},{"n":15,"note":"to land after climax","fields":{"at":"3:29.11","sync":"","picture":"DRAFT (scenes/15-structure.src.html, from structure-gen.py). The Structure view, verified, in clear air; the camera pulls straight up, and at 3:31 the view is the first to go coherent, its detail giving way to a flat mint abstraction of itself. More structure views surround it, tile by tile, more abstract the further out (cards and lines, then bare blocks); each view moves one way along grey, amber, red, starting at its own point and never stepping back; from about 5 s in, green trickles outward from the centre cell by cell, then a wave of mint rolls outward until every view is uniform mint, and the field closes into one mint surface. Over the mint, from 3:44, the features the film names pile up as black chips (Lexicon, Spec, Invariant, Chokepoint check … TypeScript support, Python support), hold to be read, then pour into the middle and become the title: coherence, lowercase, black on mint, set in Figtree, its c tilted 20° and standing a little off; under it, in thin Inter, SALVATION FOR EVERY AGENT BY POSTHOG (the last two words in medium) with PostHog's logomark in black. A scan line passes, a reticle locks onto the c, and it rights itself and slides home; fade to black with the music.","supers":"Coherence","source":"motion graphics","transition":"fade to black with the music"},"paras":["These are the kinds of tools we need to clear the fog.","Spend less inference on code that doesn’t work, less inference detecting bugs, less inference investigating the decisions that went into your changes.","So if you’re ready to try a new way of working with agents, come join us building the software of 2030."],"words":55,"render":{"url":"https://claude.ai/artifact/2amFtSz8pw85eH814vLvED","stills":[{"t":2.8,"src":"frames/15-0.jpg"},{"t":9,"src":"frames/15-1.jpg"},{"t":16.8,"src":"frames/15-2.jpg"},{"t":19.2,"src":"frames/15-3.jpg"}]}}],"raw":"Coherence script\n\n***1\nat:\nsync:\npicture: LOCKED, LIKELY REVISIT (scenes/01-opening.src.html). The review gauge (git-merge, REVIEW, white when clean, red with defects) sits centered under the build. A build, drawn like a graphic bar EQ but only ever growing. Black, then one column of mint segments builds upward, then a tidy handful: small, steady, satisfying. Columns keep arriving and building faster until they run past both edges. Ranges of built segments go red, defective: rare at first, then everywhere, with a defects counter in the corner climbing from 0 to about 250. The build completes a wall; it tips back into fog, the mint fading to grey as the unexamined floor, the reds staying red.\nsupers:\nsource: motion graphics (three.js)\ntransition:\n\nWhat if the best way to save tokens\n\nIs to stop writing bad code?\n\n***2\nat:\nsync:\npicture: LOCKED (scenes/02-road.src.html). The scene-9 transcript stands upright before us like a page, then tips back on its bottom edge (echoing scene 1's wall) into a road running to the horizon, rising to meet us as we drop onto it: prose rows across it like lines of text, tool-call chips that swing up to face us like signposts as we pass. We fly along it, slowly, then faster and faster: tokens smear into streaks, the lens widens, the token count spins up. The faster we go, the thicker the fog, and we're inside it. Top left, the session readout grows from one thread to a coordinator with ten subagents, into the millions of tokens; on the right, review-bot notifications from several (invented) vendors slide down and stack, faster than anyone could read.\nsupers:\nsource: motion graphics (three.js)\ntransition:\n\nOur industry is lost in a fog.\n\nWe have completely new tools for building software, and we can build it faster than ever.\n\nBut our processes have never been more confused. The work we do is more opaque, more complex, more difficult to reason about than at any point in our careers.\n\n***3\nat:\nsync: \"accident\" → 0:44 bass hit (the field of black boxes rises)\npicture: LOCKED (scenes/03-specs.src.html). One spec sprouts a tree of sixteen grey-white file cards (SPECIFICATIONS label, live count); an Agent Skills folder, qa-review, sprouts its own tree facing it. Then the film's one inversion: the ground goes white, the camera swings isometric, each spec card thickens into a black box on a white plane, more black boxes stack, and the skill's cards assemble into an arcade machine labeled CODE REVIEW. Gold tokens stamped with the merge glyph drop into the slot on its top; each turns one box to glass, full of fog. On \"accident\" the camera pulls away as black boxes rise to the horizon: 4 of thousands reviewed.\nsupers:\nsource: motion graphics (three.js)\ntransition:\n\nWe can imagine new code, we can describe thoughtful architecture, we can specify sturdy systems.\n\nBut we have no idea how faithfully our robots are building for us. The more complex our designs, the more challenging they are to validate.\n\nAgents are writing good code by accident.\n\n***4\nat:\nsync:\npicture: LOCKED (scenes/04-corners.src.html). Scene 3's white world. Left, a chat: you ask \"did you build it to the spec?\", the agent types, \"of course. why would I deceive you?\" At the halfway mark: qa-agent, \"actually...\", then review-droid, \"CRITICAL: 5 findings\" (red chip). Right, black boxes fall from the sky and tumble into a messy heap (a recorded rigid-body simulation), faster and faster. A few boxes have a corner sliced off, the cut face orange then red, soon buried. Pull back: the heap is a hill beside a speck of chat, and the boxes keep coming.\nsupers:\nsource: motion graphics (three.js, Rapier)\ntransition:\n\nThe systems at our disposal are trained to finish the job at any cost, so they cut subtle corners where we can’t see.\n\nUnderstanding it all requires reading code and reasoning about its consequences, but every day there’s just more. \n\nMore complexity than we can possibly get our arms around.\n\n***5\nat:\nsync:\npicture: DRAFT (scenes/05-machines.src.html). Scene 3's white world as a production line: small platinum code-asterisk tokens pour into an AGENT machine that extrudes black boxes onto a conveyor; gold merge tokens pour into the CODE REVIEW machine they pass through. Boxes exit with a lamp: mint ships; red is diverted to a return belt, back into the agent, and out again. Red lamps pop up along the line and get struck down (whack-a-mole) while the token counters race. Behind the line stand two miniature art deco banks, ANTHROPIC TREASURY and OPENAI TREASURY (names only, no logos). Smoked-glass pipes run from beneath both machines, arch over the return belt into a header, and branch to each bank's door; Cherenkov-blue pulses flow through them at one steady pace, brightening as the tokens pour in, and the doors glow blue.\nsupers:\nsource: motion graphics (three.js)\ntransition:\n\nOur solution? Throw more inference at the problem. We use inference to write code, then we use more inference to ask if the code we wrote was good.\n\nSo what do we get for all this? Bugs that recur. Endless whack a mole adversarial reviews.\n\n***6\nat:\nsync:\npicture: DRAFT (scenes/06-result.src.html). Two panels in fog: left, OpenRouter's daily token totals for 2026 drawing themselves and going vertical, 25× counting up; right, GitHub's uptime for April 2026 as a calendar, draining to 78.33%. The fog rolls in, then the picture turns out to be on a tube: scanlines and a slight bulge, then static eats it, bands slipping, the boards still faintly there; it collapses to a bright line, a dot, and dies.\nsupers: 25× tokens used in 2026\nsource: motion graphics (OpenRouter daily token totals; mrshu.github.io/github-statuses for April)\ntransition: the tube dies; scene 7 powers it back on\n\nOpenRouter does twenty trillion tokens a day. GitHub struggles to stay online.\n\nSoftware staggers under this scale of motion.\n\nBecause we don’t yet have the tools to make sense of this new world.\n\n***7 (to land at first act break)\nat:\nsync:\npicture: DRAFT (scenes/07-power.src.html). Like a CRT going black, then turning back on, typing the script. Scene 6's tube has just died; a beat of black, then the tube powers on (dot, line, flash) to a phosphor screen with scanlines, and the narration's three lines type out in mint under a block cursor. Hard cut to black.\nsupers:\nsource: motion graphics\ntransition: hard cut to black\n\nIt's time to build the next generation of tools.\n\nDevelopers need clarity and confidence, not just speed.\n\nThe race is on to deliver. Coherence lets us compete.\n\n***8\nat:\nsync:\npicture: LOCKED, REVISIT (scenes/08-lexicon.src.html). Revisit: a lot of talking and reading at once; the plan, the definition card and the narration compete for the eye. A tilted table of settled terms (API key and project token side by side) resolves from the dark. A subagent starts: its SubagentStart hook pulses and streams the lexicon into its context (super: \"Delivered through your agent's own hooks\"). Its plan types \"deactivate their account\"; the word and the account tile go orange, then red as the definition in its context says no. The tile scales outward into its full definition card and the definition fades in (the billing entity; not a person's access, that is a membership). The plan revises to \"membership\", SubagentStop runs regulate clean, everything folds away and the camera pulls out.\nsupers: Delivered through your agent's own hooks\nsource: motion graphics (three.js)\ntransition:\n\nWe start with clear definitions.\n\nLanguage models are built out of language. Clearly defining your terms changes their behavior. Agents start to do what you meant, not just what you said.\n\nThis impacts the integrity of what gets built, making bugs easier for agents to detect.\n\n***9\nat:\nsync:\npicture: LOCKED (scenes/09-journal.src.html). Left, an endless transcript with tool calls; stretches are selected in place and their lit tokens stream right, materializing a stack of five orange decision records. A reticle inspects each record and it goes mint; the last one stalls and goes red. We push in to read it, then a red thread drops through the fog to the buried cell in the code.\nsupers:\nsource: motion graphics (three.js), the style reference for every scene\ntransition:\n\nBut we can do more.\n\nThe Coherence decision journal compresses hundreds of thousands of tokens into a handful of decisions.\n\nIf a bad call happened in the process, it’s right there in the history, instead of buried in code.\n\n***10\nat:\nsync:\npicture: LOCKED (scenes/10-switchboard.src.html). A switchboard: transcript lanes, one per session, on either side of a short spine of scene 9's decision records. The coordinator's session ends; a new one opens where it was, its SessionStart hook pulses (orient) and three records thread into it by subject. subagent-a records \"Route admin reads through the session store\", reversing scene 9's bad call, which steps back. The peer feed drops only that subject into subagent-b and -c; c's next edit turns from the cache to the session store. Every session adds its decisions to the one spine as it works: a decide tool call appears in its transcript in orange, and the record lifts out of it, flies in, lands orange at the top of the stream, settles mint, and the stream flows down. Pull back: lanes multiply and rush to texture, all feeding the spine, which pours down into the ground as one crisp stream. Fog clarity 0.20 to 0.35.\nsupers:\nsource: motion graphics (three.js)\ntransition:\n\nQuickly move between different conversations and agents without costly handoff files, while letting subagents compare notes.\n\nAnd decisions are never buried in a long transcript.\n\n***11\nat:\nsync:\npicture: LOCKED (scenes/11-bypass.src.html). The Deus Ex: Human Revolution hacking board, on the half-cleared ground: components as nodes, references as links, entrances (routes, a cron job) at the near edge, the flag (the session store) at the far end, held in a lock-on reticle tagged PROTECTED, behind one gate, the chokepoint sessions.get(). Every node's name stands on a translucent sign just off the board, tilted toward the camera, so links pass beneath the labels. Paths capture in mint through the gate to the flag; invariant enforced. The language server runs its pass like a compiler: a cursor visits each reference in turn at a fixed step, each blinks white as checked, and the panel logs one terse line per reference (12 references, 0 bypasses). An agent edits admin/dashboard.ts and a link draws straight to the flag, orange, around the gate; the PostToolUse hook re-checks in the same turn, the same machine walking the references into the flag, the last line logged BYPASS. The link goes red, every path that now reaches the flag without the gate is marked red (GET /admin, GET /stats), the flag goes red and its PROTECTED tag swells into a larger BYPASS DETECTED tag with the warning triangle, and the hook's message lands: structural defect revealed at this edit, the bypass by file and line, the two honest options. Fog clarity 0.35 to 0.5.\nsupers:\nsource: motion graphics (three.js); the message quotes the hook's real output format\ntransition:\n\nWe also need constant confidence that our code matches our intentions.\n\nCoherence uses your language server to detect security bypasses. The moment an agent writes code that touches something sensitive without routing through a designated chokepoint, the project goes red.\n\n***12\nat:\nsync:\npicture: LOCKED (scenes/12-reduce.src.html). Scene 11's board, still red: the agent edits admin/dashboard.ts again, the bypass retracts, a new link draws into the gate, the PostToolUse check passes silently, the re-check logs ok, and the red walks back to mint; BYPASS DETECTED folds back into PROTECTED. The camera glides across the board to another system: a billing ledger, not yet locked on, with six call sites wired straight to it, each carrying its own copy of the guard (one drifted, role === \"admin\"; one missing). The agent's reduce pass finds them one by one, removes every copy, and they converge into one gate, the chokepoint billing.guard(), and only then does the ledger get its lock-on reticle and PROTECTED tag; the direct links retract, every site routes through the gate, all mint. The agent finalizes with one more tool call on the board, Edit Billing.spec.md, adding one line in the real spec format: chokepoint: billing.guard in billing/guard.ts; only then does it read enforced and the ledger turn mint. The PostToolUse card carried over from scene 11 turns over as the error clears: the red report dissolves into the pass, the border blends to mint, and the card shrinks down onto its two-line pass before it goes. Pull back: both systems, the same shape, one door each. Fog clarity 0.5 to 0.65.\nsupers:\nsource: motion graphics (three.js)\ntransition:\n\nThe agent discovers the violation immediately.\n\nInstead of enforcing security through implicit conventions, we know our intentions are represented in the structure of our projects themselves.\n\n***13\nat:\nsync:\npicture: LOCKED (scenes/13-structure.src.html, from structure-gen.py). A stylized Scope Structure view settles on the ground as a map over the territory, in Scope's real grammar, on the app from scenes 11-12: entrance tokens with trust tags slide in (webhook in: no control, amber), stations appear by column (where work enters, 1 step, 2 steps), structural routes light one at a time in their own colours, C and X interface identifiers settle on the lines, core dependencies run along the bottom as rails, and the masthead lands: All 24 invariants verified, live. As the map assembles, the ground's noise gives way to a ruled order spreading out from under it. Fog clarity 0.65 to 0.75.\nsupers:\nsource: motion graphics (three.js), after Scope's Structure view\ntransition:\n\nBut how do we check that the agent did what we want?\n\nThe Coherence structure view shows you the entrypoints into your project, its major components, and how those components interact with each other. Always accurate and up to date.\n\n***14 (to land at climax)\nat:\nsync:\npicture: LOCKED (scenes/14-structure.src.html). The map, live, on ruled ground. A red dashed reference from Admin into Sessions; Sessions' verdict bar goes red with ✕ 1 broken, C1 goes red, the rest dims, and the inspector names the chokepoint and the bypass site (admin/dashboard.ts:42). The fix clears it. Then a change: a new entrance POST /export and its route through Admin to Webhooks; the old Jobs → Webhooks route ghosts and withdraws; a strip names the change since the last commit (Scope computes these differences today; this view of them is the planned design). The ground fills with streaming code, which dissolves; the map returns, verified; in the last stretch its pieces (stations, entrance tokens, tags) rise off it to 45 degrees in a cascade, like the signs, the lines and rails staying flat, and the camera comes down low to see them standing, in nearly clear air. Fog clarity 0.75 to 0.9.\nsupers:\nsource: motion graphics (three.js), after Scope's Structure view\ntransition:\n\nWhen chokepoints are violated, you’ll see it.\n\nWhen a major change alters the relationships between components, you’ll see that too.\n\nNo more sifting through thousands of lines of code to understand what was built or changed. See your project as it is right now.\n\n***15 (to land after climax)\nat:\nsync:\npicture: DRAFT (scenes/15-structure.src.html, from structure-gen.py). The Structure view, verified, in clear air; the camera pulls straight up, and at 3:31 the view is the first to go coherent, its detail giving way to a flat mint abstraction of itself. More structure views surround it, tile by tile, more abstract the further out (cards and lines, then bare blocks); each view moves one way along grey, amber, red, starting at its own point and never stepping back; from about 5 s in, green trickles outward from the centre cell by cell, then a wave of mint rolls outward until every view is uniform mint, and the field closes into one mint surface. Over the mint, from 3:44, the features the film names pile up as black chips (Lexicon, Spec, Invariant, Chokepoint check … TypeScript support, Python support), hold to be read, then pour into the middle and become the title: coherence, lowercase, black on mint, set in Figtree, its c tilted 20° and standing a little off; under it, in thin Inter, SALVATION FOR EVERY AGENT BY POSTHOG (the last two words in medium) with PostHog's logomark in black. A scan line passes, a reticle locks onto the c, and it rights itself and slides home; fade to black with the music.\nsupers: Coherence\nsource: motion graphics\ntransition: fade to black with the music\n\nThese are the kinds of tools we need to clear the fog.\n\nSpend less inference on code that doesn’t work, less inference detecting bugs, less inference investigating the decisions that went into your changes.\n\nSo if you’re ready to try a new way of working with agents, come join us building the software of 2030.\n","peaks":[0,0,0.001,0.001,0.001,0.001,0.001,0.193,0.119,0.143,0.188,0.037,0.217,0.087,0.144,0.03,0.251,0.098,0.031,0.022,0.006,0.005,0.1,0.081,0.025,0.21,0.052,0.254,0.209,0.122,0.183,0.075,0.165,0.08,0.018,0.014,0.014,0.014,0.01,0.013,0.012,0.108,0.289,0.241,0.125,0.124,0.131,0.072,0.166,0.167,0.025,0.08,0.07,0.212,0.054,0.013,0.014,0.014,0.134,0.207,0.14,0.109,0.145,0.264,0.121,0.223,0.139,0.078,0.177,0.145,0.168,0.069,0.098,0.057,0.011,0.011,0.183,0.136,0.153,0.344,0.12,0.076,0.139,0.099,0.157,0.124,0.017,0.009,0.01,0.009,0.012,0.261,0.196,0.189,0.108,0.101,0.116,0.079,0.205,0.23,0.119,0.095,0.122,0.071,0.09,0.067,0.02,0.017,0.01,0.012,0.013,0.018,0.187,0.203,0.169,0.218,0.178,0.264,0.112,0.169,0.054,0.253,0.151,0.124,0.188,0.037,0.196,0.215,0.222,0.117,0.127,0.044,0.145,0.192,0.143,0.112,0.049,0.033,0.031,0.072,0.224,0.098,0.203,0.082,0.19,0.108,0.096,0.077,0.143,0.048,0.031,0.026,0.026,0.159,0.162,0.202,0.146,0.208,0.181,0.156,0.058,0.027,0.067,0.122,0.129,0.156,0.208,0.15,0.14,0.199,0.149,0.088,0.087,0.082,0.038,0.026,0.164,0.117,0.044,0.24,0.099,0.159,0.074,0.172,0.072,0.195,0.05,0.028,0.03,0.029,0.124,0.174,0.106,0.138,0.236,0.167,0.053,0.165,0.23,0.092,0.057,0.152,0.101,0.181,0.215,0.272,0.117,0.088,0.189,0.156,0.056,0.069,0.027,0.028,0.029,0.026,0.232,0.184,0.192,0.185,0.16,0.157,0.149,0.174,0.102,0.179,0.089,0.218,0.144,0.154,0.138,0.149,0.202,0.079,0.027,0.027,0.028,0.028,0.031,0.129,0.187,0.165,0.122,0.09,0.232,0.173,0.105,0.179,0.046,0.19,0.157,0.107,0.127,0.101,0.041,0.04,0.031,0.032,0.032,0.034,0.036,0.037,0.035,0.036,0.032,0.032,0.155,0.229,0.217,0.173,0.223,0.073,0.244,0.177,0.175,0.077,0.153,0.164,0.099,0.139,0.103,0.125,0.158,0.142,0.14,0.109,0.188,0.102,0.157,0.033,0.034,0.035,0.193,0.091,0.181,0.213,0.147,0.192,0.179,0.128,0.097,0.13,0.052,0.117,0.062,0.037,0.035,0.035,0.037,0.039,0.04,0.039,0.056,0.231,0.111,0.221,0.241,0.274,0.161,0.141,0.196,0.091,0.168,0.086,0.241,0.133,0.095,0.107,0.169,0.138,0.084,0.064,0.136,0.084,0.043,0.035,0.034,0.138,0.2,0.209,0.186,0.099,0.086,0.181,0.222,0.035,0.031,0.031,0.03,0.029,0.03,0.034,0.245,0.159,0.126,0.195,0.081,0.117,0.147,0.078,0.062,0.149,0.118,0.098,0.148,0.207,0.211,0.093,0.048,0.031,0.034,0.034,0.031,0.035,0.034,0.031,0.031,0.154,0.149,0.142,0.157,0.062,0.035,0.033,0.039,0.303,0.303,0.22,0.166,0.072,0.057,0.117,0.052,0.038,0.038,0.038,0.25,0.203,0.164,0.147,0.093,0.179,0.137,0.216,0.112,0.125,0.152,0.232,0.208,0.13,0.08,0.137,0.066,0.083,0.156,0.145,0.133,0.075,0.09,0.204,0.147,0.037,0.035,0.03,0.031,0.034,0.035,0.036,0.031,0.029,0.034,0.03,0.129,0.289,0.241,0.126,0.169,0.062,0.039,0.033,0.041,0.048,0.046,0.209,0.107,0.113,0.144,0.091,0.044,0.044,0.041,0.155,0.223,0.08,0.208,0.115,0.242,0.13,0.068,0.183,0.171,0.078,0.084,0.042,0.041,0.039,0.038,0.041,0.04,0.038,0.035,0.041,0.212,0.222,0.234,0.156,0.156,0.069,0.166,0.073,0.17,0.126,0.154,0.101,0.111,0.17,0.06,0.048,0.042,0.047,0.048,0.224,0.199,0.061,0.232,0.146,0.069,0.073,0.133,0.152,0.139,0.11,0.044,0.04,0.038,0.039,0.037,0.038,0.214,0.158,0.096,0.11,0.206,0.187,0.172,0.162,0.044,0.177,0.126,0.107,0.099,0.046,0.038,0.038,0.039,0.039,0.036,0.036,0.039,0.038,0.126,0.145,0.111,0.084,0.289,0.106,0.197,0.109,0.111,0.104,0.187,0.206,0.087,0.18,0.052,0.199,0.069,0.115,0.067,0.148,0.135,0.047,0.043,0.041,0.04,0.042,0.044,0.042,0.043,0.039,0.038,0.043,0.043,0.042,0.042,0.041,0.038,0.04,0.04,0.039,0.042,0.039,0.039,0.242,0.047,0.184,0.224,0.1,0.266,0.117,0.252,0.213,0.045,0.162,0.1,0.088,0.073,0.09,0.049,0.027,0.03,0.043,0.027,0.025,0.03,0.03,0.148,0.284,0.187,0.166,0.136,0.038,0.242,0.256,0.141,0.115,0.088,0.164,0.047,0.021,0.052,0.158,0.129,0.054,0.071,0.068,0.021,0.027,0.033,0.018,0.03,0.18,0.171,0.115,0.27,0.172,0.157,0.188,0.045,0.036,0.027,0.016,0.162,0.136,0.268,0.065,0.126,0.098,0.045,0.134,0.06,0.036,0.022,0.016,0.009,0.011,0.014,0.013,0.034,0.036,0.029,0.019,0.081,0.073,0.245,0.189,0.101,0.042,0.161,0.21,0.17,0.119,0.08,0.038,0.032,0.02,0.012,0.009,0.015,0.211,0.212,0.12,0.251,0.174,0.154,0.209,0.107,0.181,0.115,0.186,0.111,0.045,0.036,0.063,0.058,0.029,0.133,0.195,0.161,0.187,0.183,0.143,0.118,0.139,0.05,0.118,0.164,0.097,0.162,0.146,0.158,0.062,0.037,0.029,0.031,0.032,0.049,0.196,0.17,0.051,0.204,0.055,0.153,0.185,0.099,0.127,0.238,0.033,0.038,0.174,0.137,0.089,0.106,0.064,0.128,0.028,0.035,0.029,0.031,0.034,0.193,0.108,0.197,0.174,0.061,0.159,0.106,0.161,0.144,0.112,0.094,0.06,0.251,0.054,0.036,0.133,0.104,0.175,0.25,0.046,0.088,0.129,0.13,0.133,0.17,0.056,0.034,0.079,0.115,0.064,0.034,0.03,0.031,0.029,0.053,0.048,0.117,0.174,0.184,0.235,0.136,0.041,0.042,0.039,0.047,0.043,0.152,0.221,0.166,0.267,0.118,0.119,0.202,0.174,0.203,0.097,0.075,0.167,0.075,0.127,0.242,0.114,0.186,0.172,0.12,0.118,0.139,0.064,0.096,0.19,0.108,0.234,0.138,0.123,0.123,0.183,0.043,0.045,0.044,0.044,0.046,0.112,0.21,0.157,0.194,0.2,0.136,0.099,0.123,0.126,0.148,0.121,0.089,0.051,0.17,0.166,0.135,0.169,0.12,0.125,0.06,0.047,0.137,0.086,0.249,0.132,0.089,0.175,0.043,0.036,0.043,0.035,0.04,0.041,0.038,0.064,0.06,0.043,0.036,0.05,0.039,0.035,0.039,0.041,0.063,0.231,0.25,0.286,0.098,0.09,0.168,0.126,0.139,0.08,0.181,0.109,0.12,0.131,0.118,0.161,0.088,0.064,0.224,0.122,0.165,0.08,0.1,0.168,0.155,0.088,0.119,0.049,0.05,0.122,0.211,0.1,0.242,0.171,0.101,0.09,0.102,0.186,0.149,0.047,0.054,0.049,0.046,0.043,0.042,0.051,0.147,0.101,0.251,0.183,0.134,0.165,0.181,0.223,0.137,0.154,0.165,0.107,0.173,0.077,0.044,0.064,0.038,0.048,0.04,0.03,0.04,0.04,0.055,0.05,0.049,0.035,0.063,0.06,0.048,0.276,0.143,0.146,0.075,0.103,0.138,0.12,0.071,0.158,0.109,0.073,0.147,0.109,0.278,0.252,0.134,0.097,0.169,0.098,0.118,0.079,0.055,0.049,0.044,0.056,0.152,0.19,0.211,0.133,0.163,0.141,0.154,0.177,0.18,0.133,0.084,0.136,0.07,0.092,0.115,0.087,0.051,0.156,0.111,0.188,0.094,0.073,0.058,0.051,0.045,0.042,0.123,0.226,0.177,0.153,0.179,0.123,0.189,0.055,0.305,0.082,0.162,0.091,0.139,0.091,0.086,0.143,0.12,0.097,0.109,0.239,0.182,0.224,0.181,0.08,0.141,0.173,0.052,0.128,0.082,0.169,0.116,0.116,0.034,0.066,0.239,0.142,0.056,0.245,0.081,0.113,0.134,0.035,0.039,0.058,0.115,0.194,0.204,0.087,0.117,0.197,0.106,0.18,0.176,0.098,0.116,0.097,0.167,0.092,0.057,0.037,0.036,0.037,0.063,0.044,0.046,0.111,0.152,0.226,0.15,0.221,0.115,0.068,0.115,0.219,0.1,0.138,0.086,0.195,0.116,0.133,0.201,0.087,0.053,0.045,0.039,0.171,0.258,0.298,0.201,0.125,0.089,0.131,0.186,0.115,0.142,0.111,0.067,0.178,0.084,0.154,0.161,0.166,0.083,0.068,0.076,0.171,0.048,0.037,0.058,0.053,0.05,0.039,0.131,0.25,0.149,0.171,0.121,0.166,0.145,0.085,0.138,0.1,0.151,0.293,0.058,0.033,0.038,0.048,0.036,0.106,0.154,0.176,0.18,0.178,0.107,0.131,0.129,0.139,0.173,0.074,0.044,0.16,0.087,0.115,0.115,0.119,0.092,0.132,0.21,0.112,0.048,0.058,0.031,0.105,0.115,0.237,0.14,0.1,0.152,0.092,0.037,0.036,0.1,0.242,0.237,0.077,0.109,0.152,0.071,0.163,0.149,0.061,0.052,0.069,0.054,0.037,0.047,0.227,0.281,0.177,0.114,0.134,0.079,0.053,0.252,0.219,0.131,0.084,0.119,0.049,0.057,0.035,0.05,0.051,0.047,0.042,0.159,0.205,0.101,0.192,0.102,0.207,0.177,0.137,0.098,0.064,0.141,0.066,0.142,0.136,0.172,0.062,0.047,0.037,0.045,0.057,0.051,0.171,0.241,0.212,0.159,0.197,0.224,0.129,0.129,0.161,0.168,0.1,0.126,0.048,0.134,0.085,0.148,0.224,0.06,0.1,0.115,0.202,0.063,0.169,0.058,0.043,0.059,0.042,0.245,0.262,0.153,0.138,0.122,0.118,0.229,0.131,0.099,0.193,0.136,0.074,0.237,0.088,0.141,0.078,0.174,0.162,0.089,0.146,0.106,0.15,0.1,0.056,0.047,0.055,0.051,0.111,0.242,0.156,0.185,0.098,0.163,0.148,0.229,0.056,0.126,0.099,0.081,0.058,0.062,0.057,0.063,0.056,0.13,0.289,0.214,0.128,0.183,0.16,0.073,0.199,0.095,0.111,0.073,0.068,0.085,0.214,0.13,0.128,0.125,0.035,0.021,0.018,0.017,0.024,0.192,0.15,0.216,0.161,0.128,0.156,0.185,0.161,0.214,0.152,0.121,0.161,0.15,0.024,0.014,0.044,0.201,0.192,0.104,0.217,0.064,0.108,0.074,0.186,0.194,0.036,0.012,0.01,0.09,0.173,0.207,0.159,0.125,0.141,0.187,0.084,0.187,0.109,0.103,0.182,0.097,0.082,0.095,0.133,0.152,0.084,0.082,0.156,0.077,0.054,0.019,0.013,0.007,0.006,0.008,0.008,0.008,0.007,0.169,0.11,0.194,0.267,0.211,0.072,0.251,0.177,0.167,0.202,0.193,0.179,0.101,0.104,0.109,0.043,0.02,0.007,0.01,0.12,0.138,0.238,0.137,0.174,0.153,0.099,0.126,0.05,0.123,0.026,0.077,0.043,0.055,0.012,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0,0,0,0,0,0,0]};
+const $ = (id) => document.getElementById(id);
+const audio = $("audio");
+const KEY = "coherence-promo-marks-v1";
+
+const parseTime = (s) => {
+  if (!s) return null;
+  const m = String(s).match(/^(\d+):(\d+(?:\.\d+)?)$/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+const fmt = (t) => {
+  const m = Math.floor(t / 60), s = t - m * 60;
+  return `${m}:${s.toFixed(1).padStart(4, "0")}`;
+};
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+let marks = {};
+try { marks = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch { marks = {}; }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(marks)); } catch {} };
+
+// Effective start per scene: your mark, else the script's at:, else interpolated by words between known points.
+function placement() {
+  const S = D.scenes, known = S.map((s) => marks[s.n] ?? parseTime(s.fields.at));
+  const start = known.slice(), placed = known.map((k) => k != null);
+  const pts = [];
+  S.forEach((s, i) => {
+    const t = known[i] ?? D.anchors[s.n];
+    if (t != null) pts.push({ i, t });
+  });
+  pts.push({ i: S.length, t: D.anchors.end });
+  pts.sort((a, b) => a.i - b.i);
+  for (let p = 0; p + 1 < pts.length; p++) {
+    const a = pts[p], b = pts[p + 1];
+    const words = S.slice(a.i, b.i).reduce((n, s) => n + s.words, 0) || 1;
+    let acc = 0;
+    for (let i = a.i; i < b.i; i++) {
+      if (start[i] == null) start[i] = a.t + (b.t - a.t) * (acc / words);
+      acc += S[i].words;
+    }
+  }
+  return S.map((s, i) => ({
+    s, start: start[i], end: i + 1 < S.length ? start[i + 1] : D.anchors.end, placed: placed[i],
+  }));
+}
+const actOf = (t) => D.acts.find((a) => t >= a.from && t < a.to) || D.acts[D.acts.length - 1];
+const pct = (t) => `${(t / D.duration) * 100}%`;
+
+function paceOf(p) {
+  const dur = p.end - p.start;
+  if (dur <= 0.5) return { cls: "bad", label: "no room" };
+  const wpm = Math.round(p.s.words / (dur / 60));
+  if (!p.placed) return { cls: "dim", label: `~${wpm} wpm` };
+  if (wpm <= 160) return { cls: "ok", label: `${wpm} wpm` };
+  if (wpm <= 185) return { cls: "warn", label: `${wpm} wpm · brisk` };
+  return { cls: "bad", label: `${wpm} wpm · tight` };
+}
+
+function drawStatic() {
+  $("acts").innerHTML = D.acts.map((a) =>
+    `<div class="act" style="left:${pct(a.from)};width:calc(${pct(a.to - a.from)} - 4px);--c:var(--act-${a.id})">Act ${a.id} · ${a.name}</div>`).join("");
+  $("markers").innerHTML = D.markers.map((m) =>
+    `<div class="marker${m.major ? " major" : ""}" style="left:${pct(m.t)}" title="${fmt(m.t)} ${esc(m.label)}">${m.major ? `<span class="lab">${fmt(m.t).replace(/\.\d$/, "")} ${esc(m.label)}</span>` : ""}</div>`).join("");
+}
+
+function drawWave() {
+  const c = $("wave"), dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth, h = c.clientHeight;
+  if (!w) return;
+  c.width = w * dpr; c.height = h * dpr;
+  const g = c.getContext("2d"); g.scale(dpr, dpr);
+  const css = getComputedStyle(document.documentElement);
+  const max = Math.max(...D.peaks), played = audio.currentTime / D.duration;
+  const n = D.peaks.length, bw = w / n;
+  for (let i = 0; i < n; i++) {
+    const v = Math.max(1, (D.peaks[i] / max) * (h / 2 - 2));
+    g.fillStyle = (i / n) < played ? css.getPropertyValue("--wave-played") : css.getPropertyValue("--wave");
+    g.fillRect(i * bw, h / 2 - v, Math.max(1, bw - 0.4), v * 2);
+  }
+}
+
+let current = -1;
+function render() {
+  const P = placement();
+  const t = audio.currentTime;
+  current = P.findIndex((p) => t >= p.start && t < p.end);
+
+  $("chips").innerHTML = P.map((p, i) => {
+    const a = actOf(p.start);
+    return `<div class="scene-chip${p.placed ? "" : " est"}${i === current ? " now" : ""}" role="button" tabindex="0" data-seek="${p.start}"
+      style="left:${pct(p.start)};width:calc(${pct(Math.max(0.5, p.end - p.start))} - 2px);--c:var(--act-${a.id})"
+      title="Scene ${p.s.n} · ${fmt(p.start)}${p.placed ? "" : " (estimated)"}">${p.s.n}</div>`;
+  }).join("");
+
+  $("board").innerHTML = P.map((p, i) => {
+    const a = actOf(p.start), pace = paceOf(p), f = p.s.fields;
+    const field = (k, label) => `<dt>${label}</dt><dd class="${f[k] ? "" : "empty"}">${f[k] ? esc(f[k]) : "—"}</dd>`;
+    return `<article class="card${i === current ? " now" : ""}" style="--c:var(--act-${a.id})" id="scene-${p.s.n}">
+      <div class="slate">
+        <div class="num">${p.s.n}</div>
+        <div class="meta">
+          <span class="when mono">${fmt(p.start)} – ${fmt(p.end)} <span class="${p.placed ? "" : "est"}">${p.placed ? "" : "est."}</span></span>
+          <span>Act ${a.id} · ${p.s.words} words · ${(p.end - p.start).toFixed(1)} s</span>
+        </div>
+        <span class="pill ${pace.cls}">${pace.label}</span>
+      </div>
+      <div class="body">
+        ${p.s.render ? `<div class="stills">${p.s.render.stills.map((st) => `<figure><img src="${st.src}" alt="Scene ${p.s.n} at ${st.t} s" loading="lazy"><figcaption>${st.t.toFixed(1)} s</figcaption></figure>`).join("")}</div>` : ""}
+        ${p.s.note ? `<div class="note">${esc(p.s.note)}</div>` : ""}
+        <div class="vo">${p.s.paras.map((x) => `<p>${esc(x)}</p>`).join("")}</div>
+        <dl>${field("sync", "Sync")}${field("picture", "Picture")}${field("supers", "Supers")}${field("source", "Source")}${field("transition", "Transition")}</dl>
+      </div>
+      <footer>
+        <button data-go="${p.start}">Play from here</button>
+        <button data-set="${p.s.n}">Start = playhead</button>
+        <button data-nudge="${p.s.n}" data-by="-0.1" ${p.placed ? "" : "disabled"}>−0.1</button>
+        <button data-nudge="${p.s.n}" data-by="0.1" ${p.placed ? "" : "disabled"}>+0.1</button>
+        ${marks[p.s.n] != null ? `<button data-clear="${p.s.n}">Clear</button>` : ""}
+        ${p.s.render ? `<a class="open" href="${p.s.render.url}" target="_blank" rel="noopener">Open scene ↗</a>` : ""}
+      </footer>
+    </article>`;
+  }).join("");
+  renderNow(P);
+  tick();
+}
+
+function renderNow(P) {
+  const i = current >= 0 ? current : 0, p = P[i], a = actOf(p.start), nx = P[i + 1];
+  $("now").style.setProperty("--c", `var(--act-${a.id})`);
+  $("now").innerHTML = `
+    <div class="eyebrow"><b>Scene ${p.s.n}</b><span>Act ${a.id} · ${a.name}</span><span class="mono">${fmt(p.start)} – ${fmt(p.end)}</span>${p.s.fields.sync ? `<span>sync: ${esc(p.s.fields.sync)}</span>` : ""}</div>
+    <div class="lines">${p.s.paras.map((x) => `<p>${esc(x)}</p>`).join("")}</div>
+    ${nx ? `<div class="next">Next · ${nx.s.n}: ${esc(nx.s.paras[0] || "")}</div>` : ""}`;
+}
+
+let lastScene = -2;
+function tick() {
+  const t = audio.currentTime;
+  $("tc").innerHTML = `${fmt(t)} <span>/ ${fmt(D.duration)}</span>`;
+  const tl = $("timeline"), pad = 14, w = tl.clientWidth - pad * 2;
+  $("playhead").style.left = `${pad + (t / D.duration) * w - 1}px`;
+  drawWave();
+  const P = placement();
+  const now = P.findIndex((p) => t >= p.start && t < p.end);
+  if (now !== lastScene) { lastScene = now; if (now !== current) render(); }
+}
+
+let raf = 0;
+const loop = () => { tick(); raf = audio.paused ? 0 : requestAnimationFrame(loop); };
+audio.addEventListener("play", () => {
+  $("play").innerHTML = '<svg viewBox="0 0 16 16"><path d="M3 1.5h3.5v13H3zM9.5 1.5H13v13H9.5z"/></svg>';
+  $("play").setAttribute("aria-label", "Pause");
+  if (!raf) loop();
+});
+audio.addEventListener("pause", () => {
+  $("play").innerHTML = '<svg viewBox="0 0 16 16"><path d="M3 1.5v13l11-6.5z"/></svg>';
+  $("play").setAttribute("aria-label", "Play");
+  tick();
+});
+audio.addEventListener("seeked", tick);
+
+const seek = (t) => { audio.currentTime = Math.max(0, Math.min(D.duration - 0.05, t)); tick(); };
+const toggle = () => { audio.paused ? audio.play().catch(() => {}) : audio.pause(); };
+$("play").onclick = toggle;
+$("back").onclick = () => seek(audio.currentTime - 5);
+$("fwd").onclick = () => seek(audio.currentTime + 5);
+
+let arming = false;
+function nextUnplaced() {
+  return D.scenes.find((s) => marks[s.n] == null && parseTime(s.fields.at) == null);
+}
+function syncMarkButton() {
+  const b = $("mark"), s = nextUnplaced();
+  b.classList.toggle("armed", arming);
+  b.textContent = arming ? (s ? `Press M to place scene ${s.n}` : "Every scene placed") : "Mark scene starts";
+}
+$("mark").onclick = () => { arming = !arming; syncMarkButton(); };
+function markNow() {
+  const s = nextUnplaced();
+  if (!s) return;
+  marks[s.n] = Math.round(audio.currentTime * 10) / 10;
+  save(); render(); syncMarkButton();
+}
+
+$("timeline").addEventListener("click", (e) => {
+  const chip = e.target.closest("[data-seek]");
+  if (chip) return seek(Number(chip.dataset.seek));
+  const r = $("timeline").getBoundingClientRect(), pad = 14;
+  seek(((e.clientX - r.left - pad) / (r.width - pad * 2)) * D.duration);
+});
+$("chips").addEventListener("keydown", (e) => {
+  const chip = e.target.closest("[data-seek]");
+  if (chip && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); seek(Number(chip.dataset.seek)); }
+});
+$("board").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.go) { seek(Number(b.dataset.go)); audio.play().catch(() => {}); }
+  if (b.dataset.set) { marks[b.dataset.set] = Math.round(audio.currentTime * 10) / 10; save(); render(); syncMarkButton(); }
+  if (b.dataset.nudge) {
+    const n = b.dataset.nudge, base = marks[n] ?? parseTime(D.scenes.find((s) => String(s.n) === n).fields.at);
+    marks[n] = Math.round((base + Number(b.dataset.by)) * 10) / 10; save(); render();
+  }
+  if (b.dataset.clear) { delete marks[b.dataset.clear]; save(); render(); syncMarkButton(); }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest("textarea, input")) return;
+  if (e.key === " " && !e.target.closest("button, [role=button]")) { e.preventDefault(); toggle(); }
+  else if (e.key === "ArrowLeft") seek(audio.currentTime - 5);
+  else if (e.key === "ArrowRight") seek(audio.currentTime + 5);
+  else if ((e.key === "m" || e.key === "M") && arming) markNow();
+});
+
+function scriptWithTimings() {
+  let n = null;
+  return D.raw.split("\n").map((line) => {
+    const h = line.match(/^\*\*\*(\d+)/);
+    if (h) { n = Number(h[1]); return line; }
+    if (n != null && /^at:/.test(line) && marks[n] != null) return `at: ${fmt(marks[n])}`;
+    return line;
+  }).join("\n");
+}
+$("copy").onclick = () => {
+  const text = scriptWithTimings();
+  const fallback = () => { $("exportBox").hidden = false; $("exportText").value = text; $("exportText").select(); };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(() => { $("toast").textContent = "Copied script.md with timings."; }, fallback);
+  } else fallback();
+};
+
+window.addEventListener("resize", tick);
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", tick);
+new MutationObserver(tick).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+drawStatic(); render(); syncMarkButton();
+</script>

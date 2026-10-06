@@ -1,0 +1,548 @@
+<title>Scene 12 · Reduce</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.caption { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+.hud { position: absolute; font: 500 clamp(8px, 1.05vw, 14px)/1.4 var(--mono); color: var(--ink); pointer-events: none; }
+.panel { background: rgb(8 11 14 / .86); border: 1px solid #26313A; border-radius: 6px; padding: .7em .9em; }
+.hud svg { width: 1.3em; height: 1.3em; vertical-align: -.3em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: .45em; }
+.hud .k { color: var(--muted); font-size: .82em; letter-spacing: .08em; text-transform: uppercase; }
+.hud .v { margin-top: .25em; }
+#inv { left: 2.5%; top: 4%; width: 34%; transition: none; }
+#lsp { right: 2.5%; top: 4%; width: 33%; }
+#hook { right: 2.5%; bottom: 17%; width: 50%; opacity: 0; }   /* where scene 11 left it */
+#hook .chip { display: inline-block; background: var(--mint); color: #000; font-weight: 800; border-radius: 1em; padding: .15em .8em; margin-bottom: .55em; }
+#hook .chip svg { stroke: #000; }
+#hook pre { margin: 0; white-space: pre-wrap; font: inherit; }
+#wash { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 55%, rgb(255 75 75 / 0) 40%, rgb(255 75 75 / .28) 100%); opacity: 0; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 12 · reduce</div>
+    <h1>The agent fixes the bypass; then a system held together by copies is reduced to one door</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div id="wash"></div>
+    <div class="hud panel" id="inv"></div>
+    <div class="hud panel" id="lsp"></div>
+    <div class="hud panel" id="hook"></div>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="13" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 13.00</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <section class="box">
+    <h2>Beats (about 13 s; the same board, fog clarity 0.5 to 0.65)</h2>
+    <ol class="beats">
+      <li><span class="t">0.0</span><div><q>The agent discovers the violation immediately.</q><span>Scene 11's board, still red. The agent edits admin/dashboard.ts again: the bypass retracts and a new link draws into the gate. The PostToolUse check passes, so it says nothing; the language server's re-check logs ok. Path by path the red returns to mint, and BYPASS DETECTED folds back into PROTECTED.</span></div></li>
+      <li><span class="t">3.0</span><div><q>Instead of enforcing security through implicit conventions,</q><span>The camera glides across the board to another system: a billing ledger, with no lock-on yet, and six call sites wired straight to it, each carrying its own copy of the guard. One copy has drifted (role === "admin"); one site has none. The reduce pass finds them one by one.</span></div></li>
+      <li><span class="t">6.8</span><div><q>we know our intentions are represented in the structure of our projects themselves.</q><span>The agent reduces: the copies lift off their call sites, converge, and become one gate in front of the ledger, the chokepoint billing.guard(), and only now does the ledger get its lock-on and PROTECTED tag. The direct links retract; every site routes through the gate; everything captures mint. The agent finishes by writing it down: the same tool-call chip as the fix at the start, Edit Billing.spec.md, and the one line it adds, typed in mint: chokepoint: billing.guard in billing/guard.ts. Only then does the invariant read enforced and the ledger turn mint. Pull back: both systems, the same shape, one door each.</span></div></li>
+    </ol>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const ICONS = {"abc": ["M3 16v-6a2 2 0 1 1 4 0v6", "M3 13h4", "M10 8v6a2 2 0 1 0 4 0v-1a2 2 0 1 0 -4 0v1", "M20.732 12a2 2 0 0 0 -3.732 1v1a2 2 0 0 0 3.726 1.01"], "alert-triangle": ["M12 9v4", "M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0", "M12 16h.01"], "arrow-fork": ["M16 3h5v5", "M8 3h-5v5", "M21 3l-7.536 7.536a5 5 0 0 0 -1.464 3.534v6.93", "M3 3l7.536 7.536a5 5 0 0 1 1.464 3.534v.93"], "arrows-split-2": ["M21 17h-5.397a5 5 0 0 1 -4.096 -2.133l-.514 -.734a5 5 0 0 0 -4.096 -2.133h-3.897", "M21 7h-5.395a5 5 0 0 0 -4.098 2.135l-.51 .73a5 5 0 0 1 -4.097 2.135h-3.9", "M18 10l3 -3l-3 -3", "M18 20l3 -3l-3 -3"], "binary-tree-2": ["M14 6a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M7 14a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M21 14a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M14 18a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M12 8v8", "M6.316 12.496l4.368 -4.992", "M17.684 12.496l-4.366 -4.99"], "book-2": ["M19 4v16h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12", "M19 16h-12a2 2 0 0 0 -2 2", "M9 8h6"], "books": ["M5 5a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -14", "M9 5a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -14", "M5 8h4", "M9 16h4", "M13.803 4.56l2.184 -.53c.562 -.135 1.133 .19 1.282 .732l3.695 13.418a1.02 1.02 0 0 1 -.634 1.219l-.133 .041l-2.184 .53c-.562 .135 -1.133 -.19 -1.282 -.732l-3.695 -13.418a1.02 1.02 0 0 1 .634 -1.219l.133 -.041", "M14 9l4 -1", "M16 16l3.923 -.98"], "bug": ["M9 9v-1a3 3 0 0 1 6 0v1", "M8 9h8a6 6 0 0 1 1 3v3a5 5 0 0 1 -10 0v-3a6 6 0 0 1 1 -3", "M3 13l4 0", "M17 13l4 0", "M12 20l0 -6", "M4 19l3.35 -2", "M20 19l-3.35 -2", "M4 7l3.75 2.4", "M20 7l-3.75 2.4"], "circle-check": ["M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0", "M9 12l2 2l4 -4"], "circle-x": ["M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0", "M10 10l4 4m0 -4l-4 4"], "clipboard-check": ["M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2", "M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2", "M9 14l2 2l4 -4"], "code-asterisk": ["M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2", "M12 11.875l3 -1.687", "M12 11.875v3.375", "M12 11.875l-3 -1.687", "M12 11.875l3 1.688", "M12 8.5v3.375", "M12 11.875l-3 1.688", "M18 19a2 2 0 0 0 2 -2v-4l1 -1l-1 -1v-4a2 2 0 0 0 -2 -2"], "code": ["M7 8l-4 4l4 4", "M17 8l4 4l-4 4", "M14 4l-4 16"], "door-enter": ["M13 12v.01", "M3 21h18", "M5 21v-16a2 2 0 0 1 2 -2h6m4 10.5v7.5", "M21 7h-7m3 -3l-3 3l3 3"], "file-code": ["M14 3v4a1 1 0 0 0 1 1h4", "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2", "M10 13l-1 2l1 2", "M14 13l1 2l-1 2"], "file-plus": ["M14 3v4a1 1 0 0 0 1 1h4", "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2", "M12 11l0 6", "M9 14l6 0"], "file-text": ["M14 3v4a1 1 0 0 0 1 1h4", "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2", "M9 9l1 0", "M9 13l6 0", "M9 17l6 0"], "filter": ["M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227"], "flask": ["M9 3l6 0", "M10 9l4 0", "M10 3v6l-4 11a.7 .7 0 0 0 .5 1h11a.7 .7 0 0 0 .5 -1l-4 -11v-6"], "folder": ["M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2"], "git-commit": ["M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M12 3l0 6", "M12 15l0 6"], "git-fork": ["M10 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M15 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M7 8v2a2 2 0 0 0 2 2h6a2 2 0 0 0 2 -2v-2", "M12 12l0 4"], "git-merge": ["M5 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M15 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M7 8l0 8", "M7 8a4 4 0 0 0 4 4h4"], "help-circle": ["M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0", "M12 16v.01", "M12 13a2 2 0 0 0 .914 -3.782a1.98 1.98 0 0 0 -2.414 .483"], "hierarchy-2": ["M10 3h4v4h-4l0 -4", "M3 17h4v4h-4l0 -4", "M17 17h4v4h-4l0 -4", "M7 17l5 -4l5 4", "M12 7l0 6"], "lock-access": ["M4 8v-2a2 2 0 0 1 2 -2h2", "M4 16v2a2 2 0 0 0 2 2h2", "M16 4h2a2 2 0 0 1 2 2v2", "M16 20h2a2 2 0 0 0 2 -2v-2", "M8 12a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1l0 -3", "M10 11v-2a2 2 0 1 1 4 0v2"], "markdown": ["M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10", "M7 15v-6l2 2l2 -2v6", "M14 13l2 2l2 -2m-2 2v-6"], "message-dots": ["M12 11v.01", "M8 11v.01", "M16 11v.01", "M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3l12 0"], "pencil": ["M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4", "M13.5 6.5l4 4"], "plug-connected": ["M7 12l5 5l-1.5 1.5a3.536 3.536 0 1 1 -5 -5l1.5 -1.5", "M17 12l-5 -5l1.5 -1.5a3.536 3.536 0 1 1 5 5l-1.5 1.5", "M3 21l2.5 -2.5", "M18.5 5.5l2.5 -2.5", "M10 11l-2 2", "M13 14l-2 2"], "robot": ["M6 6a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2l0 -4", "M12 2v2", "M9 12v9", "M15 12v9", "M5 16l4 -2", "M15 14l4 2", "M9 18h6", "M10 8v.01", "M14 8v.01"], "route": ["M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0", "M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4", "M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5"], "search": ["M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0", "M21 21l-6 -6"], "shield-check": ["M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.09 7.06", "M15 19l2 2l4 -4"], "shield-lock": ["M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3", "M11 11a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M12 12l0 2.5"], "target": ["M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M7 12a5 5 0 1 0 10 0a5 5 0 1 0 -10 0", "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"], "terminal-2": ["M8 9l3 3l-3 3", "M13 15l3 0", "M3 6a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2l0 -12"], "topology-star-3": ["M10 19a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M18 5a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M10 5a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M6 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M18 19a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M14 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M22 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M6 12h4", "M14 12h4", "M15 7l-2 3", "M9 7l2 3", "M11 14l-2 3", "M13 14l2 3"], "user": ["M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0", "M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"], "world": ["M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0", "M3.6 9h16.8", "M3.6 15h16.8", "M11.5 3a17 17 0 0 0 0 18", "M12.5 3a17 17 0 0 1 0 18"], "git-pull-request": ["M4 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M4 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M16 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M6 8l0 8", "M11 6h5a2 2 0 0 1 2 2v8", "M14 9l-3 -3l3 -3"], "message-circle": ["M3 20l1.3 -3.9c-2.324 -3.437 -1.426 -7.872 2.1 -10.374c3.526 -2.501 8.59 -2.296 11.845 .48c3.255 2.777 3.695 7.266 1.029 10.501c-2.666 3.235 -7.615 4.215 -11.574 2.293l-4.7 1"], "dots": ["M4 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M18 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"], "coin": ["M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0", "M14.8 9a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1", "M12 7v10"], "building-bank": ["M3 21l18 0", "M3 10l18 0", "M5 6l7 -3l7 3", "M4 10l0 11", "M20 10l0 11", "M8 14l0 3", "M12 14l0 3", "M16 14l0 3"], "flag": ["M5 5a5 5 0 0 1 7 0a5 5 0 0 0 7 0v9a5 5 0 0 1 -7 0a5 5 0 0 0 -7 0v-9", "M5 21v-7"], "clock": ["M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0", "M12 7v5l3 3"], "scissors": ["M3 7a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M3 17a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.6 8.6l10.4 10.4", "M8.6 15.4l10.4 -10.4"], "arrows-join": ["M3 7h5l3.5 5h9.5", "M3 17h5l3.495 -5", "M18 15l3 -3l-3 -3"]};
+const T = 13;
+const CLARITY = [.5, .65];   // act two's clearing, picking up from scene 11
+const C = { bg: 0x07090C, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2", steel: "#7E93A3" };
+const LINES = [
+  [0.3, 2.9, "The agent discovers the violation immediately."],
+  [3.2, 6.6, "Instead of enforcing security through implicit conventions,"],
+  [6.8, 11.2, "we know our intentions are represented in the structure of our projects themselves."],
+];
+
+// Shared by every scene: utilities, the renderer with its bloom, fog sheets, and the territory's ground.
+// Inlined at /*COMMON*/ by build.mjs; the scene defines C, T and ICONS before it.
+// ---------- utilities ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (k) => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const smooth = (a, b, x) => { const k = clamp((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+const rand = (() => { let s = 20260923; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+function icon(ctx, name, x, y, size, color, width = 1.5) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(size / 24, size / 24);
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for (const d of ICONS[name] || []) ctx.stroke(new Path2D(d));
+  ctx.restore();
+}
+function svgIcon(name) {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${(ICONS[name] || []).map((d) => `<path d="${d}"/>`).join("")}</svg>`;
+}
+function wrap(ctx, text, maxW) {
+  const words = text.split(" "), lines = []; let cur = "";
+  for (const w of words) { const t = cur ? cur + " " + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; }
+  if (cur) lines.push(cur); return lines;
+}
+
+// ---------- renderer ----------
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("gl"), antialias: true });
+// a final render asks for more (?maxdpr=4 draws a 1920×1080 layout at 8K); on screen, 2× is plenty
+renderer.setPixelRatio(Math.min(+new URLSearchParams(location.search).get("maxdpr") || 2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(C.bg);
+scene.fog = new THREE.FogExp2(C.fog, 0.042);
+const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.05, 300);
+const composer = new THREE.EffectComposer(renderer);
+composer.addPass(new THREE.RenderPass(scene, camera));
+const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(1280, 720), 0.85, 0.55, 0.18);
+composer.addPass(bloom);
+function size() {
+  const r = stage.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false); composer.setSize(r.width, r.height);
+}
+new ResizeObserver(size).observe(stage);
+
+function canvasTex(w, h, draw) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  draw(c.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+
+// ---------- fog sheets ----------
+function noiseTex() {
+  return canvasTex(512, 256, (g, w, h) => {
+    const img = g.createImageData(w, h), d = img.data;
+    const grid = (n) => { const a = []; for (let i = 0; i < (n + 1) * (n + 1); i++) a.push(rand()); return a; };
+    const octaves = [[6, .5], [12, .3], [24, .2]].map(([n, amp]) => ({ n, amp, g: grid(n) }));
+    const val = (o, x, y) => {
+      const fx = x * o.n, fy = y * o.n, ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy;
+      const at = (i, j) => o.g[(j % o.n) * (o.n + 1) + (i % o.n)];
+      const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+      return (at(ix, iy) * (1 - sx) + at(ix + 1, iy) * sx) * (1 - sy) + (at(ix, iy + 1) * (1 - sx) + at(ix + 1, iy + 1) * sx) * sy;
+    };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let v = 0; for (const o of octaves) v += val(o, x / w, y / h) * o.amp;
+      const edge = Math.sin(Math.PI * x / w) * Math.sin(Math.PI * y / h);
+      const a = clamp((v - .22) * 1.5) * edge;
+      const i = (y * w + x) * 4; d[i] = 170; d[i + 1] = 190; d[i + 2] = 205; d[i + 3] = a * 255;
+    }
+    g.putImageData(img, 0, 0);
+  });
+}
+const fogTex = noiseTex();
+const sheets = [];
+for (let i = 0; i < 12; i++) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(64, 12), new THREE.MeshBasicMaterial({ map: fogTex, transparent: true, depthWrite: false, opacity: .16, fog: false }));
+  m.position.set((rand() - .5) * 14, -3 + rand() * 2.6, -6 - i * 6);
+  m.userData = { base: m.position.clone(), speed: (rand() - .5) * .35, o: .06 + rand() * .07, near: i < 4 };
+  m.renderOrder = 2; scene.add(m); sheets.push(m);
+}
+
+// ---------- the territory: a map's ground, fogged ----------
+const territory = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.MeshBasicMaterial({
+  map: canvasTex(2048, 2048, (g, w) => {
+    g.fillStyle = "#07090C"; g.fillRect(0, 0, w, w);
+    g.strokeStyle = "#1B252D"; g.lineWidth = 3; g.lineJoin = "round";
+    for (let r = 0; r < 70; r++) {
+      let x = rand() * w, y = rand() * w; g.beginPath(); g.moveTo(x, y);
+      for (let s = 0; s < 5; s++) { if (s % 2) x += (rand() - .5) * 700; else y += (rand() - .5) * 700; g.lineTo(x, y); }
+      g.stroke();
+    }
+    g.strokeStyle = "#24313A"; g.lineWidth = 2;
+    for (let s = 0; s < 120; s++) { const x = rand() * w, y = rand() * w; g.strokeRect(x, y, 40 + rand() * 90, 22 + rand() * 30); }
+  }),
+}));
+territory.rotation.x = -Math.PI / 2; territory.position.set(0, -6.02, -16); scene.add(territory);
+
+// ---------- clarity: act two burns the fog off, scene by scene ----------
+// A scene sets CLARITY = [start, end] before this code; each starts where the last one ended, so the clearing runs across cuts.
+// At 0 the fog is act one's; at 1 the air is clear and the territory under the map is lit.
+function clarityAt(t) { return typeof CLARITY === "undefined" ? 0 : CLARITY[0] + (CLARITY[1] - CLARITY[0]) * clamp(t / T); }
+function applyClarity(c) {
+  territory.material.color.setScalar(1 + 2.4 * c);
+  return { fog: 1 - .85 * c, sheets: 1 - c };
+}
+
+// ---------- driven: a review player can set the scene's time from outside, with postMessage({ t }) ----------
+// (t, playing and T are the scene's own; this runs later, once they exist)
+window.addEventListener("message", (e) => { const d = e.data || {}; if (typeof d.t === "number") { t = Math.min(T, Math.max(0, d.t)); playing = false; } });
+// a final render sets the time and draws at once, so the frame it captures is exactly this t (review/render.mjs)
+window.renderAt = (x) => { t = Math.min(T, Math.max(0, x)); playing = false; render(t); };
+
+
+// ---------- the board, as in scene 11, now wide enough for two systems ----------
+const BOARD_Y = -5.6, OX = 17.5;   // system B sits OX to the right of scene 11's
+const board = new THREE.Group(); board.position.y = BOARD_Y; scene.add(board);
+const flat = (m, x, z, lift = 0) => { m.rotation.x = -Math.PI / 2; m.position.set(x, lift, z); board.add(m); return m; };
+const COL = { grey: new THREE.Color("#4A5863"), mint: new THREE.Color(C.mint), orange: new THREE.Color(C.orange), red: new THREE.Color(C.red), ink: new THREE.Color("#C9D3DA"), steel: new THREE.Color(C.steel) };
+const INK = COL.ink, WHITE = new THREE.Color(1, 1, 1);
+flat(new THREE.Mesh(new THREE.PlaneGeometry(OX + 28, 16), new THREE.MeshBasicMaterial({ transparent: true, opacity: .5, depthWrite: false, map: canvasTex(3328, 1024, (g, w, h) => {
+  g.strokeStyle = "rgba(84,104,118,.35)"; g.lineWidth = 2;
+  for (let x = 0; x <= w; x += 64) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+  for (let y = 0; y <= h; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+}) })), OX / 2 - 1, -1.5, -.01);
+
+// colour over time: [[t, name], ...], each change blending in over a quarter second
+function colAt(keys, t, out) { out.copy(COL[keys[0][1]]); for (let i = 1; i < keys.length; i++) out.lerp(COL[keys[i][1]], smooth(keys[i][0], keys[i][0] + .25, t)); return out; }
+
+// ---------- the nodes ----------
+// system A is scene 11's board as it ended: the bypassing paths red, the rest mint. The fix walks them back to mint.
+const FIX = 2.2;   // the check passes
+const A_RED_TO_MINT = { E1: FIX + .1, A: FIX + .25, N: FIX + .4, E4: FIX + .2, X: FIX + .35, F: FIX };
+const NODES = {
+  F: { x: 0, z: -6.4, kind: "flag", label: "session store" },
+  K: { x: 0, z: -3.9, kind: "gate", label: "sessions.get()", sub: "CHOKEPOINT", sign: "right", col: [[0, "mint"]] },
+  D: { x: -1.9, z: -1.6, label: "auth/trust.ts", col: [[0, "mint"]] },
+  G: { x: 2.2, z: -1.8, label: "billing/invoice.ts", col: [[0, "mint"]] },
+  A: { x: -3.2, z: .6, label: "routes/admin.ts" },
+  B: { x: 0, z: .8, label: "routes/account.ts", col: [[0, "mint"]] },
+  Cc: { x: 3.4, z: .6, label: "jobs/cleanup.ts", col: [[0, "mint"]] },
+  N: { x: -5.2, z: -2.7, label: "admin/dashboard.ts" },
+  X: { x: -6.6, z: .4, label: "routes/stats.ts" },
+  E1: { x: -3.2, z: 3.1, kind: "door", label: "GET /admin" },
+  E2: { x: 0, z: 3.3, kind: "door", label: "GET /account", col: [[0, "mint"]] },
+  E3: { x: 3.4, z: 3.1, kind: "door", label: "cron · nightly", glyph: "clock", col: [[0, "mint"]] },
+  E4: { x: -6.6, z: 2.9, kind: "door", label: "GET /stats" },
+};
+for (const [id, at] of Object.entries(A_RED_TO_MINT)) NODES[id].col = [[0, "red"], [at, "mint"]];
+// system B: a billing ledger, and six call sites that each carry their own copy of the guard
+const MERGE = [7.0, 8.3];      // the copies converge into the gate
+const REWIRE = [7.4, 8.4];     // direct links retract, links into the gate draw
+const CAPTURE = 8.7;           // everything captures mint through the gate
+const SPEC = [9.1, 10.6];      // the agent writes the invariant, and its chokepoint, into the spec
+const WRITTEN = SPEC[1] + .1;  // only then is it enforced
+const SITES = [
+  { id: "S1", x: OX - 5.4, z: -.5, label: "refunds.ts", guard: "requireAdmin()", line: 18 },
+  { id: "S2", x: OX - 3.3, z: .5, label: "invoices.ts", guard: "requireAdmin()", line: 42 },
+  { id: "S3", x: OX - 1.1, z: 1.0, label: "payouts.ts", guard: 'role === "admin"', line: 31, drift: true },
+  { id: "S4", x: OX + 1.1, z: 1.0, label: "credits.ts", guard: "requireAdmin()", line: 27 },
+  { id: "S5", x: OX + 3.3, z: .5, label: "exports.ts", guard: null, line: 12 },
+  { id: "S6", x: OX + 5.4, z: -.5, label: "webhooks.ts", guard: "requireAdmin()", line: 55 },
+];
+NODES.F2 = { x: OX, z: -6.4, kind: "flag", label: "billing ledger", col: [[0, "ink"], [WRITTEN, "mint"]] };
+NODES.K2 = { x: OX, z: -3.9, kind: "gate", label: "billing.guard()", sub: "CHOKEPOINT", sign: "right", appear: MERGE[1] - .3, col: [[0, "mint"]] };
+SITES.forEach((s, i) => (NODES[s.id] = { x: s.x, z: s.z, label: s.label, front: true, col: [[0, "steel"], [CAPTURE + .1 * i, "mint"]] }));
+
+function nodeArt(n) {
+  return canvasTex(256, 256, (g) => {
+    g.lineWidth = 12; g.strokeStyle = "#fff"; g.fillStyle = "rgba(9,12,15,.94)";
+    g.beginPath();
+    if (n.kind === "flag") g.roundRect(22, 22, 212, 212, 26);
+    else if (n.kind === "gate") { g.moveTo(128, 12); g.lineTo(244, 128); g.lineTo(128, 244); g.lineTo(12, 128); g.closePath(); }
+    else if (n.kind === "door") g.roundRect(30, 62, 196, 132, 60);
+    else g.arc(128, 128, 96, 0, 7);
+    g.fill(); g.stroke();
+    const glyph = n.glyph || { flag: "flag", gate: "shield-lock", door: "door-enter" }[n.kind] || "file-code";
+    const sz = n.kind === "door" ? 84 : 112; icon(g, glyph, 128 - sz / 2, 128 - sz / 2, sz, "#fff", 1.8);
+  });
+}
+function labelArt(n) {
+  return canvasTex(640, 160, (g, w, h) => {
+    g.fillStyle = "rgba(8,11,14,.86)"; g.beginPath(); g.roundRect(6, 6, w - 12, h - 12, 18); g.fill();
+    g.strokeStyle = "#fff"; g.lineWidth = 4; g.stroke();
+    g.textAlign = "center"; g.fillStyle = "#fff";
+    g.font = `600 ${n.kind === "flag" || n.kind === "gate" ? 50 : 42}px "JetBrains Mono"`; g.fillText(n.label, w / 2, n.sub ? 64 : 94);
+    if (n.sub) { g.font = `800 34px "JetBrains Mono"`; g.letterSpacing = "6px"; g.fillText(n.sub, w / 2, 118); g.letterSpacing = "0px"; }
+  });
+}
+function buildNodes() {
+  for (const [id, n] of Object.entries(NODES)) {
+    n.id = id; n.col = n.col || [[0, "grey"]];
+    const s = n.kind === "flag" ? 1.5 : n.kind === "gate" ? 1.35 : n.kind === "door" ? 1.0 : .95; n.s = s;
+    n.mesh = flat(new THREE.Mesh(new THREE.PlaneGeometry(s, s), new THREE.MeshBasicMaterial({ map: nodeArt(n), transparent: true, opacity: 0, depthWrite: false, toneMapped: false })), n.x, n.z, .02);
+    n.mesh.renderOrder = 5;
+    // a sign standing just off the board behind the node, tilted back 45 degrees; the gate's stands to its right
+    const lw = n.kind === "flag" || n.kind === "gate" ? 2.6 : 2.2, sh = lw / 4, back = n.front ? n.z + s / 2 + .12 + sh * Math.SQRT1_2 : n.z - s / 2 - (n.kind === "flag" ? .45 : .12);
+    const px = n.sign === "right" ? n.x + s / 2 + .15 : n.x, pz = n.sign === "right" ? n.z : back, sx = n.sign === "right" ? px + lw / 2 - .1 : n.x;
+    n.sign = new THREE.Mesh(new THREE.PlaneGeometry(lw, sh), new THREE.MeshBasicMaterial({ map: labelArt(n), transparent: true, opacity: 0, depthWrite: false }));
+    n.sign.rotation.x = -Math.PI / 4; n.sign.position.set(sx, .06 + sh / 2 * Math.SQRT1_2, pz - sh / 2 * Math.SQRT1_2); board.add(n.sign); n.sign.renderOrder = 8;
+    n.c = new THREE.Color();
+  }
+}
+
+// ---------- the links ----------
+// draw: when the fill grows from source to target; retract: when it shrinks back into the source and goes
+const LINKS = [
+  { a: "E1", b: "A", col: [[0, "red"], [FIX + .15, "mint"]] }, { a: "E2", b: "B", col: [[0, "mint"]] }, { a: "E3", b: "Cc", col: [[0, "mint"]] },
+  { a: "E4", b: "X", col: [[0, "red"], [FIX + .25, "mint"]] }, { a: "A", b: "D", col: [[0, "mint"]] }, { a: "D", b: "K", col: [[0, "mint"]] },
+  { a: "B", b: "K", col: [[0, "mint"]] }, { a: "Cc", b: "G", col: [[0, "mint"]] }, { a: "G", b: "K", col: [[0, "mint"]] }, { a: "K", b: "F", col: [[0, "mint"]] },
+  { a: "A", b: "N", col: [[0, "red"], [FIX + .3, "mint"]] }, { a: "X", b: "N", col: [[0, "red"], [FIX + .4, "mint"]] },
+  { a: "N", b: "F", col: [[0, "red"]], retract: [.8, 1.3] },                              // the bypass, taken out
+  { a: "N", b: "K", col: [[0, "orange"], [FIX + .45, "mint"]], draw: [1.2, 1.9] },         // the fix, through the gate
+  { a: "K2", b: "F2", col: [[0, "mint"]], draw: [MERGE[1] - .1, MERGE[1] + .35] },
+];
+SITES.forEach((s, i) => {
+  LINKS.push({ a: s.id, b: "F2", col: [[0, "steel"]], retract: [REWIRE[0] + i * .08, REWIRE[0] + .5 + i * .08] });   // straight to the ledger, by convention
+  LINKS.push({ a: s.id, b: "K2", col: [[0, "steel"], [CAPTURE + .1 * i, "mint"]], draw: [REWIRE[0] + .5 + i * .08, REWIRE[1] + i * .05] });
+});
+const barGeo = new THREE.BoxGeometry(1, .02, 1); barGeo.translate(.5, 0, 0);
+function buildLinks() {
+  LINKS.forEach((l) => {
+    const A = NODES[l.a], B = NODES[l.b], dx = B.x - A.x, dz = B.z - A.z, len = Math.hypot(dx, dz);
+    const inset = (n) => (n.kind === "flag" ? .8 : n.kind === "gate" ? .72 : .5);
+    l.x0 = A.x + dx / len * inset(A); l.z0 = A.z + dz / len * inset(A); l.len = len - inset(A) - inset(B); l.rot = -Math.atan2(dz, dx);
+    const bar = (w, y, order) => { const m = new THREE.Mesh(barGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false })); m.position.set(l.x0, y, l.z0); m.rotation.y = l.rot; m.scale.set(l.len, 1, w); m.renderOrder = order; board.add(m); return m; };
+    l.fill = bar(.075, .01, 4);
+    l.head = flat(new THREE.Mesh(new THREE.CircleGeometry(.13, 3), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false })), l.x0 + Math.cos(-l.rot) * l.len, l.z0 + Math.sin(-l.rot) * l.len, .015);
+    l.head.rotation.z = l.rot; l.head.renderOrder = 4; l.c = new THREE.Color();
+  });
+}
+
+// ---------- the guards: copies at each call site that lift, converge, and become the gate ----------
+const guards = [];
+function guardTex(text, col) {
+  return canvasTex(720, 130, (g, w, h) => {
+    g.fillStyle = "rgba(9,12,15,.94)"; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 22); g.fill();
+    g.strokeStyle = "#fff"; g.lineWidth = 5; if (!text) g.setLineDash([18, 12]); g.stroke(); g.setLineDash([]);
+    icon(g, text ? "shield-check" : "shield-lock", 22, 26, 76, "#fff", 2);
+    g.fillStyle = "#fff"; g.font = `600 44px "JetBrains Mono"`; g.fillText(text || "no guard", 116, 82);
+  });
+}
+function buildGuards() {
+  SITES.forEach((s, i) => {
+    const F = NODES.F2, dx = F.x - s.x, dz = F.z - s.z, len = Math.hypot(dx, dz);
+    const m = flat(new THREE.Mesh(new THREE.PlaneGeometry(1.75, .32), new THREE.MeshBasicMaterial({ map: guardTex(s.guard), transparent: true, opacity: 0, depthWrite: false, toneMapped: false })), s.x + dx * .24, s.z + dz * .24, .3);
+    m.rotation.x = -Math.PI / 4;   // standing up like the signs, on the link
+    m.renderOrder = 7;
+    guards.push({ s, m, i, home: m.position.clone(), col: s.guard === null ? [[0, "grey"]] : s.drift ? [[0, "orange"]] : [[0, "steel"]] });
+  });
+}
+
+// ---------- the flags' lock-on reticles; system A's still reads BYPASS DETECTED and folds back ----------
+function makeReticle(F) {
+  const tex = (w, h, draw) => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false, map: canvasTex(w, h, draw) });
+  const reticle = flat(new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.5), tex(512, 512, (g, w) => {
+    g.strokeStyle = "#fff"; g.lineWidth = 12; g.lineCap = "square"; const m = 22, L = 104;
+    for (const [x, y, dx, dy] of [[m, m, 1, 1], [w - m, m, -1, 1], [m, w - m, 1, -1], [w - m, w - m, -1, -1]]) { g.beginPath(); g.moveTo(x + dx * L, y); g.lineTo(x, y); g.lineTo(x, y + dy * L); g.stroke(); }
+    g.lineWidth = 8; for (const [x0, y0, x1, y1] of [[w / 2, 6, w / 2, 40], [w / 2, w - 6, w / 2, w - 40], [6, w / 2, 40, w / 2], [w - 6, w / 2, w - 40, w / 2]]) { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }
+  })), F.x, F.z, .025);
+  const ring = flat(new THREE.Mesh(new THREE.PlaneGeometry(2.05, 2.05), tex(512, 512, (g, w) => { g.strokeStyle = "#fff"; g.lineWidth = 5; g.setLineDash([26, 18]); g.beginPath(); g.arc(w / 2, w / 2, w / 2 - 8, 0, 7); g.stroke(); })), F.x, F.z, .022);
+  const anchored = (w, h) => { const geo = new THREE.PlaneGeometry(w, h); geo.translate(-w / 2, h / 2, 0); return geo; };
+  const tag = flat(new THREE.Mesh(anchored(3.0, .75), tex(800, 200, (g, w, h) => {
+    g.strokeStyle = "#fff"; g.lineWidth = 6; g.beginPath(); g.moveTo(w - 4, h - 8); g.lineTo(w - 150, 70); g.lineTo(w - 230, 70); g.stroke();
+    g.fillStyle = "#fff"; g.beginPath(); g.roundRect(w - 776, 32, 540, 80, 10); g.fill();
+    g.fillStyle = "#000"; g.font = `800 50px "JetBrains Mono"`; g.letterSpacing = "8px"; g.fillText("PROTECTED", w - 746, 91); g.letterSpacing = "0px";
+  })), F.x - 1.25, F.z - .175, .03);
+  const alert = flat(new THREE.Mesh(anchored(4.8, .96), tex(1200, 240, (g, w, h) => {
+    g.strokeStyle = "#fff"; g.lineWidth = 7; g.beginPath(); g.moveTo(w - 4, h - 8); g.lineTo(w - 170, 84); g.lineTo(w - 262, 84); g.stroke();
+    g.fillStyle = "#fff"; g.beginPath(); g.roundRect(w - 1186, 22, 924, 124, 14); g.fill();
+    icon(g, "alert-triangle", w - 1160, 40, 88, "#000", 2.6);
+    g.fillStyle = "#000"; g.font = `800 62px "JetBrains Mono"`; g.letterSpacing = "6px"; g.fillText("BYPASS DETECTED", w - 1056, 106); g.letterSpacing = "0px";
+  })), F.x - 1.25, F.z - .175, .032);
+  [reticle, ring, tag, alert].forEach((m) => (m.renderOrder = 6));
+  return { reticle, ring, tag, alert };
+}
+let retA, retB, editChip, specChip, specCanvas, specTyped = -1;
+function buildRest() {
+  retA = makeReticle(NODES.F); retB = makeReticle(NODES.F2);
+  editChip = flat(new THREE.Mesh(new THREE.PlaneGeometry(2.7, .45), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false, map: canvasTex(900, 150, (g, w, h) => {
+    g.fillStyle = "rgba(9,12,15,.94)"; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 26); g.fill(); g.strokeStyle = "#fff"; g.lineWidth = 6; g.stroke();
+    icon(g, "robot", 26, 38, 74, "#fff", 2); icon(g, "pencil", 114, 42, 66, "#fff", 2);
+    g.fillStyle = "#fff"; g.font = `600 44px "JetBrains Mono"`; g.fillText("Edit  admin/dashboard.ts", 204, 92);
+  }) })), NODES.N.x - 2.1, NODES.N.z + .15, .03);
+  editChip.renderOrder = 7;
+  specCanvas = document.createElement("canvas"); specCanvas.width = 1440; specCanvas.height = 260;
+  specChip = flat(new THREE.Mesh(new THREE.PlaneGeometry(5.5, 5.5 * 260 / 1440), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(specCanvas), transparent: true, opacity: 0, depthWrite: false, toneMapped: false })), NODES.K2.x - 4.75, NODES.K2.z + .3, .35);
+  specChip.rotation.x = -Math.PI / 4;   // standing up like the tags, facing the camera
+  specChip.renderOrder = 7;
+}
+// the spec edit, drawn like the tool call at A: the chip, and the one line it adds, typed
+function drawSpec(n) {
+  const g = specCanvas.getContext("2d"), w = 1440;
+  g.clearRect(0, 0, w, 260);
+  g.fillStyle = "rgba(9,12,15,.94)"; g.beginPath(); g.roundRect(4, 4, w - 8, 252, 26); g.fill(); g.strokeStyle = "#fff"; g.lineWidth = 6; g.stroke();
+  icon(g, "robot", 26, 30, 74, "#fff", 2); icon(g, "pencil", 114, 34, 66, "#fff", 2);
+  g.fillStyle = "#fff"; g.font = `600 44px "JetBrains Mono"`; g.fillText("Edit  src/billing/Billing.spec.md", 204, 84);
+  g.fillStyle = C.mint; g.font = `600 46px "JetBrains Mono"`; g.fillText(SPEC_LINE.slice(0, n), 40, 196);
+  if (n < SPEC_LINE.length) { const x = 40 + g.measureText(SPEC_LINE.slice(0, n)).width; g.fillRect(x + 4, 158, 26, 48); }
+  specChip.material.map.needsUpdate = true;
+}
+const cursor = flat(new THREE.Mesh(new THREE.PlaneGeometry(.2, .2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, toneMapped: false })), 0, 0, .05);
+cursor.renderOrder = 9;
+
+// ---------- the machine's log: the re-check at A, then the reduce pass at B ----------
+const LOG = [
+  // scene 11's last lines, still on screen across the cut
+  [0, "lsp", "ref 11/12  routes/admin.ts → admin/dashboard.ts", "ok"],
+  [0, "lsp", "ref 12/12  routes/stats.ts → admin/dashboard.ts", "ok"],
+  [0, "lsp", "ref 12/13  sessions.get() → session store", "ok"],
+  [0, "lsp", "ref 13/13  admin/dashboard.ts → session store", "BYPASS"],
+  [1.95, "lsp", "ref 13/13  admin/dashboard.ts → sessions.get()", "ok"],
+  [2.1, "lsp", "13 references · 0 bypasses", ""],
+  ...SITES.map((s, i) => [4.9 + i * .3, "reduce", `${s.guard === null ? "missing" : "found"}  ${s.guard ?? "guard"}  ${s.label}:${s.line}`, s.guard === null ? "gap" : s.drift ? "drift" : "copy"]),
+  ...SITES.filter((s) => s.guard).map((s, i) => [MERGE[0] + i * .14, "reduce", `remove  ${s.guard}  ${s.label}:${s.line}`, "−"]),
+  [MERGE[1] - .1, "reduce", "add  chokepoint billing.guard()  → billing ledger", "+"],
+  ...SITES.map((s, i) => [REWIRE[0] + .6 + i * .1, "reduce", `route  ${s.label} → billing.guard()`, "ok"]),
+];
+const TAGCOL = { BYPASS: C.red, ok: C.mint, copy: C.steel, drift: C.orange, gap: C.orange, "−": C.muted, "+": C.mint, "": C.mint };
+const $ = (id) => document.getElementById(id);
+function hud(t) {
+  const inB = t > 3.6, fixed = t > FIX, bEnforced = t > WRITTEN;
+  const st = inB ? (bEnforced ? ["enforced", C.mint] : t > SPEC[0] ? ["declaring", C.muted] : t > MERGE[0] ? ["reducing", C.muted] : ["by convention", C.orange]) : fixed ? ["enforced", C.mint] : ["broken", C.red];
+  const text = inB ? `the ledger is written only through <b>billing.guard()</b>` : `admin sessions are read only through <b>sessions.get()</b>`;
+  $("inv").innerHTML = `<div class="k">${svgIcon("shield-lock")}invariant · ${inB ? "Billing" : "Sessions"}</div><div class="v">${text}</div><div class="v" style="color:${st[1]}">● ${st[0]}</div>`;
+  $("inv").style.borderColor = st[0] === "broken" ? C.red : "#26313A";
+  const phase = inB ? "reduce" : "lsp", lines = LOG.filter((l) => l[1] === phase && t >= l[0]).slice(-5);
+  const title = inB ? `${svgIcon("robot")}agent · reduce` : `${svgIcon("binary-tree-2")}language server${t > 1.6 && t < 2.1 ? " · re-check" : ""}`;
+  $("lsp").innerHTML = `<div class="k">${title}</div><div class="v" style="min-height:7em;font-size:.86em">${lines.map((l) => `<div style="white-space:nowrap;overflow:hidden;color:#7E93A3">${l[2]}  <b style="color:${TAGCOL[l[3]]}">${l[3]}</b></div>`).join("")}</div>`;
+  $("lsp").style.opacity = inB ? smooth(4.6, 4.9, t) : 1 - smooth(3.0, 3.4, t);
+  // scene 11's hook card carries straight over the cut, message and all; the fix's check passes, it turns mint, and only then goes
+  // it turns over: the red report dissolves into the pass in the same place, the border blends red to mint, the card dips and settles
+  const pass = smooth(1.95, 2.6, t), gone = smooth(1.95, 2.25, t), come = smooth(2.25, 2.6, t), h = 1 - smooth(4.2, 4.7, t);
+  const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+  const [br, bg, bb] = mix([255, 75, 75], [84, 232, 176], pass);
+  $("hook").style.opacity = h;
+  $("hook").style.borderColor = `rgb(${br},${bg},${bb})`;
+  $("hook").style.transform = `scale(${1 - .03 * Math.sin(Math.PI * pass)})`;
+  $("hook").style.transformOrigin = "100% 100%";
+  $("hook").innerHTML = `<span class="chip" style="transform:scale(${1 + .06 * Math.max(0, Math.sin((t - 1.9) * 9)) * (1 - smooth(2.9, 3.3, t))})">${svgIcon("plug-connected")}PostToolUse · chokepoint check</span>` +
+    `<div id="hookBody" style="display:grid;overflow:hidden;align-items:start">` +
+    `<pre id="hookRed" style="grid-area:1/1;opacity:${1 - gone};transform:translateY(${-4 * gone}px)"><span style="color:${C.red}">Structural defect revealed at this edit (admin/dashboard.ts):</span>
+✕ Sessions/admin-sessions — chokepoint sessions.get() protects the session store: broken
+    bypass admin/dashboard.ts:42 in loadStats (this edit)
+<span style="color:${C.muted}">Two honest options: route the reference through the chokepoint, or escalate a retirement for a human.</span></pre>` +
+    `<pre id="hookPass" style="grid-area:1/1;white-space:pre;justify-self:start;opacity:${come};transform:translateY(${4 * (1 - come)}px)"><span style="color:${C.mint}">✓ Sessions/admin-sessions — chokepoint sessions.get() holds</span>
+<span style="color:${C.muted}">admin/dashboard.ts now reads through the chokepoint; nothing to report.</span></pre></div>`;
+  // and it shrinks to what it now has to say: the report's height and width close down onto the pass, into the corner
+  // (the report keeps its full width while it goes, so it never rewraps)
+  const hook = $("hook"), cs = getComputedStyle(hook), padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) * 2;
+  const full = hook.parentElement.clientWidth * .5, red = $("hookRed"), ok = $("hookPass"), shrink = ease(smooth(2.2, 2.8, t));
+  red.style.width = `${full - padX}px`;
+  const fit = Math.min(full, ok.scrollWidth + padX + 2);
+  hook.style.width = `${full + (fit - full) * shrink}px`;
+  $("hookBody").style.height = `${red.offsetHeight + (ok.offsetHeight - red.offsetHeight) * shrink}px`;
+}
+
+const SPEC_LINE = "+ chokepoint: billing.guard in billing/guard.ts";
+
+// ---------- camera: scene 11's last frame, across the board, and back to take in both ----------
+const KEYS = [
+  [0, [-.6, BOARD_Y + 12.4, 7.6], [-1.4, BOARD_Y, -3.2]],
+  [2.9, [-.8, BOARD_Y + 12.0, 7.4], [-1.6, BOARD_Y, -3.1]],
+  [4.6, [OX, BOARD_Y + 9.6, 6.0], [OX, BOARD_Y, -2.3]],
+  [10.9, [OX - .8, BOARD_Y + 9.8, 6.0], [OX - .9, BOARD_Y, -2.8]],
+  [T, [OX / 2 - 1.0, BOARD_Y + 22.8, 13.6], [OX / 2 - 1.0, BOARD_Y, -2.8]],   // centred on both systems' combined span
+];
+const V = (a) => new THREE.Vector3(...a);
+function cameraAt(t) {
+  let i = 0; while (i < KEYS.length - 2 && t > KEYS[i + 1][0]) i++;
+  const [t0, p0, q0] = KEYS[i], [t1, p1, q1] = KEYS[i + 1], k = ease(clamp((t - t0) / (t1 - t0)));
+  camera.position.copy(V(p0).lerp(V(p1), k)); camera.lookAt(V(q0).lerp(V(q1), k));
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+const _c = new THREE.Color(), _p = new THREE.Vector3();
+function render(t) {
+  cameraAt(t);
+  const cl = applyClarity(clarityAt(t));
+  territory.material.color.multiplyScalar(.4);
+  scene.fog.density = .04 * cl.fog;
+  sheets.forEach((s, i) => { s.position.x = s.userData.base.x + Math.sin(t * .15 + i) * 2 + t * s.userData.speed; s.material.opacity = s.userData.o * cl.sheets; });
+  // nodes
+  for (const n of Object.values(NODES)) {
+    const shown = n.appear ? smooth(n.appear, n.appear + .35, t) : 1;
+    colAt(n.col, t, n.c);
+    n.mesh.material.color.copy(n.c); n.mesh.material.opacity = shown;
+    n.mesh.scale.setScalar(n.appear ? .6 + .4 * ease(shown) : 1);
+    n.sign.material.color.copy(n.c).lerp(INK, .45); n.sign.material.opacity = shown * .95;
+  }
+  // links
+  for (const l of LINKS) {
+    let p = 1, on = 1;
+    if (l.draw) { p = smooth(l.draw[0], l.draw[1], t); on = p > 0 ? 1 : 0; }
+    if (l.retract) { p = 1 - smooth(l.retract[0], l.retract[1], t); on = p > .001 ? 1 : 0; }
+    colAt(l.col, t, l.c);
+    l.fill.material.color.copy(l.c); l.fill.material.opacity = on;
+    l.fill.scale.x = Math.max(.001, l.len * p);
+    l.head.material.color.copy(l.c); l.head.material.opacity = on * (p >= .999 ? 1 : 0);
+  }
+  // the re-check's cursor at A, walking the new reference
+  if (t > 1.9 && t < 2.2) { const l = LINKS.find((x) => x.a === "N" && x.b === "K"), k = (t - 1.9) / .3; cursor.position.set(l.x0 + Math.cos(-l.rot) * l.len * k, .05, l.z0 + Math.sin(-l.rot) * l.len * k); cursor.material.opacity = 1; }
+  else if (t > 4.9 && t < 4.9 + SITES.length * .3) { const g = guards[Math.floor((t - 4.9) / .3)]; cursor.position.set(g.home.x - .98, .05, g.home.z + .12); cursor.material.opacity = 1; }
+  else cursor.material.opacity = 0;
+  // the edit at A
+  editChip.material.opacity = smooth(.35, .6, t) * (1 - smooth(3.0, 3.4, t));
+  editChip.material.color.copy(COL.orange).lerp(COL.mint, smooth(FIX, FIX + .3, t));
+  // the spec edit: the chip appears, its one line types, and it cools once the invariant holds
+  const typed = Math.floor(SPEC_LINE.length * clamp((t - SPEC[0] - .25) / (SPEC[1] - SPEC[0] - .25)));
+  if (typed !== specTyped) { drawSpec(typed); specTyped = typed; }
+  specChip.material.opacity = smooth(SPEC[0], SPEC[0] + .25, t) * (1 - smooth(WRITTEN + 1.0, WRITTEN + 1.4, t));
+  specChip.material.color.copy(COL.orange).lerp(COL.mint, smooth(WRITTEN, WRITTEN + .3, t));
+  // the guards: found one by one (a blink), then they lift off, converge on the gate, and are gone into it
+  for (const g of guards) {
+    const found = t - (4.9 + g.i * .3), blink = found > 0 && found < .25 ? 1 : 0;
+    colAt(g.col, t, _c); if (blink) _c.lerp(WHITE, .8);
+    const k = ease(smooth(MERGE[0] + g.i * .06, MERGE[1] - .2, t)), K = NODES.K2;
+    _p.set(g.home.x + (K.x - g.home.x) * k, g.home.y + Math.sin(k * Math.PI) * .6, g.home.z + (K.z - g.home.z) * k);
+    g.m.position.copy(_p); g.m.scale.setScalar(1 - .65 * k);
+    g.m.material.color.copy(_c).lerp(COL.mint, k); g.m.material.opacity = (1 - smooth(MERGE[1] - .35, MERGE[1] - .1, t)) * (g.s.guard === null ? 1 - k : 1);
+  }
+  // reticles: A folds back from BYPASS DETECTED to PROTECTED; B stays PROTECTED
+  for (const [r, n, alertUntil] of [[retA, NODES.F, FIX], [retB, NODES.F2, -1]]) {
+    const back = alertUntil < 0 ? 1 : smooth(alertUntil + .05, alertUntil + .45, t);
+    [r.reticle, r.ring, r.tag, r.alert].forEach((m) => m.material.color.copy(n.c));
+    // the ledger was guarded only by convention: it earns its lock-on when the chokepoint forms
+    const lock = n.id === "F2" ? smooth(MERGE[1] - .1, MERGE[1] + .5, t) : 1, tagIn = n.id === "F2" ? smooth(MERGE[1] + .35, MERGE[1] + .7, t) : 1;
+    r.reticle.material.opacity = r.ring.material.opacity = lock;
+    r.reticle.scale.setScalar((1.25 - .25 * ease(lock)) * (1 + .04 * Math.sin(t * 2.2))); r.ring.rotation.z = t * .35;
+    r.tag.material.opacity = back * tagIn; r.tag.scale.set(1 + .45 * (1 - back), 1 + .2 * (1 - back), 1);
+    r.alert.material.opacity = 1 - back; r.alert.scale.setScalar(.6 + .4 * (1 - back));
+    const lift = 1 - back; r.alert.rotation.x = -Math.PI / 2 + Math.PI / 4 * lift; r.alert.position.y = .032 + .03 * lift;
+  }
+  hud(t);
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  composer.render();
+}
+
+document.getElementById("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; document.getElementById("play").textContent = "Play"; } };
+document.getElementById("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); document.getElementById("play").click(); } });
+
+Promise.all(["600 1em 'JetBrains Mono'", "800 1em 'JetBrains Mono'", "500 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
+  .finally(() => { buildNodes(); buildLinks(); buildGuards(); buildRest(); size(); last = performance.now(); requestAnimationFrame(frame); });
+</script>

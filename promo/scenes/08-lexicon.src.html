@@ -1,0 +1,503 @@
+<title>Scene 8 · The Lexicon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hud { position: absolute; left: 3%; top: 5%; display: grid; gap: 4px; font: 500 clamp(10px, 1.3vw, 15px) var(--mono); color: var(--ink); pointer-events: none; }
+.hud .k { color: var(--muted); letter-spacing: .12em; text-transform: uppercase; font-size: .8em; display: flex; gap: 8px; align-items: center; }
+.hud .k svg { width: 1.4em; height: 1.4em; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.hud.right { left: auto; right: 3%; text-align: right; }
+.hud.right .k { justify-content: flex-end; }
+.hud .v { font-size: 1.9em; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.caption { position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.super { position: absolute; left: 50%; top: 12%; transform: translateX(-50%); white-space: nowrap; font: 500 clamp(11px, 1.5vw, 20px) var(--sans); color: var(--ink); text-shadow: 0 1px 14px rgb(0 0 0 / .9); pointer-events: none; opacity: 0; }
+.super b { color: var(--mint); font-weight: 600; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 8 · the lexicon</div>
+    <h1>An agent overloads a settled word; the term guards itself, explains, and the plan changes</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div class="hud" id="hud"><div class="k" id="hudK"></div><div class="v" id="hudV"></div></div>
+    <div class="hud right" id="hud2"><div class="k" id="hud2K"></div><div class="v" id="hud2V"></div></div>
+    <div class="super" id="super">Delivered through your agent’s own <b>hooks</b></div>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="25" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 25.00</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <section class="box">
+    <h2>Beats (timed to a ~24 s read)</h2>
+    <ol class="beats">
+      <li><span class="t">0.0</span><div><q>Starts with clear definitions.</q><span>Out of the dark after the drop, the project's vocabulary resolves one tile at a time: a tilted table of the project's settled terms (workspace, seat, invoice, API key and project token side by side), each mint-bordered with its books chip.</span></div></li>
+      <li><span class="t">3.2</span><div><q>Language models are built out of language. Clearly defining your terms changes their behavior.</q><span>A subagent starts, and its <b>SubagentStart</b> hook fires: a mint pulse sweeps its plan, a hook chip names the event, and one cell per term streams from the lexicon into the subagent's context until it reads “24 terms in context”. A line on screen names the mechanism once: delivered through your agent's own hooks. The plan types: “Offboarding: when someone leaves the team, deactivate their account…” As “account” lands, the agent checks the word against what it was handed: the word and the account tile go orange, joined by a thread.</span></div></li>
+      <li><span class="t">9.8</span><div><q>Agents start to do what you meant, not just what you said.</q><span>The definition in the agent's context says no: the tile goes red, lifts out of the table and brackets clamp around it, and the word in the plan goes red with it. Then the card scales outward from its corner to full size, and its definition fades in line by line. The billing entity, one per company. Not a person's access to it: that is a membership. The camera pushes in until the definition reads, then eases back out as a mint thread runs from “membership →” to the membership tile.</span></div></li>
+      <li><span class="t">16.2</span><div><q>This impacts the integrity of what gets built, making bugs easier for agents to detect.</q><span>The plan revises itself: “account” backs out and “membership” types in, mint, tied to its tile, and the account tile returns to mint. The subagent tries to finish: its <b>SubagentStop</b> hook fires, regulate runs, and the plan is stamped clean. The definition fades, the card shrinks back to a tile, the tile settles into the table, and the camera pulls out over the whole lexicon.</span></div></li>
+    </ol>
+    <p class="note">What's true to the tool: Coherence doesn't detect a sense overload by itself. It hands every agent and subagent the lexicon at start through its hooks, definitions and “not” lines included, so the agent has the right sense in hand when it reaches for the word, and it runs regulate at the stop. The scene shows exactly that: the catch is the agent's, made possible by what the hook delivered. The agent is the one who overloads the word here: the lexicon's value is that it binds every agent and subagent, and the narration is about a language model building your code. A human prompt works the same way; only the chip on the plan changes. The slate is an invented SaaS product's vocabulary, with API key and project token placed side by side: the kind of pair that looks interchangeable to every agent until it costs you.</p>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const ICONS = /*ICONS*/{};
+const T = 25;
+const CLARITY = [0, .1];   // act two's clearing starts here
+const C = { bg: 0x07090C, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2", steel: "#7E93A3" };
+const LINES = [
+  [0, 3, "Starts with clear definitions."],
+  [3.2, 9.6, "Language models are built out of language. Clearly defining your terms changes their behavior."],
+  [9.8, 16, "Agents start to do what you meant, not just what you said."],
+  [16.2, 25, "This impacts the integrity of what gets built, making bugs easier for agents to detect."],
+];
+// The project's vocabulary: words every model thinks it knows, each settled here to one sense.
+// API key and project token sit side by side: the pair that once meant the same thing to every agent.
+const TERMS = [
+  "workspace", "seat", "invoice", "plan", "owner", "admin",
+  "role", "guest", "account", "invitation", "project token", "API key",
+  "session", "audit log", "webhook", "export", "retention", "SSO",
+  "domain", "quota", "region", "support agent", "team", "membership",
+];
+const PATIENT = TERMS.indexOf("account"), CLIENT = TERMS.indexOf("membership");
+
+/*COMMON*/
+
+// ---------- the crisp pass: text on bright shapes is drawn after the bloom ----------
+const overlay = new THREE.Scene();
+overlay.fog = scene.fog;
+const crisp = [];
+function crispOver(mesh, w, h, draw, opacity) {
+  const o = new THREE.Mesh(mesh.geometry, new THREE.MeshBasicMaterial({ map: canvasTex(w, h, draw), transparent: true, depthWrite: false, toneMapped: false }));
+  o.matrixAutoUpdate = false; o.renderOrder = mesh.renderOrder + 10; overlay.add(o); crisp.push({ mesh, o, opacity });
+}
+function syncCrisp() {
+  scene.updateMatrixWorld();
+  for (const { mesh, o, opacity } of crisp) {
+    o.matrix.copy(mesh.matrixWorld); o.material.opacity = opacity ? opacity() : mesh.material.opacity;
+    if (mesh.material.map && o.material.map) o.material.map.repeat.x = mesh.material.map.repeat.x;
+  }
+}
+// a label chip grown from the top-left corner of a border: the fill glows, the glyph and text stay crisp
+function chip(g, col, glyph, text, textOnly = false, scale = 1) {
+  g.save(); g.scale(scale, scale);
+  g.font = `800 25px "JetBrains Mono"`;
+  const w = (text ? 102 + g.measureText(text).width : 74);
+  if (!textOnly) { g.fillStyle = col; g.beginPath(); g.roundRect(5, 5, w, 76, [22, 0, 18, 0]); g.fill(); }
+  icon(g, glyph, 22, 19, 46, "#000", 2.6);
+  if (text) { g.fillStyle = "#000"; g.fillText(text, 80, 53); }
+  g.restore();
+}
+function fitFont(g, text, weight, size, maxW, family) {
+  let s = size; g.font = `${weight} ${s}px "${family}"`;
+  while (g.measureText(text).width > maxW && s > 24) { s -= 2; g.font = `${weight} ${s}px "${family}"`; }
+}
+
+// ---------- code cells on the territory ----------
+const cellGeo = new THREE.PlaneGeometry(1, 1);
+const flat = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+{
+  const cols = 96, rows = 64, ground = new THREE.InstancedMesh(cellGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), cols * rows);
+  const m = new THREE.Matrix4(), col = new THREE.Color(); let i = 0;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    m.compose(new THREE.Vector3(-16 + c * .34, -6, -3 - r * .3), flat, new THREE.Vector3(.06 + rand() * .24, .07, 1)); ground.setMatrixAt(i, m);
+    ground.setColorAt(i++, col.set(rand() < .04 ? "#6B4A2A" : "#2A333A"));
+  }
+  scene.add(ground);
+}
+
+// ---------- state: the implicated term goes orange as it's touched, red when judged, mint once the plan is fixed ----------
+const STATE_COLS = [C.mint, C.orange, C.red];
+const RED_AT = 7.9, FIXED_AT = 17.4;
+function stateWeights(t) {
+  const o = smooth(5.8, 6.1, t) * (1 - smooth(RED_AT, RED_AT + .2, t));
+  const r = smooth(RED_AT, RED_AT + .2, t) * (1 - smooth(FIXED_AT, FIXED_AT + .6, t));
+  return [Math.max(0, 1 - o - r), o, r];
+}
+const _c = [new THREE.Color(), new THREE.Color(C.orange), new THREE.Color(C.red)];
+function stateColor(w, out) {
+  return out.set(C.mint).multiplyScalar(w[0]).add(_c[1].clone().multiplyScalar(w[1])).add(_c[2].clone().multiplyScalar(w[2]));
+}
+// one plane with three faces, mint, orange and red, blended by the state weights
+const redraws = [];
+function tri(parent, wu, hu, px, draw, order, uv = [1, 0]) {
+  const faces = STATE_COLS.map((col, k) => {
+    const f = new THREE.Mesh(new THREE.PlaneGeometry(wu, hu), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+    f.renderOrder = order + k; parent.add(f); return f;
+  });
+  const t3 = { faces, set(alpha, w) { faces.forEach((f, k) => (f.material.opacity = alpha * w[k])); },
+    redraw() { faces.forEach((f, k) => { const rx = f.material.map ? f.material.map.repeat.x : uv[0]; f.material.map = canvasTex(px[0], px[1], (g, w, h) => draw(g, w, h, STATE_COLS[k])); f.material.map.repeat.x = rx; f.material.map.offset.x = uv[1]; f.material.needsUpdate = true; }); } };
+  t3.redraw(); redraws.push(t3); return t3;
+}
+
+// ---------- the lexicon: a tilted table of settled terms ----------
+const TILE = { w: 1.5, h: .6, dx: 1.68, dy: .78, px: [640, 256] };
+const lex = new THREE.Group(); lex.position.set(2.8, .9, -3.5); lex.rotation.set(-.42, -.18, 0); scene.add(lex);
+function tileFace(term, extra) {
+  return (g, w, h, col) => {
+    g.fillStyle = "rgba(10,14,18,.94)"; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 20); g.fill();
+    g.strokeStyle = col; g.lineWidth = 3; g.stroke();
+    chip(g, col, "books", "DEFINITION", false, .9);
+    g.fillStyle = C.ink; fitFont(g, term, 600, 68, 560, "Instrument Sans"); g.fillText(term, 36, 186);
+    if (extra) extra(g, w, h, col);
+  };
+}
+const tiles = TERMS.map((term, i) => {
+  const r = Math.floor(i / 6), c = i % 6;
+  const holder = new THREE.Group(); holder.position.set((c - 2.5) * TILE.dx, (1.5 - r) * TILE.dy, 0); lex.add(holder);
+  return { term, holder, i, home: holder.position.clone() };
+});
+tiles.forEach((x) => {
+  if (x.i === PATIENT) return;
+  x.face = tri(x.holder, TILE.w, TILE.h, TILE.px, tileFace(x.term), 5);
+  crispOver(x.face.faces[0], ...TILE.px, (g) => chip(g, C.mint, "books", "DEFINITION", true, .9), () => x.alpha || 0);
+});
+
+// ---------- the implicated term: a tile that grows into its full definition ----------
+const pat = tiles[PATIENT], cli = tiles[CLIENT];
+const WIDE = 3.4, PXW = 1451 / 3.4;          // pixels per world unit
+const CARD_PX = [1451, 905], FULL_H = CARD_PX[1] / PXW;
+// the card's plane is its full size, anchored at the tile's top-left; each frame draws the frame at its current size
+const cardCanvas = document.createElement("canvas"); cardCanvas.width = CARD_PX[0]; cardCanvas.height = CARD_PX[1];
+const cardTex = new THREE.CanvasTexture(cardCanvas);
+const card = new THREE.Mesh(new THREE.PlaneGeometry(WIDE, FULL_H), new THREE.MeshBasicMaterial({ map: cardTex, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+card.position.set(-TILE.w / 2 + WIDE / 2, TILE.h / 2 - FULL_H / 2, 0); card.renderOrder = 5; pat.holder.add(card);
+crispOver(card, ...CARD_PX, (g) => chip(g, C.mint, "books", "DEFINITION", true, .9), () => pat.alpha || 0);
+// the crisp pass draws after the scene, so the text of tiles behind the open card would show through it: the card
+// stands in the crisp pass too, as depth only, sized to the frame drawn this frame (pushed back a hair so its own text passes)
+const cardDepth = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ colorWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 4 }));
+cardDepth.matrixAutoUpdate = false; overlay.add(cardDepth);
+const cardRect = new THREE.Matrix4(), cardMove = new THREE.Matrix4();
+function syncCardDepth(w, h) {
+  const ww = (w - 8) / PXW, hh = (h - 8) / PXW;
+  cardMove.makeTranslation(-WIDE / 2 + 4 / PXW + ww / 2, FULL_H / 2 - 4 / PXW - hh / 2, 0);
+  cardRect.makeScale(ww, hh, 1);
+  cardDepth.matrix.copy(card.matrixWorld).multiply(cardMove).multiply(cardRect);
+  cardDepth.visible = card.material.opacity > .5;
+}
+const DEF_LINES = [
+  { y: 374, fade: 0, draw: (g) => { g.fillStyle = C.ink; g.font = `600 54px "Instrument Sans"`; g.fillText("The billing entity: one per company.", 40, 374); } },
+  { y: 536, fade: 1, draw: (g) => { g.fillStyle = C.ink; g.font = `400 38px "Instrument Sans"`; g.fillText("Owns the plan, the seats and the invoices.", 40, 536); } },
+  { y: 689, fade: 2, draw: (g, col) => {
+      g.fillStyle = col; g.font = `700 29px "JetBrains Mono"`; g.fillText("NOT", 40, 687);
+      g.fillStyle = C.ink; g.font = `400 38px "Instrument Sans"`; const s = "a person’s access to it. That is a "; g.fillText(s, 128, 689);
+      const x = 128 + g.measureText(s).width; g.fillStyle = C.mint; g.font = `600 38px "Instrument Sans"`; g.fillText("membership →", x, 689);
+      CARD_ANCHOR[0] = x + g.measureText("membership →").width + 8; CARD_ANCHOR[1] = 677;
+    } },
+  { y: 845, fade: 3, draw: (g, col) => { g.fillStyle = col; g.font = `700 29px "JetBrains Mono"`; g.fillText("ALIASES", 40, 843); g.fillStyle = C.ink; g.font = `400 38px "Instrument Sans"`; g.fillText("organization, tenant", 210, 845); } },
+];
+const CARD_ANCHOR = [0, 0];
+const hex = (c) => "#" + c.getHexString();
+// open: the card grows from tile size to its full size; its contents fade in once there
+const OPEN = [8.7, 9.45], SHUT = [19.4, 20.1];
+let cardSize = [TILE.px[0], TILE.px[1]];
+function drawCard(t, col) {
+  const g = cardCanvas.getContext("2d"), [W, H] = CARD_PX;
+  const grow = ease(smooth(...OPEN, t) * (1 - smooth(...SHUT, t)));
+  const w = TILE.px[0] + (W - TILE.px[0]) * grow, h = TILE.px[1] + (H - TILE.px[1]) * grow;
+  cardSize = [w, h];
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = "rgb(10,14,18)"; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 20); g.fill();   // opaque: nothing behind reads through the definition
+  g.strokeStyle = col; g.lineWidth = 3; g.stroke();
+  chip(g, col, "books", "DEFINITION", false, .9);
+  g.fillStyle = C.ink; fitFont(g, "account", 600, 68, 560, "Instrument Sans"); g.fillText("account", 36, 186);
+  // the contents: header notes, a rule, then the definition, line by line
+  const shut = 1 - smooth(SHUT[0] - .5, SHUT[0], t);
+  const head = smooth(OPEN[1] - .1, OPEN[1] + .3, t) * shut;
+  if (head) {
+    g.globalAlpha = head; g.fillStyle = C.muted; g.font = `500 26px "JetBrains Mono"`; g.textAlign = "right";
+    g.fillText("lexicon · settled term", W - 40, 60); g.fillText("3 senses reviewed", W - 40, 186); g.textAlign = "left";
+    g.strokeStyle = col; g.globalAlpha = head * .35; g.lineWidth = 2; g.beginPath(); g.moveTo(36, 252); g.lineTo(W - 36, 252); g.stroke();
+  }
+  DEF_LINES.forEach((l) => {
+    const a = smooth(OPEN[1] + .05 + l.fade * .28, OPEN[1] + .45 + l.fade * .28, t) * shut;
+    if (!a) return;
+    g.globalAlpha = a; g.save(); g.translate(0, 14 * (1 - a)); l.draw(g, col); g.restore();
+  });
+  g.globalAlpha = 1;
+  cardTex.needsUpdate = true;
+}
+
+// the protective flash: brackets clamp around the tile as it is judged
+const guard = new THREE.Mesh(new THREE.PlaneGeometry(TILE.w + .3, TILE.h + .26), new THREE.MeshBasicMaterial({
+  map: canvasTex(800, 344, (g, w, h) => {
+    g.strokeStyle = "#fff"; g.lineWidth = 3; g.beginPath(); g.roundRect(8, 8, w - 16, h - 16, 30); g.stroke();
+    g.lineWidth = 1.5; g.globalAlpha = .7; g.beginPath(); g.roundRect(22, 22, w - 44, h - 44, 24); g.stroke(); g.globalAlpha = 1;
+    g.lineWidth = 7; g.lineCap = "square"; const L = 54;
+    for (const [x, y, dx, dy] of [[8, 8, 1, 1], [w - 8, 8, -1, 1], [8, h - 8, 1, -1], [w - 8, h - 8, -1, -1]]) { g.beginPath(); g.moveTo(x + dx * L, y); g.lineTo(x, y); g.lineTo(x, y + dy * L); g.stroke(); }
+  }), transparent: true, opacity: 0, depthWrite: false, toneMapped: false, color: C.red,
+}));
+guard.position.z = .01; guard.renderOrder = 12; pat.holder.add(guard);
+
+// ---------- the plan: a subagent's prompt, typed close to camera ----------
+const PLAN = { w: 5.0, h: 1.4, px: [1600, 448], pos: [-1.9, -1.35, 2.4] };
+const planCanvas = document.createElement("canvas"); planCanvas.width = PLAN.px[0]; planCanvas.height = PLAN.px[1];
+const planTex = new THREE.CanvasTexture(planCanvas);
+const plan = new THREE.Mesh(new THREE.PlaneGeometry(PLAN.w, PLAN.h), new THREE.MeshBasicMaterial({ map: planTex, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+plan.position.set(...PLAN.pos); plan.renderOrder = 20; scene.add(plan);
+const L1 = "Offboarding: when someone leaves the team,";
+const P2 = "deactivate their ", OLD = "account", NEW = "membership", S2 = " and revoke their keys.";
+const TYPE = { l1: [3.4, 4.8], p2: [4.8, 5.3], old: [5.3, 5.8], s2: [5.8, 6.8], back: [15.9, 16.4], neu: [16.5, 17.3] };
+const typed = (s, [a, b], t) => s.slice(0, Math.round(clamp((t - a) / (b - a)) * s.length));
+function drawPlan(t) {
+  const g = planCanvas.getContext("2d"), [w, h] = PLAN.px;
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = "rgba(9,12,16,.93)"; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 22); g.fill();
+  g.strokeStyle = "#2C3A45"; g.lineWidth = 2; g.stroke();
+  const glow = hookGlow(t);
+  if (glow) { g.globalAlpha = glow; g.strokeStyle = C.mint; g.lineWidth = 4; g.stroke(); g.globalAlpha = 1; }
+  // what the hook handed it: the lexicon, now in the subagent's context
+  const n = TERMS.filter((_, i) => t >= STREAM.start + i * STREAM.gap + STREAM.dur).length;
+  if (n) {
+    g.font = `500 28px "JetBrains Mono"`; g.textAlign = "right"; g.fillStyle = C.mint;
+    g.fillText(`${n} terms in context`, w - 44, 66); g.textAlign = "left";
+    icon(g, "books", w - 44 - BADGE.textW - 52, 36, 38, C.mint, 2.2);
+  }
+  // the author: a steel chip, like a tool call's
+  g.font = `600 30px "JetBrains Mono"`; const cw = 90 + g.measureText("subagent 2 · plan").width;
+  g.beginPath(); g.roundRect(28, 24, cw, 62, 14); g.fillStyle = "rgba(126,147,163,.14)"; g.fill(); g.strokeStyle = C.steel; g.lineWidth = 2.5; g.stroke();
+  icon(g, "robot", 42, 33, 42, "#9FB2C1", 2.2); g.fillStyle = "#B4C4D0"; g.fillText("subagent 2 · plan", 96, 66);
+  g.font = `500 54px "Instrument Sans"`; g.fillStyle = C.ink;
+  g.fillText(typed(L1, TYPE.l1, t), 40, 190);
+  // line two: the word under judgment, then its replacement
+  let x = 40; const y = 290;
+  const p2 = typed(P2, TYPE.p2, t); g.fillText(p2, x, y); x += g.measureText(p2).width;
+  let word = "", state = "none";
+  if (t < TYPE.back[0]) { word = typed(OLD, TYPE.old, t); state = t >= RED_AT ? "red" : word ? "orange" : "none"; }
+  else if (t < TYPE.back[1]) { word = OLD.slice(0, Math.round((1 - clamp((t - TYPE.back[0]) / (TYPE.back[1] - TYPE.back[0]))) * OLD.length)); state = "red"; }
+  else { word = typed(NEW, TYPE.neu, t); state = word ? "mint" : "none"; }
+  const ww = g.measureText(word).width;
+  if (state !== "none" && word) {
+    const col = state === "orange" ? C.orange : state === "red" ? C.red : C.mint;
+    g.globalAlpha = .2; g.fillStyle = col; g.fillRect(x - 6, y - 50, ww + 12, 66); g.globalAlpha = 1;
+    g.fillStyle = col; g.fillRect(x - 6, y + 12, ww + 12, 4);
+    g.fillText(word, x, y);
+    if (state === "red") g.fillRect(x - 4, y - 18, ww + 8, 4);
+  } else g.fillText(word, x, y);
+  PLAN.word = word ? [x + ww / 2, y - 18, state] : null;
+  x += ww;
+  const s2 = t < TYPE.back[0] ? typed(S2, TYPE.s2, t) : S2;
+  g.fillStyle = C.ink; g.fillText(s2, x, y);
+  const typing = (t > TYPE.l1[0] && t < TYPE.s2[1]) || (t > TYPE.back[0] && t < TYPE.neu[1] + .3);
+  if (typing && Math.floor(t * 3) % 2 === 0) { const cx = t > TYPE.back[0] ? x - g.measureText(S2).width : x; g.fillStyle = C.ink; g.fillRect(cx + 4, y - 44, 4, 54); }
+  const done = smooth(17.8, 18.4, t);
+  if (done) {
+    g.globalAlpha = done; icon(g, "circle-check", 40, h - 92, 40, C.mint, 2.2);
+    g.fillStyle = C.mint; g.font = `500 24px "JetBrains Mono"`; g.fillText("revised against the lexicon", 92, h - 62);
+    const st = smooth(HOOKS[1].at + .4, HOOKS[1].at + .9, t);
+    if (st) { g.globalAlpha = done * st; g.fillStyle = C.muted; g.fillText("·  SubagentStop  ·  regulate: clean", 92 + g.measureText("revised against the lexicon").width + 20, h - 62); }
+    g.globalAlpha = 1;
+  }
+  planTex.needsUpdate = true;
+}
+const planPx = (px, py) => plan.localToWorld(new THREE.Vector3((px / PLAN.px[0] - .5) * PLAN.w, (.5 - py / PLAN.px[1]) * PLAN.h, .01));
+
+// ---------- hooks: the harness events that carry Coherence into the agent ----------
+// SubagentStart hands the subagent the lexicon; SubagentStop runs regulate before it may finish.
+const HOOKS = [{ name: "SubagentStart", at: 3.0, hold: 3.2 }, { name: "SubagentStop", at: 18.6, hold: 99 }];
+const hookGlow = (t) => Math.max(...HOOKS.map((k) => smooth(k.at, k.at + .15, t) * (1 - smooth(k.at + .4, k.at + 1.2, t))));
+HOOKS.forEach((k) => {
+  k.chip = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.7 / 6.2), new THREE.MeshBasicMaterial({
+    map: canvasTex(620, 100, (g, w, h) => {
+      g.beginPath(); g.roundRect(3, 6, w - 6, 88, 16); g.fillStyle = "rgba(84,232,176,.10)"; g.fill(); g.strokeStyle = C.mint; g.lineWidth = 2.5; g.stroke();
+      icon(g, "plug-connected", 20, 24, 52, C.mint, 2.2);
+      g.fillStyle = C.mint; g.font = `600 32px "JetBrains Mono"`; g.fillText("hook · " + k.name, 86, 62);
+    }), transparent: true, opacity: 0, depthWrite: false, toneMapped: false,
+  }));
+  k.chip.position.set(PLAN.w / 2 - .9, PLAN.h / 2 + .2, .01); k.chip.renderOrder = 21; plan.add(k.chip);
+  k.sweep = new THREE.Mesh(new THREE.PlaneGeometry(.03, PLAN.h * .94), new THREE.MeshBasicMaterial({ color: C.mint, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+  k.sweep.renderOrder = 22; plan.add(k.sweep);
+});
+function updateHooks(t) {
+  for (const k of HOOKS) {
+    k.chip.material.opacity = smooth(k.at, k.at + .25, t) * (1 - smooth(k.at + k.hold, k.at + k.hold + .5, t)) * plan.material.opacity;
+    const p = smooth(k.at, k.at + .7, t);
+    k.sweep.position.set(-PLAN.w / 2 + PLAN.w * p, 0, .012); k.sweep.material.opacity = p > 0 && p < 1 ? .95 : 0;
+  }
+}
+// the delivery itself: a cell per term streams from the lexicon into the subagent's context
+const STREAM = { start: 3.15, gap: .045, dur: .85 };
+const BADGE = { textW: 0 };
+{ const g = document.createElement("canvas").getContext("2d"); g.font = `500 28px "JetBrains Mono"`; BADGE.textW = g.measureText("24 terms in context").width; }
+const streamMesh = new THREE.InstancedMesh(cellGeo, new THREE.MeshBasicMaterial({ color: C.mint, toneMapped: false }), TERMS.length);
+streamMesh.frustumCulled = false; streamMesh.renderOrder = 23; scene.add(streamMesh);
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+function updateStream(t) {
+  const b = planPx(PLAN.px[0] - 44 - BADGE.textW - 33, 55);
+  tiles.forEach((x, i) => {
+    const k = ease(clamp((t - STREAM.start - i * STREAM.gap) / STREAM.dur));
+    if (k <= 0 || k >= 1) { streamMesh.setMatrixAt(i, ZERO); return; }
+    const a = x.holder.localToWorld(new THREE.Vector3(0, 0, .02)), mid = a.clone().lerp(b, .5); mid.z += 1.2; mid.y += .6;
+    const u = 1 - k, pnt = new THREE.Vector3(u * u * a.x + 2 * u * k * mid.x + k * k * b.x, u * u * a.y + 2 * u * k * mid.y + k * k * b.y, u * u * a.z + 2 * u * k * mid.z + k * k * b.z);
+    const sh = 1 - smooth(.8, 1, k);
+    _m.compose(pnt, _q, _s.set(.2 * sh, .07 * sh, 1)); streamMesh.setMatrixAt(i, _m);
+  });
+  streamMesh.instanceMatrix.needsUpdate = true;
+}
+
+// ---------- threads ----------
+function makeThread(color) {
+  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0, fog: false, toneMapped: false }));
+  l.renderOrder = 25; scene.add(l); return l;
+}
+const wordThread = makeThread(C.orange), defThread = makeThread(C.mint), newThread = makeThread(C.mint);
+function drawThread(line, a, b, k, opacity) {
+  const mid = a.clone().lerp(b, .5); mid.z += .8; mid.y += .3;
+  const pts = []; for (let i = 0; i <= 24; i++) { const u = i / 24 * k, v = 1 - u; pts.push(new THREE.Vector3(v * v * a.x + 2 * v * u * mid.x + u * u * b.x, v * v * a.y + 2 * v * u * mid.y + u * u * b.y, v * v * a.z + 2 * v * u * mid.z + u * u * b.z)); }
+  line.geometry.setFromPoints(pts); line.material.opacity = opacity;
+}
+
+// ---------- camera ----------
+const KEYS = [
+  [0, [.7, 1.3, 13.8], [1.4, .5, -3]],
+  [3, [.4, .8, 12.2], [.9, .1, -2]],
+  [8, [.3, .4, 11.2], [.6, -.1, -1]],
+  [9.3, [.4, .45, 10.9], [.8, 0, -1]],
+  [11.4, [2.4, 1.7, 3.4], [2.4, 1.6, -1.5]],   // close on the open mechanism: the definition reads
+  [13.0, [2.5, 1.65, 3.2], [2.5, 1.55, -1.5]],
+  [15.2, [.6, .4, 11.0], [1.0, 0, -1]],        // back out: the membership thread, then the revision
+  [19.5, [.3, .4, 11.0], [.6, -.1, -1]],
+  [25, [1.0, 2.4, 15.5], [1.6, .2, -3.2]],
+];
+const V = (a) => new THREE.Vector3(...a);
+function cameraAt(t) {
+  let i = 0; while (i < KEYS.length - 2 && t > KEYS[i + 1][0]) i++;
+  const [t0, p0, q0] = KEYS[i], [t1, p1, q1] = KEYS[i + 1], k = ease(clamp((t - t0) / (t1 - t0)));
+  camera.position.copy(V(p0).lerp(V(p1), k)); camera.lookAt(V(q0).lerp(V(q1), k));
+  camera.position.x += Math.sin(t * .6) * .04; camera.position.y += Math.cos(t * .45) * .03;
+}
+
+// ---------- HUD ----------
+const hudK = document.getElementById("hudK"), hudV = document.getElementById("hudV");
+const hud2K = document.getElementById("hud2K"), hud2V = document.getElementById("hud2V");
+hudK.innerHTML = `${svgIcon("books")}lexicon · this project`;
+hud2K.innerHTML = `last hook${svgIcon("plug-connected")}`;
+function hud(t) {
+  const n = tiles.filter((x) => (x.alpha || 0) > .3).length;
+  hudV.textContent = `${n} terms`;
+  const last = [...HOOKS].reverse().find((k) => t >= k.at);
+  hud2V.textContent = last ? last.name : ""; hud2V.style.color = C.mint;
+  document.getElementById("hud2").style.opacity = String(smooth(2.9, 3.3, t));
+  document.getElementById("super").style.opacity = String(smooth(3.3, 3.8, t) * (1 - smooth(6.6, 7.2, t)));
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+const MINT = [1, 0, 0], edgeCol = new THREE.Color();
+function render(t) {
+  cameraAt(t);
+  const clear = smooth(8, 22, t);
+  const cl = applyClarity(clarityAt(t));
+  scene.fog.density = (.04 - .014 * clear) * cl.fog;
+  sheets.forEach((s, i) => {
+    s.position.x = s.userData.base.x + Math.sin(t * .15 + i) * 2 + t * s.userData.speed;
+    s.material.opacity = s.userData.o * (s.userData.near ? 1 - .9 * clear : 1 - .4 * clear) * cl.sheets;
+  });
+  // tiles resolve out of the dark, then everything not in question steps back
+  const focus = smooth(7, 8, t) * (1 - smooth(19.5, 21.5, t));
+  tiles.forEach((x) => {
+    const appear = smooth(.3 + x.i * .09, .9 + x.i * .09, t);
+    const involved = x === pat || (x === cli && t > 12.2);
+    x.alpha = appear * (involved ? 1 : 1 - .6 * focus);
+    if (x !== pat) x.face.set(x.alpha, MINT);
+  });
+  const w = stateWeights(t);
+  card.material.opacity = pat.alpha;
+  // lift: the implicated tile rises out of the table and turns to face us
+  const lift = smooth(7.2, 8.6, t) * (1 - smooth(20.8, 22.2, t));
+  pat.holder.position.copy(pat.home).add(new THREE.Vector3(-.3 * lift, .55 * lift, 2.3 * lift));
+  pat.holder.rotation.set(.42 * lift, .18 * lift, 0); pat.holder.scale.setScalar(1 + .22 * lift);
+  // judged: brackets clamp on, red, then release as the mechanism opens
+  guard.material.opacity = smooth(RED_AT, RED_AT + .3, t) * (1 - smooth(8.6, 9.0, t));
+  guard.scale.setScalar(1 + .2 * (1 - smooth(RED_AT, RED_AT + .45, t)));
+  // open: the card grows outward, then its definition fades in
+  drawCard(t, hex(stateColor(w, new THREE.Color())));
+  // the answering term
+  const cLift = smooth(12.2, 13, t) * (1 - smooth(20, 21.5, t));
+  cli.holder.position.copy(cli.home).add(new THREE.Vector3(0, .1 * cLift, .7 * cLift)); cli.holder.scale.setScalar(1 + .14 * cLift);
+  // the plan
+  plan.material.opacity = smooth(2.7, 3.1, t);
+  drawPlan(t);
+  scene.updateMatrixWorld();
+  updateHooks(t);
+  updateStream(t);
+  scene.updateMatrixWorld();
+  // threads: word to the tile it names; the definition to the right term; the new word to its tile
+  const patPos = pat.holder.localToWorld(new THREE.Vector3(-TILE.w / 2 + .1, -TILE.h / 2 + .05, 0));
+  const cliPos = cli.holder.localToWorld(new THREE.Vector3(-TILE.w / 2 + .05, 0, 0));
+  if (PLAN.word && t < TYPE.back[1]) {
+    const k = smooth(5.8, 6.8, t);
+    wordThread.material.color.set(t >= RED_AT ? C.red : C.orange);
+    drawThread(wordThread, planPx(PLAN.word[0], PLAN.word[1] - 40), patPos, k, k ? 1 - smooth(15.9, 16.3, t) : 0);
+  } else wordThread.material.opacity = 0;
+  if (CARD_ANCHOR[0] && t > 12.1 && t < SHUT[0]) {
+    const a = card.localToWorld(new THREE.Vector3((CARD_ANCHOR[0] / CARD_PX[0] - .5) * WIDE, (.5 - CARD_ANCHOR[1] / CARD_PX[1]) * FULL_H, .01));
+    drawThread(defThread, a, cliPos, smooth(12.1, 12.9, t), 1 - smooth(17.2, 18, t));
+  } else defThread.material.opacity = 0;
+  if (PLAN.word && t > TYPE.neu[0] + .3) drawThread(newThread, planPx(PLAN.word[0], PLAN.word[1] - 40), cliPos, smooth(TYPE.neu[0] + .3, TYPE.neu[1] + .4, t), 1 - smooth(21.5, 22.5, t));
+  else newThread.material.opacity = 0;
+  bloom.strength = .8 + .2 * smooth(RED_AT, RED_AT + .3, t) * (1 - smooth(10, 11, t));
+  hud(t);
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  composer.render();
+  syncCrisp(); syncCardDepth(...cardSize);
+  renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
+}
+
+document.getElementById("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; document.getElementById("play").textContent = "Play"; } };
+document.getElementById("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); document.getElementById("play").click(); } });
+
+Promise.all(["600 1em 'Instrument Sans'", "500 1em 'Instrument Sans'", "400 1em 'Instrument Sans'", "500 1em 'JetBrains Mono'", "600 1em 'JetBrains Mono'", "800 1em 'JetBrains Mono'", "700 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
+  .finally(() => { redraws.forEach((r) => r.redraw()); size(); requestAnimationFrame(frame); });
+</script>

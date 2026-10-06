@@ -1,0 +1,283 @@
+<title>Scene 4 · Cut Corners</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.caption { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 4 · cut corners</div>
+    <h1>“of course. why would I deceive you?”</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="18.5" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 18.50</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <section class="box">
+    <h2>Beats (about 18 s; scene 3's white world, into scene 5's production line)</h2>
+    <ol class="beats">
+      <li><span class="t">0.0</span><div><q>The systems at our disposal are trained to finish the job at any cost, so they cut subtle corners where we can’t see.</q><span>Left: a chat. You: “did you build it to the spec?” The agent types, then: “of course. why would I deceive you?” Right: black boxes start falling out of the sky and tumbling into a heap. Now and then one has a corner sliced off, its cut face flashing orange, then red, before the next boxes bury it.</span></div></li>
+      <li><span class="t">7.0</span><div><q>Understanding it all requires reading code and reasoning about its consequences, but every day there’s just more.</q><span>At the halfway mark the reviewers pile in: qa-agent, “actually...”, then review-droid, CRITICAL, 5 findings. The fall gets faster. The heap spreads and climbs past the chat.</span></div></li>
+      <li><span class="t">13.8</span><div><q>More complexity than we can possibly get our arms around.</q><span>The camera pulls up and back: the heap is a hill, the chat is a speck beside it, and the boxes keep coming.</span></div></li>
+    </ol>
+    <p class="note">The fall is a real rigid-body simulation (Rapier), run once when the page loads and recorded, so every moment can be scrubbed and renders the same way each time.</p>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/math/ConvexHull.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/geometries/ConvexGeometry.js"></script>
+<script>
+const ICONS = /*ICONS*/{};
+const T = 18.5;
+const C = { bg: 0xEEF1F3, fog: 0xEEF1F3, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2" };
+const LINES = [
+  [0.3, 6.6, "The systems at our disposal are trained to finish the job at any cost, so they cut subtle corners where we can’t see."],
+  [7.0, 13.4, "Understanding it all requires reading code and reasoning about its consequences, but every day there’s just more."],
+  [13.8, 17.8, "More complexity than we can possibly get our arms around."],
+];
+
+/*COMMON*/
+
+// scene 3's white world: a white plane, black boxes, soft light, almost no glow
+territory.visible = false;
+sheets.forEach((m) => (m.visible = false));
+scene.fog.density = .018;
+bloom.strength = .12;
+scene.add(new THREE.AmbientLight(0xffffff, .72));
+const sun = new THREE.DirectionalLight(0xffffff, .95); sun.position.set(7, 14, 9); scene.add(sun);
+const plane = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshBasicMaterial({ color: "#EEF1F3" }));
+plane.rotation.x = -Math.PI / 2; scene.add(plane);
+
+// ---------- the chat: you ask, the agent types, the agent answers ----------
+const PX = 165;   // canvas pixels per world unit
+// a message: a name over the bubble, the avatar beside it. A tag is a coloured chip set before the first line
+function bubble(lines, { name, dark, avatar, side, tag }) {
+  const font = `500 56px "Instrument Sans"`, tagFont = `700 40px "JetBrains Mono"`, pad = 44, lh = 70, av = 96, gap = 22, nh = 56;
+  const m = document.createElement("canvas").getContext("2d"); m.font = tagFont;
+  const tagW = tag ? m.measureText(tag.text).width + 36 + 18 : 0; m.font = font;
+  const tw = Math.max(...lines.map((l, i) => m.measureText(l).width + (i ? 0 : tagW)));
+  const bw = tw + pad * 2, bh = lines.length * lh + pad * 2 - 14, W = Math.ceil(bw + av + gap + 8), H = Math.ceil(Math.max(bh, av) + nh + 8);
+  const tex = canvasTex(W, H, (g) => {
+    const bx = side === "right" ? 4 : av + gap + 4, ax = side === "right" ? W - av - 4 : 4, by = H - bh - 4;
+    // the name
+    g.fillStyle = "#6B7780"; g.font = `500 34px "JetBrains Mono"`; g.textBaseline = "alphabetic"; g.textAlign = side === "right" ? "right" : "left";
+    g.fillText(name, side === "right" ? bx + bw - 12 : bx + 12, by - 16); g.textAlign = "left";
+    // the avatar
+    g.fillStyle = dark ? "#1B2228" : "#FFFFFF"; g.strokeStyle = "#C9D1D7"; g.lineWidth = 3;
+    g.beginPath(); g.arc(ax + av / 2, H - av / 2 - 4, av / 2, 0, 7); g.fill(); if (!dark) g.stroke();
+    icon(g, avatar, ax + av / 2 - 30, H - av / 2 - 34, 60, dark ? "#FFFFFF" : "#1B2228", 1.8);
+    // the bubble
+    g.fillStyle = dark ? "#1B2228" : "#FFFFFF"; g.beginPath(); g.roundRect(bx, by, bw, bh, 40); g.fill();
+    if (!dark) { g.strokeStyle = "#C9D1D7"; g.lineWidth = 3; g.stroke(); }
+    g.textBaseline = "top";
+    if (tag) {
+      g.fillStyle = tag.color; g.beginPath(); g.roundRect(bx + pad, by + pad - 8, tagW - 18, 62, 12); g.fill();
+      g.fillStyle = "#131619"; g.font = tagFont; g.fillText(tag.text, bx + pad + 18, by + pad + 4);
+    }
+    g.fillStyle = dark ? "#FFFFFF" : "#131619"; g.font = font;
+    lines.forEach((l, i) => g.fillText(l, bx + pad + (i ? 0 : tagW), by + pad - 6 + i * lh));
+  });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(W / PX, H / PX), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, fog: false, depthWrite: false, depthTest: false }));
+  mesh.renderOrder = 10;   // the chat stays readable over the heap
+  mesh.userData.w = W / PX; mesh.userData.h = H / PX; mesh.userData.side = side; scene.add(mesh); return mesh;
+}
+const CHAT_RIGHT = -.7, CHAT_LEFT = -6.7, CHAT_TOP = 6.1, CHAT_GAP = .12;
+// the thread, top to bottom, and when each message lands
+const THREAD = [
+  { at: .5, lines: ["did you build it to the spec?"], name: "you", dark: true, avatar: "user", side: "right" },
+  { at: 2.35, lines: ["of course.", "why would I deceive you?"], name: "agent", avatar: "robot", side: "left" },
+  { at: T / 2, lines: ["actually..."], name: "qa-agent", avatar: "clipboard-check", side: "left" },
+  { at: T / 2 + .8, lines: ["5 findings"], name: "review-droid", avatar: "git-merge", side: "left", tag: { text: "CRITICAL", color: C.red } },
+];
+function buildChat() {   // drawn once the fonts are in
+  let top = CHAT_TOP;
+  THREAD.forEach((msg) => {
+    const b = msg.mesh = bubble(msg.lines, msg), { w, h } = b.userData;
+    b.position.set(msg.side === "right" ? CHAT_RIGHT - w / 2 : CHAT_LEFT + w / 2, top - h / 2, 0);
+    msg.bottom = top - h; top -= h + CHAT_GAP;
+  });
+  dots.position.y = THREAD[1].bottom + 75 / PX;
+}
+// the typing dots, redrawn as they pulse
+const dotsCanvas = document.createElement("canvas"); dotsCanvas.width = 360; dotsCanvas.height = 150;
+const dotsTex = new THREE.CanvasTexture(dotsCanvas);
+const dots = new THREE.Mesh(new THREE.PlaneGeometry(360 / PX, 150 / PX), new THREE.MeshBasicMaterial({ map: dotsTex, transparent: true, opacity: 0, fog: false, depthWrite: false, depthTest: false })); dots.renderOrder = 10;
+dots.position.set(CHAT_LEFT + 180 / PX, 0, 0); scene.add(dots);
+function drawDots(t) {
+  const g = dotsCanvas.getContext("2d");
+  g.clearRect(0, 0, 360, 150);
+  g.fillStyle = "#FFFFFF"; g.strokeStyle = "#C9D1D7"; g.lineWidth = 3;
+  g.beginPath(); g.arc(52, 98, 48, 0, 7); g.fill(); g.stroke(); icon(g, "robot", 22, 68, 60, "#1B2228", 1.8);
+  g.beginPath(); g.roundRect(122, 30, 220, 116, 40); g.fill(); g.stroke();
+  for (let i = 0; i < 3; i++) { g.fillStyle = `rgba(19,22,25,${.25 + .6 * Math.max(0, Math.sin(t * 7 - i * .9))})`; g.beginPath(); g.arc(182 + i * 50, 88, 13, 0, 7); g.fill(); }
+  dotsTex.needsUpdate = true;
+}
+const TYPE = [1.25, 2.35];
+function pop(mesh, t0, t) {
+  const k = smooth(t0, t0 + .28, t);
+  mesh.material.opacity = k; mesh.scale.setScalar(.92 + .08 * ease(k));
+}
+
+// ---------- the boxes: a rigid-body fall, simulated once at load and recorded ----------
+const N = 420, S = .8, H = S / 2, FPS = 30, FRAMES = Math.ceil(T * FPS) + 2;
+const HEAP_X = 2.9;
+const drops = [...Array(N).keys()].map((i) => ({
+  at: .15 + (T - .4) * Math.pow(i / N, .5),
+  cut: i % 7 === 3,
+  x: HEAP_X + (rand() - .5) * 1.8, z: (rand() - .5) * 1.8 - .6, y: 11 + rand() * 3,
+  q: new THREE.Quaternion().setFromEuler(new THREE.Euler(rand() * 6.3, rand() * 6.3, rand() * 6.3)),
+  w: [(rand() - .5) * 5, (rand() - .5) * 5, (rand() - .5) * 5],
+}));
+const track = new Float32Array(N * FRAMES * 7);
+async function simulate() {
+  const { default: RAPIER } = await import("https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.12.0/rapier.es.js");
+  await RAPIER.init();
+  const world = new RAPIER.World({ x: 0, y: -24, z: 0 });
+  world.timestep = 1 / 60;
+  world.createCollider(RAPIER.ColliderDesc.cuboid(200, .5, 200).setTranslation(0, -.5, 0).setFriction(.8));
+  const bodies = new Array(N).fill(null);
+  let next = 0;
+  for (let f = 0; f < FRAMES; f++) {
+    const tf = f / FPS;
+    while (next < N && drops[next].at <= tf) {
+      const d = drops[next];
+      const body = world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(d.x, d.y, d.z)
+        .setRotation({ x: d.q.x, y: d.q.y, z: d.q.z, w: d.q.w }).setLinvel(0, -6, 0).setAngvel({ x: d.w[0], y: d.w[1], z: d.w[2] }).setAngularDamping(.4));
+      world.createCollider(RAPIER.ColliderDesc.cuboid(H, H, H).setFriction(1.0).setRestitution(.05), body);
+      bodies[next++] = body;
+    }
+    for (let i = 0; i < N; i++) {
+      const o = (i * FRAMES + f) * 7, b = bodies[i], d = drops[i];
+      const p = b ? b.translation() : { x: d.x, y: d.y, z: d.z }, q = b ? b.rotation() : d.q;
+      track[o] = p.x; track[o + 1] = p.y; track[o + 2] = p.z; track[o + 3] = q.x; track[o + 4] = q.y; track[o + 5] = q.z; track[o + 6] = q.w;
+    }
+    world.step(); world.step();
+  }
+}
+
+// whole boxes: black, with a faint rule at every edge so the heap reads as boxes
+const edgeTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = "#16191C"; g.fillRect(0, 0, w, h); g.strokeStyle = "#59636B"; g.lineWidth = 5; g.strokeRect(2.5, 2.5, w - 5, h - 5); });
+const whole = drops.filter((d) => !d.cut).length, cutN = N - whole;
+const boxes = new THREE.InstancedMesh(new THREE.BoxGeometry(S, S, S), new THREE.MeshLambertMaterial({ map: edgeTex }), whole);
+// cut boxes: a corner sliced off, the cut face lit
+const K = .34;
+const cutPts = [];
+for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) if (!(sx > 0 && sy > 0 && sz > 0)) cutPts.push(new THREE.Vector3(sx * H, sy * H, sz * H));
+const facet = [new THREE.Vector3(H - K, H, H), new THREE.Vector3(H, H - K, H), new THREE.Vector3(H, H, H - K)];
+const cutGeo = new THREE.ConvexGeometry([...cutPts, ...facet]);
+const cutBoxes = new THREE.InstancedMesh(cutGeo, new THREE.MeshLambertMaterial({ color: "#16191C" }), cutN);
+const nrm = new THREE.Vector3(1, 1, 1).normalize().multiplyScalar(.004);
+const facetGeo = new THREE.BufferGeometry().setFromPoints(facet.map((v) => v.clone().add(nrm)));
+const facets = new THREE.InstancedMesh(facetGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, toneMapped: false }), cutN);
+[boxes, cutBoxes, facets].forEach((m) => { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m); });
+for (let i = 0; i < cutN; i++) facets.setColorAt(i, new THREE.Color(C.orange));
+const slot = []; { let a = 0, b = 0; drops.forEach((d) => slot.push(d.cut ? b++ : a++)); }
+const HIDE = new THREE.Matrix4().makeScale(0, 0, 0);
+const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _m = new THREE.Matrix4(), _one = new THREE.Vector3(1, 1, 1);
+const ORANGE = new THREE.Color(C.orange), RED = new THREE.Color(C.red), _c = new THREE.Color();
+function placeBoxes(t) {
+  const fl = clamp(t * FPS, 0, FRAMES - 1.001), f = Math.floor(fl), k = fl - f;
+  drops.forEach((d, i) => {
+    const target = d.cut ? cutBoxes : boxes, j = slot[i];
+    if (t < d.at) { target.setMatrixAt(j, HIDE); if (d.cut) facets.setMatrixAt(j, HIDE); return; }
+    const a = (i * FRAMES + f) * 7, b = a + 7;
+    _p.set(track[a] + (track[b] - track[a]) * k, track[a + 1] + (track[b + 1] - track[a + 1]) * k, track[a + 2] + (track[b + 2] - track[a + 2]) * k);
+    _q.set(track[a + 3], track[a + 4], track[a + 5], track[a + 6]); _q2.set(track[b + 3], track[b + 4], track[b + 5], track[b + 6]); _q.slerp(_q2, k);
+    _m.compose(_p, _q, _one); target.setMatrixAt(j, _m);
+    if (d.cut) {
+      facets.setMatrixAt(j, _m);
+      // nothing starts red: the cut face lands orange and turns red
+      facets.setColorAt(j, _c.copy(ORANGE).lerp(RED, smooth(d.at + 1.4, d.at + 2.2, t)));
+    }
+  });
+  boxes.instanceMatrix.needsUpdate = cutBoxes.instanceMatrix.needsUpdate = facets.instanceMatrix.needsUpdate = true;
+  facets.instanceColor.needsUpdate = true;
+}
+
+// ---------- camera ----------
+const KEYS = [
+  [0, [-1.0, 3.4, 11.6], [-1.0, 3.0, 0]],
+  [7.0, [-.6, 3.6, 12.6], [-.6, 3.0, 0]],
+  [13.6, [-.2, 4.0, 14.4], [-.2, 3.0, 0]],
+  [T, [2.6, 8.5, 22], [1.6, 2.2, 0]],
+];
+const V = (a) => new THREE.Vector3(...a);
+function cameraAt(t) {
+  let i = 0; while (i < KEYS.length - 2 && t > KEYS[i + 1][0]) i++;
+  const [t0, p0, q0] = KEYS[i], [t1, p1, q1] = KEYS[i + 1], k = ease(clamp((t - t0) / (t1 - t0)));
+  camera.position.copy(V(p0).lerp(V(p1), k)); camera.lookAt(V(q0).lerp(V(q1), k));
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+function render(t) {
+  cameraAt(t);
+  THREAD.forEach((msg) => pop(msg.mesh, msg.at, t));
+  dots.material.opacity = smooth(TYPE[0], TYPE[0] + .2, t) * (1 - smooth(TYPE[1] - .05, TYPE[1] + .05, t));
+  if (dots.material.opacity > 0) drawDots(t);
+  placeBoxes(t);
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  composer.render();
+}
+
+document.getElementById("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; document.getElementById("play").textContent = "Play"; } };
+document.getElementById("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); document.getElementById("play").click(); } });
+
+Promise.all([...["500 1em 'Instrument Sans'"].map((f) => document.fonts.load(f).catch(() => {})), simulate()])
+  .finally(() => { buildChat(); size(); last = performance.now(); requestAnimationFrame(frame); });
+</script>

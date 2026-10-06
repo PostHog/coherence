@@ -1,0 +1,737 @@
+<title>Scene 15 · Coherent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Instrument+Sans:wght@400;500;600&family=Inter:wght@200;300;400;500&family=Figtree:wght@700&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.caption { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+.hud { position: absolute; font: 500 clamp(8px, 1.05vw, 14px)/1.4 var(--mono); color: var(--ink); pointer-events: none; }
+.panel { background: rgb(8 11 14 / .86); border: 1px solid #26313A; border-radius: 6px; padding: .7em .9em; }
+.hud svg { width: 1.3em; height: 1.3em; vertical-align: -.3em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: .45em; }
+.hud .k { color: var(--muted); font-size: .82em; letter-spacing: .08em; text-transform: uppercase; }
+.hud .v { margin-top: .25em; }
+#mast { left: 2.5%; top: 3.5%; }
+#mast .big { font: 600 clamp(12px, 2.1vw, 28px)/1.2 var(--sans); display: flex; align-items: center; gap: .45em; margin-top: .15em; }
+#mast .sq { width: .7em; height: .7em; border-radius: .12em; display: inline-block; }
+#strip { left: 2.5%; top: 14%; display: flex; gap: .5em; width: 90%; font-size: clamp(7px, .95vw, 13px); }
+.pill { background: rgb(8 11 14 / .86); border: 1px solid #2A3540; border-radius: 1em; padding: .2em .8em; }
+#insp { right: 2.5%; top: 3.5%; width: 30%; opacity: 0; }
+#change { right: 2.5%; top: 3.5%; opacity: 0; }
+</style>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 15 · coherent</div>
+    <h1>The structure view pulls back into a field of views, the field goes coherent, and the mint becomes the title</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div class="hud" id="mast"></div>
+    <div class="hud" id="strip"></div>
+    <div class="hud panel" id="insp"></div>
+    <div class="hud panel" id="change"></div>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="22.6" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 22.60</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <section class="box">
+    <h2>Beats (about 22.6 s; a stylized Scope Structure view on the ground)</h2>
+    <ol class="beats">
+      <li><span class="t">0.0</span><div><q>These are the kinds of tools we need to clear the fog.</q><span>The structure view, verified, in clear air. The camera starts to pull straight up, and at 3:31 the view is the first to go coherent: its detail gives way to a flat mint abstraction of the same structure.</span></div></li>
+      <li><span class="t">4.0</span><div><q>Spend less inference on code that doesn't work, less inference detecting bugs, less inference investigating the decisions that went into your changes.</q><span>More structure views surround it, tile by tile, each more abstract the further out it sits: cards and lines, then bare blocks. Each view moves one way along grey, amber, red, starting at its own point and never stepping back; from about 5 s, green trickles outward from the centre, cell by cell.</span></div></li>
+      <li><span class="t">13.4</span><div><q>So if you're ready to try a new way of working with agents, come join us building the software of 2030.</q><span>A wave of mint rolls outward from the centre until every view is uniform mint; the tiles close ranks into one surface.</span></div></li>
+      <li><span class="t">14.7</span><div><span>Pull back far enough and it is solid mint (3:44), under the end of the line before. The features Coherence names pile up as chips, hold to be read, then pour into the wordmark: coherence, lowercase and black, its c slightly tilted. A scan line passes, a reticle locks onto the c and tilts it back into place, and everything fades to black with the music.</span></div></li>
+    </ol>
+    <p class="note">Drawn from Scope's real Structure grammar: entrance tokens with trust tags, stations in columns by distance from an entrance, one colour per structural route (never red or orange), core dependencies as rails, C and X interface identifiers, red only for broken. The project is the fictional app from scenes 11 and 12.</p>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const ICONS = {"abc": ["M3 16v-6a2 2 0 1 1 4 0v6", "M3 13h4", "M10 8v6a2 2 0 1 0 4 0v-1a2 2 0 1 0 -4 0v1", "M20.732 12a2 2 0 0 0 -3.732 1v1a2 2 0 0 0 3.726 1.01"], "alert-triangle": ["M12 9v4", "M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0", "M12 16h.01"], "arrow-fork": ["M16 3h5v5", "M8 3h-5v5", "M21 3l-7.536 7.536a5 5 0 0 0 -1.464 3.534v6.93", "M3 3l7.536 7.536a5 5 0 0 1 1.464 3.534v.93"], "arrows-split-2": ["M21 17h-5.397a5 5 0 0 1 -4.096 -2.133l-.514 -.734a5 5 0 0 0 -4.096 -2.133h-3.897", "M21 7h-5.395a5 5 0 0 0 -4.098 2.135l-.51 .73a5 5 0 0 1 -4.097 2.135h-3.9", "M18 10l3 -3l-3 -3", "M18 20l3 -3l-3 -3"], "binary-tree-2": ["M14 6a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M7 14a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M21 14a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M14 18a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M12 8v8", "M6.316 12.496l4.368 -4.992", "M17.684 12.496l-4.366 -4.99"], "book-2": ["M19 4v16h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12", "M19 16h-12a2 2 0 0 0 -2 2", "M9 8h6"], "books": ["M5 5a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -14", "M9 5a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -14", "M5 8h4", "M9 16h4", "M13.803 4.56l2.184 -.53c.562 -.135 1.133 .19 1.282 .732l3.695 13.418a1.02 1.02 0 0 1 -.634 1.219l-.133 .041l-2.184 .53c-.562 .135 -1.133 -.19 -1.282 -.732l-3.695 -13.418a1.02 1.02 0 0 1 .634 -1.219l.133 -.041", "M14 9l4 -1", "M16 16l3.923 -.98"], "bug": ["M9 9v-1a3 3 0 0 1 6 0v1", "M8 9h8a6 6 0 0 1 1 3v3a5 5 0 0 1 -10 0v-3a6 6 0 0 1 1 -3", "M3 13l4 0", "M17 13l4 0", "M12 20l0 -6", "M4 19l3.35 -2", "M20 19l-3.35 -2", "M4 7l3.75 2.4", "M20 7l-3.75 2.4"], "circle-check": ["M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0", "M9 12l2 2l4 -4"], "circle-x": ["M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0", "M10 10l4 4m0 -4l-4 4"], "clipboard-check": ["M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2", "M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2", "M9 14l2 2l4 -4"], "code-asterisk": ["M6 19a2 2 0 0 1 -2 -2v-4l-1 -1l1 -1v-4a2 2 0 0 1 2 -2", "M12 11.875l3 -1.687", "M12 11.875v3.375", "M12 11.875l-3 -1.687", "M12 11.875l3 1.688", "M12 8.5v3.375", "M12 11.875l-3 1.688", "M18 19a2 2 0 0 0 2 -2v-4l1 -1l-1 -1v-4a2 2 0 0 0 -2 -2"], "code": ["M7 8l-4 4l4 4", "M17 8l4 4l-4 4", "M14 4l-4 16"], "door-enter": ["M13 12v.01", "M3 21h18", "M5 21v-16a2 2 0 0 1 2 -2h6m4 10.5v7.5", "M21 7h-7m3 -3l-3 3l3 3"], "file-code": ["M14 3v4a1 1 0 0 0 1 1h4", "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2", "M10 13l-1 2l1 2", "M14 13l1 2l-1 2"], "file-plus": ["M14 3v4a1 1 0 0 0 1 1h4", "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2", "M12 11l0 6", "M9 14l6 0"], "file-text": ["M14 3v4a1 1 0 0 0 1 1h4", "M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2", "M9 9l1 0", "M9 13l6 0", "M9 17l6 0"], "filter": ["M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227"], "flask": ["M9 3l6 0", "M10 9l4 0", "M10 3v6l-4 11a.7 .7 0 0 0 .5 1h11a.7 .7 0 0 0 .5 -1l-4 -11v-6"], "folder": ["M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2"], "git-commit": ["M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M12 3l0 6", "M12 15l0 6"], "git-fork": ["M10 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M15 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M7 8v2a2 2 0 0 0 2 2h6a2 2 0 0 0 2 -2v-2", "M12 12l0 4"], "git-merge": ["M5 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M5 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M15 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M7 8l0 8", "M7 8a4 4 0 0 0 4 4h4"], "help-circle": ["M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0", "M12 16v.01", "M12 13a2 2 0 0 0 .914 -3.782a1.98 1.98 0 0 0 -2.414 .483"], "hierarchy-2": ["M10 3h4v4h-4l0 -4", "M3 17h4v4h-4l0 -4", "M17 17h4v4h-4l0 -4", "M7 17l5 -4l5 4", "M12 7l0 6"], "lock-access": ["M4 8v-2a2 2 0 0 1 2 -2h2", "M4 16v2a2 2 0 0 0 2 2h2", "M16 4h2a2 2 0 0 1 2 2v2", "M16 20h2a2 2 0 0 0 2 -2v-2", "M8 12a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1l0 -3", "M10 11v-2a2 2 0 1 1 4 0v2"], "markdown": ["M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10", "M7 15v-6l2 2l2 -2v6", "M14 13l2 2l2 -2m-2 2v-6"], "message-dots": ["M12 11v.01", "M8 11v.01", "M16 11v.01", "M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3l12 0"], "pencil": ["M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4", "M13.5 6.5l4 4"], "plug-connected": ["M7 12l5 5l-1.5 1.5a3.536 3.536 0 1 1 -5 -5l1.5 -1.5", "M17 12l-5 -5l1.5 -1.5a3.536 3.536 0 1 1 5 5l-1.5 1.5", "M3 21l2.5 -2.5", "M18.5 5.5l2.5 -2.5", "M10 11l-2 2", "M13 14l-2 2"], "robot": ["M6 6a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2l0 -4", "M12 2v2", "M9 12v9", "M15 12v9", "M5 16l4 -2", "M15 14l4 2", "M9 18h6", "M10 8v.01", "M14 8v.01"], "route": ["M3 19a2 2 0 1 0 4 0a2 2 0 0 0 -4 0", "M19 7a2 2 0 1 0 0 -4a2 2 0 0 0 0 4", "M11 19h5.5a3.5 3.5 0 0 0 0 -7h-8a3.5 3.5 0 0 1 0 -7h4.5"], "search": ["M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0", "M21 21l-6 -6"], "shield-check": ["M11.46 20.846a12 12 0 0 1 -7.96 -14.846a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 -.09 7.06", "M15 19l2 2l4 -4"], "shield-lock": ["M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3", "M11 11a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M12 12l0 2.5"], "target": ["M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M7 12a5 5 0 1 0 10 0a5 5 0 1 0 -10 0", "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"], "terminal-2": ["M8 9l3 3l-3 3", "M13 15l3 0", "M3 6a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2l0 -12"], "topology-star-3": ["M10 19a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M18 5a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M10 5a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M6 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M18 19a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M14 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M22 12a2 2 0 1 0 -4 0a2 2 0 0 0 4 0", "M6 12h4", "M14 12h4", "M15 7l-2 3", "M9 7l2 3", "M11 14l-2 3", "M13 14l2 3"], "user": ["M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0", "M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"], "world": ["M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0", "M3.6 9h16.8", "M3.6 15h16.8", "M11.5 3a17 17 0 0 0 0 18", "M12.5 3a17 17 0 0 1 0 18"], "git-pull-request": ["M4 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M4 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M16 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M6 8l0 8", "M11 6h5a2 2 0 0 1 2 2v8", "M14 9l-3 -3l3 -3"], "message-circle": ["M3 20l1.3 -3.9c-2.324 -3.437 -1.426 -7.872 2.1 -10.374c3.526 -2.501 8.59 -2.296 11.845 .48c3.255 2.777 3.695 7.266 1.029 10.501c-2.666 3.235 -7.615 4.215 -11.574 2.293l-4.7 1"], "dots": ["M4 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0", "M18 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"], "coin": ["M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0", "M14.8 9a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1", "M12 7v10"], "building-bank": ["M3 21l18 0", "M3 10l18 0", "M5 6l7 -3l7 3", "M4 10l0 11", "M20 10l0 11", "M8 14l0 3", "M12 14l0 3", "M16 14l0 3"], "flag": ["M5 5a5 5 0 0 1 7 0a5 5 0 0 0 7 0v9a5 5 0 0 1 -7 0a5 5 0 0 0 -7 0v-9", "M5 21v-7"], "clock": ["M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0", "M12 7v5l3 3"], "scissors": ["M3 7a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M3 17a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M8.6 8.6l10.4 10.4", "M8.6 15.4l10.4 -10.4"], "arrows-join": ["M3 7h5l3.5 5h9.5", "M3 17h5l3.495 -5", "M18 15l3 -3l-3 -3"]};
+const SCENE = 15, T = 22.6;
+const CLARITY = [.95, 1];
+const C = { bg: 0x07090C, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2" };
+const LINES = [
+  [0.6, 3.4, "These are the kinds of tools we need to clear the fog."],
+  [3.9, 12.4, "Spend less inference on code that doesn’t work, less inference detecting bugs, less inference investigating the decisions that went into your changes."],
+  [13.4, 21.0, "So if you’re ready to try a new way of working with agents, come join us building the software of 2030."],
+];
+// Scenes 13 and 14 share this engine: a stylized Scope Structure view, drawn on the ground like a map over the territory.
+// structure-gen.py writes it into 13-structure.src.html and 14-structure.src.html with SCENE set.
+
+// Shared by every scene: utilities, the renderer with its bloom, fog sheets, and the territory's ground.
+// Inlined at /*COMMON*/ by build.mjs; the scene defines C, T and ICONS before it.
+// ---------- utilities ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (k) => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const smooth = (a, b, x) => { const k = clamp((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+const rand = (() => { let s = 20260923; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+function icon(ctx, name, x, y, size, color, width = 1.5) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(size / 24, size / 24);
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for (const d of ICONS[name] || []) ctx.stroke(new Path2D(d));
+  ctx.restore();
+}
+function svgIcon(name) {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${(ICONS[name] || []).map((d) => `<path d="${d}"/>`).join("")}</svg>`;
+}
+function wrap(ctx, text, maxW) {
+  const words = text.split(" "), lines = []; let cur = "";
+  for (const w of words) { const t = cur ? cur + " " + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; }
+  if (cur) lines.push(cur); return lines;
+}
+
+// ---------- renderer ----------
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("gl"), antialias: true });
+// a final render asks for more (?maxdpr=4 draws a 1920×1080 layout at 8K); on screen, 2× is plenty
+renderer.setPixelRatio(Math.min(+new URLSearchParams(location.search).get("maxdpr") || 2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(C.bg);
+scene.fog = new THREE.FogExp2(C.fog, 0.042);
+const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.05, 300);
+const composer = new THREE.EffectComposer(renderer);
+composer.addPass(new THREE.RenderPass(scene, camera));
+const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(1280, 720), 0.85, 0.55, 0.18);
+composer.addPass(bloom);
+function size() {
+  const r = stage.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false); composer.setSize(r.width, r.height);
+}
+new ResizeObserver(size).observe(stage);
+
+function canvasTex(w, h, draw) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  draw(c.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+
+// ---------- fog sheets ----------
+function noiseTex() {
+  return canvasTex(512, 256, (g, w, h) => {
+    const img = g.createImageData(w, h), d = img.data;
+    const grid = (n) => { const a = []; for (let i = 0; i < (n + 1) * (n + 1); i++) a.push(rand()); return a; };
+    const octaves = [[6, .5], [12, .3], [24, .2]].map(([n, amp]) => ({ n, amp, g: grid(n) }));
+    const val = (o, x, y) => {
+      const fx = x * o.n, fy = y * o.n, ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy;
+      const at = (i, j) => o.g[(j % o.n) * (o.n + 1) + (i % o.n)];
+      const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+      return (at(ix, iy) * (1 - sx) + at(ix + 1, iy) * sx) * (1 - sy) + (at(ix, iy + 1) * (1 - sx) + at(ix + 1, iy + 1) * sx) * sy;
+    };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let v = 0; for (const o of octaves) v += val(o, x / w, y / h) * o.amp;
+      const edge = Math.sin(Math.PI * x / w) * Math.sin(Math.PI * y / h);
+      const a = clamp((v - .22) * 1.5) * edge;
+      const i = (y * w + x) * 4; d[i] = 170; d[i + 1] = 190; d[i + 2] = 205; d[i + 3] = a * 255;
+    }
+    g.putImageData(img, 0, 0);
+  });
+}
+const fogTex = noiseTex();
+const sheets = [];
+for (let i = 0; i < 12; i++) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(64, 12), new THREE.MeshBasicMaterial({ map: fogTex, transparent: true, depthWrite: false, opacity: .16, fog: false }));
+  m.position.set((rand() - .5) * 14, -3 + rand() * 2.6, -6 - i * 6);
+  m.userData = { base: m.position.clone(), speed: (rand() - .5) * .35, o: .06 + rand() * .07, near: i < 4 };
+  m.renderOrder = 2; scene.add(m); sheets.push(m);
+}
+
+// ---------- the territory: a map's ground, fogged ----------
+const territory = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.MeshBasicMaterial({
+  map: canvasTex(2048, 2048, (g, w) => {
+    g.fillStyle = "#07090C"; g.fillRect(0, 0, w, w);
+    g.strokeStyle = "#1B252D"; g.lineWidth = 3; g.lineJoin = "round";
+    for (let r = 0; r < 70; r++) {
+      let x = rand() * w, y = rand() * w; g.beginPath(); g.moveTo(x, y);
+      for (let s = 0; s < 5; s++) { if (s % 2) x += (rand() - .5) * 700; else y += (rand() - .5) * 700; g.lineTo(x, y); }
+      g.stroke();
+    }
+    g.strokeStyle = "#24313A"; g.lineWidth = 2;
+    for (let s = 0; s < 120; s++) { const x = rand() * w, y = rand() * w; g.strokeRect(x, y, 40 + rand() * 90, 22 + rand() * 30); }
+  }),
+}));
+territory.rotation.x = -Math.PI / 2; territory.position.set(0, -6.02, -16); scene.add(territory);
+
+// ---------- clarity: act two burns the fog off, scene by scene ----------
+// A scene sets CLARITY = [start, end] before this code; each starts where the last one ended, so the clearing runs across cuts.
+// At 0 the fog is act one's; at 1 the air is clear and the territory under the map is lit.
+function clarityAt(t) { return typeof CLARITY === "undefined" ? 0 : CLARITY[0] + (CLARITY[1] - CLARITY[0]) * clamp(t / T); }
+function applyClarity(c) {
+  territory.material.color.setScalar(1 + 2.4 * c);
+  return { fog: 1 - .85 * c, sheets: 1 - c };
+}
+
+// ---------- driven: a review player can set the scene's time from outside, with postMessage({ t }) ----------
+// (t, playing and T are the scene's own; this runs later, once they exist)
+window.addEventListener("message", (e) => { const d = e.data || {}; if (typeof d.t === "number") { t = Math.min(T, Math.max(0, d.t)); playing = false; } });
+// a final render sets the time and draws at once, so the frame it captures is exactly this t (review/render.mjs)
+window.renderAt = (x) => { t = Math.min(T, Math.max(0, x)); playing = false; render(t); };
+
+
+// ---------- the map: two canvases on one plane, the shapes in the bloom pass and the words crisp after it ----------
+const MW = 2400, MH = 1350, PW = 16, PH = 9, MAP_Y = -5.9;
+const glowCanvas = document.createElement("canvas"), textCanvas = document.createElement("canvas");
+glowCanvas.width = textCanvas.width = MW; glowCanvas.height = textCanvas.height = MH;
+const glowTex = new THREE.CanvasTexture(glowCanvas), textTex = new THREE.CanvasTexture(textCanvas);
+[glowTex, textTex].forEach((t) => (t.anisotropy = renderer.capabilities.getMaxAnisotropy()));
+const mapGeo = new THREE.PlaneGeometry(PW, PH);
+const mapGlow = new THREE.Mesh(mapGeo, new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, depthWrite: false, toneMapped: false }));
+mapGlow.rotation.x = -Math.PI / 2; mapGlow.position.set(0, MAP_Y, -1); scene.add(mapGlow);
+const overlay = new THREE.Scene();
+const mapText = new THREE.Mesh(mapGeo, new THREE.MeshBasicMaterial({ map: textTex, transparent: true, depthWrite: false, toneMapped: false }));
+mapText.rotation.copy(mapGlow.rotation); mapText.position.copy(mapGlow.position); overlay.add(mapText);
+
+// ---------- the project: the app from scenes 11 and 12, read as structure ----------
+const CARD = { w: 330, h: 118 };
+const STATIONS = {
+  API: { x: 600, y: 360, name: "API (root)", role: "HTTP entry: routes and jobs", dir: "project root" },
+  Jobs: { x: 600, y: 900, name: "Jobs", role: "Scheduled and queued work", dir: "src/jobs" },
+  Sessions: { x: 1160, y: 230, name: "Sessions", role: "Read through sessions.get()", dir: "src/sessions" },
+  Admin: { x: 1160, y: 520, name: "Admin", role: "Dashboards and staff tools", dir: "src/admin" },
+  Billing: { x: 1160, y: 810, name: "Billing", role: "Ledger via billing.guard()", dir: "src/billing" },
+  Auth: { x: 1720, y: 230, name: "Auth", role: "Credentials and trust levels", dir: "src/auth" },
+  Storage: { x: 1720, y: 540, name: "Storage", role: "Objects and exports", dir: "src/storage" },
+  Webhooks: { x: 1720, y: 850, name: "Webhooks", role: "Outbound and inbound hooks", dir: "src/webhooks" },
+};
+const COLS = [[600, "Where work enters"], [1160, "1 step from an entrance"], [1720, "2 steps from an entrance"]];
+// structural routes: one colour each, never red or orange; entrance names, trust, and the stations in order
+const ROUTES = [
+  { id: "R1", col: "#3B8BFF", names: ["GET /account"], trust: "authenticated", ey: 230, via: ["API", "Sessions", "Auth"] },
+  { id: "R2", col: "#19B3C2", names: ["GET /admin", "GET /stats"], trust: "authenticated", ey: 400, via: ["API", "Admin", "Storage"] },
+  { id: "R3", col: "#58B45F", names: ["POST /refund"], trust: "authenticated", ey: 590, via: ["API", "Billing", "Storage"] },
+  { id: "R4", col: "#8B7CFF", names: ["cron · nightly"], trust: "internal", ey: 850, via: ["Jobs", "Billing", "Webhooks"] },
+  { id: "R5", col: "#D05BCB", names: ["webhook in"], trust: "no control", ey: 1000, via: ["Jobs", "Webhooks"] },
+  { id: "R6", col: "#6C7BFF", names: ["POST /export"], trust: "authenticated", ey: 690, via: ["API", "Admin", "Webhooks"], added: true },
+];
+// interface identifiers: C rounded (a chokepoint), X pointed (a crossing), sitting on a route's approach to a station
+const TAGS = [
+  { id: "C1", kind: "C", route: "R1", at: "Sessions" },
+  { id: "C2", kind: "C", route: "R3", at: "Billing" },
+  { id: "X3", kind: "X", route: "R5", at: "Webhooks" },
+  { id: "X4", kind: "X", route: "R2", at: "Admin" },
+];
+const RAILS = [{ y: 1120, name: "Core: core dependency, called by 6 of 8", from: ["API", "Sessions", "Admin", "Billing", "Storage", "Jobs"] }, { y: 1200, name: "DB: core dependency, called by 5 of 8", from: ["Sessions", "Billing", "Storage", "Auth", "Webhooks"] }];
+
+// where each route runs through a station: routes through the same station share it side by side
+const through = {};
+for (const r of ROUTES) for (const s of r.via) (through[s] = through[s] || []).push(r.id);
+const laneY = (s, rid) => { const list = through[s], k = list.indexOf(rid); return STATIONS[s].y + CARD.h / 2 + (k - (list.length - 1) / 2) * 14; };
+function routePts(r) {
+  const pts = [[330, r.ey]];
+  let prev = null;
+  for (const s of r.via) {
+    const st = STATIONS[s], y = laneY(s, r.id), x0 = st.x, x1 = st.x + CARD.w;
+    const [ax, ay] = prev || pts[0], bx = x0, by = y;
+    const dy = Math.abs(by - ay), span = bx - ax, d = Math.min(dy, span * .7), mx = ax + (span - d) / 2;
+    if (dy > .5) pts.push([mx, ay], [mx + d, ay + Math.sign(by - ay) * d]);
+    pts.push([bx - 24, by], [bx, by], [x1, by]);
+    prev = [x1, by];
+  }
+  return pts;
+}
+ROUTES.forEach((r) => (r.pts = routePts(r)));
+const segLen = (p) => { let L = 0; for (let i = 1; i < p.length; i++) L += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); return L; };
+function drawPartial(g, pts, frac) {
+  const total = segLen(pts) * frac; let left = total;
+  g.beginPath(); g.moveTo(...pts[0]);
+  for (let i = 1; i < pts.length && left > 0; i++) {
+    const [ax, ay] = pts[i - 1], [bx, by] = pts[i], L = Math.hypot(bx - ax, by - ay), k = Math.min(1, left / L);
+    g.lineTo(ax + (bx - ax) * k, ay + (by - ay) * k); left -= L;
+  }
+  g.stroke();
+}
+// where a tag sits: on its route, a little before the station it guards
+function tagPos(tag) { const r = ROUTES.find((x) => x.id === tag.route), y = laneY(tag.at, r.id); return [STATIONS[tag.at].x - 70, y]; }
+
+// ---------- drawing ----------
+const MINT = C.mint, RED = C.red, AMBER = "#F0B24A", INKc = "#E6ECEF", MUTED = "#8B98A2";
+// drawMap(S) draws the whole map; drawMap(S, piece) draws only that piece (a station, an entrance, a tag) into the piece's own canvases
+function drawMap(S, piece) {
+  const g = piece ? piece.g : glowCanvas.getContext("2d"), x = piece ? piece.x : textCanvas.getContext("2d");
+  const want = (kind, id) => (piece ? piece.kind === kind && piece.id === id : !S.lifted);   // once the pieces have risen, the base keeps only the lines
+  if (!piece) { g.clearRect(0, 0, MW, MH); x.clearRect(0, 0, MW, MH); }
+  if (!piece) {
+  // the glass the map sits on
+  g.globalAlpha = S.panel; g.fillStyle = "rgba(10,14,22,.82)"; g.beginPath(); g.roundRect(8, 8, MW - 16, MH - 16, 30); g.fill();
+  g.strokeStyle = "rgba(90,110,130,.45)"; g.lineWidth = 3; g.stroke(); g.globalAlpha = 1;
+  // column headers
+  x.globalAlpha = S.headers; x.fillStyle = MUTED; x.font = `500 26px "Instrument Sans"`;
+  for (const [cx, label] of COLS) x.fillText(label, cx + 30, 110);
+  x.fillText(`${S.routeCount} structural routes from ${S.entranceCount} entrances`, 60, 60);
+  x.globalAlpha = 1;
+  // rails: core dependencies along the bottom, and each caller's stub down to them
+  for (const rl of RAILS) {
+    const k = S.rails;
+    if (k <= 0) continue;
+    g.globalAlpha = k; g.strokeStyle = "#7E8A96"; g.lineWidth = 9; g.beginPath(); g.moveTo(60, rl.y); g.lineTo(60 + (MW - 140) * k, rl.y); g.stroke();
+    g.lineWidth = 2.5; g.strokeStyle = "rgba(160,172,184,.7)";
+    for (const s of rl.from) { const st = STATIONS[s], sx = st.x + 30 + RAILS.indexOf(rl) * 14; g.beginPath(); g.moveTo(sx, st.y + CARD.h); g.lineTo(sx, st.y + CARD.h + (rl.y - st.y - CARD.h) * k); g.stroke(); }
+    g.globalAlpha = 1;
+    x.globalAlpha = k; x.fillStyle = INKc; x.font = `500 24px "Instrument Sans"`; x.fillText(rl.name, 60, rl.y - 16); x.globalAlpha = 1;
+  }
+  // routes, under the stations
+  for (const r of ROUTES) {
+    const k = S.route[r.id] ?? 0; if (k <= 0) continue;
+    const ghost = S.ghost[r.id] ?? 0, dim = S.dim(r);
+    g.globalAlpha = (1 - ghost * .65) * dim; g.strokeStyle = r.col; g.lineWidth = 8; g.lineJoin = "round"; g.lineCap = "round";
+    if (ghost > 0) g.setLineDash([22, 16]);
+    drawPartial(g, r.pts, k); g.setLineDash([]); g.globalAlpha = 1;
+  }
+  // the bypass: a red reference from Admin straight into the session store
+  if (S.bypass > 0) {
+    const a = STATIONS.Admin, b = STATIONS.Sessions;
+    g.strokeStyle = RED; g.lineWidth = 6; g.setLineDash([16, 12]);
+    drawPartial(g, [[a.x + CARD.w - 60, a.y], [a.x + CARD.w - 60, b.y + CARD.h + 20], [b.x + CARD.w - 60, b.y + CARD.h]], S.bypass); g.setLineDash([]);
+  }
+  }
+  // entrances: arrow tokens in the left margin, trust tags beneath
+  for (const r of ROUTES) {
+    const k = S.entrance[r.id] ?? 0; if (k <= 0 || !want("entrance", r.id)) continue;
+    const ghost = S.ghost[r.id] ?? 0, dim = S.dim(r), n = r.names.length, h = 30 + n * 32, y0 = r.ey - h / 2, xOff = (1 - ease(k)) * -120;
+    g.globalAlpha = k * (1 - ghost * .7) * dim; g.fillStyle = r.col + "55"; g.strokeStyle = r.col; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(60 + xOff, y0); g.lineTo(300 + xOff, y0); g.lineTo(330 + xOff, r.ey); g.lineTo(300 + xOff, y0 + h); g.lineTo(60 + xOff, y0 + h); g.closePath(); g.fill(); g.stroke(); g.globalAlpha = 1;
+    x.globalAlpha = k * (1 - ghost * .7) * dim; x.textAlign = "right"; x.fillStyle = INKc; x.font = `500 26px "Instrument Sans"`;
+    r.names.forEach((nm, i) => x.fillText(nm, 290 + xOff, y0 + 38 + i * 32));
+    x.font = `500 21px "IBM Plex Mono", "JetBrains Mono"`; x.fillStyle = r.trust === "no control" ? AMBER : MUTED; x.fillText(r.trust, 300 + xOff, y0 + h + 26);
+    x.textAlign = "left"; x.globalAlpha = 1;
+  }
+  // stations: dark glass cards, a verdict bar on the left edge, name, role, folder
+  for (const [id, st] of Object.entries(STATIONS)) {
+    const k = S.station[id] ?? 0; if (k <= 0 || !want("station", id)) continue;
+    const s = .9 + .1 * ease(k), cx = st.x + CARD.w / 2, cy = st.y + CARD.h / 2, broken = S.broken[id] ?? 0, dim = S.dimStation(id);
+    g.save(); g.translate(cx, cy); g.scale(s, s); g.translate(-cx, -cy); g.globalAlpha = k * dim;
+    g.fillStyle = "rgba(22,29,40,.96)"; g.beginPath(); g.roundRect(st.x, st.y, CARD.w, CARD.h, 10); g.fill();
+    g.strokeStyle = broken > .5 ? RED : "rgba(150,170,190,.6)"; g.lineWidth = 3; g.stroke();
+    g.fillStyle = broken > .5 ? RED : S.verified > 0 ? MINT : "#6E7C88"; g.fillRect(st.x + 8, st.y + 12, 8, CARD.h - 24);
+    // the broken button, pinned to the card's top right
+    if (broken > 0) { g.globalAlpha = k * broken; g.fillStyle = RED; g.beginPath(); g.roundRect(st.x + CARD.w - 150, st.y - 40, 150, 40, 6); g.fill(); }
+    g.restore();
+    x.save(); x.translate(cx, cy); x.scale(s, s); x.translate(-cx, -cy); x.globalAlpha = k * dim;
+    x.fillStyle = INKc; let ns = 30; x.font = `600 ${ns}px "Instrument Sans"`;
+    while (x.measureText(st.name).width > CARD.w - (broken > 0 ? 190 : 44) && ns > 20) { ns -= .5; x.font = `600 ${ns}px "Instrument Sans"`; }
+    x.fillText(st.name, st.x + 30, st.y + 38);
+    // the role line shrinks to fit its card, so no card's text runs off its edge
+    x.fillStyle = "#B5C0C9"; let rs = 21; x.font = `400 ${rs}px "Instrument Sans"`;
+    while (x.measureText(st.role).width > CARD.w - 44 && rs > 14) { rs -= .5; x.font = `400 ${rs}px "Instrument Sans"`; }
+    x.fillText(st.role, st.x + 30, st.y + 70);
+    x.fillStyle = MUTED; x.font = `400 20px "IBM Plex Mono", "JetBrains Mono"`; x.fillText(st.dir, st.x + 30, st.y + 100);
+    if (broken > 0) { x.globalAlpha = k * broken; x.fillStyle = "#fff"; x.font = `700 24px "Instrument Sans"`; x.fillText("✕ 1 broken", st.x + CARD.w - 138, st.y - 12); }
+    x.restore();
+  }
+  // interface identifiers on the lines: C rounded, X pointed; solid when verified, red when broken
+  for (const tg of TAGS) {
+    const k = S.tag[tg.id] ?? 0; if (k <= 0 || !want("tag", tg.id)) continue;
+    const [tx, ty] = tagPos(tg), w = 70, h = 34, broken = S.tagBroken[tg.id] ?? 0, dim = S.dim(ROUTES.find((r) => r.id === tg.route));
+    const fill = broken > .5 ? RED : S.verified > 0 ? "#DCE6EE" : "#8894A0";
+    g.globalAlpha = k * dim; g.fillStyle = fill; g.strokeStyle = "#0A0D16"; g.lineWidth = 3; g.beginPath();
+    if (tg.kind === "C") g.roundRect(tx - w / 2, ty - h / 2, w, h, h / 2);
+    else { g.moveTo(tx - w / 2, ty); g.lineTo(tx - w / 2 + 12, ty - h / 2); g.lineTo(tx + w / 2 - 12, ty - h / 2); g.lineTo(tx + w / 2, ty); g.lineTo(tx + w / 2 - 12, ty + h / 2); g.lineTo(tx - w / 2 + 12, ty + h / 2); g.closePath(); }
+    g.fill(); g.stroke(); g.globalAlpha = 1;
+    x.globalAlpha = k * dim; x.fillStyle = "#0A0D16"; x.textAlign = "center"; x.font = `700 22px "IBM Plex Mono", "JetBrains Mono"`; x.fillText(tg.id, tx, ty + 8); x.textAlign = "left"; x.globalAlpha = 1;
+  }
+  if (!piece) { glowTex.needsUpdate = true; textTex.needsUpdate = true; }
+}
+
+// ---------- order: the noisy territory gives way to a ruled ground, spreading out from under the map ----------
+territory.material.transparent = true;
+const orderGround = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false,
+  uniforms: { uR: { value: 0 } },
+  vertexShader: "varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }",
+  fragmentShader: `uniform float uR; varying vec3 vW;
+    void main() {
+      vec2 p = vW.xz - vec2(0., -1.);                       // the map's centre
+      vec2 f = abs(fract(p + .5) - .5), F = abs(fract(p / 4. + .5) - .5) * 4.;
+      float minor = 1. - smoothstep(0., .025, min(f.x, f.y)), major = 1. - smoothstep(0., .04, min(F.x, F.y));
+      float r = length(p * vec2(1., 1.5)), reveal = 1. - smoothstep(uR - 3., uR, r), edge = smoothstep(uR - 3., uR - .4, r) * reveal;
+      float a = (minor * .26 + major * .5) * reveal * exp(-r * .022) + edge * .5 * (minor + major);
+      gl_FragColor = vec4(vec3(.36, .5, .6) + edge * vec3(.2, .45, .35), a);
+    }`,
+}));
+orderGround.rotation.x = -Math.PI / 2; orderGround.position.set(0, MAP_Y - .03, 0); orderGround.renderOrder = -1; scene.add(orderGround);
+
+// ---------- the rising pieces: every station, entrance and tag as its own small panel ----------
+const pieces = [];
+function pieceBox(kind, id) {
+  if (kind === "station") { const st = STATIONS[id]; return [st.x - 6, st.y - 6, CARD.w + 12, CARD.h + 12]; }
+  if (kind === "entrance") { const r = ROUTES.find((q) => q.id === id), h = 30 + r.names.length * 32; return [50, r.ey - h / 2 - 8, 300, h + 50]; }
+  const [tx, ty] = tagPos(TAGS.find((q) => q.id === id)); return [tx - 40, ty - 22, 80, 44];
+}
+function buildPieces() {
+  const list = [...ROUTES.map((r, i) => ["entrance", r.id, i]), ...Object.keys(STATIONS).map((id) => ["station", id, 0]), ...TAGS.map((tg) => ["tag", tg.id, 0])];
+  for (const [kind, id] of list) {
+    const [bx, by, bw, bh] = pieceBox(kind, id), gc = document.createElement("canvas"), xc = document.createElement("canvas");
+    gc.width = xc.width = bw; gc.height = xc.height = bh;
+    const w = bw / MW * PW, h = bh / MH * PH, geo = new THREE.PlaneGeometry(w, h);
+    const glow = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(gc), transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+    const text = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(xc), transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+    glow.renderOrder = 5; scene.add(glow); overlay.add(text);
+    // the hinge: the piece's near edge, on the map
+    const hinge = new THREE.Vector3(((bx + bw / 2) / MW - .5) * PW, MAP_Y + .01, -1 + ((by + bh) / MH - .5) * PH);
+    pieces.push({ kind, id, gc, xc, glow, text, hinge, h, delay: ((bx + bw / 2) / MW) * .5 + ((by) / MH) * .15 });
+  }
+}
+function placePieces(t, S) {
+  for (const p of pieces) {
+    const g = p.gc.getContext("2d"), x = p.xc.getContext("2d"), [bx, by] = pieceBox(p.kind, p.id);
+    g.setTransform(1, 0, 0, 1, 0, 0); x.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, p.gc.width, p.gc.height); x.clearRect(0, 0, p.xc.width, p.xc.height);
+    g.translate(-bx, -by); x.translate(-bx, -by);
+    drawMap(S, { kind: p.kind, id: p.id, g, x });
+    p.glow.material.map.needsUpdate = p.text.material.map.needsUpdate = true;
+    // up in a cascade at LIFT_AT; and, where a scene sets LOWER_AT, back down again in the same order
+    const down = typeof LOWER_AT === "number" ? ease(smooth(LOWER_AT + p.delay * .6, LOWER_AT + p.delay * .6 + .8, t)) : 0;
+    const k = ease(smooth(LIFT_AT + p.delay, LIFT_AT + p.delay + .9, t)) * (1 - down), th = -Math.PI / 2 + Math.PI / 4 * k;
+    for (const m of [p.glow, p.text]) { m.rotation.set(th, 0, 0); m.position.set(p.hinge.x, p.hinge.y + .02 * k + Math.cos(th) * p.h / 2, p.hinge.z + Math.sin(th) * p.h / 2); m.material.opacity = mapGlow.material.opacity; }
+  }
+}
+
+// ---------- the sea of code the map replaces (scene 14): token cells, scrolling ----------
+const codeTex = canvasTex(1024, 2048, (g, w, h) => {
+  let y = 10; const R = () => rand();
+  while (y < h - 20) { let x = 10 + (R() < .3 ? 40 : 0); while (x < w - 60) { const cw = 18 + R() * 80; if (x + cw > w - 10) break; g.fillStyle = `rgba(94,106,115,${.35 + R() * .4})`; g.fillRect(x, y, cw, 12); x += cw + 7; if (R() < .08) break; } y += 22; }
+});
+codeTex.wrapS = codeTex.wrapT = THREE.RepeatWrapping; codeTex.repeat.set(3, 2);
+const codeSea = new THREE.Mesh(new THREE.PlaneGeometry(60, 40), new THREE.MeshBasicMaterial({ map: codeTex, transparent: true, opacity: 0, depthWrite: false, fog: true }));
+codeSea.rotation.x = -Math.PI / 2; codeSea.position.set(0, MAP_Y - .05, -6); scene.add(codeSea);
+
+// ---------- the HUD: Scope's masthead verdict, its health strip, the inspector, the change strip ----------
+const $ = (id) => document.getElementById(id);
+function hudState(H) {
+  $("mast").style.opacity = H.mast;
+  $("mast").innerHTML = `<div class="k">${svgIcon("route")}scope · structure${H.live ? ` <span style="color:${MINT}">● live</span>` : ""}</div><div class="big"><span class="sq" style="background:${H.broken ? RED : MINT}"></span><span style="color:${H.broken ? RED : INKc}">${H.broken ? "1 broken" : "All 24 invariants verified"}</span></div>`;
+  $("strip").style.opacity = H.strip;
+  $("strip").innerHTML = `<span class="pill">■ ${H.broken ? 23 : 24} invariants enforced and verified</span><span class="pill">0 requirements, not yet enforced</span><span class="pill" style="${H.broken ? `border-color:${RED};color:${RED}` : ""}">${H.broken ? "■ 1" : "0"} structural defect${H.broken ? "" : "s"}</span>`;
+  $("insp").style.opacity = H.insp;
+  $("insp").innerHTML = `<div class="k">Sessions · selected</div><div class="v" style="color:${RED};font-weight:700">✕ 1 broken</div><div class="v">chokepoint <b>sessions.get()</b> protects the session store</div><div class="v" style="color:#B5C0C9">bypass <b>admin/dashboard.ts:42</b> in loadStats</div>`;
+  $("change").style.opacity = H.change;
+  $("change").innerHTML = `<div class="k">${svgIcon("git-commit")}since the last commit</div><div class="v"><span style="color:${MINT}">+ entrance</span> POST /export</div><div class="v"><span style="color:${MINT}">+ interface</span> Admin → Webhooks</div><div class="v"><span style="color:${MUTED}">− interface</span> Jobs → Webhooks</div>`;
+}
+
+// ---------- camera ----------
+const V = (a) => new THREE.Vector3(...a);
+function cameraAt(t) {
+  let i = 0; while (i < KEYS.length - 2 && t > KEYS[i + 1][0]) i++;
+  const [t0, p0, q0] = KEYS[i], [t1, p1, q1] = KEYS[i + 1], k = ease(clamp((t - t0) / (t1 - t0)));
+  camera.position.copy(V(p0).lerp(V(p1), k)); camera.lookAt(V(q0).lerp(V(q1), k));
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+const scrub = $("scrub"), tc = $("tc"), cap = $("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+function render(t) {
+  cameraAt(t);
+  const cl = applyClarity(clarityAt(t));
+  territory.material.color.multiplyScalar(.35);   // the map is the reading; the ground under it stays quiet
+  scene.fog.density = .04 * cl.fog;
+  sheets.forEach((s, i) => { s.position.x = s.userData.base.x + Math.sin(t * .15 + i) * 2 + t * s.userData.speed; s.material.opacity = s.userData.o * cl.sheets; });
+  const { S, H, sea } = timeline(t);
+  S.lifted = LIFT_AT !== null && t > LIFT_AT;
+  // the pieces rise off the map like the signs: each hinged on its own near edge, up to 45 degrees, in a quick cascade
+  const lifting = LIFT_AT !== null && t > LIFT_AT;
+  if (lifting) { if (!pieces.length) buildPieces(); placePieces(t, S); }
+  pieces.forEach((p) => (p.glow.visible = p.text.visible = lifting));
+  territory.material.opacity = 1 - (ORDER ? ORDER(t) : 1); orderGround.material.uniforms.uR.value = ORDER_R(t);
+  drawMap(S); hudState(H);
+  codeSea.material.opacity = sea.o; codeTex.offset.y = sea.scroll;
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  if (typeof EXTRA === "function") EXTRA(t, S);   // a scene's own layer on top of the map (scene 15's field and title)
+  composer.render();
+  renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
+}
+
+$("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; $("play").textContent = "Play"; } };
+$("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); $("play").click(); } });
+
+Promise.all(["700 1em 'Figtree'", "200 1em 'Inter'", "500 1em 'Inter'", "500 1em 'Instrument Sans'", "600 1em 'Instrument Sans'", "700 1em 'Instrument Sans'", "400 1em 'IBM Plex Mono'", "700 1em 'IBM Plex Mono'", "600 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
+  .finally(() => { size(); last = performance.now(); requestAnimationFrame(frame); });
+
+const KEYS = [[0, [0, MAP_Y + 13.4, 3.2], [0, MAP_Y, -2.3]], [T, [0, MAP_Y + 13.4, 3.2], [0, MAP_Y, -2.3]]];
+const ORDER = () => 1, ORDER_R = () => 60;
+// continuity from scene 14: we open where it ended, low, the pieces standing; they lie back down as the camera climbs
+const LIFT_AT = -5, LOWER_AT = .25, FROM14 = { p: [-1.5, MAP_Y + 7.2, 11.5], q: [0, MAP_Y + .6, -2.0] };
+// the choreography was built long; PACE compresses it so the fade to black lands just after the last word
+const PACE = .82;
+camera.far = 6000; camera.updateProjectionMatrix();
+function timeline(t) {
+  const S = { panel: 1, headers: 1, rails: 1, verified: 1, route: {}, ghost: {}, entrance: {}, station: {}, broken: {}, tag: {}, tagBroken: {},
+    routeCount: 5, entranceCount: 6, bypass: 0, dim: () => 1, dimStation: () => 1 };
+  for (const r of ROUTES) { S.entrance[r.id] = r.id === "R5" ? 0 : 1; S.route[r.id] = r.id === "R5" ? 0 : 1; }
+  for (const id of Object.keys(STATIONS)) S.station[id] = 1;
+  for (const tg of TAGS) S.tag[tg.id] = tg.route === "R5" ? 0 : 1;
+  const H = { mast: 1 - smooth(1.2, 2.6, t), strip: 1 - smooth(1.0, 2.4, t), live: true, broken: false, insp: 0, change: 0 };
+  return { S, H, sea: { o: 0, scroll: 0 } };
+}
+
+// ---------- the field: structure views all around, more abstract the further out they sit ----------
+const TW = 17, TH = 10, R = 66;                     // tile pitch (a map is 16 x 9) and the field's radius in tiles
+// every tile is its own structure view: a seeded layout (columns, stations, entrances, routes, rails), drawn at three levels of detail
+const LAYOUTS = 14;
+function layout(seed) {
+  let r = seed * 9301 + 49297; const R_ = () => ((r = (r * 9301 + 49297) % 233280) / 233280);
+  const cols = 2 + Math.floor(R_() * 4), colX = [...Array(cols)].map((_, c) => 110 + c * (360 / cols) + 20);
+  const cw = 360 / cols * (.55 + R_() * .25), stations = [];
+  colX.forEach((x, c) => { const n = 1 + Math.floor(R_() * 4); for (let k = 0; k < n; k++) stations.push({ c, x, y: 22 + (k + .5) * (190 / n) + (R_() - .5) * 12, w: cw, h: 14 + R_() * 14 }); });
+  const entrances = [...Array(1 + Math.floor(R_() * 5))].map((_, k, all) => ({ y: 26 + (k + .5) * (190 / all.length) }));
+  const routes = entrances.map((e) => {
+    const pts = [[74, e.y]]; let y = e.y;
+    for (let c = 0; c < cols; c++) { if (c && R_() < .25) break; const pick = stations.filter((st) => st.c === c); const st = pick[Math.floor(R_() * pick.length)]; if (!st) break;
+      const x0 = st.x, ty = st.y, dy = ty - y, d = Math.min(Math.abs(dy), 18); const mx = x0 - 16 - d;
+      pts.push([mx, y], [mx + d, y + Math.sign(dy) * d], [mx + d, ty], [x0, ty], [x0 + st.w, ty]); y = ty; }
+    return { pts, bright: .45 + R_() * .5 };
+  });
+  return { stations, entrances, routes, rails: Math.floor(R_() * 3) };
+}
+function tileTex(L, level) {
+  return canvasTex(480, 270, (g) => {
+    g.fillStyle = "#0B0F16"; g.fillRect(0, 0, 480, 270);
+    if (level < 2) for (const rt of L.routes) { g.strokeStyle = `rgba(220,228,234,${rt.bright * (level ? .5 : .8)})`; g.lineWidth = level ? 2 : 3; g.lineJoin = "round"; g.beginPath(); rt.pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); }
+    for (let k = 0; k < L.rails; k++) { g.fillStyle = `rgba(220,228,234,${level < 2 ? .45 : .3})`; g.fillRect(20, 238 + k * 10, 440, 4); }
+    for (const e of L.entrances) { g.fillStyle = level < 2 ? "rgba(220,228,234,.85)" : "rgba(220,228,234,.6)"; g.beginPath(); g.moveTo(16, e.y - 9); g.lineTo(62, e.y - 9); g.lineTo(72, e.y); g.lineTo(62, e.y + 9); g.lineTo(16, e.y + 9); g.fill(); }
+    for (const st of L.stations) {
+      if (level === 0) {                           // cards: a verdict bar, a name, a role
+        g.fillStyle = "#8A9BA8"; g.fillRect(st.x, st.y - st.h / 2, st.w, st.h); g.strokeStyle = "rgba(220,228,234,.8)"; g.lineWidth = 2; g.strokeRect(st.x, st.y - st.h / 2, st.w, st.h);
+        g.fillStyle = "#F2F6F9"; g.fillRect(st.x + 3, st.y - st.h / 2 + 3, 3, st.h - 6); g.fillRect(st.x + 10, st.y - st.h / 2 + 4, st.w * .45, 3); g.fillStyle = "#C9D3DA"; g.fillRect(st.x + 10, st.y - st.h / 2 + 10, st.w * .7, 2);
+      } else { g.fillStyle = level === 1 ? "#DCE4EA" : "rgba(220,228,234,.85)"; g.fillRect(st.x, st.y - st.h / 2, st.w, st.h); }
+    }
+  });
+}
+const layouts = [...Array(LAYOUTS)].map((_, k) => layout(k + 3));
+const LEVEL = (d) => (d < 6 ? 0 : d < 18 ? 1 : 2);
+const groups = new Map();                            // one instanced mesh per (layout, level)
+const put = (tl) => { const key = tl.v + ":" + tl.level; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(tl); };
+for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) {
+  if (!i && !j) continue;
+  const d = Math.hypot(i, j * TH / TW * 1.2);
+  if (d > R) continue;
+  const h = ((i * 73856093) ^ (j * 19349663)) >>> 0;
+  // where this cell starts on the path (grey or amber; nothing starts red) and when it moves on
+  const u1 = (h % 997) / 997, u2 = ((h >>> 10) % 991) / 991, startAmber = u1 < .35;
+  const tAmber = 3.2 + u2 * 10, tRed = (startAmber ? 3.4 : tAmber) + 1.5 + ((h >>> 20) % 97) / 97 * 10;   // spread wide: when the wave comes, the field is still mixed
+  // the trickle: from 5 s into the scene, cells near the centre go green one at a time, spreading outward ahead of the wave
+  const u3 = ((h >>> 5) % 983) / 983, tGreen = u3 < .45 ? 5 / PACE + d * .42 + ((h >>> 15) % 89) / 89 * 3.5 : 1e6;
+  put({ x: i * TW, z: -1 + j * TH, d, startAmber, tAmber, tRed, tGreen, v: h % LAYOUTS, level: LEVEL(d) });
+}
+const fields = [...groups.entries()].map(([key, list]) => {
+  const [v, level] = key.split(":").map(Number);
+  const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(16, 9), new THREE.MeshBasicMaterial({ map: tileTex(layouts[v], level), toneMapped: false }), list.length);
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); scene.add(m);
+  list.forEach((_, k) => m.setColorAt(k, new THREE.Color(0x7E93A3)));
+  // a tint can turn the structure mint but never light the dark ground between its pieces; as a view goes coherent,
+  // aFill floods that ground with its colour too, so green views read as solid green, the structure only a trace
+  const fill = new THREE.InstancedBufferAttribute(new Float32Array(list.length), 1); fill.setUsage(THREE.DynamicDrawUsage);
+  m.geometry.setAttribute("aFill", fill);
+  m.material.onBeforeCompile = (sh) => {
+    sh.vertexShader = "attribute float aFill;\nvarying float vFill;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n  vFill = aFill;");
+    sh.fragmentShader = "varying float vFill;\n" + sh.fragmentShader.replace("#include <dithering_fragment>", "#include <dithering_fragment>\n  gl_FragColor.rgb = mix(gl_FragColor.rgb, vColor * .92, vFill);");
+  };
+  return { m, list, fill };
+});
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
+const STEEL = new THREE.Color(0x7E93A3), REDc = new THREE.Color(C.red), AMBERc = new THREE.Color(C.orange), MINTc = new THREE.Color(C.mint);
+// how high the camera is: a steady pull at first, then faster and faster
+const height = (t) => 13.4 + 70 * smooth(.8, 5, t) + 520 * Math.pow(smooth(3.5, 12, t), 1.8) + 1200 * Math.pow(smooth(10, 19, t), 2);
+const reach = (t) => height(t) * .9 / TW + 1.5;     // how far out the field has grown, in tiles: always past the frame's edge
+const wave = (t) => (t - 12.4) * 11;               // the mint wave's radius, in tiles
+
+// the first view goes coherent first: at 3:31 it turns from its detailed self into a flat mint abstraction of the same structure
+const FIRST_GREEN = 1.95 / PACE;                     // 1.95 s into the scene, in the choreography's own time
+const firstFlat = new THREE.Mesh(new THREE.PlaneGeometry(16, 9), new THREE.MeshBasicMaterial({ color: C.mint, transparent: true, opacity: 0, depthWrite: false, toneMapped: false,
+  map: canvasTex(480, 270, (g) => {
+    g.fillStyle = "#BDBDBD"; g.fillRect(0, 0, 480, 270);            // the ground flooded, as the green views' is
+    const k = 480 / MW, box = (x, y, w, h) => { g.fillStyle = "#EEF3F6"; g.fillRect(x * k, y * k, w * k, h * k); };
+    g.strokeStyle = "rgba(238,243,246,.55)"; g.lineWidth = 3;
+    for (const r of ROUTES) { if (r.id === "R5") continue; g.beginPath(); r.pts.forEach(([x, y], i) => (i ? g.lineTo(x * k, y * k) : g.moveTo(x * k, y * k))); g.stroke(); }
+    for (const st of Object.values(STATIONS)) box(st.x, st.y, CARD.w, CARD.h);
+    for (const r of ROUTES) if (r.id !== "R5") box(60, r.ey - 30, 270, 60);
+    g.fillStyle = "rgba(238,243,246,.5)"; g.fillRect(60 * k, 1120 * k, (MW - 140) * k, 6);
+  }) }));
+firstFlat.rotation.x = -Math.PI / 2; firstFlat.position.set(0, MAP_Y + .01, -1); firstFlat.renderOrder = 4; scene.add(firstFlat);
+
+// the surface: as the tiles close ranks, the field melts into one sheet of mint on the ground
+const surface = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ color: C.mint, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+surface.rotation.x = -Math.PI / 2; surface.position.set(0, MAP_Y + .05, -1); surface.renderOrder = 9; scene.add(surface);
+
+// ---------- the title: a 2D layer over the stage ----------
+const title = document.createElement("canvas"); title.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none";
+$("stage").insertBefore(title, $("mast"));
+// the features this film names, pinned in promo/features.md
+const FEATURES = [["Lexicon"], ["Spec"], ["Invariant"], ["Chokepoint check"], ["Totality oracle"], ["Journal"], ["Work order"], ["Peer feed"],
+  ["Orient"], ["Regulate"], ["Hook install"], ["Scope"], ["Structure view"], ["Change comparison"], ["Lexicon view"], ["Components view"],
+  ["Invariants view"], ["Journal view"], ["Language adapter"], ["TypeScript support"], ["Python support"]];
+const CHIPS_AT = 17.9, CHIPS_SPAN = 2.7, FLOOD_AT = 22.4;           // choreography time (3:44 in the cut); they arrive quicker as they go, then hold to be read
+// the maker's mark under the word, black on the mint (PostHog's logomark, from the owner's file)
+const HOG = ["M.87 19.13a.5.5 0 0 0-.87.34v5.94a2.6 2.6 0 0 0 2.59 2.58H7.8a.5.5 0 0 0 .37-.84zM.86 8.4c-.3-.32-.86-.1-.86.36v6.73q0 .2.13.34l8.81 9.68 1.8 2.06v-8.82zM4.59.82A2.67 2.67 0 0 0 0 2.68v1.93q0 .4.27.69l10.47 10.95v-9.1z",
+  "M11.36 28h7.08a.5.5 0 0 0 .36-.85l-8.05-8.4v8.8l.23.28q.16.17.38.17m-.61-11.76 8.84 9.25 2.1 2.33q.1.11.27.14V18.7L10.75 7.15zm0-13.7v1.41a2 2 0 0 0 .55 1.28L21.96 16.2V7.65L15.32.8a2.67 2.67 0 0 0-4.57 1.71z",
+  "M22.06 28h7.76a.5.5 0 0 0 .36-.86l-8.22-8.45v9.27l.09.02zM31 25.49l1.13 1.14c.32.31.85.09.85-.35v-7.3l-.49-.51L21.96 7.64v8.55zM22.52 5.73l9.62 9.89c.3.32.86.1.86-.35V7.46L26.56.82a2.67 2.67 0 0 0-4.59 1.84v1.7c0 .51.2 1 .57 1.37z",
+  "m50 23.34-.35-.05A4.5 4.5 0 0 1 47 21.97L35.56 10.1c-.3-.33-.86-.1-.86.35V27.5c0 .27.22.5.5.5h13.78c1.48 0 2.67-1.2 2.67-2.67v-.1a1.9 1.9 0 0 0-1.67-1.89zm-10.81.2a1.8 1.8 0 1 1 0-3.58 1.8 1.8 0 0 1 0 3.58"].map((d) => new Path2D(d));
+const HOG_W = 52, HOG_H = 28;                           // the mark's own extent, in its units
+function drawSubtitle(g, W, cx, y, a) {
+  // thin for the claim, medium for the maker
+  const fs = W * .0145, track = fs * .32, thin = "SALVATION FOR EVERY AGENT ", reg = "BY POSTHOG";
+  g.letterSpacing = `${track}px`;
+  g.font = `200 ${fs}px "Inter"`; const w1 = g.measureText(thin).width;
+  g.font = `500 ${fs}px "Inter"`; const w2 = g.measureText(reg).width - track;
+  const tw = w1 + w2, markH = fs * .78, markW = markH * HOG_W / HOG_H, gap = fs * .55;
+  const x0 = cx - (tw + gap + markW) / 2;
+  g.globalAlpha = a; g.fillStyle = "#07090C"; g.textBaseline = "alphabetic";
+  g.font = `200 ${fs}px "Inter"`; g.fillText(thin, x0, y);
+  g.font = `500 ${fs}px "Inter"`; g.fillText(reg, x0 + w1, y);
+  g.save(); g.translate(x0 + tw + gap, y - markH); g.scale(markH / HOG_H, markH / HOG_H); HOG.forEach((p) => g.fill(p)); g.restore();
+  g.letterSpacing = "0px"; g.globalAlpha = 1;
+}
+const chipAt = i => CHIPS_AT + CHIPS_SPAN * Math.pow(i / FEATURES.length, .8);
+function drawTitle(t) {
+  const W = title.width = title.clientWidth * devicePixelRatio, Hh = title.height = title.clientHeight * devicePixelRatio, g = title.getContext("2d");
+  const mint = smooth(17.9, 19.1, t), black = smooth(26.2, 27.4, t);
+  g.clearRect(0, 0, W, Hh);
+  if (mint > 0) { g.fillStyle = `rgba(84,232,176,${mint})`; g.fillRect(0, 0, W, Hh); }
+  const size = W * .135, y = Hh * .5 + size * .32, wcx = W / 2, wcy = Hh * .5;
+  // the chips: they pile up in centred rows, then pour into the word
+  if (t > CHIPS_AT && t < FLOOD_AT + 1.6) {
+    const fs = W * .0165, padX = fs * .9, h = fs * 2.1, gap = fs * .6, maxW = W * .74;
+    g.font = `500 ${fs}px "Instrument Sans"`;
+    const rows = [[]]; let rw = 0;
+    for (const [i, [name]] of FEATURES.entries()) {
+      const w = g.measureText(name).width + padX * 2;
+      if (rw + w > maxW && rows.at(-1).length) { rows.push([]); rw = 0; }
+      rows.at(-1).push({ i, w }); rw += w + gap;
+    }
+    const top = wcy - (rows.length * h + (rows.length - 1) * gap) / 2;
+    rows.forEach((row, r) => {
+      let x = wcx - (row.reduce((s, c) => s + c.w, 0) + gap * (row.length - 1)) / 2;
+      for (const c of row) {
+        const [name] = FEATURES[c.i], cx0 = x + c.w / 2, cy0 = top + r * (h + gap) + h / 2; x += c.w + gap;
+        const inn = smooth(chipAt(c.i), chipAt(c.i) + .32, t);
+        if (inn <= 0) continue;
+        // the flood: outer chips leave first, each accelerating into the middle of the word
+        const d = Math.hypot(cx0 - wcx, (cy0 - wcy) * 2.5) / (W * .4);
+        const go = smooth(FLOOD_AT + (1 - Math.min(1, d)) * .45, FLOOD_AT + (1 - Math.min(1, d)) * .45 + .75, t), f = go * go;
+        if (f >= 1) continue;
+        const pop = .82 + .18 * ease(inn) + Math.sin(inn * Math.PI) * .05, sc = pop * (1 - .85 * f);
+        g.save(); g.translate(cx0 + (wcx - cx0) * f, cy0 + (wcy - cy0) * f); g.scale(sc, sc);
+        g.globalAlpha = inn * mint * (1 - smooth(.7, 1, f));
+        g.beginPath(); g.roundRect(-c.w / 2, -h / 2, c.w, h, h / 2);
+        g.fillStyle = "#07090C"; g.fill(); g.fillStyle = "rgb(84,232,176)";
+        g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(name, 0, fs * .04);
+        g.restore();
+      }
+    });
+    g.globalAlpha = 1; g.textAlign = "start"; g.textBaseline = "alphabetic";
+  }
+  // the word: it fills in as the chips land in it
+  const word = smooth(FLOOD_AT + .55, FLOOD_AT + 1.25, t);
+  if (word > 0) {
+    const grow = .9 + .1 * ease(word) + Math.sin(smooth(FLOOD_AT + .9, FLOOD_AT + 1.6, t) * Math.PI) * .012;
+    g.save(); g.translate(wcx, wcy); g.scale(grow, grow); g.translate(-wcx, -wcy);
+    g.font = `700 ${size}px "Figtree"`;                        // the wordmark face g.letterSpacing = `${-size * .03}px`;
+    const rest = "oherence", cw = g.measureText("c").width, rw = g.measureText(rest).width, x0 = W / 2 - (cw + rw) / 2;
+    g.globalAlpha = word; g.fillStyle = "#07090C";
+    // the c: tilted, until the reticle sets it straight (a little overshoot, then still)
+    const fix = smooth(24.5, 25.1, t), over = Math.sin(smooth(24.5, 25.35, t) * Math.PI) * .08 * (1 - smooth(25.1, 25.45, t));
+    const TILT = 20;                                                          // degrees off true, before the reticle sets it
+    const tilt = (-TILT * (1 - fix) + over * 15) * Math.PI / 180;
+    const aside = size * .07 * (1 - fix);                                     // tilted, it stands a little off, clear of the o; it slides home as it rights
+    g.save(); g.translate(x0 + cw / 2 - aside, y - size * .26); g.rotate(tilt); g.fillText("c", -cw / 2, size * .26); g.restore();
+    g.fillText(rest, x0 + cw, y);
+    drawSubtitle(g, W, W / 2, y + size * .42, word * smooth(FLOOD_AT + 1.0, FLOOD_AT + 1.6, t));   // it settles in just after the word
+    // the scan line: one pass across the word
+    const sp = smooth(23.75, 24.55, t);
+    if (sp > 0 && sp < 1) { const sy = Hh * .5 - size * .6 + sp * size * 1.2; g.fillStyle = "rgba(7,9,12,.55)"; g.fillRect(x0 - size * .3, sy, cw + rw + size * .6, Math.max(2, W * .0016)); }
+    // the reticle: brackets closing on the c, holding while it turns, then letting go
+    const lock = smooth(24.0, 24.5, t), let_ = smooth(25.45, 25.9, t);
+    if (lock > 0 && let_ < 1) {
+      const cx = x0 + cw / 2 - aside, cy = y - size * .26, r = size * (.42 + .5 * (1 - ease(lock))), L = size * .14;
+      g.globalAlpha = word * (1 - let_); g.strokeStyle = "#07090C"; g.lineWidth = Math.max(2, W * .003); g.lineCap = "square";
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { g.beginPath(); g.moveTo(cx + sx * r, cy + sy * (r - L)); g.lineTo(cx + sx * r, cy + sy * r); g.lineTo(cx + sx * (r - L), cy + sy * r); g.stroke(); }
+    }
+    g.globalAlpha = 1; g.letterSpacing = "0px"; g.restore();
+  }
+  if (black > 0) { g.fillStyle = `rgba(0,0,0,${black})`; g.fillRect(0, 0, W, Hh); }
+}
+
+function EXTRA(t) {
+  t = t / PACE;
+  scene.fog.density = 0;                            // the air is clear now
+  // the pull back
+  const h = height(t);
+  const from = 1 - ease(smooth(0, 1.6, t * PACE));        // blending out of scene 14's last camera over the first 1.6 s
+  camera.position.set(FROM14.p[0] * from, MAP_Y + h + (FROM14.p[1] - MAP_Y - h) * from, 3.2 * (1 - smooth(.8, 5, t)) * (1 - from) + FROM14.p[2] * from);
+  camera.lookAt(FROM14.q[0] * from, MAP_Y + FROM14.q[1] * 0 + (FROM14.q[1] - MAP_Y) * from, (-1 - 1.3 * (1 - smooth(.8, 5, t))) * (1 - from) + FROM14.q[2] * from);
+  // the field grows outward, flickers red and amber, then goes mint in a wave from the centre; late, the tiles close ranks
+  const close = smooth(13.7, 18.2, t), rch = reach(t) * smooth(.5, 1.3, t * PACE), wv = wave(t);   // the field waits for the pull-back, so the cut from 14 is clean
+  fields.forEach(({ m, list, fill }) => {
+    list.forEach((tl, k) => {
+      const on = smooth(tl.d - 1.2, tl.d, rch) * smooth(.5, 1.1, t * PACE);
+      if (on <= 0) { m.setMatrixAt(k, _m.makeScale(0, 0, 0)); return; }
+      const green = Math.max(smooth(tl.d - .8, tl.d + .4, wv), smooth(tl.tGreen, tl.tGreen + .35, t));
+      const sc = (.94 + .12 * close) * (.85 + .15 * ease(on)) * (1 + .075 * smooth(.3, 1, green));   // green views butt together: no dark seams
+      _p.set(tl.x, MAP_Y - .02, tl.z); _s.set(sc * (1 + close * .06), sc * (1 + close * .11), 1);
+      m.setMatrixAt(k, _m.compose(_p, _q, _s));
+      // one way only: grey, then amber, then red, then mint as the wave passes; each cell starts at its own point and moves at its own moments
+      _c.copy(STEEL);
+      _c.lerp(AMBERc, tl.startAmber ? 1 : smooth(tl.tAmber, tl.tAmber + .3, t));
+      _c.lerp(REDc, smooth(tl.tRed, tl.tRed + .3, t));
+      _c.lerp(MINTc, green);
+      m.setColorAt(k, _c); fill.array[k] = .8 * smooth(.3, 1, green);
+    });
+    m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; fill.needsUpdate = true;
+  });
+  // the centre map goes mint with them, then gives way to the surface
+  const turn = smooth(FIRST_GREEN - .45, FIRST_GREEN + .45, t);
+  mapGlow.material.opacity = mapText.material.opacity = 1 - turn;
+  firstFlat.material.opacity = turn;
+  orderGround.visible = h < 200;
+  surface.material.opacity = Math.pow(smooth(15.2, 18.3, t), 1.6);
+  bloom.strength = .85 * (1 - smooth(13.2, 15.7, t));   // the glow goes before the surface arrives, so the mint lands true
+  drawTitle(t);
+}
+</script>

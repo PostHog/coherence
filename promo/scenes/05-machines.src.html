@@ -1,0 +1,478 @@
+<title>Scene 5 · The Machines</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #EEF1F3; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.caption { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #0B0E11; text-shadow: 0 1px 10px rgb(255 255 255 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 5 · the machines</div>
+    <h1>The absurd bet, formalized: an agent writes black boxes, another machine is paid to review them</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="20" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 20.00</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <section class="box">
+    <h2>Beats (about 19 s)</h2>
+    <ol class="beats">
+      <li><span class="t">0.0</span><div><q>Our solution? Throw more inference at the problem.</q><span>The white plane of scene 3, now a production line: a conveyor belt, an AGENT machine on the left, the CODE REVIEW machine from scene 3 in the middle. Small platinum tokens stamped with the code-asterisk start pouring into the agent's slot.</span></div></li>
+      <li><span class="t">3.5</span><div><q>We use inference to write code, then we use more inference to ask if the code we wrote was good.</q><span>On the transporter pad inside the agent's arch, a black box shimmers into being every beat, platinum edges and a scan of light solidifying to black, and rides out; the belt carries them, orderly, left to right. Gold tokens start pouring into the reviewer too. Behind the line, two small art deco banks, ANTHROPIC TREASURY and OPENAI TREASURY; glass pipes run from beneath both machines, over the return belt, into a header that feeds their doors, Cherenkov-blue pulses flowing through the smoked glass at one steady pace. Each box passes through its scanner, a gold-lined wall and a curtain of light that flares as the box crosses, and comes out with a lamp: mint, it ships off the right edge.</span></div></li>
+      <li><span class="t">11.0</span><div><q>So what do we get for all this?</q><span>The camera eases back: behind the line, a return belt.</span></div></li>
+      <li><span class="t">14.5</span><div><q>Bugs that recur. Endless whack-a-mole adversarial reviews.</q><span>More boxes come out red and go all the way round: diverted onto the return belt, back across, along the front belt into the agent, where they dematerialize on the pad; the agent sends out another box that goes red again. Red lamps pop up on boxes all along the line, get struck down with a flash, and pop up somewhere else. Everything speeds up, and the token counters race.</span></div></li>
+    </ol>
+    <p class="note">Continues scene 3's inverted world: white plane, black boxes, the same CODE REVIEW machine and the same gold merge-glyph tokens.</p>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const ICONS = /*ICONS*/{};
+const T = 20;
+const C = { bg: 0xEEF1F3, fog: 0xEEF1F3, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2" };
+const LINES = [
+  [0.3, 3.2, "Our solution? Throw more inference at the problem."],
+  [3.5, 10.5, "We use inference to write code, then we use more inference to ask if the code we wrote was good."],
+  [11.0, 14.2, "So what do we get for all this?"],
+  [14.5, 19.6, "Bugs that recur. Endless whack a mole adversarial reviews."],
+];
+
+/*COMMON*/
+
+// the inverted world of scene 3: a white plane, black boxes, soft light, almost no glow
+camera.near = .5; camera.updateProjectionMatrix();   // nothing comes close to the lens here; the depth precision goes to the far field
+territory.visible = false;
+sheets.forEach((m) => (m.visible = false));
+scene.fog.density = .012;
+bloom.strength = .05;
+scene.add(new THREE.AmbientLight(0xffffff, .72));
+const sun = new THREE.DirectionalLight(0xffffff, .95); sun.position.set(7, 14, 9); scene.add(sun);
+const GROUND = 0, S = .8;
+const plane = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshBasicMaterial({ color: "#EEF1F3" }));
+plane.rotation.x = -Math.PI / 2; scene.add(plane);
+const BLACK = new THREE.Color("#131619");
+const boxGeo = new THREE.BoxGeometry(1, 1, 1), edgeGeo = new THREE.EdgesGeometry(boxGeo);
+
+// ---------- the line: a front belt left to right, a return belt behind it right to left ----------
+// the front belt runs on past the edge of frame, so passed boxes ship out of sight
+const FRONT_Z = 0, BACK_Z = -2.6, X0 = -10.5, X1 = 34, BELT_Y = .12, V = 3.0, VR = 5.2;
+function beltTex() {
+  const tx = canvasTex(256, 64, (g, w, h) => {
+    g.fillStyle = "#2A3035"; g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 32) { g.fillStyle = "#1E2327"; g.fillRect(x, 0, 4, h); }
+    g.fillStyle = "#3B4349"; g.fillRect(0, 0, w, 4); g.fillRect(0, h - 4, w, 4);
+  });
+  tx.wrapS = THREE.RepeatWrapping; return tx;
+}
+function belt(z, len, x) {
+  const tx = beltTex(); tx.repeat.set(len / 1.2, 1);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(len, .22, 1.1), [0, 1, 2, 3, 4, 5].map((i) => i === 2 ? new THREE.MeshLambertMaterial({ map: tx }) : new THREE.MeshLambertMaterial({ color: "#3B4349" })));
+  m.position.set(x, BELT_Y - .11, z); scene.add(m); return { m, tx };
+}
+const front = belt(FRONT_Z, X1 - X0, (X0 + X1) / 2), back = belt(BACK_Z, 18.4, -1.2);
+// the two short transfers that close the loop
+[[7.6, (FRONT_Z + BACK_Z) / 2], [-10.2, (FRONT_Z + BACK_Z) / 2]].forEach(([x, z]) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(1.1, .2, 1.8), new THREE.MeshLambertMaterial({ color: "#3B4349" })); m.position.set(x, BELT_Y - .12, z); scene.add(m);
+});
+
+// ---------- the machines: a writer that extrudes boxes, and scene 3's reviewer ----------
+const COIN_FACE = canvasTex(256, 256, (g) => {
+  const gr = g.createRadialGradient(100, 90, 10, 128, 128, 128);
+  gr.addColorStop(0, "#FFF0B8"); gr.addColorStop(.45, "#E8B545"); gr.addColorStop(.85, "#B07D18"); gr.addColorStop(1, "#6E4A08");
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+  g.lineWidth = 7; g.strokeStyle = "rgba(255,236,170,.75)"; g.beginPath(); g.arc(128, 128, 112, 0, 7); g.stroke();
+  g.lineWidth = 3; g.strokeStyle = "rgba(110,74,8,.8)"; g.beginPath(); g.arc(128, 128, 98, 0, 7); g.stroke();
+  g.save(); g.translate(128, 128); g.rotate(-Math.PI / 2); g.translate(-128, -128); icon(g, "git-merge", 64, 64, 128, "#7A520C", 3); g.restore();
+});
+const COIN_EDGE = canvasTex(256, 32, (g) => { for (let x = 0; x < 256; x += 4) { g.fillStyle = x % 8 ? "#C9951F" : "#8C630F"; g.fillRect(x, 0, 4, 32); } });
+COIN_EDGE.wrapS = THREE.RepeatWrapping; COIN_EDGE.repeat.x = 6;
+// the agent's tokens: smaller, platinum, stamped with code-asterisk
+const PLAT_FACE = canvasTex(256, 256, (g) => {
+  const gr = g.createRadialGradient(100, 90, 10, 128, 128, 128);
+  gr.addColorStop(0, "#FFFFFF"); gr.addColorStop(.45, "#D5DBE0"); gr.addColorStop(.85, "#9AA3AA"); gr.addColorStop(1, "#5F676E");
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+  g.lineWidth = 7; g.strokeStyle = "rgba(255,255,255,.8)"; g.beginPath(); g.arc(128, 128, 112, 0, 7); g.stroke();
+  g.lineWidth = 3; g.strokeStyle = "rgba(70,78,86,.8)"; g.beginPath(); g.arc(128, 128, 98, 0, 7); g.stroke();
+  g.save(); g.translate(128, 128); g.rotate(-Math.PI / 2); g.translate(-128, -128); icon(g, "code-asterisk", 64, 64, 128, "#3F474E", 3); g.restore();
+});
+const PLAT_EDGE = canvasTex(256, 32, (g) => { for (let x = 0; x < 256; x += 4) { g.fillStyle = x % 8 ? "#C3CAD0" : "#7F888F"; g.fillRect(x, 0, 4, 32); } });
+PLAT_EDGE.wrapS = THREE.RepeatWrapping; PLAT_EDGE.repeat.x = 6;
+const platMat = (map) => new THREE.MeshStandardMaterial({ map, transparent: true, metalness: .6, roughness: .25, emissive: new THREE.Color("#2A2F34"), emissiveIntensity: .5 });
+const goldMat = (map) => new THREE.MeshStandardMaterial({ map, transparent: true, metalness: .55, roughness: .3, emissive: new THREE.Color("#3A2604"), emissiveIntensity: .7 });
+
+function makeMachine(x, label, verb) {
+  const g = new THREE.Group(); g.position.set(x, GROUND, FRONT_Z); scene.add(g);
+  // two pillars and a hood: an arch the belt runs through
+  const mat = new THREE.MeshLambertMaterial({ color: "#1B1F23" });
+  const pillarB = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.4, .9), mat); pillarB.position.set(0, 1.7, -1.05); g.add(pillarB);
+  const pillarF = new THREE.Mesh(new THREE.BoxGeometry(2.2, .5, .5), mat); pillarF.position.set(0, .25, .85); g.add(pillarF);
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.6, 2.6), mat); hood.position.set(0, 2.6, -.3); g.add(hood);
+  const canvas = document.createElement("canvas"); canvas.width = 520; canvas.height = 360;
+  const tex = new THREE.CanvasTexture(canvas);
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 2.0 * 360 / 520), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+  panel.position.set(0, 2.6, 1.0); g.add(panel);
+  const TOP = 3.4;
+  const rim = new THREE.Mesh(new THREE.PlaneGeometry(.9, .22), new THREE.MeshBasicMaterial({ color: C.mint, toneMapped: false }));
+  rim.rotation.x = -Math.PI / 2; rim.position.set(0, TOP + .004, -.3); g.add(rim);
+  const mouth = new THREE.Mesh(new THREE.PlaneGeometry(.78, .1), new THREE.MeshBasicMaterial({ color: "#040506" }));
+  mouth.rotation.x = -Math.PI / 2; mouth.position.set(0, TOP + .008, -.3); g.add(mouth);
+  return { g, label, verb, canvas, tex, rim, TOP, coins: [] };
+}
+const writer = makeMachine(-6.6, "AGENT", "written"), reviewer = makeMachine(1.8, "CODE REVIEW", "reviewed");
+// the agent's transporter: the face inside its arch, an emitter wall of platinum dots and rings, and a pad of light on the belt
+const padWallTex = canvasTex(512, 384, (g, w, h) => {
+  g.fillStyle = "#1A1E22"; g.fillRect(0, 0, w, h);
+  for (let r = 0; r < 5; r++) { g.strokeStyle = `rgba(233,238,242,${.12 + r * .06})`; g.lineWidth = 3; g.beginPath(); g.roundRect(40 + r * 30, 30 + r * 26, w - 80 - r * 60, h - 60 - r * 52, 26 - r * 4); g.stroke(); }
+  for (let y = 70; y < h - 40; y += 34) for (let x = 60; x < w - 40; x += 34) {
+    const d = Math.hypot((x - w / 2) / w, (y - h / 2) / h), a = Math.max(.12, .95 - d * 1.9);
+    g.fillStyle = `rgba(233,238,242,${a})`; g.beginPath(); g.arc(x, y, 3.2, 0, 7); g.fill();
+  }
+});
+const padWall = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 1.55), new THREE.MeshBasicMaterial({ map: padWallTex, transparent: true, toneMapped: false }));
+padWall.position.set(0, 1.0, -.59); writer.g.add(padWall);
+const padGlowTex = canvasTex(256, 256, (g) => { const gr = g.createRadialGradient(128, 128, 10, 128, 128, 128); gr.addColorStop(0, "rgba(233,238,242,.95)"); gr.addColorStop(.6, "rgba(233,238,242,.35)"); gr.addColorStop(1, "rgba(233,238,242,0)"); g.fillStyle = gr; g.fillRect(0, 0, 256, 256); });
+const padGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.3), new THREE.MeshBasicMaterial({ map: padGlowTex, transparent: true, depthWrite: false, toneMapped: false }));
+padGlow.rotation.x = -Math.PI / 2; padGlow.position.set(0, BELT_Y + .012, 0); writer.g.add(padGlow);
+// the reviewer's scanner: the face inside its arch, ruled with scan lines, a gold bar sweeping it, and a light curtain across the belt
+const AMBER = "#FFC766";
+const scanWallTex = canvasTex(512, 384, (g, w, h) => {
+  g.fillStyle = "#16191C"; g.fillRect(0, 0, w, h);
+  for (let y = 24; y < h - 20; y += 9) { g.fillStyle = `rgba(255,199,102,${y % 45 < 9 ? .32 : .12})`; g.fillRect(34, y, w - 68, 2); }
+  g.strokeStyle = "rgba(255,199,102,.85)"; g.lineWidth = 5; const L = 44, m = 18;
+  for (const [x, y, dx, dy] of [[m, m, 1, 1], [w - m, m, -1, 1], [m, h - m, 1, -1], [w - m, h - m, -1, -1]]) { g.beginPath(); g.moveTo(x + dx * L, y); g.lineTo(x, y); g.lineTo(x, y + dy * L); g.stroke(); }
+  g.fillStyle = "rgba(255,199,102,.7)"; for (let x = 60; x < w - 50; x += 28) g.fillRect(x, h - 30, 2, x % 140 < 28 ? 14 : 7);
+});
+const scanWall = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 1.55), new THREE.MeshBasicMaterial({ map: scanWallTex, toneMapped: false }));
+scanWall.position.set(0, 1.0, -.59); reviewer.g.add(scanWall);
+const scanBar = new THREE.Mesh(new THREE.PlaneGeometry(1.95, .05), new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, toneMapped: false }));
+scanBar.position.set(0, 1.0, -.585); reviewer.g.add(scanBar);
+// the curtain: a sheet of light across the belt, perpendicular to it, that every box passes through
+const curtain = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.5), new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, opacity: .12, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+curtain.rotation.y = Math.PI / 2; curtain.position.set(0, BELT_Y + .75, .05); reviewer.g.add(curtain);
+const curtainEdge = new THREE.Mesh(new THREE.PlaneGeometry(1.3, .03), new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, side: THREE.DoubleSide, toneMapped: false }));
+curtainEdge.rotation.y = Math.PI / 2; curtainEdge.position.set(0, BELT_Y + .02, .05); reviewer.g.add(curtainEdge);
+writer.glyph = "robot"; reviewer.glyph = "git-merge";
+writer.coin = { r: .17, mats: () => [platMat(PLAT_EDGE), platMat(PLAT_FACE), platMat(PLAT_FACE)], ink: "#D8DEE3" };
+reviewer.coin = { r: .24, mats: () => [goldMat(COIN_EDGE), goldMat(COIN_FACE), goldMat(COIN_FACE)], ink: "#E8B545" };
+
+// token streams: slow at first, then a torrent. Each is [time it appears]; it falls into its machine's slot
+function stream(start, gap0, gap1, end) { const out = []; for (let a = start; a < end; ) { out.push(a); a += gap0 + (gap1 - gap0) * smooth(start, end, a); } return out; }
+const DROP = .7;
+writer.times = stream(.4, .55, .1, T);
+reviewer.times = stream(4.6, .6, .11, T);
+[writer, reviewer].forEach((mc) => {
+  mc.pool = [...Array(14)].map(() => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(mc.coin.r, mc.coin.r, .05, 40), mc.coin.mats());
+    m.rotation.x = Math.PI / 2; m.visible = false; mc.g.add(m); return m;
+  });
+});
+function updateCoins(mc, t) {
+  let n = 0;
+  mc.times.forEach((a, i) => {
+    const k = (t - a) / DROP;
+    if (k <= 0 || k >= 1) return;
+    const m = mc.pool[n++ % mc.pool.length]; m.visible = true;
+    const y = mc.TOP + 1.9 - 2.6 * k * k;
+    m.position.set(((i * 37) % 5 - 2) * .02, y, -.3);
+    m.visible = y > mc.TOP - .2;
+    m.material.forEach((mt) => (mt.opacity = smooth(0, .25, k)));
+  });
+  for (let i = n; i < mc.pool.length; i++) mc.pool[i].visible = false;
+  const inCount = mc.times.filter((a) => t >= a + DROP * .85).length;
+  const hot = mc.times.some((a) => t > a + DROP * .85 && t < a + DROP * .85 + .15);
+  mc.rim.material.color.set(hot ? "#FFD27A" : C.mint);
+  return inCount;
+}
+function drawPanel(mc, tokens, done) {
+  const g = mc.canvas.getContext("2d"), w = 520, h = 360;
+  g.fillStyle = "#15191C"; g.fillRect(0, 0, w, h);
+  g.fillStyle = "#E6ECEF"; g.beginPath(); g.roundRect(30, 26, w - 60, 90, 12); g.fill();
+  // the plate: a glyph beside the name, the pair centered
+  g.font = `800 44px "JetBrains Mono"`; const tw = g.measureText(mc.label).width, iw = 52, gap = 14, x0 = w / 2 - (iw + gap + tw) / 2;
+  icon(g, mc.glyph, x0, 45, iw, "#000", 2.6);
+  g.fillStyle = "#000"; g.textAlign = "left"; g.fillText(mc.label, x0 + iw + gap, 86); g.textAlign = "center";
+  g.fillStyle = "#0A0C0E"; g.beginPath(); g.roundRect(40, 140, w - 80, 190, 10); g.fill();
+  g.fillStyle = "#8B98A2"; g.font = `500 26px "JetBrains Mono"`; g.fillText("TOKENS IN", w / 2, 186);
+  g.fillStyle = mc.coin.ink; g.font = `600 70px "JetBrains Mono"`; g.fillText((tokens * 48213).toLocaleString("en-US"), w / 2, 262);
+  g.fillStyle = "#8B98A2"; g.font = `500 24px "JetBrains Mono"`; g.fillText(`${done} ${mc.verb}`, w / 2, 306);
+  g.textAlign = "left"; mc.tex.needsUpdate = true;
+}
+
+// ---------- where the money goes: glass pipes from beneath the machines to two small treasuries ----------
+const GOLD = "#D9A93A", XW = writer.g.position.x, XR = reviewer.g.position.x;
+// black marble: veins traced by a sine bent through fractal noise
+function marbleCanvas(w, h, base, vein, scale = 1) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"), img = g.createImageData(w, h), d = img.data;
+  const grid = (n) => { const a = []; for (let i = 0; i < (n + 1) * (n + 1); i++) a.push(rand()); return a; };
+  const oct = [[3, .5], [7, .25], [15, .15], [31, .1]].map(([n, amp]) => ({ n, amp, g: grid(n) }));
+  const val = (o, x, y) => {
+    const fx = x * o.n, fy = y * o.n, ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy;
+    const at = (i, j) => o.g[(j % o.n) * (o.n + 1) + (i % o.n)], sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+    return (at(ix, iy) * (1 - sx) + at(ix + 1, iy) * sx) * (1 - sy) + (at(ix, iy + 1) * (1 - sx) + at(ix + 1, iy + 1) * sx) * sy;
+  };
+  const B = new THREE.Color(base), Vn = new THREE.Color(vein);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const u = x / w, v = y / h; let n = 0; for (const o of oct) n += val(o, u, v) * o.amp;
+    const main = Math.pow(1 - Math.abs(Math.sin((u * 2.2 + v * 1.1) * Math.PI * scale + n * 7)), 22);
+    const fine = Math.pow(1 - Math.abs(Math.sin((u * 5 - v * 3) * Math.PI * scale + n * 11)), 60) * .5;
+    const k = Math.min(1, main + fine), cloud = (n - .5) * .06;
+    const i = (y * w + x) * 4;
+    d[i] = 255 * Math.min(1, B.r + cloud + (Vn.r - B.r) * k); d[i + 1] = 255 * Math.min(1, B.g + cloud + (Vn.g - B.g) * k); d[i + 2] = 255 * Math.min(1, B.b + cloud + (Vn.b - B.b) * k); d[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0); return c;
+}
+const MARBLE = marbleCanvas(512, 512, "#15191C", "#A7B0B6"), MARBLE_PLINTH = marbleCanvas(256, 256, "#2B3137", "#B9C1C6", .7);
+function marbleMat(canvas) { const t = new THREE.CanvasTexture(canvas); t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return new THREE.MeshStandardMaterial({ map: t, roughness: .28, metalness: .05 }); }
+const marbleBody = marbleMat(MARBLE), marblePlinth = marbleMat(MARBLE_PLINTH);
+// a miniature art deco bank: plinth, a black body with gold fluting and a stepped door, setbacks rising to a spire
+function makeTreasury(x, z, name) {
+  const g = new THREE.Group(); g.position.set(x, GROUND, z); scene.add(g);
+  const dark = marbleBody, gold = new THREE.MeshBasicMaterial({ color: GOLD, toneMapped: false });
+  const box = (w, h, d, y, mat = dark) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.y = y; g.add(m); return m; };
+  box(3.3, .28, 2.7, .14, marblePlinth);   // plinth
+  box(2.7, 2.5, 2.2, 1.53);                                                           // body
+  box(2.1, .5, 1.7, 3.03); box(1.4, .45, 1.15, 3.5); box(.6, .5, .6, 3.95);           // setbacks and spire
+  box(.05, .7, .05, 4.55, gold);                                                      // mast
+  // a gold line along the front edge of each setback
+  [[2.1, 3.28, .85], [1.4, 3.73, .575], [.6, 4.2, .3]].forEach(([w, y, dz]) => { const l = box(w, .03, .03, y, gold); l.position.z = dz; });
+  // the facade: drawn once the fonts are in
+  const facade = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 2.5), new THREE.MeshBasicMaterial({ toneMapped: false }));
+  facade.position.set(0, 1.53, 1.101); g.add(facade);
+  const drawFacade = () => { facade.material.map = canvasTex(1080, 1000, (c, w, h) => {
+    c.drawImage(MARBLE, 0, 0, w, h);
+    c.strokeStyle = GOLD; c.lineWidth = 6; c.strokeRect(34, 34, w - 68, h - 68);
+    // the name band
+    c.fillStyle = "rgba(16,19,22,.72)"; c.fillRect(40, 70, w - 80, 290);   // the marble quiets behind the name
+    c.textAlign = "center"; c.fillStyle = GOLD;
+    c.font = `600 104px "Instrument Sans"`; c.letterSpacing = "18px"; c.fillText(name, w / 2 + 9, 196);
+    c.lineWidth = 4; c.beginPath(); c.moveTo(160, 240); c.lineTo(w - 160, 240); c.stroke();
+    c.font = `600 60px "Instrument Sans"`; c.letterSpacing = "30px"; c.fillText("TREASURY", w / 2 + 15, 318);
+    c.letterSpacing = "0px";
+    // fluting either side of the door
+    c.lineWidth = 5; for (const x of [120, 180, 240, 300, w - 300, w - 240, w - 180, w - 120]) { c.beginPath(); c.moveTo(x, 390); c.lineTo(x, h - 60); c.stroke(); }
+    // the stepped door
+    const dw = 300, dx = w / 2 - dw / 2, dy = 470;
+    c.fillStyle = "#07090B"; c.beginPath(); c.moveTo(dx, h - 34); c.lineTo(dx, dy + 80); c.lineTo(dx + 50, dy + 80); c.lineTo(dx + 50, dy + 40); c.lineTo(dx + 100, dy + 40); c.lineTo(dx + 100, dy);
+    c.lineTo(dx + dw - 100, dy); c.lineTo(dx + dw - 100, dy + 40); c.lineTo(dx + dw - 50, dy + 40); c.lineTo(dx + dw - 50, dy + 80); c.lineTo(dx + dw, dy + 80); c.lineTo(dx + dw, h - 34); c.closePath(); c.fill();
+    c.lineWidth = 6; c.stroke();
+    c.textAlign = "left";
+  }); facade.material.needsUpdate = true; };
+  // the door's glow as the money arrives
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(.62, .95), new THREE.MeshBasicMaterial({ color: "#4DA6FF", transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+  glow.position.set(0, .8, 1.106); g.add(glow);
+  return { g, drawFacade, glow, door: new THREE.Vector3(x, .2, z + 1.35) };
+}
+const treasuries = [makeTreasury(-3.4, -9.6, "ANTHROPIC"), makeTreasury(4.4, -9.6, "OPENAI")];
+
+// the pipes: smoked glass, with Cherenkov-blue pulses riding inside at one steady pace
+const PIPE_Y = .17, HEADER_Z = -4.3, ARCH_Y = 1.3;
+const pulseTex = canvasTex(256, 16, (g, w, h) => { const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, "rgba(30,110,255,.45)"); gr.addColorStop(.35, "rgba(50,150,255,.75)"); gr.addColorStop(.5, "rgba(170,225,255,1)"); gr.addColorStop(.65, "rgba(50,150,255,.75)"); gr.addColorStop(1, "rgba(30,110,255,.45)"); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+const glassMat = new THREE.MeshStandardMaterial({ color: "#2E363D", transparent: true, opacity: .58, roughness: .12, metalness: .2, depthWrite: false });   // smoked glass
+const pipes = [], FITTINGS = [];
+function pipe(points, phase = 0) {
+  const path = new THREE.CurvePath();
+  for (let i = 1; i < points.length; i++) path.add(new THREE.LineCurve3(new THREE.Vector3(...points[i - 1]), new THREE.Vector3(...points[i])));
+  points.slice(1, -1).forEach((p) => FITTINGS.push(p));
+  const len = path.getLength(), segs = Math.ceil(len * 12);
+  const glass = new THREE.Mesh(new THREE.TubeGeometry(path, segs, .13, 16, false), glassMat); glass.renderOrder = 4; scene.add(glass);
+  const tex = pulseTex.clone(); tex.needsUpdate = true; tex.wrapS = THREE.RepeatWrapping; tex.repeat.x = len / 1.4;
+  const core = new THREE.Mesh(new THREE.TubeGeometry(path, segs, .07, 10, false), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false }));
+  core.renderOrder = 5; scene.add(core);
+  // the glow, faked: a wider sheath carrying the same pulse, soft, outside the glass (real bloom would wash out the white world)
+  const halo = new THREE.Mesh(new THREE.TubeGeometry(path, segs, .24, 16, false), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false, side: THREE.BackSide }));
+  halo.renderOrder = 6; scene.add(halo);
+  pipes.push({ tex, len, phase, core, halo }); return path;
+}
+// out from under each machine, over the return belt, into the header
+for (const x of [XW, XR]) pipe([[x, PIPE_Y, -.9], [x, PIPE_Y, -1.75], [x, ARCH_Y, -2.0], [x, ARCH_Y, -3.2], [x, PIPE_Y, -3.45], [x, PIPE_Y, HEADER_Z]]);
+pipe([[XW, PIPE_Y, HEADER_Z], [treasuries[1].door.x, PIPE_Y, HEADER_Z]], .3);
+// the header's ends and tees are joints too
+[[XW, PIPE_Y, HEADER_Z], [XR, PIPE_Y, HEADER_Z], ...treasuries.map((tr) => [tr.door.x, PIPE_Y, HEADER_Z])].forEach((p) => FITTINGS.push(p));
+treasuries.forEach((tr, i) => pipe([[tr.door.x, PIPE_Y, HEADER_Z], [tr.door.x, PIPE_Y, tr.door.z]], .6 + i * .2));
+// opaque fittings at every bend, tee and joint: they swallow the ends of the glass so no two transparent layers stack
+const fittingGeo = new THREE.BoxGeometry(.5, .5, .5), fittingMat = new THREE.MeshLambertMaterial({ color: "#2A3036" });
+const fittingBand = new THREE.MeshBasicMaterial({ color: GOLD, toneMapped: false });
+const placed = new Set();
+function fitting(x, y, z) {
+  const key = [x, y, z].map((v) => v.toFixed(2)).join();
+  if (placed.has(key)) return; placed.add(key);
+  const f = new THREE.Mesh(fittingGeo, fittingMat); f.position.set(x, y, z); scene.add(f);
+  const band = new THREE.Mesh(new THREE.BoxGeometry(.58, .05, .58), fittingBand); band.position.set(x, y + .12, z); scene.add(band);   // a deco band
+}
+FITTINGS.forEach((p) => fitting(...p));
+const PULSE_V = 1.6;   // world units a second, always
+function updatePipes(t) {
+  const flow = smooth(.6, 3, t), strength = .6 + .4 * smooth(4, 16, t);   // the flow starts with the first tokens and brightens as they pour in, never faster
+  pipes.forEach((p) => { p.tex.offset.x = -(t * PULSE_V / 1.4) + p.phase; p.core.material.opacity = flow * strength; p.halo.material.opacity = .3 * flow * strength; });
+  treasuries.forEach((tr, i) => (tr.glow.material.opacity = flow * strength * (.45 + .3 * (.5 + .5 * Math.sin(t * PULSE_V / 1.4 * Math.PI * 2 + i)))));
+}
+
+// ---------- the boxes: extruded on the beat, carried along, judged, and sometimes sent back ----------
+const EMIT = []; for (let a = 3.4; a < T; a += .78) EMIT.push(a);
+const XD = 7.6;
+// a box's fate: before 12 s nearly all pass; after 14 s most come out red and go around again
+const fateOf = (i, a) => { const h = ((i * 2654435761) >>> 0) % 100; return h < (a < 6.5 ? 6 : a < 9.5 ? 30 : 64) ? "red" : "mint"; };
+const PLAT = new THREE.Color("#E9EEF2");
+const boxes = EMIT.map((a, i) => {
+  const m = new THREE.Mesh(boxGeo, new THREE.MeshLambertMaterial({ color: BLACK, transparent: true }));
+  m.scale.setScalar(S); m.visible = false; scene.add(m);
+  const e = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color: "#3A4148", transparent: true })); m.add(e);
+  // the scan slice: a bright plane that sweeps up through the box as it materializes, down as it dematerializes
+  const scan = new THREE.Mesh(new THREE.PlaneGeometry(1.08, 1.08), new THREE.MeshBasicMaterial({ color: PLAT, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+  scan.rotation.x = -Math.PI / 2; m.add(scan);
+  const lamp = new THREE.Mesh(new THREE.CylinderGeometry(.16, .16, .08, 24), new THREE.MeshBasicMaterial({ color: C.mint, toneMapped: false }));
+  lamp.position.y = .55; lamp.visible = false; m.add(lamp);
+  return { m, e, scan, lamp, a, i, fate: fateOf(i, a) };
+});
+// where a box is at time t: out of the writer, along the front belt, through review; then off the end, or around the back
+const MAT = .6, TURN = .45, XL = -10.2;
+function boxAt(b, t) {
+  let tt = t - b.a;
+  if (tt < 0) return null;
+  if (tt < MAT) return { x: XW, z: FRONT_Z, leg: "mat", k: tt / MAT };            // shimmering into being on the pad
+  tt -= MAT;
+  const toDiv = (XD - XW) / V;
+  if (b.fate !== "red" || tt < toDiv) { const x = XW + V * tt; return x > X1 + 1 ? null : { x, z: FRONT_Z, leg: "front" }; }
+  tt -= toDiv;
+  if (tt < TURN) return { x: XD, z: FRONT_Z + (BACK_Z - FRONT_Z) * ease(tt / TURN), leg: "side" };
+  tt -= TURN;
+  const back = (XD - XL) / VR;
+  if (tt < back) return { x: XD - VR * tt, z: BACK_Z, leg: "back" };
+  tt -= back;
+  if (tt < TURN) return { x: XL, z: BACK_Z + (FRONT_Z - BACK_Z) * ease(tt / TURN), leg: "up" };
+  tt -= TURN;
+  const toPad = (XW - XL) / V;
+  if (tt < toPad) return { x: XL + V * tt, z: FRONT_Z, leg: "in" };                // back along the front belt into the agent
+  tt -= toPad;
+  if (tt < MAT) return { x: XW, z: FRONT_Z, leg: "demat", k: 1 - tt / MAT };      // taken back in on the pad
+  return null;
+}
+// whack-a-mole: after 14.5 s, red lamps pop up on boxes along the line and are struck down, over and over
+function moleAt(b, t) {
+  if (t < 14.5) return 0;
+  const slot = Math.floor(t / .34), h = ((slot * 40503 + b.i * 9973) >>> 0) % 23;
+  return h === 0 ? 1 - clamp((t - slot * .34) / .3) : 0;
+}
+
+// ---------- camera ----------
+const LOOK = new THREE.Vector3(-.9, 1.5, -2.6);
+const KEYS = [
+  [0, [LOOK.x + 4.6, LOOK.y + 6.0, LOOK.z + 11.0], LOOK.toArray()],
+  [10.6, [LOOK.x + 5.0, LOOK.y + 6.6, LOOK.z + 11.8], LOOK.toArray()],
+  [14.2, [LOOK.x + 6.2, LOOK.y + 9.2, LOOK.z + 14.2], [LOOK.x, LOOK.y - .3, LOOK.z - .6]],
+  [T, [LOOK.x + 5.9, LOOK.y + 8.8, LOOK.z + 13.6], [LOOK.x, LOOK.y - .3, LOOK.z - .6]],
+];
+const Vv = (a) => new THREE.Vector3(...a);
+function cameraAt(t) {
+  let i = 0; while (i < KEYS.length - 2 && t > KEYS[i + 1][0]) i++;
+  const [t0, p0, q0] = KEYS[i], [t1, p1, q1] = KEYS[i + 1], k = ease(clamp((t - t0) / (t1 - t0)));
+  camera.position.copy(Vv(p0).lerp(Vv(p1), k)); camera.lookAt(Vv(q0).lerp(Vv(q1), k));
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+function render(t) {
+  cameraAt(t);
+  // the belts run
+  front.tx.offset.x = -(t * V) / 1.2 % 1; back.tx.offset.x = (t * VR) / 1.2 % 1;
+  let written = 0, passed = 0;
+  boxes.forEach((b) => {
+    const p = boxAt(b, t);
+    if (!p) { b.m.visible = false; if (t > b.a) written++; return; }
+    written++;
+    b.m.visible = true;
+    b.m.position.set(p.x, BELT_Y + S / 2, p.z); b.m.scale.setScalar(S);
+    // materializing: edges trace in platinum, a scan slice sweeps through, the box fills from light to black
+    const k = p.leg === "mat" || p.leg === "demat" ? p.k : 1, shimmer = 1 - k;
+    b.m.material.opacity = smooth(.35, 1, k);
+    b.m.material.color.copy(BLACK).lerp(PLAT, shimmer * .9);
+    b.e.material.color.set(shimmer > .02 ? "#FFFFFF" : "#3A4148"); b.e.material.opacity = shimmer > .02 ? .4 + .6 * Math.sin(Math.PI * clamp(k * 1.4)) : 1;
+    b.scan.material.opacity = shimmer > .02 ? .85 * Math.sin(Math.PI * k) : 0;
+    b.scan.position.y = -.5 + (p.leg === "demat" ? 1 - k : k) * 1.0 * (p.leg === "demat" ? -1 : 1) + (p.leg === "demat" ? 1 : 0);
+    // judged as it clears the reviewer
+    const judged = (p.leg === "front" && p.x > XR + 1.2) || p.leg === "side" || p.leg === "back" || p.leg === "up" || p.leg === "in";
+    const mole = moleAt(b, t);
+    if (judged || mole) {
+      b.lamp.visible = true;
+      const red = b.fate === "red" || mole > 0;
+      b.lamp.material.color.set(mole > 0 && mole < .25 ? "#FFFFFF" : red ? C.red : C.mint);   // struck: a white flash, then gone
+      if (b.fate === "mint" && !mole && judged) passed++;
+    } else b.lamp.visible = false;
+    if (p.leg === "demat") b.lamp.visible = false;
+  });
+  // the pad pulses with every box it sends out or takes back
+  const pulse = Math.max(0, ...boxes.map((b) => { const p = boxAt(b, t); return p && (p.leg === "mat" || p.leg === "demat") ? Math.sin(Math.PI * p.k) : 0; }));
+  // the scanner: its bar sweeps the wall, and the curtain flares while a box is passing through it
+  scanBar.position.y = 1.0 + .66 * Math.sin(t * 3.1); scanBar.material.opacity = .75 + .25 * Math.sin(t * 9);
+  const inCurtain = Math.max(0, ...boxes.map((b) => { const p = boxAt(b, t); return p && p.leg === "front" ? 1 - clamp(Math.abs(p.x - XR) / .55) : 0; }));
+  curtain.material.opacity = .1 + .45 * inCurtain; curtainEdge.material.opacity = .5 + .5 * inCurtain;
+  padWall.material.opacity = .8 + .2 * pulse; padGlow.material.opacity = .25 + .65 * pulse; padWall.material.color.setScalar(.85 + .3 * pulse);
+  const wIn = updateCoins(writer, t), rIn = updateCoins(reviewer, t);
+  updatePipes(t);
+  drawPanel(writer, wIn, boxes.filter((b) => t > b.a + MAT).length);
+  drawPanel(reviewer, rIn, boxes.filter((b) => { const p = boxAt(b, t); return t > b.a && (!p || p.leg !== "front" || p.x > XR + 1.2); }).length);
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  composer.render();
+}
+
+document.getElementById("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; document.getElementById("play").textContent = "Play"; } };
+document.getElementById("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); document.getElementById("play").click(); } });
+
+Promise.all(["500 1em 'JetBrains Mono'", "600 1em 'JetBrains Mono'", "800 1em 'JetBrains Mono'", "600 1em 'Instrument Sans'"].map((f) => document.fonts.load(f).catch(() => {})))
+  .finally(() => { treasuries.forEach((v) => v.drawFacade()); size(); requestAnimationFrame(frame); });
+</script>

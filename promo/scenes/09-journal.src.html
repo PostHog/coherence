@@ -1,0 +1,627 @@
+<title>Scene 9 · The Journal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hud { position: absolute; left: 3%; top: 5%; display: grid; gap: 4px; font: 500 clamp(10px, 1.3vw, 15px) var(--mono); color: var(--ink); pointer-events: none; }
+.hud .k { color: var(--muted); letter-spacing: .12em; text-transform: uppercase; font-size: .8em; display: flex; gap: 8px; align-items: center; }
+.hud .k svg { width: 1.4em; height: 1.4em; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.hud.right { left: auto; right: 3%; text-align: right; }
+.hud.right .k { justify-content: flex-end; }
+.hud .v { font-size: 1.9em; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.caption { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+.tokens { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.tok { display: grid; grid-template-columns: 14px 1fr; gap: 4px 10px; align-items: center; font-size: 14px; }
+.tok i { width: 14px; height: 14px; border-radius: 3px; box-shadow: 0 0 10px currentColor; }
+.tok small { grid-column: 2; color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin-top: 4px; }
+.icon { display: grid; justify-items: start; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; }
+.icon svg { width: 28px; height: 28px; stroke: var(--ink); fill: none; stroke-width: 1.25; stroke-linecap: round; stroke-linejoin: round; }
+.icon b { font: 500 13px var(--sans); }
+.icon code { font: 11px var(--mono); color: var(--muted); }
+p.note { margin: 10px 0 0; color: var(--muted); font-size: 14px; max-width: 70ch; }
+@media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 9 · Signal in the fog, revised</div>
+    <h1>An endless transcript condenses into a stack of decisions, and the bad call surfaces</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div class="hud" id="hud">
+      <div class="k" id="hudK"></div>
+      <div class="v" id="hudV"></div>
+    </div>
+    <div class="hud right" id="hud2">
+      <div class="k" id="hud2K"></div>
+      <div class="v" id="hud2V"></div>
+    </div>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="18" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 18.00</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <div class="cols">
+    <section class="box">
+      <h2>Beats (timed to a ~17 s read)</h2>
+      <ol class="beats">
+        <li><span class="t">0.0</span><div><q>But we can do more.</q><span>Left: a transcript that never stops typing, rows of token cells scrolling up into the fog, its prose punctuated by tool calls (Read, Grep, Bash, Edit), each with its output hanging beneath it. Right: an empty column where the journal will stack.</span></div></li>
+        <li><span class="t">2.5</span><div><q>The Coherence decision journal compresses hundreds of thousands of tokens into a handful of decisions.</q><span>At a line across the column, the transcript is selected a stretch at a time: a highlight band with a bar down its left edge grows over the rows as they cross, and the tokens that carry the decision light up orange in place. A copy of each lit token streams right, and where the copies land a decision record materializes, orange: considered, not yet judged. An inspection reticle locks onto each record in turn and sweeps it; mint grows behind the sweep, and the record’s selection back in the transcript turns mint with it.</span></div></li>
+        <li><span class="t">9.0</span><div><q>If a bad call happened in the process,</q><span>The reticle reaches the last record. The sweep stalls partway, hesitates, and the record goes red, along with its selection back in the transcript. The other four dim.</span></div></li>
+        <li><span class="t">12.0</span><div><q>it’s right there in the history, instead of buried in code.</q><span>We push in until the record reads: what was chosen, over what, and why. Then we pull back and tilt down: a red thread runs off the record and drops into the fogged territory below, to one red cell among thousands of grey ones, where it would otherwise have stayed.</span></div></li>
+      </ol>
+    </section>
+    <section class="box">
+      <h2>Colored tokens</h2>
+      <div class="tokens">
+        <div class="tok"><i style="background:var(--grey);color:var(--grey)"></i>Grey<small>Unexamined: the bulk of any transcript or codebase</small></div>
+        <div class="tok"><i style="background:var(--orange);color:var(--orange)"></i>Orange<small>In question: deliberation, a requirement not yet enforced</small></div>
+        <div class="tok"><i style="background:var(--red);color:var(--red)"></i>Red<small>Broken: a bad call, a bypass, a structural defect</small></div>
+        <div class="tok"><i style="background:var(--mint);color:var(--mint)"></i>Mint<small>Coherent: settled, enforced, verified. The final surface.</small></div>
+      </div>
+      <h2 style="margin-top:18px">Symbols · Tabler Icons, stroke 1.25</h2>
+      <div class="icons" id="icons"></div>
+      <p class="note">Tabler is MIT-licensed, has about 5,900 glyphs, and draws every glyph as strokes on a 24-unit grid. That means the stroke weight can match our hairlines and any glyph can draw on in motion. The mapping above is a first proposal.</p>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const ICONS = /*ICONS*/{};
+const T = 18;
+const CLARITY = [.1, .2];   // act two's clearing, picking up from scene 8
+const C = { bg: 0x07090C, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2" };
+const LINES = [
+  [0, 2.5, "But we can do more."],
+  [2.5, 9, "The Coherence decision journal compresses hundreds of thousands of tokens into a handful of decisions."],
+  [9, 12, "If a bad call happened in the process,"],
+  [12, 18, "it’s right there in the history, instead of buried in code."],
+];
+const DECISIONS = [
+  { chose: "One session store behind a chokepoint", over: "per-route session caching", because: "every read of a session passes one door", tokens: "74,112", agent: "subagent 1", id: "d-1a2b3c4d" },
+  { chose: "Retry webhooks with backoff", over: "skip the flaky webhook tests", because: "the failures were real timeouts, not flake", tokens: "58,930", agent: "subagent 2", id: "d-5e6f7a8b" },
+  { chose: "Split auth middleware by trust level", over: "one middleware for every route", because: "admin and public callers carry different risk", tokens: "96,441", agent: "main", id: "d-9c0d1e2f" },
+  { chose: "Keep tokens out of logs", over: "redact after the write", because: "a redaction that runs late has already leaked", tokens: "102,119", agent: "subagent 4", id: "d-7f3a90b1" },
+  { chose: "Read admin sessions straight from cache", over: "route through the session store", because: "faster for the dashboard", tokens: "81,204", agent: "subagent 3", id: "d-e3abc2c8", bad: true },
+];
+
+// ---------- utilities ----------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (k) => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+const smooth = (a, b, x) => { const k = clamp((x - a) / (b - a)); return k * k * (3 - 2 * k); };
+const rand = (() => { let s = 20260923; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+function icon(ctx, name, x, y, size, color, width = 1.5) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(size / 24, size / 24);
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for (const d of ICONS[name] || []) ctx.stroke(new Path2D(d));
+  ctx.restore();
+}
+function svgIcon(name) {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${(ICONS[name] || []).map((d) => `<path d="${d}"/>`).join("")}</svg>`;
+}
+function wrap(ctx, text, maxW) {
+  const words = text.split(" "), lines = []; let cur = "";
+  for (const w of words) { const t = cur ? cur + " " + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; }
+  if (cur) lines.push(cur); return lines;
+}
+
+// ---------- renderer ----------
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("gl"), antialias: true });
+// a final render asks for more (?maxdpr=4 draws a 1920×1080 layout at 8K); on screen, 2× is plenty
+renderer.setPixelRatio(Math.min(+new URLSearchParams(location.search).get("maxdpr") || 2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(C.bg);
+scene.fog = new THREE.FogExp2(C.fog, 0.042);
+const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.05, 300);
+const composer = new THREE.EffectComposer(renderer);
+composer.addPass(new THREE.RenderPass(scene, camera));
+const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(1280, 720), 0.85, 0.55, 0.18);
+composer.addPass(bloom);
+function size() {
+  const r = stage.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false); composer.setSize(r.width, r.height);
+}
+new ResizeObserver(size).observe(stage);
+
+function canvasTex(w, h, draw) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  draw(c.getContext("2d"), w, h);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+
+// ---------- fog sheets ----------
+function noiseTex() {
+  return canvasTex(512, 256, (g, w, h) => {
+    const img = g.createImageData(w, h), d = img.data;
+    const grid = (n) => { const a = []; for (let i = 0; i < (n + 1) * (n + 1); i++) a.push(rand()); return a; };
+    const octaves = [[6, .5], [12, .3], [24, .2]].map(([n, amp]) => ({ n, amp, g: grid(n) }));
+    const val = (o, x, y) => {
+      const fx = x * o.n, fy = y * o.n, ix = Math.floor(fx), iy = Math.floor(fy), tx = fx - ix, ty = fy - iy;
+      const at = (i, j) => o.g[(j % o.n) * (o.n + 1) + (i % o.n)];
+      const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+      return (at(ix, iy) * (1 - sx) + at(ix + 1, iy) * sx) * (1 - sy) + (at(ix, iy + 1) * (1 - sx) + at(ix + 1, iy + 1) * sx) * sy;
+    };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let v = 0; for (const o of octaves) v += val(o, x / w, y / h) * o.amp;
+      const edge = Math.sin(Math.PI * x / w) * Math.sin(Math.PI * y / h);
+      const a = clamp((v - .22) * 1.5) * edge;
+      const i = (y * w + x) * 4; d[i] = 170; d[i + 1] = 190; d[i + 2] = 205; d[i + 3] = a * 255;
+    }
+    g.putImageData(img, 0, 0);
+  });
+}
+const fogTex = noiseTex();
+const sheets = [];
+for (let i = 0; i < 12; i++) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(64, 12), new THREE.MeshBasicMaterial({ map: fogTex, transparent: true, depthWrite: false, opacity: .16, fog: false }));
+  m.position.set((rand() - .5) * 14, -3 + rand() * 2.6, -6 - i * 6);
+  m.userData = { base: m.position.clone(), speed: (rand() - .5) * .35, o: .06 + rand() * .07, near: i < 4 };
+  m.renderOrder = 2; scene.add(m); sheets.push(m);
+}
+
+// ---------- the territory: a map's ground, fogged ----------
+const territory = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.MeshBasicMaterial({
+  map: canvasTex(2048, 2048, (g, w) => {
+    g.fillStyle = "#07090C"; g.fillRect(0, 0, w, w);
+    g.strokeStyle = "#1B252D"; g.lineWidth = 3; g.lineJoin = "round";
+    for (let r = 0; r < 70; r++) {
+      let x = rand() * w, y = rand() * w; g.beginPath(); g.moveTo(x, y);
+      for (let s = 0; s < 5; s++) { if (s % 2) x += (rand() - .5) * 700; else y += (rand() - .5) * 700; g.lineTo(x, y); }
+      g.stroke();
+    }
+    g.strokeStyle = "#24313A"; g.lineWidth = 2;
+    for (let s = 0; s < 120; s++) { const x = rand() * w, y = rand() * w; g.strokeRect(x, y, 40 + rand() * 90, 22 + rand() * 30); }
+  }),
+}));
+territory.rotation.x = -Math.PI / 2; territory.position.set(0, -6.02, -16); scene.add(territory);
+// ---------- clarity (as in common.js): act two burns the fog off, scene by scene ----------
+// A scene sets CLARITY = [start, end] before this code; each starts where the last one ended, so the clearing runs across cuts.
+// At 0 the fog is act one's; at 1 the air is clear and the territory under the map is lit.
+function clarityAt(t) { return typeof CLARITY === "undefined" ? 0 : CLARITY[0] + (CLARITY[1] - CLARITY[0]) * clamp(t / T); }
+function applyClarity(c) {
+  territory.material.color.setScalar(1 + 2.4 * c);
+  return { fog: 1 - .85 * c, sheets: 1 - c };
+}
+
+
+// code cells on the territory, one of them red
+const cellGeo = new THREE.PlaneGeometry(1, 1);
+const cellMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+const flat = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+const GROUND = { cols: 96, rows: 64, dx: .34, dz: .3, x0: -16, z0: -3 };
+const groundCount = GROUND.cols * GROUND.rows;
+const ground = new THREE.InstancedMesh(cellGeo, cellMat, groundCount);
+const SPECK = { x: 5.6, z: -7.5 };
+{
+  const m = new THREE.Matrix4(), col = new THREE.Color(); let i = 0;
+  for (let r = 0; r < GROUND.rows; r++) for (let c = 0; c < GROUND.cols; c++) {
+    const w = .06 + rand() * .24, x = GROUND.x0 + c * GROUND.dx, z = GROUND.z0 - r * GROUND.dz;
+    m.compose(new THREE.Vector3(x, -6, z), flat, new THREE.Vector3(w, .07, 1)); ground.setMatrixAt(i, m);
+    col.set(rand() < .04 ? "#6B4A2A" : "#2A333A"); ground.setColorAt(i, col); i++;
+  }
+  // the one red cell, where the bad call lives in the code
+  const c = Math.round((SPECK.x - GROUND.x0) / GROUND.dx), r = Math.round((GROUND.z0 - SPECK.z) / GROUND.dz);
+  const k = r * GROUND.cols + c;
+  m.compose(new THREE.Vector3(GROUND.x0 + c * GROUND.dx, -5.99, GROUND.z0 - r * GROUND.dz), flat, new THREE.Vector3(.22, .08, 1));
+  ground.setMatrixAt(k, m); ground.setColorAt(k, col.set(C.red));
+  SPECK.x = GROUND.x0 + c * GROUND.dx; SPECK.z = GROUND.z0 - r * GROUND.dz;
+}
+scene.add(ground);
+const speckGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), new THREE.MeshBasicMaterial({
+  map: canvasTex(128, 128, (g) => { const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, "rgba(255,75,75,.9)"); gr.addColorStop(1, "rgba(255,75,75,0)"); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); }),
+  transparent: true, depthWrite: false, fog: false, opacity: 0, blending: THREE.AdditiveBlending,
+}));
+speckGlow.rotation.x = -Math.PI / 2; speckGlow.position.set(SPECK.x, -5.97, SPECK.z); scene.add(speckGlow);
+
+// ---------- decision records: a stack on the right ----------
+const CARD = { w: 3.3, h: .98, x: 4.5, z: 0, ys: [2.7, 1.58, .46, -.66, -1.78] };
+const BAD = DECISIONS.findIndex((d) => d.bad);
+// the label chip: grown out of the border's top-left corner, black glyph and text on the border's color
+const CHIP_PX = { w: 0, h: 81 };
+function drawChip(g, col, textOnly = false) {
+  g.font = `800 25px "JetBrains Mono"`;
+  const chipW = 110 + g.measureText("DECISION").width;
+  CHIP_PX.w = 5 + chipW;
+  if (!textOnly) { g.fillStyle = col; g.beginPath(); g.roundRect(5, 5, chipW, 76, [22, 0, 18, 0]); g.fill(); }
+  icon(g, "arrow-fork", 26, 19, 46, "#000", 2.6);
+  g.fillStyle = "#000"; g.fillText("DECISION", 84, 53);
+}
+// the chip's glyph and text render after the bloom, in their own scene, so the glow never softens them
+const overlay = new THREE.Scene();
+overlay.fog = scene.fog;
+function cardTex(dcs, col) {
+  return canvasTex(1280, 380, (g, w, h) => {
+    g.fillStyle = "rgba(10,14,18,.94)"; g.beginPath(); g.roundRect(5, 5, w - 10, h - 10, 22); g.fill();
+    g.strokeStyle = col; g.lineWidth = 3; g.stroke();
+    // the label is a chip grown out of the border's top-left corner, in the border's color
+    drawChip(g, col); // the chip glows with the card; its glyph and text are redrawn crisp after the bloom
+    g.fillStyle = C.muted; g.textAlign = "right"; g.fillText(dcs.id + " · " + dcs.agent, w - 36, 58); g.textAlign = "left";
+    g.fillStyle = C.ink; g.font = `600 50px "Instrument Sans"`; g.fillText(dcs.chose, 36, 142);
+    g.font = `500 20px "JetBrains Mono"`; g.fillStyle = C.muted; g.fillText("OVER", 36, 214);
+    g.font = `400 30px "Instrument Sans"`; g.fillText(dcs.over, 112, 216);
+    const ow = g.measureText(dcs.over).width; g.strokeStyle = C.muted; g.lineWidth = 2; g.beginPath(); g.moveTo(112, 206); g.lineTo(112 + ow, 206); g.stroke();
+    g.font = `500 20px "JetBrains Mono"`; g.fillText("WHY", 36, 272);
+    g.font = `400 30px "Instrument Sans"`; g.fillStyle = dcs.bad ? C.orange : C.ink; g.fillText(dcs.because, 112, 274);
+    icon(g, "message-dots", 34, h - 72, 28, C.muted, 1.5);
+    g.fillStyle = C.muted; g.font = `400 20px "JetBrains Mono"`; g.fillText(`compressed from ${dcs.tokens} tokens`, 74, h - 50);
+  });
+}
+// each record is three faces of one plane: orange as it lands, mint as inspection sweeps it, red if it fails
+const cards = DECISIONS.map((d, i) => {
+  const m = new THREE.Group(); m.position.set(CARD.x, CARD.ys[i], CARD.z); scene.add(m);
+  const face = (order) => {
+    const f = new THREE.Mesh(new THREE.PlaneGeometry(CARD.w, CARD.h), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+    f.renderOrder = order; m.add(f); return f;
+  };
+  const ov = new THREE.Group(); overlay.add(ov);
+  const chip = (order) => {
+    const f = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+    f.renderOrder = order; ov.add(f); return f;
+  };
+  return { m, d, base: face(5), mint: face(6), red: face(7), ov, chips: [chip(5), chip(6), chip(7)], arrived: 0, total: 0 };
+});
+// the inspection: a reticle locks onto each record in turn; the bad call is judged last
+const RED_AT = 9.0;
+const INSPECT = DECISIONS.map((d, i) => { const s0 = 2.6 + .95 * (i + 1) + 1.15; return [s0, d.bad ? RED_AT : s0 + .7]; });
+const reticleTex = canvasTex(1400, 480, (g, w, h) => {
+  g.strokeStyle = "#fff"; g.lineWidth = 5; g.lineCap = "square";
+  const L = 70, m = 8;
+  for (const [x, y, dx, dy] of [[m, m, 1, 1], [w - m, m, -1, 1], [m, h - m, 1, -1], [w - m, h - m, -1, -1]]) {
+    g.beginPath(); g.moveTo(x + dx * L, y); g.lineTo(x, y); g.lineTo(x, y + dy * L); g.stroke();
+  }
+  g.lineWidth = 3;
+  for (const [x1, y1, x2, y2] of [[w / 2, m, w / 2, m + 26], [w / 2, h - m, w / 2, h - m - 26], [m, h / 2, m + 26, h / 2], [w - m, h / 2, w - m - 26, h / 2]]) {
+    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+  }
+  g.fillStyle = "#fff"; g.font = `500 22px "JetBrains Mono"`; g.fillText("INSPECT", m + 86, m + 22);
+});
+const reticle = new THREE.Mesh(new THREE.PlaneGeometry(CARD.w + .34, CARD.h + .3), new THREE.MeshBasicMaterial({ map: reticleTex, transparent: true, opacity: 0, depthWrite: false, toneMapped: false, color: C.ink }));
+reticle.renderOrder = 9; scene.add(reticle);
+const scan = new THREE.Mesh(new THREE.PlaneGeometry(.025, CARD.h * .94), new THREE.MeshBasicMaterial({ color: C.mint, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+scan.renderOrder = 10; scene.add(scan);
+function sweepOf(i, t) {
+  const [s0, e0] = INSPECT[i];
+  if (!DECISIONS[i].bad) return smooth(s0 + .12, e0, t);
+  return .6 * smooth(s0 + .12, e0 - .1, t) - (t > e0 - .25 && t < e0 ? .025 * Math.sin((t - e0) * 60) : 0);
+}
+function updateInspection(t) {
+  cards.forEach((c, i) => {
+    const p = clamp(sweepOf(i, t), .001, 1);
+    c.mint.scale.x = p; c.mint.position.x = -CARD.w / 2 + p * CARD.w / 2;
+    if (c.mint.material.map) c.mint.material.map.repeat.x = p;
+  });
+  // where the reticle is: on a record while it inspects, travelling between records otherwise
+  const first = INSPECT[0][0];
+  let pos, lock = 0, i = 0;
+  while (i < INSPECT.length - 1 && t > INSPECT[i][1]) i++;
+  const [s0, e0] = INSPECT[i];
+  if (t >= s0 || i === 0) { pos = cards[i].m.position; lock = smooth(s0, s0 + .22, t); }
+  else {
+    const k = ease(clamp((t - INSPECT[i - 1][1]) / (s0 - INSPECT[i - 1][1])));
+    pos = cards[i - 1].m.position.clone().lerp(cards[i].m.position, k);
+  }
+  reticle.position.set(CARD.x, pos.y, CARD.z + .05);
+  reticle.scale.setScalar(1 + .14 * (1 - lock));
+  reticle.material.opacity = smooth(first - .4, first, t) * (1 - smooth(12, 12.6, t));
+  reticle.material.color.set(t >= RED_AT ? C.red : C.ink);
+  const inspecting = t >= s0 && t <= e0;
+  const p = clamp(sweepOf(i, t));
+  scan.position.set(CARD.x - CARD.w / 2 + p * CARD.w, cards[i].m.position.y, CARD.z + .04);
+  scan.material.opacity = inspecting && p > .01 && p < .999 ? .95 : 0;
+}
+
+// thread from the bad record's edge down to the buried cell
+const thread = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+  new THREE.LineBasicMaterial({ color: C.red, transparent: true, opacity: 0, fog: false }));
+scene.add(thread);
+
+// ---------- the transcript column on the left: it never stops ----------
+const COL = { x: -4.3, y: -.8, z: -1, w: 4.6, rowH: .19, v: 1.5, bottom: -4.4, top: 5.4, detach: .9 };
+const column = new THREE.Group();
+column.position.set(COL.x, COL.y, COL.z); column.rotation.set(-.1, .3, 0); scene.add(column); column.updateMatrixWorld(true);
+const WIN = .95, WIN0 = 2.6; // record i captures the rows that cross the line during [WIN0 + i*WIN, WIN0 + (i+1)*WIN)
+const rowY = (r, t) => COL.top - r * COL.rowH + t * COL.v;
+const cells = [];
+const ROWS = Math.ceil((T * COL.v + (COL.top - COL.bottom)) / COL.rowH) + 4;
+// the transcript's shape: prose, then one or two tool calls with their output, then a turn gap
+const TOOLS = [
+  ["Read", "file-text", "src/session/store.ts"], ["Grep", "search", "\"getSession(\" src/"], ["Bash", "terminal-2", "npm test -- auth"],
+  ["Edit", "pencil", "src/api/admin.ts"], ["Read", "file-text", "src/auth/middleware.ts"], ["Bash", "terminal-2", "git diff --stat"],
+  ["WebFetch", "world", "docs: webhook retries"], ["Write", "file-plus", "src/log/redact.ts"], ["Grep", "search", "\"cache.raw\""],
+];
+const PLAN = [], toolCalls = [];
+while (PLAN.length < ROWS) {
+  const prose = 3 + Math.floor(rand() * 4);
+  for (let i = 0; i < prose; i++) PLAN.push(i === prose - 1 ? "prose-last" : "prose");
+  const calls = rand() < .3 ? 2 : 1;
+  for (let k = 0; k < calls; k++) {
+    toolCalls.push({ r: PLAN.length, tool: TOOLS[toolCalls.length % TOOLS.length], out: 0 });
+    PLAN.push("toolhead", "toolpad");
+    const out = 2 + Math.floor(rand() * 3);
+    toolCalls[toolCalls.length - 1].out = out;
+    for (let i = 0; i < out; i++) PLAN.push("toolout");
+  }
+  PLAN.push("blank");
+}
+for (let r = 0; r < ROWS; r++) {
+  const type = PLAN[r];
+  if (type !== "prose" && type !== "prose-last" && type !== "toolout") continue;
+  const code = type === "toolout";
+  const x0 = -COL.w / 2 + (code ? .5 : 0);
+  const len = COL.w * (code ? .4 + rand() * .45 : type === "prose-last" ? .25 + rand() * .4 : .82 + rand() * .18);
+  let x = x0;
+  while (x < -COL.w / 2 + len) {
+    const w = (code ? .04 : .05) + rand() * (code ? .22 : .3); if (x + w > COL.w / 2) break;
+    let kind = code ? "code" : "grey"; const q = rand();
+    if (!code && q < .09) kind = "orange";
+    const yd = COL.detach;
+    const ts = (yd - COL.top + r * COL.rowH) / COL.v;
+    const win = ts >= WIN0 && ts < WIN0 + WIN * 5 ? Math.floor((ts - WIN0) / WIN) : -1;
+    const td = ts + .05 + rand() * .2;
+    cells.push({ r, x: x + w / 2, w, kind, typed: (x - x0) / COL.w, yd, ts, td, win });
+    x += w + (code ? .05 : .06);
+  }
+}
+// each tool call: a chip with its glyph, name and argument, and a rule down its output
+const CHIP = { h: .3, w: 2.6 };
+toolCalls.forEach((c) => {
+  c.chip = new THREE.Mesh(new THREE.PlaneGeometry(CHIP.w, CHIP.h), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+  c.rule = new THREE.Mesh(cellGeo, new THREE.MeshBasicMaterial({ color: "#3E4F5D", transparent: true, opacity: 0, depthWrite: false }));
+  column.add(c.chip, c.rule);
+});
+function chipTex([name, glyph, arg]) {
+  return canvasTex(832, 96, (g, w, h) => {
+    g.font = `600 38px "JetBrains Mono"`;
+    const cw = 96 + g.measureText(name).width;
+    g.beginPath(); g.roundRect(3, 8, cw, 80, 16);
+    g.fillStyle = "rgba(126,147,163,.14)"; g.fill(); g.strokeStyle = "#7E93A3"; g.lineWidth = 3; g.stroke();
+    icon(g, glyph, 22, 24, 48, "#9FB2C1", 2.2);
+    g.fillStyle = "#B4C4D0"; g.fillText(name, 80, 61);
+    g.font = `400 34px "JetBrains Mono"`; g.fillStyle = "#7A8FA1"; g.fillText(arg, cw + 26, 60);
+  });
+}
+function updateToolCalls(t) {
+  for (const c of toolCalls) {
+    const y = rowY(c.r, t) - COL.rowH / 2, fade = 1 - smooth(COL.top - 3.2, COL.top, y);
+    const live = y > COL.bottom && y < COL.top;
+    c.chip.position.set(-COL.w / 2 + CHIP.w / 2, y, .005);
+    c.chip.material.opacity = live ? fade : 0;
+    const top = y - CHIP.h / 2 - .02, bot = rowY(c.r + 2 + c.out - 1, t) - COL.rowH * .4;
+    const visTop = Math.min(top, COL.top), visBot = Math.max(bot, COL.bottom);
+    c.rule.position.set(-COL.w / 2 + .24, (visTop + visBot) / 2, 0); c.rule.scale.set(.025, Math.max(.001, visTop - visBot), 1);
+    c.rule.material.opacity = visTop > visBot ? .9 * fade : 0;
+  }
+}
+const tint = { grey: new THREE.Color(C.grey), code: new THREE.Color("#46596A"), orange: new THREE.Color(C.orange), red: new THREE.Color(C.red), mint: new THREE.Color(C.mint), hot: new THREE.Color("#9BFFD6"), hotOrange: new THREE.Color("#FFB866") };
+// what a selection has become by time t: orange while it waits, mint once inspected, red once judged
+function verdictColor(win, t, out) {
+  out.copy(tint.hotOrange);
+  if (DECISIONS[win].bad) return out.lerp(tint.red, smooth(RED_AT, RED_AT + .15, t));
+  const e0 = INSPECT[win][1];
+  return out.lerp(tint.hot, smooth(e0 - .15, e0 + .1, t));
+}
+const bandCol = new THREE.Color();
+const fogCol = new THREE.Color(C.fog);
+const colMesh = new THREE.InstancedMesh(cellGeo, cellMat.clone(), cells.length);
+const flyMesh = new THREE.InstancedMesh(cellGeo, cellMat.clone(), cells.length);
+[colMesh, flyMesh].forEach((m) => { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; });
+column.add(colMesh); scene.add(flyMesh);
+cells.forEach((c, i) => {
+  colMesh.setColorAt(i, tint[c.kind]); flyMesh.setColorAt(i, tint[c.kind]);
+  c.keep = c.win >= 0 && c.kind !== "code" && (c.kind !== "grey" || rand() < .24);
+  if (!c.keep) return;
+  c.p0 = column.localToWorld(new THREE.Vector3(c.x, c.yd, 0));
+  {
+    cards[c.win].total++;
+    c.p1 = new THREE.Vector3(CARD.x + (rand() - .5) * CARD.w * .9, CARD.ys[c.win] + (rand() - .5) * CARD.h * .8, CARD.z + .02);
+    c.dur = .9 + rand() * .3;
+  }
+  c.ctrl = new THREE.Vector3((c.p0.x + c.p1.x) / 2, (c.p0.y + c.p1.y) / 2 + .7 + rand() * .6, 1.4 + rand() * .8);
+});
+
+// selection bands: the captured stretch of transcript, highlighted in place
+const bands = DECISIONS.map((d, i) => {
+  const col = C.orange;
+  const fill = new THREE.Mesh(cellGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false }));
+  const bar = new THREE.Mesh(cellGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+  fill.position.z = -.01; column.add(fill, bar);
+  const first = Math.ceil(((WIN0 + i * WIN) * COL.v + COL.top - COL.detach) / COL.rowH);
+  const lastRow = Math.ceil(((WIN0 + (i + 1) * WIN) * COL.v + COL.top - COL.detach) / COL.rowH) - 1;
+  return { fill, bar, first, lastRow, start: WIN0 + i * WIN, i };
+});
+function updateBands(t) {
+  for (const b of bands) {
+    if (t < b.start) { b.fill.material.opacity = b.bar.material.opacity = 0; continue; }
+    const cur = Math.min(b.lastRow, Math.floor((t * COL.v + COL.top - COL.detach) / COL.rowH));
+    const top = Math.min(COL.top - .6, rowY(b.first, t) + COL.rowH * .6), bot = rowY(cur, t) - COL.rowH * .6;
+    const fade = 1 - smooth(COL.top - 3, COL.top - .8, bot);
+    const h = Math.max(.001, top - bot), yc = (top + bot) / 2;
+    b.fill.position.set(0, yc, -.01); b.fill.scale.set(COL.w + .3, h, 1); b.fill.material.opacity = .11 * fade;
+    b.bar.position.set(-COL.w / 2 - .2, yc, 0); b.bar.scale.set(.035, h, 1); b.bar.material.opacity = .95 * fade;
+    verdictColor(b.i, t, bandCol); b.fill.material.color.copy(bandCol); b.bar.material.color.copy(bandCol);
+  }
+}
+const M = new THREE.Matrix4(), P = new THREE.Vector3(), S = new THREE.Vector3(), Q = new THREE.Quaternion(), ID = new THREE.Quaternion(), tmpC = new THREE.Color();
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+function updateCells(t) {
+  cards.forEach((c) => (c.arrived = 0));
+  cells.forEach((c, i) => {
+    const y = rowY(c.r, t);
+    const flying = c.keep && t >= c.td;
+    // in the column: typed in at the bottom, scrolling up into the fog; a selected token stays and lights
+    if (y < COL.bottom + c.typed * COL.rowH * 1.5 || y > COL.top) colMesh.setMatrixAt(i, ZERO);
+    else {
+      const sel = c.keep ? smooth(c.ts, c.ts + .3, t) : 0;
+      P.set(c.x, y, .01 * sel); S.set(c.w, .07 + .03 * sel, 1); M.compose(P, ID, S); colMesh.setMatrixAt(i, M);
+      tmpC.copy(tint[c.kind]);
+      if (sel) tmpC.lerp(verdictColor(c.win, t, bandCol), sel);
+      tmpC.lerp(fogCol, smooth(COL.top - 3.2, COL.top, y)); colMesh.setColorAt(i, tmpC);
+    }
+    if (!flying) { flyMesh.setMatrixAt(i, ZERO); return; }
+    const k = ease(clamp((t - c.td) / c.dur)), u = 1 - k;
+    P.set(u * u * c.p0.x + 2 * u * k * c.ctrl.x + k * k * c.p1.x, u * u * c.p0.y + 2 * u * k * c.ctrl.y + k * k * c.p1.y, u * u * c.p0.z + 2 * u * k * c.ctrl.z + k * k * c.p1.z);
+    const sh = 1 - smooth(.78, 1, k);
+    S.set(c.w * sh, .07 * sh, 1);
+    M.compose(P, ID, S); flyMesh.setMatrixAt(i, M);
+    if (k >= 1) cards[c.win].arrived++;
+    flyMesh.setColorAt(i, tmpC.copy(tint.orange));
+  });
+  colMesh.instanceMatrix.needsUpdate = true; colMesh.instanceColor.needsUpdate = true;
+  flyMesh.instanceMatrix.needsUpdate = true; flyMesh.instanceColor.needsUpdate = true;
+}
+
+// ---------- camera ----------
+const KEYS = [
+  [0, [.3, .5, 11.8], [.3, .4, 0]],
+  [8.8, [.8, .3, 11.0], [.7, .3, 0]],
+  [11.6, [3.4, -1.5, 6.6], [4.4, -1.74, 0]],
+  [14.2, [4.5, -1.78, 3.05], [4.5, -1.78, 0]],
+  [18, [5.2, 2.2, 7.8], [5.0, -4.2, -3.5]],
+];
+const V = (a) => new THREE.Vector3(...a);
+function cameraAt(t) {
+  let i = 0; while (i < KEYS.length - 2 && t > KEYS[i + 1][0]) i++;
+  const [t0, p0, q0] = KEYS[i], [t1, p1, q1] = KEYS[i + 1], k = ease(clamp((t - t0) / (t1 - t0)));
+  camera.position.copy(V(p0).lerp(V(p1), k));
+  camera.lookAt(V(q0).lerp(V(q1), k));
+  camera.position.x += Math.sin(t * .6) * .04; camera.position.y += Math.cos(t * .45) * .03;
+}
+
+// ---------- HUD ----------
+const hudK = document.getElementById("hudK"), hudV = document.getElementById("hudV");
+const hud2K = document.getElementById("hud2K"), hud2V = document.getElementById("hud2V");
+hudK.innerHTML = `${svgIcon("message-dots")}transcript · session 7f3a`;
+hud2K.innerHTML = `journal${svgIcon("arrow-fork")}`;
+function hud(t) {
+  hudV.textContent = `${Math.round(398210 + t * 1873).toLocaleString("en-US")} tokens`;
+  const n = cards.filter((c) => c.total && c.arrived / c.total > .5).length;
+  hud2V.textContent = `${n} decision${n === 1 ? "" : "s"}`;
+  hud2V.style.color = n ? C.ink : C.muted;
+  const out = 1 - smooth(10.6, 11.4, t);
+  document.getElementById("hud").style.opacity = String(out);
+  document.getElementById("hud2").style.opacity = String(out * smooth(2.2, 2.8, t));
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+// ---------- driven: a review player can set the scene's time from outside, with postMessage({ t }) ----------
+// (t, playing and T are the scene's own; this runs later, once they exist)
+window.addEventListener("message", (e) => { const d = e.data || {}; if (typeof d.t === "number") { t = Math.min(T, Math.max(0, d.t)); playing = false; } });
+// a final render sets the time and draws at once, so the frame it captures is exactly this t (review/render.mjs)
+window.renderAt = (x) => { t = Math.min(T, Math.max(0, x)); playing = false; render(t); };
+const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+function render(t) {
+  updateCells(t);
+  updateBands(t);
+  updateToolCalls(t);
+  cameraAt(t);
+  const clear = smooth(3, 9, t);
+  const cl = applyClarity(clarityAt(t));
+  scene.fog.density = (.04 - .012 * clear) * cl.fog;
+  sheets.forEach((s, i) => {
+    s.position.x = s.userData.base.x + Math.sin(t * .15 + i) * 2 + t * s.userData.speed;
+    s.material.opacity = s.userData.o * (s.userData.near ? 1 - .9 * clear : 1 - .3 * clear) * cl.sheets;
+  });
+  updateInspection(t);
+  cards.forEach((c) => {
+    const formed = c.total ? smooth(.2, .85, c.arrived / c.total) : 0;
+    const dim = c.d.bad ? 1 : 1 - .55 * smooth(RED_AT + .2, RED_AT + 1.2, t);
+    const red = c.d.bad ? smooth(RED_AT, RED_AT + .15, t) : 0;
+    const pulse = c.d.bad ? 1 + .05 * Math.max(0, Math.sin((t - RED_AT) * 4)) * red * (1 - smooth(12, 13, t)) : 1;
+    c.base.material.opacity = formed * dim; c.mint.material.opacity = formed * dim * (1 - red); c.red.material.opacity = formed * red;
+    c.m.scale.setScalar((.94 + .06 * formed) * pulse);
+    c.m.position.x = CARD.x - .35 * (1 - formed);
+    // the overlay chips track their record: same place, same faces, same sweep
+    c.ov.position.copy(c.m.position); c.ov.scale.copy(c.m.scale);
+    const [cb, cm, cr] = c.chips, cwu = CHIP_PX.w / 1280 * CARD.w, chu = CHIP_PX.h / 380 * CARD.h;
+    const sweep = clamp(c.mint.scale.x * CARD.w / cwu, .001, 1);
+    for (const f of c.chips) { f.scale.set(cwu, chu, 1); f.position.set(-CARD.w / 2 + cwu / 2, CARD.h / 2 - chu / 2, .001); }
+    cm.scale.x = cwu * sweep; cm.position.x = -CARD.w / 2 + cwu * sweep / 2; if (cm.material.map) cm.material.map.repeat.x = sweep;
+    cb.material.opacity = c.base.material.opacity; cm.material.opacity = c.mint.material.opacity; cr.material.opacity = c.red.material.opacity;
+  });
+  // the thread: off the bad record's right edge, down through the fog to the buried cell
+  const drop = smooth(14.5, 16.8, t), b = cards[BAD].m.position;
+  const pts = [new THREE.Vector3(b.x + CARD.w / 2, b.y, b.z), new THREE.Vector3(b.x + CARD.w / 2 + .45, b.y, b.z), new THREE.Vector3(SPECK.x, -5.98, SPECK.z)];
+  const l1 = pts[0].distanceTo(pts[1]), l2 = pts[1].distanceTo(pts[2]), d = drop * (l1 + l2);
+  const shown = d <= l1 ? [pts[0], pts[0].clone().lerp(pts[1], d / l1)] : [pts[0], pts[1], pts[1].clone().lerp(pts[2], (d - l1) / l2)];
+  thread.geometry.setFromPoints(shown); thread.material.opacity = smooth(14.3, 14.7, t);
+  speckGlow.material.opacity = smooth(16.3, 17, t) * (.6 + .4 * Math.sin(t * 6));
+  bloom.strength = .8 + .25 * smooth(9, 10, t);
+  hud(t);
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  composer.render();
+  renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
+}
+
+document.getElementById("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; document.getElementById("play").textContent = "Play"; } };
+document.getElementById("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); document.getElementById("play").click(); } });
+
+const VOCAB = [["arrow-fork", "decision"], ["flask", "conjecture"], ["bug", "defect"], ["alert-triangle", "escalation"], ["clipboard-check", "work order"], ["abc", "lexicon"], ["lock-access", "chokepoint"], ["door-enter", "entrance"], ["circle-check", "run"], ["message-dots", "transcript"], ["route", "structural route"], ["topology-star-3", "component"]];
+document.getElementById("icons").innerHTML = VOCAB.map(([n, l]) => `<div class="icon">${svgIcon(n)}<b>${l}</b><code>${n}</code></div>`).join("");
+
+Promise.all(["600 1em 'Instrument Sans'", "400 1em 'Instrument Sans'", "500 1em 'JetBrains Mono'", "400 1em 'JetBrains Mono'", "800 1em 'JetBrains Mono'", "600 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
+  .finally(() => {
+    toolCalls.forEach((c) => { c.chip.material.map = chipTex(c.tool); c.chip.material.needsUpdate = true; });
+    cards.forEach((c) => {
+      [[c.base, C.orange], [c.mint, C.mint], [c.red, C.red]].forEach(([f, col], k) => {
+        f.material.map = cardTex(c.d, col); f.material.needsUpdate = true;
+        const cf = c.chips[k];
+        cf.material.map = canvasTex(Math.ceil(CHIP_PX.w) + 1, CHIP_PX.h, (g) => drawChip(g, col, true)); cf.material.needsUpdate = true;
+      });
+    });
+    size(); requestAnimationFrame(frame);
+  });
+</script>

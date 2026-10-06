@@ -1,0 +1,236 @@
+[
+ {
+  "i": 1,
+  "scene": 1,
+  "text": "What if the best way to save tokens",
+  "heard": "What if the best way to save tokens",
+  "start": 6.22,
+  "end": 8.5,
+  "file": "01-01.wav",
+  "cut": [
+   6.04,
+   8.5
+  ]
+ },
+ {
+  "i": 2,
+  "scene": 1,
+  "text": "Is to stop writing bad code?",
+  "heard": "is to stop writing bad code?",
+  "start": 8.5,
+  "end": 11.1,
+  "file": "01-02.wav",
+  "cut": [
+   8.5,
+   11.45
+  ]
+ },
+ {
+  "i": 3,
+  "scene": 2,
+  "text": "Our industry is lost in a fog.",
+  "heard": "",
+  "start": 12.92,
+  "end": 14.94,
+  "file": "02-03.wav",
+  "cut": [
+   12.74,
+   15.29
+  ]
+ },
+ {
+  "i": 4,
+  "scene": 2,
+  "text": "We have completely new tools for building software, and we can build it faster than ever.",
+  "heard": "",
+  "start": 16.02,
+  "end": 20.52,
+  "file": "02-04.wav",
+  "cut": [
+   15.84,
+   20.85
+  ]
+ },
+ {
+  "i": 5,
+  "scene": 2,
+  "text": "But our processes have never been more confused. The work we do is more opaque, more complex, more difficult to reason about than at any point in our careers.",
+  "heard": "",
+  "start": 21.18,
+  "end": 31.38,
+  "file": "02-05.wav",
+  "cut": [
+   21.0,
+   31.73
+  ]
+ },
+ {
+  "i": 6,
+  "scene": 3,
+  "text": "We can imagine new code, we can describe thoughtful architecture, we can specify sturdy systems.",
+  "heard": "",
+  "start": 32.44,
+  "end": 38.02,
+  "file": "03-06.wav",
+  "cut": [
+   32.26,
+   38.37
+  ]
+ },
+ {
+  "i": 7,
+  "scene": 3,
+  "text": "But we have no idea how faithfully our robots are building for us. The more complex our designs, the more challenging they are to validate.",
+  "heard": "",
+  "start": 38.98,
+  "end": 46.02,
+  "file": "03-07.wav",
+  "cut": [
+   38.8,
+   46.21
+  ]
+ },
+ {
+  "i": 8,
+  "scene": 3,
+  "text": "Agents are writing good code by accident.",
+  "heard": "",
+  "start": 49.42,
+  "end": 52.22,
+  "file": "03-08.wav",
+  "cut": [
+   49.24,
+   52.57
+  ]
+ },
+ {
+  "i": 9,
+  "scene": 4,
+  "text": "The systems at our disposal are trained to finish the job at any cost, so they cut subtle corners where we can\u2019t see.",
+  "heard": "",
+  "start": 53.56,
+  "end": 60.3,
+  "file": "04-09.wav",
+  "cut": [
+   53.38,
+   60.65
+  ]
+ },
+ {
+  "i": 10,
+  "scene": 4,
+  "text": "Understanding it all requires reading code and reasoning about its consequences, but every day there\u2019s just more.",
+  "heard": "",
+  "start": 61.4,
+  "end": 66.7,
+  "file": "04-10.wav",
+  "cut": [
+   61.22,
+   66.84
+  ]
+ },
+ {
+  "i": 11,
+  "scene": 4,
+  "text": "More complexity than we can possibly get our arms around.",
+  "heard": "",
+  "start": 66.98,
+  "end": 70.1,
+  "file": "04-11.wav",
+  "cut": [
+   66.84,
+   70.31
+  ]
+ },
+ {
+  "i": 12,
+  "scene": 5,
+  "text": "Our solution? Throw more inference at the problem. We use inference to write code, then we use more inference to ask if the code we wrote was good.",
+  "heard": "",
+  "start": 70.52,
+  "end": 78.06,
+  "file": "05-12.wav",
+  "cut": [
+   70.34,
+   78.41
+  ]
+ },
+ {
+  "i": 13,
+  "scene": 5,
+  "text": "So what do we get for all this? Bugs that recur. Endless whack a mole adversarial reviews.",
+  "heard": "",
+  "start": 78.76,
+  "end": 84.42,
+  "file": "05-13.wav",
+  "cut": [
+   78.58,
+   84.77
+  ]
+ },
+ {
+  "i": 14,
+  "scene": 6,
+  "text": "OpenRouter does twenty trillion tokens a day. GitHub struggles to stay online.",
+  "heard": "",
+  "start": 85.16,
+  "end": 90.44,
+  "file": "06-14.wav",
+  "cut": [
+   84.98,
+   90.75
+  ]
+ },
+ {
+  "i": "15a",
+  "scene": 6,
+  "text": "Software staggers under this scale of motion.",
+  "heard": "Software staggers under the scale of motion. (first take)",
+  "start": 91.06,
+  "end": 93.7,
+  "file": "06-15a.wav",
+  "cut": [
+   90.88,
+   93.87
+  ]
+ },
+ {
+  "i": 15,
+  "scene": 6,
+  "text": "Software staggers under this scale of motion.",
+  "heard": "Software staggers under the scale of motion. (second take, used)",
+  "start": 94.04,
+  "end": 96.6,
+  "file": "06-15.wav",
+  "cut": [
+   93.87,
+   96.83
+  ]
+ },
+ {
+  "i": 16,
+  "scene": 6,
+  "text": "Because we don\u2019t yet have the tools to make sense of this new world.",
+  "heard": "",
+  "start": 97.06,
+  "end": 100.98,
+  "file": "06-16.wav",
+  "cut": [
+   96.88,
+   101.33
+  ]
+ },
+ {
+  "i": 17,
+  "scene": 7,
+  "text": "It's time to build the next generation of tools.",
+  "heard": "So it's time to build the next generation of tools.",
+  "start": 101.94,
+  "end": 105.06,
+  "file": "07-17.wav",
+  "cut": [
+   101.76,
+   105.41
+  ]
+ }
+]

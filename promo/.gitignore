@@ -1,0 +1,17 @@
+# The soundtrack is a licensed recording kept out of history; drop it beside script.md to build the storyboard.
+Black Hole.m4a
+
+# voice reads: local only
+audio/**/*.wav
+.venv/
+audio/processed/
+.venv-enhance/
+
+# rendered from the licensed track or the voice reads: rebuilt by review/assemble.py, local only
+review/music.mp3
+review/mix.mp3
+review/clips/
+review/compare/
+review/master/
+render/
+storyboard/mix.mp3

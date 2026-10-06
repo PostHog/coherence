@@ -1,0 +1,63 @@
+{
+ "_about": "Edit decisions the assembler and review page apply on top of the narration timing. in/out: where in a scene's own time its window starts and ends (seconds; defaults 0 and the scene's length). hits: moments in a scene's own time that should land on a beat; the player warps the scene's clock gently so each one does. Every cut snaps to the nearest beat within 0.35 s. dissolve (on the incoming scene): seconds of cross-dissolve centred on its cut; both scenes keep moving through it.",
+ "io": {
+  "1": {
+   "out": 13.0,
+   "why": "scene 1 hands over mid-tip, under the dissolve"
+  },
+  "2": {
+   "in": 1.82,
+   "dissolve": 1.2,
+   "why": "a plain 1.2 s dissolve as the page starts to tip"
+  }
+ },
+ "hits": {
+  "2": [
+   3.3
+  ],
+  "3": [
+   8.6,
+   19.6
+  ],
+  "7": [
+   1.6
+  ],
+  "8": [
+   7.9,
+   17.4
+  ],
+  "9": [
+   9.0
+  ],
+  "10": [
+   3.9
+  ],
+  "11": [
+   9.6,
+   12.5
+  ],
+  "12": [
+   2.2,
+   8.3
+  ],
+  "13": [
+   9.6
+  ],
+  "14": [
+   1.0,
+   12.0
+  ]
+ },
+ "_hits": {
+  "2": "the road lands",
+  "3": "the inversion; the black boxes rise on 'accident'",
+  "7": "the tube comes back on",
+  "8": "the term goes red; the fix goes mint",
+  "9": "the bad call goes red",
+  "10": "the reversal lands in the journal",
+  "11": "the edit; the project goes red",
+  "12": "the check passes; the chokepoint forms",
+  "13": "all verified",
+  "14": "broken; the pieces rise"
+ }
+}

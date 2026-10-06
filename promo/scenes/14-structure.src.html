@@ -1,0 +1,425 @@
+<title>Scene 14 · Seen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Instrument+Sans:wght@400;500;600&family=Inter:wght@200;300;400;500&family=Figtree:wght@700&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.caption { position: absolute; left: 50%; bottom: 5%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+.hud { position: absolute; font: 500 clamp(8px, 1.05vw, 14px)/1.4 var(--mono); color: var(--ink); pointer-events: none; }
+.panel { background: rgb(8 11 14 / .86); border: 1px solid #26313A; border-radius: 6px; padding: .7em .9em; }
+.hud svg { width: 1.3em; height: 1.3em; vertical-align: -.3em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; margin-right: .45em; }
+.hud .k { color: var(--muted); font-size: .82em; letter-spacing: .08em; text-transform: uppercase; }
+.hud .v { margin-top: .25em; }
+#mast { left: 2.5%; top: 3.5%; }
+#mast .big { font: 600 clamp(12px, 2.1vw, 28px)/1.2 var(--sans); display: flex; align-items: center; gap: .45em; margin-top: .15em; }
+#mast .sq { width: .7em; height: .7em; border-radius: .12em; display: inline-block; }
+#strip { left: 2.5%; top: 14%; display: flex; gap: .5em; width: 90%; font-size: clamp(7px, .95vw, 13px); }
+.pill { background: rgb(8 11 14 / .86); border: 1px solid #2A3540; border-radius: 1em; padding: .2em .8em; }
+#insp { right: 2.5%; top: 3.5%; width: 30%; opacity: 0; }
+#change { right: 2.5%; top: 3.5%; opacity: 0; }
+</style>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 14 · seen</div>
+    <h1>A violation shows on the map, then a change, then the project as it is</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div class="hud" id="mast"></div>
+    <div class="hud" id="strip"></div>
+    <div class="hud panel" id="insp"></div>
+    <div class="hud panel" id="change"></div>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="15" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 15.00</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <section class="box">
+    <h2>Beats (about 15 s; a stylized Scope Structure view on the ground)</h2>
+    <ol class="beats">
+      <li><span class="t">0.0</span><div><q>When chokepoints are violated, you'll see it.</q><span>The map from scene 13, live. A red dashed reference runs from Admin straight into Sessions; Sessions' verdict bar goes red and a ✕ 1 broken button pins to it; C1 on the line goes red. The rest dims, and the inspector names it: chokepoint sessions.get() protects the session store, bypass admin/dashboard.ts:42 in loadStats. The masthead reads 1 broken.</span></div></li>
+      <li><span class="t">3.5</span><div><q>When a major change alters the relationships between components, you'll see that too.</q><span>The fix lands and the red clears. A new entrance, POST /export, slides in and its route draws through Admin to Webhooks; the old Jobs → Webhooks route ghosts to dashes and withdraws. A strip names the change since the last commit. (Scope computes these differences today; this view of them is the planned design.)</span></div></li>
+      <li><span class="t">8.5</span><div><q>No more sifting through thousands of lines of code to understand what was built or changed. See your project as it is right now.</q><span>The ground under the map fills with code, thousands of rows streaming; then it dissolves, the map comes back to full, verified and live; in the last stretch its pieces (stations, entrances, tags) rise off it to 45 degrees in a cascade, like the signs, the lines staying flat, as the camera pulls up through air that is almost clear.</span></div></li>
+    </ol>
+    <p class="note">Drawn from Scope's real Structure grammar: entrance tokens with trust tags, stations in columns by distance from an entrance, one colour per structural route (never red or orange), core dependencies as rails, C and X interface identifiers, red only for broken. The project is the fictional app from scenes 11 and 12.</p>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const ICONS = /*ICONS*/{};
+const SCENE = 14, T = 15;
+const CLARITY = [.75, .9];
+const C = { bg: 0x07090C, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2" };
+const LINES = [
+  [0.3, 3.2, "When chokepoints are violated, you’ll see it."],
+  [3.5, 8.2, "When a major change alters the relationships between components, you’ll see that too."],
+  [8.5, 14.6, "No more sifting through thousands of lines of code to understand what was built or changed. See your project as it is right now."],
+];
+// Scenes 13 and 14 share this engine: a stylized Scope Structure view, drawn on the ground like a map over the territory.
+// structure-gen.py writes it into 13-structure.src.html and 14-structure.src.html with SCENE set.
+
+/*COMMON*/
+
+// ---------- the map: two canvases on one plane, the shapes in the bloom pass and the words crisp after it ----------
+const MW = 2400, MH = 1350, PW = 16, PH = 9, MAP_Y = -5.9;
+const glowCanvas = document.createElement("canvas"), textCanvas = document.createElement("canvas");
+glowCanvas.width = textCanvas.width = MW; glowCanvas.height = textCanvas.height = MH;
+const glowTex = new THREE.CanvasTexture(glowCanvas), textTex = new THREE.CanvasTexture(textCanvas);
+[glowTex, textTex].forEach((t) => (t.anisotropy = renderer.capabilities.getMaxAnisotropy()));
+const mapGeo = new THREE.PlaneGeometry(PW, PH);
+const mapGlow = new THREE.Mesh(mapGeo, new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, depthWrite: false, toneMapped: false }));
+mapGlow.rotation.x = -Math.PI / 2; mapGlow.position.set(0, MAP_Y, -1); scene.add(mapGlow);
+const overlay = new THREE.Scene();
+const mapText = new THREE.Mesh(mapGeo, new THREE.MeshBasicMaterial({ map: textTex, transparent: true, depthWrite: false, toneMapped: false }));
+mapText.rotation.copy(mapGlow.rotation); mapText.position.copy(mapGlow.position); overlay.add(mapText);
+
+// ---------- the project: the app from scenes 11 and 12, read as structure ----------
+const CARD = { w: 330, h: 118 };
+const STATIONS = {
+  API: { x: 600, y: 360, name: "API (root)", role: "HTTP entry: routes and jobs", dir: "project root" },
+  Jobs: { x: 600, y: 900, name: "Jobs", role: "Scheduled and queued work", dir: "src/jobs" },
+  Sessions: { x: 1160, y: 230, name: "Sessions", role: "Read through sessions.get()", dir: "src/sessions" },
+  Admin: { x: 1160, y: 520, name: "Admin", role: "Dashboards and staff tools", dir: "src/admin" },
+  Billing: { x: 1160, y: 810, name: "Billing", role: "Ledger via billing.guard()", dir: "src/billing" },
+  Auth: { x: 1720, y: 230, name: "Auth", role: "Credentials and trust levels", dir: "src/auth" },
+  Storage: { x: 1720, y: 540, name: "Storage", role: "Objects and exports", dir: "src/storage" },
+  Webhooks: { x: 1720, y: 850, name: "Webhooks", role: "Outbound and inbound hooks", dir: "src/webhooks" },
+};
+const COLS = [[600, "Where work enters"], [1160, "1 step from an entrance"], [1720, "2 steps from an entrance"]];
+// structural routes: one colour each, never red or orange; entrance names, trust, and the stations in order
+const ROUTES = [
+  { id: "R1", col: "#3B8BFF", names: ["GET /account"], trust: "authenticated", ey: 230, via: ["API", "Sessions", "Auth"] },
+  { id: "R2", col: "#19B3C2", names: ["GET /admin", "GET /stats"], trust: "authenticated", ey: 400, via: ["API", "Admin", "Storage"] },
+  { id: "R3", col: "#58B45F", names: ["POST /refund"], trust: "authenticated", ey: 590, via: ["API", "Billing", "Storage"] },
+  { id: "R4", col: "#8B7CFF", names: ["cron · nightly"], trust: "internal", ey: 850, via: ["Jobs", "Billing", "Webhooks"] },
+  { id: "R5", col: "#D05BCB", names: ["webhook in"], trust: "no control", ey: 1000, via: ["Jobs", "Webhooks"] },
+  { id: "R6", col: "#6C7BFF", names: ["POST /export"], trust: "authenticated", ey: 690, via: ["API", "Admin", "Webhooks"], added: true },
+];
+// interface identifiers: C rounded (a chokepoint), X pointed (a crossing), sitting on a route's approach to a station
+const TAGS = [
+  { id: "C1", kind: "C", route: "R1", at: "Sessions" },
+  { id: "C2", kind: "C", route: "R3", at: "Billing" },
+  { id: "X3", kind: "X", route: "R5", at: "Webhooks" },
+  { id: "X4", kind: "X", route: "R2", at: "Admin" },
+];
+const RAILS = [{ y: 1120, name: "Core: core dependency, called by 6 of 8", from: ["API", "Sessions", "Admin", "Billing", "Storage", "Jobs"] }, { y: 1200, name: "DB: core dependency, called by 5 of 8", from: ["Sessions", "Billing", "Storage", "Auth", "Webhooks"] }];
+
+// where each route runs through a station: routes through the same station share it side by side
+const through = {};
+for (const r of ROUTES) for (const s of r.via) (through[s] = through[s] || []).push(r.id);
+const laneY = (s, rid) => { const list = through[s], k = list.indexOf(rid); return STATIONS[s].y + CARD.h / 2 + (k - (list.length - 1) / 2) * 14; };
+function routePts(r) {
+  const pts = [[330, r.ey]];
+  let prev = null;
+  for (const s of r.via) {
+    const st = STATIONS[s], y = laneY(s, r.id), x0 = st.x, x1 = st.x + CARD.w;
+    const [ax, ay] = prev || pts[0], bx = x0, by = y;
+    const dy = Math.abs(by - ay), span = bx - ax, d = Math.min(dy, span * .7), mx = ax + (span - d) / 2;
+    if (dy > .5) pts.push([mx, ay], [mx + d, ay + Math.sign(by - ay) * d]);
+    pts.push([bx - 24, by], [bx, by], [x1, by]);
+    prev = [x1, by];
+  }
+  return pts;
+}
+ROUTES.forEach((r) => (r.pts = routePts(r)));
+const segLen = (p) => { let L = 0; for (let i = 1; i < p.length; i++) L += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); return L; };
+function drawPartial(g, pts, frac) {
+  const total = segLen(pts) * frac; let left = total;
+  g.beginPath(); g.moveTo(...pts[0]);
+  for (let i = 1; i < pts.length && left > 0; i++) {
+    const [ax, ay] = pts[i - 1], [bx, by] = pts[i], L = Math.hypot(bx - ax, by - ay), k = Math.min(1, left / L);
+    g.lineTo(ax + (bx - ax) * k, ay + (by - ay) * k); left -= L;
+  }
+  g.stroke();
+}
+// where a tag sits: on its route, a little before the station it guards
+function tagPos(tag) { const r = ROUTES.find((x) => x.id === tag.route), y = laneY(tag.at, r.id); return [STATIONS[tag.at].x - 70, y]; }
+
+// ---------- drawing ----------
+const MINT = C.mint, RED = C.red, AMBER = "#F0B24A", INKc = "#E6ECEF", MUTED = "#8B98A2";
+// drawMap(S) draws the whole map; drawMap(S, piece) draws only that piece (a station, an entrance, a tag) into the piece's own canvases
+function drawMap(S, piece) {
+  const g = piece ? piece.g : glowCanvas.getContext("2d"), x = piece ? piece.x : textCanvas.getContext("2d");
+  const want = (kind, id) => (piece ? piece.kind === kind && piece.id === id : !S.lifted);   // once the pieces have risen, the base keeps only the lines
+  if (!piece) { g.clearRect(0, 0, MW, MH); x.clearRect(0, 0, MW, MH); }
+  if (!piece) {
+  // the glass the map sits on
+  g.globalAlpha = S.panel; g.fillStyle = "rgba(10,14,22,.82)"; g.beginPath(); g.roundRect(8, 8, MW - 16, MH - 16, 30); g.fill();
+  g.strokeStyle = "rgba(90,110,130,.45)"; g.lineWidth = 3; g.stroke(); g.globalAlpha = 1;
+  // column headers
+  x.globalAlpha = S.headers; x.fillStyle = MUTED; x.font = `500 26px "Instrument Sans"`;
+  for (const [cx, label] of COLS) x.fillText(label, cx + 30, 110);
+  x.fillText(`${S.routeCount} structural routes from ${S.entranceCount} entrances`, 60, 60);
+  x.globalAlpha = 1;
+  // rails: core dependencies along the bottom, and each caller's stub down to them
+  for (const rl of RAILS) {
+    const k = S.rails;
+    if (k <= 0) continue;
+    g.globalAlpha = k; g.strokeStyle = "#7E8A96"; g.lineWidth = 9; g.beginPath(); g.moveTo(60, rl.y); g.lineTo(60 + (MW - 140) * k, rl.y); g.stroke();
+    g.lineWidth = 2.5; g.strokeStyle = "rgba(160,172,184,.7)";
+    for (const s of rl.from) { const st = STATIONS[s], sx = st.x + 30 + RAILS.indexOf(rl) * 14; g.beginPath(); g.moveTo(sx, st.y + CARD.h); g.lineTo(sx, st.y + CARD.h + (rl.y - st.y - CARD.h) * k); g.stroke(); }
+    g.globalAlpha = 1;
+    x.globalAlpha = k; x.fillStyle = INKc; x.font = `500 24px "Instrument Sans"`; x.fillText(rl.name, 60, rl.y - 16); x.globalAlpha = 1;
+  }
+  // routes, under the stations
+  for (const r of ROUTES) {
+    const k = S.route[r.id] ?? 0; if (k <= 0) continue;
+    const ghost = S.ghost[r.id] ?? 0, dim = S.dim(r);
+    g.globalAlpha = (1 - ghost * .65) * dim; g.strokeStyle = r.col; g.lineWidth = 8; g.lineJoin = "round"; g.lineCap = "round";
+    if (ghost > 0) g.setLineDash([22, 16]);
+    drawPartial(g, r.pts, k); g.setLineDash([]); g.globalAlpha = 1;
+  }
+  // the bypass: a red reference from Admin straight into the session store
+  if (S.bypass > 0) {
+    const a = STATIONS.Admin, b = STATIONS.Sessions;
+    g.strokeStyle = RED; g.lineWidth = 6; g.setLineDash([16, 12]);
+    drawPartial(g, [[a.x + CARD.w - 60, a.y], [a.x + CARD.w - 60, b.y + CARD.h + 20], [b.x + CARD.w - 60, b.y + CARD.h]], S.bypass); g.setLineDash([]);
+  }
+  }
+  // entrances: arrow tokens in the left margin, trust tags beneath
+  for (const r of ROUTES) {
+    const k = S.entrance[r.id] ?? 0; if (k <= 0 || !want("entrance", r.id)) continue;
+    const ghost = S.ghost[r.id] ?? 0, dim = S.dim(r), n = r.names.length, h = 30 + n * 32, y0 = r.ey - h / 2, xOff = (1 - ease(k)) * -120;
+    g.globalAlpha = k * (1 - ghost * .7) * dim; g.fillStyle = r.col + "55"; g.strokeStyle = r.col; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(60 + xOff, y0); g.lineTo(300 + xOff, y0); g.lineTo(330 + xOff, r.ey); g.lineTo(300 + xOff, y0 + h); g.lineTo(60 + xOff, y0 + h); g.closePath(); g.fill(); g.stroke(); g.globalAlpha = 1;
+    x.globalAlpha = k * (1 - ghost * .7) * dim; x.textAlign = "right"; x.fillStyle = INKc; x.font = `500 26px "Instrument Sans"`;
+    r.names.forEach((nm, i) => x.fillText(nm, 290 + xOff, y0 + 38 + i * 32));
+    x.font = `500 21px "IBM Plex Mono", "JetBrains Mono"`; x.fillStyle = r.trust === "no control" ? AMBER : MUTED; x.fillText(r.trust, 300 + xOff, y0 + h + 26);
+    x.textAlign = "left"; x.globalAlpha = 1;
+  }
+  // stations: dark glass cards, a verdict bar on the left edge, name, role, folder
+  for (const [id, st] of Object.entries(STATIONS)) {
+    const k = S.station[id] ?? 0; if (k <= 0 || !want("station", id)) continue;
+    const s = .9 + .1 * ease(k), cx = st.x + CARD.w / 2, cy = st.y + CARD.h / 2, broken = S.broken[id] ?? 0, dim = S.dimStation(id);
+    g.save(); g.translate(cx, cy); g.scale(s, s); g.translate(-cx, -cy); g.globalAlpha = k * dim;
+    g.fillStyle = "rgba(22,29,40,.96)"; g.beginPath(); g.roundRect(st.x, st.y, CARD.w, CARD.h, 10); g.fill();
+    g.strokeStyle = broken > .5 ? RED : "rgba(150,170,190,.6)"; g.lineWidth = 3; g.stroke();
+    g.fillStyle = broken > .5 ? RED : S.verified > 0 ? MINT : "#6E7C88"; g.fillRect(st.x + 8, st.y + 12, 8, CARD.h - 24);
+    // the broken button, pinned to the card's top right
+    if (broken > 0) { g.globalAlpha = k * broken; g.fillStyle = RED; g.beginPath(); g.roundRect(st.x + CARD.w - 150, st.y - 40, 150, 40, 6); g.fill(); }
+    g.restore();
+    x.save(); x.translate(cx, cy); x.scale(s, s); x.translate(-cx, -cy); x.globalAlpha = k * dim;
+    x.fillStyle = INKc; let ns = 30; x.font = `600 ${ns}px "Instrument Sans"`;
+    while (x.measureText(st.name).width > CARD.w - (broken > 0 ? 190 : 44) && ns > 20) { ns -= .5; x.font = `600 ${ns}px "Instrument Sans"`; }
+    x.fillText(st.name, st.x + 30, st.y + 38);
+    // the role line shrinks to fit its card, so no card's text runs off its edge
+    x.fillStyle = "#B5C0C9"; let rs = 21; x.font = `400 ${rs}px "Instrument Sans"`;
+    while (x.measureText(st.role).width > CARD.w - 44 && rs > 14) { rs -= .5; x.font = `400 ${rs}px "Instrument Sans"`; }
+    x.fillText(st.role, st.x + 30, st.y + 70);
+    x.fillStyle = MUTED; x.font = `400 20px "IBM Plex Mono", "JetBrains Mono"`; x.fillText(st.dir, st.x + 30, st.y + 100);
+    if (broken > 0) { x.globalAlpha = k * broken; x.fillStyle = "#fff"; x.font = `700 24px "Instrument Sans"`; x.fillText("✕ 1 broken", st.x + CARD.w - 138, st.y - 12); }
+    x.restore();
+  }
+  // interface identifiers on the lines: C rounded, X pointed; solid when verified, red when broken
+  for (const tg of TAGS) {
+    const k = S.tag[tg.id] ?? 0; if (k <= 0 || !want("tag", tg.id)) continue;
+    const [tx, ty] = tagPos(tg), w = 70, h = 34, broken = S.tagBroken[tg.id] ?? 0, dim = S.dim(ROUTES.find((r) => r.id === tg.route));
+    const fill = broken > .5 ? RED : S.verified > 0 ? "#DCE6EE" : "#8894A0";
+    g.globalAlpha = k * dim; g.fillStyle = fill; g.strokeStyle = "#0A0D16"; g.lineWidth = 3; g.beginPath();
+    if (tg.kind === "C") g.roundRect(tx - w / 2, ty - h / 2, w, h, h / 2);
+    else { g.moveTo(tx - w / 2, ty); g.lineTo(tx - w / 2 + 12, ty - h / 2); g.lineTo(tx + w / 2 - 12, ty - h / 2); g.lineTo(tx + w / 2, ty); g.lineTo(tx + w / 2 - 12, ty + h / 2); g.lineTo(tx - w / 2 + 12, ty + h / 2); g.closePath(); }
+    g.fill(); g.stroke(); g.globalAlpha = 1;
+    x.globalAlpha = k * dim; x.fillStyle = "#0A0D16"; x.textAlign = "center"; x.font = `700 22px "IBM Plex Mono", "JetBrains Mono"`; x.fillText(tg.id, tx, ty + 8); x.textAlign = "left"; x.globalAlpha = 1;
+  }
+  if (!piece) { glowTex.needsUpdate = true; textTex.needsUpdate = true; }
+}
+
+// ---------- order: the noisy territory gives way to a ruled ground, spreading out from under the map ----------
+territory.material.transparent = true;
+const orderGround = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false,
+  uniforms: { uR: { value: 0 } },
+  vertexShader: "varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }",
+  fragmentShader: `uniform float uR; varying vec3 vW;
+    void main() {
+      vec2 p = vW.xz - vec2(0., -1.);                       // the map's centre
+      vec2 f = abs(fract(p + .5) - .5), F = abs(fract(p / 4. + .5) - .5) * 4.;
+      float minor = 1. - smoothstep(0., .025, min(f.x, f.y)), major = 1. - smoothstep(0., .04, min(F.x, F.y));
+      float r = length(p * vec2(1., 1.5)), reveal = 1. - smoothstep(uR - 3., uR, r), edge = smoothstep(uR - 3., uR - .4, r) * reveal;
+      float a = (minor * .26 + major * .5) * reveal * exp(-r * .022) + edge * .5 * (minor + major);
+      gl_FragColor = vec4(vec3(.36, .5, .6) + edge * vec3(.2, .45, .35), a);
+    }`,
+}));
+orderGround.rotation.x = -Math.PI / 2; orderGround.position.set(0, MAP_Y - .03, 0); orderGround.renderOrder = -1; scene.add(orderGround);
+
+// ---------- the rising pieces: every station, entrance and tag as its own small panel ----------
+const pieces = [];
+function pieceBox(kind, id) {
+  if (kind === "station") { const st = STATIONS[id]; return [st.x - 6, st.y - 6, CARD.w + 12, CARD.h + 12]; }
+  if (kind === "entrance") { const r = ROUTES.find((q) => q.id === id), h = 30 + r.names.length * 32; return [50, r.ey - h / 2 - 8, 300, h + 50]; }
+  const [tx, ty] = tagPos(TAGS.find((q) => q.id === id)); return [tx - 40, ty - 22, 80, 44];
+}
+function buildPieces() {
+  const list = [...ROUTES.map((r, i) => ["entrance", r.id, i]), ...Object.keys(STATIONS).map((id) => ["station", id, 0]), ...TAGS.map((tg) => ["tag", tg.id, 0])];
+  for (const [kind, id] of list) {
+    const [bx, by, bw, bh] = pieceBox(kind, id), gc = document.createElement("canvas"), xc = document.createElement("canvas");
+    gc.width = xc.width = bw; gc.height = xc.height = bh;
+    const w = bw / MW * PW, h = bh / MH * PH, geo = new THREE.PlaneGeometry(w, h);
+    const glow = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(gc), transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+    const text = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(xc), transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+    glow.renderOrder = 5; scene.add(glow); overlay.add(text);
+    // the hinge: the piece's near edge, on the map
+    const hinge = new THREE.Vector3(((bx + bw / 2) / MW - .5) * PW, MAP_Y + .01, -1 + ((by + bh) / MH - .5) * PH);
+    pieces.push({ kind, id, gc, xc, glow, text, hinge, h, delay: ((bx + bw / 2) / MW) * .5 + ((by) / MH) * .15 });
+  }
+}
+function placePieces(t, S) {
+  for (const p of pieces) {
+    const g = p.gc.getContext("2d"), x = p.xc.getContext("2d"), [bx, by] = pieceBox(p.kind, p.id);
+    g.setTransform(1, 0, 0, 1, 0, 0); x.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, p.gc.width, p.gc.height); x.clearRect(0, 0, p.xc.width, p.xc.height);
+    g.translate(-bx, -by); x.translate(-bx, -by);
+    drawMap(S, { kind: p.kind, id: p.id, g, x });
+    p.glow.material.map.needsUpdate = p.text.material.map.needsUpdate = true;
+    // up in a cascade at LIFT_AT; and, where a scene sets LOWER_AT, back down again in the same order
+    const down = typeof LOWER_AT === "number" ? ease(smooth(LOWER_AT + p.delay * .6, LOWER_AT + p.delay * .6 + .8, t)) : 0;
+    const k = ease(smooth(LIFT_AT + p.delay, LIFT_AT + p.delay + .9, t)) * (1 - down), th = -Math.PI / 2 + Math.PI / 4 * k;
+    for (const m of [p.glow, p.text]) { m.rotation.set(th, 0, 0); m.position.set(p.hinge.x, p.hinge.y + .02 * k + Math.cos(th) * p.h / 2, p.hinge.z + Math.sin(th) * p.h / 2); m.material.opacity = mapGlow.material.opacity; }
+  }
+}
+
+// ---------- the sea of code the map replaces (scene 14): token cells, scrolling ----------
+const codeTex = canvasTex(1024, 2048, (g, w, h) => {
+  let y = 10; const R = () => rand();
+  while (y < h - 20) { let x = 10 + (R() < .3 ? 40 : 0); while (x < w - 60) { const cw = 18 + R() * 80; if (x + cw > w - 10) break; g.fillStyle = `rgba(94,106,115,${.35 + R() * .4})`; g.fillRect(x, y, cw, 12); x += cw + 7; if (R() < .08) break; } y += 22; }
+});
+codeTex.wrapS = codeTex.wrapT = THREE.RepeatWrapping; codeTex.repeat.set(3, 2);
+const codeSea = new THREE.Mesh(new THREE.PlaneGeometry(60, 40), new THREE.MeshBasicMaterial({ map: codeTex, transparent: true, opacity: 0, depthWrite: false, fog: true }));
+codeSea.rotation.x = -Math.PI / 2; codeSea.position.set(0, MAP_Y - .05, -6); scene.add(codeSea);
+
+// ---------- the HUD: Scope's masthead verdict, its health strip, the inspector, the change strip ----------
+const $ = (id) => document.getElementById(id);
+function hudState(H) {
+  $("mast").style.opacity = H.mast;
+  $("mast").innerHTML = `<div class="k">${svgIcon("route")}scope · structure${H.live ? ` <span style="color:${MINT}">● live</span>` : ""}</div><div class="big"><span class="sq" style="background:${H.broken ? RED : MINT}"></span><span style="color:${H.broken ? RED : INKc}">${H.broken ? "1 broken" : "All 24 invariants verified"}</span></div>`;
+  $("strip").style.opacity = H.strip;
+  $("strip").innerHTML = `<span class="pill">■ ${H.broken ? 23 : 24} invariants enforced and verified</span><span class="pill">0 requirements, not yet enforced</span><span class="pill" style="${H.broken ? `border-color:${RED};color:${RED}` : ""}">${H.broken ? "■ 1" : "0"} structural defect${H.broken ? "" : "s"}</span>`;
+  $("insp").style.opacity = H.insp;
+  $("insp").innerHTML = `<div class="k">Sessions · selected</div><div class="v" style="color:${RED};font-weight:700">✕ 1 broken</div><div class="v">chokepoint <b>sessions.get()</b> protects the session store</div><div class="v" style="color:#B5C0C9">bypass <b>admin/dashboard.ts:42</b> in loadStats</div>`;
+  $("change").style.opacity = H.change;
+  $("change").innerHTML = `<div class="k">${svgIcon("git-commit")}since the last commit</div><div class="v"><span style="color:${MINT}">+ entrance</span> POST /export</div><div class="v"><span style="color:${MINT}">+ interface</span> Admin → Webhooks</div><div class="v"><span style="color:${MUTED}">− interface</span> Jobs → Webhooks</div>`;
+}
+
+// ---------- camera ----------
+const V = (a) => new THREE.Vector3(...a);
+function cameraAt(t) {
+  let i = 0; while (i < KEYS.length - 2 && t > KEYS[i + 1][0]) i++;
+  const [t0, p0, q0] = KEYS[i], [t1, p1, q1] = KEYS[i + 1], k = ease(clamp((t - t0) / (t1 - t0)));
+  camera.position.copy(V(p0).lerp(V(p1), k)); camera.lookAt(V(q0).lerp(V(q1), k));
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+const scrub = $("scrub"), tc = $("tc"), cap = $("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+function render(t) {
+  cameraAt(t);
+  const cl = applyClarity(clarityAt(t));
+  territory.material.color.multiplyScalar(.35);   // the map is the reading; the ground under it stays quiet
+  scene.fog.density = .04 * cl.fog;
+  sheets.forEach((s, i) => { s.position.x = s.userData.base.x + Math.sin(t * .15 + i) * 2 + t * s.userData.speed; s.material.opacity = s.userData.o * cl.sheets; });
+  const { S, H, sea } = timeline(t);
+  S.lifted = LIFT_AT !== null && t > LIFT_AT;
+  // the pieces rise off the map like the signs: each hinged on its own near edge, up to 45 degrees, in a quick cascade
+  const lifting = LIFT_AT !== null && t > LIFT_AT;
+  if (lifting) { if (!pieces.length) buildPieces(); placePieces(t, S); }
+  pieces.forEach((p) => (p.glow.visible = p.text.visible = lifting));
+  territory.material.opacity = 1 - (ORDER ? ORDER(t) : 1); orderGround.material.uniforms.uR.value = ORDER_R(t);
+  drawMap(S); hudState(H);
+  codeSea.material.opacity = sea.o; codeTex.offset.y = sea.scroll;
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  if (typeof EXTRA === "function") EXTRA(t, S);   // a scene's own layer on top of the map (scene 15's field and title)
+  composer.render();
+  renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
+}
+
+$("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; $("play").textContent = "Play"; } };
+$("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); $("play").click(); } });
+
+Promise.all(["700 1em 'Figtree'", "200 1em 'Inter'", "500 1em 'Inter'", "500 1em 'Instrument Sans'", "600 1em 'Instrument Sans'", "700 1em 'Instrument Sans'", "400 1em 'IBM Plex Mono'", "700 1em 'IBM Plex Mono'", "600 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
+  .finally(() => { size(); last = performance.now(); requestAnimationFrame(frame); });
+
+const KEYS = [
+  [0, [0, MAP_Y + 13.4, 3.2], [0, MAP_Y, -2.3]],
+  [1.8, [.8, MAP_Y + 8.6, -.4], [.8, MAP_Y, -3.2]],
+  [3.4, [.8, MAP_Y + 8.6, -.5], [.8, MAP_Y, -3.2]],
+  [5.0, [0, MAP_Y + 13.4, 3.2], [0, MAP_Y, -2.3]],
+  [8.4, [0, MAP_Y + 13.4, 3.2], [0, MAP_Y, -2.3]],
+  [10.6, [0, MAP_Y + 15.5, 9.5], [0, MAP_Y, -2.6]],
+  [12.0, [0, MAP_Y + 14.5, 9.8], [0, MAP_Y, -2.4]],
+  [T, [-1.5, MAP_Y + 7.2, 11.5], [0, MAP_Y + .6, -2.0]],   // down low, so the risen pieces read as standing
+];
+const ORDER = () => 1, ORDER_R = () => 60;   // the ground is already ruled
+const LIFT_AT = 12.0;   // the final stretch: the pieces rise off the map, in a cascade from the entrances out
+function timeline(t) {
+  const sel = smooth(1.2, 1.6, t) * (1 - smooth(5.6, 6.2, t)), heal = smooth(3.6, 4.2, t);
+  const removed = smooth(7.0, 7.8, t), added = smooth(4.6, 5.0, t);
+  const S = { panel: 1, headers: 1, rails: 1, verified: 1, route: {}, ghost: {}, entrance: {}, station: {}, broken: {}, tag: {}, tagBroken: {},
+    routeCount: 5 + (added > .5 ? 1 : 0) - (removed > .5 ? 1 : 0), entranceCount: 6 + (added > .5 ? 1 : 0) - (removed > .5 ? 1 : 0),
+    bypass: smooth(.5, 1.1, t) * (1 - heal),
+    dim: (r) => 1 - .55 * sel * (["R1", "R2"].includes(r.id) ? 0 : 1),
+    dimStation: (id) => 1 - .55 * sel * (["Sessions", "Admin"].includes(id) ? 0 : 1) };
+  for (const r of ROUTES) {
+    if (r.added) { S.entrance[r.id] = added; S.route[r.id] = ease(smooth(4.9, 6.1, t)); continue; }
+    S.entrance[r.id] = r.id === "R5" ? 1 - removed : 1;
+    S.route[r.id] = r.id === "R5" ? 1 - ease(removed) : 1;
+    S.ghost[r.id] = r.id === "R5" ? smooth(5.6, 6.1, t) : 0;
+  }
+  for (const id of Object.keys(STATIONS)) S.station[id] = 1;
+  S.broken.Sessions = smooth(1.0, 1.3, t) * (1 - heal);
+  for (const tg of TAGS) S.tag[tg.id] = tg.route === "R5" ? 1 - removed : 1;
+  S.tagBroken.C1 = S.broken.Sessions;
+  // the sea of code: it rises under the map, the map fades back, then the code dissolves and the map returns
+  const seaIn = smooth(8.6, 9.4, t), seaOut = smooth(10.8, 12.0, t);
+  const back = seaIn * (1 - seaOut);
+  mapGlow.material.opacity = mapText.material.opacity = 1 - .7 * back;
+  const H = { mast: 1, strip: 1, live: true, broken: S.broken.Sessions > .5, insp: smooth(1.4, 1.8, t) * (1 - smooth(4.0, 4.4, t)), change: smooth(4.8, 5.2, t) * (1 - smooth(8.2, 8.6, t)) };
+  return { S, H, sea: { o: .6 * back, scroll: t * .35 } };
+}
+</script>

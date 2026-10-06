@@ -1,0 +1,251 @@
+<title>Scene 1 · The Opening</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #07090C; --panel: #0E1216; --ink: #E6ECEF; --muted: #8B98A2; --line: #1F272E;
+  --grey: #5E6A73; --orange: #FF9A3C; --red: #FF4B4B; --mint: #54E8B0;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 64px; display: grid; gap: 18px; }
+.eyebrow { font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 2px 0 0; font: 600 26px/1.2 var(--sans); text-wrap: balance; }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #000; border-radius: 4px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.caption { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); width: min(80%, 900px); text-align: center; font: 500 clamp(12px, 1.7vw, 22px)/1.35 var(--sans); color: #fff; text-shadow: 0 1px 12px rgb(0 0 0 / .9); pointer-events: none; }
+.caption[hidden] { display: none; }
+.transport { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+button { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+input[type=range] { flex: 1 1 280px; accent-color: var(--mint); }
+.tc { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 10ch; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+.box h2 { margin: 0 0 10px; font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.beats { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.beats li { display: grid; grid-template-columns: 58px 1fr; gap: 12px; }
+.beats .t { font: 500 12px/1.9 var(--mono); color: var(--muted); }
+.beats q { display: block; font-style: italic; color: var(--ink); quotes: "“" "”"; }
+.beats span { color: var(--muted); font-size: 14px; }
+p.note { margin: 12px 0 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Coherence promo · scene 1 · the opening</div>
+    <h1>A build: small and satisfying, then everything, with defects going red</h1>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="gl"></canvas>
+    <div class="caption" id="caption"></div>
+  </div>
+
+  <div class="transport">
+    <button id="play">Pause</button>
+    <input type="range" id="scrub" min="0" max="15" step="0.01" value="0" aria-label="Scene time">
+    <span class="tc" id="tc">0.00 / 15.00</span>
+    <button id="cc" aria-pressed="true">Captions on</button>
+  </div>
+
+  <section class="box">
+    <h2>Beats (the quiet intro, 0:04 to the bass at 0:19)</h2>
+    <ol class="beats">
+      <li><span class="t">0.0</span><div><span>Black. One column of thin mint segments builds upward, one segment at a time, each flashing as it's placed. A faint scaffold of dark segments above it shows where it's going.</span></div></li>
+      <li><span class="t">1.8</span><div><q>What if the best way to save tokens</q><span>A tidy handful of columns joins it from the center, each building at its own pace: a small, steady skyline. Manageable. Satisfying. This is the seduction. Around five seconds, a short run in one column quietly goes red, then another; the review counter, a small panel centered under the build, ticks from 0 to 1 to 2 and its border turns red.</span></div></li>
+      <li><span class="t">4.8</span><div><q>is to stop wasting them on the wrong code?</q><span>Then the columns keep coming, from both edges, and everything builds faster; the camera keeps backing off and never catches up. By nine seconds it runs past both edges. Red ranges keep appearing in what's already built, faster and faster, and the counter races with them.</span></div></li>
+      <li><span class="t">10.0</span><div><span>Every column finishes: one full wall, mint, heavily shot through with red, the counter still climbing as the last ranges fail.</span></div></li>
+      <li><span class="t">11.2</span><div><span>The wall tips back onto its baseline and the fog takes it. The mint fades to grey as it goes, the built thing becoming the unexamined floor every later scene stands on, and the reds stay red. Ready for the bass at 0:19.</span></div></li>
+    </ol>
+    <p class="note">The seduction of agent development is that it isn't overwhelming until it is. The build carries that: it starts as one clean column going up, and becomes a wall. The segments are the film's cells on its 0.19 row pitch; red means defective here exactly as it will everywhere after.</p>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+const ICONS = /*ICONS*/{};
+const T = 15;
+const NARROW = 0;   // was narrowing toward scene 2's page; the cut is a plain dissolve now
+const C = { bg: 0x000000, fog: 0x0A0F13, grey: "#5E6A73", orange: "#FF9A3C", red: "#FF4B4B", mint: "#54E8B0", ink: "#E6ECEF", muted: "#8B98A2" };
+const LINES = [
+  [2.0, 5.4, "What if the best way to save tokens"],
+  [5.8, 9.6, "is to stop wasting them on the wrong code?"],
+];
+
+/*COMMON*/
+
+// this scene opens on black: the shared territory and haze arrive only when the field becomes a floor
+territory.visible = false;
+scene.fog.density = 0;
+
+// ---------- the build: columns of segments, each only ever growing ----------
+// It starts as one column, then a tidy handful: small, steady, satisfying. Then it multiplies until it's everything.
+const COLS = 121, ROWS = 44, PITCH = { x: .34, y: .19 }, SEG = { w: .27, h: .1 };
+const field = new THREE.Group(); scene.add(field);           // baseline at y = 0; tips back about it at the end
+const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), COLS * ROWS);
+mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.frustumCulled = false; field.add(mesh);
+const tint = { mint: new THREE.Color(C.mint), grey: new THREE.Color(C.grey), red: new THREE.Color(C.red), place: new THREE.Color("#C8FFE9"), flash: new THREE.Color("#FFE4E0") };
+// columns arrive center-out: one, then a handful, slowly; then the rest, faster and faster
+const order = [...Array(COLS).keys()].sort((a, b) => Math.abs(a - (COLS - 1) / 2) - Math.abs(b - (COLS - 1) / 2) || a - b);
+const arrive = new Array(COLS);
+order.forEach((k, r) => { arrive[k] = r === 0 ? 1.0 : r < 9 ? 1.8 + r * .32 : 4.8 + Math.pow(r - 9, .72) * .14; });
+// each column builds at its own rate, and the whole build speeds up as it goes
+const cols = [...Array(COLS).keys()].map((k) => ({ k, x: (k - (COLS - 1) / 2) * PITCH.x, rate: .55 + rand() * .8 }));
+const height = (c, t) => {
+  const x = Math.max(0, t - arrive[c.k]);
+  const h = c.rate * (1.5 * x + .38 * x * x);
+  return Math.min(ROWS, Math.max(h, ROWS * smooth(10.0, 11.2, t) * Math.min(1, x)));   // the end: every column finishes the wall
+};
+// when a height is reached: the inverse, found by stepping, so a range can go red a beat after it was built
+function builtAt(c, j) { for (let t = arrive[c.k]; t < 12; t += .02) if (height(c, t) > j + 1) return t; return 12; }
+// defects: occasional ranges of already-built segments go red; rare early, more common as the build speeds up
+cols.forEach((c) => {
+  c.defects = [];
+  const r = order.indexOf(c.k);
+  // the handful is clean while it's small: two early hints, short runs near the base
+  if (r === 4) c.defects.push({ start: 1, end: 3, at: builtAt(c, 3) + .4 });
+  if (r === 7) c.defects.push({ start: 2, end: 5, at: builtAt(c, 5) + .3 });
+  const add = (when) => {
+    const reach = Math.floor(height(c, when)), len = 3 + Math.floor(rand() * 6);
+    if (reach < len + 1) return;
+    const start = Math.floor(rand() * (reach - len));
+    if (c.defects.some((d) => start < d.end && start + len > d.start)) return;
+    const at = Math.max(when, builtAt(c, start + len) + .2 + rand() * .5);
+    if (at < 11.2) c.defects.push({ start, end: start + len, at });
+  };
+  // then, everywhere, ranges fail across the whole build, more as it speeds up
+  const from = Math.max(arrive[c.k] + .75, r < 9 ? 5.9 : 0), n = 3 + Math.floor(rand() * 5);
+  for (let d = 0; d < n; d++) add(from + Math.pow(rand(), 1.5) * Math.max(.4, 10.8 - from));   // weighted early: red accumulates the whole way up
+  // and a last wave as the wall completes
+  for (let d = 0, last = 3 + (rand() < .5); d < last; d++) add(10.2 + rand() * .9);
+});
+const DEFECTS = cols.flatMap((c) => c.defects).sort((a, b) => a.at - b.at);
+const segs = [];
+for (let k = 0; k < COLS; k++) for (let j = 0; j < ROWS; j++) segs.push({ k, j });
+segs.forEach((s, i) => mesh.setColorAt(i, tint.mint)); // allocate the color buffer before the first frame
+const M = new THREE.Matrix4(), P = new THREE.Vector3(), S = new THREE.Vector3(), Q = new THREE.Quaternion(), col = new THREE.Color();
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+function updateField(t) {
+  const hs = cols.map((c) => height(c, t));
+  const grey = smooth(11.4, 14, t);                        // tipping into the fog, what was built becomes the unexamined floor
+  segs.forEach((s, i) => {
+    const c = cols[s.k], on = smooth(arrive[s.k], arrive[s.k] + .25, t), h = hs[s.k];
+    // a little scaffold of ghost segments above each column shows where it's going
+    if (!on || (s.j >= Math.floor(h) + 4 && grey === 0)) { mesh.setMatrixAt(i, ZERO); return; }
+    P.set(c.x, s.j * PITCH.y + SEG.h / 2, 0); S.set(SEG.w * on, SEG.h, 1);
+    M.compose(P, Q, S); mesh.setMatrixAt(i, M);
+    const built = s.j < Math.floor(h);
+    if (!built) { col.copy(tint.mint).multiplyScalar(.07); mesh.setColorAt(i, col); return; }
+    const d = c.defects.find((d) => s.j >= d.start && s.j < d.end && t >= d.at);
+    if (d) {
+      const f = clamp((t - d.at) / .35);                   // goes red: a hot flash, then it holds
+      col.copy(tint.flash).lerp(tint.red, f);
+    } else {
+      const fresh = clamp(h - 1 - s.j);                    // the segment just placed is brighter for a moment
+      col.copy(tint.mint).lerp(tint.place, 1 - Math.min(1, fresh * 1.5)).lerp(tint.grey, grey * .85);
+    }
+    mesh.setColorAt(i, col);
+  });
+  mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
+}
+
+// ---------- the defects counter: a UI panel centered under the build, drawn after the bloom so it stays crisp ----------
+const overlay = new THREE.Scene();
+const PANEL = { px: [820, 168] };
+const panelCanvas = document.createElement("canvas"); panelCanvas.width = PANEL.px[0]; panelCanvas.height = PANEL.px[1];
+const panelTex = new THREE.CanvasTexture(panelCanvas);
+const panel = new THREE.Mesh(new THREE.PlaneGeometry(1, PANEL.px[1] / PANEL.px[0]), new THREE.MeshBasicMaterial({ map: panelTex, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+overlay.add(panel);
+let shown = -1;
+function drawPanel(n) {
+  const g = panelCanvas.getContext("2d"), [w, h] = PANEL.px, hot = n > 0, col = hot ? C.red : C.ink;   // inert, the gauge is white; with a defect, red
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = "rgba(10,13,17,.94)"; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 26); g.fill();
+  g.strokeStyle = col; g.lineWidth = 3; g.stroke();
+  // the label: a chip grown out of the left edge, in the border's color, glyph and word in black
+  g.fillStyle = col; g.beginPath(); g.roundRect(4, 4, 290, h - 8, [26, 0, 0, 26]); g.fill();
+  icon(g, "git-merge", 28, h / 2 - 29, 58, "#000", 2.6);
+  g.fillStyle = "#000"; g.font = `800 38px "JetBrains Mono"`; g.fillText("REVIEW", 100, h / 2 + 13);
+  // the count: the number, then what it counts
+  g.font = `500 30px "JetBrains Mono"`; const unit = n === 1 ? "defect" : "defects", uw = g.measureText(unit).width;
+  g.fillStyle = C.muted; g.textAlign = "right"; g.fillText(unit, w - 36, h / 2 + 24);
+  g.fillStyle = hot ? C.red : C.ink; g.font = `600 84px "JetBrains Mono"`;
+  g.fillText(String(n), w - 36 - uw - 18, h / 2 + 30); g.textAlign = "left";
+  panelTex.needsUpdate = true;
+}
+const _pp = new THREE.Vector3();
+function updateCounter(t) {
+  const n = DEFECTS.filter((d) => t >= d.at).length;
+  if (n !== shown) { drawPanel(n); shown = n; }
+  // hold one size on screen however far the camera backs off, just under the baseline at center
+  field.updateMatrixWorld();
+  _pp.set(0, 0, 0).applyMatrix4(field.matrixWorld);
+  const dist = camera.position.distanceTo(_pp), wu = dist * .24, hu = wu * PANEL.px[1] / PANEL.px[0];
+  panel.scale.setScalar(wu);
+  panel.position.set(0, -(dist * .018) - hu / 2, .02);
+  panel.quaternion.copy(camera.quaternion);
+  panel.material.opacity = smooth(1.4, 2.0, t) * (1 - smooth(11.2, 11.8, t));
+}
+
+// ---------- camera: close on one column, backing off as the EQ multiplies, then over the floor ----------
+const KEYS = [
+  [0, [0, .75, 4.0], [0, .75, 0]],
+  [1.8, [0, .8, 4.2], [0, .8, 0]],
+  [4.4, [0, 1.3, 7.2], [0, 1.2, 0]],
+  [7.0, [0, 2.6, 12.5], [0, 2.4, 0]],
+  [9.6, [0, 4.2, 20], [0, 4.0, 0]],         // it never fits: at its busiest the EQ runs past both edges
+  [11.0, [0, 4.4, 21], [0, 4.1, 0]],
+  [15, [0, 10, 22], [0, 0, -12]],
+];
+const V = (a) => new THREE.Vector3(...a);
+function cameraAt(t) {
+  let i = 0; while (i < KEYS.length - 2 && t > KEYS[i + 1][0]) i++;
+  const [t0, p0, q0] = KEYS[i], [t1, p1, q1] = KEYS[i + 1], k = ease(clamp((t - t0) / (t1 - t0)));
+  camera.position.copy(V(p0).lerp(V(p1), k)); camera.lookAt(V(q0).lerp(V(q1), k));
+}
+
+// ---------- frame ----------
+const hashT = location.hash.match(/^#t(\d+(?:\.\d+)?)$/);
+let t = hashT ? Number(hashT[1]) : 0, playing = !hashT, last = performance.now(), captions = true;
+const scrub = document.getElementById("scrub"), tc = document.getElementById("tc"), cap = document.getElementById("caption");
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (playing) { t += dt; if (t > T) t = 0; scrub.value = t; }
+  render(t);
+  requestAnimationFrame(frame);
+}
+function render(t) {
+  updateField(t);
+  cameraAt(t);
+  // the field tips back on its bottom edge and the fog takes it: a floor now
+  const tip = ease(smooth(11.2, 14.8, t));
+  field.rotation.x = -1.45 * tip;
+  // and it narrows toward the proportions of scene 2's page, which it dissolves into mid-fall
+  field.scale.x = 1 - NARROW * ease(smooth(11.2, 13.0, t));
+  scene.fog.density = .045 * smooth(11, 14, t);
+  sheets.forEach((s, i) => {
+    s.position.x = s.userData.base.x + Math.sin(t * .15 + i) * 2 + t * s.userData.speed;
+    s.material.opacity = s.userData.o * smooth(11.5, 14.5, t) * .8;
+  });
+  bloom.strength = .9 - .3 * smooth(6, 9, t);
+  updateCounter(t);
+  const line = LINES.find(([a, b]) => t >= a && t < b);
+  cap.hidden = !captions; cap.textContent = line ? line[2] : "";
+  tc.textContent = `${t.toFixed(2)} / ${T.toFixed(2)}`;
+  composer.render();
+  renderer.autoClear = false; renderer.clearDepth(); renderer.render(overlay, camera); renderer.autoClear = true;
+}
+
+document.getElementById("play").onclick = (e) => { playing = !playing; e.target.textContent = playing ? "Pause" : "Play"; last = performance.now(); };
+scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false; document.getElementById("play").textContent = "Play"; } };
+document.getElementById("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
+document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); document.getElementById("play").click(); } });
+document.fonts.load("800 1em 'JetBrains Mono'").then(() => document.fonts.load("600 1em 'JetBrains Mono'")).catch(() => {}).finally(() => { shown = -1; size(); requestAnimationFrame(frame); });
+</script>
