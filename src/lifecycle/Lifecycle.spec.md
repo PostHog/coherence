@@ -528,3 +528,17 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: advisory for the reason d-f780c7b9 gives for open requirements: refusing the stop would train a session to fabricate an enactment; naming it at the stop with the shape filled in makes the honest record the cheapest one
   refuted: made practiceStopText treat every firing as enacted, so regulate named nothing owed -> "regulate names a practice that fired with no enactment since, advisory, and never refuses a subagent stop for it" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
   kinds: none
+- a shell command's writes are read from its words: The files a shell command writes are read from its text before it runs: output redirects, heredoc targets, tee, sed -i and perl -i, the destinations of cp, mv, install and ln, and touch, truncate and rm, through a cd earlier in the line; a quoted >, a heredoc's body, a variable, a substitution, a glob and a device name none.
+  over: redirects of every form, heredocs with a redirect inside their body, tee, sed -i in GNU and BSD form, perl -pi, cp and mv, touch and rm, a cd to a folder and to a variable, a quoted >, a program writing from its own code, and a Codex shell argv
+  via: a shell command's written files are read from its words: redirects, heredocs, tee, sed -i, perl -i, cp and mv destinations, touch and rm, through cd, and never a quoted >, a heredoc body, a variable or a device
+  because: agents write files through the shell as often as through edit tools, and the ai-chatbot adoption wrote its entry spec with cat > ... <<EOF; a reading that missed it would leave an edit-triggered practice silent and the chokepoint check at the edit unrun, while a guessed path would fire them on files nobody wrote
+  refuted: read heredoc bodies as commands, so a redirect inside one counted as a write -> "a shell command's written files are read from its words: redirects, heredocs, tee, sed -i, perl -i, cp and mv destinations, touch and rm, through cd, and never a quoted >, a heredoc body, a variable or a device" went red in shell-writes.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+- a shell write is an edit: writtenFiles counts the files a shell command writes beside an edit tool's, resolved against the folder the command runs in and confined to the project root, so edit triggers and the chokepoint check at the edit see them.
+  over: a heredoc onto a spec, a write from a subfolder, a write above the root, a command that writes nothing, and a reading tool
+  via: writtenFiles counts a shell command's writes beside an edit tool's, resolved against the folder the command runs in and confined to the project
+  because: one reader of written files serves both the practice triggers and revelation at the edit; resolving against the root instead of the command's folder would name the wrong file, and a path above the root is another project's
+  crossing: harness -> reading
+  refuted: resolved shell-written paths against the root instead of the folder the command runs in -> "writtenFiles counts a shell command's writes beside an edit tool's, resolved against the folder the command runs in and confined to the project" went red in shell-writes.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+

@@ -91,6 +91,7 @@ import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
 import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
 import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
+import { shellCommandOf, shellWrittenPaths } from "./shell-writes.ts";
 
 const run = promisify(execFile);
 
@@ -476,14 +477,19 @@ export function writtenFiles(root: string, input: HookInput): string[] {
   if (typeof input.tool_name === "string" && READING_TOOLS.has(input.tool_name)) return [];
   const record = typeof input.tool_input === "object" && input.tool_input !== null ? input.tool_input as Record<string,unknown> : {};
   const paths = [record["file_path"],record["notebook_path"],record["path"]].filter((v):v is string=>typeof v === "string" && v !== "");
-  if(typeof input.tool_name === "string" && input.tool_name.split(".").at(-1)==="apply_patch") {
+  const isPatch = typeof input.tool_name === "string" && input.tool_name.split(".").at(-1)==="apply_patch";
+  if(isPatch) {
     const patch=typeof input.tool_input === "string" ? input.tool_input : [record["patch"],record["input"],record["command"]].find((v):v is string=>typeof v === "string");
     if(patch?.trimStart().startsWith("*** Begin Patch") && patch.trimEnd().endsWith("*** End Patch")) {
       for(const match of patch.matchAll(/^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$/gm)) paths.push(match[1]!.trim());
     }
   }
-  return [...new Set(paths.flatMap(path=> {
-    const absolute=resolve(root,path);
+  // A shell command writes files too (a heredoc, sed -i, tee, a redirect, cp): read them from its words, against the folder it runs in.
+  const shellPaths: string[] = [];
+  const command = isPatch ? undefined : shellCommandOf(record);
+  if(command !== undefined) shellPaths.push(...shellWrittenPaths(command));
+  const ran = typeof input.cwd === "string" && input.cwd !== "" && within(root, resolve(root, input.cwd)) ? resolve(root, input.cwd) : root;
+  return [...new Set([...paths.map((path)=>resolve(root,path)), ...shellPaths.map((path)=>resolve(ran,path))].flatMap(absolute=> {
     if(!within(root,absolute)) return [];
     const rel=relative(resolve(root),absolute).split(sep).join("/");
     return rel && rel!==".." && !rel.startsWith("../") ? [rel] : [];

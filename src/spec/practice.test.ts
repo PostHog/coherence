@@ -273,3 +273,15 @@ test("in Coherence's own tree every practice declares its reach, kernel or inter
   const adopter = loadSpecModel(root, { runs: false }).problems.map((p) => p.message);
   assert.ok(adopter.some((m) => /reach: is for Coherence's own practices; a project's practices are its own/.test(m)), adopter.join("\n"));
 });
+
+test("a shell command that writes a file fires an edit trigger the way an edit tool does, and the text it writes counts as added", async () => {
+  const { root } = widget();
+  const fire = async (command: string) => {
+    const result = await runHook("PreToolUse", { cwd: root, session_id: "s-shell", tool_name: "Bash", tool_input: { command } }, root);
+    result.commit?.();
+    return result.stdout === "" ? "" : (JSON.parse(result.stdout).hookSpecificOutput.additionalContext as string);
+  };
+  assert.match(await fire("cat > src/widget/a/b.ts <<'EOF'\nconst knob = 1\nEOF"), /This edit src\/widget\/a\/b\.ts adding knob fires a practice/);
+  assert.equal(await fire("cat > src/widget/a/c.ts <<'EOF'\nconst dial = 1\nEOF"), "", "the edit adds no knob");
+  assert.equal(await fire("cat src/widget/a/b.ts"), "", "reading the file writes nothing");
+});

@@ -20,6 +20,7 @@ import { KERNEL_PREFIX, type ModelPractice } from "../spec/practices.ts";
 import { loadJournal } from "../journal/store.ts";
 import type { Enactment } from "../journal/record.ts";
 import { enactTemplate } from "../journal/verbs.ts";
+import { shellCommandOf } from "./shell-writes.ts";
 
 export const PRACTICES_DIR = join(".coherence", "practices");
 
@@ -60,9 +61,9 @@ function keepFirings(root: string, session: string, fired: readonly Firing[]): v
 /** What a tool use offers a trigger, read from the event: the command, the files written, the text added. */
 export function toolUseOf(input: Record<string, unknown>, writes: string[]): ToolUse {
   const record = typeof input["tool_input"] === "object" && input["tool_input"] !== null ? (input["tool_input"] as Record<string, unknown>) : {};
-  const raw = record["command"] ?? record["cmd"];
-  const command = typeof raw === "string" ? raw : Array.isArray(raw) ? raw.filter((p): p is string => typeof p === "string").join(" ") : undefined;
-  const texts: string[] = [];
+  const command = shellCommandOf(record);
+  // A command that writes files carries what it writes in its own text (a heredoc's body, a sed replacement), so it counts as text added.
+  const texts: string[] = writes.length > 0 && command !== undefined ? [command] : [];
   for (const key of ["new_string", "content", "new_source", "patch", "input"]) {
     const value = record[key];
     if (typeof value === "string") texts.push(value);

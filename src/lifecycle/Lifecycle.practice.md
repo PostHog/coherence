@@ -64,6 +64,8 @@
   step: decide what it is: the project's own concept, an alias of one, a property of one (a field, a column, a unit), or an ordinary programming word that needs no entry
   step: settle a contested term from the project's own history (commit messages, pull request discussion) and record the tie-break with decide
     leaves: the decision's id
+  step: when the history does not settle it, escalate instead of deciding: two live senses that no record separates, the owner's word colliding with a name the lexicon rejected, or any rename, retire, reject or lift of a concept; carry on with the term provisional, and apply only with the human's words
+    leaves: the escalation's id
   step: before rejecting a name, count the findings it would create; a word in ordinary use gets a qualifying rename, not a bare rejection
   step: propose, then apply with because and over; a human ruling carries the human's words with --human, and none is ever invented
   step: run coherence lexicon --check
@@ -73,6 +75,7 @@
   pitfall: identifiers written in backticks in specs were nominated as unknown nouns (d-9e7b9247)
   pitfall: common programming words kept as rejected names made hundreds of findings in ordinary code (d-f77ce193)
   pitfall: the owner's own word for a thing collided with a name the lexicon had rejected for another concept (c-c05b409e)
+  pitfall: new nouns were left undeclared because the lexicon was outside the session's scope, where an escalation would have reached the owner (u-de8416b2)
   learned: d-3283157b, d-f77ce193, d-2a689809, rt-cdcf2a29
   reach: kernel
   because: a lexicon entry is injected into every session, so a term filed as the wrong kind of thing (a field as a concept, a common word as a rejection) costs every later session a false finding or a missing one
