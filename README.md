@@ -250,6 +250,7 @@ node src/cli.ts scaffold invariant <folder> "<sentence>" --kinds a,b [--chokepoi
 node src/cli.ts enact "<practice>" --step <n>=done[:<evidence>]|deviated:<why>|skipped:<why>...   # record a practice carried out
 node src/cli.ts run [--session --agent]   # the chokepoint check and the totality oracle pass, one run appended; exit 1 on a structural defect
 node src/cli.ts run --status              # the latest verdict per enforcement, a view over every run
+node src/cli.ts run --each                # after the batched pass, each totality oracle's test in its own invocation, a second run; exit 1 if one fails alone
 node src/cli.ts serve                     # the warm language server for this project (spawned on demand otherwise)
 node src/cli.ts hook <event>              # answer one harness event (event JSON on stdin)
 node src/cli.ts hooks install --host claude|codex [--command "<prefix>"]

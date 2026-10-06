@@ -91,6 +91,13 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   crossing: instrument -> record
   refuted: mapped a report entry to a via by substring again -> the totality oracle went red, then green once restored (2026-09-18)
   kinds: none
+- each alone after the batch: run --each runs every totality oracle's test the batched invocation ran again in its own invocation through the config's test command, appends those verdicts as a second run, names any that passed batched but fail alone, and exits non-zero when one does not pass alone.
+  over: every totality oracle the batched invocation of a run --each ran
+  via: run --each runs each batched totality oracle's test in its own invocation and catches one that passes only on an earlier test's leftovers
+  because: one invocation for every test can hide a test that passes only on what an earlier test left behind (df-9e673484), and witness a refutation asks that the bullet's test pass alone; without a per-test mode, every enactment deviated on that step (en-182851e5, en-bc89997b), and a batched green could not tell a test that holds from one that leans on its neighbors
+  crossing: instrument -> record
+  refuted: made run --each reuse each test's batched result instead of running it in its own invocation -> the totality oracle went red on "alone, the reader fails", then green batched and alone once restored (2026-10-05)
+  kinds: none
 - the instrument outlives the test pass: A run keeps the instrument alive across the totality pass and asks it again afterwards; a run whose instrument did not survive records the reason on every entry it could not check and exits non-zero, never 0 with not run.
   over: every run that needs the instrument and runs the totality pass first
   via: the run keeps the instrument alive across the test pass, and a run whose instrument died exits non-zero with the reason
