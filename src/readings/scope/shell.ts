@@ -12,6 +12,7 @@ import { lexiconCounts, renderLexiconView } from "./lexicon-view.ts";
 import { html, type Markup } from "./html.ts";
 import { renderInvariantsResults, renderInvariantsTools } from "./invariants-view.ts";
 import { renderJournalResults, renderJournalTools } from "./journal-view.ts";
+import { renderPracticesResults, renderPracticesTools } from "./practices-view.ts";
 import type { ShellState } from "./model.ts";
 import { renderRunsResults, renderRunsTools } from "./runs-view.ts";
 import { flowOf, flowVerdict } from "./structure-flow.ts";
@@ -26,6 +27,7 @@ export const VIEWS = [
   { id: "lexicon", label: "Lexicon" },
   { id: "components", label: "Components" },
   { id: "invariants", label: "Invariants" },
+  { id: "practices", label: "Practices" },
   { id: "runs", label: "Runs" },
   { id: "journal", label: "Journal" },
 ] as const;
@@ -129,6 +131,8 @@ export function renderViewResults(state: ShellState): Markup {
       return renderStructureResults(state);
     case "invariants":
       return renderInvariantsResults(state);
+    case "practices":
+      return renderPracticesResults(state);
     case "runs":
       return renderRunsResults(state);
     case "journal":
@@ -153,6 +157,8 @@ function renderViewTools(state: ShellState): Markup | null {
       return renderStructureTools(state);
     case "invariants":
       return renderInvariantsTools(state);
+    case "practices":
+      return renderPracticesTools(state);
     case "runs":
       return renderRunsTools(state);
     case "journal":

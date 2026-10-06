@@ -34,10 +34,11 @@ import { loadJournal } from "../../journal/store.ts";
 import { WORK_DIR, foldOrders, loadWork as loadWorkRecords, workDir } from "../../journal/work.ts";
 import { lexiconCoverage } from "../../lifecycle/lexicon-coverage.ts";
 import { COHERENCE_LEXICON, projectLexiconPath } from "../../lifecycle/project.ts";
-import { loadSpecModel } from "../../spec/model.ts";
+import { loadSpecModel, projectPractices } from "../../spec/model.ts";
+import { KERNEL_PREFIX } from "../../spec/practices.ts";
 import { projectLexiconCoverage } from "./lexicon-projection.ts";
 import { windowJournal, windowRuns } from "./derive.ts";
-import { parseLexicon, type Lexicon, type InterfaceReading, type Ladder, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
+import { parseLexicon, type Lexicon, type InterfaceReading, type Ladder, type PracticesData, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
 import { DEFAULT_VIEW, VIEWS } from "./shell.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -59,6 +60,8 @@ export const BROWSER_SOURCES = [
   "structure-flow-view.ts",
   "structure-view.ts",
   "invariants-view.ts",
+  "practices.ts",
+  "practices-view.ts",
   "runs-view.ts",
   "journal-view.ts",
   "shell.ts",
@@ -161,7 +164,8 @@ export function loadSpec(root: string): SpecData {
     // The spec model carries each bullet's latest run entries; the page does not. They are the
     // run records, which the page already holds, read by enforcement: derive.ts reads them back
     // at render so no copy can disagree with the records it came from.
-    components: model.components.map((component) => ({
+    // A component's practices are held once, in the state's practices beside the kernel's; the spec keeps where its practice file is.
+    components: model.components.map(({ practices: _practices, ...component }) => ({
       ...component,
       invariants: component.invariants.map(({ latest: _latest, verified: _verified, defects: _defects, ...invariant }) => invariant),
     })),
@@ -174,6 +178,41 @@ export function loadSpec(root: string): SpecData {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Every practice a session at this root may enact, as the page holds it: the
+ * project's own from its practice files and, in an adopter, the kernel
+ * practices Coherence ships. The parser's line numbers stay behind.
+ */
+export function loadPractices(root: string): PracticesData {
+  let practices: ReturnType<typeof projectPractices>;
+  try {
+    practices = projectPractices(root);
+  } catch {
+    return { practices: [] };
+  }
+  const data: PracticesData = {
+    practices: practices.map((p) => ({
+      id: p.id,
+      name: p.name,
+      sentence: p.sentence,
+      component: p.component,
+      file: p.file,
+      kernel: p.id.startsWith(KERNEL_PREFIX),
+      ...(p.reach === undefined ? {} : { reach: p.reach }),
+      triggers: p.triggers,
+      steps: p.steps.map((s) => (s.leaves === undefined ? { n: s.n, text: s.text } : { n: s.n, text: s.text, leaves: s.leaves })),
+      pitfalls: p.pitfalls.map((pf) => ({ text: pf.text, cites: pf.cites })),
+      learned: p.learned,
+      invariants: p.invariants,
+      ...(p.because === undefined ? {} : { because: p.because }),
+      version: p.version,
+      state: p.state,
+      enactments: p.enactments,
+    })),
+  };
+  return JSON.parse(JSON.stringify(data)) as PracticesData;
 }
 
 /**
@@ -252,6 +291,8 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
     components: { query: "" },
     structure: { preview: options.structurePreview === undefined ? [] : options.structurePreview.map((proposal) => ({ ...proposal, crossing: { ...proposal.crossing }, ...(proposal.chokepoints === undefined ? {} : { chokepoints: proposal.chokepoints.map((entry) => ({ ...entry })) }) })) },
     invariants: { query: "", state: "", component: "" },
+    practices: loadPractices(root),
+    practicesView: { query: "" },
     runsView: { query: "" },
     journalView: { query: "", kind: "", agent: "", session: "" },
   };
@@ -267,7 +308,8 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
  */
 export function windowState(state: ShellState): ShellState {
   const runs = windowRuns(state.runs.records);
-  const journal = windowJournal(state.journal.records, undefined, state.journal.work.kind === "present" ? state.journal.work.orders : []);
+  const cited = new Set(state.practices.practices.flatMap((p) => [...p.pitfalls.flatMap((pf) => pf.cites), ...p.learned]));
+  const journal = windowJournal(state.journal.records, undefined, state.journal.work.kind === "present" ? state.journal.work.orders : [], undefined, cited);
   return {
     ...state,
     runs: { ...state.runs, records: runs.records, ...(runs.omitted === 0 ? {} : { omitted: runs.omitted }) },

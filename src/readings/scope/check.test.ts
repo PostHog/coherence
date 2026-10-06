@@ -217,19 +217,19 @@ function stringsIn(value: unknown): string[] {
   return [];
 }
 
-test("the render has one view strip with the six views in order", async () => {
+test("the render has one view strip with the seven views in order", async () => {
   const { state } = await buildScopePage(options);
   const rendered = renderShell(state).text;
   const tabs = [...rendered.matchAll(/role="tab"[^>]*data-view="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tabs, ["structure", "lexicon", "components", "invariants", "runs", "journal"]);
-  for (const label of ["Structure", "Lexicon", "Components", "Invariants", "Runs", "Journal"]) {
+  assert.deepEqual(tabs, ["structure", "lexicon", "components", "invariants", "practices", "runs", "journal"]);
+  for (const label of ["Structure", "Lexicon", "Components", "Invariants", "Practices", "Runs", "Journal"]) {
     assert.ok(rendered.includes(`>${label}</button>`), `${label} tab`);
   }
 });
 
 test("Structure is the first view: the strip leads with Structure then Lexicon, and a page whose address names no view opens on it", () => {
   const state = fresh();
-  assert.deepEqual(state.views.map((v) => v.id), ["structure", "lexicon", "components", "invariants", "runs", "journal"], "Structure, then Lexicon, then the rest in their order");
+  assert.deepEqual(state.views.map((v) => v.id), ["structure", "lexicon", "components", "invariants", "practices", "runs", "journal"], "Structure, then Lexicon, then the rest in their order");
   assert.equal(state.activeView, state.views[0]!.id, "the state opens on the first view");
   assert.equal(state.activeView, "structure");
   const rendered = renderShell(state).text;

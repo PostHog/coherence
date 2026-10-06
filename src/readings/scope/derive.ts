@@ -98,6 +98,7 @@ const ID_PREFIXES: [string, string][] = [
   ["structure-", "structure"],
   ["component-", "components"],
   ["invariant-", "invariants"],
+  ["practice-", "practices"],
   ["run-", "runs"],
   ["journal-", "journal"],
   ["work-", "journal"],
@@ -546,9 +547,17 @@ export function windowJournal(
   keep: number = JOURNAL_WINDOW,
   orders: readonly WorkOrder[] = [],
   cap: number = CITED_WINDOW,
+  pinned: ReadonlySet<string> = new Set(),
 ): { records: JournalRecord[]; omitted: number } {
   const kept = new Set<string>(records.slice(Math.max(0, records.length - keep)).map((record) => record.id));
+  // Records a reading must be able to land on whatever their age: what the practices cite (their pitfalls and what they were learned from).
+  for (const record of records) if (pinned.has(record.id)) kept.add(record.id);
   for (const escalation of openEscalations(records)) kept.add(escalation.id);
+  // The Practices view reads every enactment and every decision that cites one (an amendment), so the window keeps them all: they are few.
+  const enactments = new Set(records.filter((record) => record.kind === "enactment").map((record) => record.id));
+  for (const record of records) {
+    if (enactments.has(record.id) || (record.kind === "decision" && citesOf(record).some((id) => enactments.has(id)))) kept.add(record.id);
+  }
   const present = new Set(records.map((record) => record.id));
   const citing = [...records.filter((record) => kept.has(record.id)).reverse().map(citesOf), ...[...orders].reverse().map(workCites)];
   let pulled = 0;
