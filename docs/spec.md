@@ -165,7 +165,9 @@ component's methods, one bullet each, in the same grammar, with no headings:
 ```
 
 `when:` names what fires the practice: a command's words, an edited path's
-glob with the text the edit adds, or `explicit`. Steps are numbered in the
+glob with the text the edit adds, or `explicit`. A shell command that writes a file
+(a redirect, a heredoc, `tee`, `sed -i`, `cp`) counts as an edit of that file, and
+its own text as the text added. Steps are numbered in the
 order written; `leaves:` under a step names the evidence it leaves. Every
 pitfall cites the record or commit that witnessed it, and a practice that
 cites nothing is a problem. `invariants:` names invariants of the sister spec,
