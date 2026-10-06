@@ -11,8 +11,8 @@ import { test } from "node:test";
 import { loadLexicon } from "../lifecycle/lexicon.ts";
 import { runCheck } from "../lifecycle/check.ts";
 import { COHERENCE_LEXICON } from "../lifecycle/project.ts";
-import { RETIRED_SECTIONS, isCalendarDate, parseSpec, type Invariant } from "./grammar.ts";
-import { loadSpecModel, type SpecModel } from "./model.ts";
+import { RETIRED_SECTIONS, isCalendarDate, isModuleHandler, parseSpec, type Invariant } from "./grammar.ts";
+import { declaresAtTop, loadSpecModel, type SpecModel } from "./model.ts";
 import { formatReport } from "./report.ts";
 import { applicableShapes, loadSeed } from "./seed.ts";
 import { deriveState } from "./state.ts";
@@ -470,6 +470,49 @@ test("the model: an entrance's handler may be a module file whose top-level scri
   withModel(withJob("scripts/notes.md"), (model) => {
     assert.deepEqual(model.problems.map((p) => p.message), ["entrance job: handler scripts/notes.md names a file that is not source code"]);
   });
+});
+
+/** A Next.js App Router project shaped like ai-chatbot: a component in a (group) folder, its NextAuth route re-exporting handlers a multi-line destructuring declares. */
+function nextApp(entrances: string, files: Record<string, string> = {}): Record<string, string> {
+  return {
+    "Chatbot.spec.md": "# Chatbot\n\nA chat app.\n\n## trust levels\n- public (outside): anyone on the network\n\n## invariants\n",
+    "app/(auth)/(auth).spec.md": `# Auth\n\nSigning in.\n\n## entrances\n${entrances}\n## invariants\n`,
+    "app/(auth)/api/auth/[...nextauth]/route.ts": 'export { GET, POST } from "@/app/(auth)/auth";\n',
+    "app/(auth)/auth.ts": 'import NextAuth from "next-auth";\n\nexport const {\n  handlers: { GET, POST },\n  auth,\n  signIn,\n  signOut,\n} = NextAuth({\n  providers: [],\n});\n',
+    ...files,
+  };
+}
+
+test("the model: a module handler's path may carry route segments, [slug], [...slug], [[...slug]], (group), (.)intercepted and @slot, and it must still exist", () => {
+  for (const path of ["api/auth/[...nextauth]/route.ts", "app/(chat)/chat/[id]/page.tsx", "app/[[...rest]]/page.tsx", "app/@modal/(.)photo/[id]/page.tsx", "app/(auth)/(auth).spec.ts"]) assert.equal(isModuleHandler(path), true, path);
+  for (const value of ["GET in api/auth/[...nextauth]/route.ts", "views.detail(x)", "api/auth/[...nextauth]/route"]) assert.equal(isModuleHandler(value), false, value);
+  const entrances = "- NextAuth handlers: the sign-in callbacks\n  handler: api/auth/[...nextauth]/route.ts\n- chat page: a visitor opens a chat\n  handler: app/(chat)/chat/[id]/page.tsx\n";
+  withModel(nextApp(entrances, { "app/(chat)/chat/[id]/page.tsx": "export default function Page() { return null; }\n" }), (model) => {
+    assert.deepEqual(model.problems, []);
+    const auth = model.components.find((c) => c.folder === "app/(auth)")!;
+    assert.equal(auth.specPath, "app/(auth)/(auth).spec.md", "a spec in a (group) folder is a component");
+    assert.deepEqual(auth.entrances.map((e) => [e.name, e.file]), [["NextAuth handlers", "app/(auth)/api/auth/[...nextauth]/route.ts"], ["chat page", "app/(chat)/chat/[id]/page.tsx"]]);
+  });
+  withModel(nextApp(entrances), (model) => {
+    assert.deepEqual(model.problems.map((p) => p.message), ["entrance chat page: handler module app/(chat)/chat/[id]/page.tsx does not exist (read under app/(auth) and under the root)"]);
+  });
+});
+
+test("the model: a handler an export list re-exports, or a destructuring across lines declares, is declared at the top level of its file", () => {
+  const entrances = "- NextAuth GET: the sign-in callbacks\n  handler: GET in api/auth/[...nextauth]/route.ts\n- NextAuth POST: the sign-in form posts\n  handler: POST in api/auth/[...nextauth]/route.ts\n- sign out: a visitor signs out\n  handler: signOut in auth.ts\n";
+  withModel(nextApp(entrances), (model) => {
+    assert.deepEqual(model.problems, []);
+    assert.deepEqual(model.components.find((c) => c.folder === "app/(auth)")!.entrances.map((e) => e.file), ["app/(auth)/api/auth/[...nextauth]/route.ts", "app/(auth)/api/auth/[...nextauth]/route.ts", "app/(auth)/auth.ts"]);
+  });
+  withModel(nextApp("- NextAuth handlers object: never bound\n  handler: handlers in auth.ts\n"), (model) => {
+    assert.deepEqual(model.problems.map((p) => p.message), ["entrance NextAuth handlers object: handler handlers is not declared at the top level of auth.ts (read under app/(auth) and under the root)"], "a key the destructuring reads through binds nothing");
+  });
+  const listed = "const handle = () => null;\nexport { handle as GET, type Shape, other };\n";
+  assert.deepEqual(["GET", "Shape", "other", "handle"].map((n) => declaresAtTop(listed, n)), [true, true, true, true], "an export list exports a name, under its alias when it has one; handle is declared by its const");
+  assert.equal(declaresAtTop('export { handle as GET } from "./h";\n', "handle"), false, "a name a re-export renames is not exported under its own name");
+  assert.equal(declaresAtTop('import { GET } from "./auth";\n', "GET"), false, "an import declares nothing");
+  assert.equal(declaresAtTop("export const {\n  a,\n  b: { c },\n}: Things = make();\n", "c"), true, "a typed destructuring across lines");
+  assert.equal(declaresAtTop("const {\n  a,\n  b,\n};\n", "a"), false, "braces that assign nothing are no destructuring");
 });
 
 test("the model: an entrance's guard: line names a chokepoint an invariant declares, or a symbol of a chokepoint module", () => {

@@ -8,7 +8,7 @@ import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { cliName, HOOK_EVENTS, REFUSE_EXIT } from "./hook.ts";
 import { PACKAGE_NAME } from "./project.ts";
-import { driftOf, formatCheck, formatStatus, install, LOCATED_PREFIX, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
+import { driftOf, formatCheck, formatStatus, formatUninstall, IGNORE_TEXT, install, LOCATED_PREFIX, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
@@ -214,7 +214,7 @@ test("uninstall removes only Coherence's commands and returns the settings to wh
     }
     assert.deepEqual(
       await uninstall(join(dir, "nowhere"), "claude"),
-      { path: join(dir, "nowhere", ".claude", "settings.json"), removed: [], changed: false },
+      { path: join(dir, "nowhere", ".claude", "settings.json"), removed: [], changed: false, removedIgnore: false },
       "no settings file: nothing to do, nothing created",
     );
   } finally {
@@ -246,6 +246,67 @@ test("uninstall removes only Coherence's commands and returns the settings to wh
     { other: 1 },
     "an emptied hooks object goes",
   );
+});
+
+/** Every folder Coherence writes under .coherence, durable or regenerated. */
+const STATE_FOLDERS = ["journal", "runs", "work", "hooks", "feed", "lexicon", "models", "observations", "practices", "run", "structure", "traces"];
+const DURABLE = new Set(["journal", "runs", "work", "hooks"]);
+
+function gitStatus(dir: string): string[] {
+  const run = spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: dir, encoding: "utf8" });
+  assert.equal(run.status, 0, run.stderr);
+  return run.stdout.split("\n").filter(Boolean).map((line) => line.slice(3)).sort();
+}
+
+test("install keeps Coherence's regenerated state out of the project's git, and uninstall removes only the ignore file it wrote", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "coherence-ignore-"));
+  try {
+    assert.equal(spawnSync("git", ["init", "-q"], { cwd: dir }).status, 0);
+    await writeFile(join(dir, ".gitignore"), "node_modules/\n");
+    const before = await readFile(join(dir, ".gitignore"), "utf8");
+    const first = await install({ root: dir, host: "claude", command: "npx coherence" });
+    assert.deepEqual(first.ignore, { path: join(dir, ".coherence", ".gitignore"), action: "wrote" });
+    for (const folder of STATE_FOLDERS) {
+      await mkdir(join(dir, ".coherence", folder), { recursive: true });
+      await writeFile(join(dir, ".coherence", folder, "state.jsonl"), "{}\n");
+    }
+    assert.deepEqual(
+      gitStatus(dir),
+      [".claude/settings.json", ".coherence/.gitignore", ...[...DURABLE].map((f) => `.coherence/${f}/state.jsonl`), ".gitignore"].sort(),
+      "git sees the settings, the ignore file and the durable folders, and none of the regenerated state",
+    );
+    assert.equal(await readFile(join(dir, ".gitignore"), "utf8"), before, "the adopter's own .gitignore is never edited");
+    assert.equal((await install({ root: dir, host: "claude", command: "npx coherence" })).ignore.action, "unchanged", "a second install writes nothing");
+
+    // A second host shares the file; uninstall leaves it while any host keeps a hook of ours.
+    await install({ root: dir, host: "codex", command: "npx coherence" });
+    const claude = await uninstall(dir, "claude");
+    assert.equal(claude.removedIgnore, false, "codex still holds our hooks");
+    assert.equal(await readFile(join(dir, ".coherence", ".gitignore"), "utf8"), IGNORE_TEXT);
+    const codex = await uninstall(dir, "codex");
+    assert.equal(codex.removedIgnore, true, "the last host's uninstall removes the file install wrote");
+    assert.match(formatUninstall("codex", codex), /removed \.coherence\/\.gitignore/);
+    assert.equal(existsSync(join(dir, ".coherence", ".gitignore")), false);
+    assert.equal(existsSync(join(dir, ".coherence", "journal", "state.jsonl")), true, "the records stay");
+    assert.equal((await uninstall(dir, "codex")).removedIgnore, false, "a second uninstall changes nothing");
+
+    // A fresh tree: install then uninstall leaves no .coherence folder behind.
+    const fresh = join(dir, "fresh");
+    await mkdir(fresh);
+    await install({ root: fresh, host: "claude", command: "npx coherence" });
+    await uninstall(fresh, "claude");
+    assert.equal(existsSync(join(fresh, ".coherence")), false, "the folder install made is gone when it held only the ignore file");
+
+    // A .coherence/.gitignore with any other text is the adopter's: install keeps it and uninstall never removes it.
+    const theirs = "# ours\n*.log\n";
+    await mkdir(join(dir, ".coherence"), { recursive: true });
+    await writeFile(join(dir, ".coherence", ".gitignore"), theirs);
+    assert.equal((await install({ root: dir, host: "claude", command: "npx coherence" })).ignore.action, "kept");
+    assert.equal((await uninstall(dir, "claude")).removedIgnore, false);
+    assert.equal(await readFile(join(dir, ".coherence", ".gitignore"), "utf8"), theirs);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 type Hooks = Record<string, { matcher?: string; hooks: Record<string, unknown>[] }[]>;

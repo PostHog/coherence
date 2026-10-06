@@ -7,7 +7,11 @@ command certifies that every word in a project has the right meaning.
 Use `node src/cli.ts` in this checkout or `node_modules/.bin/coherence` in a linked
 adopter, from the project root. A domain lexicon can be used before specs, runs,
 or Scope exist. `coherence.config.json` may name its `lexicon`; otherwise the
-project uses `lexicon.json`. This checkout uses `docs/lexicon.json`.
+project uses `lexicon.json`. This checkout uses `docs/lexicon.json`. Before a
+project has a lexicon, it has none: `lexicon coverage --json` names no
+`projectLexicon` (Coherence's installed lexicon is never read as the project's), and
+`lexicon review <term>` prints every line of the project that writes a term too rare
+to be a candidate yet, so its live uses can be read before it is named.
 
 ## Observe coverage and inspect a meaning
 
@@ -51,17 +55,38 @@ node src/cli.ts lexicon apply <proposal-id> \
   --because "Why this meaning or name was chosen." --over "The rejected alternative."
 ```
 
-Actions are `declare`, `define`, `alias`, `reject`, `rename`, and `retire`. Use
-`--definition` or `--entry <project-relative.json>` for structured concept fields.
-Metadata is preserved; definition updates merge properties, detail, and provenance,
-and preserve prior aliases/rejections rather than silently losing history. An entry
-cannot import the draft's live-use/code-address fields. Rejecting an accepted alias or instance under its own concept needs an explicit
-human acknowledgement and moves that name into the rejection history. A concept
-name itself changes only through rename or retire. Named instances are distinct
+Actions are `declare`, `define`, `alias`, `reject`, `lift`, `rename`, and `retire`. Use
+`--definition` or `--entry <project-relative.json>` for structured concept fields; an
+entry file outside the project is refused, and the refusal names that file. An entry
+cannot import the draft's live-use/code-address fields. Named instances are distinct
 from aliases; for example, an application is an instance of an agent host, not a
 synonym for the category.
 
-A concept rename or retirement also needs `--human "the explicit acknowledgement"`.
+Each field of a concept has one change rule:
+
+| field | rule |
+| --- | --- |
+| definition | replaced by `define`, with because and over |
+| properties, detail | merged by `define`; a key leaves only by an explicit drop: `lexicon propose define <concept> --drop properties.<key>` (or `detail.<key>`). The removed key and its text go into the applying decision, not the lexicon |
+| aliases, instances | added freely; one leaves only by `reject` under its own concept, with `--human` |
+| rejected | append-only; `lexicon propose lift <concept> <name>` takes one back, with `--human` and `--cite` of the decision that rejected it (a rejection older than the journal has none, and the lift's decision carries the lifted entry and its reason) |
+| provenance | append-only: a new key is added, an existing key is never rewritten, and a drop of `provenance.<key>` is refused |
+| name | `rename` or `retire`, with `--human` |
+
+A property key counts as accepted vocabulary (d-3283157b), so the preview of a
+property drop runs the lexicon check over the lexicon as it stands and as the drop
+leaves it, and prints how many current uses of that key would become unknown-noun
+findings before anything is applied:
+
+```sh
+node src/cli.ts lexicon propose define practice --drop properties.layer \
+  --because "replaced by reach"
+#   removes properties.layer: "…" (kept in the applying decision)
+#   dropping properties.layer: 0 current uses would become unknown-noun findings
+```
+
+A concept rename or retirement, a removed alias or instance, and a lifted rejection
+need `--human "the explicit acknowledgement"`.
 This is an auditable assertion of a human ruling, **not identity authentication**.
 Agents must not invent it. Likewise, a preview is not human approval by itself.
 

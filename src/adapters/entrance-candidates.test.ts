@@ -1,6 +1,6 @@
 /**
  * Entrance detection (entrance-candidates.ts): every rule the language lists
- * detects its shape, with the rule and why; what the rules leave alone (a
+ * detects its shape, with the rule and why; what the rules leave alone (a TanStack
  * page route, a path inside a string, include(), an imported helper script,
  * a test file) stays undetected; and a detected entrance records the
  * declared wrappers its own statement calls, bound in its file.
@@ -166,4 +166,64 @@ describe("entrance detection", () => {
       remove();
     }
   });
+});
+
+/** The Next.js rules over one tree: what each detects, by file and symbol, with its rule and why. */
+function nextDetected(files: Record<string, string>): EntranceCandidate[] {
+  const { root, files: listed, remove } = project(files);
+  try {
+    const found = detectEntranceCandidates(root, { language: "typescript", files: listed, wrappers: [], testFolders: [] });
+    const rules = new Set(CANDIDATE_RULES["typescript"]!.map((r) => r.rule));
+    for (const c of found) assert.ok(rules.has(c.rule) && c.why.length > 0, `${c.rule} is a listed rule and says why`);
+    return found;
+  } finally {
+    remove();
+  }
+}
+
+test("the request proxy rule detects the proxy a Next.js proxy.ts exports, or the middleware a middleware.ts exports, at the root or under src/: declared, re-exported, or the default export", () => {
+  const found = nextDetected({
+    "proxy.ts": "import type { NextRequest } from 'next/server'\n\nexport async function proxy(request: NextRequest) {\n  return null\n}\n\nexport const config = { matcher: ['/'] }\nexport function helper() {}\n",
+    "src/middleware.ts": 'export { auth as middleware } from "@/app/(auth)/auth"\n',
+    "lib/proxy.ts": "export function proxy() {}\n",
+    "src/proxy.test.ts": "export function proxy() {}\n",
+  });
+  assert.deepEqual(found.map((c) => [c.file, c.symbol, c.rule]), [["proxy.ts", "proxy", "request proxy"], ["src/middleware.ts", "middleware", "request proxy"]], "only the proxy itself, at the root or under src/, never a helper, a namesake elsewhere or a test");
+  assert.match(found[1]!.why, /re-exported/);
+  const byDefault = nextDetected({ "middleware.ts": "export default auth((req) => null)\n" });
+  assert.deepEqual(byDefault.map((c) => [c.file, c.symbol, c.rule]), [["middleware.ts", "", "request proxy"]], "a default export is the file as a whole");
+});
+
+test("a Next.js route file's methods are read from its export lists too: re-exported, listed under an alias, or destructured", () => {
+  const found = nextDetected({
+    "app/(auth)/api/auth/[...nextauth]/route.ts": 'export { GET, POST } from "@/app/(auth)/auth";\n',
+    "app/(auth)/auth.ts": "export const {\n  handlers: { GET, POST },\n  auth,\n} = NextAuth({})\n",
+    "app/api/listed/route.ts": "const handler = () => new Response('')\nexport {\n  handler as GET,\n  handler as POST,\n  config,\n}\n",
+    "app/api/split/route.ts": "export const { GET, POST } = handlers\n",
+  });
+  assert.deepEqual(
+    found.map((c) => [c.file, c.symbol, c.line]),
+    [
+      ["app/(auth)/api/auth/[...nextauth]/route.ts", "GET", 1],
+      ["app/(auth)/api/auth/[...nextauth]/route.ts", "POST", 1],
+      ["app/api/listed/route.ts", "GET", 2],
+      ["app/api/listed/route.ts", "POST", 2],
+      ["app/api/split/route.ts", "GET", 1],
+      ["app/api/split/route.ts", "POST", 1],
+    ],
+    "every method a route file exports by name, never a non-method, and never in a file that is no route",
+  );
+  assert.ok(found.every((c) => c.rule === "route handler"));
+  assert.match(found[0]!.why, /^GET re-exported in a Next\.js route file/);
+});
+
+test("the page route rule detects the default export of a Next.js app/**/page file as the page as a whole, and no layout, app/routes file or page without a default export", () => {
+  const found = nextDetected({
+    "app/(chat)/page.tsx": "export default async function Page() {\n  return null\n}\n",
+    "app/(chat)/chat/[id]/page.tsx": "import { Chat } from '@/components/chat'\n\nexport default function Page() { return null }\n",
+    "app/(chat)/layout.tsx": "export default function Layout() { return null }\n",
+    "app/routes/page.tsx": "export default function Page() { return null }\n",
+    "app/empty/page.tsx": "export const dynamic = 'force-dynamic'\n",
+  });
+  assert.deepEqual(found.map((c) => [c.file, c.symbol, c.rule, c.line]), [["app/(chat)/chat/[id]/page.tsx", "", "page route", 3], ["app/(chat)/page.tsx", "", "page route", 1]]);
 });

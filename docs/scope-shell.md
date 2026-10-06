@@ -18,7 +18,7 @@ own loader from their records, so each carries its current state) when
 read them, and per view the reader's query, filters, and selection.
 
 `build.ts` loads those truths once and embeds the state as JSON in
-`public/_scope.html` with the styles and one inline script. Same inputs in,
+`.coherence/scope/_scope.html` with the styles and one inline script. Same inputs in,
 byte-identical page out. With `--root <project>` it builds over another
 project: that root's specs, runs, journal, and lexicon (named under
 `lexicon` in `coherence.config.json`, else `lexicon.json`) become the

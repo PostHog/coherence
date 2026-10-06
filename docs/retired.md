@@ -107,3 +107,19 @@ a harness metric crossing its own threshold is the project's business; when it s
 Carried over: nothing; the conjecture verb covers the unexplained-move case
 
 Decided by owner, 2026-09-23.
+
+## typecheck (a config key) and the tree-wide typechecks invariant
+
+the typechecks claim form retired into a tree-wide invariant whose enforcement is the compiler (above), and the config concept carried how to typecheck for it; that invariant was never built and nothing read the key, while every adopter's own test command already runs its compiler. A fresh adoption wrote the key and found it inert (df-b8084178).
+
+Carried over: nothing; a project's compiler runs in its own test command
+
+Decided by owner, 2026-10-05 (e-3bf51fcc, acknowledged ak-9e146686).
+
+## outputDir (a config key)
+
+the reference's folder for generated artifacts (default public, docs/coherence in Mnemion): the outline (graph.json, _graph.html), the overview and index pages, the Scope page, the ratchet baselines (mass, sinks), and the atlas and sidecar diagnostics. Each consumer retired, became a journal record (the lexicon and gap baselines), or, for the Scope snapshot, took a fixed default under the project's .coherence folder; nothing read the key. The old default also put the page, journal and all, in the folder web frameworks serve (df-f2f6b207).
+
+Carried over: the Scope snapshot's default, .coherence/scope/_scope.html; --out still names any other place
+
+Decided by owner, 2026-10-06.

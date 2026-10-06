@@ -30,7 +30,9 @@ export const CANDIDATE_RULES: Record<string, readonly { rule: string; detects: s
     { rule: "server function", detects: "an exported const created by createServerFn (TanStack Start)" },
     { rule: "wrapped export", detects: "an exported const created by calling a symbol a declared entrance names as its handler or guard" },
     { rule: "server route", detects: "an exported route created by createFileRoute with server handlers, createServerFileRoute or createAPIFileRoute" },
-    { rule: "route handler", detects: "an exported GET, POST, PUT, PATCH, DELETE, HEAD or OPTIONS in a Next.js app/**/route file, a default export under pages/api, or an exported loader or action under app/routes" },
+    { rule: "route handler", detects: "a GET, POST, PUT, PATCH, DELETE, HEAD or OPTIONS a Next.js app/**/route file exports, declared there, in an export list or re-export, or destructured; a default export under pages/api; or an exported loader or action under app/routes" },
+    { rule: "request proxy", detects: "the proxy a Next.js proxy.ts exports, or the middleware a middleware.ts exports, at the root or under src/: declared, in an export list or re-export, or as the default export" },
+    { rule: "page route", detects: "the default export of a Next.js app/**/page file, the page as a whole" },
     { rule: "server action", detects: "an exported function of a file that opens with 'use server'" },
     { rule: "route table", detects: "an object literal naming a path or pattern that starts with / and a handler, on one line" },
     { rule: "route method", detects: "a call like app.get('/path', handler) whose first argument is a path starting with /" },
@@ -51,7 +53,7 @@ export const CANDIDATE_RULES: Record<string, readonly { rule: string; detects: s
 
 /** What the rules do not see, per language: said wherever the coverage is, so an absence is never read as none. */
 export const NOT_DETECTED: Record<string, string> = {
-  typescript: "page routes without server handlers (their work enters through server functions), hand-written dispatchers, message consumers, workers and host callbacks are not detected",
+  typescript: "file routes outside a Next.js app/**/page without server handlers (their work enters through server functions), hand-written dispatchers, message consumers, workers and host callbacks are not detected",
   python: "views reached only through include(), hand-written dispatchers, message consumers and signal handlers are not detected",
 };
 

@@ -65,7 +65,8 @@ export async function scopeCommand(argv: string[], io: Io): Promise<number> {
 }
 
 async function snapshot(root: string, values: Map<string, string>, switches: Set<string>, io: Io): Promise<number> {
-  const out = values.get("out") ?? DEFAULTS.outPath;
+  // The default is the project's own .coherence folder, resolved against the root the reading is of, not the working folder.
+  const out = values.get("out") ?? resolve(root, DEFAULTS.outPath);
   const options: BuildOptions = {
     root,
     // Coherence's own lexicon always comes from this installation, never from the project's folder: an adopter has no docs/lexicon.json of Coherence's.
