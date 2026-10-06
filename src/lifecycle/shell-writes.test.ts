@@ -12,7 +12,7 @@ import { test } from "node:test";
 import { shellCommandOf, shellWrittenPaths } from "./shell-writes.ts";
 import { writtenFiles } from "./hook.ts";
 
-test("a shell command's written files are read from its words: redirects, heredocs, tee, sed -i, perl -i, cp and mv destinations, touch and rm, through cd, and never a quoted >, a heredoc body, a variable or a device", () => {
+test("a shell command's written files are read from its words: redirects, heredocs, tee, sed -i, perl -i, cp and mv destinations and mv sources, -t target folders, touch and rm, through cd, pushd and subshells, quoted brackets and CRLF, and never a quoted > or <<, a here-string, a heredoc body, a variable or a device", () => {
   const cases: [string, string[]][] = [
     ["cat > src/a.spec.md <<'EOF'\n- x: y\n  echo > not/this\nEOF", ["src/a.spec.md"]],
     ["echo hi >> notes.txt && ls", ["notes.txt"]],
@@ -20,7 +20,7 @@ test("a shell command's written files are read from its words: redirects, heredo
     ["sed -i.bak -e s/x/y/ e.md", ["e.md"]],
     ["sed -i 's/x/y/' f.md", ["f.md"]],
     ["tee -a g.md h.md < in.txt", ["g.md", "h.md"]],
-    ["cp x.md out/y.md; mv a b", ["out/y.md", "b"]],
+    ["cp x.md out/y.md; mv a b", ["out/y.md", "a", "b"]],
     ["node run.js 2>/dev/null > out.txt 2>&1", ["out.txt"]],
     ['git commit -m "fix > than"', []],
     ["cd sub && echo x > h.md", ["sub/h.md"]],
@@ -30,6 +30,19 @@ test("a shell command's written files are read from its words: redirects, heredo
     ["grep refute src/ | head > $OUT", []],
     ["printf '%s\\n' a > 'with space.md'", ["with space.md"]],
     ["touch a b && rm -rf c", ["a", "b", "c"]],
+    ["cat > 'app/(chat)/api/[id]/route.ts' <<'EOF'\nexport {}\nEOF", ["app/(chat)/api/[id]/route.ts"]],
+    ['echo x > "src/[slug].ts" && echo y > src/[slug].ts', ["src/[slug].ts"]],
+    ['echo x > "$OUT/a.md"', []],
+    ["tr a b <<< foo\ncat x > src/X.spec.md", ["src/X.spec.md"]],
+    ["(cd sub && echo hi > a.txt); echo hi > b.txt", ["sub/a.txt", "b.txt"]],
+    ["echo a > a.md\r\ncat > b.md <<EOF\r\nbody > no.md\r\nEOF\r\necho c > c.md\r\n", ["a.md", "b.md", "c.md"]],
+    ["echo 'a <<EOF' && echo\necho z > late.md", ["late.md"]],
+    ["mv src/Old.spec.md /tmp/x", ["src/Old.spec.md", "/tmp/x"]],
+    ["cp -t dest src/a.ts", ["dest/a.ts"]],
+    ["mv --target-directory=out src/b.ts c/", ["src/b.ts", "c/", "out/b.ts", "out/c"]],
+    ["install -m 755 -t bin tool", ["bin/tool"]],
+    ["pushd sub && echo q > p.md && popd && echo r > r.md", ["sub/p.md", "r.md"]],
+    ["cd $DIR && cd sub && echo x > h.md", []],
   ];
   for (const [command, written] of cases) assert.deepEqual(shellWrittenPaths(command), written, command);
   assert.equal(shellCommandOf({ command: ["bash", "-lc", "echo x > y.md"] }), "echo x > y.md", "a Codex shell argv runs its script");
