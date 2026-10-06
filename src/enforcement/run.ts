@@ -305,7 +305,9 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     if (batchedDetails.length === 0) {
       outcome.eachSkipped = !wantTotality ? "the run checked no totality oracle" : "no totality oracle ran in the batched invocation, so each already ran in its own";
     } else {
-      outcome.each = await confirmEach(root, config, model, options, batchedDetails, adapter, instrument, recorded, now);
+      // The one function that performs a pass is the only one that appends: confirmEach builds the second record, performRun writes it.
+      const each = await confirmEach(root, config, model, options, batchedDetails, adapter, instrument, recorded, now);
+      outcome.each = { ...each, file: appendRun(root, each.record) };
     }
   }
   return outcome;
@@ -342,7 +344,7 @@ async function confirmEach(
   instrument: RunRecord["instrument"],
   recorded: ReadonlySet<string>,
   now: () => Date,
-): Promise<EachOutcome> {
+): Promise<Omit<EachOutcome, "file">> {
   const started = Date.now();
   const details: EntryDetail[] = [];
   const hidden: EntryDetail[] = [];
@@ -393,7 +395,7 @@ async function confirmEach(
     latency: Date.now() - started,
     invariants: details.map((d) => d.entry),
   };
-  return { record, file: appendRun(root, record), details, hidden, unconfirmed };
+  return { record, details, hidden, unconfirmed };
 }
 
 /**
@@ -425,6 +427,17 @@ export async function withWarmAdapter<T>(
   } finally {
     if (remote !== undefined) await remote.close();
   }
+}
+
+/**
+ * Warm the project's instrument: connect to its warm server, which a
+ * connection spawns when none listens and which loads the project as it
+ * starts, then let go. A hook starts this detached at a session's start and
+ * at each prompt, so the stop that ends the turn finds the server loaded and
+ * its idle timer fresh. Nothing is printed and nothing is recorded.
+ */
+export async function warmInstrument(root: string): Promise<void> {
+  await withWarmAdapter(root, async () => {});
 }
 
 function entryOf(component: string, name: string, form: Form, rest: Omit<RunEntry, "component" | "name" | "form" | "grade"> & { grade: RunEntry["grade"] | undefined }): RunEntry {

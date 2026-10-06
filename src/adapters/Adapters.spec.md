@@ -145,3 +145,9 @@ The language adapter seam: how to ask a language's server for definitions, refer
   because: the same per-question git cost the TypeScript adapter carried (d-55040f81) sat in the Python adapter's resolve and reference filter, which is what reads a Python adopter such as PostHog; a listing kept past a forget would hide a new module from the chokepoint check
   refuted: kept the Python adapter's walked file list across a forget -> "the Python adapter reads the project's files once per forget: a module created after the listing is found only after a forget" went red in listing.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
   kinds: none
+- a cold server resolves what the project declares: The TypeScript adapter loads the project through a source file inside a component folder, and a name the server does not know yet is looked for in the files whose text spells it and confirmed by their document symbols, so a fresh server never answers no symbol for a name the project declares.
+  over: a project whose first source file lies outside the tsconfig, on a fresh server, at the first question
+  via: a cold server resolves a name the project declares even when the first source file of the walk lies outside the TypeScript project
+  because: a bench script outside the tsconfig became the first source file the walk met, so a fresh server loaded only an inferred project around it and answered no symbol for every bare name; the check at an edit then recorded not run and printed nothing, which let a bypass of run appended never rewritten reach main unseen
+  refuted: chose the first source file of the walk as the seed again, inside a component or not -> "a cold server resolves a name the project declares even when the first source file of the walk lies outside the TypeScript project" went red in listing.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none

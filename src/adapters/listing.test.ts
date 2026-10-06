@@ -82,3 +82,22 @@ test("the Python adapter reads the project's files once per forget: a module cre
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("a cold server resolves a name the project declares even when the first source file of the walk lies outside the TypeScript project", { timeout: 120_000 }, async () => {
+  const { seedFile } = await import("./typescript.ts");
+  const root = repo({
+    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+    "bench/a-measure.ts": "export const measured = 1;\n",
+    "src/w/W.spec.md": "# W\n\nWidgets.\n\n## invariants\n",
+    "src/w/thing.ts": "export function thing(): number {\n  return 1;\n}\n",
+  });
+  assert.equal(seedFile(["bench/a-measure.ts", "src/w/W.spec.md", "src/w/thing.ts"]), "src/w/thing.ts", "the seed is a source file inside a component folder");
+  const adapter = new TypeScriptAdapter(root);
+  try {
+    const resolved = await adapter.resolve("thing", { component: "src/w", testFolders: [] });
+    assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.reason);
+  } finally {
+    await adapter.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});

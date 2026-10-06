@@ -542,3 +542,27 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   refuted: resolved shell-written paths against the root instead of the folder the command runs in -> "writtenFiles counts a shell command's writes beside an edit tool's, resolved against the folder the command runs in and confined to the project" went red in shell-writes.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
   kinds: none
 
+- a turn's instrument is warmed before its stop: A session start and every prompt start warming the instrument in the background and never wait for it; no other event does.
+  over: SessionStart, UserPromptSubmit, PreToolUse and PostToolUse
+  via: a session start and every prompt warm the instrument without waiting for it, and no other event does
+  because: the stop regulates with the economy prediction, which needs the warm server; it idles out after five minutes, and every turn begins with a prompt, so warming there makes the stop find it loaded without the hook ever waiting on it
+  refuted: stopped warming the instrument at a prompt -> "a session start and every prompt warm the instrument without waiting for it, and no other event does" went red in hook-speed.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+- regulate reports the prediction: A stop names the files the prediction found beyond what the session wrote and which of them it never read, advisory; nothing when the prediction found none.
+  over: a prediction with read and unread files beyond the session's own, one with none, and no snapshot
+  via: regulate names the files the prediction found beyond what the session wrote, and which of them it never read
+  because: owner: the stop must regulate behaviour, not be skipped for speed; the prediction is computed at every stop, and a session that changed a file without reading what relies on it should hear so before it ends
+  refuted: counted every predicted file as unread, whatever the session read -> "regulate names the files the prediction found beyond what the session wrote, and which of them it never read" went red in hook-speed.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+- practice delivery reads the practices light: PreToolUse reads no practice for a tool use that runs no command and writes nothing, and otherwise reads only the practice files git lists, each beside its spec and outside every ignored folder, which are the same practices the spec model holds.
+  over: a paired practice, one beside no spec, one in an ignored folder, against the spec model's practices
+  via: practice delivery reads the same practices as the spec model, through git's listing of practice files alone
+  because: PreToolUse runs before every command and edit (every tool under Codex), and loading the whole spec model there cost about 0.34 s on this repository and 0.7 s on a 40,000-file one (df-f1b7e11a); delivery needs triggers, steps and versions, and the spec check is what holds the pairing
+  refuted: dropped the pairing check from practice delivery -> "practice delivery reads the same practices as the spec model, through git's listing of practice files alone" went red in hook-speed.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+- an edit never stays silent about a check it could not make: When a chokepoint invariant an edit may touch could not be checked, the edit names it with the reason; only a value the spec writes as prose, which spec --check already reports, goes unnamed there.
+  over: a touched invariant whose protected thing resolves to nothing, and one whose value is prose
+  via: an edit says which chokepoint invariants it could not check, and stays silent only for a value the spec writes as prose
+  because: a not-run verdict read as a clean edit: on a fresh server every check at the edit came back not run and nothing was said, so the alarm that should have fired on a bypass was quiet; a silent alarm is a vacuous check
+  refuted: said nothing for a check the edit could not make -> "an edit says which chokepoint invariants it could not check, and stays silent only for a value the spec writes as prose" went red in hook-speed.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none

@@ -30,7 +30,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Definition, LanguageAdapter } from "../adapters/adapter.ts";
-import { projectSites } from "../adapters/project-files.ts";
+import { projectListing, projectSites } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
@@ -125,6 +125,15 @@ function chokepointForms(invariant: ModelInvariant): { protects: string; chokepo
   return invariant.enforcements.flatMap((e) => (e.form === "chokepoint" ? [{ protects: e.protects, chokepoint: e.chokepoint }] : []));
 }
 
+/** Whether a spec value (a symbol, a symbol in a file, or a module path) could be defined in one of the given files: a given file spells the symbol, or is the module. */
+export function spelledInGiven(value: string, given: readonly string[], texts: ReadonlyMap<string, string>): boolean {
+  const trimmed = value.trim();
+  const named = /^([A-Za-z_$][\w$]*)(?:\s+in\s+\S+)?$/.exec(trimmed)?.[1];
+  if (named === undefined) return given.some((file) => file === trimmed || file.endsWith(`/${trimmed}`) || trimmed.endsWith(`/${file}`) || file.startsWith(trimmed.replace(/\/+$/, "") + "/"));
+  const spelled = new RegExp(`(^|[^\\w$])${named.replace(/\$/g, "\\$")}([^\\w$]|$)`);
+  return given.some((file) => spelled.test(texts.get(file) ?? ""));
+}
+
 /** The closure of a change to `paths` (absolute or project-relative). */
 export async function predictClosure(rootGiven: string, paths: readonly string[], options: ClosureOptions = {}): Promise<Closure> {
   const root = resolve(rootGiven);
@@ -154,6 +163,8 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
   for (const file of given) texts.set(file, readFileSync(resolve(root, file), "utf8"));
 
   if (adapter !== undefined) {
+    // The tree holds still for one prediction: git's listing is taken once and every reported site is kept against it.
+    const listing = projectListing(root);
     const hint = (file: string): { component: string; testFolders: readonly string[] } => ({ component: componentOf(model, file)?.folder ?? ".", testFolders: config.testFolders });
 
     // Hop in: who references what the given files declare.
@@ -161,7 +172,7 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
       for (const declaration of declarationsOf(texts.get(file)!, language)) {
         const resolved = await adapter.resolve(`${declaration.name} in ${file}`, hint(file));
         if (!resolved.ok) continue;
-        for (const site of projectSites(root, await adapter.references(resolved.definition))) {
+        for (const site of projectSites(root, await adapter.references(resolved.definition), listing)) {
           if (givenSet.has(site.file)) continue;
           const kind = isTest(site.file, config.testFolders) ? "test references" : "references";
           out.add(site.file, `${kind} ${declaration.name} (${file}) at line ${site.line}${site.symbol === undefined ? "" : ` in ${site.symbol}`}`);
@@ -176,7 +187,7 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
         const name = imported.name === undefined ? imported.module : `${imported.name} in ${imported.module}`;
         const resolved = await adapter.resolve(name, hint(imported.module));
         if (!resolved.ok) continue;
-        const sites = projectSites(root, await adapter.references(resolved.definition));
+        const sites = projectSites(root, await adapter.references(resolved.definition), listing);
         const used = sites.filter((s) => s.file === file);
         if (used.length === 0) continue;
         const label = imported.name === undefined ? "the module" : imported.name;
@@ -188,6 +199,8 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
     for (const component of model.components) {
       for (const invariant of component.invariants) {
         for (const form of chokepointForms(invariant)) {
+          // A name is defined only in a file whose text spells it: when no given file spells either name (or is the module a path names), neither can be defined in one.
+          if (!spelledInGiven(form.protects, given, texts) && !spelledInGiven(form.chokepoint, given, texts)) continue;
           const resolvedProtects = await adapter.resolve(form.protects, { component: component.folder, testFolders: config.testFolders });
           const resolvedChokepoint = await adapter.resolve(form.chokepoint, { component: component.folder, testFolders: config.testFolders });
           const protectedDef: Definition | undefined = resolvedProtects.ok ? resolvedProtects.definition : undefined;

@@ -6,9 +6,11 @@
  *
  *   read      one line per PostToolUse of a reading tool that named a file
  *             under the root
- *   snapshot  one line at Stop: the files the session changed (the working
- *             tree against HEAD, plus untracked), the distinct files it read,
- *             and the closure predicted for the changed files
+ *   write     one line per PostToolUse that wrote files under the root (an
+ *             edit tool, a patch, or a shell command that writes)
+ *   snapshot  one line at Stop: the files the session itself wrote that
+ *             still exist and the config does not ignore, the distinct files
+ *             it read, and the closure predicted for what it wrote
  *
  * The hook calls recordReadTrace on PostToolUse and snapshotTrace on Stop;
  * the two call sites live in the hook, not here. Traces are not committed:
@@ -21,7 +23,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
-import { keepProjectFiles } from "../adapters/project-files.ts";
+import { configIgnore, keepProjectFiles, projectListing, underIgnored } from "../adapters/project-files.ts";
 import type { HookInput } from "../lifecycle/hook.ts";
 import type { SpecModel } from "../spec/model.ts";
 import { predictClosure, type Instrument } from "./closure.ts";
@@ -46,7 +48,7 @@ export interface Snapshot {
   at: string;
   session: string;
   commit: string | null;
-  /** The patch: files changed in the working tree against HEAD, plus untracked. */
+  /** The patch: the files the session wrote (a snapshot older than write lines holds the working tree against HEAD, plus untracked). */
   changed: string[];
   /** The distinct files the session read before this snapshot. */
   read: string[];
@@ -56,7 +58,15 @@ export interface Snapshot {
   instrument: Instrument;
 }
 
-export type TraceLine = ReadLine | Snapshot;
+/** Files one tool use wrote: the session's own patch, as the hook saw it, never another session's or a person's edits. */
+export interface WriteLine {
+  kind: "write";
+  at: string;
+  session: string;
+  files: string[];
+}
+
+export type TraceLine = ReadLine | WriteLine | Snapshot;
 
 export function tracesDir(root: string): string {
   return join(root, TRACES_DIR);
@@ -108,6 +118,46 @@ export function recordReadTrace(root: string, session: string, input: HookInput,
   return file;
 }
 
+/** Record the files a tool use wrote, when it wrote any; the hook hands in what writtenFiles read from the event. */
+export function recordWriteTrace(root: string, session: string, files: readonly string[], options: TraceOptions = {}): void {
+  if (files.length === 0 || !SESSION_TOKEN.test(session)) return;
+  const at = (options.now ?? (() => new Date()))().toISOString();
+  append(root, { kind: "write", at, session, files: [...files] });
+}
+
+/** The distinct files a session's trace says it wrote, sorted. */
+export function filesWritten(root: string, session: string): string[] {
+  const file = traceFile(root, session);
+  if (!existsSync(file)) return [];
+  const found = new Set<string>();
+  for (const line of readFileSync(file, "utf8").split("\n")) {
+    if (line.trim() === "") continue;
+    const parsed = parseLine(line);
+    if (typeof parsed !== "string" && parsed.kind === "write") for (const f of parsed.files) found.add(f);
+  }
+  return [...found].sort();
+}
+
+/**
+ * The session's own patch at a stop: the files its tool uses wrote that are
+ * still files, are the project's own, and lie outside every folder the
+ * config ignores. Another session's edits and a person's uncommitted work
+ * are not this session's change, so they are never predicted for.
+ */
+export function sessionPatch(root: string, session: string): string[] {
+  const written = filesWritten(root, session).filter((f) => {
+    try {
+      return statSync(resolve(root, f)).isFile();
+    } catch {
+      return false;
+    }
+  });
+  if (written.length === 0) return [];
+  const skip = new Set(configIgnore(root));
+  const own = keepProjectFiles(root, written, projectListing(root));
+  return written.filter((f) => own.has(f) && !underIgnored(f, skip)).sort();
+}
+
 function git(cwd: string, args: string[]): string | null {
   try {
     return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
@@ -130,6 +180,7 @@ export function patchFiles(root: string): string[] {
 export interface SessionTrace {
   session: string;
   reads: ReadLine[];
+  writes: WriteLine[];
   snapshots: Snapshot[];
 }
 
@@ -143,12 +194,13 @@ export function loadTraces(root: string): LoadedTraces {
   const loaded: LoadedTraces = { sessions: [], damaged: [] };
   if (!existsSync(dir)) return loaded;
   for (const name of readdirSync(dir).filter((n) => n.endsWith(".jsonl")).sort()) {
-    const session: SessionTrace = { session: name.slice(0, -".jsonl".length), reads: [], snapshots: [] };
+    const session: SessionTrace = { session: name.slice(0, -".jsonl".length), reads: [], writes: [], snapshots: [] };
     readFileSync(join(dir, name), "utf8").split("\n").forEach((line, index) => {
       if (line.trim() === "") return;
       const parsed = parseLine(line);
       if (typeof parsed === "string") loaded.damaged.push({ file: join(TRACES_DIR, name), line: index + 1, reason: parsed });
       else if (parsed.kind === "read") session.reads.push(parsed);
+      else if (parsed.kind === "write") session.writes.push(parsed);
       else session.snapshots.push(parsed);
     });
     loaded.sessions.push(session);
@@ -168,6 +220,7 @@ function parseLine(line: string): TraceLine | string {
   for (const field of ["kind", "at", "session"]) if (typeof record[field] !== "string") return `missing ${field}`;
   if (Number.isNaN(Date.parse(record["at"] as string))) return `unreadable time "${String(record["at"])}"`;
   if (record["kind"] === "read") return typeof record["file"] === "string" ? (value as ReadLine) : "read line names no file";
+  if (record["kind"] === "write") return Array.isArray(record["files"]) && record["files"].every((f) => typeof f === "string") ? (value as WriteLine) : "write line names no files";
   if (record["kind"] === "snapshot") {
     for (const field of ["changed", "read", "predicted"]) if (!Array.isArray(record[field])) return `snapshot missing ${field}`;
     return value as Snapshot;
@@ -203,7 +256,7 @@ export interface SnapshotOptions extends TraceOptions {
  * nor changed a file; the snapshot is returned otherwise.
  */
 export async function snapshotTrace(root: string, session: string, options: SnapshotOptions = {}): Promise<Snapshot | undefined> {
-  const changed = [...(options.changed ?? patchFiles(root))].filter((f) => {
+  const changed = [...(options.changed ?? sessionPatch(root, session))].filter((f) => {
     try {
       return statSync(resolve(root, f)).isFile();
     } catch {
