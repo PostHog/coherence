@@ -53,7 +53,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { acceptedNames, rejectedNames, type Lexicon, type RejectedName } from "./lexicon.ts";
 import { STOPLIST } from "./stoplist.ts";
-import { configIgnore, projectFiles, underIgnored } from "../adapters/project-files.ts";
+import { configIgnore, exclusionOf, projectFiles, underIgnored, walkBounds, type Bounds } from "../adapters/project-files.ts";
 import { CONFIG_FILE, isCoherenceItself, vocabularyFacts } from "./project.ts";
 import { isWellKnown, wellKnown, type WellKnown } from "./well-known.ts";
 import { proseNominations } from "./nomination.ts";
@@ -134,7 +134,6 @@ const DATA_EXTENSIONS = new Set([
   ".json", ".jsonl", ".ndjson", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf",
   ".env", ".properties", ".xml", ".csv", ".tsv", ".graphql", ".proto",
 ]);
-const EXCLUDED_FOLDERS = new Set(["node_modules", "public", ".git", "dist", "build", ".claude", ".codex", ".venv", "__pycache__"]);
 
 /** Machine-written or foreign-vocabulary files no adopter can repair by renaming: a dependency lockfile is the author's, not the project's. */
 const EXCLUDED_NAMES = new Set(["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.lock", "poetry.lock", "uv.lock", "Gemfile.lock", "composer.lock", "go.sum"]);
@@ -225,6 +224,8 @@ interface Walk {
   root: string;
   /** The config's ignore list: folders outside the adoption's bounds, never entered. */
   ignore: ReadonlySet<string>;
+  /** The walk's own rules (exclusionOf), reading hidden folders; the config's ignore list is applied apart, so the record store stays inside it. */
+  rules: Bounds;
   found: string[];
   unreadable: UnreadablePath[];
   excluded: UnreadablePath[];
@@ -254,7 +255,8 @@ async function walk(dir: string, walker: Walk): Promise<void> {
     // Coherence's own machine-written output (runs, traces, a warm server's files) is neither read nor reported: it churns on every run, and a reading whose population moved with it would never build the same page twice.
     if (machineWritten(relPath(walker.root, path))) continue;
     if (entry.isDirectory()) {
-      if (EXCLUDED_FOLDERS.has(entry.name)) { walker.excluded.push({ file: relPath(walker.root, path), reason: "dependency, generated, host, or environment folder" }); continue; }
+      const rule = exclusionOf(relPath(walker.root, path) + "/", walker.rules);
+      if (rule !== undefined) { walker.excluded.push({ file: relPath(walker.root, path), reason: rule }); continue; }
       if (outsideBounds(relPath(walker.root, path) + "/", walker.ignore)) { walker.excluded.push({ file: relPath(walker.root, path), reason: OUTSIDE_BOUNDS }); continue; }
       if (existsSync(resolve(path, ".git"))) { walker.excluded.push({ file: relPath(walker.root, path), reason: "a nested checkout: another repository or worktree, not the project's files" }); continue; }
       await walk(path, walker);
@@ -288,7 +290,7 @@ export async function collectFiles(options: CheckOptions): Promise<{ files: stri
   const excluded = new Set<string>([resolve(options.coherence.path), resolve(root, "docs", "retired.md"), resolve(root, "src", "spec", "retired-sections.json")]);
   const foreignDocs = [resolve(root, "docs", "reference"), resolve(root, "docs", "reviews")];
   if (options.project !== undefined) excluded.add(resolve(options.project.path));
-  const walker: Walk = { root, ignore: new Set(configIgnore(root)), found: [], unreadable: [], excluded: [] };
+  const walker: Walk = { root, ignore: new Set(configIgnore(root)), rules: walkBounds(root, [], { readHidden: true }), found: [], unreadable: [], excluded: [] };
   const roots = options.paths === undefined || options.paths.length === 0 ? [root] : options.paths.map((given) => confine(root, given));
   for (const path of roots) {
     let info;
@@ -310,7 +312,7 @@ export async function collectFiles(options: CheckOptions): Promise<{ files: stri
     if (foreignDocs.some((d) => p === d || p.startsWith(d + sep))) return false;
     const rel = relPath(root, p);
     if (rel.split("/")[0] === COHERENCE_DIR && !isRecordFile(rel)) return false;
-    return !dirname(rel).split("/").some((part) => EXCLUDED_FOLDERS.has(part));
+    return exclusionOf(rel, walker.rules) === undefined;
   });
   for (const path of walker.found) {
     if (files.includes(path)) continue;

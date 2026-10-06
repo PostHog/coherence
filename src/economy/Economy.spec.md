@@ -33,6 +33,13 @@ The context closure of a change, the read traces that record what sessions actua
   crossing: project-source -> reading
   refuted: printed the total line before the unreached line -> "mass: a file in no component and a file in a component that no invariant reaches count as unreached; unreached prints first; deterministic" went red in economy.test.ts on the first printed line; restored, green (2026-09-17)
   kinds: none
+- mass names folders with no spec of their own: Mass names every folder, at any depth inside a component, that directly holds three or more of its code files and has no spec of its own, with its numbers and the component that holds it; a folder with its own spec is a component and is never named.
+  over: every folder inside a component's folder, at any depth, that holds code files directly
+  via: mass names each folder of three or more code files that a component above it holds only because the folder has no spec of its own
+  because: an adoption declared a spec per top-level folder and stopped, and every reading counted the nested units (credit balances, an inbox, each Temporal feature) as covered by the component above them; nothing said the reading had folded them, so a human had to ask the agent to go deeper (df-9750aee2). Naming each folded folder with its weight makes the next spec to write a printed line
+  crossing: project-source -> reading
+  refuted: named only the folders directly under the component, as a top-level walk would -> "mass names each folder of three or more code files that a component above it holds only because the folder has no spec of its own" went red in economy.test.ts, src/app/queue/inbox unnamed; restored, green (2026-10-06)
+  kinds: none
 - working change is the project's change: The economy of the working change starts from exactly the project files git reports as changed, each with how git reported it: staged, unstaged, and untracked files not ignored against HEAD, and with --since everything from the merge base of the ref and HEAD; a deletion is reported and never given, a rename is its new path noting the old, and no ignored file or nested checkout ever counts.
   over: every path git reports for the working change of one tree, with and without --since
   via: working change: staged, unstaged, and untracked project files against HEAD, deletions reported and renames as the new path, never an ignored file or a nested checkout; --since adds everything from the merge base; sorted and deterministic

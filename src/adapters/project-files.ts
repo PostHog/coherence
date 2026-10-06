@@ -179,6 +179,106 @@ export function boundedProjectFiles(root: string, ignore: readonly string[] = co
   return projectFiles(root).filter((rel) => !underIgnored(rel, skip));
 }
 
+/* ------------------------------------------------------------ the walks */
+
+/**
+ * Folder names no project authors its code in, wherever they sit: a package
+ * manager's install and an interpreter's cache. Nothing else is left out by
+ * its name alone: a folder named public, dist or build may hold the
+ * project's own code (billing's api/public held five routes no walk read),
+ * and a generated one is already left out by the project's git ignore rules.
+ */
+const ENVIRONMENT_FOLDERS: ReadonlySet<string> = new Set(["node_modules", "__pycache__", "site-packages"]);
+
+/** The agent hosts' and git's own folders: never the project's words, even for a walk that reads hidden folders. */
+const HOST_FOLDERS: ReadonlySet<string> = new Set([".git", ".claude", ".codex"]);
+
+/** A file the walks leave out, and the rule that left it out. */
+export interface Exclusion {
+  file: string;
+  reason: string;
+}
+
+/** What a walk reads and what it leaves out: together, exactly projectFiles. */
+export interface Walked {
+  files: string[];
+  excluded: Exclusion[];
+}
+
+/** The bounds one walk applies: the config's ignore list, and whether hidden folders are read. */
+export interface Bounds {
+  root: string;
+  ignore: ReadonlySet<string>;
+  /** Read hidden folders other than the hosts' (.github, .coherence): the vocabulary check reads them; a code walk never does. */
+  readHidden: boolean;
+  /** Per folder, its reason or "" when the folder is walked. */
+  memo: Map<string, string>;
+}
+
+export function walkBounds(root: string, ignore: readonly string[] = configIgnore(root), options: { readHidden?: boolean } = {}): Bounds {
+  return { root: resolve(root), ignore: new Set(ignore.map(folderKey).filter((f) => f !== "")), readHidden: options.readHidden ?? false, memo: new Map() };
+}
+
+/** Whether a folder on disk is a Python virtual environment. */
+export function isVirtualEnvironment(dir: string): boolean {
+  return existsSync(join(dir, "pyvenv.cfg"));
+}
+
+/** Whether a disk walk looking for folders (virtual environments, nested checkouts) may skip descending into one by its name: hidden, a host's, or an environment folder. */
+export function neverWalkedName(name: string): boolean {
+  return name.startsWith(".") || HOST_FOLDERS.has(name) || ENVIRONMENT_FOLDERS.has(name);
+}
+
+/** Why one folder (project-relative) is left out, or "" when the walk enters it. */
+function folderReason(bounds: Bounds, folder: string): string {
+  let reason = bounds.memo.get(folder);
+  if (reason !== undefined) return reason;
+  const name = folder.slice(folder.lastIndexOf("/") + 1);
+  if (bounds.ignore.has(folder) || bounds.ignore.has(name)) reason = `config ignore: ${bounds.ignore.has(folder) ? folder : name}`;
+  else if (HOST_FOLDERS.has(name)) reason = `host folder: ${folder}`;
+  else if (name.startsWith(".") && !bounds.readHidden) reason = `hidden folder: ${folder}`;
+  else if (ENVIRONMENT_FOLDERS.has(name)) reason = `environment folder: ${folder}`;
+  else if (isVirtualEnvironment(join(bounds.root, folder))) reason = `virtual environment: ${folder}`;
+  else reason = "";
+  bounds.memo.set(folder, reason);
+  return reason;
+}
+
+/**
+ * Why a project-relative path lies outside the walk, or undefined when the
+ * walk reads it: the first folder on its way down that a rule leaves out,
+ * named with the rule. The one place any walk of the project leaves a file
+ * out; a walker may narrow what it reads by kind (an extension, a test), but
+ * a folder is left out here or not at all.
+ */
+export function exclusionOf(rel: string, bounds: Bounds): string | undefined {
+  const folders = rel.split("/").slice(0, -1);
+  for (let i = 0; i < folders.length; i++) {
+    const reason = folderReason(bounds, folders.slice(0, i + 1).join("/"));
+    if (reason !== "") return reason;
+  }
+  return undefined;
+}
+
+/** Every project file a walk reads, and every one it leaves out with its reason. */
+export function walkedProjectFiles(bounds: Bounds): Walked {
+  const files: string[] = [];
+  const excluded: Exclusion[] = [];
+  for (const file of projectFiles(bounds.root)) {
+    const reason = exclusionOf(file, bounds);
+    if (reason === undefined) files.push(file);
+    else excluded.push({ file, reason });
+  }
+  return { files, excluded };
+}
+
+/** The exclusions summed by reason, largest first: what a reading shows of what no walk read. */
+export function exclusionSummary(excluded: readonly Exclusion[]): { reason: string; files: number }[] {
+  const counts = new Map<string, number>();
+  for (const { reason } of excluded) counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  return [...counts].map(([reason, files]) => ({ reason, files })).sort((a, b) => b.files - a.files || a.reason.localeCompare(b.reason));
+}
+
 /**
  * The given paths (absolute or project-relative) that are project files, as
  * project-relative paths with forward slashes. The same rule as

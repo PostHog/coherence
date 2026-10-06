@@ -20,15 +20,12 @@ import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type Latest } from "../enforcement/record.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
-import { projectFiles, underIgnored } from "../adapters/project-files.ts";
+import { walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
 import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPractice, practiceProblems, stemOf, type ModelPractice } from "./practices.ts";
 
 export const SPEC_SUFFIX = ".spec.md";
 export const CONFIG_FILE = "coherence.config.json";
-
-/** Folders never walked, whatever the config says. */
-const EXCLUDED_FOLDERS: ReadonlySet<string> = new Set(["node_modules", ".git", "dist", ".coherence", ".claude", ".codex", "public"]);
 
 export interface ModelInvariant extends Invariant {
   /** The folder of the component the bullet lives in. */
@@ -123,14 +120,13 @@ export function findSpecs(root: string, ignore: readonly string[] = []): string[
 }
 
 /**
- * The project's own files under a folder (projectFiles), project-relative,
- * never inside a folder no walk enters: a spec in a nested checkout is
+ * The project's own files under a folder that the walk reads
+ * (walkedProjectFiles), project-relative: a spec in a nested checkout is
  * another tree's component, and its source is not this project's.
  */
 function walkedFiles(root: string, folder: string, ignore: readonly string[]): string[] {
-  const skip = new Set([...EXCLUDED_FOLDERS, ...ignore]);
   const prefix = folder === "." || folder === "" ? "" : folder.replace(/\/+$/, "") + "/";
-  return projectFiles(root).filter((rel) => rel.startsWith(prefix) && !underIgnored(rel, skip));
+  return walkedProjectFiles(walkBounds(root, ignore)).files.filter((rel) => rel.startsWith(prefix));
 }
 
 function folderOf(root: string, specPath: string): string {

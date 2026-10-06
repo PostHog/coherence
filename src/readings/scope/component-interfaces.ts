@@ -74,11 +74,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite } from "../../adapters/adapter.ts";
 import { detectEntranceCandidates, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
-import { configIgnore, projectFiles, projectSites, underIgnored } from "../../adapters/project-files.ts";
+import { configIgnore, exclusionOf, projectFiles, projectSites, walkBounds, type Bounds } from "../../adapters/project-files.ts";
 import { adapterFor, type Language } from "../../adapters/index.ts";
 import { resolveDotted } from "../../adapters/python.ts";
 import { resolveSpecifier } from "../../adapters/typescript.ts";
-import { EXCLUDED_FOLDERS, componentOf, declarationsOf, isSourceFile, isTest } from "../../economy/source.ts";
+import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy/source.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
 import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
@@ -202,10 +202,9 @@ const SITE_EXTENSIONS: Record<Language, readonly string[]> = {
   python: [".py", ".pyi"],
 };
 
-/** Whether a project-relative file lies inside the config's bounds: under no ignored folder, no folder no walk enters, and no dot folder. */
-export function withinBounds(file: string, skip: Set<string>): boolean {
-  if (file.split("/").slice(0, -1).some((name) => name.startsWith("."))) return false;
-  return !underIgnored(file, skip);
+/** Whether a project-relative file lies inside the bounds: no rule of the walk (exclusionOf) leaves it out. */
+export function withinBounds(file: string, skip: Bounds): boolean {
+  return exclusionOf(file, skip) === undefined;
 }
 
 /** The adapter the reading starts for itself: bounded to the config's ignore list, when it names one and the language's server can be bounded. */
@@ -237,9 +236,9 @@ export function interfaceBounds(root: string): string {
   return configIgnore(root).join("\n");
 }
 
-/** The folders the bounds leave out: the config's ignore list and the folders no walk enters. */
-export function boundsOf(ignore: readonly string[]): Set<string> {
-  return new Set([...EXCLUDED_FOLDERS, ...ignore]);
+/** The bounds of the reading's walk: the config's ignore list and the walk's own rules (walkBounds). */
+export function boundsOf(root: string, ignore: readonly string[]): Bounds {
+  return walkBounds(root, ignore);
 }
 
 /**
@@ -247,7 +246,7 @@ export function boundsOf(ignore: readonly string[]): Set<string> {
  * component, when it is a non-test file of the language inside the config's
  * bounds; otherwise undefined, and a reference site there is outside.
  */
-function componentCodeOf(model: SpecModel, file: string, language: Language, skip: Set<string>, testFolders: readonly string[]): string | undefined {
+function componentCodeOf(model: SpecModel, file: string, language: Language, skip: Bounds, testFolders: readonly string[]): string | undefined {
   if (!SITE_EXTENSIONS[language].some((ext) => file.endsWith(ext)) || isTest(file, testFolders) || !withinBounds(file, skip)) return undefined;
   return componentOf(model, file)?.folder;
 }
@@ -520,7 +519,7 @@ export function entranceWrappers(model: Pick<SpecModel, "components">): string[]
  * scan: it asks the language server nothing and costs a read of the tree.
  */
 export function detectedEntrances(root: string, model: Pick<SpecModel, "components">, language: Language, testFolders: readonly string[], ignore: readonly string[] = configIgnore(root)): EntranceCandidate[] {
-  const skip = boundsOf(ignore);
+  const skip = boundsOf(root, ignore);
   const files = projectFiles(root).filter((file) => withinBounds(file, skip));
   return detectEntranceCandidates(root, { language, files, wrappers: entranceWrappers(model), testFolders });
 }
@@ -577,7 +576,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
     if (ready === STOPPED) return { kind: "unread", because: `the ${config.language} instrument did not start within the interface reading's time budget (${budget.seconds} s)` };
     if (!ready.ok) return { kind: "unread", because: `the ${config.language} instrument did not answer: ${ready.reason}` };
     const testFolders = config.testFolders;
-    const skip = boundsOf(ignore);
+    const skip = boundsOf(root, ignore);
     const language = config.language;
     // The component code: every bounded non-test file of the language whose nearest spec folder is a component.
     const code = new Map<string, string>();

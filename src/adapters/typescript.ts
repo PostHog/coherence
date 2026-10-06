@@ -45,13 +45,12 @@ import {
   type Visibility,
 } from "./adapter.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
-import { keepProjectFiles, projectFiles } from "./project-files.ts";
+import { keepProjectFiles, walkBounds, walkedProjectFiles } from "./project-files.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..");
 const SERVER_BIN = "typescript-language-server";
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
-const SKIPPED_FOLDERS = new Set(["node_modules", ".git", "dist", ".coherence", ".claude", ".codex", "public"]);
 
 export const TYPESCRIPT_LADDER: Ladder = {
   top: "visibility-choked",
@@ -122,9 +121,9 @@ export function refusesReference(diagnostic: Diagnostic): boolean {
   return /not exported|no exported member|is private|is protected|not accessible/.test(diagnostic.message);
 }
 
-/** The project's files a walk of this adapter may read: never under a dot folder or a folder no adopter's code lives in. */
+/** The project's files a walk of this adapter may read: the walk's own bounds (walkedProjectFiles), never the config's ignore list. */
 function walkedFiles(root: string): string[] {
-  return projectFiles(root).filter((rel) => rel.split("/").every((part) => !part.startsWith(".") && !SKIPPED_FOLDERS.has(part)));
+  return walkedProjectFiles(walkBounds(root, [])).files;
 }
 
 /** The first source file of the project: opening it makes the language server load the project. */

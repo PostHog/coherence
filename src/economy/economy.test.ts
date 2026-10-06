@@ -347,3 +347,33 @@ test("mass: a file in no component and a file in a component that no invariant r
   assert.deepEqual(fromSpec.components.find((c) => c.folder === "src/store")?.unreachedFiles, ["src/store/extra.ts"]);
   assert.deepEqual(fromSpec.outside.files, ["src/api/render.ts", "src/util/format.ts"]);
 });
+
+test("mass names each folder of three or more code files that a component above it holds only because the folder has no spec of its own", () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-mass-unspecced-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), text, "utf8");
+  };
+  const code = (name: string): string => `export function ${name}(): number {\n  return 1;\n}\n`;
+  try {
+    put("coherence.config.json", CONFIG);
+    put("src/app/App.spec.md", "# App\n\nThe whole app, declared at the top.\n");
+    put("src/app/main.ts", code("main"));
+    for (const name of ["post", "replay", "balance"]) put(`src/app/accounts/${name}.ts`, code(name));
+    for (const name of ["a", "b", "c"]) put(`src/app/queue/inbox/${name}.ts`, code(name));
+    for (const name of ["x", "y"]) put(`src/app/small/${name}.ts`, code(name));
+    put("src/app/billed/Billed.spec.md", "# Billed\n\nA unit with a spec of its own.\n");
+    for (const name of ["d", "e", "f"]) put(`src/app/billed/${name}.ts`, code(name));
+
+    const report = computeMass(dir);
+    const app = report.components.find((c) => c.folder === "src/app");
+    assert.ok(app !== undefined);
+    assert.deepEqual(app.unspecced.map((u) => u.folder), ["src/app/accounts", "src/app/queue/inbox"], "a nested unit at any depth is named; a folder of two files and a folder with its own spec are not");
+    assert.equal(report.components.find((c) => c.folder === "src/app/billed")?.unspecced.length, 0);
+    const printed = formatMass(report);
+    assert.match(printed, /folders with no spec of their own, folded into a component above them .*: 2/);
+    assert.match(printed, /\n  src\/app\/accounts: 9 lines, 3 files, 3 symbols, inside src\/app/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

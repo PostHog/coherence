@@ -21,13 +21,13 @@
  */
 
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { posix, resolve } from "node:path";
 import { parseName } from "../adapters/adapter.ts";
-import { configIgnore } from "../adapters/project-files.ts";
+import { configIgnore, exclusionSummary, walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
-import { componentOf, declarationsOf, isTest, sourceFiles } from "./source.ts";
+import { componentOf, declarationsOf, isSourceFile, isTest, sourceFiles } from "./source.ts";
 
 export interface Numbers {
   lines: number;
@@ -46,7 +46,16 @@ export interface ComponentMass {
   total: Numbers;
   unreached: Numbers;
   unreachedFiles: string[];
+  /**
+   * Folders inside the component with no spec of their own that hold at
+   * least UNIT_FILES code files directly: each may be a unit of its own,
+   * folded into this component only because no spec sits there.
+   */
+  unspecced: { folder: string; total: Numbers }[];
 }
+
+/** Code files a folder must hold directly before mass names it as a possible component of its own. */
+export const UNIT_FILES = 3;
 
 export interface MassReport {
   language: string;
@@ -65,6 +74,8 @@ export interface MassReport {
    */
   silentTotalityOracles: string[];
   testsExcluded: number;
+  /** The language's source files no walk reads, summed by the rule that left them out: what mass cannot see, said beside what it counts. */
+  leftOut: { reason: string; files: number }[];
 }
 
 export interface MassOptions {
@@ -157,7 +168,17 @@ export function computeMass(rootGiven: string, options: MassOptions = {}): MassR
     .map((component) => {
       const mine = files.filter((f) => componentOf(model, f.file)?.folder === component.folder);
       const unreached = mine.filter((f) => f.reachedBy.length === 0);
-      return { folder: component.folder, total: sum(mine), unreached: sum(unreached), unreachedFiles: unreached.map((f) => f.file).sort() };
+      const byFolder = new Map<string, FileMass[]>();
+      for (const f of mine) {
+        const folder = posix.dirname(f.file);
+        if (folder === component.folder) continue;
+        byFolder.set(folder, [...(byFolder.get(folder) ?? []), f]);
+      }
+      const unspecced = [...byFolder]
+        .filter(([, held]) => held.length >= UNIT_FILES)
+        .map(([folder, held]) => ({ folder, total: sum(held) }))
+        .sort((a, b) => b.total.lines - a.total.lines || a.folder.localeCompare(b.folder));
+      return { folder: component.folder, total: sum(mine), unreached: sum(unreached), unreachedFiles: unreached.map((f) => f.file).sort(), unspecced };
     })
     .sort((a, b) => a.folder.localeCompare(b.folder));
 
@@ -172,6 +193,7 @@ export function computeMass(rootGiven: string, options: MassOptions = {}): MassR
     reachFrom: [...reachFrom].sort(),
     silentTotalityOracles,
     testsExcluded: tests.length,
+    leftOut: exclusionSummary(walkedProjectFiles(walkBounds(root, ignore)).excluded.filter((e) => isSourceFile(e.file, language))),
   };
 }
 
@@ -194,10 +216,20 @@ export function formatMass(report: MassReport): string {
     if (c.unreached.files === 0) continue;
     lines.push(`  ${c.folder}: ${numbers(c.unreached)} unreached of ${numbers(c.total)} — ${c.unreachedFiles.slice(0, SHOWN).join(", ")}${c.unreachedFiles.length > SHOWN ? `, and ${c.unreachedFiles.length - SHOWN} more` : ""}`);
   }
+  const unspecced = report.components.flatMap((c) => c.unspecced.map((u) => ({ ...u, within: c.folder }))).sort((a, b) => b.total.lines - a.total.lines || a.folder.localeCompare(b.folder));
+  if (unspecced.length > 0) {
+    lines.push(`folders with no spec of their own, folded into a component above them (${UNIT_FILES} or more code files each; give each that is a unit its own spec): ${unspecced.length}`);
+    for (const u of unspecced.slice(0, SHOWN)) lines.push(`  ${u.folder}: ${numbers(u.total)}, inside ${u.within}`);
+    if (unspecced.length > SHOWN) lines.push(`  and ${unspecced.length - SHOWN} more`);
+  }
   lines.push(`total mass: ${numbers(report.total)}`);
   for (const c of report.components) lines.push(`  ${c.folder}: ${numbers(c.total)}; unreached ${numbers(c.unreached)}`);
   const from = report.reachFrom.length === 0 ? "no invariant reaches any file" : `reach from ${report.reachFrom.map((f) => (f === "run" ? "the latest run's files" : "the spec's named symbols")).join(" and ")}`;
   lines.push(`${from}; symbols are top-level declarations by a plain scan; ${report.testsExcluded} test file${report.testsExcluded === 1 ? "" : "s"} excluded`);
+  if (report.leftOut.length > 0) {
+    const n = report.leftOut.reduce((total, r) => total + r.files, 0);
+    lines.push(`left out of every walk: ${n} source file${n === 1 ? "" : "s"} — ${report.leftOut.slice(0, SHOWN).map((r) => `${r.reason} (${r.files})`).join(", ")}${report.leftOut.length > SHOWN ? `, and ${report.leftOut.length - SHOWN} more` : ""}`);
+  }
   if (report.silentTotalityOracles.length > 0) {
     const n = report.silentTotalityOracles.length;
     lines.push(`${n} totality oracle${n === 1 ? "'s" : "s'"} run record does not say which files its test touched, so nothing is counted reached through it: ${report.silentTotalityOracles.join(", ")}`);

@@ -140,7 +140,7 @@ describe("entrance detection", () => {
       "pyproject.toml": '[project]\nname = "app"\n\n[project.scripts]\napp-sync = "app.sync:main"\n',
       "app/__init__.py": "",
       "app/sync.py": "def main():\n    pass\n",
-      "app/urls.py": "from django.urls import include, path\nfrom . import views\nurlpatterns = [\n    path('items/', views.items),\n    path('item/<int:pk>/', views.ItemView.as_view()),\n    path('api/', include('app.api')),\n]\nrouter.register(r'things', ThingViewSet)\n",
+      "app/urls.py": "from django.urls import include, path\nfrom . import views\nurlpatterns = [\n    path('items/', views.items),\n    path('item/<int:pk>/', views.ItemView.as_view()),\n    path('api/', include('app.api')),\n    path(\n        'seats/<str:id>/reactivate/',\n        views.seat_reactivate,\n    ),\n    path(\n        'internal/limited',\n        LimitedView.as_view(),\n    ),\n]\nrouter.register(r'things', ThingViewSet)\n",
       "app/api.py": "from fastapi import APIRouter\nfrom app.guard import checked\nrouter = APIRouter()\n\n@router.get('/health')\n@checked\ndef health():\n    return {}\n\n@router.get('health')\ndef not_a_path():\n    return {}\n",
       "app/guard.py": "def checked(f):\n    return f\n",
       "app/tasks.py": "from celery import shared_task\n\n@shared_task\ndef reindex():\n    pass\n\n@activity.defn\nasync def fetch():\n    pass\n",
@@ -154,7 +154,7 @@ describe("entrance detection", () => {
       const rules = new Set(CANDIDATE_RULES["python"]!.map((r) => r.rule));
       for (const c of found) assert.ok(rules.has(c.rule), `${c.rule} is a listed rule`);
       const names = (rule: string): string[] => found.filter((c) => c.rule === rule).map((c) => c.symbol || c.file);
-      assert.deepEqual(names("url pattern"), ["items", "ItemView"], "include() is delegation, not an entrance");
+      assert.deepEqual(names("url pattern"), ["items", "ItemView", "seat_reactivate", "LimitedView"], "include() is delegation, not an entrance; a call broken across lines is still a pattern");
       assert.deepEqual(names("viewset"), ["ThingViewSet"]);
       assert.deepEqual(names("route decorator"), ["health"], "a route path must start with /");
       assert.deepEqual(found.find((c) => c.symbol === "health")?.through, ["checked"], "a decorator a declared entrance names is its registration");
