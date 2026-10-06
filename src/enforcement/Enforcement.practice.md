@@ -1,14 +1,14 @@
 - witness a refutation: A refutation counts only when the detector went red because of the staged break, and the code is back byte for byte afterwards.
   when: command refute | edit **/*.spec.md adding refuted:
-  step: run the bullet's test alone, by its filter, and see it green
-    leaves: run record for the bullet, pass
+  step: run the totality oracles being refuted in one batched run confirmed with run --each (run --invariant <name>... --each), and see each green batched and alone
+    leaves: run record for the bullets, pass; per-test run record, pass
   step: stage the smallest break that changes the behavior the bullet claims, not the strings the detector reads; read the diff to confirm the edit touched only the lines you meant
   step: refute <component>/<name> --broke "<what you changed>"; the detector fails on its own assertion, not by a hang, a kill, a timeout, or what an earlier test left behind
     leaves: run record for the bullet, refutation red
   step: restore the source byte for byte
     leaves: the file matches HEAD
-  step: run the bullet's test alone again and see it green
-    leaves: run record for the bullet, pass
+  step: run them again in one batched run confirmed with run --each, and see each green batched and alone
+    leaves: run record for the bullets, pass; per-test run record, pass
   step: when the red did not come from the break, record a decision that this refutation does not count and refute again; the run store is append-only, so the correction is a later record
   pitfall: a sed matched two lines, so the test hung and went red only when it was killed (d-828ddc83)
   pitfall: a substring detector passed an unconditional early return that kept every expected string (df-c40bb904, x-429ed176)
