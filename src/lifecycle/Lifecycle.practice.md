@@ -41,6 +41,8 @@
   step: write coherence.config.json at the root: name, language, the folders that are not this project's code or prose under ignore (vendored code, generated output, fixtures), and, where the project has tests, test with testMatch and testJson; every key is in docs/config.md in the installed package
   step: settle the vocabulary: coherence lexicon coverage, then declare the terms that carry the project's meaning (the practice settle a domain term)
   step: declare the components and where work enters them: the entry spec with its trust levels, one spec per component folder, then every entrance (the practice declare entrances); the grammar is in docs/spec.md in the installed package
+  step: give each real unit its own spec at whatever depth it sits, not one per top-level folder: run coherence mass, and for each folder it names as having no spec of its own, write its spec or record with decide why it belongs to the component above; repeat until mass names none you have not decided
+    leaves: mass names no folder without a spec or a decision
   step: declare the few invariants that matter most (security, tenant isolation, data integrity), each through the practice declare a requirement
   step: run, then witness each refutation (the practice witness a refutation); a broken chokepoint is a finding to report with its bypass sites, not a failure to hide; a requirement the code already breaks stays a requirement, with a defect per site and an escalation, and a test that cannot run here is recorded as unable
     leaves: spec --check with 0 problems
@@ -54,6 +56,7 @@
   pitfall: Scope failed when run from an adopter's own folder, because every page until then had been built from Coherence's checkout with --root (d-01976691)
   pitfall: a coverage report redirected into the adopter's root was read back as its source and grew on every run (df-79ac2d4e)
   pitfall: both outside adoptions left their route gaps open because nothing in the session's loop showed them (d-a1095ef2)
+  pitfall: an adoption declared one spec per top-level folder and stopped, and a human had to ask for the nested units (df-9750aee2)
   pitfall: a fresh adoption found its first requirements already false and its tests unable to run unattended, and had to improvise what to record (df-8ac95c4d)
   learned: d-96eb6814, d-127ab8e4, d-a1095ef2, f658594
   reach: kernel

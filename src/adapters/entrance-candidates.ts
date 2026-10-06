@@ -265,16 +265,20 @@ function pythonCandidates(file: string, text: string, wrappers: readonly string[
   const seen = new Set<number>();
   const urls = /(^|\/)urls\.py$/.test(file);
   const command = /(^|\/)management\/commands\/[^_/][^/]*\.py$/.test(file);
-  lines.forEach((line, i) => {
-    if (urls) {
-      const pattern = /\b(?:re_path|path|url)\(\s*[rbuf]*["'][^"']*["']\s*,\s*([A-Za-z_][\w.]*(?:\.as_view\s*\([^)]*\))?)/.exec(line);
-      if (pattern !== null && !/^include\b/.test(pattern[1]!)) {
-        const symbol = handlerName(pattern[1]!);
-        if (symbol !== "") add({ file, line: i + 1, symbol, rule: "url pattern", why: `a URL pattern routed to ${pattern[1]!.trim()}`, registered: true }, line);
-      }
+  // A URL pattern and a router registration are read over the whole text, not line by line: a call may break after its open parenthesis, its route and its handler on the lines below, as billing's seats/<id>/reactivate/ route is written.
+  const lineAt = (index: number): number => text.slice(0, index).split("\n").length;
+  const callText = (index: number, end: number): string => text.slice(index, end);
+  if (urls) {
+    for (const pattern of text.matchAll(/\b(?:re_path|path|url)\(\s*[rbuf]*["'][^"']*["']\s*,\s*([A-Za-z_][\w.]*(?:\.as_view\s*\([^)]*\))?)/g)) {
+      if (/^include\b/.test(pattern[1]!)) continue;
+      const symbol = handlerName(pattern[1]!);
+      if (symbol !== "") add({ file, line: lineAt(pattern.index), symbol, rule: "url pattern", why: `a URL pattern routed to ${pattern[1]!.trim()}`, registered: true }, callText(pattern.index, pattern.index + pattern[0].length));
     }
-    const viewset = /\b\w+\.register\(\s*[rbuf]*["'][^"']*["']\s*,\s*([A-Za-z_][\w.]*)/.exec(line);
-    if (viewset !== null) add({ file, line: i + 1, symbol: handlerName(viewset[1]!), rule: "viewset", why: `a router registration of ${viewset[1]}`, registered: true }, line);
+  }
+  for (const viewset of text.matchAll(/\b\w+\.register\(\s*[rbuf]*["'][^"']*["']\s*,\s*([A-Za-z_][\w.]*)/g)) {
+    add({ file, line: lineAt(viewset.index), symbol: handlerName(viewset[1]!), rule: "viewset", why: `a router registration of ${viewset[1]}`, registered: true }, callText(viewset.index, viewset.index + viewset[0].length));
+  }
+  lines.forEach((line, i) => {
     if (command && /^class\s+Command\b/.test(line)) add({ file, line: i + 1, symbol: "Command", rule: "management command", why: `a Django management command, run as manage.py ${posix.basename(file, ".py")}` }, spanOf(lines, i, "python"));
     const route = /^\s*@[\w.]*\.(get|post|put|patch|delete|route|api_route|websocket)\(\s*[rbuf]*["'](\/[^"']*)["']/.exec(line);
     const task = /^\s*@(shared_task|[\w.]*\.task|(?:activity|workflow)\.defn)\b/.exec(line);

@@ -158,7 +158,7 @@ const MANIFESTS: ReadonlySet<string> = new Set(["coherence.config.json", "packag
  */
 export function structureFingerprint(root: string): string {
   const language = readEnforcementConfig(root).language;
-  const skip = boundsOf(configIgnore(root));
+  const skip = boundsOf(root, configIgnore(root));
   const hash = createHash("sha256");
   hash.update(specShape(root)).update("\u0000");
   for (const file of projectFiles(root)) {

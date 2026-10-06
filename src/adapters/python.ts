@@ -75,7 +75,7 @@ import {
   type Visibility,
 } from "./adapter.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
-import { keepProjectFiles, nestedCheckouts, projectFiles } from "./project-files.ts";
+import { isVirtualEnvironment, keepProjectFiles, nestedCheckouts, neverWalkedName, walkBounds, walkedProjectFiles } from "./project-files.ts";
 
 /** The small JSON-RPC surface the adapter needs, exposed so a test can control server ordering. */
 export interface PythonLanguageClient {
@@ -92,7 +92,6 @@ export type PythonClientFactory = (command: string, args: string[], cwd: string,
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..");
 const SERVER_BIN = "pyright-langserver";
-const SKIPPED_FOLDERS = new Set(["node_modules", ".git", "__pycache__", "site-packages", ".coherence", ".claude", ".codex", "dist", "build"]);
 const ENUMERATION_TIMEOUT_MS = 10 * 60 * 1000;
 const COHERENCE_ENFORCER = "Coherence's check at the edit and in CI";
 
@@ -243,11 +242,6 @@ export function resolveDotted(from: string, dots: string, dotted: string): strin
   return parts.length === 0 ? undefined : parts.join("/");
 }
 
-/** Whether a folder is a virtual environment (never source). */
-function isVenv(dir: string): boolean {
-  return existsSync(join(dir, "pyvenv.cfg"));
-}
-
 /**
  * The exclude list Pyright's workspace gets so it never indexes a nested
  * checkout, or nothing when the root holds none. A list given replaces
@@ -269,10 +263,10 @@ export function workspaceExclusions(root: string): string[] | undefined {
       return;
     }
     for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith(".") || SKIPPED_FOLDERS.has(entry.name)) continue;
+      if (!entry.isDirectory() || neverWalkedName(entry.name)) continue;
       const rel = folder === "" ? entry.name : `${folder}/${entry.name}`;
       if (nested.includes(rel)) continue;
-      if (isVenv(join(root, rel))) venvs.push(rel);
+      if (isVirtualEnvironment(join(root, rel))) venvs.push(rel);
       else walk(rel);
     }
   };
@@ -372,10 +366,10 @@ export function boundedWorkspaceConfig(root: string, folder: string, bounds: Ada
       return;
     }
     for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith(".") || SKIPPED_FOLDERS.has(entry.name) || skip.has(entry.name)) continue;
+      if (!entry.isDirectory() || neverWalkedName(entry.name) || skip.has(entry.name)) continue;
       const rel = dir === "" ? entry.name : `${dir}/${entry.name}`;
       if (skip.has(rel) || nested.includes(rel)) continue;
-      if (isVenv(join(root, rel))) venvs.push(rel);
+      if (isVirtualEnvironment(join(root, rel))) venvs.push(rel);
       else walk(rel);
     }
   };
@@ -387,23 +381,10 @@ export function boundedWorkspaceConfig(root: string, folder: string, bounds: Ada
   return config;
 }
 
-/** Every Python file of the project under `start` (project-relative paths), skipping venvs, caches, and dot folders. */
+/** Every Python file of the project under `start` (project-relative paths) that the walk reads (walkedProjectFiles): never in a virtual environment, a cache, or a hidden folder. */
 export function pythonFiles(root: string, start = "."): string[] {
   const prefix = start === "." ? "" : start.replace(/^\.\//, "").replace(/\/+$/, "") + "/";
-  const venv = new Map<string, boolean>();
-  const inVenv = (rel: string): boolean => {
-    const parts = rel.split("/");
-    for (let i = 1; i < parts.length; i++) {
-      const folder = parts.slice(0, i).join("/");
-      let answer = venv.get(folder);
-      if (answer === undefined) venv.set(folder, (answer = isVenv(join(root, folder))));
-      if (answer) return true;
-    }
-    return false;
-  };
-  return projectFiles(root).filter(
-    (rel) => rel.endsWith(".py") && rel.startsWith(prefix) && rel.split("/").every((part) => !part.startsWith(".") && !SKIPPED_FOLDERS.has(part)) && !inVenv(rel),
-  );
+  return walkedProjectFiles(walkBounds(root, [])).files.filter((rel) => rel.endsWith(".py") && rel.startsWith(prefix));
 }
 
 /** Every Python file whose project-relative path is the hint or ends with `/<hint>`. */

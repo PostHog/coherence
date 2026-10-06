@@ -9,12 +9,9 @@
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { isTestPath } from "../adapters/adapter.ts";
-import { projectFiles, underIgnored } from "../adapters/project-files.ts";
+import { walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
 import type { Component, SpecModel } from "../spec/model.ts";
-
-/** Folders never walked, whatever the config says; the same set the spec walker skips. */
-export const EXCLUDED_FOLDERS: ReadonlySet<string> = new Set(["node_modules", ".git", "dist", ".coherence", ".claude", ".codex", "public"]);
 
 const EXTENSIONS: Record<Language, readonly string[]> = {
   typescript: [".ts", ".tsx", ".mts", ".cts"],
@@ -28,15 +25,11 @@ export function isSourceFile(file: string, language: Language): boolean {
 
 /**
  * Every source file of the project for the language, project-relative with
- * forward slashes, sorted: the project's own files (projectFiles), never
- * under a dot folder or a folder no walk enters.
+ * forward slashes, sorted: the files the walk reads (walkedProjectFiles),
+ * which leaves a folder out only by a named rule.
  */
 export function sourceFiles(root: string, language: Language, ignore: readonly string[] = []): string[] {
-  const skip = new Set([...EXCLUDED_FOLDERS, ...ignore]);
-  return projectFiles(resolve(root)).filter((rel) => {
-    if (!isSourceFile(rel, language)) return false;
-    return !rel.split("/").slice(0, -1).some((name) => name.startsWith(".")) && !underIgnored(rel, skip);
-  });
+  return walkedProjectFiles(walkBounds(root, ignore)).files.filter((rel) => isSourceFile(rel, language));
 }
 
 /** A path as project-relative with forward slashes, or undefined when it lies outside the root. */
