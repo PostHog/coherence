@@ -286,7 +286,7 @@ export function exclusionSummary(excluded: readonly Exclusion[]): { reason: stri
  * sites, a file an edit wrote. A tracked file an edit just deleted is still
  * the project's until the deletion is committed.
  */
-export function keepProjectFiles(root: string, paths: readonly string[]): Set<string> {
+export function keepProjectFiles(root: string, paths: readonly string[], listing?: ProjectListing): Set<string> {
   const base = resolve(root);
   const memo = new Map<string, boolean>();
   const candidates = [...new Set(paths.map((p) => projectRelative(base, p)).filter((rel): rel is string => rel !== undefined))].filter(
@@ -295,6 +295,8 @@ export function keepProjectFiles(root: string, paths: readonly string[]): Set<st
   if (candidates.length === 0 || !inRepository(base)) {
     return new Set(inRepository(base) ? [] : candidates.filter((rel) => !rel.split("/").includes("node_modules")));
   }
+  // A listing taken once answers what git would for each batch: the same listing, without a git call per question.
+  if (listing !== undefined && listing.root === base) return new Set(candidates.filter((rel) => listing.listed.has(rel)));
   const kept = new Set<string>();
   for (let i = 0; i < candidates.length; i += PATHSPEC_BATCH) {
     for (const rel of gitList(base, candidates.slice(i, i + PATHSPEC_BATCH))) kept.add(rel);
@@ -303,13 +305,33 @@ export function keepProjectFiles(root: string, paths: readonly string[]): Set<st
 }
 
 /**
+ * What git lists for a project at one moment: every tracked and every
+ * untracked, unignored file. A caller asking many questions of a tree that
+ * holds still (one reading, an instrument between two forgets) takes it once
+ * and hands it to keepProjectFiles and projectSites, which then answer
+ * exactly as git would without asking it again. A caller that must see a
+ * file written a moment ago (the check at an edit) takes none.
+ */
+export interface ProjectListing {
+  root: string;
+  listed: ReadonlySet<string>;
+}
+
+/** The listing of a repository now, or undefined outside one (where keepProjectFiles asks no git). */
+export function projectListing(root: string): ProjectListing | undefined {
+  const base = resolve(root);
+  if (!inRepository(base)) return undefined;
+  return { root: base, listed: new Set(gitList(base, [])) };
+}
+
+/**
  * The reference sites that sit in the project's own files, in their order.
  * Every consumer of an instrument's references accepts sites through this,
  * whatever instrument answered: a warm server started before this rule
  * existed may still report a nested checkout's copy.
  */
-export function projectSites<T extends { file: string }>(root: string, sites: readonly T[]): T[] {
-  const own = keepProjectFiles(root, sites.map((site) => site.file));
+export function projectSites<T extends { file: string }>(root: string, sites: readonly T[], listing?: ProjectListing): T[] {
+  const own = keepProjectFiles(root, sites.map((site) => site.file), listing);
   return sites.filter((site) => own.has(site.file));
 }
 

@@ -74,7 +74,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite } from "../../adapters/adapter.ts";
 import { detectEntranceCandidates, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
-import { configIgnore, exclusionOf, projectFiles, projectSites, walkBounds, type Bounds } from "../../adapters/project-files.ts";
+import { configIgnore, exclusionOf, projectFiles, projectListing, projectSites, walkBounds, type Bounds } from "../../adapters/project-files.ts";
 import { adapterFor, type Language } from "../../adapters/index.ts";
 import { resolveDotted } from "../../adapters/python.ts";
 import { resolveSpecifier } from "../../adapters/typescript.ts";
@@ -648,6 +648,8 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
     };
     const asked = new Set<string>();
     const answered = new Set<string>();
+    // The tree holds still for one reading: git's listing is taken once and every reported site is kept against it.
+    const listing = projectListing(root);
     /** Ask one declaration for its references and account for every site; false once a budget stops the reading. */
     const ask = async (d: Declared): Promise<boolean> => {
       asked.add(d.id);
@@ -660,7 +662,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
       const definition: Definition = resolved.definition;
       const reported = await within(() => adapter.references(definition));
       if (reported === STOPPED) return false;
-      for (const site of projectSites(root, reported) as ReferenceSite[]) {
+      for (const site of projectSites(root, reported, listing) as ReferenceSite[]) {
         if (isTest(site.file, testFolders)) continue;
         // A private declaration is reached only from its own file: it widens a handler's reach, never an interface.
         if (!d.exported && site.file !== d.file) continue;
@@ -726,7 +728,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
       if (spelled.test(own.slice(definition.range.start.line, definition.range.end.line + 1).join("\n"))) return named;
       const sites = await within(() => adapter.references(definition));
       if (sites === STOPPED) return STOPPED;
-      for (const site of projectSites(root, sites) as ReferenceSite[]) {
+      for (const site of projectSites(root, sites, listing) as ReferenceSite[]) {
         if (isTest(site.file, testFolders) || !existsSync(join(root, site.file))) continue;
         const lines = readFileSync(join(root, site.file), "utf8").split("\n");
         const from = statementStartLine(lines, site.line - 1);
