@@ -130,7 +130,7 @@ export function spelledInGiven(value: string, given: readonly string[], texts: R
   const trimmed = value.trim();
   const named = /^([A-Za-z_$][\w$]*)(?:\s+in\s+\S+)?$/.exec(trimmed)?.[1];
   if (named === undefined) return given.some((file) => file === trimmed || file.endsWith(`/${trimmed}`) || trimmed.endsWith(`/${file}`) || file.startsWith(trimmed.replace(/\/+$/, "") + "/"));
-  const spelled = new RegExp(`(^|[^\\w$])${named.replace(/\$/g, "\\$")}([^\\w$]|$)`);
+  const spelled = new RegExp(`(^|[^\\w$])${named.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\w$]|$)`);
   return given.some((file) => spelled.test(texts.get(file) ?? ""));
 }
 

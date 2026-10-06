@@ -467,7 +467,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     if (candidates.length > 0) return candidates;
     // The server searches only the projects it has loaded: a name it does not know yet (a cold server, a second tsconfig) is
     // looked for in the files whose text spells it, and confirmed by their document symbols, never by the text alone.
-    const spelled = new RegExp(`(^|[^\\w$])${name.replace(/\$/g, "\\$")}([^\\w$]|$)`);
+    const spelled = new RegExp(`(^|[^\\w$])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\w$]|$)`);
     for (const file of this.walkedNow().filter((rel) => SOURCE_EXTENSIONS.has(extensionOf(rel)) && !/\.d\.ts$/.test(rel))) {
       let text: string;
       try {
