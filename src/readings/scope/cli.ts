@@ -20,6 +20,7 @@ import type { Io } from "../../journal/cli.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { DEFAULTS, projectNameOf, writeScopePage, type BuildOptions } from "./build.ts";
 import { BUDGET_FLAGS, budgetFlags, readComponentInterfaces } from "./component-interfaces.ts";
+import { readAndRecord } from "./gaps.ts";
 
 export const SCOPE_USAGE = [
   "  scope [--root <dir>] [--no-open]   open the live Scope reading from the warm server (prints its address)",
@@ -64,7 +65,8 @@ export async function scopeCommand(argv: string[], io: Io): Promise<number> {
 }
 
 async function snapshot(root: string, values: Map<string, string>, switches: Set<string>, io: Io): Promise<number> {
-  const out = values.get("out") ?? DEFAULTS.outPath;
+  // The default is the project's own .coherence folder, resolved against the root the reading is of, not the working folder.
+  const out = values.get("out") ?? resolve(root, DEFAULTS.outPath);
   const options: BuildOptions = {
     root,
     // Coherence's own lexicon always comes from this installation, never from the project's folder: an adopter has no docs/lexicon.json of Coherence's.
@@ -78,7 +80,7 @@ async function snapshot(root: string, values: Map<string, string>, switches: Set
       io.err(`scope: ${budget}\n${SCOPE_USAGE}`);
       return 64;
     }
-    options.componentInterfaces = await readComponentInterfaces(root, undefined, { budget });
+    options.componentInterfaces = await readAndRecord(root, () => readComponentInterfaces(root, undefined, { budget }));
   }
   const domain = values.get("domain");
   if (domain !== undefined) options.domainPath = domain;

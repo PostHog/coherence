@@ -17,7 +17,7 @@
  * With --root the state is read over another project: its spec tree, its
  * .coherence/runs, .coherence/journal and .coherence/work, and its lexicon
  * (named in coherence.config.json under `lexicon`, else lexicon.json at
- * its root) as the domain layer beneath Coherence's own. The command line is
+ * its root) as the domain layer beside Coherence's own. The command line is
  * cli.ts.
  */
 
@@ -25,7 +25,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { stripTypeScriptTypes } from "node:module";
-import { basename, dirname, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { adapterFor } from "../../adapters/index.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
@@ -34,10 +34,11 @@ import { loadJournal } from "../../journal/store.ts";
 import { WORK_DIR, foldOrders, loadWork as loadWorkRecords, workDir } from "../../journal/work.ts";
 import { lexiconCoverage } from "../../lifecycle/lexicon-coverage.ts";
 import { COHERENCE_LEXICON, projectLexiconPath } from "../../lifecycle/project.ts";
-import { loadSpecModel } from "../../spec/model.ts";
+import { loadSpecModel, projectPractices } from "../../spec/model.ts";
+import { KERNEL_PREFIX } from "../../spec/practices.ts";
 import { projectLexiconCoverage } from "./lexicon-projection.ts";
 import { windowJournal, windowRuns } from "./derive.ts";
-import { parseLexicon, type Lexicon, type InterfaceReading, type Ladder, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
+import { parseLexicon, type Lexicon, type InterfaceReading, type Ladder, type PracticesData, type LadderRung, type Layer, type ShellState, type SpecData, type StructurePreview, type WorkData } from "./model.ts";
 import { DEFAULT_VIEW, VIEWS } from "./shell.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -47,10 +48,11 @@ const here = dirname(fileURLToPath(import.meta.url));
  * before it; the relative imports are removed when the files are joined into
  * one inline module, and types are stripped by Node's own stripper.
  */
-const BROWSER_SOURCES = [
+export const BROWSER_SOURCES = [
   "html.ts",
   "model.ts",
   "derive.ts",
+  "entrance-coverage.ts",
   "structure-flow.ts",
   "lexicon-view.ts",
   "components-view.ts",
@@ -58,6 +60,8 @@ const BROWSER_SOURCES = [
   "structure-flow-view.ts",
   "structure-view.ts",
   "invariants-view.ts",
+  "practices.ts",
+  "practices-view.ts",
   "runs-view.ts",
   "journal-view.ts",
   "shell.ts",
@@ -86,7 +90,8 @@ export interface BuildOptions {
 
 export const DEFAULTS = {
   lexiconPath: "docs/lexicon.json",
-  outPath: "public/_scope.html",
+  // Under .coherence, never a served folder: public/ is what web frameworks publish, and the page embeds the journal (df-f2f6b207).
+  outPath: ".coherence/scope/_scope.html",
   domainTitle: "Domain lexicon",
   project: "Coherence",
 } as const;
@@ -159,7 +164,8 @@ export function loadSpec(root: string): SpecData {
     // The spec model carries each bullet's latest run entries; the page does not. They are the
     // run records, which the page already holds, read by enforcement: derive.ts reads them back
     // at render so no copy can disagree with the records it came from.
-    components: model.components.map((component) => ({
+    // A component's practices are held once, in the state's practices beside the kernel's; the spec keeps where its practice file is.
+    components: model.components.map(({ practices: _practices, ...component }) => ({
       ...component,
       invariants: component.invariants.map(({ latest: _latest, verified: _verified, defects: _defects, ...invariant }) => invariant),
     })),
@@ -172,6 +178,41 @@ export function loadSpec(root: string): SpecData {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Every practice a session at this root may enact, as the page holds it: the
+ * project's own from its practice files and, in an adopter, the kernel
+ * practices Coherence ships. The parser's line numbers stay behind.
+ */
+export function loadPractices(root: string): PracticesData {
+  let practices: ReturnType<typeof projectPractices>;
+  try {
+    practices = projectPractices(root);
+  } catch {
+    return { practices: [] };
+  }
+  const data: PracticesData = {
+    practices: practices.map((p) => ({
+      id: p.id,
+      name: p.name,
+      sentence: p.sentence,
+      component: p.component,
+      file: p.file,
+      kernel: p.id.startsWith(KERNEL_PREFIX),
+      ...(p.reach === undefined ? {} : { reach: p.reach }),
+      triggers: p.triggers,
+      steps: p.steps.map((s) => (s.leaves === undefined ? { n: s.n, text: s.text } : { n: s.n, text: s.text, leaves: s.leaves })),
+      pitfalls: p.pitfalls.map((pf) => ({ text: pf.text, cites: pf.cites })),
+      learned: p.learned,
+      invariants: p.invariants,
+      ...(p.because === undefined ? {} : { because: p.because }),
+      version: p.version,
+      state: p.state,
+      enactments: p.enactments,
+    })),
+  };
+  return JSON.parse(JSON.stringify(data)) as PracticesData;
 }
 
 /**
@@ -202,7 +243,7 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
   const coherence: Layer = {
     kind: "present",
     id: "coherence",
-    title: `${options.project} lexicon`,
+    title: "Coherence lexicon",
     lexicon: await readLexicon(options.lexiconPath),
   };
   const domainPath = await domainPathFor(options, root);
@@ -214,7 +255,7 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
           id: "domain",
           title: domainTitle(options, undefined),
           because:
-            "No domain lexicon is present. Supply a second lexicon file of the same shape to read the project's own vocabulary beneath Coherence's.",
+            "No domain lexicon is present. Supply a second lexicon file of the same shape to read the project's own vocabulary here, ahead of Coherence's terms.",
         }
       : {
           kind: "present",
@@ -250,6 +291,8 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
     components: { query: "" },
     structure: { preview: options.structurePreview === undefined ? [] : options.structurePreview.map((proposal) => ({ ...proposal, crossing: { ...proposal.crossing }, ...(proposal.chokepoints === undefined ? {} : { chokepoints: proposal.chokepoints.map((entry) => ({ ...entry })) }) })) },
     invariants: { query: "", state: "", component: "" },
+    practices: loadPractices(root),
+    practicesView: { query: "" },
     runsView: { query: "" },
     journalView: { query: "", kind: "", agent: "", session: "" },
   };
@@ -265,7 +308,8 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
  */
 export function windowState(state: ShellState): ShellState {
   const runs = windowRuns(state.runs.records);
-  const journal = windowJournal(state.journal.records, undefined, state.journal.work.kind === "present" ? state.journal.work.orders : []);
+  const cited = new Set(state.practices.practices.flatMap((p) => [...p.pitfalls.flatMap((pf) => pf.cites), ...p.learned]));
+  const journal = windowJournal(state.journal.records, undefined, state.journal.work.kind === "present" ? state.journal.work.orders : [], undefined, cited);
   return {
     ...state,
     runs: { ...state.runs, records: runs.records, ...(runs.omitted === 0 ? {} : { omitted: runs.omitted }) },
@@ -273,9 +317,23 @@ export function windowState(state: ShellState): ShellState {
   };
 }
 
-/** Strip one source file to JavaScript and drop its relative imports. */
-function toBrowserModule(source: string, name: string): string {
-  const stripped = stripTypeScriptTypes(source, { mode: "strip" });
+/** One browser source stripped to JavaScript, as the published package carries it beside its compiled modules. */
+export function strippedName(name: string): string {
+  return name.replace(/\.ts$/, ".browser.js");
+}
+
+/**
+ * One browser source as JavaScript: stripped here in a checkout, and read
+ * already stripped in the published package, whose build ran the same
+ * stripper, so an installed Coherence never calls the experimental API.
+ */
+async function browserSource(name: string): Promise<string> {
+  if (extname(fileURLToPath(import.meta.url)) === ".js") return readFile(resolve(here, strippedName(name)), "utf8");
+  return stripTypeScriptTypes(await readFile(resolve(here, name), "utf8"), { mode: "strip" });
+}
+
+/** Drop a stripped source's relative imports. */
+function toBrowserModule(stripped: string, name: string): string {
   // A relative import may span several lines; `[^;]` crosses them.
   return stripped.replace(/^import\s[^;]*from\s+["']\.\/[^"']*["'];[^\S\n]*$/gm, "").concat(`\n// end of ${name}\n`);
 }
@@ -294,8 +352,7 @@ async function browserScript(): Promise<string> {
   const parts: string[] = [];
   const declared = new Map<string, string>();
   for (const name of BROWSER_SOURCES) {
-    const source = await readFile(resolve(here, name), "utf8");
-    const module = toBrowserModule(source, name);
+    const module = toBrowserModule(await browserSource(name), name);
     for (const declaredName of topLevelNames(module)) {
       const earlier = declared.get(declaredName);
       if (earlier !== undefined) throw new Error(`Scope: ${name} declares ${declaredName} at top level, which ${earlier} already declares; the inline module has one name space`);
@@ -319,14 +376,16 @@ const PLEX_LATIN = "U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02D
  * base64 woff2 so the page stays self-contained: the regular weight of the
  * Latin subset the package ships (17.5 KB, 23.4 KB as base64), the only
  * weight the map and the page set mono text in; the medium weight would push
- * the page with a domain lexicon past its 2 MB budget. Without the package
- * the page falls back to the monospace stack it names after Plex.
+ * the page with a domain lexicon past its 2 MB budget. The file sits in fonts/
+ * beside this module with its license, copied from the font package once, because
+ * that package's install script is telemetry. Without it the page falls back
+ * to the monospace stack it names after Plex.
  */
 async function plexMono(): Promise<string> {
   const faces: string[] = [];
   for (const [weight, file] of [[400, "Regular"]] as const) {
     try {
-      const bytes = await readFile(resolve(here, `../../../node_modules/@ibm/plex-mono/fonts/split/woff2/IBMPlexMono-${file}-Latin1.woff2`));
+      const bytes = await readFile(resolve(here, "fonts", `IBMPlexMono-${file}-Latin1.woff2`));
       faces.push(`@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: ${weight}; font-display: swap; src: url(data:font/woff2;base64,${bytes.toString("base64")}) format("woff2"); unicode-range: ${PLEX_LATIN}; }`);
     } catch {
       return "";

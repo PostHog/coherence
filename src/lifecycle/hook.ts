@@ -36,31 +36,62 @@
  * The cursor advances only after the feed was handed to the host: runHook
  * renders and returns the advance as `commit`, and the command line calls it
  * once its stdout write has succeeded, never before.
+ * Spec gaps (d-a1095ef2) ride with both: orient adds one bounded line when
+ * entrances outside the adoption baseline carry untrusted work in with no
+ * traced control, read from the last complete Structure reading while it
+ * still describes the tree (gaps.ts); when it does not, from that reading
+ * with the current spec, labeled as the reading before the latest changes,
+ * after a bounded wait at a session start for a refresh of this tree that is
+ * nearly done. A stop, and a session start that finds the reading stale,
+ * starts one refresh in the background, never waited on there (df-84db9e4f). Regulate
+ * names the gaps this session touched, advisory: no traced control is not a
+ * demonstrated bypass, so a gap never refuses a stop. Undeclared entrances
+ * ride with both too (undeclared.ts), detected now by a scan that needs no
+ * reading: orient's one line counts them against what was detected and names
+ * the folder holding the most with the scaffold command that proposes their
+ * bullets; regulate names those in the files the session changed, advisory.
  * The root of every event is confined to the project the hook was installed
  * for: the harness names the working directory on stdin, and a cwd outside
  * that tree is refused with exit 78 rather than read or written.
+ * The hook voice is the project's own text at each event (d-d884e343, in the
+ * reference): `.coherence/hooks/<Event>.override.md` replaces what the event
+ * would say, an empty one is a deliberate silence, and
+ * `.coherence/hooks/<Event>.append.md` follows it; an event with nothing of
+ * its own to say still speaks a declared file. A refusal is enforcement, so
+ * no override reaches its reason; an append follows it. A file whose real
+ * path leaves the project root is named as not read, never followed.
+ * Practices ride with three events (practice-delivery.ts): orient names each
+ * with what fires it; PreToolUse delivers a practice whole when the tool use
+ * about to run fires it, before the act rather than after; regulate names one
+ * that fired and has no enactment since, advisory, never refused.
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
+import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
-import { openFeed, peerFeed } from "../journal/feed.ts";
+import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
 import { recordReadTrace, snapshotTrace } from "../economy/trace.ts";
 import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
-import { renderCompactWithin, type InjectionLevel } from "./lexicon.ts";
-import { installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
+import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, type Lexicon } from "./lexicon.ts";
+import { COHERENCE_LEXICON, installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
+import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
+import { loadSpec } from "../readings/scope/build.ts";
+import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
 import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
+import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
+import { shellCommandOf, shellWrittenPaths } from "./shell-writes.ts";
 
 const run = promisify(execFile);
 
@@ -68,6 +99,7 @@ export const HOOK_EVENTS = [
   "SessionStart",
   "SubagentStart",
   "UserPromptSubmit",
+  "PreToolUse",
   "PostToolUse",
   "Stop",
   "SubagentStop",
@@ -98,7 +130,7 @@ export const OUTSIDE_ROOT_EXIT = 78;
  */
 export const CONTEXT_BUDGET = 9_500;
 
-/** The rule; with the session block above it the whole tail stays under 120 words. */
+/** The rule in Coherence's own repository, where its rejected names are defects everywhere; with the session block above it the whole tail stays under 120 words. */
 export const INSTRUCTION = [
   "Use these names. A rejected name in prose, a spec, a journal record, or an",
   "identifier is a defect: replace it. A new noun the lexicon lacks must be",
@@ -106,6 +138,30 @@ export const INSTRUCTION = [
   "before this session ends. Coherence's names describe the tool; the",
   "project's names describe its domain, and inside the project its sense wins.",
 ].join(" ");
+
+/**
+ * The rule in an adopter, matching what the check enforces there: Coherence's
+ * rejected names cover only text that names Coherence's concepts, the
+ * project's own rejected names are defects everywhere, and the check fails
+ * only on findings newer than the adoption baseline. The example swap is drawn
+ * from the lexicon, so Coherence's own source never spells a rejected name.
+ */
+export function adopterInstruction(example: { concept: string; rejected: string }): string {
+  return [
+    "Use Coherence's names when you mean its concepts in specs, journal records",
+    `and the config: say ${example.concept}, not ${example.rejected}. Its rejected names cover only`,
+    "that use; this project's own words and senses stand everywhere else. The",
+    "project's rejected names are defects: replace them. Declare a new domain noun",
+    "in the lexicon, or map it as an alias, before this session ends. The check",
+    "fails only on findings newer than the adoption baseline.",
+  ].join(" ");
+}
+
+/** The example the adopter rule shows: the invariant concept and its first one-word rejected name. */
+export function adopterExample(coherence: Lexicon): { concept: string; rejected: string } {
+  const found = rejectedNames(coherence).find((n) => n.concept === "invariant" && !n.name.includes(" "));
+  return { concept: "invariant", rejected: found?.name ?? "another name" };
+}
 
 /** The agent name a journal write carries when the harness names none: the main thread. */
 const MAIN_AGENT = "main";
@@ -261,9 +317,45 @@ export function workStopText(root: string, input: HookInput): string {
     .join("\n");
 }
 
-/** How a session at this root invokes the tool: its own source tree, or the installed bin. */
-async function cliName(root: string): Promise<string> {
-  return (await isCoherenceItself(root)) ? "node src/cli.ts" : "node_modules/.bin/coherence";
+/**
+ * This checkout's cli: the one the hook is running from, wherever the adopter
+ * keeps it, by the path it was invoked through when that is this file (a
+ * sibling reached through a link reads as ../coherence, not as the link's
+ * target).
+ */
+const OWN_CLI = ((): string => {
+  // Compiled, this module is .js and so is the cli beside it.
+  const own = fileURLToPath(new URL(`../cli${extname(fileURLToPath(import.meta.url))}`, import.meta.url));
+  const invoked = process.argv[1];
+  try {
+    if (invoked !== undefined && realpathSync(invoked) === realpathSync(own)) return resolve(invoked);
+  } catch {
+    // An invocation path that cannot be resolved is not used.
+  }
+  return own;
+})();
+
+/**
+ * How a session at this root invokes the tool: its own source tree, or the
+ * checkout this hook ran from, as a path from the root (`node
+ * ../coherence/src/cli.ts`) or, when that climbs further than a sibling of a
+ * worktree's main checkout, absolute. It is never a path into the project's
+ * node_modules, which a pnpm-safe install leaves alone.
+ */
+export async function cliName(root: string, cli: string = OWN_CLI): Promise<string> {
+  if (await isCoherenceItself(root)) return "node src/cli.ts";
+  // Both sides are compared as real paths, except the checkout's own folder, which keeps the name it was reached by.
+  const real = (path: string): string => {
+    try {
+      return realpathSync(path);
+    } catch {
+      return path;
+    }
+  };
+  const checkout = dirname(dirname(cli));
+  const rel = relative(real(root), join(real(dirname(checkout)), basename(checkout), relative(checkout, cli)));
+  const path = rel.split(sep).filter((part) => part === "..").length <= 4 ? rel : cli;
+  return `node ${/[\s"'$`\\]/.test(path) ? JSON.stringify(path) : path}`;
 }
 
 /** The session id as the exact --session value, write and read commands, and the rule. */
@@ -272,13 +364,15 @@ export async function sessionBlock(root: string, input: HookInput): Promise<stri
   const agent = agentOf(input);
   const cli = await cliName(root);
   const id = session ?? "<the id your harness shows>";
+  const coordinator = !isMainThread(input) && typeof input.session_id === "string" && input.session_id !== "" && input.session_id !== session ? input.session_id : undefined;
   return [
     `Session: ${session ?? "unknown"}`,
     `Every journal write needs --session ${id} --agent ${agent}. Record a choice as:`,
+    ...(coordinator === undefined ? [] : [`This is your own session, not your coordinator's (${coordinator}): never write under that one, even when a prompt passes it on; what you record reaches the coordinator on its own when you stop.`]),
     `  ${cli} decide "<chose>" --over "<rejected>" --because "<why>" --session ${id} --agent ${agent}`,
     "Read the project journal from the project root:",
     `  ${cli} journal`,
-    INSTRUCTION,
+    (await isCoherenceItself(root)) ? INSTRUCTION : adopterInstruction(adopterExample(await loadLexicon(COHERENCE_LEXICON))),
   ].join("\n") + "\n";
 }
 
@@ -358,13 +452,14 @@ export function specStopText(root: string, changed: readonly string[] = [], wall
 export function lexiconStopText(report: CheckReport | undefined, walls: readonly Unable[] = []): { text: string; owed: number } {
   if (report === undefined || !hasFindings(report)) return { text: "", owed: 0 };
   const lines = formatReport(report).trimEnd().split("\n");
+  const failing = failingRejected(report);
   let owed = 0;
   const out: string[] = [];
   let next = 0;
   for (const line of lines) {
     out.push(line);
     if (!line.startsWith("REJECTED NAME")) continue;
-    const finding = report.rejected[next];
+    const finding = failing[next];
     next += 1;
     if (finding === undefined) continue;
     const wall = excusedBy(walls, [finding.file, finding.name]);
@@ -382,14 +477,19 @@ export function writtenFiles(root: string, input: HookInput): string[] {
   if (typeof input.tool_name === "string" && READING_TOOLS.has(input.tool_name)) return [];
   const record = typeof input.tool_input === "object" && input.tool_input !== null ? input.tool_input as Record<string,unknown> : {};
   const paths = [record["file_path"],record["notebook_path"],record["path"]].filter((v):v is string=>typeof v === "string" && v !== "");
-  if(typeof input.tool_name === "string" && input.tool_name.split(".").at(-1)==="apply_patch") {
+  const isPatch = typeof input.tool_name === "string" && input.tool_name.split(".").at(-1)==="apply_patch";
+  if(isPatch) {
     const patch=typeof input.tool_input === "string" ? input.tool_input : [record["patch"],record["input"],record["command"]].find((v):v is string=>typeof v === "string");
     if(patch?.trimStart().startsWith("*** Begin Patch") && patch.trimEnd().endsWith("*** End Patch")) {
       for(const match of patch.matchAll(/^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$/gm)) paths.push(match[1]!.trim());
     }
   }
-  return [...new Set(paths.flatMap(path=> {
-    const absolute=resolve(root,path);
+  // A shell command writes files too (a heredoc, sed -i, tee, a redirect, cp): read them from its words, against the folder it runs in.
+  const shellPaths: string[] = [];
+  const command = isPatch ? undefined : shellCommandOf(record);
+  if(command !== undefined) shellPaths.push(...shellWrittenPaths(command));
+  const ran = typeof input.cwd === "string" && input.cwd !== "" && within(root, resolve(root, input.cwd)) ? resolve(root, input.cwd) : root;
+  return [...new Set([...paths.map((path)=>resolve(root,path)), ...shellPaths.map((path)=>resolve(ran,path))].flatMap(absolute=> {
     if(!within(root,absolute)) return [];
     const rel=relative(resolve(root),absolute).split(sep).join("/");
     return rel && rel!==".." && !rel.startsWith("../") ? [rel] : [];
@@ -425,7 +525,7 @@ export async function editContext(root: string, input: HookInput, options: HookO
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
   if (failed.length === 0) return "";
-  const cli = (await isCoherenceItself(root)) ? "node src/cli.ts" : "node_modules/.bin/coherence";
+  const cli = await cliName(root);
   const lines = [`Structural defect revealed at this edit (${files.join(", ")}); recorded in ${outcome.file ?? "the run"}:`];
   for (const d of failed) {
     const e = d.entry;
@@ -443,6 +543,77 @@ export async function editContext(root: string, input: HookInput, options: HookO
 }
 
 /**
+ * What orient knows of the spec gaps: the gaps now, when the recorded reading
+ * still describes the tree, and the fingerprint it was checked against; when
+ * it does not, the gaps as the last reading had them with the current spec
+ * (`last`, undefined when none was ever kept) and whether a refresh is under way.
+ */
+export interface GapReading {
+  fingerprint: string | undefined;
+  now: (GapState & { at: string }) | undefined;
+  last?: (GapState & { at: string }) | undefined;
+  refreshing?: boolean;
+}
+
+/**
+ * The longest a session start waits for a refresh of this very tree that the
+ * last reading's duration says is nearly done: well inside the 60 s hook
+ * timeout with the rest of the start's work (df-84db9e4f).
+ */
+export const START_WAIT_MS = 15_000;
+
+/**
+ * Whether any declared entrance could be a gap: one that declares no
+ * control: none and carries untrusted work in, its trust unknown (undeclared,
+ * which a crossing may still derive) or a level outside the system's control
+ * or declared nowhere. Without one, no reading is worth starting.
+ */
+function mayHaveGaps(root: string): boolean {
+  const model = specModelOrNull(root);
+  if ("error" in model) return false;
+  const trusted = new Set(model.trustLevels.filter((l) => !l.outside).map((l) => l.name));
+  return model.components.some((c) => c.entrances.some((e) => e.noControl === undefined && (e.trust === undefined || !trusted.has(e.trust))));
+}
+
+/**
+ * The gaps as orient reads them: `now` from a reading that still describes
+ * the tree; else `last`, the last reading's gaps with the current spec, less
+ * those it visibly closes. Cheap: a content fingerprint and a parse. With
+ * `waitMs`, a stale reading first waits that long at most for a refresh of
+ * this tree the last reading's duration says is nearly done.
+ */
+export async function gapReading(root: string, options: { waitMs?: number } = {}): Promise<GapReading> {
+  if (!mayHaveGaps(root)) return { fingerprint: undefined, now: undefined };
+  try {
+    const fingerprint = structureFingerprint(root);
+    const now = currentGaps(root, fingerprint) ?? (options.waitMs ? await awaitRefresh(root, fingerprint, options.waitMs) : undefined);
+    if (now !== undefined) return { fingerprint, now };
+    return { fingerprint, now: undefined, last: lastGaps(root), refreshing: refreshUnderWay(root) !== undefined };
+  } catch {
+    return { fingerprint: undefined, now: undefined };
+  }
+}
+
+/**
+ * Orient's gap line under the spec block, and the entrance coverage line
+ * beneath it, or nothing. The coverage line is detected now (undeclared.ts),
+ * so it needs neither a reading nor an entrance that could be a gap.
+ */
+export async function gapBlock(root: string, reading?: GapReading): Promise<string> {
+  const gaps = reading ?? (await gapReading(root));
+  const cli = await cliName(root);
+  let text = "";
+  if (gaps.fingerprint === undefined) text = "";
+  else if (gaps.now !== undefined) text = orientGapText(gaps.now, readGapBaseline(root), cli);
+  else if (gaps.last !== undefined) text = orientGapText(gaps.last, readGapBaseline(root), cli, { at: gaps.last.at, refreshing: gaps.refreshing === true });
+  else text = unreadGapText(cli, gaps.refreshing === true);
+  // What the gap count speaks for: one line, the busiest folder of undeclared entrances and the command that proposes them.
+  const coverage = orientUndeclaredText(undeclaredNow(root), cli);
+  const lines = [text, coverage].filter((line) => line !== "");
+  return lines.length === 0 ? "" : `${lines.join("\n")}\n\n`;
+}
+
+/**
  * The start injection: escalations (never shortened), what the spec and the
  * work orders owe, the vocabulary at the richest level that leaves the whole
  * under the budget, and the session block. When the escalations alone crowd
@@ -454,16 +625,18 @@ export async function startContext(root: string, input: HookInput = {}, report?:
 }
 
 /** The start injection with the level the vocabulary was delivered at, so a reading of the hook can say what orient carries. */
-export async function startReading(root: string, input: HookInput = {}, report?: Coverage): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
+export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
   const { coherence, project } = await loadProjectLexicons(root);
-  const head = escalationBlock(root) + specBlock(root) + workBlock(root, input);
+  const head = escalationBlock(root) + specBlock(root) + (await gapBlock(root, gaps)) + workBlock(root, input);
   const reading=report ?? await lexiconCoverage(root);
   const commands=await cliName(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
   const signal=attentionText(reading, commands);
   const coverage=signal ? `\n${signal}\n` : "";
-  const tail = coverage + `\n${await sessionBlock(root, input)}`;
-  const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root));
+  // The practices ride beside the commands that record them, after the vocabulary.
+  const practices = practiceOrientText(root, commands);
+  const tail = coverage + (practices === "" ? "" : `\n${practices.trimEnd()}\n`) + `\n${await sessionBlock(root, input)}`;
+  const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root));
   return { text: head + text + tail, detail, coverage: reading };
 }
 
@@ -493,11 +666,25 @@ async function vocabularyAtStop(root: string, reading: Coverage, prior: Record<s
   return lines.join("\n");
 }
 
-/** The feed for a boundary event: the text to inject and the advance to commit once it is in the host's hands. */
+/** Whether the event comes from the main thread rather than a subagent. */
+function isMainThread(input: HookInput): boolean {
+  return ![input.agent_id, input.agentId].some((id) => typeof id === "string" && id !== "");
+}
+
+/**
+ * The feed for a boundary event: the returns of subagents that stopped since
+ * (every record each made), then what peers recorded, less what the returns
+ * showed; the text to inject and the advance to commit once it is in the
+ * host's hands. The main thread counts a record of its own session under
+ * another agent's name as a peer's.
+ */
 export function feedContext(root: string, input: HookInput): { text: string; commit: () => void } {
   const session = sessionOf(input);
   if (session === undefined) return { text: "", commit: () => {} };
-  return peerFeed(root, session);
+  const returns = returnFeed(root, session);
+  const peers = peerFeed(root, session, isMainThread(input) ? agentOf(input) : undefined, returns.ids);
+  const text = [returns.text, peers.text].filter((t) => t !== "").join("");
+  return { text, commit: text === "" ? () => {} : () => { returns.commit(); peers.commit(); } };
 }
 
 async function checkChanged(root: string, paths: readonly string[]): Promise<CheckReport | undefined> {
@@ -518,8 +705,33 @@ export const WARM_DOOR: WarmDoor = withWarmAdapter;
 export interface HookOptions {
   /** An adapter to check with instead of the warm server (tests). */
   adapter?: LanguageAdapter | undefined;
+  /**
+   * Start a Structure reading in the background when the recorded one is
+   * stale or absent. The command line passes STRUCTURE_REFRESH; absent (a
+   * test), nothing is started.
+   */
+  refresh?: ((root: string, fingerprint: string) => void) | undefined;
   /** The door to the warm instrument; enforcement's own by default. */
   door?: WarmDoor | undefined;
+  /** How long a session start may wait for a nearly done refresh; START_WAIT_MS by default. */
+  startWaitMs?: number | undefined;
+}
+
+/**
+ * At a session's stop, start one reading of the tree it leaves when the
+ * recorded one no longer describes it, so the next session starts on a fresh
+ * one (df-84db9e4f). Detached and never waited on: the stop returns at once.
+ * Only the session's own stop: a subagent stops while its session still
+ * edits, and each stop would supersede the last one's reading.
+ */
+export function refreshAtStop(root: string, options: HookOptions): void {
+  if (options.refresh === undefined || !mayHaveGaps(root)) return;
+  try {
+    const fingerprint = structureFingerprint(root);
+    if (currentGaps(root, fingerprint) === undefined) options.refresh(root, fingerprint);
+  } catch {
+    // A refresh that cannot start only means the next session reads the last reading, labeled.
+  }
 }
 
 /**
@@ -538,6 +750,100 @@ async function snapshotAtStop(root: string, session: string, changed: readonly s
   await door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed }));
 }
 
+/** The refresh the command line starts: this checkout's query structure, which records the reading it takes. */
+export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
+  refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure"], fingerprint);
+};
+
+/** Regulate's gap lines: the gaps this session touched, advisory, or nothing. */
+export async function gapStopText(root: string, input: HookInput, changed: readonly string[]): Promise<string> {
+  if (changed.length === 0 || !mayHaveGaps(root)) return "";
+  try {
+    const session = sessionOf(input);
+    const now = currentGaps(root);
+    const start = session === undefined ? undefined : sessionGaps(root, session);
+    const spec = loadSpec(root);
+    const declared = declaredThisSession(root, changed, spec);
+    return regulateGapText({ changed, now, start, declared, spec, cli: await cliName(root) });
+  } catch {
+    return "";
+  }
+}
+
+/** Regulate's coverage lines: the undeclared entrances in the files this session changed, advisory, or nothing. */
+export async function undeclaredStopText(root: string, changed: readonly string[]): Promise<string> {
+  if (changed.length === 0) return "";
+  return regulateUndeclaredText(changed, undeclaredNow(root), await cliName(root));
+}
+
+/** Where a project keeps its hook voice: `<Event>.override.md` and `<Event>.append.md` under the root. */
+export const HOOK_VOICE_DIR = join(".coherence", "hooks");
+
+/** What a project declared for one event. */
+export interface HookVoice {
+  /** The text in place of what the event would say; "" is a deliberate silence. Absent when none is declared. */
+  override?: string;
+  /** The text that follows what the event says, or follows the override. */
+  append?: string;
+  /** A declared file that was not read, and why: outside the root, or unreadable. */
+  problems: string[];
+}
+
+/** One declared file, trimmed, read where it really is and only when that is inside the root; undefined when absent. */
+function voiceFile(root: string, event: HookEvent, kind: "override" | "append", problems: string[]): string | undefined {
+  const name = join(HOOK_VOICE_DIR, `${event}.${kind}.md`);
+  const path = join(root, name);
+  if (!existsSync(path)) return undefined;
+  try {
+    // A link, of the file or of a folder above it, is followed only to see where it leads; a file outside the project is not read.
+    const real = realpathSync(path);
+    if (!within(root, real)) {
+      problems.push(`${name} leads outside the project root; not read`);
+      return undefined;
+    }
+    return readFileSync(real, "utf8").trim();
+  } catch (error) {
+    // A torn file costs the project its text for this event, never the session.
+    problems.push(`${name} not read: ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  }
+}
+
+/** The project's hook voice for one event: two stat calls when nothing is declared. */
+export function readHookVoice(root: string, event: HookEvent): HookVoice {
+  const problems: string[] = [];
+  const override = voiceFile(root, event, "override", problems);
+  const append = voiceFile(root, event, "append", problems);
+  return { ...(override === undefined ? {} : { override }), ...(append === undefined ? {} : { append }), problems };
+}
+
+/** The values a voice file may name as {{session}}, {{agent}} and {{cli}}. */
+export interface VoiceTokens {
+  session?: string | undefined;
+  agent?: string | undefined;
+  cli?: string | undefined;
+}
+
+/**
+ * The override in place of the canonical text, or the canonical text, then
+ * the append, then a line for each declared file that was not read. Only the
+ * three tokens are substituted, and only when a value was supplied: an
+ * unsupplied one stays literal so the reader sees it was never filled.
+ */
+export function composeVoice(canonical: string, voice: HookVoice, tokens: VoiceTokens): string {
+  const fill = (text: string): string => text.replace(/\{\{(session|agent|cli)\}\}/g, (whole, key: keyof VoiceTokens) => tokens[key] ?? whole);
+  const base = voice.override === undefined ? canonical : fill(voice.override);
+  const append = voice.append === undefined ? "" : fill(voice.append);
+  const problems = voice.problems.map((p) => `Hook voice: ${p}`).join("\n");
+  return [base, append, problems].filter((part) => part !== "").join("\n\n");
+}
+
+/** The canonical text with the project's voice over it; the canonical text alone, unchanged, when nothing is declared. */
+async function voiced(root: string, input: HookInput, canonical: string, voice: HookVoice): Promise<string> {
+  if (voice.override === undefined && voice.append === undefined && voice.problems.length === 0) return canonical;
+  return composeVoice(canonical, voice, { session: sessionOf(input), agent: agentOf(input), cli: await cliName(root) });
+}
+
 /** Run one event. `input` is the parsed stdin the host sent; `root` defaults to its cwd. */
 export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: string, options: HookOptions = {}): Promise<HookResult> {
   const project = installedRoot(fallbackRoot);
@@ -547,15 +853,42 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     return { stdout: "", stderr: `hook ${event}: the working directory "${given}" is not inside the project root this hook was installed for (${project}); nothing was read and nothing was written\n`, exit: OUTSIDE_ROOT_EXIT };
   }
   const root = project ?? given;
+  const voice = readHookVoice(root, event);
   switch (event) {
     case "SessionStart":
     case "SubagentStart": {
       const reading=await lexiconCoverage(root);
-      const context = await startContext(root, input, reading);
+      // Only a session start waits, and only for a refresh of this tree that is nearly done; a subagent starts at once.
+      let gaps = await gapReading(root, event === "SessionStart" ? { waitMs: options.startWaitMs ?? START_WAIT_MS } : {});
+      // A stale or absent reading starts one in the background (a no-op while one of this tree runs), then orient reads the last one, labeled.
+      // Only a session start: a subagent inherits the session's reading, and one refresh per tree is enough.
+      if (event === "SessionStart" && gaps.now === undefined && gaps.fingerprint !== undefined) {
+        options.refresh?.(root, gaps.fingerprint);
+        gaps = { ...gaps, refreshing: refreshUnderWay(root) !== undefined };
+      }
+      const context = await voiced(root, input, (await startReading(root, input, reading, gaps)).text, voice);
       const session = sessionOf(input);
       if (session !== undefined) openFeed(root, session);
-      const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
-      return { stdout: stdout + "\n", stderr: "", exit: 0, ...(session ? {commit:()=>saveBaseline(root,session,reading)} : {}) };
+      // A subagent's start is kept so its stop can find what it wrote under the coordinator's session.
+      if (event === "SubagentStart" && session !== undefined && !isMainThread(input)) markChildStart(root, session);
+      // An empty override silences the start; the session still began, so its baseline is still kept.
+      const stdout = context === "" ? "" : JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
+      const commit = (): void => {
+        saveBaseline(root, session!, reading);
+        // The gaps as this session found them, for regulate once its own edits make the reading stale.
+        const found = gaps.now ?? gaps.last;
+        if (found !== undefined) saveSessionGaps(root, session!, found);
+      };
+      return { stdout, stderr: "", exit: 0, ...(session ? { commit } : {}) };
+    }
+    case "PreToolUse": {
+      // Before the act: a practice whose trigger this tool use fires is delivered now, when its first steps can still be taken.
+      const session = sessionOf(input);
+      const practice = practiceContext(root, session, toolUseOf(input, writtenFiles(root, input)), await cliName(root), agentOf(input));
+      const context = await voiced(root, input, practice.text, voice);
+      if (context === "") return { stdout: "", stderr: "", exit: 0 };
+      const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
+      return { stdout, stderr: "", exit: 0, ...(practice.text !== "" && voice.override === undefined ? { commit: practice.commit } : {}) };
     }
     case "UserPromptSubmit":
     case "PostToolUse": {
@@ -566,14 +899,18 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
       const changes=reading && session ? coverageChanges(reading,priorBaseline(root,session)) : [];
       const vocabulary=changes.length ? await vocabularyAtEdit(root, changes) : "";
-      const context = [feed.text,edit,vocabulary].filter(Boolean).join("\n");
+      const context = await voiced(root, input, [feed.text,edit,vocabulary].filter(Boolean).join("\n"), voice);
       if (context === "") return { stdout: "", stderr: "", exit: 0 };
       const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
+      // An override took the feed's and the vocabulary line's place, so neither reached the host and neither advances.
+      const delivered = voice.override === undefined && (feed.text !== "" || changes.length > 0);
       const commit=()=> { if(feed.text) feed.commit(); if(changes.length && reading && session) saveBaseline(root,session,reading); };
-      return {stdout:stdout+"\n",stderr:"",exit:0,...(feed.text || changes.length ? {commit} : {})};
+      return {stdout:stdout+"\n",stderr:"",exit:0,...(delivered ? {commit} : {})};
     }
     case "Stop":
     case "SubagentStop": {
+      // The tree this session leaves is the one the next starts on: read it now, in the background, never waited on (df-84db9e4f).
+      if (event === "Stop") refreshAtStop(root, options);
       const changed = await changedFiles(root);
       const report = await checkChanged(root, changed.files);
       const session=sessionOf(input);
@@ -585,20 +922,33 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
       const coverageText=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : "";
       const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the lexicon check ran over nothing`;
-      if (lexicon.text === "" && spec.text === "" && workText === "" && changedText === "" && coverageText === "") return { stdout: "", stderr: "", exit: 0 };
+      const gapText = await gapStopText(root, input, changed.files);
+      const undeclaredText = await undeclaredStopText(root, changed.files);
+      const practiceText = practiceStopText(root, session, await cliName(root), agentOf(input));
       const parts: string[] = [];
       if (changedText !== "") parts.push(changedText);
       if (lexicon.text !== "") parts.push(`Lexicon check:\n${lexicon.text}`);
       if (spec.text !== "") parts.push(`Spec:\n${spec.text}`);
       if (workText !== "") parts.push(`Work:\n${workText}`);
       if (coverageText) parts.push(coverageText);
+      if (gapText !== "") parts.push(gapText);
+      if (undeclaredText !== "") parts.push(undeclaredText);
+      if (practiceText !== "") parts.push(practiceText);
       const text = parts.join("\n");
       // A refusal is spent only on what the tool can prove is owed and no recorded wall excuses: a rejected name in a changed file, a spec problem, a structural defect.
+      // A spec gap is not among them: no traced control is not a demonstrated bypass, so gapText never counts toward the refusal; nor does an undeclared entrance.
       const refuse = event === "SubagentStop" && input.stop_hook_active !== true && lexicon.owed + spec.owed > 0;
       if (refuse) {
-        return { stdout: "", stderr: `Regulate found what this session owes; settle it before stopping.\n${text}`, exit: REFUSE_EXIT };
+        // The refusal is enforcement: no override reaches its reason, and an append only follows it.
+        const { override: _unheard, ...heard } = voice;
+        const reason = await voiced(root, input, `Regulate found what this session owes; settle it before stopping.\n${text}`, heard);
+        return { stdout: "", stderr: reason, exit: REFUSE_EXIT };
       }
-      const message = `Regulate (${event}):\n${text}`;
+      // The stop goes through: what this subagent recorded waits for its coordinator's next boundary.
+      const parent = typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
+      if (event === "SubagentStop" && session !== undefined && parent !== undefined && !isMainThread(input)) leaveReturn(root, parent, session, agentOf(input));
+      const message = await voiced(root, input, parts.length === 0 ? "" : `Regulate (${event}):\n${text}`, voice);
+      if (message === "") return { stdout: "", stderr: "", exit: 0 };
       return { stdout: JSON.stringify({ systemMessage: message }) + "\n", stderr: "", exit: 0 };
     }
   }

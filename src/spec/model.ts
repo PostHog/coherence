@@ -16,17 +16,16 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
+import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type Latest } from "../enforcement/record.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
-import { projectFiles, underIgnored } from "../adapters/project-files.ts";
+import { walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
+import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
+import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPractice, practiceProblems, stemOf, type ModelPractice } from "./practices.ts";
 
 export const SPEC_SUFFIX = ".spec.md";
 export const CONFIG_FILE = "coherence.config.json";
-
-/** Folders never walked, whatever the config says. */
-const EXCLUDED_FOLDERS: ReadonlySet<string> = new Set(["node_modules", ".git", "dist", ".coherence", ".claude", ".codex", "public"]);
 
 export interface ModelInvariant extends Invariant {
   /** The folder of the component the bullet lives in. */
@@ -55,6 +54,10 @@ export interface Component {
   /** Where work enters through this component, as its spec declares; each handler was found declared in the code. */
   entrances: ModelEntrance[];
   invariants: ModelInvariant[];
+  /** The practice file paired with the spec, when there is one. */
+  practicePath: string | undefined;
+  /** The component's practices, from its practice file. */
+  practices: ModelPractice[];
   parent: string | undefined;
   children: string[];
 }
@@ -117,14 +120,13 @@ export function findSpecs(root: string, ignore: readonly string[] = []): string[
 }
 
 /**
- * The project's own files under a folder (projectFiles), project-relative,
- * never inside a folder no walk enters: a spec in a nested checkout is
+ * The project's own files under a folder that the walk reads
+ * (walkedProjectFiles), project-relative: a spec in a nested checkout is
  * another tree's component, and its source is not this project's.
  */
 function walkedFiles(root: string, folder: string, ignore: readonly string[]): string[] {
-  const skip = new Set([...EXCLUDED_FOLDERS, ...ignore]);
   const prefix = folder === "." || folder === "" ? "" : folder.replace(/\/+$/, "") + "/";
-  return projectFiles(root).filter((rel) => rel.startsWith(prefix) && !underIgnored(rel, skip));
+  return walkedProjectFiles(walkBounds(root, ignore)).files.filter((rel) => rel.startsWith(prefix));
 }
 
 function folderOf(root: string, specPath: string): string {
@@ -179,6 +181,30 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
     problems.push(...parsed.problems);
     byFolder.set(folder, { folder, specPath: rel, parsed });
   }
+
+  // A practice file stands beside its folder's spec, with the spec's stem (d-861e8319).
+  const practiceFiles = new Map<string, { file: string; parsed: ReturnType<typeof parsePractices> }>();
+  for (const rel of walkedFiles(root, ".", config.ignore).filter((f) => f.endsWith(PRACTICE_SUFFIX)).sort()) {
+    const folder = folderOf(root, join(root, rel));
+    const spec = byFolder.get(folder);
+    if (spec === undefined) {
+      problems.push({ file: rel, line: 1, message: `a practice file is paired with a spec; ${folder === "." ? "the root" : folder} has none (a spec and its practice file are always paired)` });
+      continue;
+    }
+    if (stemOf(rel) !== stemOf(spec.specPath)) {
+      problems.push({ file: rel, line: 1, message: `a practice file takes its spec's stem: ${stemOf(spec.specPath)}${PRACTICE_SUFFIX} beside ${spec.specPath}` });
+      continue;
+    }
+    if (practiceFiles.has(folder)) {
+      problems.push({ file: rel, line: 1, message: `a folder holds one practice file; ${practiceFiles.get(folder)!.file} is already this component's` });
+      continue;
+    }
+    const parsed = parsePractices(readFileSync(join(root, rel), "utf8"), rel);
+    problems.push(...parsed.problems);
+    practiceFiles.set(folder, { file: rel, parsed });
+  }
+  const records = practiceFiles.size === 0 ? [] : journalRecords(root);
+  const enactments = enactmentsIn(records);
 
   const folders = new Set(byFolder.keys());
   const entryFolder = folderOf(root, join(resolve(root, config.entryDir), "x"));
@@ -238,6 +264,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       }
       return { ...entrance, component: folder, file: found };
     });
+    const paired = practiceFiles.get(folder);
+    const practices = (paired?.parsed.practices ?? []).map((practice) => modelPractice(practice, `${folder}/${practice.name}`, folder, paired!.file, enactments));
     components.push({
       folder,
       name: parsed.title ?? basename(folder === "." ? root : folder),
@@ -246,12 +274,24 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       trustLevels: parsed.trustLevels,
       entrances,
       invariants,
+      practicePath: paired?.file,
+      practices,
       parent: parentOf(folder, folders),
       children: [],
     });
   }
   components.sort((a, b) => a.folder.localeCompare(b.folder));
   problems.push(...entranceTrustProblems(components, trustLevels));
+  problems.push(...entranceGuardProblems(root, components));
+  problems.push(
+    ...practiceProblems({
+      root,
+      practices: components.flatMap((c) => c.practices),
+      invariantsByFolder: new Map(components.map((c) => [c.folder, new Set(c.invariants.map((i) => i.name))])),
+      coherenceTree: practiceFiles.size === 0 ? true : isCoherenceTree(root),
+      records,
+    }),
+  );
   const byName = new Map(components.map((c) => [c.folder, c]));
   for (const component of components) {
     if (component.parent !== undefined) byName.get(component.parent)!.children.push(component.folder);
@@ -263,8 +303,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
 }
 
 /** The component whose folder holds a project-relative file: the deepest component folder above it. */
-function componentHolding(components: readonly Component[], file: string): Component | undefined {
-  let best: Component | undefined;
+export function componentHolding<C extends Pick<Component, "folder">>(components: readonly C[], file: string): C | undefined {
+  let best: C | undefined;
   for (const component of components) {
     const inside = component.folder === "." || file.startsWith(`${component.folder}/`);
     if (inside && (best === undefined || component.folder.length > best.folder.length || best.folder === ".")) best = component;
@@ -310,14 +350,95 @@ function entranceTrustProblems(components: readonly Component[], trustLevels: re
 }
 
 const HANDLER = /^([A-Za-z_$][\w$]*)(?:\s+in\s+(\S+))?$/;
+
+/**
+ * An entrance's declared guard, checked (d-127ab8e4): it names a chokepoint
+ * some invariant declares, by its symbol, or a symbol declared at the top
+ * level of a chokepoint that is a module. That its handler really is
+ * registered through it is the reading's to confirm, where references resolve.
+ */
+function entranceGuardProblems(root: string, components: readonly Component[]): Problem[] {
+  const problems: Problem[] = [];
+  const chokepoints = components.flatMap((c) => c.invariants.flatMap((invariant) => invariant.enforcements.flatMap((e) => (e.form === "chokepoint" ? [{ component: c, value: e.chokepoint.trim() }] : []))));
+  for (const component of components) {
+    for (const entrance of component.entrances) {
+      if (entrance.guard === undefined) continue;
+      const guard = HANDLER.exec(entrance.guard.trim());
+      const line = entrance.guardLine ?? entrance.line;
+      if (guard === null) {
+        problems.push({ file: component.specPath, line, message: `entrance ${entrance.name}: guard "${entrance.guard}" reads <chokepoint symbol> or <symbol> in <file>` });
+        continue;
+      }
+      const name = guard[1]!;
+      const named = chokepoints.some(({ component: owner, value }) => {
+        const symbol = HANDLER.exec(value)?.[1];
+        if (symbol !== undefined) return symbol === name;
+        if (!SOURCE.test(value)) return false;
+        return [owner.folder === "." ? value : `${owner.folder}/${value}`, value].some((path) => {
+          const at = resolve(root, path);
+          return existsSync(at) && statSync(at).isFile() && declaresAtTop(readFileSync(at, "utf8"), name);
+        });
+      });
+      if (!named) {
+        const listed = chokepoints.length === 0 ? "no invariant declares a chokepoint" : `declared chokepoints: ${[...new Set(chokepoints.map((c) => c.value))].join(", ")}`;
+        problems.push({ file: component.specPath, line, message: `entrance ${entrance.name}: guard ${name} is no chokepoint an invariant declares, nor a symbol of a chokepoint module; ${listed}` });
+      }
+    }
+  }
+  return problems;
+}
 const SOURCE = /\.(?:[cm]?[jt]sx?|py)$/;
 
-/** Whether a source text declares the name at its top level (TypeScript, JavaScript, or Python). */
-function declaresAtTop(text: string, name: string): boolean {
+/**
+ * Whether a source text declares the name at its top level (TypeScript,
+ * JavaScript, or Python). A destructured binding counts, on one line or
+ * across several and however deeply nested, as a factory's products are
+ * exported (export const { handlers: { GET, POST }, auth } = NextAuth(...));
+ * so does an export list, with or without a from, under the name it exports
+ * (export { GET, POST } from "./auth", export { handle as GET }): the
+ * re-exporting file is where a framework finds the name, and the source is
+ * not followed (d-7155e46f).
+ */
+export function declaresAtTop(text: string, name: string): boolean {
   const escaped = name.replace(/\$/g, "\\$");
   const typescript = new RegExp(`^(?:export\\s+)?(?:default\\s+)?(?:declare\\s+)?(?:abstract\\s+)?(?:async\\s+)?(?:function\\*?|const|let|var|class|interface|type|enum|namespace)\\s+${escaped}\\b`, "m");
+  if (destructuredAtTop(text).has(name) || exportListed(text).has(name)) return true;
   const python = new RegExp(`^(?:async\\s+)?(?:def|class)\\s+${escaped}\\b|^${escaped}\\s*(?::[^=\\n]+)?=`, "m");
   return typescript.test(text) || python.test(text);
+}
+
+/** The text of the braces opening at `open`, through its matching close, or undefined when it never closes. */
+function braced(text: string, open: number): string | undefined {
+  let depth = 0;
+  for (let i = open; i < text.length; i++) {
+    if (text[i] === "{") depth += 1;
+    else if (text[i] === "}" && --depth === 0) return text.slice(open, i + 1);
+  }
+  return undefined;
+}
+
+/** The names a top-level object destructuring binds, on one line or several, nested or not: a name followed by , } or = (a key followed by : binds nothing). */
+function destructuredAtTop(text: string): Set<string> {
+  const names = new Set<string>();
+  for (const m of text.matchAll(/^(?:export\s+)?(?:const|let|var)\s*(?=\{)/gm)) {
+    const open = m.index + m[0].length;
+    const pattern = braced(text, open);
+    if (pattern === undefined || !/^\s*(?::[^=]+)?=/.test(text.slice(open + pattern.length))) continue;
+    for (const b of pattern.matchAll(/(?<=[\s,{:])([A-Za-z_$][\w$]*)(?=\s*[,}=])/g)) names.add(b[1]!);
+  }
+  return names;
+}
+
+/** The names a top-level export list exports, with or without a from: export { a, b as c } from "x" exports a and c. */
+function exportListed(text: string): Set<string> {
+  const names = new Set<string>();
+  for (const m of text.matchAll(/^export\s+(?:type\s+)?\{([^}]*)\}/gm)) {
+    for (const item of m[1]!.split(",")) {
+      const named = /^\s*(?:type\s+)?([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?\s*$/.exec(item.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ""));
+      if (named !== null) names.add(named[2] ?? named[1]!);
+    }
+  }
+  return names;
 }
 
 /** Source files under a folder, sorted, never into the folders no walk enters. */
@@ -333,8 +454,19 @@ function sourcesUnder(root: string, folder: string, ignore: readonly string[]): 
  * the reading, where reachability is known.
  */
 function handlerFile(root: string, folder: string, handler: string, ignore: readonly string[]): string | { reason: string } {
+  if (isModuleHandler(handler)) {
+    // A module file: its top-level script is the handler. It must be a source file that exists, under the component or the root.
+    const file = handler.trim();
+    if (!SOURCE.test(file)) return { reason: `handler ${file} names a file that is not source code` };
+    const candidates = [folder === "." ? file : `${folder}/${file}`, file].filter((path, index, all) => all.indexOf(path) === index && !path.split("/").includes(".."));
+    for (const candidate of candidates) {
+      const path = resolve(root, candidate);
+      if (existsSync(path) && statSync(path).isFile()) return candidate;
+    }
+    return { reason: `handler module ${file} does not exist (read under ${folder} and under the root)` };
+  }
   const parsed = HANDLER.exec(handler.trim());
-  if (parsed === null) return { reason: `handler "${handler}" reads <symbol> or <symbol> in <file>` };
+  if (parsed === null) return { reason: `handler "${handler}" reads <symbol>, <symbol> in <file>, or a module file` };
   const [, name, file] = parsed as unknown as [string, string, string | undefined];
   const candidates =
     file === undefined
@@ -369,4 +501,15 @@ function countModel(components: Component[], problems: Problem[]): Counts {
     }
   }
   return { components: components.length, bullets, invariants, requirements: bullets - invariants - structuralDefects, structuralDefects, lacking, unfilled, problems: problems.length };
+}
+
+/**
+ * Every practice a session at this root may enact: the project's own, from
+ * its practice files, and in an adopter the practices of Coherence's own
+ * kernel practices, read from where Coherence is installed, their ids led by coherence:.
+ */
+export function projectPractices(root: string, model: SpecModel = loadSpecModel(root, { runs: false })): ModelPractice[] {
+  const own = model.components.flatMap((c) => c.practices);
+  if (isCoherenceTree(root)) return own;
+  return [...own, ...kernelPractices(enactmentsIn(journalRecords(root)))];
 }

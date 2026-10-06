@@ -32,7 +32,6 @@ import { createHash, type Hash } from "node:crypto";
 import { dirname } from "node:path";
 import { loadJournal } from "../journal/store.ts";
 import {
-  normalizeTerm,
   readCorpus,
   type UnreadablePath,
 } from "./check.ts";
@@ -43,8 +42,12 @@ import {
   type Concept,
   type Lexicon,
 } from "./lexicon.ts";
-import { loadProjectLexicons, vocabularyFacts } from "./project.ts";
-import { ALWAYS_CAPITALIZED, FUNCTION_WORD_SET, STOPLIST } from "./stoplist.ts";
+import { isCoherenceItself, loadProjectLexicons, vocabularyFacts } from "./project.ts";
+import { BASELINE_CHOSE } from "./lexicon-baseline.ts";
+import { FUNCTION_WORD_SET, STOPLIST } from "./stoplist.ts";
+import { clean, proseNominations, type Nomination } from "./nomination.ts";
+
+export { proseNominations };
 import { isWellKnown, wellKnown, type WellKnown } from "./well-known.ts";
 
 export interface VocabularyUse {
@@ -123,13 +126,6 @@ function digestAll(parts: Iterable<unknown>): string {
   for (const part of parts) hash.update(JSON.stringify(part) ?? "null").update("\n");
   return hash.digest("hex");
 }
-const clean = (s: string): string =>
-  normalizeTerm(
-    s
-      .replace(/([a-z\d])([A-Z])/g, "$1 $2")
-      .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2"),
-  );
-const HEADING_WORD = /[A-Za-z][A-Za-z'-]*/g;
 
 /**
  * A structured sense review as a decision's text: the vocabulary verb,
@@ -237,7 +233,7 @@ function isLexiconDecision(line: string): boolean {
     return (
       record["kind"] === "decision" &&
       typeof record["chose"] === "string" &&
-      (REVIEW.test(record["chose"]) || APPLY.test(record["chose"]))
+      (REVIEW.test(record["chose"]) || APPLY.test(record["chose"]) || BASELINE_CHOSE.test(record["chose"]))
     );
   } catch {
     return false;
@@ -325,57 +321,6 @@ function wordRuns(text: string): Word[][] {
   return runs;
 }
 
-/** Whether the text before a match on a line puts the match at the start of a sentence. */
-function atSentenceStart(prefix: string): boolean {
-  const lead = prefix.replace(/^[\s>*\-+|#]*(?:\d+[.)]\s*)?/, "");
-  if (lead.trim() === "") return true;
-  const trimmed = lead.replace(/[\s"'*_)\]]+$/, "");
-  return /[.!?:|]$/.test(trimmed) || trimmed === "";
-}
-
-interface Nomination {
-  term: string;
-  /** The name as written, for a well-known name skipped only in its capitalized spelling. */
-  spelling: string;
-  /** Title Case away from a sentence start: a proper noun, so a common word stays a candidate. */
-  proper: boolean;
-}
-
-/** Names prose writes as names: Title Case away from a sentence start, heading words, a single backticked word. */
-export function proseNominations(text: string, heading: boolean): Nomination[] {
-  const out: Nomination[] = [];
-  let blanked = text;
-  for (const match of text.matchAll(/`([^`\n]+)`/g)) {
-    const inner = match[1]!.trim();
-    // One plain word only: a backticked identifier (flowOf, work_order) is a code reference, not a word.
-    if (/^[A-Za-z][a-z]+$/.test(inner)) out.push({ term: clean(inner), spelling: inner, proper: false });
-    blanked = blanked.slice(0, match.index) + " ".repeat(match[0].length) + blanked.slice(match.index + match[0].length);
-  }
-  blanked = blanked.replace(/\[([^\]]*)\]\([^)]*\)/g, (m, label: string) => label.padEnd(m.length));
-  if (heading) {
-    for (const m of blanked.replace(/^#+\s*/, "").matchAll(HEADING_WORD)) out.push({ term: clean(m[0]), spelling: m[0], proper: false });
-    return out;
-  }
-  for (const match of blanked.matchAll(/(?<![A-Za-z0-9_'./-])[A-Z][a-z]+(?:[ -][A-Z][a-z]+){0,2}(?![A-Za-z0-9_/-]|\.[A-Za-z0-9])/g)) {
-    // A capitalized common word opening the phrase ("Every Durable Object") is the sentence's, not the name's.
-    let phrase = match[0];
-    let start = match.index;
-    for (;;) {
-      const lead = /^([A-Za-z]+)[\s-]+/.exec(phrase);
-      if (lead === null || !STOPLIST.has(lead[1]!.toLowerCase())) break;
-      phrase = phrase.slice(lead[0].length);
-      start += lead[0].length;
-    }
-    if (atSentenceStart(blanked.slice(0, start))) continue;
-    // A capitalized word after an acronym or a model number ("M4 Pro", "SF Pro") is the tail of that product's name.
-    if (/(?:^|\s)(?:[A-Z]{2,}|\S*\d\S*)\s+$/.test(blanked.slice(0, start))) continue;
-    // Months, weekdays and language names are capitalized in any sentence; that is English, not a proper noun of the project's.
-    if (ALWAYS_CAPITALIZED.has(clean(phrase))) continue;
-    out.push({ term: clean(phrase), spelling: phrase, proper: true });
-  }
-  return out;
-}
-
 /** The fields of a journal or work record that are written prose; ids, sessions, commits and flags are not words. */
 const RECORD_METADATA = new Set(["id", "at", "session", "agent", "commit", "dirty", "binding", "kind", "work", "files", "file", "evidence", "cursor", "target", "owner", "state"]);
 
@@ -411,8 +356,55 @@ interface ProseLine {
   runs: Word[][];
 }
 
-export async function lexiconCoverage(root: string): Promise<Coverage> {
+/**
+ * Every line of the project's own files that writes the term, as a word or
+ * inside an identifier, whether or not it recurs enough to be a candidate. A
+ * term a project has not declared yet is read here before it is named (step
+ * one of settle a domain term); coverage's terms hold only what recurs.
+ */
+export async function liveUses(
+  root: string,
+  term: string,
+  limit = 40,
+): Promise<{ uses: VocabularyUse[]; total: number }> {
   const { coherence, project } = await loadProjectLexicons(root);
+  const corpus = await readCorpus({ root, coherence, project });
+  const wanted = " " + clean(term).replace(/[^a-z0-9 ]/g, " ").trim() + " ";
+  if (wanted.trim() === "") return { uses: [], total: 0 };
+  const components = corpus.files
+    .filter((f) => f.rel.endsWith(".spec.md"))
+    .map((f) => dirname(f.rel))
+    .sort((a, b) => b.length - a.length);
+  const found: VocabularyUse[] = [];
+  for (const f of corpus.files) {
+    const secret = /(^|\/)\.env(?:$|\.)/.test(f.rel);
+    f.lines.forEach((source, n) => {
+      if (f.kind === "record" && isLexiconDecision(source)) return;
+      const observed = secret ? source.replace(/=.*/, "") : source;
+      const normalized = " " + clean(observed).replace(/[^a-z0-9 ]/g, " ") + " ";
+      if (!normalized.replace(/\s+/g, " ").includes(wanted)) return;
+      found.push({
+        file: f.rel,
+        line: n + 1,
+        component:
+          components.find((c) => c === "." || f.rel.startsWith(c + "/")) ??
+          "(no declared component)",
+        text: (secret ? source.replace(/=.*/, "=<redacted>") : source).trim().slice(0, 360),
+        kind: f.kind,
+        fingerprint: digest(source),
+      });
+    });
+  }
+  return { uses: found.slice(0, limit), total: found.length };
+}
+
+export async function lexiconCoverage(
+  root: string,
+  layers?: { coherence: Lexicon; project: Lexicon | undefined },
+): Promise<Coverage> {
+  const { coherence, project } = layers ?? (await loadProjectLexicons(root));
+  // Coherence's own lexicon is the project's only in Coherence's own checkout; an adopter without lexicon.json has none yet.
+  const own = await isCoherenceItself(root);
   const rawEntries = new Map<string, Record<string, unknown>>();
   for (const g of [coherence, ...(project ? [project] : [])]) {
     const raw = JSON.parse(await readFile(g.path, "utf8")) as {
@@ -448,6 +440,10 @@ export async function lexiconCoverage(root: string): Promise<Coverage> {
     ? new Set([...acceptedNames(project)].map(clean))
     : new Set<string>();
   for (const name of projectNames) rejected.delete(name);
+  // Only a name that binds here marks a sense at risk beside it: Coherence's rejected names bind in an adopter's prose never, the project's own always (check.ts).
+  const binding = new Set(
+    own ? rejected.keys() : (project ? rejectedNames(project) : []).map((r) => clean(r.name)).filter((n) => rejected.has(n)),
+  );
   // The lexicon's "not:" entries name things it already knows are something else (Pyright, Python): never candidates.
   const confusables = new Set<string>();
   for (const g of [coherence, project])
@@ -537,7 +533,7 @@ export async function lexiconCoverage(root: string): Promise<Coverage> {
           add(phrase, use);
           spans.push(phrase);
         }
-      const refused = spans.filter((p) => rejected.has(p));
+      const refused = spans.filter((p) => binding.has(p));
       // Only prose a person can still edit puts a sense at risk: code shares words with the language (Promise), and a record is history.
       if (refused.length && f.kind === "prose") {
         // A rejected word inside a longer known name on the same line is that name, not the refusal.
@@ -767,9 +763,7 @@ export async function lexiconCoverage(root: string): Promise<Coverage> {
   };
   return {
     version: 1,
-    projectLexicon:
-      project?.path ??
-      (coherence.path.startsWith(root + "/") ? coherence.path : null),
+    projectLexicon: project?.path ?? (own ? coherence.path : null),
     fingerprint: digestAll([population.extraction, ...population.limits, ...population.files, ...population.excluded, ...population.unreadable, ...terms]),
     population,
     terms,
@@ -865,13 +859,25 @@ export function attentionText(report: Coverage, cli = "coherence", limit = 5): s
   return lines.join("\n");
 }
 
-export function coverageText(report: Coverage, term?: string): string {
+export function coverageText(
+  report: Coverage,
+  term?: string,
+  live?: { uses: VocabularyUse[]; total: number },
+): string {
   if (term) {
     const entries = report.terms.filter(
       (t) => t.term === clean(term) || clean(t.concept ?? "") === clean(term),
     );
+    const below =
+      live && live.total > 0
+        ? [
+            `"${term}" is written on ${live.total} ${live.total === 1 ? "line" : "lines"}, below the recurrence a candidate needs; its live uses:`,
+            ...live.uses.map((u) => `  ${u.file}:${u.line} ${u.text}`),
+            ...(live.total > live.uses.length ? [`  ${live.total - live.uses.length} more in --json.`] : []),
+          ]
+        : [`No observed use of "${term}" in this reading.`];
     return [
-      ...(entries.length ? [] : [`No observed use of "${term}" in this reading.`]),
+      ...(entries.length ? [] : below),
       ...entries.flatMap((t) => [
         `${t.term} [${t.state}${t.concept ? "; " + t.concept : ""}] ${t.count} uses${t.recurrence ? `; recurs on ${t.recurrence.prose} prose lines across ${t.recurrence.components} components` : ""}`,
         t.definition ?? "No settled definition.",

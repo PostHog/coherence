@@ -23,6 +23,63 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   trust: harness
 
 ## invariants
+- a subagent is told its own session: A subagent's start names its own session for every journal write and names its coordinator's session as one it never writes under; the main thread's start names no coordinator.
+  over: a subagent start carrying the host's agent id beside its coordinator's session, and a main-thread start
+  via: a subagent's start names its own session and its coordinator's, and says never to write under the coordinator's
+  because: coordinators passed their own session id into subagent prompts, and subagents wrote under it: their decisions then read as the coordinator's own
+  crossing: harness -> reading
+  kinds: none
+- a proposal prints as a reader needs it: lexicon propose prints the proposal's id first, what it changes, the entry as it would stand and the apply command; the whole lexicon after the change is printed only with --json.
+  over: a define proposal printed plainly and with --json
+  via: lexicon propose prints the proposal as a reader needs it, id first, and the whole lexicon only with --json
+  because: every proposal printed the whole lexicon after the change, 87 KB, into the agent's context, and agents scraped the id out of it
+  crossing: record -> reading
+  kinds: none
+- a dropped lexicon key stays on record: A define keeps every property and detail key it does not name; a key leaves only by an explicit --drop of properties.<key> or detail.<key>, and the decision that applies the drop carries the removed key and its text.
+  over: a define that adds a property, a define that drops a property and a detail key, a drop of another field, and a drop on another action
+  via: a define keeps every property and detail key unless one is dropped by name, and the applying decision carries the dropped text
+  because: define could only merge, so a retired key could never leave and was rewritten in place as a note that it was former (d-e5a064e3); a drop that deleted the text with the key would lose the meaning a later reader of the journal needs to see what the lexicon once said
+  crossing: harness -> project-source
+  refuted: deleted the line in propose's define branch that records a dropped key's text, so the drop still removed the key but the decision no longer carried its text -> "a define keeps every property and detail key unless one is dropped by name, and the applying decision carries the dropped text" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: revision
+  checklist: revision-preservation declared as a dropped lexicon key stays on record
+- a property drop counts its findings before apply: The preview of a define that drops a property key prints, before anything is applied, how many current uses of that key in the corpus would become unknown-noun findings, from the lexicon check run over the lexicon as it stands and as the drop leaves it.
+  over: a dropped property key the prose writes as a name on three lines, and one it never writes
+  via: a property drop's preview counts the current uses that would become unknown-noun findings, before apply
+  because: a property key counts as accepted vocabulary (d-3283157b), so dropping one can turn every use of it into a finding, as a bare rejection once turned 227 uses of a keyword into findings (rt-cdcf2a29); the count belongs in the preview, where the drop can still be withdrawn
+  crossing: harness -> project-source
+  refuted: made dropFindings run the after-check over the project lexicon as it stands, so the preview counted no new finding -> "a property drop's preview counts the current uses that would become unknown-noun findings, before apply" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- lexicon provenance is append-only: A define adds a provenance key and never rewrites one the concept already records, and a drop of provenance.<key> is refused.
+  over: a drop of a provenance key, a define rewriting an existing provenance key, and a define adding a new one
+  via: provenance is append-only: a drop of a provenance key and a define that rewrites one are refused, a new key is added
+  because: provenance is who defined a concept and in whose words; a merge that let a later define overwrite it would erase the owner's ruling under an agent's, with nothing in the lexicon to show it happened
+  crossing: harness -> project-source
+  refuted: made define's provenance guard test a key no field has, so a define rewrote an existing provenance key -> "provenance is append-only: a drop of a provenance key and a define that rewrites one are refused, a new key is added" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: revision
+  checklist: revision-preservation declared as lexicon provenance is append-only
+- a lifted rejection cites the decision that made it: A rejected name leaves a concept's rejected list only by lift, never by define; applying a lift needs a human acknowledgement and a cite of the applied decision that rejected the name when the journal holds one, and the lift's decision carries the lifted entry with its reason.
+  over: a define carrying an empty rejected list, a lift applied without a human, with a human and no cite, and with both
+  via: a rejection is lifted only with a human acknowledgement and a cite of the decision that rejected it
+  because: a rejection is a ruling a human or an agent made with a reason; taking it back without citing it would let a later session undo the ruling without reading why it was made, and the name would drift back in
+  crossing: harness -> project-source
+  refuted: made rejectingDecisions find no decision for any rejection, so a lift applied with a human and no cite -> "a rejection is lifted only with a human acknowledgement and a cite of the decision that rejected it" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: revision
+  checklist: revision-preservation declared as a lifted rejection cites the decision that made it
+- no project lexicon before a project makes one: Before a project has its own lexicon, lexicon coverage names no project lexicon even when Coherence's lexicon is installed under the project root, and lexicon review prints every live use of a term too rare to be a candidate yet; only Coherence's own checkout reads Coherence's lexicon as its project lexicon.
+  over: an adopter with Coherence's lexicon installed under its root and no lexicon.json, reviewing a term written in its code and prose below the candidate threshold
+  via: before a project lexicon exists, coverage names no project lexicon even with Coherence installed inside the project, and review reads a term's live uses
+  because: at adoption coverage named node_modules/@posthog/coherence/docs/lexicon.json as the project's, and review showed no live use of the project's domain terms, so the first step of settle a domain term could not be done and the agent read the schema directly (df-0d4e5065)
+  crossing: project-source -> reading
+  refuted: restored the old fallback in lexiconCoverage, naming Coherence's lexicon as the project's whenever it lies under the root -> the totality oracle went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- an outside entry file is named as outside: lexicon propose --entry with a file outside the project is refused with a message that names that entry file, never the lexicon.
+  over: an entry file in another folder outside the project root
+  via: an entry file outside the project is refused naming that entry file, not the lexicon
+  because: the refusal said the lexicon path was outside the project, naming the wrong thing, and the adopting agent copied its entries into a folder inside the project to get past a wall it could not read (df-292f9083)
+  crossing: harness -> reading
+  refuted: dropped the entry-file label from the confinement call in lexicon propose, so the refusal again named the lexicon path -> "an entry file outside the project is refused naming that entry file, not the lexicon" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
 - compact injection: The injection at session start carries the vocabulary only: nothing from detail, provenance, or metaphors.
   over: every concept of both lexicon layers
   via: renderCompact: header, one line per concept, rejected in brackets, nothing from detail, provenance or metaphors
@@ -55,12 +112,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: removed the prose pass from rejectedInProse -> "rejected names are found as whole words in prose, with concept and because" went red in check.test.ts; restored, green (2026-09-17)
   kinds: none
-- both layers reach identifiers: Both lexicon layers' rejected names are matched in identifiers as well as in prose; only a name the project declares as its own concept or alias is silent there.
+- both layers reach identifiers: Wherever a lexicon layer's rejected names bind, they are matched in identifiers as well as in prose; only a name the project declares as its own concept or alias is silent there.
   over: every rejected name of both layers against every identifier token in the corpus, in a project with its own lexicon and in one without
-  via: in code, both layers' rejected names match identifier tokens, Coherence's too in an adopter, unless the project declares the name as its own; language globals and module specifiers never match
-  because: the cross-lexicon rule is about sense, not about where a word sits: a project that means something of its own by a word declares it and is left alone, and a project that has not declared it is drifting whether the word is in a sentence or in a symbol. Holding Coherence's names against prose only let an adopter's code carry them untouched, which is where naming drift actually lives
+  via: in code, both layers' rejected names match identifier tokens where both bind, unless the project declares the name as its own; language globals and module specifiers never match
+  because: where a name binds is decided once, by whose text it is (Coherence's rejected names bind only in Coherence's own text), never by where the word sits: a project that has not declared a word its lexicon refuses is drifting whether the word is in a sentence or in a symbol, and a symbol is where naming drift actually lives
   crossing: project-source -> reading
-  refuted: held Coherence's rejected names against an adopter's prose only, so the name in an adopter identifier went unreported -> "in code, both layers' rejected names match identifier tokens, Coherence's too in an adopter, unless the project declares the name as its own; language globals and module specifiers never match" went red in check.test.ts, the identifier hit missing from the expected list; restored, green (2026-09-18)
+  refuted: held rejected names against prose only, so the names in identifiers went unreported -> "in code, both layers' rejected names match identifier tokens where both bind, unless the project declares the name as its own; language globals and module specifiers never match" went red in check.test.ts, the identifier hits missing from the expected list; restored, green (2026-09-25)
   kinds: none
 - the corpus is every text kind: The check reads every text file kind the project holds, the journal's and work's own records included, and leaves out what is written in another vocabulary on purpose, what no rename can repair, and what is not text.
   over: every file under the project root, by kind: prose, code, data, dotfiles, records, lockfiles, binaries, the retired inventories, the reference docs and the reviews
@@ -91,6 +148,34 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: Coherence's names describe the tool and a project's names describe its domain; a domain that legitimately uses a word the tool refuses must not be made to rename its own things
   crossing: project-source -> reading
   refuted: dropped the project's own accepted phrases from the guard, so a Coherence rejection spoke over the project's sense -> the totality oracle went red, then green once restored (2026-09-18)
+  kinds: none
+- Coherence's rejected names bind only in Coherence's own text: In Coherence's own repository its rejected names bind in every text; in an adopter they are never matched in the project's code or domain prose, and a hit in the text written to Coherence (records, spec grammar, coherence.config.json) is advisory, counted and never failing.
+  over: every Coherence rejected name against an adopter's prose, code, spec grammar and sentences, records and config, and against the same text read as Coherence's own repository, detected by its package name
+  via: Coherence's rejected names bind only in Coherence's own text: in an adopter its code and domain prose are the project's words, and the text written to Coherence is advisory
+  because: Coherence's names describe the tool and a project's names describe its domain; two adoptions arrived with 289 and 918 failing hits of words the tool refused for its own concepts, used in the project's own sense, so a fresh adoption could not pass and the check taught agents to rename the domain. Coherence's concepts are named only where the project writes to Coherence, and even there a word can be the domain's, so there it is reported and never refused
+  crossing: project-source -> reading
+  refuted: matched Coherence's rejected names in every text of an adopter, as if it were Coherence's own repository -> the via went red in check.test.ts, the adopter's prose and identifier hits enforced; restored, green (2026-09-25)
+  kinds: none
+- a project's claim wins inside it: A Coherence rejected name the project declares in its own lexicon, as a concept, alias, or instance, is no finding anywhere in that project, advisory or enforced.
+  over: every Coherence rejected name the project's lexicon declares, against the adopter's records, where Coherence's names are still read
+  via: a project's claim wins inside it: a Coherence rejected name the project declares is no finding, advisory or enforced
+  because: a project claims a word through the lexicon workflow it already has, and the claim must reach every text the check still reads Coherence's names in; the claim is the existing declaration, not a parallel list, so a word is claimed exactly when the project has defined it
+  crossing: project-source -> reading
+  refuted: kept every Coherence rejected name in force, ignoring the names the project's lexicon declares -> the via went red in check.test.ts, the claimed word reported in the record; restored, green (2026-09-25)
+  kinds: none
+- the baseline only shrinks: A project's lexicon check fails only on findings outside its baseline, the findings recorded when it adopted Coherence and counted on one line; a later baseline record is intersected with the earlier ones so it can drop findings and never add one, a fixed finding stops matching at once, and Coherence's own repository keeps none.
+  over: every rejected-name finding and unknown noun of an adopter's whole-project check, across a first baseline, an edit, a fix, a second baseline, and a hand-written record with more in it, and the same record in Coherence's own repository
+  via: the baseline only shrinks: a fresh adoption passes once baselined, a new finding fails, a fixed one drops out, a later record never adds, and Coherence's own repository keeps none
+  because: an adoption inherits findings it did not write, and a check red on arrival is skipped from then on; but an excuse that can grow is a way to stop checking. The retired growth-failure mechanisms fell because growth was not the danger; here the danger is a new finding, so the known residual is excluded from the check's named set and can only get smaller
+  crossing: project-source -> reading
+  refuted: let the newest baseline record replace the earlier ones instead of being intersected with them -> the via went red in check.test.ts, a hand-written record widening the baseline; restored, green (2026-09-25)
+  kinds: none
+- the check's unknown nouns are coverage's names: An unknown noun is a proper noun coverage's nomination reads in prose, never the tail of an acronym, a word English always capitalizes, a well-known name in its well-known spelling, a backticked identifier, or a component folder's name, and it stands only by coverage's recurrence: three prose lines, or two across two components.
+  over: every prose line of the corpus, with component folder names, acronym tails, well-known names, backticked words and single-line repeats
+  via: unknown nouns: Title Case away from a sentence start, on three lines or two across two components, with three closed options; a component folder's name is its spec's
+  because: the check and coverage disagreed about what a name is, so two adoptions got 89 and 103 unknown nouns, the most frequent being component folders (core, scripts) counted wherever the word appeared and the tail of the project's own name; one nomination for both keeps the failing check a subset of the reading that explains it
+  crossing: project-source -> reading
+  refuted: dropped the acronym-tail rule from the shared nomination, so the capitalized tail of a product name was nominated -> the via went red in check.test.ts; restored, green (2026-09-25)
   kinds: none
 - regulate refuses only what it can prove: A subagent stop is refused for a rejected name in a changed file, a spec problem, or a structural defect, and never for an open requirement.
   protects: REFUSE_EXIT
@@ -189,6 +274,16 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: graceful-drain dismissed: nothing is shut down by an uninstall; a session already running keeps the hooks its agent host loaded
   checklist: readiness-evidence dismissed: uninstall reports what it removed from the settings file and claims nothing about a running process
   checklist: declared-target-coverage dismissed: one host's one settings file per call, not a registry of targets
+- install keeps regenerated state out of git: Installing the hook writes .coherence/.gitignore once, so the project's git sees only the durable folders (journal, runs, work) and the project's hook voice under .coherence, never the state Coherence regenerates, and the project's own .gitignore is never edited; a .coherence/.gitignore with any other text is the adopter's and is kept, and uninstall removes the file only when it is exactly what install wrote and no agent host keeps a hook of ours.
+  over: every folder Coherence writes under .coherence (journal, runs, work, hooks, feed, lexicon, models, observations, practices, run, structure, traces), in a fresh git project, across both agent hosts installed and uninstalled in turn, a fresh tree, and an ignore file of the adopter's
+  via: install keeps Coherence's regenerated state out of the project's git, and uninstall removes only the ignore file it wrote
+  because: a fresh adoption saw feed cursors, read traces, readings and a language model's weights as untracked files and had to guess what to ignore (df-35f4975d); Coherence's own .gitignore kept them out, but an adopter never receives that. The file sits in Coherence's own folder, so install never edits a file the adopter wrote and uninstall can remove it whole; while another host still runs our hooks the state keeps being written, so the file stays (d-e2cff03c)
+  crossing: project-source -> harness
+  refuted: made removeIgnore stop asking whether another agent host keeps our hooks, so uninstalling Claude Code took the ignore file while Codex still ran ours -> "install keeps Coherence's regenerated state out of the project's git, and uninstall removes only the ignore file it wrote" went red in install.test.ts on "codex still holds our hooks"; restored, green (2026-10-05)
+  kinds: deploy
+  checklist: graceful-drain dismissed: nothing is shut down by an install or an uninstall
+  checklist: readiness-evidence dismissed: install and uninstall report what they wrote or removed and claim nothing about a running process
+  checklist: declared-target-coverage dismissed: one ignore file in one folder per project, not a registry of targets
 - check fails on any drift: The hook check exits non-zero, naming the event and the kind, whenever an agent host's installed hooks differ from what install would write: an event missing, an entry of ours stale in any field or shape, or an extra entry of ours; another tool's hook is never drift.
   over: every event install wires, every field and the shape of the entry install writes, and every entry of ours under any event, for both agent hosts
   via: the check names every drift from what install would write: missing, stale, and extra
@@ -196,6 +291,25 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> harness
   refuted: made the check compare only the command, so a changed timeout, a dropped Codex context limit, a shared entry, or a matcher passed as clean -> "the check names every drift from what install would write: missing, stale, and extra" went red in install.test.ts; restored, green (2026-09-23)
   kinds: none
+- a hook without Coherence tells the agent how to supply it: A hook installed for an adopter, run where Coherence cannot be found or node is not on the PATH, exits 0 with no shell error on every event; at the session start it shows the user one line, and when Coherence is missing it tells the agent every way to supply it and that changing the project's dependencies is the user's decision, so the agent makes the call; every other event is silent.
+  over: every event install wires, for both agent hosts, with no checkout anywhere the command looks and with a checkout but no node; and uninstall still owns the command
+  via: a hook without Coherence installed tells the user once and the agent how to supply it, and is otherwise silent
+  because: a teammate who opens the project without Coherence, or a session in a fresh clone, would otherwise see a stack of shell errors on every event and a SubagentStop that fails for a reason that has nothing to do with the work; a line only the user sees leaves the agent unaware, and a hook that installed Coherence itself would change the project's dependencies and lockfile mid-session without anyone deciding to; the agent knows whether the user asked for Coherence and which package manager the project uses, so it is told and decides
+  crossing: project-source -> harness
+  kinds: deploy
+  checklist: graceful-drain dismissed: nothing is shut down; the hook exits at once without having accepted any work
+  checklist: readiness-evidence dismissed: the line and the context claim only that Coherence was not found, which is what the command just observed
+  checklist: declared-target-coverage declared as a hook without Coherence tells the agent how to supply it
+- a located Coherence answers as a direct command does: An adopter's hook finds Coherence outside the project ($COHERENCE_HOME, a sibling checkout, the sibling of a worktree's main checkout, then the project's own bin) and, once found, answers and refuses exactly as a direct command would; the committed command names no path on one machine and never touches the project's node_modules or lockfile.
+  over: both agent hosts, the start injection and a refused subagent stop, and each place the command looks
+  via: a located Coherence answers, and refuses, as a direct command does
+  because: an npm link into a pnpm project installed a second dependency tree over the locked one and broke its production build, and a command naming one person's absolute path breaks for every teammate; locating a checkout outside the project keeps the project's packages its own, and answering as the direct command does keeps the refusal at SubagentStop, the one refusal the lifecycle has
+  crossing: project-source -> harness
+  refuted: ran the located Coherence under an EXIT trap that exits 0, so its exit status was swallowed -> "a located Coherence answers, and refuses, as a direct command does" went red in install.test.ts; restored, green (2026-09-25)
+  kinds: deploy
+  checklist: graceful-drain dismissed: the located command runs the same process a direct one would, with nothing of its own to drain
+  checklist: readiness-evidence dismissed: the command runs what it found; it makes no claim about a running process
+  checklist: declared-target-coverage declared as a located Coherence answers as a direct command does
 - feed injects subjects only: At prompt and tool boundaries the peer feed injects the subjects of records other sessions wrote since this session's cursor, twelve at most with a count of the rest and the command that shows them whole; a full record is never injected.
   over: every record another session wrote after the cursor, at every UserPromptSubmit and PostToolUse
   via: the peer feed injects subjects of other sessions' records since the cursor, capped, never full records
@@ -208,7 +322,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: commit-ordered-effects declared as cursor advances after the print
   checklist: circuit-breaker-policy dismissed: the feed reads local files; no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
-- feed carries two kinds: The feed injects a peer's decisions and a peer's escalations, and no other verb.
+- feed carries two kinds: The feed's peer lines inject a peer's decisions and a peer's escalations, and no other verb; a stopped subagent's return is the one block that lists every kind its subagent recorded.
   over: every record kind a peer can write, at every boundary event
   via: the peer feed injects a peer's decisions and escalations and no other kind
   because: the lexicon names decision subjects, and an escalation heads every read: a question standing before a human changes what a peer should do next, so a session that met one only at its own start would act past it for a whole cycle. Every other verb is the journal, one command away, and injecting all eleven at every tool use spends the session's budget on what nobody asked for
@@ -219,6 +333,23 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: redaction declared as feed injects subjects only
   checklist: commit-ordered-effects declared as cursor advances after the print
   checklist: circuit-breaker-policy dismissed: the feed reads local files; no dependency is sampled
+  checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
+- another agent under the session is a peer: For the main thread, a record of its own session written under another agent's name is a peer's, so a subagent that wrote under its coordinator's session id still reaches the coordinator's feed; the main thread's own records never do, and a subagent's reader keeps the session rule.
+  over: the coordinator's feed with records of its own session under its own name and under another agent's name
+  via: the main thread's feed counts a record of its own session under another agent's name as a peer's
+  because: subagents in one coordinated session wrote their decisions under the coordinator's session id, as the prompt that spawned them said to, and the feed filtered every one out as the coordinator's own; the coordinator saw them only because each subagent's report happened to list them
+  crossing: record -> reading
+  kinds: none
+- a stopped subagent returns what it recorded: When a subagent's stop goes through, every record it made (under its own session, or under its coordinator's session and another agent's name since it began) is listed, whole list, uncapped, at the coordinator's next prompt or tool boundary, once: the block leaves only after it reached the host, and the peer lines that follow never repeat a record it showed.
+  over: a subagent that recorded more decisions than the feed's cap, a conjecture, and a record under its coordinator's session, stopping, then the coordinator's boundaries before and after a print
+  via: a subagent that stops returns every record it made to its coordinator's next boundary, once, uncapped
+  because: a coordinator that spawns subagents answers for what they decided, and a subagent's report is prose that can leave a decision out; the return is the journal's own account of what the subagent recorded, put before the coordinator whether or not the report named it
+  crossing: record -> reading
+  kinds: output
+  checklist: destination-confinement dismissed: one destination, the coordinator's additionalContext, and no redirect
+  checklist: redaction dismissed: subjects only, as the feed, never a full record
+  checklist: commit-ordered-effects declared as a stopped subagent returns what it recorded
+  checklist: circuit-breaker-policy dismissed: the return reads local files; no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
 - cursor advances after the print: The feed cursor moves past the records a feed covered only after that feed was handed to the host: rendering alone moves nothing, the hook hands the advance back to the command line, which commits it only once its stdout write succeeded, and an unprinted feed is shown again.
   over: every feed rendered for a session, at every boundary event, through the library and through the command line that prints it
@@ -318,3 +449,96 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: dropped the function-word refusal from nominate in lexicon-coverage.ts, so a function word written capitalized mid-sentence was nominated as a proper noun -> "function words are never candidates: every preposition, conjunction, determiner, pronoun and auxiliary is refused however prose writes it" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
   kinds: none
+- orient names spec gaps: Orient names the spec gaps, entrances carrying outside or unknown trust in with no traced control, in one line under the spec block, from the recorded Structure reading while it still describes the tree; when it is stale or absent, a session start starts one reading in the background; when no reading was ever kept, orient says only that the gaps are not read yet and which command reads them, never a count; it counts the gaps the adoption baseline holds as still open, without naming them.
+  over: no reading, a fresh reading, a stale one, and a baselined one, at SessionStart
+  via: orient names the spec gaps in one bounded line from a recorded reading that still describes the tree, starts one background reading when it is stale or absent, says only that the gaps are not read yet when no reading was ever kept, and counts, without naming, the gaps the adoption baseline holds
+  because: both outside adoptions left their route gaps open because nothing in the session's loop showed them (d-a1095ef2); with no reading nothing was traced, so a count would be a guess, but silence hid the gaps from every session that started before one was kept (df-84db9e4f); the owner ruled on 2026-09-28 that gaps baselined at adoption stay counted as open, because an A/B adoption baselined both its gaps on day one and orient then never mentioned them again
+  crossing: project-source -> reading
+  refuted: made orient silent again when every gap is held by the adoption baseline, in orientGapText -> the totality oracle went red; restored, green (2026-09-28)
+  kinds: none
+- orient names the last reading's gaps when it is stale: When the recorded Structure reading no longer describes the tree, orient names the gaps as that reading had them, derived with the current spec and runs, labeled as the reading before the latest changes with when it was taken, and never a gap the current spec visibly closes: an entrance that now declares guard: or control: none, carries trusted work in, or is no longer declared; the injection holds its budget.
+  over: a reading made stale by a source edit, then a control: none, a guard:, a trusted trust: and a removed entrance in the current spec, and all of them closed, at SessionStart
+  via: orient names the gaps as the last reading had them when it no longer describes the tree, labeled as the reading before the latest changes, with the current trust, and never one the current spec visibly closes by guard:, control: none or removing the entrance, within the start budget
+  because: an adopting session ends by committing spec changes, so the next session always started on a stale reading and orient said nothing; the line never reached an agent in the A/B test (df-84db9e4f). The reading's component interfaces change slowly and the spec is read now, so the last reading with the current spec names what is still open, and a gap the spec answers is never named
+  crossing: project-source -> reading
+  kinds: none
+- a session's stop refreshes the structure reading: At a session's Stop, when the recorded Structure reading no longer describes the tree, one reading of the tree the session leaves is started in the background and never waited on, even when nothing is left uncommitted; a SubagentStop starts none.
+  over: a fresh reading at Stop, a committed spec change at SubagentStop, then at Stop
+  via: the session's stop starts one background reading of the tree it leaves when the recorded one no longer describes it, and returns without waiting; a subagent stop starts none
+  because: the tree a session leaves is the tree the next one starts on, so reading it at the stop gives the next session a fresh reading whenever it starts a reading's length later (df-84db9e4f); a subagent stops while its session still edits, and each of its stops would supersede the last one's reading
+  crossing: project-source -> reading
+  kinds: none
+- a spec gap never refuses a stop: Regulate names the spec gaps a session touched, the handler files it changed and the untrusted entrances it declared with neither guard: nor control: none, and never refuses a stop for them.
+  over: a session that changed nothing, one that changed a handler file of two gaps and declared an untrusted entrance, at Stop and at SubagentStop
+  via: regulate names the gaps a session touched, a changed handler file and an untrusted entrance it declared, and never refuses a subagent stop for them
+  because: a refusal is spent only on what the tool can prove is owed; no traced control is not a demonstrated bypass (d-127ab8e4), so a gap is named for the session that touched it and left to it and to the human
+  crossing: project-source -> reading
+  refuted: counted a touched spec gap as owed, so SubagentStop refused with exit 2 -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- orient names undeclared entrances: Orient names the detected entrances no spec declares in one line beneath the spec gaps, detected now from the tree and the current spec, with no Structure reading and whether or not any entrance could be a gap: the count against what is detected, the folder holding the most with their rules, and the scaffold entrances command that proposes their bullets; never a list, and nothing when every detected entrance is declared.
+  over: a project whose declared entrance carries an inside level and that never kept a reading, the same after one more entrance is declared, one with 400 undeclared server functions in one folder, and one with none undeclared
+  via: orient names the undeclared entrances in one bounded line: the count against what is detected now, the folder holding the most, and the scaffold command that proposes their bullets, with no reading and no gap needed
+  because: c-9941b95e: the replicated A/B adoption test (12 adoptions) showed the gap treatment closing gaps, while entrance coverage on praetorium.gg stayed at 11 to 14 percent in both arms, about 100 server functions and routes never declared, and no session transcript mentions an undeclared entrance; the only nudge was a passive count that named the first three by file order and rode on the recorded reading. No adoption baseline: the line is one bounded line whatever the count, and a baseline taken on day one would silence exactly the surface that stayed undeclared (as the owner ruled for baselined gaps on 2026-09-28)
+  crossing: project-source -> reading
+  refuted: made orient's entrance coverage line ride on the spec gaps again, silent when no entrance could be a gap, in gapBlock -> the totality oracle went red; restored, green (2026-09-28)
+  kinds: none
+- an undeclared entrance never refuses a stop: Regulate names the detected entrances no spec declares in the files the session changed, by file with three names at most and the scaffold entrances command for them, and never refuses a stop for them.
+  over: a session that changed nothing, and one that added a server function to a file holding four undeclared, at Stop and at SubagentStop
+  via: regulate names the undeclared entrances in the files a session changed, by file, and never refuses a subagent stop for them
+  because: the session that writes an entrance holds what it means and who calls it, so its stop is when declaring it is cheapest, the in-loop nudge the gaps got (d-a1095ef2); detection is a scan and some of what it finds is no entrance, so an undeclared one is not proven owed and is left advisory
+  crossing: project-source -> reading
+  refuted: counted an undeclared entrance in a changed file as owed, so SubagentStop refused with exit 2 -> the totality oracle went red; restored, green (2026-09-28)
+  kinds: none
+- the project's hook voice composes over what each event says: A project's .coherence/hooks/<Event>.override.md replaces what that event would say and an empty one silences it, its <Event>.append.md follows the canonical text or the override, and an event with nothing of its own to say still speaks a declared file; no override reaches a refusal's reason, which an append only follows.
+  over: every hook event, with nothing declared, an append, an override, both, an empty override, an override in place of the peer feed, and an override and an append on a refused subagent stop
+  via: a project's hook voice composes over what each event says: an override replaces it, an empty one silences it, an append follows it, an event with nothing to say speaks a declared file, and a refusal keeps its reason
+  because: text only one project can say (a house rule, a build hazard, how that project wants a session to start) belongs in the project's own files, not in the canonical text every adopter receives (d-d884e343, in the reference); the reference let a project shape each event this way and the rebuild dropped it without a record. A refusal is enforcement, so a project may speak after it but never replace or silence it, and a feed the override replaced never reached the host, so its cursor stays
+  crossing: project-source -> reading
+  refuted: made composeVoice ignore the override, so the canonical text was always the base -> the totality oracle went red in hook.test.ts; restored, green (2026-09-28)
+  kinds: output
+  checklist: destination-confinement dismissed: the text goes to one destination, the host's additionalContext, systemMessage or stderr, and follows no redirect
+  checklist: redaction dismissed: the project's own text is shown as the project wrote it; nothing in it is designated sensitive
+  checklist: commit-ordered-effects declared as cursor advances after the print
+  checklist: circuit-breaker-policy dismissed: two local files are read; no dependency is sampled
+  checklist: declared-target-coverage dismissed: one file of each kind per event, not a registry of targets
+- a hook voice file stays inside the root: A hook voice file is read only where its real path lies inside the project root; a file, or a folder above it, that links outside is named as not read and never followed, an unreadable one is named, and in both cases the event's canonical text stands.
+  over: a file linked outside the root, the hooks folder linked outside it, a link that stays inside it, and a folder where the file should be, at SessionStart
+  via: a hook voice file whose real path leaves the project root is named as not read and never followed
+  because: the hook reads these files inside every session from the tree it was installed for, and a link can point anywhere; a hook that followed one would inject a neighbouring tree's text, or a secret, as the project's own words. A torn file costs the project its text for that event, never the session, and the line saying so keeps the loss from being silent
+  crossing: project-source -> reading
+  refuted: dropped the within check in voiceFile, so a file whose real path left the project root was read -> the totality oracle went red in hook.test.ts; restored, green (2026-09-28)
+  kinds: read
+  checklist: scoped-reads declared as a hook voice file stays inside the root
+  checklist: redaction dismissed: a file that is not read is named by its path under the root alone, never its target or contents
+- a fired practice is delivered before the act: When the tool use about to run fires a practice's trigger, PreToolUse delivers the practice whole on its first firing at that version in the session and one line after, and never blocks the tool.
+  over: a command that fires a practice, the same command again, another session, and a command that fires nothing
+  via: PreToolUse delivers a fired practice whole once per version per session, then one line, and never blocks
+  because: the steps that slip come first (count the stores before a merge, measure the budget before applying), so delivery after the act is too late; whole once and one line after keeps the injection affordable; a refusal would train a session to route around the practice
+  crossing: project-source -> reading
+  refuted: made practiceContext forget earlier firings, so every firing delivered the practice whole -> "PreToolUse delivers a fired practice whole once per version per session, then one line, and never blocks" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: output
+  checklist: destination-confinement dismissed: the practice goes to one destination, the host's additionalContext
+  checklist: redaction dismissed: a practice is the project's own method, shown whole by design
+  checklist: commit-ordered-effects declared as cursor advances after the print
+  checklist: circuit-breaker-policy dismissed: practice files are read locally; no dependency is sampled
+  checklist: declared-target-coverage dismissed: one host reads the delivery, not a registry of targets
+- a fired practice not enacted is owed: Regulate names each practice that fired in the session with no enactment since, with the command that records it, and never refuses a stop for it.
+  over: a subagent stop after a firing, and a stop after the enactment
+  via: regulate names a practice that fired with no enactment since, advisory, and never refuses a subagent stop for it
+  because: advisory for the reason d-f780c7b9 gives for open requirements: refusing the stop would train a session to fabricate an enactment; naming it at the stop with the shape filled in makes the honest record the cheapest one
+  refuted: made practiceStopText treat every firing as enacted, so regulate named nothing owed -> "regulate names a practice that fired with no enactment since, advisory, and never refuses a subagent stop for it" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- a shell command's writes are read from its words: The files a shell command writes are read from its text before it runs: output redirects, heredoc targets, tee, sed -i and perl -i, the destinations of cp, mv, install and ln, and touch, truncate and rm, through a cd earlier in the line; a quoted >, a heredoc's body, a variable, a substitution, a glob and a device name none.
+  over: redirects of every form, heredocs with a redirect inside their body, tee, sed -i in GNU and BSD form, perl -pi, cp and mv, touch and rm, a cd to a folder and to a variable, a quoted >, a program writing from its own code, and a Codex shell argv
+  via: a shell command's written files are read from its words: redirects, heredocs, tee, sed -i, perl -i, cp and mv destinations, touch and rm, through cd, and never a quoted >, a heredoc body, a variable or a device
+  because: agents write files through the shell as often as through edit tools, and the ai-chatbot adoption wrote its entry spec with cat > ... <<EOF; a reading that missed it would leave an edit-triggered practice silent and the chokepoint check at the edit unrun, while a guessed path would fire them on files nobody wrote
+  refuted: read heredoc bodies as commands, so a redirect inside one counted as a write -> "a shell command's written files are read from its words: redirects, heredocs, tee, sed -i, perl -i, cp and mv destinations, touch and rm, through cd, and never a quoted >, a heredoc body, a variable or a device" went red in shell-writes.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+- a shell write is an edit: writtenFiles counts the files a shell command writes beside an edit tool's, resolved against the folder the command runs in and confined to the project root, so edit triggers and the chokepoint check at the edit see them.
+  over: a heredoc onto a spec, a write from a subfolder, a write above the root, a command that writes nothing, and a reading tool
+  via: writtenFiles counts a shell command's writes beside an edit tool's, resolved against the folder the command runs in and confined to the project
+  because: one reader of written files serves both the practice triggers and revelation at the edit; resolving against the root instead of the command's folder would name the wrong file, and a path above the root is another project's
+  crossing: harness -> reading
+  refuted: resolved shell-written paths against the root instead of the folder the command runs in -> "writtenFiles counts a shell command's writes beside an edit tool's, resolved against the folder the command runs in and confined to the project" went red in shell-writes.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+

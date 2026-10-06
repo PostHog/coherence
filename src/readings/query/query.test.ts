@@ -4,8 +4,7 @@
  */
 
 import assert from "node:assert/strict";
-import { access } from "node:fs/promises";
-import { dirname } from "node:path";
+
 import { after, before, test } from "node:test";
 import { predictClosure } from "../../economy/closure.ts";
 import { economyFor } from "../../economy/cli.ts";
@@ -25,16 +24,6 @@ let state: ShellState;
 
 /** A few hundred tokens: four characters each, so 1600 characters. */
 const FEW_HUNDRED_TOKENS = 1600;
-const MNEMION_LEXICON = process.env["COHERENCE_DOMAIN_LEXICON"] ?? "/Users/daniloc/Documents/Dev/mnemion/mnemion-js/lexicon.json";
-
-async function queryPathExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 before(async () => {
   fixture = makeFixture();
@@ -102,18 +91,6 @@ test("query spine uses the same ordered crossing model as Structure", () => {
   assert.equal(answer(state, "spine", ["extra"]).code, 64);
 });
 
-test("query spine reads all six Mnemion trust levels and every crossing when the read-only adopter is available", {
-  skip: (await queryPathExists(MNEMION_LEXICON)) ? false : `${MNEMION_LEXICON} is not on this machine`,
-}, async () => {
-  const { state: mnemion } = await buildScopePage({ root: dirname(MNEMION_LEXICON), lexiconPath: COHERENCE_LEXICON, project: "Mnemion" });
-  const model = structureOf(mnemion);
-  const text = answerSpine(mnemion).text;
-  assert.equal(model.levels.length, 6);
-  for (const level of model.levels) assert.ok(text.includes(`  ${level.name} — ${level.meaning}`));
-  const lines = text.split("\n").filter((line) => line.startsWith("  ") && line.includes(" -> "));
-  assert.deepEqual(lines.map((line) => line.trim().split(/\s{2}/)[0]!), model.edges.map((edge) => `${edge.component}/${edge.name}`));
-});
-
 test("query status lists structural defects, open requirements, and escalations, in that order", () => {
   const result = answer(state, "status", []);
   assert.equal(result.code, 0);
@@ -179,7 +156,6 @@ test("query economy answers what must be loaded to change the given files safely
   assert.equal(hint.code, 64, "the page state cannot answer it; the command line does, through the instrument");
   assert.match(hint.text, /query economy/);
 });
-
 
 test("bounded lexicon answers make no false absence claim, while the CLI reads omitted terms and every use from full coverage", async () => {
   const omitted = {

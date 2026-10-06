@@ -20,6 +20,7 @@ import { JournalError, onePositional, parseFlags, required, type FlagShape, type
 import {
   INSTRUMENT_IS_WRONG,
   deriveOutcome,
+  enactmentTally,
   citesOf,
   pointsAt,
   recordId,
@@ -40,14 +41,30 @@ import {
   type StepResult,
   type Unable,
   type Dismissal,
+  type Enactment,
+  type StepOutcome,
   type WorkKind,
 } from "./record.ts";
+import { projectPractices } from "../spec/model.ts";
+import type { ModelPractice } from "../spec/practices.ts";
 import { JOURNAL_DIR, appendRecord, gitState, loadJournal, type Loaded } from "./store.ts";
 import { describeBinding, loadWork } from "./work.ts";
+import { recordsOnOtherBranches } from "./branches.ts";
 
 export interface Context {
   cwd: string;
   now: () => Date;
+  /**
+   * What stands against a record before it is written, one line each: the
+   * command line supplies the lexicon's rejected names; none when absent.
+   */
+  vet?: (record: object) => string[];
+}
+
+/** Refuse a record the vet stands against, before anything is written: the store is append-only. */
+export function vetted(ctx: Context, record: object): void {
+  const problems = ctx.vet?.(record) ?? [];
+  if (problems.length > 0) throw new JournalError(`nothing was written; the store is append-only, so reword this record first:\n${problems.map((p) => `  ${p}`).join("\n")}`);
 }
 
 export interface Written {
@@ -86,8 +103,9 @@ export const CITE: Record<string, FlagShape> = { cite: "many" };
 
 /**
  * The records a write cites, checked against both stores: each --cite must
- * name a record already in the journal or the work store, of any kind, and
- * none may be given twice. Returns the field to spread into the record,
+ * name a record already in the journal or the work store, of any kind, or
+ * one another branch has committed (a parallel session's, before it merges),
+ * and none may be given twice. An id found nowhere is refused: that is a typo. Returns the field to spread into the record,
  * empty when nothing is cited, so a record that cites nothing looks exactly
  * like one written before citations existed. This is the one site that
  * accepts a citation.
@@ -104,9 +122,22 @@ export function citations(parsed: Parsed, cwd: string): { cites?: string[] } {
     if (id.trim() === "") throw new JournalError("--cite needs a record id");
     if (seen.has(id)) throw new JournalError(`--cite ${id} given twice`);
     seen.add(id);
-    if (!known.has(id)) throw new JournalError(`--cite ${id}: no journal or work record has that id; cite a record that exists (journal, work inspect)`);
   }
+  const unknown = given.filter((id) => !known.has(id));
+  const elsewhere = unknown.length === 0 ? new Map() : recordsOnOtherBranches(cwd, unknown);
+  const missing = unknown.find((id) => !elsewhere.has(id));
+  if (missing !== undefined) throw new JournalError(`--cite ${missing}: no journal or work record has that id, here or committed on another branch; cite a record that exists (journal, work inspect)`);
   return { cites: given };
+}
+
+/** Each cited id, with the branch that holds it when this checkout does not. */
+function citedWhere(cwd: string, ids: readonly string[]): string[] {
+  const local = new Set<string>([...loadJournal(cwd).records.map((r) => r.id), ...loadWork(cwd).records.map((r) => r.id)]);
+  const elsewhere = recordsOnOtherBranches(cwd, ids.filter((id) => !local.has(id)));
+  return ids.map((id) => {
+    const found = elsewhere.get(id);
+    return found === undefined ? id : `${id} (on branch ${found.branch}, not in this checkout)`;
+  });
 }
 
 /** The words a human said, as the agent attributes them; refused when given blank. */
@@ -118,13 +149,14 @@ function humanWords(parsed: Parsed): { human?: string } {
 }
 
 function write(ctx: Context, record: JournalRecord, extra: string[] = []): Written {
+  vetted(ctx, record);
   const written = appendRecord(ctx.cwd, record);
   return {
     record: written,
     lines: [
       `${written.id}  ${written.kind} recorded in ${JOURNAL_DIR}/${written.session}.jsonl`,
       `  ${describeBinding({ binding: written.binding ?? "none: unsettled", ...(written.work === undefined ? {} : { work: written.work }) })}`,
-      ...(citesOf(written).length > 0 ? [`  cites ${citesOf(written).join(", ")}`] : []),
+      ...(citesOf(written).length > 0 ? [`  cites ${citedWhere(ctx.cwd, citesOf(written)).join(", ")}`] : []),
       ...extra,
     ],
   };
@@ -345,4 +377,78 @@ export function acknowledge(argv: string[], ctx: Context): Written {
   refuseIfAnswered(loaded, of, "acknowledge", ["acknowledgement"]);
   const record: Acknowledgement = { ...head("acknowledgement", who, ctx, `${of}\n${because}`), of, because, ...humanWords(parsed) };
   return write(ctx, record);
+}
+
+/** The practice an id names: its full id, or its bare name when one practice alone carries it. */
+export function findPractice(practices: readonly ModelPractice[], given: string): ModelPractice {
+  const exact = practices.find((p) => p.id === given);
+  if (exact !== undefined) return exact;
+  const named = practices.filter((p) => p.name === given);
+  if (named.length === 1) return named[0]!;
+  const known = practices.length === 0 ? "this project declares no practice (a practice file beside a spec)" : `known: ${practices.map((p) => p.id).join("; ")}`;
+  if (named.length > 1) throw new JournalError(`enact: "${given}" names ${named.length} practices; give the id: ${named.map((p) => p.id).join("; ")}`);
+  throw new JournalError(`enact: no practice "${given}"; ${known}`);
+}
+
+/** The command that enacts a practice, one --step line per step, for a session to fill in. */
+export function enactTemplate(practice: ModelPractice, cli: string, session: string, agent: string, trigger?: string): string {
+  return [
+    `${cli} enact "${practice.id}"${trigger === undefined ? "" : ` --trigger "${trigger}"`} --session ${session} --agent ${agent}`,
+    ...practice.steps.map((step) => `  --step ${step.n}=done${step.leaves === undefined ? "" : `:"<the evidence: ${step.leaves}>"`}`),
+  ].join(" \\\n") + "\n  (a step not done as written: --step <n>=deviated:<why> or --step <n>=skipped:<why>)";
+}
+
+/** One --step value: <n>=done[:<evidence>], <n>=deviated:<because>, or <n>=skipped:<because>. */
+function stepOutcome(pair: string): { n: string; outcome: StepOutcome } {
+  const match = /^(\d+)=(done|deviated|skipped)(?::([\s\S]*))?$/.exec(pair);
+  if (match === null) throw new JournalError(`--step "${pair}" reads <n>=done[:<evidence>], <n>=deviated:<why>, or <n>=skipped:<why>`);
+  const [, n, result, text] = match as unknown as [string, string, StepOutcome["result"], string | undefined];
+  const said = text?.trim() ?? "";
+  if (result === "done") return { n, outcome: said === "" ? { result } : { result, evidence: said } };
+  if (said === "") throw new JournalError(`--step ${n}=${result} needs a because: a ${result} step says why, so the practice can learn from it`);
+  return { n, outcome: { result, because: said } };
+}
+
+/**
+ * Record a practice carried out. Every step needs an outcome: done, with its
+ * evidence where the step names what it leaves, or deviated or skipped with
+ * a because. The record keeps the text of the steps and pitfalls enacted, so
+ * a later change to the practice is read against what was carried out.
+ */
+export function enact(argv: string[], ctx: Context): Written {
+  const parsed = parseFlags(argv, withCommon({ step: "many", trigger: "one", ...CITE }));
+  const who = attribution(parsed);
+  const given = onePositional(parsed, "the practice (its id, or its name when only one practice carries it)");
+  const practice = findPractice(projectPractices(ctx.cwd), given);
+  const results: Record<string, StepOutcome> = {};
+  for (const pair of parsed.many.get("step") ?? []) {
+    const { n, outcome } = stepOutcome(pair);
+    if (Object.hasOwn(results, n)) throw new JournalError(`--step ${n} given twice`);
+    if (!practice.steps.some((s) => String(s.n) === n)) throw new JournalError(`enact: ${practice.id} has steps 1 to ${practice.steps.length}; there is no step ${n}`);
+    results[n] = outcome;
+  }
+  const missing = practice.steps.filter((s) => !Object.hasOwn(results, String(s.n)));
+  if (missing.length > 0) {
+    throw new JournalError(
+      `enact: every step needs an outcome; missing ${missing.map((s) => s.n).join(", ")}. The practice, version ${practice.version}:\n` +
+        practice.steps.map((s) => `  ${s.n}. ${s.text}${s.leaves === undefined ? "" : `\n     leaves: ${s.leaves}`}`).join("\n"),
+    );
+  }
+  const trigger = parsed.one.get("trigger") ?? "explicit";
+  const record: Enactment = {
+    ...head("enactment", who, ctx, `${practice.id}\n${practice.version}\n${JSON.stringify(results)}`),
+    practice: practice.id,
+    version: practice.version,
+    trigger,
+    steps: practice.steps.map((s) => (s.leaves === undefined ? { text: s.text } : { text: s.text, leaves: s.leaves })),
+    pitfalls: practice.pitfalls.map((p) => p.text),
+    results,
+    ...citations(parsed, ctx.cwd),
+  };
+  // A step that names its evidence and was marked done without it is claimed, not shown: said now, and again at the stop.
+  const unshown = practice.steps.filter((s) => s.leaves !== undefined && results[String(s.n)]?.result === "done" && (results[String(s.n)] as { evidence?: string }).evidence === undefined);
+  return write(ctx, record, [
+    `  version ${practice.version}, ${enactmentTally(record)}`,
+    ...unshown.map((s) => `  step ${s.n} names its evidence (${s.leaves}) and none was given: claimed, not shown`),
+  ]);
 }

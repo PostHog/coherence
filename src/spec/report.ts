@@ -52,6 +52,13 @@ function componentLines(component: Component): string[] {
   if (component.trustLevels !== undefined) lines.push(`  trust levels: ${component.trustLevels.map((level) => level.name).join(", ")}`);
   if (component.invariants.length === 0) lines.push("  (no invariants)");
   for (const invariant of component.invariants) lines.push(...invariantLines(invariant));
+  if (component.practicePath !== undefined) {
+    lines.push(`  practices  ${component.practicePath}`);
+    for (const p of component.practices) {
+      const evidenced = p.steps.filter((s) => s.leaves !== undefined).length;
+      lines.push(`  ${p.name}  ${p.state}, version ${p.version}, ${p.enactments} enacted; ${p.steps.length} steps (${evidenced} name their evidence), ${p.pitfalls.length} pitfalls`);
+    }
+  }
   return lines;
 }
 
@@ -64,9 +71,12 @@ export function formatCounts(model: SpecModel): string {
     model.runs === undefined
       ? "no run yet: every enforcement is declared, unverified"
       : `latest run ${model.runs.latest} (${plural(model.runs.count, "run")}${model.runs.damaged === 0 ? "" : `, ${model.runs.damaged} unreadable`})`;
+  const practices = model.components.flatMap((component) => component.practices);
+  const practiceLine = practices.length === 0 ? [] : [`${plural(practices.length, "practice")}: ${practices.filter((p) => p.state === "established").length} established, ${practices.filter((p) => p.state === "candidate").length} candidate`];
   return [
     `${plural(c.components, "component")}, ${plural(c.bullets, "bullet")}: ${plural(c.invariants, "invariant")}, ${plural(c.requirements, "requirement")}${defects}`,
     `lacking: ${lacking}; unfilled placeholders ${c.unfilled}; ${plural(c.problems, "problem")}; ${runs}`,
+    ...practiceLine,
   ].join("\n");
 }
 

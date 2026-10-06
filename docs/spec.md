@@ -145,3 +145,37 @@ carries its kinds; the shapes whose kinds intersect are applicable, and each
 needs one line: `<shape> declared as <invariant name>` (the bullet itself may
 be that invariant) or `<shape> dismissed: <reason>`. The scaffold prints one
 placeholder line per applicable shape with the shapes' sentences beside it.
+
+## Practices
+
+A spec may have a sister: the practice file beside it, with the spec's stem
+(`Enforcement.practice.md` beside `Enforcement.spec.md`). It holds the
+component's methods, one bullet each, in the same grammar, with no headings:
+
+```markdown
+- oil the knob: A knob is oiled before it turns.
+  when: command turn-knob | edit src/widget/**/*.ts adding knob | explicit
+  step: wipe the knob
+  step: oil the knob
+    leaves: an oil record
+  pitfall: a dry knob seized (d-1a2b3c4d)
+  learned: d-1a2b3c4d, 3f2e1d0
+  invariants: knob turns
+  because: a dry knob seizes
+```
+
+`when:` names what fires the practice: a command's words, an edited path's
+glob with the text the edit adds, or `explicit`. A shell command that writes a file
+(a redirect, a heredoc, `tee`, `sed -i`, `cp`) counts as an edit of that file, and
+its own text as the text added. Steps are numbered in the
+order written; `leaves:` under a step names the evidence it leaves. Every
+pitfall cites the record or commit that witnessed it, and a practice that
+cites nothing is a problem. `invariants:` names invariants of the sister spec,
+or `<folder>/<name>` elsewhere. A practice file never stands without its spec.
+
+The hook delivers a practice whole when a tool use is about to fire it; a
+session records it carried out with `coherence enact "<practice>" --step
+<n>=done[:<evidence>]|deviated:<why>|skipped:<why>` for every step. Once
+enacted, a step or pitfall leaves the practice only with a decision citing an
+enactment. `coherence scaffold practice <folder> "<name>" "<sentence>"`
+prints the shape; `coherence query practice` lists every practice.

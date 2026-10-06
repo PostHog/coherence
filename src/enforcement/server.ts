@@ -52,7 +52,7 @@ import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, rea
 import { createServer as createHttpServer, type IncomingHttpHeaders, type IncomingMessage, type Server as HttpServer, type ServerResponse } from "node:http";
 import { createConnection, createServer, type AddressInfo, type Server, type Socket } from "node:net";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, extname, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import type { Definition, Ladder, LanguageAdapter, Refutation, ReferenceSite, ResolveHint, Resolved, Visibility } from "../adapters/adapter.ts";
@@ -81,7 +81,7 @@ const HTTP_REQUEST_MS = 10_000;
 /** HTTP: the most connections at once; a page holds two or three. */
 const HTTP_MAX_CONNECTIONS = 64;
 const CODE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const CLI = join(CODE_DIR, "cli.ts");
+const CLI = join(CODE_DIR, `cli${extname(fileURLToPath(import.meta.url))}`);
 const PACKAGE_JSON = join(CODE_DIR, "..", "package.json");
 const CODE_FILE = /\.(ts|mts|cts|js|mjs|cjs|json)$/;
 

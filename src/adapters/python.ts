@@ -75,7 +75,7 @@ import {
   type Visibility,
 } from "./adapter.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
-import { keepProjectFiles, nestedCheckouts, projectFiles } from "./project-files.ts";
+import { isVirtualEnvironment, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
 
 /** The small JSON-RPC surface the adapter needs, exposed so a test can control server ordering. */
 export interface PythonLanguageClient {
@@ -92,7 +92,6 @@ export type PythonClientFactory = (command: string, args: string[], cwd: string,
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..");
 const SERVER_BIN = "pyright-langserver";
-const SKIPPED_FOLDERS = new Set(["node_modules", ".git", "__pycache__", "site-packages", ".coherence", ".claude", ".codex", "dist", "build"]);
 const ENUMERATION_TIMEOUT_MS = 10 * 60 * 1000;
 const COHERENCE_ENFORCER = "Coherence's check at the edit and in CI";
 
@@ -243,11 +242,6 @@ export function resolveDotted(from: string, dots: string, dotted: string): strin
   return parts.length === 0 ? undefined : parts.join("/");
 }
 
-/** Whether a folder is a virtual environment (never source). */
-function isVenv(dir: string): boolean {
-  return existsSync(join(dir, "pyvenv.cfg"));
-}
-
 /**
  * The exclude list Pyright's workspace gets so it never indexes a nested
  * checkout, or nothing when the root holds none. A list given replaces
@@ -269,10 +263,10 @@ export function workspaceExclusions(root: string): string[] | undefined {
       return;
     }
     for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith(".") || SKIPPED_FOLDERS.has(entry.name)) continue;
+      if (!entry.isDirectory() || neverWalkedName(entry.name)) continue;
       const rel = folder === "" ? entry.name : `${folder}/${entry.name}`;
       if (nested.includes(rel)) continue;
-      if (isVenv(join(root, rel))) venvs.push(rel);
+      if (isVirtualEnvironment(join(root, rel))) venvs.push(rel);
       else walk(rel);
     }
   };
@@ -372,10 +366,10 @@ export function boundedWorkspaceConfig(root: string, folder: string, bounds: Ada
       return;
     }
     for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith(".") || SKIPPED_FOLDERS.has(entry.name) || skip.has(entry.name)) continue;
+      if (!entry.isDirectory() || neverWalkedName(entry.name) || skip.has(entry.name)) continue;
       const rel = dir === "" ? entry.name : `${dir}/${entry.name}`;
       if (skip.has(rel) || nested.includes(rel)) continue;
-      if (isVenv(join(root, rel))) venvs.push(rel);
+      if (isVirtualEnvironment(join(root, rel))) venvs.push(rel);
       else walk(rel);
     }
   };
@@ -387,29 +381,25 @@ export function boundedWorkspaceConfig(root: string, folder: string, bounds: Ada
   return config;
 }
 
-/** Every Python file of the project under `start` (project-relative paths), skipping venvs, caches, and dot folders. */
+/** Every Python file of the project under `start` (project-relative paths) that the walk reads (walkedProjectFiles): never in a virtual environment, a cache, or a hidden folder. */
 export function pythonFiles(root: string, start = "."): string[] {
+  return pythonIn(walkedProjectFiles(walkBounds(root, [])).files, start);
+}
+
+/** The Python files of a walk under `start`. */
+function pythonIn(files: readonly string[], start = "."): string[] {
   const prefix = start === "." ? "" : start.replace(/^\.\//, "").replace(/\/+$/, "") + "/";
-  const venv = new Map<string, boolean>();
-  const inVenv = (rel: string): boolean => {
-    const parts = rel.split("/");
-    for (let i = 1; i < parts.length; i++) {
-      const folder = parts.slice(0, i).join("/");
-      let answer = venv.get(folder);
-      if (answer === undefined) venv.set(folder, (answer = isVenv(join(root, folder))));
-      if (answer) return true;
-    }
-    return false;
-  };
-  return projectFiles(root).filter(
-    (rel) => rel.endsWith(".py") && rel.startsWith(prefix) && rel.split("/").every((part) => !part.startsWith(".") && !SKIPPED_FOLDERS.has(part)) && !inVenv(rel),
-  );
+  return files.filter((rel) => rel.endsWith(".py") && rel.startsWith(prefix));
 }
 
 /** Every Python file whose project-relative path is the hint or ends with `/<hint>`. */
 export function filesEndingWith(root: string, hint: string): string[] {
+  return pythonEndingWith(pythonFiles(root), hint);
+}
+
+function pythonEndingWith(files: readonly string[], hint: string): string[] {
   const suffix = hint.replace(/^\.\//, "");
-  return pythonFiles(root).filter((rel) => rel === suffix || rel.endsWith("/" + suffix));
+  return files.filter((rel) => rel === suffix || rel.endsWith("/" + suffix));
 }
 
 /** Whether a file's text can declare `name`: a def, a class, an assignment, or an attribute assignment. */
@@ -538,6 +528,9 @@ export class PythonAdapter implements LanguageAdapter {
   private checkerFacts: CheckerFacts | undefined;
   /** Star-import sites by the module path they re-export; Pyright reports no site for a name the statement never spells. Scanned once per forget. */
   private wildcards: Map<string, ReferenceSite[]> | undefined;
+  /** The project's files and git's listing, each taken once per forget: a name resolved in a file, or a site kept, asks no git between forgets. */
+  private walked: string[] | undefined;
+  private listing: { taken: ProjectListing | undefined } | undefined;
   /** The last diagnostics Pyright published, by project-relative file. */
   private readonly diagnostics = new Map<string, { message: string; severity?: number }[]>();
   /** When the workspace was last reported to Pyright as possibly changed. */
@@ -739,6 +732,8 @@ export class PythonAdapter implements LanguageAdapter {
     this.lineCache.clear();
     this.checkerFacts = undefined;
     this.wildcards = undefined;
+    this.walked = undefined;
+    this.listing = undefined;
     this.diagnostics.clear();
     const since = this.lastForget - 1000;
     this.lastForget = Date.now();
@@ -815,17 +810,17 @@ export class PythonAdapter implements LanguageAdapter {
       ? path
       : existsSync(full) && statSync(full).isDirectory() && existsSync(join(full, "__init__.py")) ? `${path.replace(/\/+$/, "")}/__init__.py` : undefined;
     // A module in a nested checkout or an ignored file is not the project's, whatever the spec names.
-    return file !== undefined && keepProjectFiles(this.root, [file]).has(file) ? file : undefined;
+    return file !== undefined && keepProjectFiles(this.root, [file], this.listingNow()).has(file) ? file : undefined;
   }
 
   /** A bare name: files whose text can declare it, the component's first (a unique non-test hit there settles it), then the whole tree. */
   private async searchByText(name: string, hint: ResolveHint): Promise<Candidate[]> {
     const under = hint.component === "." ? undefined : hint.component;
-    const inComponent = under === undefined ? [] : await this.candidatesIn(pythonFiles(this.root, under), name);
+    const inComponent = under === undefined ? [] : await this.candidatesIn(this.pythonNow(under), name);
     const nonTest = inComponent.filter((c) => !isTestPath(c.file, hint.testFolders));
     if (nonTest.length === 1 && inComponent.length === 1) return inComponent;
     const prefix = under === undefined ? undefined : under + "/";
-    const elsewhere = pythonFiles(this.root).filter((f) => prefix === undefined || !f.startsWith(prefix));
+    const elsewhere = this.pythonNow().filter((f) => prefix === undefined || !f.startsWith(prefix));
     return [...inComponent, ...(await this.candidatesIn(elsewhere, name))];
   }
 
@@ -846,8 +841,18 @@ export class PythonAdapter implements LanguageAdapter {
 
   private async searchFiles(name: string, fileHint: string): Promise<Candidate[]> {
     const candidates: Candidate[] = [];
-    for (const file of filesEndingWith(this.root, fileHint)) candidates.push(...(await this.declarationsIn(file, name)));
+    for (const file of pythonEndingWith(this.pythonNow(), fileHint)) candidates.push(...(await this.declarationsIn(file, name)));
     return candidates;
+  }
+
+  /** The project's Python files under `start`, from a walk taken once per forget. */
+  private pythonNow(start = "."): string[] {
+    return pythonIn((this.walked ??= walkedProjectFiles(walkBounds(this.root, [])).files), start);
+  }
+
+  /** Git's listing of the project, taken once per forget. */
+  private listingNow(): ProjectListing | undefined {
+    return (this.listing ??= { taken: projectListing(this.root) }).taken;
   }
 
   /** Declarations named `name` in a file: module members first; a class member or a function-local counts when no module member has the name. */
@@ -879,7 +884,7 @@ export class PythonAdapter implements LanguageAdapter {
       reported.push(...(locations ?? []));
     }
     // Only the project's own files are evidence, and a site outside them is dropped before it is read or opened.
-    const own = keepProjectFiles(this.root, reported.map((location) => this.relative(location.uri)));
+    const own = keepProjectFiles(this.root, reported.map((location) => this.relative(location.uri)), this.listingNow());
     const seen = new Set<string>();
     const sites: ReferenceSite[] = [];
     for (const location of reported) {
@@ -910,7 +915,7 @@ export class PythonAdapter implements LanguageAdapter {
   private starImports(file: string): ReferenceSite[] {
     if (this.wildcards === undefined) {
       const found = new Map<string, ReferenceSite[]>();
-      for (const source of pythonFiles(this.root)) {
+      for (const source of this.pythonNow()) {
         let lines: string[];
         try {
           lines = readFileSync(join(this.root, source), "utf8").split(/\r?\n/);

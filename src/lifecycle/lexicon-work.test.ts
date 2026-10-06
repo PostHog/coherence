@@ -7,6 +7,7 @@ import {
   rmSync,
   existsSync,
   symlinkSync,
+  copyFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -25,6 +26,9 @@ import {
   saveBaseline,
 } from "./lexicon-cli.ts";
 import { loadJournal } from "../journal/store.ts";
+import { COHERENCE_LEXICON, PACKAGE_NAME } from "./project.ts";
+import { loadLexicon } from "./lexicon.ts";
+import { parseLexicon as parseScopeLexicon } from "../readings/scope/model.ts";
 
 const who = { session: "lexicon-test", agent: "test" };
 function fixture(): string {
@@ -181,6 +185,25 @@ test("lexicon maintenance preserves full entries, records actual effects, and re
       /changed since preview/,
     );
     assert.equal(loadJournal(root).records.length, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+test("an acknowledged retirement writes a lexicon Scope reads: the name is refused at the top level as a concept", async () => {
+  const root = fixture();
+  try {
+    const retire = await propose(root, {
+      action: "retire",
+      name: "exposure",
+      because: "moved out of the vocabulary",
+    });
+    applyProposal(root, retire.id, who, "moved out", ["keeping it"], "owner approved");
+    const raw = readFileSync(join(root, "lexicon.json"), "utf8");
+    const lexicon = parseScopeLexicon(JSON.parse(raw), "lexicon.json");
+    assert.deepEqual(lexicon.rejected_names, [
+      { concept: "exposure", because: "moved out of the vocabulary" },
+    ]);
+    assert.equal(lexicon.concepts.length, 0);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -523,7 +546,7 @@ test("an installed hook command locates its project from a non-git subdirectory 
   try {
     writeFileSync(
       join(root, "package.json"),
-      JSON.stringify({ name: "coherence" }),
+      JSON.stringify({ name: PACKAGE_NAME }),
     );
     symlinkSync(
       fileURLToPath(new URL("..", import.meta.url)),
@@ -733,5 +756,167 @@ test("rulings recorded under the retired verb still count: the journal is read a
     assert.throws(() => applyProposal(root, change.id, who, "clarified", ["none"]), /already applied/, "an application recorded before the rename still counts as applied");
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("lexicon propose prints the proposal as a reader needs it, id first, and the whole lexicon only with --json", async () => {
+  const root = fixture();
+  try {
+    const summary = await run(root, ["propose", "define", "exposure", "--definition", "Money at risk, in USD.", "--because", "tighter"]);
+    assert.equal(summary.code, 0, summary.err);
+    const lines = summary.out.split("\n");
+    assert.match(lines[0]!, /^lp-[0-9a-f]+ {2}proposes define "exposure" in lexicon\.json$/, "the id leads the first line");
+    assert.match(summary.out, /entry after: \{"name":"exposure".*"definition":"Money at risk, in USD\."/);
+    assert.match(summary.out, /apply: lexicon apply lp-[0-9a-f]+ --because "<why>"/);
+    assert.ok(!summary.out.includes('"after"') && summary.out.length < 2000, "the lexicon after the change is not printed");
+    const whole = await run(root, ["propose", "define", "exposure", "--definition", "Money at risk.", "--because", "tighter", "--json"]);
+    const parsed = JSON.parse(whole.out) as { id: string; after: string };
+    assert.match(parsed.id, /^lp-/);
+    assert.ok(parsed.after.includes("Money at risk."), "--json keeps the whole proposal");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a define keeps every property and detail key unless one is dropped by name, and the applying decision carries the dropped text", async () => {
+  const root = fixture();
+  try {
+    const merge = await propose(root, {
+      action: "define",
+      name: "exposure",
+      entry: { properties: { currency: "the ISO code" } },
+      because: "a second property",
+    });
+    applyProposal(root, merge.id, who, "a second property", ["none"]);
+    let entry = JSON.parse(readFileSync(join(root, "lexicon.json"), "utf8")).concepts[0];
+    assert.deepEqual(entry.properties, { unit: "USD", currency: "the ISO code" }, "a define merges; it never drops a key it does not name");
+    const drop = await propose(root, {
+      action: "define",
+      name: "exposure",
+      drop: ["properties.unit", "detail.explanation"],
+      because: "the unit moved into the definition",
+    });
+    const id = applyProposal(root, drop.id, who, "the unit moved into the definition", ["keeping a stale key"]);
+    entry = JSON.parse(readFileSync(join(root, "lexicon.json"), "utf8")).concepts[0];
+    assert.deepEqual(entry.properties, { currency: "the ISO code" });
+    assert.equal(entry.detail, undefined, "an emptied detail leaves the entry");
+    const decision = loadJournal(root).records.find((r) => r.id === id) as { chose: string };
+    assert.ok(decision.chose.includes('"properties.unit":"USD"'), decision.chose);
+    assert.ok(decision.chose.includes('"detail.explanation":"retained"'), decision.chose);
+    await assert.rejects(
+      propose(root, { action: "define", name: "exposure", drop: ["aliases.amount at risk"], because: "x" }),
+      /properties\.<key> or detail\.<key>/,
+    );
+    await assert.rejects(
+      propose(root, { action: "alias", name: "exposure", value: "y", drop: ["properties.currency"], because: "x" }),
+      /only to define/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a property drop's preview counts the current uses that would become unknown-noun findings, before apply", async () => {
+  const root = fixture();
+  try {
+    const lexicon = JSON.parse(readFileSync(join(root, "lexicon.json"), "utf8"));
+    lexicon.concepts[0].properties.tranche = "the slice of a book the exposure sits in";
+    writeFileSync(join(root, "lexicon.json"), JSON.stringify(lexicon));
+    writeFileSync(
+      join(root, "money/book.md"),
+      "Each charge names its Tranche here.\nA desk reports per Tranche daily.\nThe report sums every Tranche monthly.\n",
+    );
+    const counted = await run(root, ["propose", "define", "exposure", "--drop", "properties.tranche", "--because", "not a property"]);
+    assert.equal(counted.code, 0, counted.err);
+    assert.match(counted.out, /dropping properties\.tranche: 3 current uses would become unknown-noun findings \(tranche\)/);
+    assert.match(counted.out, /removes properties\.tranche: "the slice of a book the exposure sits in"/);
+    const quiet = await propose(root, { action: "define", name: "exposure", drop: ["properties.unit"], because: "x" });
+    assert.deepEqual(quiet.findings, [{ drop: "properties.unit", uses: 0, terms: [] }]);
+    assert.ok(readFileSync(join(root, "lexicon.json"), "utf8").includes("tranche"), "a preview writes nothing");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("provenance is append-only: a drop of a provenance key and a define that rewrites one are refused, a new key is added", async () => {
+  const root = fixture();
+  try {
+    await assert.rejects(
+      propose(root, { action: "define", name: "exposure", drop: ["provenance.owner"], because: "x" }),
+      /provenance is append-only/,
+    );
+    await assert.rejects(
+      propose(root, { action: "define", name: "exposure", entry: { provenance: { owner: "agent" } }, because: "x" }),
+      /provenance is append-only/,
+    );
+    const added = await propose(root, { action: "define", name: "exposure", entry: { provenance: { source: "the 2026 audit" } }, because: "x" });
+    const entry = (JSON.parse(added.after) as { concepts: { provenance: unknown }[] }).concepts[0]!;
+    assert.deepEqual(entry.provenance, { owner: "human", source: "the 2026 audit" });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a rejection is lifted only with a human acknowledgement and a cite of the decision that rejected it", async () => {
+  const root = fixture();
+  try {
+    const reject = await propose(root, { action: "reject", name: "exposure", value: "risk sum", because: "vague" });
+    const original = applyProposal(root, reject.id, who, "vague", ["keeping it"]);
+    const define = await propose(root, { action: "define", name: "exposure", entry: { rejected: [] }, because: "x" });
+    assert.ok(define.after.includes("risk sum"), "a define never removes a rejection");
+    const lift = await propose(root, { action: "lift", name: "exposure", value: "risk sum", because: "the desk's own word" });
+    assert.equal(lift.humanRequired, true);
+    assert.throws(() => applyProposal(root, lift.id, who, "the desk's own word", ["keeping it rejected"]), /human/);
+    assert.throws(
+      () => applyProposal(root, lift.id, who, "the desk's own word", ["keeping it rejected"], "owner said so"),
+      new RegExp(`cites the decision that made it: --cite ${original}`),
+    );
+    assert.ok(readFileSync(join(root, "lexicon.json"), "utf8").includes("risk sum"), "a refused lift changes nothing");
+    const id = applyProposal(root, lift.id, { ...who, cite: [original] }, "the desk's own word", ["keeping it rejected"], "owner said so");
+    assert.ok(!readFileSync(join(root, "lexicon.json"), "utf8").includes("risk sum"));
+    const decision = loadJournal(root).records.find((r) => r.id === id) as { chose: string };
+    assert.ok(decision.chose.includes('"rejected.risk sum":{"alternative":"risk sum","because":"vague"}'), decision.chose);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("before a project lexicon exists, coverage names no project lexicon even with Coherence installed inside the project, and review reads a term's live uses", async () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-lexicon-adopt-"));
+  try {
+    // Coherence installed inside the adopter, as npm puts it: its lexicon lies under the root but is not the project's.
+    mkdirSync(join(root, "vendor/coherence/docs"), { recursive: true });
+    const installed = join(root, "vendor/coherence/docs/lexicon.json");
+    copyFileSync(COHERENCE_LEXICON, installed);
+    mkdirSync(join(root, "app"));
+    writeFileSync(join(root, "app/schema.ts"), "export interface Chat { id: string }\nexport function saveChat(chat: Chat) { return chat; }\n");
+    writeFileSync(join(root, "notes.md"), "Each chat belongs to a user.\n");
+    const coherence = await loadLexicon(installed);
+    const report = await lexiconCoverage(root, { coherence, project: undefined });
+    assert.equal(report.projectLexicon, null);
+    const review = await run(root, ["review", "chat"]);
+    assert.equal(review.code, 0, review.err);
+    assert.match(review.out, /"chat" is written on 3 lines, below the recurrence a candidate needs/);
+    assert.match(review.out, /app\/schema\.ts:2 export function saveChat/);
+    assert.match(review.out, /notes\.md:1 Each chat belongs to a user\./);
+    const json = JSON.parse((await run(root, ["review", "chat", "--json"])).out) as { liveUseCount: number };
+    assert.equal(json.liveUseCount, 3);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an entry file outside the project is refused naming that entry file, not the lexicon", async () => {
+  const root = fixture();
+  const outside = mkdtempSync(join(tmpdir(), "coherence-lexicon-entry-"));
+  try {
+    const entry = join(outside, "x.json");
+    writeFileSync(entry, JSON.stringify({ properties: { currency: "ISO" } }));
+    const refused = await run(root, ["propose", "define", "exposure", "--entry", entry, "--because", "x"]);
+    assert.equal(refused.code, 1);
+    assert.equal(refused.err, `lexicon: entry file ${entry} is outside the project root`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
   }
 });

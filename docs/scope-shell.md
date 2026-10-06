@@ -1,7 +1,7 @@
 # The Scope shell
 
 Scope is the reading: one surface that projects the model for a human, in
-views. Six views ship: Lexicon, Components, Structure, Invariants, Runs, and
+views. Seven views ship: Lexicon, Components, Structure, Invariants, Practices, Runs, and
 Journal.
 
 ## Structure
@@ -18,7 +18,7 @@ own loader from their records, so each carries its current state) when
 read them, and per view the reader's query, filters, and selection.
 
 `build.ts` loads those truths once and embeds the state as JSON in
-`public/_scope.html` with the styles and one inline script. Same inputs in,
+`.coherence/scope/_scope.html` with the styles and one inline script. Same inputs in,
 byte-identical page out. With `--root <project>` it builds over another
 project: that root's specs, runs, journal, and lexicon (named under
 `lexicon` in `coherence.config.json`, else `lexicon.json`) become the
@@ -210,6 +210,26 @@ declared trust levels, because, refutation (witnessed, automatic from the
 run, or missing), checklist, and what it lacks. A structural defect shows
 its bypass sites and the two honest options: route through the chokepoint,
 or escalate a retirement. Filters by state and component.
+
+**Practices** tells the story of what the project practices before how each
+practice holds. It opens with a summary in words, then the project's working
+rules by what sets them off ("When you run `refute` → witness a
+refutation", "When you edit `**/*.spec.md` adding `refuted:` → …", and the
+practices taken up on purpose), then where the practices live (each
+component with its own, the kernel practices Coherence ships, and the
+components with none), then what has no practice yet: components with
+defects or walls on record and no practice of their own, and defects no
+pitfall cites. What needs attention follows: a step gone from an enacted
+practice with no decision, a step claimed done without the evidence it
+names, a step deviated from repeatedly, a candidate never enacted. Each
+practice's card shows its steps with an adherence strip over its latest
+twelve enactments (evidenced, done, claimed, deviated, skipped, or absent
+when the version enacted lacked the step), the reasons sessions gave for
+deviating, its pitfalls linked to the records that witnessed them, what it
+was learned from, its versions and amendments, and its enactments. The
+derivations are `practices.ts`; the journal window keeps every enactment,
+every decision citing one, and every record a practice cites, so none of it
+depends on the record's age. `query practice` prints the same story.
 
 **Runs** lists the records latest first with session, agent, commit, dirty
 flag, and counts; the verdicts one click away; on the latest, what the status

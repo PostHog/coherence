@@ -23,6 +23,7 @@ test("status says what each event delivers: orient at the starts, the peer feed 
       ["SessionStart", "orient"],
       ["SubagentStart", "orient"],
       ["UserPromptSubmit", "peer feed"],
+      ["PreToolUse", "practice"],
       ["PostToolUse", "peer feed"],
       ["Stop", "regulate"],
       ["SubagentStop", "regulate"],
@@ -31,9 +32,10 @@ test("status says what each event delivers: orient at the starts, the peer feed 
     assert.match(start, /escalations awaiting a human: 1 /, "measured from this project's journal");
     assert.match(start, /no project lexicon, delivered at detail "full"/);
     assert.match(start, new RegExp(`size now: ${(await startContext(dir, {})).length.toLocaleString("en-US")} of 9,500 characters`), "the size is the injection's own");
-    assert.match(list[3]!.carries.join("\n"), /never whole records[\s\S]*revelation at the edit/);
-    assert.match(list[4]!.carries.join("\n"), /never refuses/);
-    assert.match(list[5]!.carries.join("\n"), /refuses the stop \(exit 2\)/);
+    assert.match(list[3]!.carries.join("\n"), /a practice whose trigger the tool use about to run fires[\s\S]*never blocks the tool/);
+    assert.match(list[4]!.carries.join("\n"), /never whole records[\s\S]*revelation at the edit/);
+    assert.match(list[5]!.carries.join("\n"), /never refuses/);
+    assert.match(list[6]!.carries.join("\n"), /refuses the stop \(exit 2\)/);
 
     // Nothing installed: every event says it delivers nothing.
     const none = formatDeliveries(list, [await status(dir, "claude"), await status(dir, "codex")]);

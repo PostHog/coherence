@@ -115,6 +115,8 @@ export interface Lexicon {
   shape?: Fields;
   /** Undefined when the file does not speak of them; empty when it says there are none. */
   rejected_names?: RejectedName[];
+  /** Concepts the lexicon retired, each as it stood, with why it left. */
+  retired?: Concept[];
   trust_levels?: TrustLevel[];
   rulings?: Ruling[];
   candidate_overloads?: Overload[];
@@ -254,8 +256,14 @@ export interface SpecEntrance {
   /** The trust level it declares it carries in; absent when it declares none, and its trust is derived. */
   trust?: string | undefined;
   trustLine?: number | undefined;
+  /** The chokepoint it declares its handler is registered through (a guard: line); absent when it declares none. */
+  guard?: string | undefined;
+  guardLine?: number | undefined;
+  /** Why it needs no control (a control: none — <reason> line); absent when it declares none. */
+  noControl?: string | undefined;
+  controlLine?: number | undefined;
   component: string;
-  /** The file whose top level declares the handler, as the spec model found it. */
+  /** The file whose top level declares the handler (a module handler: the module itself), as the spec model found it. */
   file: string | undefined;
 }
 
@@ -268,6 +276,8 @@ export interface SpecComponent {
   trustLevels: TrustLevel[] | undefined;
   entrances: SpecEntrance[];
   invariants: SpecInvariant[];
+  /** The practice file paired with the spec, when there is one; its practices are in the state's practices. */
+  practicePath?: string | undefined;
   parent: string | undefined;
   children: string[];
 }
@@ -345,7 +355,8 @@ export type JournalKind =
   | "close"
   | "unable"
   | "escalation"
-  | "acknowledgement";
+  | "acknowledgement"
+  | "enactment";
 
 export interface JournalHead {
   id: string;
@@ -378,7 +389,11 @@ export type JournalRecord =
   | (JournalHead & { kind: "close"; of: string; results: Record<string, "pass" | "fail" | "unknown">; outcome: "success" | "failure" | "inconclusive" })
   | (JournalHead & { kind: "unable"; what: string; because: string })
   | (JournalHead & { kind: "escalation"; what: string; because: string })
-  | (JournalHead & { kind: "acknowledgement"; of: string; because: string });
+  | (JournalHead & { kind: "acknowledgement"; of: string; because: string })
+  | (JournalHead & { kind: "enactment"; practice: string; version: string; trigger: string; steps: { text: string; leaves?: string }[]; pitfalls: string[]; results: Record<string, JournalStepOutcome> });
+
+/** What one step of an enacted practice came to. */
+export type JournalStepOutcome = { result: "done"; evidence?: string } | { result: "deviated"; because: string } | { result: "skipped"; because: string };
 
 /**
  * One work order as the journal folds it from its records: the order's
@@ -387,6 +402,7 @@ export type JournalRecord =
  * the raw store.
  */
 import type { WorkOrder } from "../../journal/work.ts";
+import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 export type { WorkOrder };
 
 /** The work orders under .coherence/work, or their absence with the reason. */
@@ -462,6 +478,26 @@ export interface EntranceResolution {
   reason?: string;
   /** The component interfaces the handler's static reach uses, through value references only; absent from a reading taken before reach was read. */
   reach?: ReachReference[];
+  /**
+   * The chokepoints the handler passes, as the reading traced them: `wrapper`
+   * when the handler's own declaration references the chokepoint and its reach
+   * reaches the protected thing (the handler is wrapped by it); `declared` when
+   * the entrance's guard: line names it and a reference to the handler at its
+   * registration spells it; `reach` when the reach reaches the protected thing
+   * further on. Only chokepoints whose protected thing the reach reaches count
+   * (a declared guard's is reached through the chokepoint itself). Absent from
+   * a reading taken before guards were traced.
+   */
+  guards?: EntranceGuard[];
+  /** Why a declared guard did not count, when it did not: no registration of the handler spells it. */
+  guardUnconfirmed?: string;
+}
+
+/** One chokepoint an entrance's handler passes, by its invariant, and how the reading traced it. */
+export interface EntranceGuard {
+  component: string;
+  name: string;
+  how: "wrapper" | "declared" | "reach";
 }
 
 /**
@@ -505,6 +541,8 @@ export type InterfaceReading =
       outside?: { sites: number; files: number; into: { component: string; sites: number }[] };
       /** Present when a budget stopped the reading: which budget, its size, and the components whose declarations were not all read. */
       partial?: InterfacePartial;
+      /** The entrances the language's rules detect in the tree, each with its rule and why: what the declared entrances' coverage is measured against. Absent from a reading taken before detection. */
+      candidates?: EntranceCandidate[];
     }
   | { kind: "unread"; because: string };
 
@@ -536,6 +574,45 @@ export interface JournalViewState {
   session: string;
 }
 
+/* Practices, as the spec model and Coherence's kernel hold them. */
+
+/** What fires a practice: a command's words, an edited path's glob with the text the edit adds, or nothing but a deliberate choice. */
+export type PracticeTrigger = { kind: "command"; words: string } | { kind: "edit"; glob: string; adding?: string | undefined } | { kind: "explicit" };
+
+/**
+ * One practice as the page holds it: the project's own, from a practice file
+ * paired with a spec, or a kernel practice Coherence ships, its id led by
+ * coherence:. State and enactment count come from the spec model; the
+ * enactments themselves are journal records the page already holds.
+ */
+export interface ScopePractice {
+  id: string;
+  name: string;
+  sentence: string;
+  /** The component folder whose practice file holds it. */
+  component: string;
+  file: string;
+  kernel: boolean;
+  reach?: "kernel" | "internal" | undefined;
+  triggers: PracticeTrigger[];
+  steps: { n: number; text: string; leaves?: string | undefined }[];
+  pitfalls: { text: string; cites: string[] }[];
+  learned: string[];
+  invariants: string[];
+  because?: string | undefined;
+  version: string;
+  state: "candidate" | "established";
+  enactments: number;
+}
+
+export interface PracticesData {
+  practices: ScopePractice[];
+}
+
+export interface PracticesViewState {
+  query: string;
+}
+
 /** The whole state of the Scope shell. The page is a function of this value. */
 export interface ShellState {
   project: string;
@@ -550,6 +627,9 @@ export interface ShellState {
   components: ComponentsViewState;
   structure: StructureViewState;
   invariants: InvariantsViewState;
+  /** Every practice a session here may enact: the project's own and the kernel practices. */
+  practices: PracticesData;
+  practicesView: PracticesViewState;
   runsView: RunsViewState;
   journalView: JournalViewState;
   /** How the page holds its state: set by the page, never by the builder, so no snapshot or first load carries it. */
@@ -602,6 +682,7 @@ const LEXICON_KEYS = new Set([
   "metaphors",
   "shape",
   "rejected",
+  "retired",
   "trust_levels",
   "rulings",
   "candidate_overloads",
@@ -797,6 +878,8 @@ export function parseLexicon(input: unknown, where: string): Lexicon {
   if (input["shape"] !== undefined) lexicon.shape = fieldsAt(input, "shape", where);
   const rejectedNames = optionalListAt(input, "rejected", where, parseRejectedName);
   if (rejectedNames !== undefined) lexicon.rejected_names = rejectedNames;
+  const retired = optionalListAt(input, "retired", where, parseConcept);
+  if (retired !== undefined) lexicon.retired = retired;
   const trustLevels = optionalListAt(input, "trust_levels", where, parseTrustLevel);
   if (trustLevels !== undefined) lexicon.trust_levels = trustLevels;
   const rulings = optionalListAt(input, "rulings", where, parseRuling);

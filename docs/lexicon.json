@@ -298,11 +298,12 @@
     {
       "name": "component",
       "status": "settled",
-      "definition": "Any folder with a spec file. A component is the aggregate of an implementation and its spec definition. Subcomponents are declared by specs in child folders; folders without a spec are transparent. A super folder becomes a component when a relationship invariant about its children needs a home there.",
+      "definition": "Any folder with a spec file. A component is the aggregate of an implementation, its spec definition, and the practice file paired with that spec when it has one. Subcomponents are declared by specs in child folders; folders without a spec are transparent. A super folder becomes a component when a relationship invariant about its children needs a home there.",
       "related": [
         "invariant",
-        "zone",
-        "crossing"
+        "trust level",
+        "crossing",
+        "practice"
       ],
       "rejected": [
         {
@@ -459,7 +460,7 @@
     {
       "name": "trust level",
       "status": "settled",
-      "definition": "One entry in the short list the entry spec declares for crossings and entrances: a name and a one-line meaning for a class of data or caller. A level marked (outside) comes from outside the system's control; an entrance carrying it with no control on its route is marked no control. Declared order carries no meaning. Not a place in the code and not a container of components.",
+      "definition": "One entry in the short list the entry spec declares for crossings and entrances: a name and a one-line meaning for a class of data or caller. A level marked (outside) comes from outside the system's control; an entrance carrying it with no control traced on its route is marked no traced control. Declared order carries no meaning. Not a place in the code and not a container of components.",
       "rejected": [
         {
           "alternative": "zones as a topology with residence (lives in) and nesting (inside)",
@@ -489,14 +490,15 @@
     {
       "name": "spec",
       "status": "settled",
-      "definition": "The file that makes a folder a component. Contains: a one-line intent; the invariants, each with its enforcement (chokepoint with protected thing, or totality oracle over a named set), its because, its crossing where security-relevant, and its refutation; and, in the entry spec only, the list of trust levels. One bullet grammar: every bullet is an invariant with enforcement.",
+      "definition": "The file that makes a folder a component. Contains: a one-line intent; the invariants, each with its enforcement (chokepoint with protected thing, or totality oracle over a named set), its because, its crossing where security-relevant, and its refutation; and, in the entry spec only, the list of trust levels. One bullet grammar: every bullet is an invariant with enforcement. Its sister is the practice file, which holds the component's practices in the same bullet grammar and never exists without it.",
       "related": [
         "component",
         "invariant",
         "enforcement",
         "refutation",
         "crossing",
-        "trust level"
+        "trust level",
+        "practice"
       ],
       "rejected": [],
       "provenance": {
@@ -797,7 +799,7 @@
     {
       "name": "agent query",
       "status": "settled",
-      "definition": "CLI access for the agent to what Scope shows a human, as a small fixed set of questions with plain-text answers: which invariants touch these files, who relies on this chokepoint, what must be loaded to change this safely (the economy prediction), and what does my work order say. Fixed questions first; a query language only if the fixed set proves insufficient.",
+      "definition": "CLI access for the agent to what Scope shows a human. It is a small fixed set of questions with plain-text answers: which invariants touch these files, who relies on this chokepoint, what must be loaded to change this safely (the economy prediction), and what does my work order say. Fixed questions first; a query language only if the fixed set proves insufficient.",
       "related": [
         "scope",
         "economy"
@@ -888,7 +890,7 @@
     {
       "name": "orient",
       "status": "settled",
-      "definition": "The start-of-cycle reading. Before acting, the session sees where the project stands and what heading follows from it: escalations awaiting a human, structural defects, requirements stuck short of invariant, unreached mass, the session's own work order, and what peers recorded. One heading, derived from state.",
+      "definition": "The start-of-cycle reading. Before acting, the session sees where the project stands and what heading follows from it: escalations awaiting a human, structural defects, requirements stuck short of invariant, unreached mass, the session's own work order, and what peers recorded. One heading, derived from state; it also names the spec gaps beyond the adoption baseline.",
       "rejected": [
         {
           "alternative": "orient and regulate as two competing machines over the same ledgers",
@@ -908,7 +910,7 @@
     {
       "name": "regulate",
       "status": "settled",
-      "definition": "The end-of-cycle reading. Before the session stops, it supplies the balance: what this session owes so that it leaves the project no less coherent than it found it. Candidates: an invariant touched without a run, a requirement declared without its checklist, a structural defect revealed and not acknowledged or repaired, a decision made and not recorded.",
+      "definition": "The end-of-cycle reading: what the session owes at its stop, to leave the project no less coherent than it found it. Candidates: an invariant touched without a run, a requirement declared without its checklist, a structural defect revealed and not acknowledged or repaired, a decision made and not recorded, and, advisory, a spec gap the session touched.",
       "related": [
         "gyroscope",
         "orient",
@@ -944,7 +946,7 @@
     {
       "name": "config",
       "status": "settled",
-      "definition": "The list of project facts the tool cannot derive: name, entry dir, output dir, ignore patterns, language, platform, how to typecheck, how to run tests and match their names, where tests live, the well-known names the project vouches for (wellKnown), and the interface reading's budget (interfaceBudget). Every key that configures a mechanism leaves with the mechanism.",
+      "definition": "The list of project facts the tool cannot derive. They are: name, entry dir, ignore patterns, language, how to run tests and match their names, where tests live, the well-known names the project vouches for (wellKnown), and the interface reading's budget (interfaceBudget). Every key that configures a mechanism leaves with the mechanism.",
       "rejected": [
         {
           "alternative": "mass, conventions, sinks, atlas keys",
@@ -1035,7 +1037,7 @@
     {
       "name": "scaffold",
       "status": "settled",
-      "definition": "The command that makes the complete shape the cheapest thing to ship. Two shapes: a component (folder plus spec with intent and empty invariants) and an invariant (bullet with slots for enforcement, because, crossing, refutation, and the decomposition checklist printed beside it as declare-or-dismiss lines). The agent fills slots instead of recalling rules. Scope shows a visual preview of the proposed structure before it is written, so a human can see the new vertebra in place.",
+      "definition": "The command that makes the complete shape the cheapest thing to ship. Two shapes: a component (folder plus spec with intent and empty invariants) and an invariant (bullet with slots for enforcement, because, crossing, refutation, and the decomposition checklist printed beside it as declare-or-dismiss lines). The agent fills slots instead of recalling rules. For a spec gap it proposes the closure in those same terms: a guard: line, an invariant bullet whose crossing enters from the entrance's trust, or control: none with a reason. Scope shows a visual preview of the proposed structure before it is written, so a human can see the new vertebra in place.",
       "rejected": [
         {
           "alternative": "four kinds (component, invariant, boundary, parity)",
@@ -1127,7 +1129,9 @@
         "two_layers": "Coherence's own lexicon (the tool vocabulary) and each project's domain lexicon share one shape and one mechanism; scaffold for a new project begins by asking for the domain lexicon.",
         "growth": "Asymmetric, like invariants: agents propose and announce new concepts; only a human retires or renames one. Each definition change is a decision with a rejected alternative.",
         "injection": "Compact: name, one-line definition, rejected names. Full entries through agent query.",
-        "naming_check": "Identifiers are checked against rejected names and misused concept names by word, not by address."
+        "naming_check": "Identifiers are checked against rejected names and misused concept names by word, not by address.",
+        "baseline": "What was already here when work began, remembered so only what is new speaks. In an adopter, the findings its lexicon check held at adoption, recorded as a journal decision (lexicon baseline) the check then fails only beyond; every later baseline record is intersected with the earlier ones, so it only shrinks. For a session, the vocabulary uses observed at its start. Coherence's own repository keeps no lexicon check baseline: its text is enforced whole.",
+        "where_rejected_names_bind": "Coherence's rejected names bind only where Coherence's concepts are named: everywhere in Coherence's own repository; in an adopter, only in the text written to Coherence (records, spec grammar, coherence.config.json), and there as advisory. A project's own rejected names bind in all of its text, and a word the project declares in its own lexicon is its own inside it."
       },
       "rejected": [
         {
@@ -1146,24 +1150,6 @@
       "provenance": {
         "owner_words": "glossary.json. Injected into context same as AGENTS.md. no run can miss it. glossary must be anti-rot, anti-fragile. Coherence will need first class support for building, maintaining and validating the glossary.",
         "defined_by": "owner, 2026-09-17"
-      }
-    },
-    {
-      "name": "platform",
-      "definition": "The only supported platform is Apple Silicon, the M-series Macs. Metal is its GPU interface. This is what makes a local embedding service practical with no API key and no network.",
-      "status": "settled",
-      "aliases": [
-        "apple silicon",
-        "m-series",
-        "metal"
-      ],
-      "related": [
-        "lexicon",
-        "language adapter"
-      ],
-      "provenance": {
-        "defined_by": "owner, 2026-09-17",
-        "owner_words": "supporting M-series processors only means we can easily run the embeddings service locally"
       }
     },
     {
@@ -1206,10 +1192,14 @@
     },
     {
       "name": "entrance",
-      "definition": "Where work enters the system from outside it: a command, a host event, a route, a tool. Declared in the owning component's spec and checked against the code: the named handler must resolve and be reachable, so a declared entrance cannot rot unseen. It declares the trust level it carries in with a trust: line; without one, its trust is derived from the crossings on its handler.",
+      "definition": "Where work enters the system from outside it: a command, a host event, a route, a tool. Declared in the owning component's spec and checked against the code: the named handler (a symbol, or a module file whose top-level script receives the work) must resolve and be reachable, so a declared entrance cannot rot unseen. It declares the trust level it carries in with a trust: line; without one, its trust is derived from the crossings on its handler. A guard: line names the chokepoint its handler is registered through, counted once the reading confirms the registration. A control: none line with its reason says it needs no control: a stated claim Scope shows for a human to challenge, never beside a guard:.",
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-0db9b17b)",
         "owner_words": "Declared and checked for entrypoints is good."
+      },
+      "properties": {
+        "entrance coverage": "How much of the surface the reading detects the declared entrances cover: each detected entrance is covered individually (an entrance's handler names it and nothing else), through a grouped entrance (one entrance stands for every detected entrance registered through its handler or detected in its module), or undeclared. A spec-gap count speaks only for the covered part.",
+        "detected entrance": "An entrance the reading finds by one of the rules its language lists (a server function, a server route, a URL pattern, a package script, a top-level script), with the rule and why it matched; never a guess presented as fact."
       }
     },
     {
@@ -1235,7 +1225,7 @@
     },
     {
       "name": "structural route",
-      "definition": "The path one entrance takes through the components it reaches, in the order work flows, drawn as one line of its own color. Computed from the entrance and the component interfaces, never declared. Components on more than one structural route are where those routes meet.",
+      "definition": "The path one entrance takes through the components it reaches, in the order work flows, as one line of its own color. Computed from the entrance and the component interfaces, never declared. Components on more than one structural route are where those routes meet; entrances share one only when they share its stops, its trust, and what they declare of their control. Its controls are traced, never declared: the interface identifiers on its lines, and the verified chokepoints wrapping its handler or standing inside a component on it, and verified totality oracles on it covering its trust. An untrusted route with none is marked no traced control, which is not a demonstrated bypass, unless its entrances declare control: none, which it shows as no control needed.",
       "provenance": {
         "defined_by": "owner, 2026-09-22 (journal d-e4cd0983)",
         "owner_words": "structural route. not utility, core dependency. not tag. interface identifier"
@@ -1306,6 +1296,133 @@
       "provenance": {
         "defined_by": "agent relations (session a40acfaebbf15f7f7), 2026-09-23, on the owner-approved approach for relationships between journal and work records"
       }
+    },
+    {
+      "name": "spec gap",
+      "definition": "An untrusted entrance with no traced control. Its trust is a level from outside the system's control, or unknown, no control is traced on its structural route, and it declares no control: none. It closes three ways: a guard: line, an invariant whose crossing enters from its trust, or control: none with a reason. Orient names the gaps beyond the adoption baseline and regulate the ones a session touched; neither is a demonstrated bypass.",
+      "provenance": {
+        "defined_by": "agent gaps (session a3238ebe9efd46ba5), 2026-09-25 (journal d-a1095ef2)",
+        "owner_words": "let's do 1-3, and then test the results on a pre-Coherence commit from both of those projects to see if the behavior change is effective"
+      },
+      "related": [
+        "entrance",
+        "structural route",
+        "trust level",
+        "orient",
+        "regulate",
+        "scaffold"
+      ]
+    },
+    {
+      "name": "hook voice",
+      "definition": "A project's own text at a hook event, in place of or after what the hook says. The override file, .coherence/hooks/<Event>.override.md, replaces the event's canonical text (an empty one is a deliberate silence), and the append file, .coherence/hooks/<Event>.append.md, follows it; a refusal's reason is never replaced.",
+      "provenance": {
+        "defined_by": "agent hook-voice (session c1db1b63-f5b7-4dc3-94a8-3c324ee41fcb), 2026-09-28 (journal d-9a9d08cb), restoring the reference per-event override and append files (fb445b2)",
+        "owner_words": "yeah, have a subagent restore hook overrides and addenda"
+      }
+    },
+    {
+      "definition": "A component's recorded method for a kind of work, kept in the practice file paired with its spec. A spec and a practice file are always paired: no practice file stands without a sister spec, and project-wide practices sit beside the entry spec. Each practice is one bullet in the spec grammar naming its trigger (when), ordered steps with the evidence each leaves, pitfalls citing the records that witnessed them, the records it was learned from, and its because; an invariant named in a step resolves against the sister spec. Adding a step or a pitfall is free; removing one needs a cited record. A practice is a candidate until its first enactment in which every step that names its evidence produced it; then it is established. The hook delivers a practice when its trigger fires.",
+      "status": "settled",
+      "related": [
+        "spec",
+        "component",
+        "enactment",
+        "journal",
+        "hook",
+        "refutation"
+      ],
+      "rejected": [
+        {
+          "alternative": "process as the name of this concept",
+          "because": "pulls toward the operating-system sense, which the tool's own text and code already use (subprocess, process tree)"
+        },
+        {
+          "alternative": "a practices section inside the spec",
+          "because": "a spec says what must hold and a practice says how work is done; a sister file gives the practice its own history, its own check rules, and a load the hook can make without parsing invariants"
+        },
+        {
+          "alternative": "practice files in folders without a spec",
+          "because": "pairing keeps the component the unit, so a folder never becomes half a component"
+        },
+        {
+          "alternative": "skills or memory files as the store for method",
+          "because": "a skill loads when the model judges it relevant, with no trigger guarantee, no record that it was carried out, and one host only; memory files are where these methods went unreviewed and outside the project"
+        }
+      ],
+      "provenance": {
+        "owner_words": "There are processes that are implicit to every project but right now there's nowhere to store and maintain their integrity. ... spec and practice must be paired.",
+        "metaphor": "Cultural ratcheting (Tomasello): culture accumulates when innovation is joined by faithful transmission that keeps a gain from slipping back. Every agent session is a new generation with no memory; a practice is the transmission, and its pitfalls are the teeth.",
+        "defined_by": "owner, 2026-10-05 (session 8efd6465; the name proposed by main)"
+      },
+      "name": "practice",
+      "properties": {
+        "trigger": "What fires a practice, on its when: line: a command's words, an edited path's glob with the text the edit adds, or explicit. The hook reads it before the tool runs.",
+        "step": "One thing the practice says to do, numbered from one in the order written; an enactment gives every step an outcome.",
+        "leaves": "The evidence a step leaves behind, named under it: a run record, a journal record, a file state. A step that names one is auditable; one that does not is taken at its word.",
+        "pitfall": "A way the practice has failed, citing the record or commit that witnessed it. Delivered with the practice, after its steps.",
+        "learned": "The records and commits the practice was learned from. A practice that cites nothing is a problem: it is learned, not wished.",
+        "version": "A fingerprint of the triggers, steps and pitfalls; an enactment binds to the version it carried out.",
+        "reach": "How far one of Coherence's own practices goes, on its reach: line: kernel (every adopter receives it) or internal (it never leaves Coherence's tree). Required in Coherence's tree, refused elsewhere."
+      }
+    },
+    {
+      "definition": "The journal record that a session carried out a practice: the practice, the version enacted, what triggered it, and a result for each step. A practice is enacted. Each step is done, with its evidence where the step names one, or deviated or skipped, each with a because. A deviation is how a practice improves; a step left out silently is how it decays. Enactments are what the practice's integrity is read from: a step removed without a cited record, a step claimed done whose evidence is missing, and a trigger with no enactment by stop.",
+      "status": "settled",
+      "related": [
+        "practice",
+        "journal",
+        "run",
+        "experiment",
+        "regulate"
+      ],
+      "rejected": [
+        {
+          "alternative": "follow as the verb and the record",
+          "because": "owner: a little opaque"
+        },
+        {
+          "alternative": "exercise as the verb",
+          "because": "the journal already says exercised to mean tested, which blurs into refutation"
+        },
+        {
+          "alternative": "observance as the record",
+          "because": "observation is already a concept: a record of runtime behavior"
+        }
+      ],
+      "provenance": {
+        "owner_words": "follow doesn't feel right. a little opaque, but we do need a verb for it. ... yes, a practice is enacted, proceed",
+        "defined_by": "owner, 2026-10-05 (session 8efd6465)"
+      },
+      "name": "enactment"
+    },
+    {
+      "definition": "A practice Coherence ships that every adopter receives beside its own. In Coherence's own tree each practice declares its reach: reach: kernel ships it to every adopter, where its id is led by coherence: and its steps arrive when its trigger fires; reach: internal keeps it in Coherence's tree, an internal practice, because its steps are about Coherence itself. The reach is a value set rather than yes or no, so a later reach is one more value. A project's own practices carry no reach.",
+      "status": "settled",
+      "related": [
+        "practice",
+        "enactment",
+        "lexicon"
+      ],
+      "rejected": [
+        {
+          "alternative": "layer: coherence as the line that marks one",
+          "because": "the lexicon's layers are Coherence's vocabulary and the project's; this is how far a practice goes, a different question"
+        },
+        {
+          "alternative": "a yes or no flag for whether a practice ships",
+          "because": "owner: an enum-like value set, in case of future cases"
+        },
+        {
+          "alternative": "shipping by default, with internal marked",
+          "because": "a practice whose reach was never decided would put Coherence's own steps into every adopter's sessions; the reach is said for every practice instead"
+        }
+      ],
+      "provenance": {
+        "owner_words": "lexicon: \"kernel practice,\" practices Coherence ships that fall through into user projects. but do we have a distinction flag for internal practices which DO NOT? ... I don't like yes/no values, we should have an enum-like value set here in case we have future cases",
+        "defined_by": "owner, 2026-10-05 (session 8efd6465)"
+      },
+      "name": "kernel practice"
     }
   ],
   "metaphors": {
@@ -1329,5 +1446,32 @@
     "detail": "definitional sub-structure the injection omits and Scope shows",
     "provenance": "owner_words, metaphor, evidence, defined_by and similar: history, never injected",
     "retired_mechanisms": "docs/retired.md"
-  }
+  },
+  "retired": [
+    {
+      "name": "supported platform",
+      "definition": "Apple Silicon Macs, the primary target, and Linux; not Windows. Metal is Apple Silicon's GPU interface, which makes the optional local embedding service fast there with no API key and no network; on Linux it runs on the CPU or another GPU, more slowly.",
+      "status": "settled",
+      "aliases": [
+        "apple silicon",
+        "m-series",
+        "metal"
+      ],
+      "related": [
+        "lexicon",
+        "language adapter"
+      ],
+      "provenance": {
+        "defined_by": "owner, 2026-09-17",
+        "owner_words": "supporting M-series processors only means we can easily run the embeddings service locally"
+      },
+      "because": "nothing reads a platform setting; the supported platforms are an install fact enforced by package.json's os field and stated in the README, not vocabulary agents use, and the concept cost injected tokens every session"
+    }
+  ],
+  "rejected": [
+    {
+      "concept": "supported platform",
+      "because": "nothing reads a platform setting; the supported platforms are an install fact enforced by package.json's os field and stated in the README, not vocabulary agents use, and the concept cost injected tokens every session"
+    }
+  ]
 }

@@ -16,17 +16,20 @@ import { loadJournal } from "../journal/store.ts";
 import { openEscalations } from "../journal/read.ts";
 import { loadOrders } from "../journal/work.ts";
 import { loadSpecModel } from "../spec/model.ts";
-import { CONTEXT_BUDGET, HOOK_EVENTS, changedFiles, startReading, type HookEvent } from "./hook.ts";
+import { CONTEXT_BUDGET, HOOK_EVENTS, changedFiles, gapReading, startReading, type GapReading, type HookEvent } from "./hook.ts";
+import { readGapBaseline } from "../readings/scope/gaps.ts";
+import { busiestFolder, undeclaredNow } from "../readings/scope/undeclared.ts";
 import type { HostStatus } from "./install.ts";
 import { loadProjectLexicons } from "./project.ts";
 import { attention, type Coverage } from "./lexicon-coverage.ts";
 
-export type Reading = "orient" | "peer feed" | "regulate";
+export type Reading = "orient" | "peer feed" | "practice" | "regulate";
 
 export const READING_OF: Record<HookEvent, Reading> = {
   SessionStart: "orient",
   SubagentStart: "orient",
   UserPromptSubmit: "peer feed",
+  PreToolUse: "practice",
   PostToolUse: "peer feed",
   Stop: "regulate",
   SubagentStop: "regulate",
@@ -68,6 +71,29 @@ function vocabularySignal(coverage: Coverage): string {
   return `vocabulary signal, named and ranked: ${terms.length ? `undefined ${terms.join(", ")}` : "no undefined term"}; ${risky.length ? `sense at risk ${risky.join(", ")}` : "no sense at risk"}`;
 }
 
+/** What orient says of entrance coverage now: how many detected entrances are undeclared and the folder it names, or that it says nothing. */
+function undeclaredSignal(root: string): string {
+  const state = undeclaredNow(root);
+  if (state === undefined) return "entrance coverage: nothing (no spec yet, or nothing detected)";
+  if (state.undeclared.length === 0) return `entrance coverage: nothing (all ${state.detected} detected entrances declared)`;
+  return `entrance coverage: ${state.undeclared.length} of ${state.detected} detected entrances undeclared, most in ${busiestFolder(state.undeclared)!.folder}`;
+}
+
+/** What orient says of the spec gaps now: how many it would name, or why it says nothing. */
+function gapSignal(root: string, gaps: GapReading): string {
+  if (gaps.fingerprint === undefined) return "spec gaps: nothing (no entrance could be one)";
+  if (gaps.now === undefined && gaps.last === undefined) return `spec gaps: not read yet (no Structure reading was ever kept; a stop or session start begins one in the background${gaps.refreshing ? ", one is under way" : ""})`;
+  if (gaps.now === undefined) {
+    const last = gaps.last!;
+    const baseline = readGapBaseline(root);
+    const open = last.gaps.filter((g) => baseline === undefined || !baseline.entrances.has(`${g.component}\u0000${g.name}`)).length;
+    return `spec gaps: ${plural(open, "entrance")} with no traced control named from the reading before the latest changes (${last.at.slice(0, 16).replace("T", " ")} UTC), less those the spec now closes${gaps.refreshing ? "; a new reading is under way" : ""}`;
+  }
+  const baseline = readGapBaseline(root);
+  const open = gaps.now.gaps.filter((g) => baseline === undefined || !baseline.entrances.has(`${g.component}\u0000${g.name}`)).length;
+  return `spec gaps: ${plural(open, "entrance")} with no traced control named${baseline === undefined ? "" : `, ${plural(gaps.now.gaps.length - open, "more")} held by the adoption baseline`} (reading of ${gaps.now.at.slice(0, 16).replace("T", " ")} UTC)`;
+}
+
 /** Every event's delivery for the project at `root`, measured now. */
 export async function deliveries(root: string): Promise<Delivery[]> {
   const records = loadJournal(root).records;
@@ -75,7 +101,8 @@ export async function deliveries(root: string): Promise<Delivery[]> {
   const orders = loadOrders(root).filter((o) => o.state === "open" || o.state === "active").length;
   const spec = specFigures(root);
   const { coherence, project } = await loadProjectLexicons(root);
-  const start = await startReading(root, {});
+  const gaps = await gapReading(root);
+  const start = await startReading(root, {}, undefined, gaps);
   const changed = await changedFiles(root);
 
   const specLine = "error" in spec
@@ -90,6 +117,9 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     `the session's own work order, when it owns one (${plural(orders, "order")} open or active in the project)`,
     `${vocabulary}, delivered at detail "${start.detail}"`,
     vocabularySignal(start.coverage),
+    gapSignal(root, gaps),
+    undeclaredSignal(root),
+    "the practices, each with what fires it",
     "the session id with the decide and journal commands, and the rule",
     `size now: ${start.text.length.toLocaleString("en-US")} of ${CONTEXT_BUDGET.toLocaleString("en-US")} characters`,
   ];
@@ -104,12 +134,13 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     ? `the lexicon check over the changed files (${changed.files.length} now)`
     : `the lexicon check over the changed files (not known now: ${changed.failure})`;
   const debt = "error" in spec ? specLine : `spec: ${plural(spec.problems, "problem")}, ${plural(spec.defects, "structural defect")}, ${plural(spec.open, "open requirement")}`;
-  const regulate = [changedLine, debt, "the reminder that an active work order is closed with work close", "the read trace snapshotted for calibrate"];
+  const regulate = [changedLine, debt, "the reminder that an active work order is closed with work close", "the spec gaps this session touched, advisory", "the undeclared entrances in the files it changed, advisory", "practices that fired this session with no enactment since, advisory", "the read trace snapshotted for calibrate"];
 
   const carries: Record<HookEvent, string[]> = {
     SessionStart: orient,
     SubagentStart: [...orient.slice(0, -1), `${orient[orient.length - 1]} (a subagent is oriented as a session is)`],
     UserPromptSubmit: feed,
+    PreToolUse: ["a practice whose trigger the tool use about to run fires: whole on its first firing this session, one line after; never blocks the tool"],
     PostToolUse: [...feed, edit, "the read trace: the file a read tool named"],
     Stop: [...regulate, "never refuses: the human is present and decides"],
     SubagentStop: [...regulate, "refuses the stop (exit 2) on a rejected name in a changed file, a spec problem, or a structural defect, unless the session recorded unable naming it"],

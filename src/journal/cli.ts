@@ -12,6 +12,7 @@
  *   node src/cli.ts unable "<what you could not do>" --because "<the wall>"
  *   node src/cli.ts escalate "<what a human must see>" --because "<why a human>" [--human "<words>"] [--cite <id>]...
  *   node src/cli.ts acknowledge <id> --because "<what the human decided>" [--human "<words>"]
+ *   node src/cli.ts enact "<practice>" --step <n>=<done[:evidence]|deviated:why|skipped:why>... [--trigger "<what fired it>"] [--cite <id>]...
  *   node src/cli.ts journal [--session <id>] [--agent <name>] [--kind <kind>] [--since <cursorOrIso>] [--json]
  *   node src/cli.ts journal --subjects [--since <cursorOrIso>]
  *   node src/cli.ts journal <id>      one record of either store, what it cites and what cites it
@@ -36,6 +37,7 @@ import {
   decide,
   defect,
   dismiss,
+  enact,
   escalate,
   experiment,
   resolved,
@@ -45,19 +47,22 @@ import {
   type Written,
 } from "./verbs.ts";
 import { WORK_USAGE, work } from "./workVerbs.ts";
+import { recordsOnOtherBranches } from "./branches.ts";
 
 export interface Io {
   cwd: string;
   out: (line: string) => void;
   err: (line: string) => void;
   now?: () => Date;
+  /** What stands against a record before it is written; see Context.vet. */
+  vet?: (record: object) => string[];
 }
 
 /** A command prints through its Io and returns the exit code. */
 export type Command = (argv: string[], io: Io) => number;
 
 function context(io: Io): Context {
-  return { cwd: io.cwd, now: io.now ?? (() => new Date()) };
+  return { cwd: io.cwd, now: io.now ?? (() => new Date()), ...(io.vet === undefined ? {} : { vet: io.vet }) };
 }
 
 function guarded(run: (argv: string[], io: Io) => void): Command {
@@ -96,7 +101,7 @@ const read: Command = guarded((argv, io) => {
     const [id, ...rest] = parsed.positionals;
     if (rest.length > 0) throw new JournalError(`journal takes at most one record id; got "${rest[0]}"`);
     if (parsed.one.size > 0 || parsed.switches.size > 0) throw new JournalError("journal <id> takes no filter; it shows one record and its citations both ways");
-    for (const line of renderOne(id!, loaded, work)) io.out(line);
+    for (const line of renderOne(id!, loaded, work, (ids) => recordsOnOtherBranches(io.cwd, ids))) io.out(line);
     for (const line of renderDamaged(loaded.damaged)) io.err(line);
     return;
   }
@@ -138,13 +143,14 @@ export const journalVerbs: Record<string, Command> = {
   unable: writing(unable),
   escalate: writing(escalate),
   acknowledge: writing(acknowledge),
+  enact: writing(enact),
   journal: read,
 };
 
 export const JOURNAL_USAGE = [
   WORK_USAGE,
   "journal verbs (each needs --session <id> --agent <name>; a write binds to the one active order its session owns, or to --work <id>):",
-  "  (--cite <id>, repeatable, names an earlier journal or work record this one rests on or is about; an unknown id refuses the write)",
+  "  (--cite <id>, repeatable, names an earlier journal or work record this one rests on or is about, here or committed on another branch; an id found nowhere refuses the write)",
   "  (--human records words the agent attributes to a human, apart from its own because; it is not proof a human wrote them)",
   '  decide "<chose>" [--over "<rejected>"]... --because "<why>" [--human "<what the human said>"] [--cite <id>]...',
   '  retract <id> --because "<what refuted it>"',
@@ -157,6 +163,7 @@ export const JOURNAL_USAGE = [
   '  unable "<what you could not do>" --because "<the wall>" [--cite <id>]...',
   '  escalate "<what a human must see>" --because "<why a human>" [--human "<what the human said>"] [--cite <id>]...',
   '  acknowledge <id> --because "<what the human decided>" [--human "<what the human said>"]',
+  '  enact "<practice>" --step <n>=done[:<evidence>] | <n>=deviated:<why> | <n>=skipped:<why>  (one per step) [--trigger "<what fired it>"] [--cite <id>]...',
   `  journal [--session <id>] [--agent <name>] [--kind <${KIND_NAMES.join("|")}>] [--since <cursorOrIso>] [--json]`,
   "  journal --subjects [--since <cursorOrIso>]",
   "  journal <id>      one journal or work record, each record it cites, and each record citing it",

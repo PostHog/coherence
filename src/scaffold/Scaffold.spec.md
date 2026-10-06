@@ -43,3 +43,38 @@ The command that makes the complete shape the cheapest thing to produce: a compo
   crossing: project-source -> reading
   refuted: inverted the preview branch so a preview request only printed the bullet and wrote no page -> the focused scaffold preview detector failed because no preview path was printed; restored, green (2026-09-18)
   kinds: none
+- a gap's closure is proposed: For each entrance with no traced control the scaffold proposes a ranked closure in the spec's terms: the exact guard: line where its handler calls or passes a verified chokepoint its route-mates do not, else an invariant bullet in the scaffold shape whose crossing enters from its trust, and control: none first where it plausibly needs none.
+  over: a handler calling a verified chokepoint, one the reading traced passing it while a route-mate does not, one whose reach meets no control, and a health check reaching no component beyond its own
+  via: scaffold control proposes each gap's closure: a guard: line where its handler calls or passes a verified chokepoint its route-mates do not, else an invariant whose crossing enters from its trust, and control: none first where it plausibly needs none
+  because: both outside adoptions left their gaps open (d-a1095ef2); the closure must be the cheapest thing to write, printed from what the reading already knows, not recalled from the grammar
+  crossing: record -> reading
+  refuted: stopped reading which verified chokepoint symbol a handler's declaration calls, so no guard: line was proposed for it -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- a closure is written only where safe: The scaffold writes a guard: line under the entrance's bullet, never a second one nor one beside control: none; control: none only with a real reason, never a placeholder; and an invariant bullet as a requirement with its placeholders; what it writes still parses.
+  over: a guard: written, written again, a control: none without a reason, with a placeholder reason, with a reason, beside a guard, and an invariant appended
+  via: scaffold control writes only where safe: a guard: line under the entrance's bullet, never twice nor beside control: none; control: none only with a real reason; an invariant as a requirement with its placeholders
+  because: a waiver without a reason is a silent one, and a guard beside control: none contradicts itself; a write that left the spec unparseable would cost more than it saved
+  crossing: project-source -> reading
+  refuted: let writeClosure write control: none without a reason or with a placeholder one -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- scaffold control reads the recorded reading: The scaffold control command proposes from the recorded Structure reading while it describes the tree, reading only when it does not, and prints one entrance's closure or every gap's, writes on --write, and records the adoption baseline on --baseline.
+  over: one entrance, a control: none written and read back without a new reading, every gap, an unknown entrance, and the baseline
+  via: the scaffold control command reads the recorded reading, prints one entrance's closure or every gap's, writes on --write, and records the adoption baseline
+  because: a reading takes minutes on a large project; a closure the agent writes one entrance at a time must not cost a reading each, and a spec line the reading never reads leaves it standing
+  crossing: record -> reading
+  refuted: made the control verb ignore the recorded reading and read the component interfaces every time -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- undeclared entrances are proposed in the spec grammar: For every detected entrance no declared entrance covers, scaffold entrances prints one ## entrances bullet in the spec grammar under the spec of the component whose folder holds its file, named apart from that spec's entrances, its handler resolving to that entrance, and its meaning and trust as placeholders, the trust listing the entry spec's levels; filled and pasted where it says, each bullet parses and covers the entrance it was proposed for; it never writes.
+  over: the undeclared server functions, server route and package script of a project with a component of its own for its server functions, pasted with the meaning and trust filled, and the specs before and after the command
+  via: scaffold entrances proposes a bullet in the spec grammar for every undeclared entrance, under the spec of the component owning its file, that covers it once its meaning and trust are filled, and writes nothing
+  because: c-9941b95e: coverage stayed at 11 to 14 percent on praetorium.gg in both arms of the replicated A/B, about 100 server functions and routes never declared; declaring one by hand means recalling the grammar and how the spec resolves a handler, so the complete bullet must be the cheapest thing to write. Only the agent knows what work enters and whose trust it carries, so those stay placeholders and nothing is written, as control: none is never written with a placeholder reason
+  crossing: project-source -> reading
+  refuted: proposed every symbol handler as a bare name, dropping in <file>, in entranceHandler -> the totality oracle went red; restored, green (2026-09-28)
+  kinds: none
+- a Next.js app's entrances are proposed and resolve: On a Next.js app shaped like ai-chatbot, scaffold entrances proposes the request proxy, the GET and POST its NextAuth route file re-exports, and each page route, a page named by its route path and handled by its module file, under the spec of the component holding each file, even a component in a (group) folder; filled and pasted, every bullet resolves and covers its entrance.
+  over: proxy.ts, the re-exported GET and POST of app/(auth)/api/auth/[...nextauth]/route.ts under app/(auth)/(auth).spec.md, and the pages app/(chat)/page.tsx and app/(chat)/chat/[id]/page.tsx, pasted with the meaning and trust filled
+  via: scaffold entrances on a Next.js app shaped like ai-chatbot proposes the request proxy, the GET and POST its NextAuth route re-exports, and its page routes, and the filled bullets resolve and cover them
+  because: a real adoption of ai-chatbot detected 21 entrances and missed 3 the agent declared by hand, and the handlers it wrote for them were refused (df-6cdc0504, df-0a67c462, df-a0e893af)
+  crossing: project-source -> reading
+  refuted: dropped the page route naming in entranceName, so every page was named page by its file stem -> "scaffold entrances on a Next.js app shaped like ai-chatbot proposes the request proxy, the GET and POST its NextAuth route re-exports, and its page routes, and the filled bullets resolve and cover them" went red in src/scaffold/entrances.test.ts; restored, green (2026-10-05)
+  kinds: none

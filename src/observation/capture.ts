@@ -20,7 +20,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { keepProjectFiles, projectFiles } from "../adapters/project-files.ts";
 import type { EnforcementConfig } from "../enforcement/config.ts";
@@ -56,7 +56,7 @@ export interface Capture {
   run?: ExecutedFile[];
 }
 
-const PRELOAD = fileURLToPath(new URL("./preload.ts", import.meta.url));
+const PRELOAD = fileURLToPath(new URL(`./preload${extname(fileURLToPath(import.meta.url))}`, import.meta.url));
 
 function commandText(config: EnforcementConfig): string {
   return Array.isArray(config.testJson) ? config.testJson.join(" ") : (config.testJson ?? "");

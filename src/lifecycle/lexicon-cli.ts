@@ -9,12 +9,15 @@ import {
 import { dirname, relative } from "node:path";
 import { parseFlags, type Parsed } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
-import { loadProjectLexicons } from "./project.ts";
+import { isCoherenceItself, loadProjectLexicons } from "./project.ts";
+import { runCheck } from "./check.ts";
+import { recordBaseline } from "./lexicon-baseline.ts";
 import {
   attention,
   coverageText,
   digest,
   lexiconCoverage,
+  liveUses,
   type Coverage,
 } from "./lexicon-coverage.ts";
 import {
@@ -25,18 +28,23 @@ import {
   recoverLexicon,
   reviewLexicon,
   type Change,
+  type Proposal,
   type Who,
 } from "./lexicon-maintain.ts";
 
 export const LEXICON_WORK_USAGE = `  lexicon coverage [--json]              recurring terms without a definition and senses at risk, ranked; --json: every observed use and population fact
   lexicon review <term> [--json]          definition, live contexts, evidence keys and prior rulings
   lexicon review <term> --component <folder> --evidence <key> --disposition confirmed|not-domain|deferred|defect --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>] [--cite <id>]
-  lexicon propose declare|define|alias|reject|rename|retire <concept> [value] [--definition <text>] [--entry <file.json>] [--qualify] --because <reason>
+  lexicon propose declare|define|alias|reject|lift|rename|retire <concept> [value] [--definition <text>] [--entry <file.json>] [--drop <field.key>]... [--qualify] --because <reason>
+                                          define --drop properties.<key>|detail.<key>: remove that key; the removed text goes into the applying decision
+                                          lift <concept> <name>: take a rejected name back; apply needs --human and --cite of the decision that rejected it
                                           rename --qualify: the old name keeps its other senses and is not rejected
   lexicon apply <proposal-id> --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>] [--work <id>] [--cite <id>]
   lexicon recover                        finish an interrupted application without overwriting intervening edits
   lexicon draft [--out <file>]            unsettled candidates, collisions and review questions; never overwrites
-  lexicon baseline --session <id>         remember observed uses for this session; no meaning is marked covered
+  lexicon baseline --session <id> --agent <name> [--because <reason>] [--cite <id>]
+                                          remember what is here now: this session's observed uses (no meaning is marked covered) and, in an adopter,
+                                          the lexicon check's findings as a journal record the check then fails only beyond; that record only shrinks
   lexicon changes [--session <id>] [--json] new undefined terms and senses at risk relative to that session's baseline
   lexicon ready --terms <a,b,...> [--json] explicit vocabulary prerequisites for a named slice; not host-delivery proof
   lexicon similar <text> [--json]         optional offline suggestions; model absence leaves exact checks available
@@ -57,6 +65,32 @@ Run lexicon help for every workflow.`
 }
 
 const get = (p: Parsed, name: string): string | undefined => p.one.get(name);
+/**
+ * A proposal as a reader needs it: its id first, what it changes, the entry
+ * as it would stand, and the apply command to run. The whole lexicon after
+ * the change is the proposal file's, printed only with --json.
+ */
+export function proposalSummary(proposal: Proposal): string[] {
+  const { change } = proposal;
+  const target = change.action === "rename" && change.value ? change.value : change.name;
+  const after = JSON.parse(proposal.after) as { concepts?: { name?: string }[] };
+  const entry = after.concepts?.find((c) => c.name === target);
+  const what = `${change.action} ${JSON.stringify(change.name)}${change.value ? ` -> ${JSON.stringify(change.value)}` : ""}`;
+  return [
+    `${proposal.id}  proposes ${what} in ${proposal.target}`,
+    ...(entry === undefined ? [`  the concept leaves the lexicon`] : [`  entry after: ${JSON.stringify(entry)}`]),
+    `  apply: lexicon apply ${proposal.id} --because "<why>" --over "<the alternative>" --session <id> --agent <name>${proposal.humanRequired ? ' --human "<what the human said>"' : ""}`,
+    ...Object.entries(change.removed ?? {}).map(
+      ([path, text]) => `  removes ${path}: ${JSON.stringify(text)} (kept in the applying decision)`,
+    ),
+    ...(proposal.findings ?? []).map(
+      (f) =>
+        `  dropping ${f.drop}: ${f.uses} current ${f.uses === 1 ? "use" : "uses"} would become unknown-noun findings${f.terms.length ? ` (${f.terms.join(", ")})` : ""}`,
+    ),
+    ...(proposal.humanRequired ? ["  a human must acknowledge it: apply refuses without --human"] : []),
+  ];
+}
+
 function need(p: Parsed, name: string): string {
   const s = get(p, name);
   if (!s?.trim()) throw new Error(`missing --${name}`);
@@ -182,6 +216,7 @@ export async function lexiconWorkCommand(
       out: "one",
       definition: "one",
       entry: "one",
+      drop: "many",
       because: "one",
       over: "many",
       human: "one",
@@ -221,31 +256,34 @@ export async function lexiconWorkCommand(
         extra.length ||
         !action ||
         !name ||
-        !["declare", "define", "alias", "reject", "rename", "retire"].includes(
+        !["declare", "define", "alias", "reject", "lift", "rename", "retire"].includes(
           action,
         )
       )
         throw new Error(
           "propose needs an action and concept; see lexicon help",
         );
-      const entry = get(p, "entry")
+      const entryPath = get(p, "entry");
+      const entry = entryPath
         ? (JSON.parse(
-            readFileSync(confined(io.cwd, get(p, "entry")!), "utf8"),
+            readFileSync(confined(io.cwd, entryPath, `entry file ${entryPath}`), "utf8"),
           ) as Record<string, unknown>)
         : undefined;
-      print(
-        await propose(io.cwd, {
-          action: action as Change["action"],
-          name,
-          ...(value ? { value } : {}),
-          ...(get(p, "definition") !== undefined
-            ? { definition: get(p, "definition")! }
-            : {}),
-          ...(entry ? { entry } : {}),
-          ...(p.switches.has("qualify") ? { qualify: true } : {}),
-          because: need(p, "because"),
-        }),
-      );
+      const proposal = await propose(io.cwd, {
+        action: action as Change["action"],
+        name,
+        ...(value ? { value } : {}),
+        ...(get(p, "definition") !== undefined
+          ? { definition: get(p, "definition")! }
+          : {}),
+        ...(entry ? { entry } : {}),
+        ...(p.many.get("drop")?.length ? { drop: p.many.get("drop")! } : {}),
+        ...(p.switches.has("qualify") ? { qualify: true } : {}),
+        because: need(p, "because"),
+      });
+      // The whole proposal carries the whole lexicon after the change; only --json prints it.
+      if (json) print(proposal);
+      else for (const line of proposalSummary(proposal)) io.out(line);
       return 0;
     }
     if (verb === "apply") {
@@ -364,10 +402,27 @@ export async function lexiconWorkCommand(
       return 0;
     }
     if (verb === "baseline") {
-      saveBaseline(io.cwd, need(p, "session"), report);
+      const writer = who(p);
+      saveBaseline(io.cwd, writer.session, report);
       io.out(
-        `Baseline saved for ${need(p, "session")}; no sense ruling was created.`,
+        `Baseline saved for ${writer.session}; no sense ruling was created.`,
       );
+      if (await isCoherenceItself(io.cwd)) {
+        io.out("Coherence's own text is enforced whole: the lexicon check keeps no baseline here.");
+        return 0;
+      }
+      const { coherence, project } = await loadProjectLexicons(io.cwd);
+      const check = await runCheck({ root: io.cwd, coherence, project, coherenceItself: false });
+      const files = new Map<string, string[]>();
+      const lineOf = (file: string, line: number): string => {
+        let lines = files.get(file);
+        if (lines === undefined) {
+          lines = readFileSync(confined(io.cwd, file), "utf8").split(/\r?\n/);
+          files.set(file, lines);
+        }
+        return lines[line - 1] ?? "";
+      };
+      io.out(recordBaseline(io.cwd, check, lineOf, writer, get(p, "because")));
       return 0;
     }
     if (verb === "changes") {
@@ -431,21 +486,27 @@ export async function lexiconWorkCommand(
       return ready ? 0 : 1;
     }
     if (verb === "review" && !term) throw new Error("review needs a term");
-    if (json)
-      print(
-        verb === "review"
-          ? {
-              term,
-              entries: report.terms.filter(
-                (t) =>
-                  t.term === term?.toLowerCase() ||
-                  t.concept?.toLowerCase() === term?.toLowerCase(),
-              ),
-              limits: report.population.limits,
-            }
-          : report,
+    if (verb === "review") {
+      const entries = report.terms.filter(
+        (t) =>
+          t.term === term?.toLowerCase() ||
+          t.concept?.toLowerCase() === term?.toLowerCase(),
       );
-    else io.out(coverageText(report, verb === "review" ? term : undefined));
+      // A term below the candidate threshold still has live uses to read before it is named.
+      const live =
+        entries.length === 0
+          ? await liveUses(io.cwd, term!, json ? 1000 : 40)
+          : undefined;
+      if (json)
+        print({
+          term,
+          entries,
+          ...(live ? { liveUses: live.uses, liveUseCount: live.total } : {}),
+          limits: report.population.limits,
+        });
+      else io.out(coverageText(report, term, live));
+    } else if (json) print(report);
+    else io.out(coverageText(report));
     return 0;
   } catch (e) {
     io.err(`lexicon: ${e instanceof Error ? e.message : String(e)}`);

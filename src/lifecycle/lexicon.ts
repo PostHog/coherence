@@ -325,13 +325,15 @@ function capitalize(text: string): string {
  * it the project lexicon under its own header. Detail, provenance and
  * metaphors never appear.
  */
-export function renderCompact(coherence: Lexicon, project?: Lexicon, detail: DetailLevel = "full", coherenceDetail: "full" | "names" = "full"): string {
+export function renderCompact(coherence: Lexicon, project?: Lexicon, detail: DetailLevel = "full", coherenceDetail: "full" | "names" = "full", own = true): string {
   const lines: string[] = [];
+  // In Coherence's own repository its rejected names are defects everywhere; in an adopter they bind only where Coherence's concepts are named.
+  const rule = own ? "rejected names are defects" : "use these names when you mean Coherence's concepts";
   if (coherenceDetail === "names") {
-    lines.push(`Coherence vocabulary (${coherence.concepts.length} concepts; names only here, rejected names are defects; full entries: coherence lexicon):`);
+    lines.push(`Coherence vocabulary (${coherence.concepts.length} concepts; names only here, ${rule}; full entries: coherence lexicon):`);
     lines.push(coherence.concepts.map((c) => renderConcept(c, "names")).join(", "));
   } else {
-    lines.push(`Coherence vocabulary (${coherence.concepts.length} concepts; rejected names are defects):`);
+    lines.push(`Coherence vocabulary (${coherence.concepts.length} concepts; ${rule}):`);
     for (const concept of coherence.concepts) lines.push(renderConcept(concept));
   }
   if (project !== undefined) {
@@ -362,13 +364,14 @@ export function renderCompactWithin(
   project: Lexicon | undefined,
   maxChars: number,
   cli = "coherence",
+  own = true,
 ): { text: string; detail: InjectionLevel } {
   const fits = (text: string): boolean => text.length <= maxChars;
   for (const detail of project === undefined ? ([DETAIL_LEVELS[0]] as const) : DETAIL_LEVELS) {
-    const text = renderCompact(coherence, project, detail);
+    const text = renderCompact(coherence, project, detail, "full", own);
     if (fits(text)) return { text, detail };
   }
-  const names = renderCompact(coherence, project, "names", "names");
+  const names = renderCompact(coherence, project, "names", "names", own);
   if (fits(names)) return { text: names, detail: "coherence-names" };
   return { text: renderPointer(cli), detail: "pointer" };
 }

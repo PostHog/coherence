@@ -19,8 +19,13 @@ import { lexiconCoverage } from "../../lifecycle/lexicon-coverage.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { buildScopePage } from "../scope/build.ts";
 import { budgetFlags, readComponentInterfaces } from "../scope/component-interfaces.ts";
+import { readAndRecord } from "../scope/gaps.ts";
 import { observedCommand } from "../../observation/observed.ts";
 import { answer, answerLexicon, QUERY_USAGE } from "./query.ts";
+import { practiceAnswer } from "../../lifecycle/practice-delivery.ts";
+import { practiceStoryText } from "../scope/practices.ts";
+import { loadPractices, loadSpec, loadWork } from "../scope/build.ts";
+import { loadJournal } from "../../journal/store.ts";
 
 export { QUERY_USAGE };
 
@@ -71,6 +76,19 @@ function parse(argv: string[]): Parsed {
 export async function queryCommand(argv: string[], io: Io, deps: QueryDependencies = QUERY_DEPENDENCIES): Promise<number> {
   // The observed question reads the observation store, never the page state, and takes its own flags.
   if (argv[0] === "observed") return observedCommand(io.cwd, argv.slice(1), io);
+  // The practice question reads the practice files and the journal's enactments, never the page state.
+  if (argv[0] === "practice") {
+    const given = argv.slice(1).join(" ").trim() || undefined;
+    // With no practice named, the same story the Practices view opens with.
+    if (given === undefined) {
+      const root = resolve(io.cwd);
+      io.out(practiceStoryText({ practices: loadPractices(root), spec: loadSpec(root), journal: { records: loadJournal(root).records, damaged: [], work: loadWork(root) } }));
+      return 0;
+    }
+    const answered = practiceAnswer(io.cwd, given);
+    (answered.code === 0 ? io.out : io.err)(answered.text.trimEnd());
+    return answered.code;
+  }
   // The economy question reads the instrument and git, never the page state, and takes its own flags (--changed, --since).
   if (argv[0] === "economy") return queryEconomyCommand(argv.slice(1), io, deps.economy);
   let parsed: Parsed;
@@ -109,7 +127,8 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
     project: basename(root),
     window: false,
     // Only the Structure question needs every component interface, read through the language adapter.
-    ...(question === "structure" ? { componentInterfaces: await (deps.interfaces ?? readComponentInterfaces)(root, undefined, { budget }) } : {}),
+    // The real reading is kept for the hooks (gaps.ts); an injected one is a test's, and never kept.
+    ...(question === "structure" ? { componentInterfaces: deps.interfaces !== undefined ? await deps.interfaces(root, undefined, { budget }) : await readAndRecord(root, () => readComponentInterfaces(root, undefined, { budget })) } : {}),
   });
   const result = answer(state, question, args, { session: parsed.session });
   if (result.code === 0) io.out(result.text);

@@ -483,15 +483,29 @@ function renderVocabularyCoverage(state: LexiconViewState): Markup | null {
   </section>`;
 }
 
-/** The Lexicon view body: every layer, in order, filtered by the query. */
+function renderLayer(layer: Layer, state: LexiconViewState, index: ConceptIndex): Markup {
+  return layer.kind === "present" ? renderPresentLayer(layer, state, index) : renderAbsentLayer(layer);
+}
+
+/**
+ * The Lexicon view body, filtered by the query: the project's vocabulary
+ * first (the signal, then its lexicon or the note that it has none), then
+ * Coherence's own terms in a section of their own, since a reader comes for
+ * the project's words and reaches for the tool's only to talk about the tool.
+ */
 export function renderLexiconView(state: LexiconViewState): Markup {
   const index = indexConcepts(state.layers);
+  const project = state.layers.filter((layer) => layer.id !== "coherence");
+  const coherence = state.layers.filter((layer) => layer.id === "coherence");
+  const tool = coherence.length === 0 ? "" : html`<section class="coherence-terms" aria-labelledby="coherence-terms-heading">
+    <h2 class="coherence-terms-heading" id="coherence-terms-heading">Coherence's terms</h2>
+    <p class="section-lead">The names Coherence uses for its own concepts: say these when you talk about specs, invariants, the journal or the readings. The project's words above keep their own sense.</p>
+    ${coherence.map((layer) => renderLayer(layer, state, index))}
+  </section>`.text;
   return raw(
-    (renderVocabularyCoverage(state)?.text ?? "") + state.layers
-      .map((layer) =>
-        layer.kind === "present" ? renderPresentLayer(layer, state, index) : renderAbsentLayer(layer),
-      )
-      .map((m) => m.text)
-      .join("\n"),
+    (renderVocabularyCoverage(state)?.text ?? "") +
+      project.map((layer) => renderLayer(layer, state, index).text).join("\n") +
+      "\n" +
+      tool,
   );
 }

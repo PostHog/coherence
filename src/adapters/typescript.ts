@@ -45,13 +45,12 @@ import {
   type Visibility,
 } from "./adapter.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
-import { keepProjectFiles, projectFiles } from "./project-files.ts";
+import { keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..");
 const SERVER_BIN = "typescript-language-server";
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
-const SKIPPED_FOLDERS = new Set(["node_modules", ".git", "dist", ".coherence", ".claude", ".codex", "public"]);
 
 export const TYPESCRIPT_LADDER: Ladder = {
   top: "visibility-choked",
@@ -122,9 +121,9 @@ export function refusesReference(diagnostic: Diagnostic): boolean {
   return /not exported|no exported member|is private|is protected|not accessible/.test(diagnostic.message);
 }
 
-/** The project's files a walk of this adapter may read: never under a dot folder or a folder no adopter's code lives in. */
+/** The project's files a walk of this adapter may read: the walk's own bounds (walkedProjectFiles), never the config's ignore list. */
 function walkedFiles(root: string): string[] {
-  return projectFiles(root).filter((rel) => rel.split("/").every((part) => !part.startsWith(".") && !SKIPPED_FOLDERS.has(part)));
+  return walkedProjectFiles(walkBounds(root, [])).files;
 }
 
 /** The first source file of the project: opening it makes the language server load the project. */
@@ -140,7 +139,11 @@ function extensionOf(name: string): string {
 
 /** Every project file whose project-relative path is the hint or ends with `/<hint>`. */
 export function filesEndingWith(root: string, hint: string): string[] {
-  return walkedFiles(root).filter((rel) => rel === hint || rel.endsWith("/" + hint));
+  return endingWith(walkedFiles(root), hint);
+}
+
+function endingWith(files: readonly string[], hint: string): string[] {
+  return files.filter((rel) => rel === hint || rel.endsWith("/" + hint));
 }
 
 /** A wildcard re-export of a whole module: `export * from "./x.ts"`, `export * as ns from …`, `export type * from …`. */
@@ -217,6 +220,9 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private readonly probes = new Set<string>();
   /** Wildcard re-export sites by the file they re-export; the reference query never reports them. Scanned once per forget. */
   private wildcards: Map<string, ReferenceSite[]> | undefined;
+  /** The project's files and git's listing, each taken once per forget: a name resolved in a file, or a site kept, asks no git between forgets. */
+  private walked: string[] | undefined;
+  private listing: { taken: ProjectListing | undefined } | undefined;
   /** The last diagnostics the server published, by project-relative file. */
   private readonly diagnostics = new Map<string, Diagnostic[]>();
   readonly root: string;
@@ -369,6 +375,8 @@ export class TypeScriptAdapter implements LanguageAdapter {
     this.symbolCache.clear();
     this.lineCache.clear();
     this.wildcards = undefined;
+    this.walked = undefined;
+    this.listing = undefined;
     this.diagnostics.clear();
     if (this.client === undefined) return;
     // A named file that is not the project's (a nested checkout's copy, an ignored file) is never opened:
@@ -448,8 +456,18 @@ export class TypeScriptAdapter implements LanguageAdapter {
 
   private async searchFiles(name: string, fileHint: string): Promise<Candidate[]> {
     const candidates: Candidate[] = [];
-    for (const file of filesEndingWith(this.root, fileHint)) candidates.push(...(await this.declarationsIn(file, name)));
+    for (const file of endingWith(this.walkedNow(), fileHint)) candidates.push(...(await this.declarationsIn(file, name)));
     return candidates;
+  }
+
+  /** The project's files as the walk reads them, taken once per forget. */
+  private walkedNow(): string[] {
+    return (this.walked ??= walkedFiles(this.root));
+  }
+
+  /** Git's listing of the project, taken once per forget. */
+  private listingNow(): ProjectListing | undefined {
+    return (this.listing ??= { taken: projectListing(this.root) }).taken;
   }
 
   /** Top-level declarations named `name` in a file (a nested declaration is not a module member). */
@@ -481,7 +499,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     }
     // Only the project's own files are evidence, and a site outside them is dropped before it is read or opened:
     // opening a nested checkout's copy would load that checkout into the instrument as if it were this project.
-    const own = keepProjectFiles(this.root, reported.map((location) => this.relative(location.uri)));
+    const own = keepProjectFiles(this.root, reported.map((location) => this.relative(location.uri)), this.listingNow());
     const seen = new Set<string>();
     const sites: ReferenceSite[] = [];
     for (const location of reported) {

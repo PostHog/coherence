@@ -6,7 +6,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -35,5 +35,25 @@ test("scope run from an adopter's own folder reads Coherence's lexicon from the 
     assert.equal(state.project, "Demo", "the page is named after the project's config");
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a snapshot without --out lands in the project's .coherence folder, resolved against the root, and never in a served folder such as public/", async () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-scope-default-"));
+  const elsewhere = mkdtempSync(join(tmpdir(), "coherence-scope-cwd-"));
+  try {
+    writeFileSync(join(root, "coherence.config.json"), JSON.stringify({ name: "demo", language: "typescript" }), "utf8");
+    writeFileSync(join(root, "Demo.spec.md"), "# Demo\n\nA demo project.\n", "utf8");
+    mkdirSync(join(root, "public"), { recursive: true });
+    const errors: string[] = [];
+    // Run from another folder with --root, as an agent outside the project would.
+    const code = await scopeCommand(["--snapshot", "--root", root, "--no-interfaces"], { cwd: elsewhere, out: () => {}, err: (line) => errors.push(line) });
+    assert.equal(code, 0, errors.join("\n"));
+    assert.ok(existsSync(join(root, ".coherence", "scope", "_scope.html")), "the page is under the project's .coherence folder");
+    assert.deepEqual(readdirSync(join(root, "public")), [], "nothing is written into the served folder");
+    assert.ok(!existsSync(join(elsewhere, ".coherence")) && !existsSync(join(elsewhere, "public")), "nothing is written beside the working folder");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(elsewhere, { recursive: true, force: true });
   }
 });

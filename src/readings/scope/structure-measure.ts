@@ -1,7 +1,7 @@
 /**
  * The Structure map's measure: read a rendered SVG the way a reader's eye
  * does and count what makes a map unreadable. Text boxes come from font
- * metrics embedded here (the system face's, SF Pro on the supported platform,
+ * metrics embedded here (the system face's, SF Pro on macOS,
  * with tabular numerals, which the map's text is set in: the widest advance
  * Chrome reported for each character at 10 to 13 px, regular and semibold),
  * never from the renderer's own layout, so the check cannot

@@ -33,7 +33,9 @@ import {
   structureOf,
   type RelianceSite,
 } from "../scope/derive.ts";
-import { CORE_RULE, DEFAULT_RULE, ROUTE_RULE, flowBoundsText, flowDefaultSelection, flowLabelLines, flowOf, flowPartialText, routeName, trustInWords } from "../scope/structure-flow.ts";
+import { CORE_RULE, DEFAULT_RULE, NO_CONTROL_NEEDED, NO_TRACED_CONTROL, ROUTE_RULE, CONTROL_WORDS, controlInWords, flowBoundsText, flowDefaultSelection, flowLabelLines, flowOf, flowPartialText, routeName, trustInWords } from "../scope/structure-flow.ts";
+import type { FlowModel } from "../scope/structure-flow.ts";
+import { CANDIDATE_RULES, NOT_DETECTED, coverageLine, groupLine } from "../scope/entrance-coverage.ts";
 import { renderOrder } from "../../journal/workVerbs.ts";
 import { lexiconReviewCommand } from "../scope/model.ts";
 import type { LexiconCoverage, RunRecord, ShellState, SpecComponent, SpecInvariant } from "../scope/model.ts";
@@ -55,6 +57,7 @@ export const QUERY_USAGE = [
   "  query component <folder>       one component: intent, counts, bullets",
   "  query order [--session <id>]   the active work order the session owns, folded from its records, with what it cites, what binds to it, and what cites it",
   "  query economy <path...> | --changed [--since <commit>]   what must be loaded to change these files safely: the economy prediction, through the instrument; --changed reads the working change from git (staged, unstaged, untracked), --since widens it from the merge base of <commit> and HEAD (--since main: this branch's whole change set)",
+  "  query practice [<practice>]     every practice with its trigger, state and enactments; with one named, the whole practice as the hook delivers it",
   "  query observed [<component>] [--failures [--since <commit>]]   each component interface exercised by N tests or never observed, from the latest observation, fresh or stale; failing tests with what broke, the likely site, and the region",
 ].join("\n");
 
@@ -226,7 +229,7 @@ export function answerStructure(state: ShellState): Answer {
     `crossings (${model.crossings.length}), every one drawn: ${model.crossings.filter((c) => c.on === "interface").length} on component interfaces, ${model.crossings.filter((c) => c.on === "entrance").length} on entrance lines only, ${model.crossings.filter((c) => c.on === "component").length} on component boundary marks`,
     `structural routes (${model.routes.length}), ${model.routesFrom === "root interfaces" ? "derived from the root component's component interfaces by reference weight, not flow: no entrance is declared" : model.routesFrom === "entrances" ? `one per distinct path and trust from the declared entrances; ${ROUTE_RULE}` : "none: no entrance is declared and there is no root"}:`,
   ];
-  for (const route of model.routes) lines.push(`  ${routeName(route)}  ${route.stops.join(" -> ")}${route.rail === undefined ? "" : ` -> ${route.rail} (rail)`}${route.derived ? "" : `  trust ${trustInWords(route)}`}${route.entry.length === 0 ? "" : `  enters through ${route.entry.join(" ")}`}${route.noControl ? "  no control" : ""}  ${route.sites} sites`);
+  for (const route of model.routes) lines.push(`  ${routeName(route)}  ${route.stops.join(" -> ")}${route.rail === undefined ? "" : ` -> ${route.rail} (rail)`}${route.derived ? "" : `  trust ${trustInWords(route)}`}${route.entry.length === 0 ? "" : `  enters through ${route.entry.join(" ")}`}${route.noTracedControl ? `  ${NO_TRACED_CONTROL}` : ""}${route.noControl ? `  ${NO_CONTROL_NEEDED}` : ""}${route.traced.some((c) => c.kind !== "interface") ? `  traced: ${route.traced.filter((c) => c.kind !== "interface").map(controlInWords).join("; ")}` : ""}${route.partial.length === 0 ? "" : `  passed by some: ${route.partial.map((c) => `${c.name} (${CONTROL_WORDS[c.kind]}) on ${c.entrances} of ${route.entrances.length}`).join("; ")}`}  ${route.sites} sites`);
   const opens = model.nodes.find((node) => node.id === flowDefaultSelection(model));
   lines.push(`the map opens on: ${opens === undefined ? "nothing selected, the whole system" : `${opens.folder}, broken`} (${DEFAULT_RULE})`);
   lines.push(`not covered (${h.uncovered.length})${h.uncovered.length === 0 ? "" : `: ${h.uncovered.join(", ")}`}`);
@@ -243,14 +246,35 @@ export function answerStructure(state: ShellState): Answer {
   }
   lines.push(`entrances (${model.entrances.length}):`);
   for (const entrance of model.entrances) {
-    lines.push(`  ${entrance.declaredBy}/${entrance.name}  ${entrance.handler ?? "no handler"}  ${entrance.reachable ? `starts in ${entrance.start}` : entrance.reason ?? "unreachable"}`);
+    lines.push(`  ${entrance.declaredBy}/${entrance.name}  ${entrance.handler ?? "no handler"}  ${entrance.reachable ? `starts in ${entrance.start}` : entrance.reason ?? "unreachable"}${entrance.noControl === undefined ? "" : `  ${NO_CONTROL_NEEDED}: ${entrance.noControl}`}`);
   }
+  lines.push(...coverageLines(model));
   lines.push("placement, row (rows keep routes straight; folder order within a column)  column (true distance from where work enters):");
   for (const node of model.nodes) lines.push(`  ${node.core ? "rail" : node.row}  ${node.core ? "rail" : node.column}  ${node.folder}${node.span > 1 ? `  spans ${node.span} rows` : ""}${node.unconnected ? "  no component interface" : ""}`);
   if (model.unowned !== undefined && model.unowned.files > 0) lines.push(`  no component  ${model.unowned.files} files, ${model.unowned.lines} lines`);
   const broken = model.nodes.flatMap((node) => node.defects.map((d) => `  ${node.folder}/${d.name}  ${d.state}; ${d.bypasses} bypasses, ${d.internal} inside ${node.folder}: ${d.sites.map((s) => `${s.file}:${s.line}`).join(", ")}`));
   if (broken.length > 0) lines.push("broken chokepoints, each marked on its component:", ...broken);
   return { text: lines.join("\n"), code: 0 };
+}
+
+/**
+ * The entrance coverage section (c-3760638e): the summary line the map's
+ * health strip shows, each grouped entrance and what it stands for, how many
+ * declared entrances cover nothing detected, every undeclared detected
+ * entrance with its rule and why, and the rules with what they cannot see.
+ */
+function coverageLines(model: FlowModel): string[] {
+  const coverage = model.coverage;
+  if (coverage === undefined) return model.evidence === "language adapter" ? ["entrance coverage: not measured; the reading kept no detected entrances (taken before detection)"] : [];
+  const lines = [`entrance coverage: ${coverageLine(coverage)}`];
+  for (const group of coverage.groups) lines.push(`  ${groupLine(group)}`);
+  if (coverage.beyond > 0) lines.push(`  ${coverage.beyond} declared ${coverage.beyond === 1 ? "entrance covers" : "entrances cover"} nothing detected: declared where the rules do not reach, or finer than they detect`);
+  lines.push(`  undeclared (${coverage.uncovered.length})${coverage.uncovered.length === 0 ? "" : ", each detected and covered by no declared entrance:"}`);
+  for (const c of coverage.uncovered) lines.push(`    ${c.file}:${c.line}  ${c.symbol === "" ? "(the file)" : c.symbol}  ${c.rule}: ${c.why}`);
+  const language = model.language ?? "";
+  const rules = CANDIDATE_RULES[language] ?? [];
+  if (rules.length > 0) lines.push(`  detected by (${language}): ${rules.map((r) => `${r.rule}, ${r.detects}`).join("; ")}; ${NOT_DETECTED[language]}`);
+  return lines;
 }
 
 function answerStatus(state: ShellState): Answer {

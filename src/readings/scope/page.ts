@@ -57,6 +57,9 @@ function setQuery(state: ShellState, value: string): void {
     case "invariants":
       state.invariants.query = value;
       return;
+    case "practices":
+      state.practicesView.query = value;
+      return;
     case "runs":
       state.runsView.query = value;
       return;

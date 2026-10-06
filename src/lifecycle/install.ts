@@ -18,13 +18,35 @@
  * and names each drift: missing, stale, or an extra entry of ours. Install
  * and uninstall keep the file's indentation and final newline and write
  * nothing when nothing changed, so a round trip gives back the adopter's file.
+ *
+ * An adopter's hook finds Coherence rather than naming one path to it:
+ * Coherence is the package in the project's node_modules, or a checkout run
+ * from outside the project (never `npm link`ed in: that installed a second
+ * dependency tree and broke a pnpm build). The command walks up to the
+ * project root and looks, in order, at $COHERENCE_HOME, a `coherence` folder
+ * beside the project, one beside the main checkout when the project is a git
+ * worktree, the installed package's own cli, and last the project's
+ * node_modules/.bin/coherence. The committed command names no one's absolute
+ * path, so it is the same on every teammate's machine and the check agrees
+ * across them. When nothing is found, or node is not on the PATH, the hook
+ * prints one line as a systemMessage (both hosts show it to the user), exits
+ * 0, and does nothing else.
+ *
+ * Install also writes `.coherence/.gitignore` once, so an adopter's git sees
+ * only what Coherence keeps for good (the journal, runs and work orders, and
+ * the project's own hook voice) and none of the state it regenerates. The
+ * file sits inside Coherence's own folder, so install edits nothing the
+ * adopter wrote; a file there with any other text is the adopter's and is
+ * left alone. Uninstall removes it only when it is still exactly what
+ * install wrote and no agent host keeps a hook of ours.
  */
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { mkdir, readFile, rm, rmdir, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
-import { HOSTS, SETTINGS_FILE, isHost, type Host } from "./project.ts";
+import { HOSTS, PACKAGE_NAME, SETTINGS_FILE, isHost, type Host } from "./project.ts";
 
 // Where each host keeps its settings, and which hosts there are, live in the project
 // layer: the hook reads them to know which tree it was installed for.
@@ -45,12 +67,13 @@ const START_EVENTS: ReadonlySet<string> = new Set(["SessionStart", "SubagentStar
 
 /**
  * A command is Coherence's when the program it runs is this tool's binary
- * (`coherence`, bare or at the end of a path such as node_modules/.bin) or
- * this tool's own cli path (`src/cli.ts`, as Coherence's own checkout wires
- * it), followed by `hook <Event>`. A stranger's cli.ts, or a program whose
- * name merely contains "coherence", is never ours and is never touched.
+ * (`coherence`, bare, at the end of a path such as node_modules/.bin, or the
+ * `$coherence` the located command runs) or this tool's own cli path
+ * (`src/cli.ts`, as Coherence's own checkout wires it), followed by `hook
+ * <Event>`. A stranger's cli.ts, or a program whose name merely contains
+ * "coherence", is never ours and is never touched.
  */
-const MINE = new RegExp(`(?:^|[\\s"'/])(?:coherence|src/cli\\.ts)"?\\s+hook\\s+(?:${HOOK_EVENTS.join("|")})\\s*$`);
+const MINE = new RegExp(`(?:^|[\\s"'/$])(?:coherence|src/cli\\.ts)"?\\s+hook\\s+(?:${HOOK_EVENTS.join("|")})\\s*$`);
 
 function isMine(command: unknown): command is string {
   return typeof command === "string" && MINE.test(command);
@@ -76,6 +99,66 @@ export interface InstallOptions {
   host: Host;
   /** The command prefix that reaches this CLI, e.g. "npx coherence" or "node src/cli.ts". */
   command: string;
+}
+
+/** The variable that names a checkout of Coherence outside the default places. */
+export const HOME_VAR = "COHERENCE_HOME";
+
+/** The folder name the hooks look for beside the project. */
+export const SIBLING = "coherence";
+
+/** Walk up from the host's project dir (or cwd) to the folder that holds a host's settings. */
+const ROOT_WALK =
+  'root="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$root" != / ] && [ ! -f "$root/.claude/settings.json" ] && [ ! -f "$root/.codex/hooks.json" ]; do root=$(dirname "$root"); done';
+
+/**
+ * Shell that sets `$coherence` to the cli to run, or to nothing: $COHERENCE_HOME,
+ * the sibling folder, the sibling of a worktree's main checkout, the installed
+ * package's own cli, then the project's own bin. The package's cli comes
+ * before the bin because a package manager may write the bin as a shell shim
+ * that node cannot run. Nothing here names a path on one machine.
+ */
+export const LOCATE = [
+  ROOT_WALK,
+  'main=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)',
+  "coherence=",
+  `for c in "\${${HOME_VAR}:+\$${HOME_VAR}/src/cli.ts}" "$root/../${SIBLING}/src/cli.ts" "\${main:+\${main%/*}/../${SIBLING}/src/cli.ts}" "$root/node_modules/${PACKAGE_NAME}/dist/cli.js" "$root/node_modules/.bin/coherence"; do if [ -n "$c" ] && [ -f "$c" ]; then coherence=$c; break; fi; done`,
+].join("; ");
+
+/** The one line the user is shown at session start when Coherence cannot be reached. No apostrophes: it sits in single quotes. */
+export const NOT_INSTALLED = "Coherence is configured for this project but not installed, so its hooks do nothing this session; the agent has been told how to install it.";
+
+/**
+ * What the agent is told at session start when Coherence cannot be reached:
+ * that it is missing, every way to supply it, and that changing the
+ * project's dependencies is the user's decision. The agent makes the call.
+ * No apostrophes: it sits in single quotes.
+ */
+export const MISSING_CONTEXT = `Coherence is configured for this project (its hooks are in the agent host settings) but is not installed where the hooks look, so they do nothing this session: no vocabulary, specs, journal or checks. Ways to supply it: add ${PACKAGE_NAME} as a dev dependency with the package manager this project uses (npm install -D ${PACKAGE_NAME}, pnpm add -D ${PACKAGE_NAME}, or yarn add -D ${PACKAGE_NAME}), which changes package.json and the lockfile; clone github.com/PostHog/coherence beside the project as ../${SIBLING} and run npm ci in the clone; or set ${HOME_VAR} to a checkout. Changing the project dependencies is for the user to decide: unless the user asked for Coherence in this session, tell them it is missing and ask before installing it. Once it is installed, npx --no coherence spec --check confirms it, and the hooks answer from their next event.`;
+
+/** The one line the user is shown at session start when Coherence is there but node is not. */
+export const NO_NODE = "Coherence was found but node is not on the PATH its hooks run with, so they do nothing this session. Install Node 22.18 or newer.";
+
+/** Shell that prints `output` as JSON when the event, the function's second argument, is SessionStart, and nothing otherwise, then exits 0. */
+function atSessionStart(output: object): string {
+  return `if [ "$2" = SessionStart ]; then printf '%s\\n' '${JSON.stringify(output)}'; fi; exit 0`;
+}
+
+/**
+ * The default prefix for an adopter: locate Coherence, and otherwise run it
+ * as before (`hook <Event>` follows, the arguments of the shell function
+ * named for it), so a found Coherence answers, and refuses, exactly as a
+ * direct command would. Where it is not found, or node is not, every event
+ * exits 0 in silence but the session start, which tells the user in one line
+ * and, when Coherence is missing, tells the agent how to supply it.
+ */
+export const LOCATED_PREFIX = `${LOCATE}; coherence() { if [ -z "$coherence" ]; then ${atSessionStart({ systemMessage: NOT_INSTALLED, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: MISSING_CONTEXT } })}; fi; if ! command -v node >/dev/null 2>&1; then ${atSessionStart({ systemMessage: NO_NODE })}; fi; exec node "$coherence" "$@"; }; coherence`;
+
+/** Where the located command would find Coherence from `root`, under `env`; undefined when it would find nothing. */
+export function locate(root: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const run = spawnSync("sh", ["-c", `${LOCATE}; printf '%s' "$coherence"`], { cwd: root, env: { ...env, CLAUDE_PROJECT_DIR: root }, encoding: "utf8" });
+  const found = run.status === 0 ? run.stdout : "";
+  return found === "" ? undefined : found;
 }
 
 export function hookCommand(prefix: string, event: HookEvent): string {
@@ -145,10 +228,15 @@ function hooksOf(settings: Record<string, unknown>): HooksByEvent {
   return out;
 }
 
+/** The tools whose use can fire a practice: a command, or a file written. */
+export const PRACTICE_TOOLS = "Bash|Edit|Write|MultiEdit|NotebookEdit";
+
 /** The one entry install writes for an event: the merge writes it and the check compares against it. */
 export function installedEntry(options: Pick<InstallOptions, "command" | "host">, event: HookEvent): HookEntry {
   const handler: HookCommand = { type: "command", command: hookCommand(options.command, event), timeout: TIMEOUT_SECONDS };
   if (options.host === "codex" && START_EVENTS.has(event)) handler["additionalContextLimit"] = CODEX_CONTEXT_LIMIT;
+  // Practices fire on a command or a written file; Claude Code runs the hook for those tools only.
+  if (options.host === "claude" && event === "PreToolUse") return { matcher: PRACTICE_TOOLS, hooks: [handler] };
   return { hooks: [handler] };
 }
 
@@ -169,11 +257,56 @@ export function mergeHooks(settings: Record<string, unknown>, options: Pick<Inst
   return { ...settings, hooks };
 }
 
+/** Coherence's own folder in a project. */
+const STATE_DIR = ".coherence";
+
+/** The ignore file install writes inside Coherence's own folder. */
+export const IGNORE_FILE = join(STATE_DIR, ".gitignore");
+
+/** The folders under .coherence a project commits: the durable records, and the project's own hook voice. */
+export const DURABLE_FOLDERS: readonly string[] = ["journal", "runs", "work", "hooks"];
+
+/** The exact text install writes; only a file holding exactly this is Coherence's to remove. */
+export const IGNORE_TEXT = [
+  "# Written by coherence hooks install; hooks uninstall removes it.",
+  "# Commit this file and the folders it keeps: the journal, runs and work",
+  "# orders are durable records, and hooks holds the project's own hook voice.",
+  "# Everything else here is regenerated (feed cursors, read traces, practice",
+  "# firings, the warm server, structure and lexicon readings), so git ignores it.",
+  "/*",
+  "!/.gitignore",
+  ...DURABLE_FOLDERS.map((folder) => `!/${folder}/`),
+].join("\n") + "\n";
+
+/** What install did with .coherence/.gitignore: wrote it, found it already written, or kept a file of the adopter's. */
+export type IgnoreAction = "wrote" | "unchanged" | "kept";
+
+async function readText(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+/** Write .coherence/.gitignore when it is absent; a file already there is never rewritten. */
+async function writeIgnore(root: string): Promise<IgnoreAction> {
+  const path = resolve(root, IGNORE_FILE);
+  const found = await readText(path);
+  if (found === IGNORE_TEXT) return "unchanged";
+  if (found !== undefined) return "kept";
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, IGNORE_TEXT);
+  return "wrote";
+}
+
 export interface InstallResult {
   path: string;
   events: HookEvent[];
   /** False when the file already held exactly what install writes. */
   changed: boolean;
+  /** .coherence/.gitignore, and what install did with it. */
+  ignore: { path: string; action: IgnoreAction };
 }
 
 export async function install(options: InstallOptions): Promise<InstallResult> {
@@ -181,7 +314,8 @@ export async function install(options: InstallOptions): Promise<InstallResult> {
   const file = await readSettingsFile(path);
   const merged = mergeHooks(file.value, options);
   const changed = await writeSettings(path, file, merged);
-  return { path, events: [...HOOK_EVENTS], changed };
+  const ignore = { path: resolve(options.root, IGNORE_FILE), action: await writeIgnore(options.root) };
+  return { path, events: [...HOOK_EVENTS], changed, ignore };
 }
 
 /** One command of ours, by the event it sits under. */
@@ -225,22 +359,43 @@ export interface UninstallResult {
   /** The commands of ours that were removed; empty when there were none. */
   removed: OwnedCommand[];
   changed: boolean;
+  /** Whether this uninstall removed .coherence/.gitignore: only when it was exactly what install wrote and no host keeps a hook of ours. */
+  removedIgnore: boolean;
+}
+
+/** Whether any agent host's settings still hold a command of ours. */
+async function anyHostInstalled(root: string): Promise<boolean> {
+  for (const host of HOSTS) {
+    const file = await readSettingsFile(resolve(root, SETTINGS_FILE[host]));
+    if (Object.values(hooksOf(file.value)).some((entries) => entries.some(isCoherenceEntry))) return true;
+  }
+  return false;
+}
+
+/** Remove .coherence/.gitignore when it is exactly what install wrote and no host keeps our hooks; the folder goes too when that left it empty. */
+async function removeIgnore(root: string): Promise<boolean> {
+  const path = resolve(root, IGNORE_FILE);
+  if ((await readText(path)) !== IGNORE_TEXT || (await anyHostInstalled(root))) return false;
+  await rm(path);
+  await rmdir(dirname(path)).catch(() => undefined);
+  return true;
 }
 
 /** Remove what install wrote for a host, and nothing else; a second pass changes nothing. */
 export async function uninstall(root: string, host: Host): Promise<UninstallResult> {
   const path = resolve(root, SETTINGS_FILE[host]);
   const file = await readSettingsFile(path);
-  if (!file.exists) return { path, removed: [], changed: false };
+  if (!file.exists) return { path, removed: [], changed: false, removedIgnore: await removeIgnore(root) };
   const { settings, removed } = stripHooks(file.value);
   const changed = removed.length > 0 && (await writeSettings(path, file, settings));
-  return { path, removed, changed };
+  return { path, removed, changed, removedIgnore: await removeIgnore(root) };
 }
 
 export function formatUninstall(host: Host, result: UninstallResult): string {
-  if (result.removed.length === 0) return `${host}: ${result.path}: no Coherence hook installed; nothing changed\n`;
+  const ignore = result.removedIgnore ? `${host}: removed ${IGNORE_FILE}, which install wrote\n` : "";
+  if (result.removed.length === 0) return `${host}: ${result.path}: no Coherence hook installed${ignore === "" ? "; nothing changed" : ""}\n${ignore}`;
   const events = [...new Set(result.removed.map((r) => r.event))];
-  return `${host}: removed ${result.removed.length} Coherence hook${result.removed.length === 1 ? "" : "s"} from ${result.path}: ${events.join(", ")}\n`;
+  return `${host}: removed ${result.removed.length} Coherence hook${result.removed.length === 1 ? "" : "s"} from ${result.path}: ${events.join(", ")}\n${ignore}`;
 }
 
 /** One way the installed hooks differ from what install would write. */
