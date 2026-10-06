@@ -509,3 +509,15 @@ The reading: one surface projecting the model for a human, in six views: Structu
   crossing: project-source -> reading
   refuted: stopped cutting entrance names in orient's gap line, so a long name grew the line without bound -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
+- a snapshot never defaults into a served folder: A snapshot written without --out lands in the project's .coherence folder, resolved against the root, and never in a served folder such as public/ nor beside the working folder.
+  over: a snapshot without --out, run from another folder with --root, in a project that has a public/ folder
+  via: a snapshot without --out lands in the project's .coherence folder, resolved against the root, and never in a served folder such as public/
+  because: the page embeds the journal, escalations and defects included, and public/ is the folder Next.js, Vite and most web frameworks serve as static files; the old default would have put an adopter's security findings one commit away from being deployed (df-f2f6b207). The project's own .coherence folder is where install's ignore file already keeps transient state out of git
+  crossing: record -> reading
+  refuted: set the snapshot default back to public/_scope.html -> "a snapshot without --out lands in the project's .coherence folder, resolved against the root, and never in a served folder such as public/" went red in cli.test.ts on its own assertion; restored byte for byte, green alone and batched (2026-10-06)
+  kinds: output
+  checklist: destination-confinement declared as a snapshot never defaults into a served folder
+  checklist: redaction dismissed: the page is the project's own reading for its own people; the fix is where it lands, not what it hides
+  checklist: commit-ordered-effects dismissed: the page has no effect
+  checklist: circuit-breaker-policy dismissed: the page has no dependency to sample
+  checklist: declared-target-coverage dismissed: one file is written

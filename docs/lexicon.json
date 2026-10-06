@@ -946,7 +946,7 @@
     {
       "name": "config",
       "status": "settled",
-      "definition": "The list of project facts the tool cannot derive. They are: name, entry dir, output dir, ignore patterns, language, how to run tests and match their names, where tests live, the well-known names the project vouches for (wellKnown), and the interface reading's budget (interfaceBudget). Every key that configures a mechanism leaves with the mechanism.",
+      "definition": "The list of project facts the tool cannot derive. They are: name, entry dir, ignore patterns, language, how to run tests and match their names, where tests live, the well-known names the project vouches for (wellKnown), and the interface reading's budget (interfaceBudget). Every key that configures a mechanism leaves with the mechanism.",
       "rejected": [
         {
           "alternative": "mass, conventions, sinks, atlas keys",

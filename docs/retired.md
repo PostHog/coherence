@@ -115,3 +115,11 @@ the typechecks claim form retired into a tree-wide invariant whose enforcement i
 Carried over: nothing; a project's compiler runs in its own test command
 
 Decided by owner, 2026-10-05 (e-3bf51fcc, acknowledged ak-9e146686).
+
+## outputDir (a config key)
+
+the reference's folder for generated artifacts (default public, docs/coherence in Mnemion): the outline (graph.json, _graph.html), the overview and index pages, the Scope page, the ratchet baselines (mass, sinks), and the atlas and sidecar diagnostics. Each consumer retired, became a journal record (the lexicon and gap baselines), or, for the Scope snapshot, took a fixed default under the project's .coherence folder; nothing read the key. The old default also put the page, journal and all, in the folder web frameworks serve (df-f2f6b207).
+
+Carried over: the Scope snapshot's default, .coherence/scope/_scope.html; --out still names any other place
+
+Decided by owner, 2026-10-06.

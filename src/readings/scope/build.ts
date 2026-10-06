@@ -87,7 +87,8 @@ export interface BuildOptions {
 
 export const DEFAULTS = {
   lexiconPath: "docs/lexicon.json",
-  outPath: "public/_scope.html",
+  // Under .coherence, never a served folder: public/ is what web frameworks publish, and the page embeds the journal (df-f2f6b207).
+  outPath: ".coherence/scope/_scope.html",
   domainTitle: "Domain lexicon",
   project: "Coherence",
 } as const;
