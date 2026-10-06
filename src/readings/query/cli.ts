@@ -23,6 +23,9 @@ import { readAndRecord } from "../scope/gaps.ts";
 import { observedCommand } from "../../observation/observed.ts";
 import { answer, answerLexicon, QUERY_USAGE } from "./query.ts";
 import { practiceAnswer } from "../../lifecycle/practice-delivery.ts";
+import { practiceStoryText } from "../scope/practices.ts";
+import { loadPractices, loadSpec, loadWork } from "../scope/build.ts";
+import { loadJournal } from "../../journal/store.ts";
 
 export { QUERY_USAGE };
 
@@ -75,7 +78,14 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
   if (argv[0] === "observed") return observedCommand(io.cwd, argv.slice(1), io);
   // The practice question reads the practice files and the journal's enactments, never the page state.
   if (argv[0] === "practice") {
-    const answered = practiceAnswer(io.cwd, argv.slice(1).join(" ").trim() || undefined);
+    const given = argv.slice(1).join(" ").trim() || undefined;
+    // With no practice named, the same story the Practices view opens with.
+    if (given === undefined) {
+      const root = resolve(io.cwd);
+      io.out(practiceStoryText({ practices: loadPractices(root), spec: loadSpec(root), journal: { records: loadJournal(root).records, damaged: [], work: loadWork(root) } }));
+      return 0;
+    }
+    const answered = practiceAnswer(io.cwd, given);
     (answered.code === 0 ? io.out : io.err)(answered.text.trimEnd());
     return answered.code;
   }

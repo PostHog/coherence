@@ -2153,3 +2153,175 @@ a.flow-term {
     margin-left: 0.75rem;
   }
 }
+
+/* Practices: the story first, then each practice with its steps' adherence strips */
+
+.practice-story,
+.practice-attention {
+  padding: 1rem 0 1.25rem;
+  border-top: 1px solid var(--rule);
+}
+
+.story-head {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+
+.story-subhead {
+  margin: 1rem 0 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-quiet);
+}
+
+.when-list,
+.home-list,
+.unpracticed-list,
+.attention-list,
+.reasons,
+.enactment-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.when-list li,
+.home-list li,
+.unpracticed-list li,
+.attention-list li,
+.enactment-list li {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--rule-soft);
+  overflow-wrap: anywhere;
+}
+
+.when-list .arrow {
+  color: var(--ink-quiet);
+  padding: 0 0.25rem;
+}
+
+.when-list li[data-kind="explicit"] .when {
+  font-style: italic;
+}
+
+.attention-list .label {
+  display: inline-block;
+  min-width: 11rem;
+}
+
+.attention-list li[data-attention="removed step"] .label,
+.attention-list li[data-attention="claimed, not shown"] .label {
+  color: var(--fail);
+}
+
+.attention-list li[data-attention="amendment suggested"] .label {
+  color: var(--hold);
+}
+
+.practice-steps {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+
+.practice-steps > li {
+  margin: 0 0 0.6rem;
+}
+
+.step-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+}
+
+.step-text {
+  flex: 1 1 22rem;
+  min-width: 0;
+}
+
+.strip {
+  display: inline-flex;
+  gap: 2px;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.cell {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.9rem;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  vertical-align: middle;
+}
+
+.cell[data-cell="evidenced"] {
+  background: var(--pass);
+}
+
+.cell[data-cell="done"] {
+  background: var(--pass-wash);
+  border-color: var(--pass);
+}
+
+.cell[data-cell="claimed"] {
+  background: repeating-linear-gradient(135deg, var(--fail-wash) 0 2px, transparent 2px 4px);
+  border-color: var(--fail);
+}
+
+.cell[data-cell="deviated"] {
+  background: var(--hold);
+}
+
+.cell[data-cell="skipped"] {
+  background: var(--hold-wash);
+  border-color: var(--hold);
+}
+
+.cell[data-cell="absent"] {
+  border: 1px dashed var(--rule);
+}
+
+.practice-steps li[data-amend="true"] > .step-line .step-text {
+  text-decoration: underline wavy var(--hold);
+  text-underline-offset: 0.2em;
+}
+
+.amend {
+  margin: 0.2rem 0 0;
+  color: var(--hold);
+  font-size: 0.875rem;
+}
+
+.reasons {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+}
+
+.reasons li {
+  padding: 0.1rem 0 0.1rem 0.75rem;
+  border-left: 2px solid var(--hold-wash);
+}
+
+.leaves {
+  margin: 0.15rem 0 0;
+  font-size: 0.875rem;
+}
+
+.pitfalls ul {
+  margin: 0.25rem 0 0.75rem;
+  padding-left: 1.25rem;
+}
+
+.citation {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+}
+
+.strip-legend .cell {
+  margin: 0 0.15rem 0 0.35rem;
+}

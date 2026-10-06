@@ -1,6 +1,6 @@
 # Scope
 
-The reading: one surface projecting the model for a human, in six views: Structure, Lexicon, Components, Invariants, Runs, Journal; a fixed shell that loads its state from the warm server and follows the stores live, or carries one state as a snapshot file; and the agent query, the same state as plain text.
+The reading: one surface projecting the model for a human, in seven views: Structure, Lexicon, Components, Invariants, Practices, Runs, Journal; a fixed shell that loads its state from the warm server and follows the stores live, or carries one state as a snapshot file; and the agent query, the same state as plain text.
 
 ## entrances
 - scope: a human opens the live reading from the root's warm server, or an agent writes a snapshot of this project or another root
@@ -521,3 +521,21 @@ The reading: one surface projecting the model for a human, in six views: Structu
   checklist: commit-ordered-effects dismissed: the page has no effect
   checklist: circuit-breaker-policy dismissed: the page has no dependency to sample
   checklist: declared-target-coverage dismissed: one file is written
+- the practices view tells what exists first: The Practices view opens with the story of what the project practices (a summary, every trigger of every practice in the when-you list, the components with and without practices, the kernel, and what has no practice yet) before any practice's card, and the agent query tells the same story.
+  over: a project with its own practice, a kernel practice, a component with none, and a defect in it
+  via: the Practices view opens with what the project practices: every trigger of every practice in the when-you list, the components with and without practices, the kernel, and what has no practice yet, before any practice's card
+  because: owner: the tab must tell the story of what practices exist at all in a project; a reader new to the project learns its methods by what sets them off before reading how well each holds, and a trigger left out of the list is a rule nobody sees until it fires
+  refuted: left edit triggers out of the when-you list -> "the Practices view opens with what the project practices: every trigger of every practice in the when-you list, the components with and without practices, the kernel, and what has no practice yet, before any practice's card" went red in practices.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+- a strip shows each enactment's outcome for its step: Each step's adherence strip has one cell per enactment it shows, matched by the step's words: evidenced, claimed (done without the evidence the step names), done, deviated, skipped, or absent when the version enacted lacked the step; repeated deviation within the strip suggests an amendment, and a skip does not.
+  over: enactments of an older version without a step, a step done with and without its evidence, deviations with one reason twice, and a skip
+  via: each step's strip classifies every enactment it shows: evidenced, claimed, done, deviated, skipped, and absent when the version enacted lacked the step, and repeated deviation suggests an amendment
+  because: the strip is where a method is seen bending: a claimed cell drawn as evidenced would hide the step that slips, and an older version's missing step drawn as skipped would blame sessions for a step that did not exist yet; two deviations on witness a refutation's steps 1 and 5 were the signal that amended it (d-abadce10)
+  refuted: drew a step done without the evidence it names as evidenced -> "each step's strip classifies every enactment it shows: evidenced, claimed, done, deviated, skipped, and absent when the version enacted lacked the step, and repeated deviation suggests an amendment" went red in practices.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+- the window keeps what practices need: The journal window keeps every enactment, every decision that cites one, and every record a practice cites, whatever its age; an old record nothing needs stays out.
+  over: an old enactment, an amendment citing it, a defect a pitfall cites, an unrelated old decision, beside thirty recent records
+  via: the journal window keeps every enactment, every decision that cites one, and every record the practices cite, whatever its age
+  because: the strips, amendments and pitfall links are derived from those records, so a window that dropped them would draw a practice that seems never enacted and pitfalls that link nowhere; they are few, so keeping them costs little
+  refuted: stopped keeping enactments in the journal window -> "the journal window keeps every enactment, every decision that cites one, and every record the practices cite, whatever its age" went red in practices.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none

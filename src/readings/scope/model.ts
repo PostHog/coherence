@@ -276,6 +276,8 @@ export interface SpecComponent {
   trustLevels: TrustLevel[] | undefined;
   entrances: SpecEntrance[];
   invariants: SpecInvariant[];
+  /** The practice file paired with the spec, when there is one; its practices are in the state's practices. */
+  practicePath?: string | undefined;
   parent: string | undefined;
   children: string[];
 }
@@ -572,6 +574,45 @@ export interface JournalViewState {
   session: string;
 }
 
+/* Practices, as the spec model and Coherence's kernel hold them. */
+
+/** What fires a practice: a command's words, an edited path's glob with the text the edit adds, or nothing but a deliberate choice. */
+export type PracticeTrigger = { kind: "command"; words: string } | { kind: "edit"; glob: string; adding?: string | undefined } | { kind: "explicit" };
+
+/**
+ * One practice as the page holds it: the project's own, from a practice file
+ * paired with a spec, or a kernel practice Coherence ships, its id led by
+ * coherence:. State and enactment count come from the spec model; the
+ * enactments themselves are journal records the page already holds.
+ */
+export interface ScopePractice {
+  id: string;
+  name: string;
+  sentence: string;
+  /** The component folder whose practice file holds it. */
+  component: string;
+  file: string;
+  kernel: boolean;
+  reach?: "kernel" | "internal" | undefined;
+  triggers: PracticeTrigger[];
+  steps: { n: number; text: string; leaves?: string | undefined }[];
+  pitfalls: { text: string; cites: string[] }[];
+  learned: string[];
+  invariants: string[];
+  because?: string | undefined;
+  version: string;
+  state: "candidate" | "established";
+  enactments: number;
+}
+
+export interface PracticesData {
+  practices: ScopePractice[];
+}
+
+export interface PracticesViewState {
+  query: string;
+}
+
 /** The whole state of the Scope shell. The page is a function of this value. */
 export interface ShellState {
   project: string;
@@ -586,6 +627,9 @@ export interface ShellState {
   components: ComponentsViewState;
   structure: StructureViewState;
   invariants: InvariantsViewState;
+  /** Every practice a session here may enact: the project's own and the kernel practices. */
+  practices: PracticesData;
+  practicesView: PracticesViewState;
   runsView: RunsViewState;
   journalView: JournalViewState;
   /** How the page holds its state: set by the page, never by the builder, so no snapshot or first load carries it. */
