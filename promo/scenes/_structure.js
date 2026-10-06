@@ -288,5 +288,5 @@ scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false;
 $("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
 document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); $("play").click(); } });
 
-Promise.all(["200 1em 'Inter'", "500 1em 'Inter'", "500 1em 'Instrument Sans'", "600 1em 'Instrument Sans'", "700 1em 'Instrument Sans'", "400 1em 'IBM Plex Mono'", "700 1em 'IBM Plex Mono'", "600 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
+Promise.all(["700 1em 'Figtree'", "200 1em 'Inter'", "500 1em 'Inter'", "500 1em 'Instrument Sans'", "600 1em 'Instrument Sans'", "700 1em 'Instrument Sans'", "400 1em 'IBM Plex Mono'", "700 1em 'IBM Plex Mono'", "600 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
   .finally(() => { size(); last = performance.now(); requestAnimationFrame(frame); });

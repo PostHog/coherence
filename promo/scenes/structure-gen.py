@@ -340,13 +340,15 @@ function drawTitle(t) {
   if (word > 0) {
     const grow = .9 + .1 * ease(word) + Math.sin(smooth(FLOOD_AT + .9, FLOOD_AT + 1.6, t) * Math.PI) * .012;
     g.save(); g.translate(wcx, wcy); g.scale(grow, grow); g.translate(-wcx, -wcy);
-    g.font = `600 ${size}px "Instrument Sans"`; g.letterSpacing = `${-size * .03}px`;
+    g.font = `700 ${size}px "Figtree"`;                        // the wordmark face g.letterSpacing = `${-size * .03}px`;
     const rest = "oherence", cw = g.measureText("c").width, rw = g.measureText(rest).width, x0 = W / 2 - (cw + rw) / 2;
     g.globalAlpha = word; g.fillStyle = "#07090C";
     // the c: tilted, until the reticle sets it straight (a little overshoot, then still)
     const fix = smooth(24.5, 25.1, t), over = Math.sin(smooth(24.5, 25.35, t) * Math.PI) * .08 * (1 - smooth(25.1, 25.45, t));
-    const tilt = (-10 * (1 - fix) + over * 10) * Math.PI / 180;
-    g.save(); g.translate(x0 + cw / 2, y - size * .26); g.rotate(tilt); g.fillText("c", -cw / 2, size * .26); g.restore();
+    const TILT = 20;                                                          // degrees off true, before the reticle sets it
+    const tilt = (-TILT * (1 - fix) + over * 15) * Math.PI / 180;
+    const aside = size * .07 * (1 - fix);                                     // tilted, it stands a little off, clear of the o; it slides home as it rights
+    g.save(); g.translate(x0 + cw / 2 - aside, y - size * .26); g.rotate(tilt); g.fillText("c", -cw / 2, size * .26); g.restore();
     g.fillText(rest, x0 + cw, y);
     drawSubtitle(g, W, W / 2, y + size * .42, word * smooth(FLOOD_AT + 1.0, FLOOD_AT + 1.6, t));   // it settles in just after the word
     // the scan line: one pass across the word
@@ -355,7 +357,7 @@ function drawTitle(t) {
     // the reticle: brackets closing on the c, holding while it turns, then letting go
     const lock = smooth(24.0, 24.5, t), let_ = smooth(25.45, 25.9, t);
     if (lock > 0 && let_ < 1) {
-      const cx = x0 + cw / 2, cy = y - size * .26, r = size * (.42 + .5 * (1 - ease(lock))), L = size * .14;
+      const cx = x0 + cw / 2 - aside, cy = y - size * .26, r = size * (.42 + .5 * (1 - ease(lock))), L = size * .14;
       g.globalAlpha = word * (1 - let_); g.strokeStyle = "#07090C"; g.lineWidth = Math.max(2, W * .003); g.lineCap = "square";
       for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { g.beginPath(); g.moveTo(cx + sx * r, cy + sy * (r - L)); g.lineTo(cx + sx * r, cy + sy * r); g.lineTo(cx + sx * (r - L), cy + sy * r); g.stroke(); }
     }

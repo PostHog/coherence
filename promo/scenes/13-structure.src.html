@@ -1,6 +1,6 @@
 <title>Scene 13 · Structure</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Instrument+Sans:wght@400;500;600&family=Inter:wght@200;300;400;500&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Instrument+Sans:wght@400;500;600&family=Inter:wght@200;300;400;500&family=Figtree:wght@700&family=JetBrains+Mono:wght@400;500;600;800&display=swap">
 <style>
 :root {
   color-scheme: dark;
@@ -384,7 +384,7 @@ scrub.oninput = () => { t = Number(scrub.value); if (playing) { playing = false;
 $("cc").onclick = (e) => { captions = !captions; e.target.textContent = captions ? "Captions on" : "Captions off"; e.target.setAttribute("aria-pressed", String(captions)); };
 document.addEventListener("keydown", (e) => { if (e.key === " " && e.target === document.body) { e.preventDefault(); $("play").click(); } });
 
-Promise.all(["200 1em 'Inter'", "500 1em 'Inter'", "500 1em 'Instrument Sans'", "600 1em 'Instrument Sans'", "700 1em 'Instrument Sans'", "400 1em 'IBM Plex Mono'", "700 1em 'IBM Plex Mono'", "600 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
+Promise.all(["700 1em 'Figtree'", "200 1em 'Inter'", "500 1em 'Inter'", "500 1em 'Instrument Sans'", "600 1em 'Instrument Sans'", "700 1em 'Instrument Sans'", "400 1em 'IBM Plex Mono'", "700 1em 'IBM Plex Mono'", "600 1em 'JetBrains Mono'"].map((f) => document.fonts.load(f).catch(() => {})))
   .finally(() => { size(); last = performance.now(); requestAnimationFrame(frame); });
 
 const KEYS = [

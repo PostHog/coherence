@@ -151,10 +151,10 @@ Everything Coherence does as of branch `promo` (2026-09-24), grouped by what the
 
 1- **Language adapter** — the seam that lets chokepoint checks and reference lookup work across languages via each language's server. `src/adapters/`
 1- **TypeScript support** — via the TypeScript language server; reaches the visibility-choked grade. `src/adapters/typescript.ts`
-1- **Python support** — via Pyright and pytest; reaches closure-choked and checker-choked grades. `src/adapters/python.ts`
+1- **Python support** — via Pyright and pytest; reaches closure-choked and checker-chokefd grades. `src/adapters/python.ts`
 - **Agent host support** — Claude Code and Codex.
 - **Platform** — Apple Silicon Macs only.
-- **Project files only** _(unnamed)_ — only files git tracks (or untracked, not ignored) count as evidence; vendored checkouts are ignored. `src/adapters/project-files.ts`
+- **Project files only** _(unnamed)_ — only files git tracks (or untracked, not ignored) count as evidence; vendored checkouts are ignored. `src/adapters/project-filesure,s.ts`
 
 ## Shown in the promo so far
 

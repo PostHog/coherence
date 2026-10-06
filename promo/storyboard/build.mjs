@@ -1,6 +1,6 @@
-// Builds the storyboard page from promo/script.md and the track.
+// Builds the storyboard page from promo/script.md and the assembled cut (review/timeline.json, review/master/mix.wav).
 // node promo/storyboard/build.mjs  →  promo/storyboard/storyboard.html
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -72,13 +72,19 @@ function peaks(path, buckets) {
 // scenes that have been built: their published page and the stills capture.mjs rendered into frames/
 const registry = JSON.parse(readFileSync(join(here, "scenes.json"), "utf8"));
 const scenes = parseScenes(scriptText);
+// the cut as assembled: each scene's real start, the film's length, and its final mix to play and draw
+const cut = JSON.parse(readFileSync(join(promo, "review/timeline.json"), "utf8"));
+const mixPath = join(promo, "review/master/mix.wav");
+const clock = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, "0")}`;
+scenes.forEach((s) => { const c = cut.scenes.find((x) => x.n === s.n); if (c && !s.fields.at) s.fields.at = clock(c.start); });
+ANCHORS.end = cut.track;
 scenes.forEach((s) => {
   const r = registry[String(s.n)];
   if (r) s.render = { url: r.url, stills: r.stills.map((t, i) => ({ t, src: `frames/${String(s.n).padStart(2, "0")}-${i}.jpg` })) };
 });
 const data = {
-  duration: DURATION, acts: ACTS, markers: MARKERS, anchors: ANCHORS,
-  scenes, raw: scriptText, peaks: peaks(trackPath, 1400),
+  duration: cut.track, acts: ACTS.map((a) => ({ ...a, to: Math.min(a.to, cut.track) })), markers: MARKERS.filter((m) => m.t < cut.track), anchors: ANCHORS,
+  scenes, raw: scriptText, peaks: peaks(existsSync(mixPath) ? mixPath : trackPath, 1400),
 };
 const json = JSON.stringify(data).replace(/</g, "\\u003c");
 const template = readFileSync(join(here, "page.html"), "utf8");

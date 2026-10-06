@@ -69,10 +69,10 @@ So what do we get for all this? Bugs that recur. Endless whack a mole adversaria
 ***6
 at:
 sync:
-picture: A pull request list scrolling without end; the token graph climbing.
-supers: 25x tokens used in 2026 (source needed)
-source: motion graphics
-transition:
+picture: DRAFT (scenes/06-result.src.html). Two panels in fog: left, OpenRouter's daily token totals for 2026 drawing themselves and going vertical, 25× counting up; right, GitHub's uptime for April 2026 as a calendar, draining to 78.33%. The fog rolls in, then the picture turns out to be on a tube: scanlines and a slight bulge, then static eats it, bands slipping, the boards still faintly there; it collapses to a bright line, a dot, and dies.
+supers: 25× tokens used in 2026
+source: motion graphics (OpenRouter daily token totals; mrshu.github.io/github-statuses for April)
+transition: the tube dies; scene 7 powers it back on
 
 OpenRouter does twenty trillion tokens a day. GitHub struggles to stay online.
 
@@ -83,7 +83,7 @@ Because we don’t yet have the tools to make sense of this new world.
 ***7 (to land at first act break)
 at:
 sync:
-picture: DRAFT (scenes/07-power.src.html). Like a CRT going black, then turning back on, typing the script. Out of scene 6's dark, the last of the picture is static on a tube; it collapses to a line, a dot, and dies. A beat of black, then the tube powers on (dot, line, flash) to a phosphor screen with scanlines, and the narration's three lines type out in mint under a block cursor. Hard cut to black.
+picture: DRAFT (scenes/07-power.src.html). Like a CRT going black, then turning back on, typing the script. Scene 6's tube has just died; a beat of black, then the tube powers on (dot, line, flash) to a phosphor screen with scanlines, and the narration's three lines type out in mint under a block cursor. Hard cut to black.
 supers:
 source: motion graphics
 transition: hard cut to black
@@ -149,7 +149,7 @@ Coherence uses your language server to detect security bypasses. The moment an a
 ***12
 at:
 sync:
-picture: LOCKED (scenes/12-reduce.src.html). Scene 11's board, still red: the agent edits admin/dashboard.ts again, the bypass retracts, a new link draws into the gate, the PostToolUse check passes silently, the re-check logs ok, and the red walks back to mint; BYPASS DETECTED folds back into PROTECTED. The camera glides across the board to another system: a billing ledger, not yet locked on, with six call sites wired straight to it, each carrying its own copy of the guard (one drifted, role === "admin"; one missing). The agent's reduce pass finds them one by one, removes every copy, and they converge into one gate, the chokepoint billing.guard(), and only then does the ledger get its lock-on reticle and PROTECTED tag; the direct links retract, every site routes through the gate, all mint. The agent finalizes with one more tool call on the board, Edit Billing.spec.md, adding one line in the real spec format: chokepoint: billing.guard in billing/guard.ts; only then does it read enforced and the ledger turn mint. Pull back: both systems, the same shape, one door each. Fog clarity 0.5 to 0.65.
+picture: LOCKED (scenes/12-reduce.src.html). Scene 11's board, still red: the agent edits admin/dashboard.ts again, the bypass retracts, a new link draws into the gate, the PostToolUse check passes silently, the re-check logs ok, and the red walks back to mint; BYPASS DETECTED folds back into PROTECTED. The camera glides across the board to another system: a billing ledger, not yet locked on, with six call sites wired straight to it, each carrying its own copy of the guard (one drifted, role === "admin"; one missing). The agent's reduce pass finds them one by one, removes every copy, and they converge into one gate, the chokepoint billing.guard(), and only then does the ledger get its lock-on reticle and PROTECTED tag; the direct links retract, every site routes through the gate, all mint. The agent finalizes with one more tool call on the board, Edit Billing.spec.md, adding one line in the real spec format: chokepoint: billing.guard in billing/guard.ts; only then does it read enforced and the ledger turn mint. The PostToolUse card carried over from scene 11 turns over as the error clears: the red report dissolves into the pass, the border blends to mint, and the card shrinks down onto its two-line pass before it goes. Pull back: both systems, the same shape, one door each. Fog clarity 0.5 to 0.65.
 supers:
 source: motion graphics (three.js)
 transition:
@@ -187,7 +187,7 @@ No more sifting through thousands of lines of code to understand what was built 
 ***15 (to land after climax)
 at:
 sync:
-picture: DRAFT (scenes/15-structure.src.html, from structure-gen.py). The Structure view, verified, in clear air; the camera pulls straight up, and at 3:31 the view is the first to go coherent, its detail giving way to a flat mint abstraction of itself. More structure views surround it, tile by tile, more abstract the further out (cards and lines, then bare blocks); each view moves one way along grey, amber, red, starting at its own point and never stepping back; from about 5 s in, green trickles outward from the centre cell by cell, then a wave of mint rolls outward until every view is uniform mint, and the field closes into one mint surface. The title: coherence, lowercase, black on mint, its c tilted; a scan line passes, a reticle locks onto the c and tilts it back into place; fade to black with the music.
+picture: DRAFT (scenes/15-structure.src.html, from structure-gen.py). The Structure view, verified, in clear air; the camera pulls straight up, and at 3:31 the view is the first to go coherent, its detail giving way to a flat mint abstraction of itself. More structure views surround it, tile by tile, more abstract the further out (cards and lines, then bare blocks); each view moves one way along grey, amber, red, starting at its own point and never stepping back; from about 5 s in, green trickles outward from the centre cell by cell, then a wave of mint rolls outward until every view is uniform mint, and the field closes into one mint surface. Over the mint, from 3:44, the features the film names pile up as black chips (Lexicon, Spec, Invariant, Chokepoint check … TypeScript support, Python support), hold to be read, then pour into the middle and become the title: coherence, lowercase, black on mint, set in Figtree, its c tilted 20° and standing a little off; under it, in thin Inter, SALVATION FOR EVERY AGENT BY POSTHOG (the last two words in medium) with PostHog's logomark in black. A scan line passes, a reticle locks onto the c, and it rights itself and slides home; fade to black with the music.
 supers: Coherence
 source: motion graphics
 transition: fade to black with the music
