@@ -127,3 +127,21 @@ The language adapter seam: how to ask a language's server for definitions, refer
   crossing: project-source -> reading
   refuted: never looked for a page file's default export, so no page route was detected -> "the page route rule detects the default export of a Next.js app/**/page file as the page as a whole, and no layout, app/routes file or page without a default export" went red in src/adapters/entrance-candidates.test.ts; restored, green (2026-10-05)
   kinds: none
+- a listing answers as git does: keepProjectFiles and projectSites given a listing taken once keep exactly the paths they keep asking git: tracked, untracked and unignored, a tracked file just deleted, and never an ignored, nested, folder or outside path.
+  over: tracked, untracked, ignored, deleted, nested, folder, outside and absolute paths in one repository
+  via: keepProjectFiles with a listing taken once answers exactly as it does asking git: tracked, untracked, ignored, deleted, nested, folder and outside paths
+  because: a git listing per question cost three git processes per declaration a reading asks about, about 85 percent of reading Coherence's own tree (129 s to 11 s once removed, the reading byte for byte the same); the listing is only worth taking if it can never keep a file git would not, or drop one it would
+  refuted: made keepProjectFiles keep every candidate when given a listing -> "keepProjectFiles with a listing taken once answers exactly as it does asking git: tracked, untracked, ignored, deleted, nested, folder and outside paths" went red in listing.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+- the adapter's listing lasts until forget: The TypeScript adapter takes the project's files and git's listing once per forget, so a name resolved in a file and a reference site kept ask no git between forgets, and a file created after the listing is found after the next forget.
+  over: a file present at the first question, and a file created after it, before and after a forget
+  via: the TypeScript adapter reads the project's files once per forget: a file created after the listing is found only after a forget
+  because: the warm instrument answers many questions between edits, and every path that changes the tree (a run, the check at an edit, a live reading's refresh) calls forget first, so a listing kept past a forget would hide a new file from the chokepoint check, and one taken per question costs a git process each time
+  refuted: kept the walked file list across a forget -> "the TypeScript adapter reads the project's files once per forget: a file created after the listing is found only after a forget" went red in listing.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+- the Python adapter's listing lasts until forget: The Python adapter takes the project's files and git's listing once per forget, so a name resolved in a module, a star import scanned, and a reference site kept ask no git between forgets, and a module created after the listing is found after the next forget.
+  over: a module present at the first question, and a module created after it, before and after a forget
+  via: the Python adapter reads the project's files once per forget: a module created after the listing is found only after a forget
+  because: the same per-question git cost the TypeScript adapter carried (d-55040f81) sat in the Python adapter's resolve and reference filter, which is what reads a Python adopter such as PostHog; a listing kept past a forget would hide a new module from the chokepoint check
+  refuted: kept the Python adapter's walked file list across a forget -> "the Python adapter reads the project's files once per forget: a module created after the listing is found only after a forget" went red in listing.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
