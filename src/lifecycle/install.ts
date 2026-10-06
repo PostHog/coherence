@@ -31,11 +31,19 @@
  * across them. When nothing is found, or node is not on the PATH, the hook
  * prints one line as a systemMessage (both hosts show it to the user), exits
  * 0, and does nothing else.
+ *
+ * Install also writes `.coherence/.gitignore` once, so an adopter's git sees
+ * only what Coherence keeps for good (the journal, runs and work orders, and
+ * the project's own hook voice) and none of the state it regenerates. The
+ * file sits inside Coherence's own folder, so install edits nothing the
+ * adopter wrote; a file there with any other text is the adopter's and is
+ * left alone. Uninstall removes it only when it is still exactly what
+ * install wrote and no agent host keeps a hook of ours.
  */
 
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { mkdir, readFile, rm, rmdir, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
 import { HOSTS, PACKAGE_NAME, SETTINGS_FILE, isHost, type Host } from "./project.ts";
@@ -220,10 +228,15 @@ function hooksOf(settings: Record<string, unknown>): HooksByEvent {
   return out;
 }
 
+/** The tools whose use can fire a practice: a command, or a file written. */
+export const PRACTICE_TOOLS = "Bash|Edit|Write|MultiEdit|NotebookEdit";
+
 /** The one entry install writes for an event: the merge writes it and the check compares against it. */
 export function installedEntry(options: Pick<InstallOptions, "command" | "host">, event: HookEvent): HookEntry {
   const handler: HookCommand = { type: "command", command: hookCommand(options.command, event), timeout: TIMEOUT_SECONDS };
   if (options.host === "codex" && START_EVENTS.has(event)) handler["additionalContextLimit"] = CODEX_CONTEXT_LIMIT;
+  // Practices fire on a command or a written file; Claude Code runs the hook for those tools only.
+  if (options.host === "claude" && event === "PreToolUse") return { matcher: PRACTICE_TOOLS, hooks: [handler] };
   return { hooks: [handler] };
 }
 
@@ -244,11 +257,56 @@ export function mergeHooks(settings: Record<string, unknown>, options: Pick<Inst
   return { ...settings, hooks };
 }
 
+/** Coherence's own folder in a project. */
+const STATE_DIR = ".coherence";
+
+/** The ignore file install writes inside Coherence's own folder. */
+export const IGNORE_FILE = join(STATE_DIR, ".gitignore");
+
+/** The folders under .coherence a project commits: the durable records, and the project's own hook voice. */
+export const DURABLE_FOLDERS: readonly string[] = ["journal", "runs", "work", "hooks"];
+
+/** The exact text install writes; only a file holding exactly this is Coherence's to remove. */
+export const IGNORE_TEXT = [
+  "# Written by coherence hooks install; hooks uninstall removes it.",
+  "# Commit this file and the folders it keeps: the journal, runs and work",
+  "# orders are durable records, and hooks holds the project's own hook voice.",
+  "# Everything else here is regenerated (feed cursors, read traces, practice",
+  "# firings, the warm server, structure and lexicon readings), so git ignores it.",
+  "/*",
+  "!/.gitignore",
+  ...DURABLE_FOLDERS.map((folder) => `!/${folder}/`),
+].join("\n") + "\n";
+
+/** What install did with .coherence/.gitignore: wrote it, found it already written, or kept a file of the adopter's. */
+export type IgnoreAction = "wrote" | "unchanged" | "kept";
+
+async function readText(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+/** Write .coherence/.gitignore when it is absent; a file already there is never rewritten. */
+async function writeIgnore(root: string): Promise<IgnoreAction> {
+  const path = resolve(root, IGNORE_FILE);
+  const found = await readText(path);
+  if (found === IGNORE_TEXT) return "unchanged";
+  if (found !== undefined) return "kept";
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, IGNORE_TEXT);
+  return "wrote";
+}
+
 export interface InstallResult {
   path: string;
   events: HookEvent[];
   /** False when the file already held exactly what install writes. */
   changed: boolean;
+  /** .coherence/.gitignore, and what install did with it. */
+  ignore: { path: string; action: IgnoreAction };
 }
 
 export async function install(options: InstallOptions): Promise<InstallResult> {
@@ -256,7 +314,8 @@ export async function install(options: InstallOptions): Promise<InstallResult> {
   const file = await readSettingsFile(path);
   const merged = mergeHooks(file.value, options);
   const changed = await writeSettings(path, file, merged);
-  return { path, events: [...HOOK_EVENTS], changed };
+  const ignore = { path: resolve(options.root, IGNORE_FILE), action: await writeIgnore(options.root) };
+  return { path, events: [...HOOK_EVENTS], changed, ignore };
 }
 
 /** One command of ours, by the event it sits under. */
@@ -300,22 +359,43 @@ export interface UninstallResult {
   /** The commands of ours that were removed; empty when there were none. */
   removed: OwnedCommand[];
   changed: boolean;
+  /** Whether this uninstall removed .coherence/.gitignore: only when it was exactly what install wrote and no host keeps a hook of ours. */
+  removedIgnore: boolean;
+}
+
+/** Whether any agent host's settings still hold a command of ours. */
+async function anyHostInstalled(root: string): Promise<boolean> {
+  for (const host of HOSTS) {
+    const file = await readSettingsFile(resolve(root, SETTINGS_FILE[host]));
+    if (Object.values(hooksOf(file.value)).some((entries) => entries.some(isCoherenceEntry))) return true;
+  }
+  return false;
+}
+
+/** Remove .coherence/.gitignore when it is exactly what install wrote and no host keeps our hooks; the folder goes too when that left it empty. */
+async function removeIgnore(root: string): Promise<boolean> {
+  const path = resolve(root, IGNORE_FILE);
+  if ((await readText(path)) !== IGNORE_TEXT || (await anyHostInstalled(root))) return false;
+  await rm(path);
+  await rmdir(dirname(path)).catch(() => undefined);
+  return true;
 }
 
 /** Remove what install wrote for a host, and nothing else; a second pass changes nothing. */
 export async function uninstall(root: string, host: Host): Promise<UninstallResult> {
   const path = resolve(root, SETTINGS_FILE[host]);
   const file = await readSettingsFile(path);
-  if (!file.exists) return { path, removed: [], changed: false };
+  if (!file.exists) return { path, removed: [], changed: false, removedIgnore: await removeIgnore(root) };
   const { settings, removed } = stripHooks(file.value);
   const changed = removed.length > 0 && (await writeSettings(path, file, settings));
-  return { path, removed, changed };
+  return { path, removed, changed, removedIgnore: await removeIgnore(root) };
 }
 
 export function formatUninstall(host: Host, result: UninstallResult): string {
-  if (result.removed.length === 0) return `${host}: ${result.path}: no Coherence hook installed; nothing changed\n`;
+  const ignore = result.removedIgnore ? `${host}: removed ${IGNORE_FILE}, which install wrote\n` : "";
+  if (result.removed.length === 0) return `${host}: ${result.path}: no Coherence hook installed${ignore === "" ? "; nothing changed" : ""}\n${ignore}`;
   const events = [...new Set(result.removed.map((r) => r.event))];
-  return `${host}: removed ${result.removed.length} Coherence hook${result.removed.length === 1 ? "" : "s"} from ${result.path}: ${events.join(", ")}\n`;
+  return `${host}: removed ${result.removed.length} Coherence hook${result.removed.length === 1 ? "" : "s"} from ${result.path}: ${events.join(", ")}\n${ignore}`;
 }
 
 /** One way the installed hooks differ from what install would write. */

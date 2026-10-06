@@ -12,6 +12,7 @@
  *   node src/cli.ts unable "<what you could not do>" --because "<the wall>"
  *   node src/cli.ts escalate "<what a human must see>" --because "<why a human>" [--human "<words>"] [--cite <id>]...
  *   node src/cli.ts acknowledge <id> --because "<what the human decided>" [--human "<words>"]
+ *   node src/cli.ts enact "<practice>" --step <n>=<done[:evidence]|deviated:why|skipped:why>... [--trigger "<what fired it>"] [--cite <id>]...
  *   node src/cli.ts journal [--session <id>] [--agent <name>] [--kind <kind>] [--since <cursorOrIso>] [--json]
  *   node src/cli.ts journal --subjects [--since <cursorOrIso>]
  *   node src/cli.ts journal <id>      one record of either store, what it cites and what cites it
@@ -36,6 +37,7 @@ import {
   decide,
   defect,
   dismiss,
+  enact,
   escalate,
   experiment,
   resolved,
@@ -141,6 +143,7 @@ export const journalVerbs: Record<string, Command> = {
   unable: writing(unable),
   escalate: writing(escalate),
   acknowledge: writing(acknowledge),
+  enact: writing(enact),
   journal: read,
 };
 
@@ -160,6 +163,7 @@ export const JOURNAL_USAGE = [
   '  unable "<what you could not do>" --because "<the wall>" [--cite <id>]...',
   '  escalate "<what a human must see>" --because "<why a human>" [--human "<what the human said>"] [--cite <id>]...',
   '  acknowledge <id> --because "<what the human decided>" [--human "<what the human said>"]',
+  '  enact "<practice>" --step <n>=done[:<evidence>] | <n>=deviated:<why> | <n>=skipped:<why>  (one per step) [--trigger "<what fired it>"] [--cite <id>]...',
   `  journal [--session <id>] [--agent <name>] [--kind <${KIND_NAMES.join("|")}>] [--since <cursorOrIso>] [--json]`,
   "  journal --subjects [--since <cursorOrIso>]",
   "  journal <id>      one journal or work record, each record it cites, and each record citing it",

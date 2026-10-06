@@ -23,12 +23,13 @@ import type { HostStatus } from "./install.ts";
 import { loadProjectLexicons } from "./project.ts";
 import { attention, type Coverage } from "./lexicon-coverage.ts";
 
-export type Reading = "orient" | "peer feed" | "regulate";
+export type Reading = "orient" | "peer feed" | "practice" | "regulate";
 
 export const READING_OF: Record<HookEvent, Reading> = {
   SessionStart: "orient",
   SubagentStart: "orient",
   UserPromptSubmit: "peer feed",
+  PreToolUse: "practice",
   PostToolUse: "peer feed",
   Stop: "regulate",
   SubagentStop: "regulate",
@@ -118,6 +119,7 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     vocabularySignal(start.coverage),
     gapSignal(root, gaps),
     undeclaredSignal(root),
+    "the practices, each with what fires it",
     "the session id with the decide and journal commands, and the rule",
     `size now: ${start.text.length.toLocaleString("en-US")} of ${CONTEXT_BUDGET.toLocaleString("en-US")} characters`,
   ];
@@ -132,12 +134,13 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     ? `the lexicon check over the changed files (${changed.files.length} now)`
     : `the lexicon check over the changed files (not known now: ${changed.failure})`;
   const debt = "error" in spec ? specLine : `spec: ${plural(spec.problems, "problem")}, ${plural(spec.defects, "structural defect")}, ${plural(spec.open, "open requirement")}`;
-  const regulate = [changedLine, debt, "the reminder that an active work order is closed with work close", "the spec gaps this session touched, advisory", "the undeclared entrances in the files it changed, advisory", "the read trace snapshotted for calibrate"];
+  const regulate = [changedLine, debt, "the reminder that an active work order is closed with work close", "the spec gaps this session touched, advisory", "the undeclared entrances in the files it changed, advisory", "practices that fired this session with no enactment since, advisory", "the read trace snapshotted for calibrate"];
 
   const carries: Record<HookEvent, string[]> = {
     SessionStart: orient,
     SubagentStart: [...orient.slice(0, -1), `${orient[orient.length - 1]} (a subagent is oriented as a session is)`],
     UserPromptSubmit: feed,
+    PreToolUse: ["a practice whose trigger the tool use about to run fires: whole on its first firing this session, one line after; never blocks the tool"],
     PostToolUse: [...feed, edit, "the read trace: the file a read tool named"],
     Stop: [...regulate, "never refuses: the human is present and decides"],
     SubagentStop: [...regulate, "refuses the stop (exit 2) on a rejected name in a changed file, a spec problem, or a structural defect, unless the session recorded unable naming it"],

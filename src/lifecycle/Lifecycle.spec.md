@@ -35,6 +35,51 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: every proposal printed the whole lexicon after the change, 87 KB, into the agent's context, and agents scraped the id out of it
   crossing: record -> reading
   kinds: none
+- a dropped lexicon key stays on record: A define keeps every property and detail key it does not name; a key leaves only by an explicit --drop of properties.<key> or detail.<key>, and the decision that applies the drop carries the removed key and its text.
+  over: a define that adds a property, a define that drops a property and a detail key, a drop of another field, and a drop on another action
+  via: a define keeps every property and detail key unless one is dropped by name, and the applying decision carries the dropped text
+  because: define could only merge, so a retired key could never leave and was rewritten in place as a note that it was former (d-e5a064e3); a drop that deleted the text with the key would lose the meaning a later reader of the journal needs to see what the lexicon once said
+  crossing: harness -> project-source
+  refuted: deleted the line in propose's define branch that records a dropped key's text, so the drop still removed the key but the decision no longer carried its text -> "a define keeps every property and detail key unless one is dropped by name, and the applying decision carries the dropped text" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: revision
+  checklist: revision-preservation declared as a dropped lexicon key stays on record
+- a property drop counts its findings before apply: The preview of a define that drops a property key prints, before anything is applied, how many current uses of that key in the corpus would become unknown-noun findings, from the lexicon check run over the lexicon as it stands and as the drop leaves it.
+  over: a dropped property key the prose writes as a name on three lines, and one it never writes
+  via: a property drop's preview counts the current uses that would become unknown-noun findings, before apply
+  because: a property key counts as accepted vocabulary (d-3283157b), so dropping one can turn every use of it into a finding, as a bare rejection once turned 227 uses of a keyword into findings (rt-cdcf2a29); the count belongs in the preview, where the drop can still be withdrawn
+  crossing: harness -> project-source
+  refuted: made dropFindings run the after-check over the project lexicon as it stands, so the preview counted no new finding -> "a property drop's preview counts the current uses that would become unknown-noun findings, before apply" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- lexicon provenance is append-only: A define adds a provenance key and never rewrites one the concept already records, and a drop of provenance.<key> is refused.
+  over: a drop of a provenance key, a define rewriting an existing provenance key, and a define adding a new one
+  via: provenance is append-only: a drop of a provenance key and a define that rewrites one are refused, a new key is added
+  because: provenance is who defined a concept and in whose words; a merge that let a later define overwrite it would erase the owner's ruling under an agent's, with nothing in the lexicon to show it happened
+  crossing: harness -> project-source
+  refuted: made define's provenance guard test a key no field has, so a define rewrote an existing provenance key -> "provenance is append-only: a drop of a provenance key and a define that rewrites one are refused, a new key is added" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: revision
+  checklist: revision-preservation declared as lexicon provenance is append-only
+- a lifted rejection cites the decision that made it: A rejected name leaves a concept's rejected list only by lift, never by define; applying a lift needs a human acknowledgement and a cite of the applied decision that rejected the name when the journal holds one, and the lift's decision carries the lifted entry with its reason.
+  over: a define carrying an empty rejected list, a lift applied without a human, with a human and no cite, and with both
+  via: a rejection is lifted only with a human acknowledgement and a cite of the decision that rejected it
+  because: a rejection is a ruling a human or an agent made with a reason; taking it back without citing it would let a later session undo the ruling without reading why it was made, and the name would drift back in
+  crossing: harness -> project-source
+  refuted: made rejectingDecisions find no decision for any rejection, so a lift applied with a human and no cite -> "a rejection is lifted only with a human acknowledgement and a cite of the decision that rejected it" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: revision
+  checklist: revision-preservation declared as a lifted rejection cites the decision that made it
+- no project lexicon before a project makes one: Before a project has its own lexicon, lexicon coverage names no project lexicon even when Coherence's lexicon is installed under the project root, and lexicon review prints every live use of a term too rare to be a candidate yet; only Coherence's own checkout reads Coherence's lexicon as its project lexicon.
+  over: an adopter with Coherence's lexicon installed under its root and no lexicon.json, reviewing a term written in its code and prose below the candidate threshold
+  via: before a project lexicon exists, coverage names no project lexicon even with Coherence installed inside the project, and review reads a term's live uses
+  because: at adoption coverage named node_modules/@posthog/coherence/docs/lexicon.json as the project's, and review showed no live use of the project's domain terms, so the first step of settle a domain term could not be done and the agent read the schema directly (df-0d4e5065)
+  crossing: project-source -> reading
+  refuted: restored the old fallback in lexiconCoverage, naming Coherence's lexicon as the project's whenever it lies under the root -> the totality oracle went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- an outside entry file is named as outside: lexicon propose --entry with a file outside the project is refused with a message that names that entry file, never the lexicon.
+  over: an entry file in another folder outside the project root
+  via: an entry file outside the project is refused naming that entry file, not the lexicon
+  because: the refusal said the lexicon path was outside the project, naming the wrong thing, and the adopting agent copied its entries into a folder inside the project to get past a wall it could not read (df-292f9083)
+  crossing: harness -> reading
+  refuted: dropped the entry-file label from the confinement call in lexicon propose, so the refusal again named the lexicon path -> "an entry file outside the project is refused naming that entry file, not the lexicon" went red in lexicon-work.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
 - compact injection: The injection at session start carries the vocabulary only: nothing from detail, provenance, or metaphors.
   over: every concept of both lexicon layers
   via: renderCompact: header, one line per concept, rejected in brackets, nothing from detail, provenance or metaphors
@@ -229,6 +274,16 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: graceful-drain dismissed: nothing is shut down by an uninstall; a session already running keeps the hooks its agent host loaded
   checklist: readiness-evidence dismissed: uninstall reports what it removed from the settings file and claims nothing about a running process
   checklist: declared-target-coverage dismissed: one host's one settings file per call, not a registry of targets
+- install keeps regenerated state out of git: Installing the hook writes .coherence/.gitignore once, so the project's git sees only the durable folders (journal, runs, work) and the project's hook voice under .coherence, never the state Coherence regenerates, and the project's own .gitignore is never edited; a .coherence/.gitignore with any other text is the adopter's and is kept, and uninstall removes the file only when it is exactly what install wrote and no agent host keeps a hook of ours.
+  over: every folder Coherence writes under .coherence (journal, runs, work, hooks, feed, lexicon, models, observations, practices, run, structure, traces), in a fresh git project, across both agent hosts installed and uninstalled in turn, a fresh tree, and an ignore file of the adopter's
+  via: install keeps Coherence's regenerated state out of the project's git, and uninstall removes only the ignore file it wrote
+  because: a fresh adoption saw feed cursors, read traces, readings and a language model's weights as untracked files and had to guess what to ignore (df-35f4975d); Coherence's own .gitignore kept them out, but an adopter never receives that. The file sits in Coherence's own folder, so install never edits a file the adopter wrote and uninstall can remove it whole; while another host still runs our hooks the state keeps being written, so the file stays (d-e2cff03c)
+  crossing: project-source -> harness
+  refuted: made removeIgnore stop asking whether another agent host keeps our hooks, so uninstalling Claude Code took the ignore file while Codex still ran ours -> "install keeps Coherence's regenerated state out of the project's git, and uninstall removes only the ignore file it wrote" went red in install.test.ts on "codex still holds our hooks"; restored, green (2026-10-05)
+  kinds: deploy
+  checklist: graceful-drain dismissed: nothing is shut down by an install or an uninstall
+  checklist: readiness-evidence dismissed: install and uninstall report what they wrote or removed and claim nothing about a running process
+  checklist: declared-target-coverage dismissed: one ignore file in one folder per project, not a registry of targets
 - check fails on any drift: The hook check exits non-zero, naming the event and the kind, whenever an agent host's installed hooks differ from what install would write: an event missing, an entry of ours stale in any field or shape, or an extra entry of ours; another tool's hook is never drift.
   over: every event install wires, every field and the shape of the entry install writes, and every entry of ours under any event, for both agent hosts
   via: the check names every drift from what install would write: missing, stale, and extra
@@ -455,3 +510,21 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   kinds: read
   checklist: scoped-reads declared as a hook voice file stays inside the root
   checklist: redaction dismissed: a file that is not read is named by its path under the root alone, never its target or contents
+- a fired practice is delivered before the act: When the tool use about to run fires a practice's trigger, PreToolUse delivers the practice whole on its first firing at that version in the session and one line after, and never blocks the tool.
+  over: a command that fires a practice, the same command again, another session, and a command that fires nothing
+  via: PreToolUse delivers a fired practice whole once per version per session, then one line, and never blocks
+  because: the steps that slip come first (count the stores before a merge, measure the budget before applying), so delivery after the act is too late; whole once and one line after keeps the injection affordable; a refusal would train a session to route around the practice
+  crossing: project-source -> reading
+  refuted: made practiceContext forget earlier firings, so every firing delivered the practice whole -> "PreToolUse delivers a fired practice whole once per version per session, then one line, and never blocks" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: output
+  checklist: destination-confinement dismissed: the practice goes to one destination, the host's additionalContext
+  checklist: redaction dismissed: a practice is the project's own method, shown whole by design
+  checklist: commit-ordered-effects declared as cursor advances after the print
+  checklist: circuit-breaker-policy dismissed: practice files are read locally; no dependency is sampled
+  checklist: declared-target-coverage dismissed: one host reads the delivery, not a registry of targets
+- a fired practice not enacted is owed: Regulate names each practice that fired in the session with no enactment since, with the command that records it, and never refuses a stop for it.
+  over: a subagent stop after a firing, and a stop after the enactment
+  via: regulate names a practice that fired with no enactment since, advisory, and never refuses a subagent stop for it
+  because: advisory for the reason d-f780c7b9 gives for open requirements: refusing the stop would train a session to fabricate an enactment; naming it at the stop with the shape filled in makes the honest record the cheapest one
+  refuted: made practiceStopText treat every firing as enacted, so regulate named nothing owed -> "regulate names a practice that fired with no enactment since, advisory, and never refuses a subagent stop for it" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none

@@ -22,6 +22,7 @@ import { budgetFlags, readComponentInterfaces } from "../scope/component-interfa
 import { readAndRecord } from "../scope/gaps.ts";
 import { observedCommand } from "../../observation/observed.ts";
 import { answer, answerLexicon, QUERY_USAGE } from "./query.ts";
+import { practiceAnswer } from "../../lifecycle/practice-delivery.ts";
 
 export { QUERY_USAGE };
 
@@ -72,6 +73,12 @@ function parse(argv: string[]): Parsed {
 export async function queryCommand(argv: string[], io: Io, deps: QueryDependencies = QUERY_DEPENDENCIES): Promise<number> {
   // The observed question reads the observation store, never the page state, and takes its own flags.
   if (argv[0] === "observed") return observedCommand(io.cwd, argv.slice(1), io);
+  // The practice question reads the practice files and the journal's enactments, never the page state.
+  if (argv[0] === "practice") {
+    const answered = practiceAnswer(io.cwd, argv.slice(1).join(" ").trim() || undefined);
+    (answered.code === 0 ? io.out : io.err)(answered.text.trimEnd());
+    return answered.code;
+  }
   // The economy question reads the instrument and git, never the page state, and takes its own flags (--changed, --since).
   if (argv[0] === "economy") return queryEconomyCommand(argv.slice(1), io, deps.economy);
   let parsed: Parsed;

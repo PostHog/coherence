@@ -48,6 +48,22 @@ export interface RunOptions {
   observe?: boolean | undefined;
   /** How long the one test invocation may run before its whole process tree is killed and its totality oracles read unfinished (default TOTALITY_TIMEOUT_MS). */
   timeoutMs?: number | undefined;
+  /**
+   * After the batched pass, run each batched totality oracle's test again in its own invocation through the
+   * config's `test` command, and append those verdicts as a second run record (every entry mode one-at-a-time).
+   */
+  each?: boolean | undefined;
+}
+
+/** The per-test confirmation `run --each` adds: the second record, and the totality oracles it caught. */
+export interface EachOutcome {
+  record: RunRecord;
+  file: string;
+  details: EntryDetail[];
+  /** Totality oracles whose test passed in the batched invocation and failed in its own: it passed on what its neighbors left behind. */
+  hidden: EntryDetail[];
+  /** Totality oracles whose test the batched invocation passed and its own invocation could not run (no test command, or it never started). */
+  unconfirmed: EntryDetail[];
 }
 
 /** How often the run touches the instrument while the test suite holds the floor. */
@@ -71,6 +87,10 @@ export interface RunOutcome {
   observation?: ObservationOutcome;
   /** Why an observed run appended no observation. */
   observationSkipped?: string;
+  /** With `each`: the second record, one invocation per totality oracle the batched pass ran. */
+  each?: EachOutcome;
+  /** With `each`: why no per-test record was appended (no totality oracle ran batched). */
+  eachSkipped?: string;
 }
 
 function chokepointEnforcements(invariant: ModelInvariant): { protects: string; chokepoint: string }[] {
@@ -280,6 +300,14 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
       });
     }
   }
+  if (options.each === true) {
+    const batchedDetails = details.filter((d) => d.entry.form === "totality oracle" && d.entry.mode === "batched");
+    if (batchedDetails.length === 0) {
+      outcome.eachSkipped = !wantTotality ? "the run checked no totality oracle" : "no totality oracle ran in the batched invocation, so each already ran in its own";
+    } else {
+      outcome.each = await confirmEach(root, config, model, options, batchedDetails, adapter, instrument, recorded, now);
+    }
+  }
   return outcome;
   };
 
@@ -296,6 +324,76 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     return pass(given, { language: given.language, server: "cold" }, undefined);
   }
   return pass(undefined, { language: config.language, server: "none" }, undefined);
+}
+
+/**
+ * `run --each`: every totality oracle the batched invocation ran, run again in its own invocation through the
+ * config's `test` command, appended as a second record so each record stays one pass. A test that passed batched
+ * and fails alone passed on what an earlier test left behind (df-9e673484); the second record's verdict is the
+ * latest, so the status view shows it as a structural defect.
+ */
+async function confirmEach(
+  root: string,
+  config: EnforcementConfig,
+  model: SpecModel,
+  options: RunOptions,
+  batchedDetails: readonly EntryDetail[],
+  adapter: LanguageAdapter | undefined,
+  instrument: RunRecord["instrument"],
+  recorded: ReadonlySet<string>,
+  now: () => Date,
+): Promise<EachOutcome> {
+  const started = Date.now();
+  const details: EntryDetail[] = [];
+  const hidden: EntryDetail[] = [];
+  const unconfirmed: EntryDetail[] = [];
+  // The batched details of one invariant come in the order of its totality forms, so the k-th is the k-th via.
+  const seen = new Map<string, number>();
+  for (const batched of batchedDetails) {
+    const { component, name } = batched.entry;
+    const key = `${component} ${name}`;
+    const index = seen.get(key) ?? 0;
+    seen.set(key, index + 1);
+    const invariant = model.components.find((c) => c.folder === component)?.invariants.find((i) => i.name === name);
+    const via = invariant === undefined ? undefined : totalityEnforcements(invariant)[index]?.via;
+    if (via !== undefined) {
+      const t0 = Date.now();
+      const result = await runTotalityOracle(root, config, adapter?.testFilter(via) ?? via, options.timeoutMs);
+      const reason = batched.entry.verdict === "pass" && result.verdict !== "pass" ? `passed in the batched invocation, ${result.verdict === "fail" ? "failed" : "did not run"} in its own: ${result.reason}` : result.reason;
+      const detail: EntryDetail = {
+        entry: {
+          ...entryOf(component, name, "totality oracle", {
+            verdict: result.verdict,
+            grade: undefined,
+            refutation: recorded.has(entryKey(component, name, "totality oracle")) ? "witnessed" : "missing",
+            bypasses: [],
+            testReferences: 0,
+            files: [],
+            latency: Date.now() - t0,
+            reason,
+          }),
+          mode: "one-at-a-time",
+        },
+        totality: result,
+      };
+      details.push(detail);
+      if (batched.entry.verdict === "pass" && result.verdict === "fail") hidden.push(detail);
+      if (batched.entry.verdict === "pass" && result.verdict === "not run") unconfirmed.push(detail);
+    }
+  }
+  const { commit, dirty } = gitState(root);
+  const record: RunRecord = {
+    at: now().toISOString(),
+    session: options.session,
+    agent: options.agent,
+    ...workBinding(root, options.session),
+    commit,
+    dirty,
+    instrument,
+    latency: Date.now() - started,
+    invariants: details.map((d) => d.entry),
+  };
+  return { record, file: appendRun(root, record), details, hidden, unconfirmed };
 }
 
 /**

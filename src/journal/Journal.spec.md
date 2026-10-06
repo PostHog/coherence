@@ -139,3 +139,19 @@ Compression: one append-only file per session of attributed, durable outcomes, r
   crossing: project-source -> record
   refuted: folded --human into the decision's because in decide instead of its own field -> the totality oracle went red in journal.test.ts; restored, green (2026-09-23)
   kinds: none
+- an enactment answers every step: An enactment is refused unless every step of the practice has an outcome; a deviated or skipped step carries its because, and the record keeps the text of the steps and pitfalls it carried out.
+  over: every enact write: steps missing, a skip without a because, and one complete
+  via: an enactment needs an outcome for every step, a because for a deviation or a skip, and keeps the text it enacted
+  because: an enactment is what a practice's integrity is read from; one that answered some steps would hide which were left out, a deviation without its reason teaches the practice nothing, and without the text enacted a later removal could not be seen
+  crossing: project-source -> record
+  refuted: let enact write a record with steps missing an outcome -> "an enactment needs an outcome for every step, a because for a deviation or a skip, and keeps the text it enacted" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: storage
+  checklist: scoped-reads dismissed: every reader sees every enactment; there is no scope to narrow
+  checklist: encrypted-storage dismissed: the journal is plain text by design
+  checklist: key-rotation-compatibility dismissed: no key exists
+  checklist: input-validation declared as an enactment answers every step
+  checklist: revision-preservation declared as append-only store
+  checklist: commit-ordered-effects dismissed: the append is the only effect
+  checklist: durable-dispatch-intent dismissed: nothing is dispatched after the append
+  checklist: declared-target-coverage dismissed: one session file, no fan-out
+  checklist: completion-evidence dismissed: the append is complete when the call returns

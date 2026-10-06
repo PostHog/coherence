@@ -582,6 +582,7 @@ export const GLYPH: Record<JournalKind, string> = {
   unable: "⊘",
   escalation: "▲",
   acknowledgement: "△",
+  enactment: "◇",
 };
 
 export const JOURNAL_KINDS: readonly JournalKind[] = Object.keys(GLYPH) as JournalKind[];
@@ -700,6 +701,8 @@ export function subjectOf(record: JournalRecord): string {
       return `closed ${record.of}: ${record.outcome}`;
     case "acknowledgement":
       return `acknowledged ${record.of}`;
+    case "enactment":
+      return `enacted ${record.practice}`;
   }
 }
 
@@ -726,6 +729,8 @@ export function journalText(record: JournalRecord): string[] {
     case "dismissal":
     case "acknowledgement":
       return [...head, record.of, record.because];
+    case "enactment":
+      return [...head, record.practice, record.trigger, ...record.steps.map((s) => s.text), ...Object.values(record.results).map((o) => (o.result === "done" ? o.evidence ?? "" : o.because))];
   }
 }
 

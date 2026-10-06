@@ -71,3 +71,10 @@ The command that makes the complete shape the cheapest thing to produce: a compo
   crossing: project-source -> reading
   refuted: proposed every symbol handler as a bare name, dropping in <file>, in entranceHandler -> the totality oracle went red; restored, green (2026-09-28)
   kinds: none
+- a Next.js app's entrances are proposed and resolve: On a Next.js app shaped like ai-chatbot, scaffold entrances proposes the request proxy, the GET and POST its NextAuth route file re-exports, and each page route, a page named by its route path and handled by its module file, under the spec of the component holding each file, even a component in a (group) folder; filled and pasted, every bullet resolves and covers its entrance.
+  over: proxy.ts, the re-exported GET and POST of app/(auth)/api/auth/[...nextauth]/route.ts under app/(auth)/(auth).spec.md, and the pages app/(chat)/page.tsx and app/(chat)/chat/[id]/page.tsx, pasted with the meaning and trust filled
+  via: scaffold entrances on a Next.js app shaped like ai-chatbot proposes the request proxy, the GET and POST its NextAuth route re-exports, and its page routes, and the filled bullets resolve and cover them
+  because: a real adoption of ai-chatbot detected 21 entrances and missed 3 the agent declared by hand, and the handlers it wrote for them were refused (df-6cdc0504, df-0a67c462, df-a0e893af)
+  crossing: project-source -> reading
+  refuted: dropped the page route naming in entranceName, so every page was named page by its file stem -> "scaffold entrances on a Next.js app shaped like ai-chatbot proposes the request proxy, the GET and POST its NextAuth route re-exports, and its page routes, and the filled bullets resolve and cover them" went red in src/scaffold/entrances.test.ts; restored, green (2026-10-05)
+  kinds: none

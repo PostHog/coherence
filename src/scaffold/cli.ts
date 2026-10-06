@@ -39,13 +39,14 @@ import { proposeEntrances, renderEntrances, under } from "./entrances.ts";
 import { undeclaredOf } from "../readings/scope/undeclared.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { existsSync } from "node:fs";
-import { appendInvariant, componentDir, parseCrossing, renderGuidance, renderInvariant, scaffoldComponent, ScaffoldError, specsIn, type Form } from "./scaffold.ts";
+import { appendInvariant, appendPractice, componentDir, parseCrossing, practiceFileFor, renderGuidance, renderInvariant, renderPractice, scaffoldComponent, ScaffoldError, specsIn, type Form } from "./scaffold.ts";
 
 export const SCAFFOLD_USAGE = [
   '  scaffold component <folder> "<intent>"',
   '  scaffold invariant <componentFolder> "<sentence>" [--name "<name>"] --kinds <a,b|none> [--chokepoint|--totality-oracle] [--crossing "<level> -> <level>"] [--preview] [--write]',
   `  scaffold control "<entrance>" | --all [--component <folder>] [--as guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write] ${BUDGET_FLAGS}   the closure for an entrance with no traced control: a guard: line, an invariant, or control: none`,
   "  scaffold control --baseline --session <id> --agent <name>   record the entrances with no traced control at adoption, so orient names only new ones",
+  '  scaffold practice <componentFolder> "<name>" "<sentence>" [--when "<trigger>"] [--write]   a practice bullet with every slot to fill; --write appends it to the practice file beside the spec',
   "  scaffold entrances [<folder or file>]   the ## entrances bullets for the detected entrances no spec declares, by the component that owns each; printed, never written",
 ].join("\n");
 
@@ -267,6 +268,25 @@ function scaffoldFailure(error: unknown, io: Io): number {
   throw error;
 }
 
+function practiceVerb(argv: string[], io: Io): void {
+  const parsed = parseFlags(argv, { when: "one", write: "switch" });
+  const [folder, name, sentence, ...rest] = parsed.positionals;
+  if (folder === undefined || name === undefined || sentence === undefined) usage("scaffold practice takes a component folder, a name, and a sentence");
+  if (rest.length > 0) usage(`unexpected argument "${rest[0]}"; quote the sentence`);
+  const dir = componentDir(io.cwd, folder);
+  const specs = specsIn(dir);
+  // A spec and its practice file are always paired (d-861e8319): no spec, no practice file.
+  if (specs.length === 0) throw new ScaffoldError(`${folder} holds no spec, and a practice file stands only beside one; scaffold component ${folder} "<intent>" first`);
+  const bullet = renderPractice(name, sentence, parsed.one.get("when"));
+  io.out(bullet.trimEnd());
+  if (parsed.switches.has("write")) {
+    const path = practiceFileFor(dir, specs[0]!);
+    appendPractice(path, bullet);
+    io.out(`appended to ${path}`);
+  }
+  io.err("fill every slot: a pitfall cites the record or commit that witnessed it, learned: names what the practice rests on, and spec --check refuses a practice that cites nothing");
+}
+
 /** Synchronous shapes return a number; preview returns the rendering promise. */
 export function scaffoldCommand(argv: string[], io: Io): number | Promise<number> {
   const [shape, ...rest] = argv;
@@ -279,9 +299,13 @@ export function scaffoldCommand(argv: string[], io: Io): number | Promise<number
       const result = invariantVerb(rest, io);
       return result === undefined ? 0 : result.then(() => 0, (error: unknown) => scaffoldFailure(error, io));
     }
+    if (shape === "practice") {
+      practiceVerb(rest, io);
+      return 0;
+    }
     if (shape === "control") return controlVerb(rest, io).then(() => 0, (error: unknown) => scaffoldFailure(error, io));
     if (shape === "entrances") return entrancesVerb(rest, io).then(() => 0, (error: unknown) => scaffoldFailure(error, io));
-    usage('scaffold takes "component", "invariant", "control" or "entrances"');
+    usage('scaffold takes "component", "invariant", "practice", "control" or "entrances"');
   } catch (error) {
     return scaffoldFailure(error, io);
   }

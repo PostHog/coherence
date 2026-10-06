@@ -67,6 +67,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(dir=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$dir\" != \"/\" ] && [ ! -f \"$dir/.claude/settings.json\" ] && [ ! -f \"$dir/.codex/hooks.json\" ]; do dir=$(dirname \"$dir\"); done; printf \"%s\" \"$dir\")/src/cli.ts\" hook PreToolUse",
+            "timeout": 60
+          }
+        ]
+      }
     ]
   }
 }

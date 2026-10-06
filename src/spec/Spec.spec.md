@@ -84,6 +84,20 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: returned a module handler's first candidate path in handlerFile without checking the file exists -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
+- a module handler may carry route segments: An entrance's handler naming a module file resolves as a module file when its path carries a framework's route segments ([slug], [...slug], [[...slug]], (group), (.)intercepted, @slot), and a spec in such a folder is a component; such a file that does not exist is still a problem.
+  over: every route segment form in a module handler's path, a spec in a (group) folder, and a missing file under such segments, against a symbol in a file and a path without an extension, which stay no module
+  via: the model: a module handler's path may carry route segments, [slug], [...slug], [[...slug]], (group), (.)intercepted and @slot, and it must still exist
+  because: every Next.js App Router route lives under such segments, so handler: api/auth/[...nextauth]/route.ts was refused as neither a symbol nor a module file at a real adoption (df-0a67c462)
+  crossing: project-source -> reading
+  refuted: narrowed isModuleHandler's path characters back to letters, digits and _./@-, refusing [ ] ( ) -> "the model: a module handler's path may carry route segments, [slug], [...slug], [[...slug]], (group), (.)intercepted and @slot, and it must still exist" went red in src/spec/spec.test.ts; restored, green (2026-10-05)
+  kinds: none
+- a re-exported or destructured handler is declared: A handler name is declared at the top level of a file that exports it in an export list, with or without a from and under its alias when it has one, or binds it in an object destructuring on one line or across several, nested or not; a key the destructuring reads through, an imported name and the name a re-export renames are not.
+  over: every export list shape (re-export from a module, renamed, local, type) and every destructuring shape (one line, several lines, nested, typed), against a destructuring key, an import, a renamed source name and braces that assign nothing
+  via: the model: a handler an export list re-exports, or a destructuring across lines declares, is declared at the top level of its file
+  because: a Next.js route file re-exports NextAuth's GET and POST, which a multi-line destructuring declares, so handler: GET in api/auth/[...nextauth]/route.ts was not found at a real adoption (df-a0e893af); the re-exporting file is where the framework finds the name and the source is not followed (d-7155e46f)
+  crossing: project-source -> reading
+  refuted: made declaresAtTop ignore export lists, so a name a route file re-exports was not declared there -> "the model: a handler an export list re-exports, or a destructuring across lines declares, is declared at the top level of its file" went red in src/spec/spec.test.ts; restored, green (2026-10-05)
+  kinds: none
 - an entrance guard names a chokepoint: An entrance's guard: line names a chokepoint some invariant declares, by its symbol, or a symbol declared in a chokepoint that is a module; any other name, an empty line, or a second guard line is a problem.
   over: every guard: line: a chokepoint's symbol, a symbol of a chokepoint module, a name no invariant declares, an empty and a second line
   via: the model: an entrance's guard: line names a chokepoint an invariant declares, or a symbol of a chokepoint module
@@ -97,4 +111,35 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   because: an entrance that needs no control is a claim a human must be able to challenge (d-a1095ef2), and only a stated reason can be challenged; an empty one is a silent waiver, and one beside a guard contradicts itself, since a guard is a control
   crossing: project-source -> reading
   refuted: made the grammar accept control: none with an empty reason, dropping the problem -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- a practice is paired with its spec: A practice file stands only in a folder whose spec shares its stem; one beside no spec, under another stem, or second in its folder is a problem.
+  over: every practice file under the root: beside no spec, under another stem, and paired
+  via: a practice file stands only beside its folder's spec, with the spec's stem
+  because: owner ruling d-861e8319: a spec and its practice file are always paired, so the component stays the unit; a practice file alone would make a folder half a component, and one under another stem would read as a second component's
+  refuted: dropped the problem for a practice file beside no spec, so a loose practice file was skipped silently -> "a practice file stands only beside its folder's spec, with the spec's stem" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- an enacted practice keeps what it taught: Once a practice is enacted, a step or pitfall that its latest enactment carried out and the practice no longer holds is a problem until a decision cites an enactment of it; adding is free, and a practice never enacted changes freely.
+  over: every practice with an enactment, against the text its latest enactment carried out
+  via: a step enacted and since removed is a problem until a decision cites an enactment of the practice
+  because: this is what keeps a gain from slipping back: a method decays by losing steps silently, and its pitfalls each cost a defect to learn; a removal must say why and cite what was carried out, while additions and candidates stay cheap so that practices get written at all
+  refuted: made practiceProblems treat every enacted practice as amended, so a removed step passed without a citing decision -> "a step enacted and since removed is a problem until a decision cites an enactment of the practice" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: revision
+  checklist: revision-preservation declared as an enacted practice keeps what it taught
+- a practice rests on evidence that exists: Every record or commit a practice cites resolves, here or on another branch, every invariant it names is declared, and a practice that cites nothing is a problem.
+  over: every citation in learned: and pitfall: lines and every name in invariants: lines across the project's practice files
+  via: every record a practice cites must exist, and every invariant it names must be declared
+  because: a practice is learned, not wished: what makes it binding is the record of the failure it prevents, and a citation of nothing would make an invented step read as witnessed
+  refuted: made practiceProblems accept a cited record id that no store holds -> "every record a practice cites must exist, and every invariant it names must be declared" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- kernel practices reach adopters: In an adopter, the practices whose reach is kernel are delivered beside the project's own with their ids led by coherence:, and an internal practice never leaves Coherence's tree.
+  over: Coherence's practice files as an adopter reads them: kernel and internal
+  via: in an adopter, the kernel practices are delivered beside the project's own, their ids led by coherence:, and an internal practice is not
+  because: a practice for using Coherence's own commands (witnessing a refutation) applies in every adopter from the first session, so adoption starts with the method already learned; a practice about Coherence's own tree (its lexicon budget) would be noise anywhere else
+  refuted: made kernelPractices take every practice with a reach, so an internal one reached adopters -> "in an adopter, the kernel practices are delivered beside the project's own, their ids led by coherence:, and an internal practice is not" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- every Coherence practice declares its reach: In Coherence's own tree each practice declares reach: kernel or reach: internal, an unknown value is a problem, and a reach line in any other project is a problem.
+  over: a practice in Coherence's tree with no reach, with each value, with an unknown value, and an adopter's practice with one
+  via: in Coherence's own tree every practice declares its reach, kernel or internal; anywhere else a reach line is a problem
+  because: a practice whose reach was never decided either fails silently to reach adopters or puts Coherence's own steps into every adopter's sessions; never examined and examined are different facts (d-8ed21083), so the reach is said, and as a value set so a later reach is one more value (owner, 2026-10-05)
+  refuted: dropped the problem for a practice in Coherence's tree with no reach line -> "in Coherence's own tree every practice declares its reach, kernel or internal; anywhere else a reach line is a problem" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
   kinds: none
