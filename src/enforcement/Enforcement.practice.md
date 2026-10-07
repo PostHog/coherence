@@ -15,7 +15,6 @@
   pitfall: the red came from the selected test depending on what earlier tests appended, not from the break (d-c4be0b1a, df-9e673484)
   pitfall: a self-asserted refuted: line read as witnessed, and an automatic refutation proved the instrument reports a site, not that the classifier calls it a bypass (df-b9b2711b, df-87881a8d)
   pitfall: a break that turns a test red when the via does not test the claim refutes nothing; record unable instead (u-2e6ee400)
-  pitfall: a full run pushed the Scope page over its budget; witness with a targeted run (c-cdfe7253)
   learned: d-4dafa61b, df-b9b2711b, d-828ddc83, d-c4be0b1a, d-082ff525
   reach: kernel
   because: a refutation is what turns a requirement into an invariant, and the step that slips is the one no command checks: that the red came from the break. 32 of 52 refutations were once unwitnessed, and vacuous ones were found three times after they had been recorded
