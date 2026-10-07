@@ -33,7 +33,7 @@ import {
   structureOf,
   type RelianceSite,
 } from "../scope/derive.ts";
-import { CORE_RULE, DEFAULT_RULE, NO_CONTROL_NEEDED, NO_TRACED_CONTROL, ROUTE_RULE, CONTROL_WORDS, controlInWords, flowBoundsText, flowDefaultSelection, flowLabelLines, flowOf, flowPartialText, routeName, trustInWords } from "../scope/structure-flow.ts";
+import { CORE_RULE, DEFAULT_RULE, NO_CONTROL_NEEDED, NO_TRACED_CONTROL, ROUTE_RULE, CONTROL_WORDS, controlInWords, flowBoundsText, unreadLanguagesText, flowDefaultSelection, flowLabelLines, flowOf, flowPartialText, routeName, trustInWords } from "../scope/structure-flow.ts";
 import type { FlowModel } from "../scope/structure-flow.ts";
 import { CANDIDATE_RULES, NOT_DETECTED, coverageLine, groupLine } from "../scope/entrance-coverage.ts";
 import { renderOrder } from "../../journal/workVerbs.ts";
@@ -224,7 +224,7 @@ export function answerStructure(state: ShellState): Answer {
   const partial = flowPartialText(model);
   const lines = [
     ...(partial === undefined ? [] : [partial]),
-    `evidence: static and computed; ${model.evidence === "language adapter" ? `resolved references through the ${model.language} language adapter${bounded === undefined ? "" : `, ${bounded}`}` : `run sites only (${model.unread}); plain component interfaces unknown`}`,
+    `evidence: static and computed; ${model.evidence === "language adapter" ? `resolved references through the ${model.language} language adapter${bounded === undefined ? "" : `, ${bounded}`}${unreadLanguagesText(model)}` : `run sites only (${model.unread}); plain component interfaces unknown`}`,
     `health: ${h.verified.length} invariants enforced and verified, ${h.requirements.length} requirements, ${h.defects.length} structural defects, ${h.bypassed.length} requirements with a broken chokepoint, ${h.escalations.length} escalations${h.verified.length === 0 && h.requirements.length > 0 ? "; nothing is enforced yet" : ""}`,
     `crossings (${model.crossings.length}), every one drawn: ${model.crossings.filter((c) => c.on === "interface").length} on component interfaces, ${model.crossings.filter((c) => c.on === "entrance").length} on entrance lines only, ${model.crossings.filter((c) => c.on === "component").length} on component boundary marks`,
     `structural routes (${model.routes.length}), ${model.routesFrom === "root interfaces" ? "derived from the root component's component interfaces by reference weight, not flow: no entrance is declared" : model.routesFrom === "entrances" ? `one per distinct path and trust from the declared entrances; ${ROUTE_RULE}` : "none: no entrance is declared and there is no root"}:`,

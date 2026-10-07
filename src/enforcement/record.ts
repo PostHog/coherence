@@ -107,6 +107,11 @@ export interface RunEntry {
   testMs?: number;
   /** One line: why the verdict is what it is. */
   reason: string;
+  /**
+   * A multi-language project only: the language whose server graded a chokepoint, or whose test setup ran a
+   * totality oracle's test. Absent in a single-language project, where the record's instrument says it.
+   */
+  language?: string;
 }
 
 export interface RunRecord {
@@ -120,7 +125,13 @@ export interface RunRecord {
   commit: string | null;
   dirty: boolean;
   /** Which instrument answered and whether it was already warm. */
-  instrument: { language: string; server: "cold" | "warm" | "none" };
+  instrument: {
+    /** The language whose server answered; several joined with `+` when a multi-language run asked more than one. */
+    language: string;
+    server: "cold" | "warm" | "none";
+    /** When more than one language's server answered: each, with how it was reached. */
+    languages?: { language: string; server: "cold" | "warm" | "none" }[];
+  };
   latency: number;
   /** The machine's one-minute load average and core count as the run started, so a slower test on a busy machine is read against its load. */
   load?: { average: number; cores: number };

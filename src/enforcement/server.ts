@@ -56,7 +56,7 @@ import { dirname, extname, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import type { Definition, Ladder, LanguageAdapter, Refutation, ReferenceSite, ResolveHint, Resolved, Visibility } from "../adapters/adapter.ts";
-import { adapterFor } from "../adapters/index.ts";
+import { adapterFor, type Language } from "../adapters/index.ts";
 import { readEnforcementConfig } from "./config.ts";
 
 export const RUN_DIR = join(".coherence", "run");
@@ -153,12 +153,27 @@ function canonicalRoot(rootGiven: string): string {
   }
 }
 
-export function serverPaths(rootGiven: string): ServerPaths {
+/**
+ * The paths of one warm server: one per (root, language). The primary
+ * language's server (or a single-language project's only one) keeps the
+ * plain names; another language's names carry the language (server-python.json,
+ * server-python.lock, adapter-python.sock), so each language's server has its
+ * own lock and pointer and none waits for another's. The token file is the
+ * root's, shared.
+ */
+export function serverPaths(rootGiven: string, slot?: string): ServerPaths {
   const root = canonicalRoot(rootGiven);
   const dir = join(root, RUN_DIR);
-  const local = join(dir, "adapter.sock");
-  const socket = Buffer.byteLength(local) <= SOCKET_PATH_LIMIT ? local : join(tmpdir(), `coherence-${createHash("sha1").update(root).digest("hex").slice(0, 12)}.sock`);
-  return { root, dir, pointer: join(dir, "server.json"), socket, lock: join(dir, "server.lock"), http: join(dir, "http.json") };
+  const suffix = slot === undefined ? "" : `-${slot}`;
+  const local = join(dir, `adapter${suffix}.sock`);
+  const socket = Buffer.byteLength(local) <= SOCKET_PATH_LIMIT ? local : join(tmpdir(), `coherence-${createHash("sha1").update(slot === undefined ? root : `${root}:${slot}`).digest("hex").slice(0, 12)}.sock`);
+  return { root, dir, pointer: join(dir, `server${suffix}.json`), socket, lock: join(dir, `server${suffix}.lock`), http: join(dir, "http.json") };
+}
+
+/** The slot a language's server takes at a root: none for the primary language (or when none is named), else the language. */
+export function languageSlot(root: string, language: string | undefined): string | undefined {
+  if (language === undefined) return undefined;
+  return language === readEnforcementConfig(root).language ? undefined : language;
 }
 
 interface Pointer {
@@ -432,6 +447,8 @@ export interface ServeOptions {
   http?: HttpAppFactory;
   /** How long an HTTP client may take to send its headers (default 5 s); a test shortens it. */
   httpHeadersMs?: number;
+  /** The language this server answers for; the config's primary one when absent. */
+  language?: string | undefined;
 }
 
 export interface Serving {
@@ -443,7 +460,8 @@ export interface Serving {
 
 /** Start the server for a root; resolves once it listens. */
 export async function serve(rootGiven: string, options: ServeOptions = {}): Promise<Serving> {
-  const paths = serverPaths(rootGiven);
+  const slot = languageSlot(resolve(rootGiven), options.language);
+  const paths = serverPaths(rootGiven, slot);
   const root = paths.root;
   const idleMs = options.idleMs ?? DEFAULT_IDLE_MS;
   const log = options.log ?? (() => {});
@@ -458,7 +476,8 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   let adapter: LanguageAdapter;
   try {
     config = readEnforcementConfig(root);
-    adapter = adapterFor(config.language, root);
+    if (slot !== undefined && !(config.languages as readonly string[]).includes(slot)) throw new Error(`${slot} is not one of this project's languages (${config.languages.join(", ")})`);
+    adapter = adapterFor(slot === undefined ? config.language : (slot as Language), root);
   } catch (error) {
     if (owns()) rmSync(paths.lock, { force: true });
     heldHere.delete(paths.lock);
@@ -468,13 +487,13 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   let warm = false;
   void adapter.ready().then((state) => {
     warm = state.ok;
-    log(state.ok ? `${config.language} adapter ready` : `${config.language} adapter not ready: ${state.reason}`);
+    log(state.ok ? `${adapter.language} adapter ready` : `${adapter.language} adapter not ready: ${state.reason}`);
     // An adapter whose instrument enumerates the workspace (Pyright) reports when that is done, for the measurement.
     const enumerating = (adapter as { indexed?: () => Promise<unknown>; enumeration?: { sourceFiles: number; latency: number } }).indexed;
     if (state.ok && typeof enumerating === "function") {
       void enumerating.call(adapter).then(() => {
         const e = (adapter as { enumeration?: { sourceFiles: number; latency: number } }).enumeration;
-        if (e !== undefined) log(`${config.language} instrument enumerated ${e.sourceFiles} source files in ${e.latency} ms`);
+        if (e !== undefined) log(`${adapter.language} instrument enumerated ${e.sourceFiles} source files in ${e.latency} ms`);
       }, () => {});
     }
   });
@@ -502,7 +521,9 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   let http: HttpServer | undefined;
   let app: HttpApp | undefined;
   let opening: Promise<{ port: number; url: string }> | undefined;
-  let pointer: Pointer = { pid: process.pid, socket: paths.socket, language: config.language, startedAt, fingerprint, token };
+  let pointer: Pointer = { pid: process.pid, socket: paths.socket, language: adapter.language, startedAt, fingerprint, token };
+  // HTTP (the Scope reading) is the primary server's alone: another language's server never takes the root's port.
+  const httpFactory = slot === undefined ? options.http : undefined;
 
   const stop = async (): Promise<void> => {
     if (stopping) return;
@@ -559,8 +580,8 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
 
   /** Answer HTTP on loopback, once: the recorded port when it is free, else one the system assigns. */
   const openHttp = (): Promise<{ port: number; url: string }> => {
-    if (options.http === undefined) return Promise.reject(new Error("this warm server answers no HTTP: it was started without a reading to serve"));
-    const factory = options.http;
+    if (httpFactory === undefined) return Promise.reject(new Error("this warm server answers no HTTP: it was started without a reading to serve, or it serves a language other than the primary one"));
+    const factory = httpFactory;
     opening ??= (async () => {
       const made = factory({ root, adapter: queued, log, keepAlive: touch });
       app = made;
@@ -691,7 +712,7 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   }
   touch();
   // A root whose reading was opened before answers HTTP from the start, so a page left open reconnects to a restarted server.
-  if (options.http !== undefined && record.port !== undefined) {
+  if (httpFactory !== undefined && record.port !== undefined) {
     openHttp().catch((error: unknown) => log(`http did not start: ${error instanceof Error ? error.message : String(error)}`));
   }
   // Lifetime beyond idleness: a removed root (a deleted worktree) or a lock taken by another server ends this one.
@@ -874,6 +895,8 @@ export interface ConnectOptions {
   /** Spawn the server when none listens (default true). */
   spawn?: boolean;
   idleMs?: number;
+  /** The language whose server to connect to; the config's primary one when absent. */
+  language?: string | undefined;
 }
 
 export interface Connected {
@@ -912,7 +935,8 @@ async function awaitExit(pid: number): Promise<boolean> {
  * fingerprint is asked to stop, and the client then starts a fresh one.
  */
 export async function connectAdapter(rootGiven: string, options: ConnectOptions = {}): Promise<Connected> {
-  const paths = serverPaths(rootGiven);
+  const slot = languageSlot(resolve(rootGiven), options.language);
+  const paths = serverPaths(rootGiven, slot);
   const root = paths.root;
   const want = codeFingerprint();
   let spawns = 0;
@@ -959,7 +983,7 @@ export async function connectAdapter(rootGiven: string, options: ConnectOptions 
     }
     // Only the client that takes the lock spawns; a dead or never-listening owner's lock is reclaimed first.
     if (spawns < SPAWN_ATTEMPTS && (tryLock(paths, process.pid) || (reclaim(paths, false) && tryLock(paths, process.pid)))) {
-      const args = ["--disable-warning=ExperimentalWarning", CLI, "serve", "--root", root, ...(options.idleMs === undefined ? [] : ["--idle", String(Math.ceil(options.idleMs / 1000))])];
+      const args = ["--disable-warning=ExperimentalWarning", CLI, "serve", "--root", root, ...(slot === undefined ? [] : ["--language", slot]), ...(options.idleMs === undefined ? [] : ["--idle", String(Math.ceil(options.idleMs / 1000))])];
       const child = spawn(process.execPath, args, { cwd: root, detached: true, stdio: "ignore" });
       child.unref();
       if (child.pid !== undefined) handLock(paths, child.pid);

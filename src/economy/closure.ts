@@ -23,7 +23,13 @@
  *
  * Nothing is stored; the closure is a reading over references. With no
  * instrument the hops are skipped and invariants come from the files the
- * latest run touched, and the closure says so. Deterministic for one tree:
+ * latest run touched, and the closure says so.
+ *
+ * Per language: in a project that spans languages, each given file is read
+ * in its own language (by extension) and its hops go through that language's
+ * instrument, reached only when a given file is written in it; a language
+ * whose instrument is unavailable has its invariants taken from the latest
+ * run instead. Deterministic for one tree:
  * entries sort by path and every why sorts within its entry.
  */
 
@@ -32,7 +38,7 @@ import { resolve } from "node:path";
 import type { Definition, LanguageAdapter } from "../adapters/adapter.ts";
 import { projectListing, projectSites } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
-import { readEnforcementConfig } from "../enforcement/config.ts";
+import { languageOfFile, readEnforcementConfig } from "../enforcement/config.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
 import { describeChanged, type WorkingChange } from "./change.ts";
 import { componentOf, declarationsOf, importsOf, isTest, sourceFiles, toRelative } from "./source.ts";
@@ -45,6 +51,7 @@ export interface ClosureEntry {
 }
 
 export interface Instrument {
+  /** The language whose instrument answered; several joined with `+` in a multi-language project. */
   language: string;
   /** none when no adapter answered; the reason says why. */
   server: "cold" | "warm" | "none";
@@ -64,8 +71,17 @@ export interface Closure {
   change?: { named: string[]; working: WorkingChange };
 }
 
+/** One language's instrument as a caller reached it: the adapter and how, or why there is none. */
+export interface Reached {
+  adapter: LanguageAdapter | undefined;
+  server?: "cold" | "warm" | undefined;
+  reason?: string | undefined;
+}
+
 export interface ClosureOptions {
   adapter?: LanguageAdapter | undefined;
+  /** A multi-language project: each language's instrument, reached when a given file is written in it. Without it, `adapter` serves its own language alone. */
+  adapterOf?: ((language: Language) => Promise<Reached>) | undefined;
   /** How the adapter was reached, for the report. */
   server?: "cold" | "warm" | undefined;
   /** Why no adapter is available, when none is. */
@@ -153,22 +169,18 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
   const out = new Builder(root);
   for (const file of given) out.add(file, "given");
 
-  const adapter = options.adapter;
-  const instrument: Instrument =
-    adapter === undefined
-      ? { language, server: "none", reason: options.instrumentReason ?? "no adapter" }
-      : { language: adapter.language, server: options.server ?? "cold" };
-
   const texts = new Map<string, string>();
   for (const file of given) texts.set(file, readFileSync(resolve(root, file), "utf8"));
 
-  if (adapter !== undefined) {
-    // The tree holds still for one prediction: git's listing is taken once and every reported site is kept against it.
-    const listing = projectListing(root);
-    const hint = (file: string): { component: string; testFolders: readonly string[] } => ({ component: componentOf(model, file)?.folder ?? ".", testFolders: config.testFolders });
+  // The tree holds still for one prediction: git's listing is taken once and every reported site is kept against it.
+  let listing: ReturnType<typeof projectListing> | undefined;
+  const hint = (file: string): { component: string; testFolders: readonly string[] } => ({ component: componentOf(model, file)?.folder ?? ".", testFolders: config.testFolders });
 
+  /** The hops for the given files of one language, through that language's adapter. */
+  const hops = async (adapter: LanguageAdapter, language: Language, mine: readonly string[]): Promise<void> => {
+    listing ??= projectListing(root);
     // Hop in: who references what the given files declare.
-    for (const file of given) {
+    for (const file of mine) {
       for (const declaration of declarationsOf(texts.get(file)!, language)) {
         const resolved = await adapter.resolve(`${declaration.name} in ${file}`, hint(file));
         if (!resolved.ok) continue;
@@ -181,7 +193,7 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
     }
 
     // Hop out: what the given files reference, confirmed by a reference site in the given file (an import specifier is one).
-    for (const file of given) {
+    for (const file of mine) {
       for (const imported of importsOf(root, file, texts.get(file)!, language)) {
         if (givenSet.has(imported.module)) continue;
         const name = imported.name === undefined ? imported.module : `${imported.name} in ${imported.module}`;
@@ -200,7 +212,7 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
       for (const invariant of component.invariants) {
         for (const form of chokepointForms(invariant)) {
           // A name is defined only in a file whose text spells it: when no given file spells either name (or is the module a path names), neither can be defined in one.
-          if (!spelledInGiven(form.protects, given, texts) && !spelledInGiven(form.chokepoint, given, texts)) continue;
+          if (!spelledInGiven(form.protects, mine, texts) && !spelledInGiven(form.chokepoint, mine, texts)) continue;
           const resolvedProtects = await adapter.resolve(form.protects, { component: component.folder, testFolders: config.testFolders });
           const resolvedChokepoint = await adapter.resolve(form.chokepoint, { component: component.folder, testFolders: config.testFolders });
           const protectedDef: Definition | undefined = resolvedProtects.ok ? resolvedProtects.definition : undefined;
@@ -214,8 +226,10 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
         }
       }
     }
-  } else {
-    // No instrument: the latest run's entry files stand in for resolution; the hops are skipped.
+  };
+
+  /** No instrument: the latest run's entry files stand in for resolution; the hops are skipped. */
+  const fromLatestRun = (): void => {
     for (const component of model.components) {
       for (const invariant of component.invariants) {
         const latest = invariant.latest.find((l) => l.form === "chokepoint");
@@ -225,6 +239,41 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
         for (const f of latest.files) out.add(f, `touched by the chokepoint check of ${label} (from the run at ${latest.at.slice(0, 10)})`);
       }
     }
+  };
+
+  let instrument: Instrument;
+  let hopped = false;
+  if (config.languages.length === 1) {
+    const adapter = options.adapter;
+    instrument = adapter === undefined ? { language, server: "none", reason: options.instrumentReason ?? "no adapter" } : { language: adapter.language, server: options.server ?? "cold" };
+    if (adapter !== undefined) {
+      await hops(adapter, language, given);
+      hopped = true;
+    } else fromLatestRun();
+  } else {
+    // Each language the given files are written in, through its own instrument; a language with none takes its invariants from the latest run.
+    const used: { language: string; server: "cold" | "warm" }[] = [];
+    const reasons: string[] = [];
+    for (const each of config.languages) {
+      const mine = given.filter((f) => languageOfFile(f, config.languages) === each);
+      if (mine.length === 0) continue;
+      const reached: Reached = options.adapterOf !== undefined
+        ? await options.adapterOf(each)
+        : options.adapter?.language === each
+          ? { adapter: options.adapter, server: options.server ?? "cold" }
+          : { adapter: undefined, reason: options.instrumentReason ?? `no ${each} adapter` };
+      if (reached.adapter === undefined || reached.reason !== undefined) {
+        reasons.push(`${each}: ${reached.reason ?? "no adapter"}`);
+        continue;
+      }
+      await hops(reached.adapter, each, mine);
+      hopped = true;
+      used.push({ language: each, server: reached.server ?? "cold" });
+    }
+    if (reasons.length > 0 || !hopped) fromLatestRun();
+    instrument = used.length === 0
+      ? { language: config.languages.join("+"), server: "none", reason: reasons.join("; ") || (options.instrumentReason ?? "no given file is written in one of the project's languages") }
+      : { language: used.map((u) => u.language).join("+"), server: used.some((u) => u.server === "cold") ? "cold" : "warm", ...(reasons.length === 0 ? {} : { reason: reasons.join("; ") }) };
   }
 
   // Dependents of what the change removed: files still importing a deleted path, or the old path of a rename.
@@ -235,10 +284,10 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
   }
   if (vanished.size > 0) {
     const gone = new Set(vanished.keys());
-    for (const file of sourceFiles(root, language)) {
+    for (const each of config.languages) for (const file of sourceFiles(root, each)) {
       if (gone.has(file)) continue;
       const text = texts.get(file) ?? readFileSync(resolve(root, file), "utf8");
-      for (const imported of importsOf(root, file, text, language, gone)) {
+      for (const imported of importsOf(root, file, text, each, gone)) {
         const what = vanished.get(imported.module);
         if (what !== undefined) out.add(file, `imports ${imported.name ?? "the module"} from ${what}`);
       }
@@ -260,7 +309,7 @@ export async function predictClosure(rootGiven: string, paths: readonly string[]
 
   const entries = out.build();
   const bytes = entries.reduce((sum, e) => sum + e.bytes, 0);
-  const closure: Closure = { given, entries, bytes, tokens: tokenEstimate(bytes), instrument, hops: adapter === undefined ? "skipped" : "references" };
+  const closure: Closure = { given, entries, bytes, tokens: tokenEstimate(bytes), instrument, hops: hopped ? "references" : "skipped" };
   if (working !== undefined) closure.change = { named, working };
   return closure;
 }
