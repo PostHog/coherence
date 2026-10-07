@@ -208,6 +208,9 @@ test("an edit pays for the files it names, the specs and the history's file list
       const input = edit(1);
       out[where] = { pre: await workOf(project, "PreToolUse", input), post: await workOf(project, "PostToolUse", input) };
     }
+    // The edit's check appended its run, ungraded: deriving a state would read the whole model and history, and the invariant floor counts it nowhere.
+    const last = readFileSync(join(project.root, ".coherence", "runs", `${SESSION}.jsonl`), "utf8").trim().split("\n").at(-1)!;
+    assert.ok((JSON.parse(last) as RunRecord).invariants.every((e) => e.ungraded === true && e.state === undefined), "the edit's check recorded its entries ungraded");
     return out;
   });
   for (const [where, { rel }] of Object.entries(files)) {
@@ -316,7 +319,7 @@ test("the coverage scan compares a line only with the phrases its own words star
 /** The meter: the one module that takes child_process. */
 const SPAWN_ALLOWED = new Set(["lifecycle/work-meter.ts"]);
 /** Test support that takes child_process to build fixtures, each by name. */
-const FIXTURES_THAT_SPAWN = new Set(["adapters/git-count-fixture.ts", "lifecycle/size-fixture.ts", "readings/scope/undeclared-fixture.ts", "readings/scope/gaps-fixture.ts"]);
+const FIXTURES_THAT_SPAWN = new Set(["adapters/git-count-fixture.ts", "lifecycle/size-fixture.ts", "readings/scope/undeclared-fixture.ts", "readings/scope/gaps-fixture.ts", "enforcement/server-fixture.ts"]);
 /** Test support that loads a module by a computed name, each by name: the file system counter, which takes fs as CommonJS to replace its functions. */
 const LOADERS_ALLOWED = new Set(["lifecycle/fs-count-fixture.ts"]);
 

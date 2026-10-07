@@ -652,7 +652,8 @@ function chokepointModel(root: string, entries: readonly ChokepointEntry[]): Spe
 async function checkAtEdit(root: string, input: HookInput, options: HookOptions, files: readonly string[], model: SpecModel, touched: readonly string[]): Promise<string> {
   const session = sessionOf(input) ?? "unknown-session";
   const agent = agentOf(input);
-  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files] });
+  // The edit's check grades nothing: deriving a state reads the whole model and history, and the floor counts only a full run's grades.
+  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false });
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
   // A check the instrument could not make is said, never silent: a quiet not-run would read as a clean edit. A value written as prose is the spec's own lack, reported by spec --check instead.

@@ -144,6 +144,8 @@ export interface RunEntry {
   state?: "requirement" | "invariant" | "structural defect";
   /** What this form of the bullet enforces through: its via: test titles, or its chokepoints. The floor recognizes a rename by it. */
   enforces?: string[];
+  /** Set on an edit's check, which derives no state (run.ts, grade: false): the invariant floor does not count the entry. */
+  ungraded?: true;
 }
 
 export interface RunRecord {

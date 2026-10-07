@@ -41,6 +41,12 @@ export interface RunOptions {
   invariants?: readonly string[] | undefined;
   /** Files (project-relative) whose text changed since the instrument last read them; the warm server re-reads them first. */
   refresh?: readonly string[] | undefined;
+  /**
+   * False for an edit's check: the run's entries are recorded ungraded, with
+   * no state derived, since deriving one reads the whole spec model and run
+   * store; the invariant floor counts only graded entries. A full run grades.
+   */
+  grade?: boolean | undefined;
   /** An adapter to use instead of the warm server (tests, and `--no-server`); in a multi-language project, for its own language. */
   adapter?: LanguageAdapter | undefined;
   /** Adapters by language to use instead of the warm servers (tests, and `--no-server` in a multi-language project). */
@@ -485,7 +491,8 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     ...(batched.size === 0 ? {} : { batch: { ms: totalBatch } }),
     invariants: details.map((d) => d.entry),
   };
-  gradeRecord(root, record);
+  if (options.grade === false) for (const entry of record.invariants) entry.ungraded = true;
+  else gradeRecord(root, record);
   const file = appendRun(root, record);
   const outcome: RunOutcome = { record, file, details, instrumentReason, instrumentDied: needsAdapter && instrumentReason !== undefined };
   if (batched.size > 0) {
