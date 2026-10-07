@@ -709,7 +709,7 @@ test("the feed cursor advances only after the feed is printed: rendering moves n
     assert.notDeepEqual(readCursor(dir, "child"), before, "the commit after the print moves the cursor");
     assert.equal(feedContext(dir, { session_id: "child" }).text, "");
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
 

@@ -874,8 +874,14 @@ export function economyStopText(snapshot: Snapshot | undefined): string {
   return `${head} Not read: ${unread.slice(0, 6).join(", ")}${unread.length > 6 ? `, and ${unread.length - 6} more` : ""}.`;
 }
 
-/** The warm-up the command line starts: this checkout's warm verb, detached and never waited on. */
+/**
+ * The warm-up the command line starts: this checkout's warm verb, detached
+ * and never waited on. COHERENCE_NO_WARM_UP=1 starts nothing: the test suite
+ * sets it, since a detached server started in a fixture outlives the test
+ * and writes into a folder the test is removing.
+ */
 export const WARM_UP = (root: string): void => {
+  if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
   try {
     const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", OWN_CLI, "warm"], { cwd: root, detached: true, stdio: "ignore" });
     child.on("error", () => {});
