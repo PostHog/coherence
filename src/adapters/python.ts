@@ -75,7 +75,7 @@ import {
   type Visibility,
 } from "./adapter.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
-import { isVirtualEnvironment, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, referenceHorizon, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
+import { horizonFolders, isVirtualEnvironment, keepHorizonFiles, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, nestedFolder, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
 
 /** The small JSON-RPC surface the adapter needs, exposed so a test can control server ordering. */
 export interface PythonLanguageClient {
@@ -540,6 +540,8 @@ export class PythonAdapter implements LanguageAdapter {
   private readonly bounds: AdapterBounds | undefined;
   /** The scratch folder a bounded workspace's configuration lives in, removed at close. */
   private boundedFolder: string | undefined;
+  /** The folders outside the project the config's `references` adds to the search, absolute; set when the server starts. */
+  private horizon: string[] = [];
   /** Whether the workspace is bounded, or why it could not be. */
   bounded: { ok: true; sourceFiles?: number } | { ok: false; reason: string } | undefined;
 
@@ -612,12 +614,15 @@ export class PythonAdapter implements LanguageAdapter {
     const exclude = workspace === this.root ? workspaceExclusions(this.root) : undefined;
     // A project nested below the repository top imports its own modules from that top (products.notebooks.backend.x): the top joins
     // the import search, never the workspace, so those imports resolve and their references are reported, and no file above is indexed.
-    const top = workspace === this.root && referenceHorizon(this.root) !== undefined ? repositoryTop(this.root) : undefined;
+    const top = workspace === this.root && nestedFolder(this.root) !== undefined ? repositoryTop(this.root) : undefined;
+    // The config's reference horizon joins the files Pyright enumerates, so a references query searches those folders too.
+    this.horizon = workspace === this.root ? horizonFolders(this.root) : [];
+    const include = this.horizon.length === 0 ? undefined : [this.root, ...this.horizon];
     client.onRequest = (method, params) => {
       if (method !== "workspace/configuration") return null;
       const items = (params as { items?: { section?: string }[] }).items ?? [];
       // Diagnostics for open files only: the check asks for references and symbols, never for a workspace-wide type check.
-      return items.map((item) => (item.section === "python" ? { analysis: { diagnosticMode: "openFilesOnly", ...(exclude === undefined ? {} : { exclude }), ...(top === undefined ? {} : { extraPaths: [top] }) } } : null));
+      return items.map((item) => (item.section === "python" ? { analysis: { diagnosticMode: "openFilesOnly", ...(exclude === undefined ? {} : { exclude }), ...(top === undefined ? {} : { extraPaths: [top] }), ...(include === undefined ? {} : { include }) } } : null));
     };
     try {
       await client.request("initialize", {
@@ -886,8 +891,8 @@ export class PythonAdapter implements LanguageAdapter {
       }, ENUMERATION_TIMEOUT_MS);
       reported.push(...(locations ?? []));
     }
-    // Only the project's own files are evidence, and a site outside them is dropped before it is read or opened.
-    const own = keepProjectFiles(this.root, reported.map((location) => this.relative(location.uri)), this.listingNow());
+    // Only the project's own files and its reference horizon's are evidence, and a site outside them is dropped before it is read or opened.
+    const own = keepHorizonFiles(this.root, reported.map((location) => this.relative(location.uri)), this.listingNow(), this.horizon);
     const seen = new Set<string>();
     const sites: ReferenceSite[] = [];
     for (const location of reported) {
