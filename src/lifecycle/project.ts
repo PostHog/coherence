@@ -35,6 +35,15 @@ export const SETTINGS_FILE: Record<Host, string> = {
   codex: ".codex/hooks.json",
 };
 
+/**
+ * The personal settings file a host reads beside the shared one, relative to
+ * the folder holding it, for a host that has one: Claude Code's is never
+ * committed, and launched in a subfolder it reads the one at the git root.
+ */
+export const LOCAL_SETTINGS_FILE: Partial<Record<Host, string>> = {
+  claude: ".claude/settings.local.json",
+};
+
 /** The harness's own name for the project directory, honored when it agrees with where the process runs. */
 export const PROJECT_DIR_VAR = "CLAUDE_PROJECT_DIR";
 
@@ -71,7 +80,7 @@ export function installedRoot(fallback: string, env: NodeJS.ProcessEnv = process
   if (typeof named === "string" && named !== "" && existsSync(named) && within(named, start)) return real(named);
   let dir = start;
   for (;;) {
-    if (Object.values(SETTINGS_FILE).some((file) => existsSync(join(dir, file)))) return dir;
+    if ([...Object.values(SETTINGS_FILE), ...Object.values(LOCAL_SETTINGS_FILE)].some((file) => existsSync(join(dir, file)))) return dir;
     const up = dirname(dir);
     if (up === dir) return undefined;
     dir = up;
@@ -243,9 +252,11 @@ function listNestedProjects(base: string): string[] {
 
 /**
  * Where a hook event belongs: to one project, to none (outside every
- * project, ignored), or to several the event cannot choose between.
+ * project, ignored), or to several the event cannot choose between. `above`
+ * marks a project reached from a cwd above it (the repository root), not
+ * from a cwd or a file inside it.
  */
-export type HookProject = { kind: "project"; root: string } | { kind: "outside" } | { kind: "several"; projects: string[] };
+export type HookProject = { kind: "project"; root: string; above?: true } | { kind: "outside" } | { kind: "several"; projects: string[] };
 
 /**
  * The project a hook event belongs to, for a hook installed at `base` (the
@@ -271,7 +282,7 @@ export function hookProject(base: string, subjects: readonly string[], cwd: stri
   if (nested.length === 0) return { kind: "project", root: base };
   if (subjects.length > 0) return { kind: "outside" };
   const below = nested.filter((project) => within(cwd, project));
-  if (below.length === 1) return { kind: "project", root: below[0]! };
+  if (below.length === 1) return { kind: "project", root: below[0]!, above: true };
   return below.length === 0 ? { kind: "outside" } : { kind: "several", projects: below };
 }
 

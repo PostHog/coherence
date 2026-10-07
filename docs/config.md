@@ -24,13 +24,22 @@ config, the specs and `.coherence/` in the folder you adopt, say
   settings at the repository root, where a host started there reads them,
   and in the folder, for a session started there. `.coherence/.gitignore`
   goes in the folder only. `hooks --check` and `hooks uninstall` cover both
-  settings files.
+  settings files. The settings at the root reach every engineer who works in
+  the repository. To adopt for yourself alone, run `hooks install --host
+  claude --local`. It writes `.claude/settings.local.json` at the repository
+  root instead, which Claude Code reads wherever in the repository it is
+  launched and which is never committed.
 - **Which project an event belongs to.** An edit belongs to the folder
   holding the nearest config to the file it writes. A command, prompt or
   stop belongs to the folder nearest its working directory. At the
   repository root, it belongs to the one project below. If there are
   several projects below, the hooks stay silent until the session works
   inside one of them.
+- **Orient waits for the project.** A session started at the repository
+  root hears one line at its start naming the adopted folder. Its prompts,
+  stops and work elsewhere hear nothing. The first edit or command inside
+  the folder carries the project's orient, once per session, and from then
+  on the session's events are the project's.
 - **Outside the project.** An edit, command or prompt elsewhere in the
   repository gets no answer. It reads no spec, walks no corpus and writes
   nothing. A command run at the repository root, such as an `enact` or
