@@ -206,6 +206,9 @@
       },
       "provenance": {
         "defined_by": "owner, 2026-09-17"
+      },
+      "properties": {
+        "exempt reference": "A reference to the protected thing from inside the folder a chokepoint bullet's from: line exempts (from: outside the component, or from: outside <folder>; the config's chokepointFrom when the bullet is silent; from: anywhere, the default, exempts nothing). It is classed exempt and reported with the from: value that governed and who said it, never a bypass and never dropped, so a module boundary lets the module use its own internals while a narrow invariant counts every reference."
       }
     },
     {

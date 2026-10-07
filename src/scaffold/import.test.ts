@@ -78,7 +78,8 @@ function run(cwd: string, ...argv: string[]): Run {
 
 const BILLING = `# Billing
 
-<what shop.billing is for, in one line> Billing, owned by team-payments, team-risk (shop/billing/product.yaml); drafted from tach module shop.billing (tach.toml:4).
+<what shop.billing is for, in one line> Billing, drafted from tach module shop.billing (tach.toml:4).
+owners: team-payments, team-risk
 
 ## invariants
 - declared dependencies only: Code in shop/billing imports another tach module only where tach.toml declares it: shop.stock.
@@ -96,15 +97,17 @@ const BILLING = `# Billing
   refuted: <what was broken> -> <what was seen> (<date>)
   kinds: <a, b: the kinds of thing protected, or none>
 - internals only through api.facade: Code outside shop/billing reaches the internal it protects only through api.facade.
-  protects: <an internal of shop/billing that nothing but api.facade references; Coherence counts the module's own references too>
+  protects: <an internal of shop/billing that code outside it reaches only through api.facade>
   chokepoint: shop/billing/api/facade/
+  from: outside the component
   because: <why this exists; what it protects against>
   crossing: <trust level> -> <trust level>
   refuted: <what was broken> -> <what was seen> (<date>)
   kinds: <a, b: the kinds of thing protected, or none>
 - internals only through api\\.(alpha|beta): Code outside shop/billing reaches the internal it protects only through api\\.(alpha|beta).
-  protects: <an internal of shop/billing that nothing but api\\.(alpha|beta) references; Coherence counts the module's own references too>
+  protects: <an internal of shop/billing that code outside it reaches only through api\\.(alpha|beta)>
   chokepoint: <the module or symbol 'api\\.(alpha|beta)' names under shop/billing; a pattern names no single path>
+  from: outside the component
   because: <why this exists; what it protects against>
   crossing: <trust level> -> <trust level>
   refuted: <what was broken> -> <what was seen> (<date>)
@@ -125,7 +128,7 @@ const ORDERS = `# Orders
   kinds: <a, b: the kinds of thing protected, or none>
 `;
 
-test("scaffold import tach drafts each module's spec from tach.toml: its folder, its intent with the product.yaml owners, its declared dependencies, and a chokepoint per exposed path", () => {
+test("scaffold import tach drafts each module's spec from tach.toml: its folder, its intent, an owners: line from product.yaml, its declared dependencies, and a chokepoint per exposed path that governs from outside the component", () => {
   const root = fixture();
   try {
     const result = run(root, "import", "tach", "shop.billing", "shop.orders");
@@ -169,6 +172,12 @@ test("scaffold import tach --write creates only the specs that do not exist, rep
     assert.ok(billing !== undefined, "the written draft is a component");
     assert.equal(billing.invariants.length, 4);
     assert.deepEqual(model.problems.filter((p) => p.file.includes("Billing")), [], "the written draft parses");
+    assert.deepEqual(billing.owners, ["team-payments", "team-risk"], "the owners land in the owners: line, not the intent");
+    assert.doesNotMatch(billing.intent, /team-payments/);
+    const facade = billing.invariants.find((i) => i.name === "internals only through api.facade")!.enforcements;
+    assert.equal(facade.length, 0, "the protected internal is still a placeholder, so no chokepoint is checked yet");
+    const orders = model.components.find((c) => c.folder === "shop/orders");
+    assert.equal(orders?.owners, undefined, "a module with no product.yaml declares no owners");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

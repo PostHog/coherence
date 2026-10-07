@@ -5,8 +5,8 @@
   step: stage the smallest break that changes the behavior the bullet claims, not the strings the detector reads; read the diff to confirm the edit touched only the lines you meant
   step: refute <component>/<name> --broke "<what you changed>"; the detector fails on its own assertion, not by a hang, a kill, a timeout, or what an earlier test left behind
     leaves: run record for the bullet, refutation red
-  step: restore the source byte for byte
-    leaves: the file matches HEAD
+  step: restore the source byte for byte: from HEAD when the code under test is committed, and from a copy taken before the break when it is not
+    leaves: the file matches its state before the break (git diff against HEAD, or cmp against the copy)
   step: run them again in one batched run confirmed with run --each, and see each green batched and alone
     leaves: run record for the bullets, pass; per-test run record, pass
   step: when the red did not come from the break, record a decision that this refutation does not count and refute again; the run store is append-only, so the correction is a later record

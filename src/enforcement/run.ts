@@ -21,6 +21,7 @@ import { isLanguage, type Language } from "../adapters/index.ts";
 import { projectFiles } from "../adapters/project-files.ts";
 import { gitState } from "../journal/store.ts";
 import { workBinding } from "../journal/work.ts";
+import type { ChokepointFrom } from "../spec/grammar.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
 import { checkChokepoint, type ChokepointResult } from "./check.ts";
 import { languageOfFile, readEnforcementConfig, setupClaims, type EnforcementConfig } from "./config.ts";
@@ -106,8 +107,8 @@ export interface RunOutcome {
   latency?: LatencyReading;
 }
 
-function chokepointEnforcements(invariant: ModelInvariant): { protects: string; chokepoint: string }[] {
-  return invariant.enforcements.flatMap((e) => (e.form === "chokepoint" ? [{ protects: e.protects, chokepoint: e.chokepoint }] : []));
+function chokepointEnforcements(invariant: ModelInvariant): { protects: string; chokepoint: string; from: ChokepointFrom | undefined }[] {
+  return invariant.enforcements.flatMap((e) => (e.form === "chokepoint" ? [{ protects: e.protects, chokepoint: e.chokepoint, from: e.from }] : []));
 }
 
 function totalityEnforcements(invariant: ModelInvariant): { over: string; via: string }[] {
@@ -190,6 +191,8 @@ interface ChokepointPlan {
   invariant: ModelInvariant;
   protects: string;
   chokepoint: string;
+  /** The bullet's own from: line, when it has one. */
+  from: ChokepointFrom | undefined;
   languages: Language[];
 }
 
@@ -288,7 +291,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   let listed: string[] | undefined;
   const files = (): string[] => (listed ??= projectFiles(root));
   const plans: ChokepointPlan[] = wantChokepoints
-    ? selected.flatMap(({ component, invariant }) => chokepointEnforcements(invariant).map(({ protects, chokepoint }) => ({ component, invariant, protects, chokepoint, languages: enforcementLanguages(config, component, invariant, protects, chokepoint, files) })))
+    ? selected.flatMap(({ component, invariant }) => chokepointEnforcements(invariant).map(({ protects, chokepoint, from }) => ({ component, invariant, protects, chokepoint, from, languages: enforcementLanguages(config, component, invariant, protects, chokepoint, files) })))
     : [];
   const chooseSetup = setupChooser(root, config);
   const multiSetup = config.tests.length > 1;
@@ -346,7 +349,9 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   for (const { component, invariant } of selected) {
     if (wantChokepoints) {
       for (const plan of plans.filter((p) => p.component === component && p.invariant === invariant)) {
-        const { protects, chokepoint } = plan;
+        const { protects, chokepoint, from } = plan;
+        // The bullet's own from: line governs; a silent bullet takes the config's default, and with none, anywhere.
+        const governs = from !== undefined ? { from, fromBy: "bullet" as const } : config.chokepointFrom !== undefined ? { from: config.chokepointFrom, fromBy: "config" as const } : {};
         const t0 = Date.now();
         let firstReason: string | undefined;
         for (const [i, language] of plan.languages.entries()) {
@@ -374,7 +379,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
           }
           let result: ChokepointResult;
           try {
-            result = await checkChokepoint(door.adapter, { protects, chokepoint, component, testFolders: config.testFolders, root });
+            result = await checkChokepoint(door.adapter, { protects, chokepoint, component, testFolders: config.testFolders, root, ...governs });
           } catch (error) {
             const message = error instanceof Error ? error.message.split("\n")[0]! : String(error);
             instruments.fail(language, message);
@@ -403,6 +408,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
               verdict: result.verdict,
               grade: result.grade,
               ...(result.enforcer === undefined ? {} : { enforcer: result.enforcer }),
+              ...(result.governed === undefined ? {} : { from: result.governed }),
               refutation: result.refutation,
               bypasses: result.bypasses,
               ...(result.siteEvidence !== "complete" ? {} : { sites: result.sites.map((site) => ({
@@ -539,25 +545,26 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     return pass(one({ adapter: undefined, server: undefined, reason: undefined }), { language: config.language, server: "none" }, undefined);
   }
 
-  // Several languages: each language's instrument is reached only when a check first asks for it, and let go after.
-  const remotes: RemoteAdapter[] = [];
-  const instruments = new Instruments(async (language): Promise<Door> => {
-    const given = options.adapters?.[language] ?? (options.adapter?.language === language ? options.adapter : undefined);
-    if (given !== undefined) {
-      await given.forget(options.refresh ?? []);
-      return { adapter: given, server: "cold", reason: undefined };
-    }
-    if (options.adapter !== undefined || options.adapters !== undefined || options.server === false) return { adapter: undefined, server: undefined, reason: `no ${language} adapter was handed to this run` };
-    const connected = await connectAdapter(root, { language, ...(options.idleMs === undefined ? {} : { idleMs: options.idleMs }) });
-    remotes.push(connected.adapter);
-    await connected.adapter.forget(options.refresh ?? []);
-    return { adapter: connected.adapter, server: connected.server, reason: undefined };
-  });
-  try {
-    return await pass(instruments, undefined, undefined);
-  } finally {
-    for (const remote of remotes) await remote.close();
-  }
+  // Several languages: each language's instrument is reached through the one door only when a check first asks for it, and let go after.
+  return withWarmAdapters(
+    root,
+    (open) => {
+      const instruments = new Instruments(async (language): Promise<Door> => {
+        const given = options.adapters?.[language] ?? (options.adapter?.language === language ? options.adapter : undefined);
+        if (given !== undefined) {
+          await given.forget(options.refresh ?? []);
+          return { adapter: given, server: "cold", reason: undefined };
+        }
+        if (options.adapter !== undefined || options.adapters !== undefined || options.server === false) return { adapter: undefined, server: undefined, reason: `no ${language} adapter was handed to this run` };
+        const door = await open(language);
+        if (door.adapter === undefined) return { adapter: undefined, server: undefined, reason: door.reason };
+        await door.adapter.forget(options.refresh ?? []);
+        return { adapter: door.adapter, server: door.server, reason: undefined };
+      });
+      return pass(instruments, undefined, undefined);
+    },
+    { idleMs: options.idleMs },
+  );
 }
 
 /**
@@ -642,9 +649,8 @@ async function confirmEach(
 }
 
 /**
- * The one door to the warm instrument, for the run and for a reading that
- * needs the adapter itself (the economy's closure): connects over the
- * socket, spawning the server detached when none listens, re-reads the
+ * One language's warm instrument through the one door, for the run and for a
+ * reading that needs the adapter itself (the economy's closure): re-reads the
  * named files, hands the adapter to `fn` with whether the server was warm,
  * and ends the connection after. When no server answers, `fn` gets no
  * adapter and the reason, so a caller records not run rather than crashing.
@@ -654,49 +660,50 @@ export async function withWarmAdapter<T>(
   fn: (adapter: RemoteAdapter | undefined, server: "cold" | "warm" | undefined, reason: string | undefined) => Promise<T>,
   options: { refresh?: readonly string[] | undefined; idleMs?: number | undefined; language?: string | undefined } = {},
 ): Promise<T> {
-  let remote: RemoteAdapter | undefined;
-  let server: "cold" | "warm" | undefined;
-  let reason: string | undefined;
-  try {
-    const connected = await connectAdapter(root, { ...(options.idleMs === undefined ? {} : { idleMs: options.idleMs }), ...(options.language === undefined ? {} : { language: options.language }) });
-    remote = connected.adapter;
-    server = connected.server;
-    await remote.forget(options.refresh ?? []);
-  } catch (error) {
-    reason = error instanceof Error ? error.message : String(error);
-  }
-  try {
-    return await fn(remote, server, reason);
-  } finally {
-    if (remote !== undefined) await remote.close();
-  }
+  return withWarmAdapters(
+    root,
+    async (open) => {
+      const door = await open(options.language);
+      let reason = door.reason;
+      if (door.adapter !== undefined) {
+        try {
+          await door.adapter.forget(options.refresh ?? []);
+        } catch (error) {
+          reason = error instanceof Error ? error.message : String(error);
+        }
+      }
+      return fn(door.adapter, door.server, reason);
+    },
+    { idleMs: options.idleMs },
+  );
 }
 
 /**
- * The door to several languages' warm instruments, for a reading in a
- * multi-language project: `open` connects to one language's warm server the
- * first time it is asked (spawning it when none listens), never before, and
- * every connection is ended after `fn`. A language whose server cannot be
- * reached answers with the reason, so a caller says so rather than crashing.
+ * The one door to the warm instruments: `open` connects over the socket to
+ * one language's warm server (the primary's when no language is named) the
+ * first time it is asked, spawning it detached when none listens, never
+ * before, and every connection is ended after `fn`. A language whose server
+ * cannot be reached answers with the reason, so a caller says so rather than
+ * crashing. Nothing else connects.
  */
 export async function withWarmAdapters<T>(
   root: string,
-  fn: (open: (language: string) => Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }>) => Promise<T>,
+  fn: (open: (language?: string) => Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }>) => Promise<T>,
   options: { idleMs?: number | undefined } = {},
 ): Promise<T> {
   const remotes: RemoteAdapter[] = [];
   const opened = new Map<string, Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }>>();
-  const open = (language: string): Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }> => {
-    let door = opened.get(language);
+  const open = (language?: string): Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }> => {
+    let door = opened.get(language ?? "");
     if (door === undefined) {
-      door = connectAdapter(root, { language, ...(options.idleMs === undefined ? {} : { idleMs: options.idleMs }) }).then(
+      door = connectAdapter(root, { ...(language === undefined ? {} : { language }), ...(options.idleMs === undefined ? {} : { idleMs: options.idleMs }) }).then(
         (connected) => {
           remotes.push(connected.adapter);
           return { adapter: connected.adapter, server: connected.server };
         },
         (error: unknown) => ({ adapter: undefined, reason: error instanceof Error ? error.message : String(error) }),
       );
-      opened.set(language, door);
+      opened.set(language ?? "", door);
     }
     return door;
   };

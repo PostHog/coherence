@@ -7,6 +7,20 @@ intent, `## trust levels` in the entry spec only, `## entrances`, and
 `## invariants`. No other section: the parser refuses the reference's sections
 by name and says what replaced each.
 
+The header may also declare who owns the component, on one line beside the
+intent:
+
+```markdown
+# Notebooks
+
+The notebooks product: documents that mix queries and prose.
+owners: team-notebooks, @ana
+```
+
+The owners are comma separated and declared, never routed on. The spec
+reading (`spec --check`), Scope's component card and `query component` show
+them. An empty `owners:` line or a second one is a problem.
+
 ## Entrances
 
 An entrance is where work enters the system from outside it: a command, a host
@@ -74,15 +88,16 @@ It reads the nearest `tach.toml` at or above the project root. Each
 a source root, and its draft carries:
 
 - an intent line holding a placeholder for what the module is for, the `name`
-  and `owners` of a `product.yaml` in its folder, and where tach.toml declares
-  it. The grammar has no owner slot.
+  of a `product.yaml` in its folder, and where tach.toml declares it; and the
+  `owners` of that `product.yaml` on the header's `owners:` line.
 - for `depends_on`, a totality oracle bullet listing the declared modules.
   Reliance stays computed, never declared.
 - for each `[[interfaces]]` entry whose `from` pattern matches the module, a
   totality oracle bullet listing everything it exposes, and one chokepoint bullet
   per exposed path. That path is the chokepoint when it names a package folder,
   a module file or a symbol in its file on disk. Otherwise it is a placeholder
-  showing the pattern.
+  showing the pattern. Each carries `from: outside the component`, because
+  tach checks only imports from other modules.
 
 The protected internal, `because:`, `crossing:` and `kinds:` stay
 placeholders. The totality oracle bullets name pytest functions (`via:
@@ -93,9 +108,6 @@ diagnostics.
 
 The command cannot express everything tach does:
 
-- A chokepoint counts every reference outside it, the module's own included,
-  whereas tach checks only imports from other modules. Choose a protected internal
-  that nothing but the exposed path references.
 - One chokepoint bullet names one site, whereas tach lets a module expose
   several at once. The totality oracle bullet carries the union.
 - Patterns that name no single path, `layer`, `utility` and `visibility` have
@@ -160,6 +172,40 @@ names the whole set the detector is total over and the test:
   kinds: storage
   checklist: scoped-reads dismissed: reads are the capability invariant's
 ```
+
+### Which references a chokepoint governs
+
+By default a chokepoint governs every reference to the protected thing: any
+reference outside the chokepoint, tests aside, is a bypass. That is right for a
+narrow invariant ("the secret is read only through `seal`"). It is wrong for a
+module boundary, where outside code may reach a module's internals only
+through its facade but the module's own code uses them freely. A `from:` line
+says which references the chokepoint governs:
+
+```markdown
+- internals only through the facade: Code outside the notebooks reaches their rows only through the facade.
+  protects: NOTEBOOK_ROWS
+  chokepoint: products/notebooks/backend/facade/
+  from: outside the component
+```
+
+- `from: anywhere`, the default, governs every reference.
+- `from: outside the component` governs only references from outside the
+  folder of the component whose spec holds the bullet.
+- `from: outside <folder>` governs only references from outside that
+  project-relative folder.
+
+A reference from inside the exempted folder is classed `exempt`. It is reported
+and counted, never dropped and never a bypass. A re-export there is still a
+bypass, because it widens the thing's reach. Without a `from:` line, the
+config's `chokepointFrom` applies, and with neither, `anywhere`. The run
+records which value governed and who said it: the bullet, the config, or the
+default. The grade's reason, the `run` output, Scope's enforcement and sites,
+and `query relies-on` all show it, so the component's own references read as
+exempted rather than absent. Under a `from:` line that exempts a folder, the
+automatic refutation also stages a use of the protected thing from an unsaved
+document outside that folder. The check must call it a bypass. Any other value
+is a problem, and so is a `from:` on a bullet with no chokepoint form.
 
 `because` says why the invariant exists and what it protects against.
 `crossing` is the security marker: two trust levels the entry spec declares.

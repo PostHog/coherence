@@ -20,6 +20,7 @@ import { JournalError, parseFlags } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
 import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { verdictText } from "../spec/report.ts";
+import { governedBy } from "./check.ts";
 import { readEnforcementConfig } from "./config.ts";
 import { latencyLines } from "./latency.ts";
 import { RUNS_DIR, appendRefutation, latestByEnforcement, loadRuns, type Form, type RefutationRecord } from "./record.ts";
@@ -62,7 +63,9 @@ export function formatRun(outcome: RunOutcome): string {
         lines.push(`    ${e.reason}`);
         if (c !== undefined && c.protectedThing !== undefined) {
           const counts = c.counts;
-          lines.push(`    references: ${counts.inside} inside, ${counts.test} test, ${counts.bypass} bypass`);
+          const governed = c.governed;
+          const exempt = governed?.exempt === undefined ? "" : `, ${counts.exempt} exempt (from inside ${governed.exempt}; from: ${governed.value}, by ${governedBy(governed)})`;
+          lines.push(`    references: ${counts.inside} inside, ${counts.test} test${exempt}, ${counts.bypass} bypass`);
           lines.push(`    refutation ${e.refutation}: ${c.refutationAccount}`);
         }
       } else {

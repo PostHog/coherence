@@ -61,6 +61,9 @@
   pitfall: both outside adoptions left their route gaps open because nothing in the session's loop showed them (d-a1095ef2)
   pitfall: an adoption declared one spec per top-level folder and stopped, and a human had to ask for the nested units (df-9750aee2)
   pitfall: a fresh adoption found its first requirements already false and its tests unable to run unattended, and had to improvise what to record (df-8ac95c4d)
+  pitfall: in a monorepo, a session started at the repository root took the whole repository as the project: another team's specs reached orient, their practices fired, and .coherence was written at the root (df-0b68c987)
+  pitfall: a chokepoint in a project nested below the repository top passed without searching the rest of the repository, where a product boundary's bypasses live; choose its references horizon (df-0d235229)
+  pitfall: a bullet inserted between another bullet and its refuted:, kinds: or checklist: lines took them, so that invariant fell back to a requirement while spec --check reported 0 problems; append a whole bullet after another's last line (df-f3826eaa)
   learned: d-96eb6814, d-127ab8e4, d-a1095ef2, f658594
   reach: kernel
   because: the setup prompt was a method kept in prose, carried out once and reported in a chat reply that no later session reads; as a practice each step is delivered where its commands run, and the enactment is the durable record of how the project was adopted

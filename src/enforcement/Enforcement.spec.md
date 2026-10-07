@@ -107,7 +107,7 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   kinds: none
 - warm server the only path: From a hook or a reading, the language server is reached only through the warm server: one door connects over the socket, spawns the server detached when none listens, and hands the adapter to the run or to the reading that asked.
   protects: connectAdapter
-  chokepoint: withWarmAdapter
+  chokepoint: withWarmAdapters
   over: every hook event that re-checks a chokepoint and every reading that needs the instrument itself
   via: two clients ask the same questions; the second finds the server warm
   because: a hook is short-lived and a cold project load is too slow for a check at the edit; every run and every reading (the economy's closure) connects through one door that finds the warm server or spawns it detached, so no hook and no reading can start its own cold instrument and wait on it
@@ -255,4 +255,18 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   via: each chokepoint resolves and grades through its own language's warm server, and a run or an edit reaches only the languages its checks need
   because: Pyright cannot resolve a TypeScript name, nor the TypeScript server a Python one, so one instrument for the project could grade only half of it; starting both servers at every edit would spend the latency budget on a language the edit never touched
   refuted: made every chokepoint take the primary language alone, so a TypeScript chokepoint was asked of Pyright -> "each chokepoint resolves and grades through its own language's warm server, and a run or an edit reaches only the languages its checks need" went red in languages.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- a chokepoint governs what its from line names: A chokepoint whose from: line says outside the component or outside a folder classes a protected reference from inside that folder as exempt, reported and never a bypass, still calls a reference from anywhere else a bypass, and its automatic refutation stages a use from outside the folder that the check must call a bypass; from anywhere, the default, exempts nothing.
+  over: a component whose own code references its protected internal, a facade module as the chokepoint, and a reference from another component, under from anywhere, outside the component and outside the folder, broken and clean
+  via: a chokepoint from outside the component exempts its own references and still catches a bypass from another component; from anywhere calls both bypasses
+  because: a narrow invariant (the secret is read only through one function) must count the component's own references, while a module boundary (PostHog's tach facade rule: outside code reaches a product's internals only through its facade) lets the module use its own internals; counting those as bypasses would grade every honest boundary broken. An exempt reference is classed and counted rather than dropped, so a reader sees the own references were exempted, not absent; and since the same-module synthetic use the import ruling needs is exempt there on purpose, a use from outside the folder takes its place, so the refutation still proves the exemption cannot swallow an outside use
+  crossing: instrument -> reading
+  refuted: made classifySite call a reference from inside the exempted folder a bypass instead of exempt -> "a chokepoint from outside the component exempts its own references and still catches a bypass from another component; from anywhere calls both bypasses" went red in from.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- a silent bullet takes the config default: A chokepoint bullet with no from: line governs what the config's chokepointFrom names, a bullet's own from: line overrides it, an unreadable chokepointFrom is refused, and every run entry records which value governed and who said it.
+  over: a silent bullet, a from: anywhere bullet and a from: outside a folder bullet, with chokepointFrom set to outside the component and unset, and a chokepointFrom no form reads
+  via: the config's chokepointFrom governs a silent bullet, a bullet's own from: overrides it, and the run records and prints which governed
+  because: a project whose chokepoints are mostly module boundaries should say so once rather than on every bullet, and a project-wide default must never be mistaken for a bullet's own word, so the record keeps the source beside the value; a typo in the default would silently govern anywhere, so it is refused
+  crossing: project-source -> record
+  refuted: made performRun ignore the config's chokepointFrom for a bullet with no from: line -> "the config's chokepointFrom governs a silent bullet, a bullet's own from: overrides it, and the run records and prints which governed" went red in from.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none

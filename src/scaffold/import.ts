@@ -13,7 +13,7 @@ import { findUpward, readTach, renderDraft, renderTachTests, writeDrafts, type B
 import { ScaffoldError } from "./scaffold.ts";
 
 export const IMPORT_USAGE =
-  "  scaffold import tach [<module>...] | --all [--write]   a draft spec per module from tach.toml (nearest at or above the root): folder, intent with product.yaml owners, a bullet per declared boundary; printed, and --write creates only specs that do not exist";
+  "  scaffold import tach [<module>...] | --all [--write]   a draft spec per module from tach.toml (nearest at or above the root): folder, intent, owners: from product.yaml, a bullet per declared boundary, each facade chokepoint from: outside the component; printed, and --write creates only specs that do not exist";
 
 interface Source {
   file: string;

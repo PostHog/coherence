@@ -554,3 +554,10 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   crossing: reading -> record
   refuted: dropped the scoped test from recordReading, so a scoped reading was kept like a whole one -> "a scoped reading is never recorded as the tree's reading" went red in component-interfaces.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- which references governed is shown: Where a chokepoint governed only references from outside a folder, Scope's enforcement shows its from: value, who said it and how many references it exempted, each exempt site reads as exempt and never a bypass in Scope and the relies-on query, and a component's owners show on its card and in the component query.
+  over: a run of a chokepoint governed by the config's chokepointFrom over a component with an owners: line, read by the components and invariants views and the relies-on and component queries
+  via: Scope and the agent query show which references governed: the from: line with its exempt count on the enforcement, each exempt site as exempt, and the component's owners
+  because: a grade earned under an exemption reads exactly like one earned under none unless the reading says which references governed; a reader who cannot see the component's own references were exempted would take them for absent
+  crossing: record -> reading
+  refuted: made renderGoverned skip the from: line a run applied -> "Scope and the agent query show which references governed: the from: line with its exempt count on the enforcement, each exempt site as exempt, and the component's owners" went red in from.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none

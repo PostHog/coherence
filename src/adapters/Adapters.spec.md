@@ -175,3 +175,10 @@ The language adapter seam: how to ask a language's server for definitions, refer
   because: a monorepo opting in many leaves states its test runner, ignore list and budgets once; a leaf that read only its own file would run its tests from the wrong folder or not at all, and an inherited relative path read against the leaf would name a folder that does not exist
   refuted: effectiveConfig inherited the registry's test setups without rebasing their cwd to the leaf -> "a registry leaf inherits the registry's keys, its own config overriding key by key, and inherited paths resolve against the file that declared them" went red in registry.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- Python stages a use from outside an exempted folder: Under a from: line that exempts a folder, the Python adapter's refutation stages an unsaved use of the protected thing from outside that folder, and the check classes the package's own references exempt and another package's a bypass.
+  over: a Python package whose own module references its protected internal, a facade module chokepoint, and a reference from a sibling package, under from anywhere and outside the component
+  via: Python: a chokepoint from outside the component exempts its own references and still catches a bypass from another component; from anywhere calls both bypasses
+  because: the exemption is classified in the check, but what the refutation can stage is the adapter's: a use beside the protected thing lies inside the exempted folder, so without a document outside it the refutation would prove only that a re-export is caught, never that the exemption stops at the folder
+  crossing: instrument -> reading
+  refuted: stopped the Python adapter expecting its staged use from outside the exempted folder -> "Python: a chokepoint from outside the component exempts its own references and still catches a bypass from another component; from anywhere calls both bypasses" went red in python-from.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none

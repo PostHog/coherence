@@ -61,6 +61,7 @@ function renderComponent(state: ShellState, component: SpecComponent, depth: num
     </div>
     <div class="body">
       ${component.intent !== "" ? html`<p class="definition">${component.intent}</p>` : html`<p class="definition quiet">No intent line in the spec.</p>`}
+      ${component.owners === undefined ? null : html`<p class="related" data-field="owners"><span class="label">Owners</span> ${component.owners.join(", ")}</p>`}
       <p class="counts-line">
         <span class="count" data-count="bullets">${plural(bullets, "bullet", "bullets")}</span>
         <span class="count" data-count="invariants">${plural(counts.invariants, "invariant", "invariants")}</span>

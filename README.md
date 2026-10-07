@@ -106,7 +106,9 @@ and the detector went red.
   chokepoint check asks the language server for every reference and flags
   any that go around it. It also stages fake bypasses, without touching your
   files, to prove it would fire; a check that would miss one is reported as vacuous, not
-  passing.
+  passing. A module boundary adds `from: outside the component`, so the
+  module's own code may use its internals; those references are reported as
+  exempt, never dropped.
 - A **totality oracle** is a detector, usually a test, that checks the
   invariant over a whole set, for the cases where a chokepoint isn't
   practical.

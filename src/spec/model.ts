@@ -51,6 +51,8 @@ export interface Component {
   name: string;
   specPath: string;
   intent: string;
+  /** Who owns it, as the spec's owners: line declares; absent when it declares none. Declared, never routed on. */
+  owners?: string[];
   trustLevels: TrustLevel[] | undefined;
   /** Where work enters through this component, as its spec declares; each handler was found declared in the code. */
   entrances: ModelEntrance[];
@@ -266,6 +268,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       name: parsed.title ?? basename(folder === "." ? root : folder),
       specPath,
       intent: parsed.intent ?? "",
+      ...(parsed.owners === undefined ? {} : { owners: parsed.owners }),
       trustLevels: parsed.trustLevels,
       entrances,
       invariants,
