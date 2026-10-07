@@ -88,7 +88,9 @@ function inside(root: string, path: string): boolean {
  * root takes the writes and every command that runs in it; a command a cd
  * took into another project (a second worktree, another checkout) is read
  * against that project's practices, whose journal is where its enactment
- * will be recorded. Only a cd out of the root asks where it landed.
+ * will be recorded. Only a cd out of the root asks where it landed, and a
+ * command that landed in no Coherence project (no config, no .coherence)
+ * fires nothing: no folder that is not a project is ever read for practices.
  */
 function useByRoot(root: string, cwd: string, use: ToolUse): Map<string, ToolUse> {
   const home: SimpleCommand[] = [];
@@ -97,7 +99,7 @@ function useByRoot(root: string, cwd: string, use: ToolUse): Map<string, ToolUse
     const target = command.dir === undefined || command.dir === "" ? undefined : resolve(cwd, command.dir);
     const other = target === undefined || inside(root, target) ? root : projectRoot(target);
     if (other === root) home.push(command);
-    else away.set(other, [...(away.get(other) ?? []), command]);
+    else if (existsSync(join(other, "coherence.config.json")) || existsSync(join(other, ".coherence"))) away.set(other, [...(away.get(other) ?? []), command]);
   }
   const out = new Map<string, ToolUse>([[root, use.commands === undefined ? use : { ...use, commands: home }]]);
   for (const [other, commands] of away) out.set(other, { command: use.command, commands, writes: [], added: "" });
