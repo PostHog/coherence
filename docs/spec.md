@@ -36,7 +36,76 @@ node src/cli.ts spec --check [root]   # components, invariants with state, probl
 node src/cli.ts spec --json [root]    # the model
 node src/cli.ts scaffold component <folder> "<intent>"
 node src/cli.ts scaffold invariant <folder> "<sentence>" --kinds a,b [--chokepoint|--totality-oracle] [--crossing "a -> b"] [--preview] [--write]
+node src/cli.ts scaffold control "<entrance>" | --all [--component <folder>] [--whole] [--write]
+node src/cli.ts scaffold control --baseline --session <id> --agent <name>
 ```
+
+`scaffold control` proposes the closure for an entrance with no traced
+control: a `guard:` line, an invariant, or `control: none`. It proposes from
+the recorded Structure reading while that reading still describes the tree.
+When no recorded reading does, and the request names entrances (`"<entrance>"`,
+or `--all --component <folder>` for every entrance that component declares),
+it reads only what their routes need. It resolves those handlers and the
+handlers of every entrance declared beside them, since only those can share
+their route. It follows their reach as the whole reading does, and reads the
+interfaces of a component only when a route enters it. A component no route
+enters is never asked about. The output says the reading was scoped and names
+the components it read. A scoped reading is never recorded, because orient
+and Stop read their gaps from a whole one.
+
+The scoped reading stands only when the facts the route rule needs beyond the
+routes themselves are settled for every tree the unread interfaces allow.
+Those facts are whether a component is a core dependency and which column it
+stands in. When they are not settled, the command reads whole. `--all` alone,
+`--baseline` and `--whole` always read every component interface and record
+the reading. The interface budget flags apply to either reading.
+
+### Drafting from declared boundaries
+
+A repository that already declares its module boundaries by machine gets its
+specs drafted from that declaration rather than transcribed:
+
+```sh
+node src/cli.ts scaffold import tach [<module>...] | --all [--write]
+```
+
+It reads the nearest `tach.toml` at or above the project root. Each
+`[[modules]]` entry becomes a component, the folder its dotted path names under
+a source root, and its draft carries:
+
+- an intent line holding a placeholder for what the module is for, the `name`
+  and `owners` of a `product.yaml` in its folder, and where tach.toml declares
+  it. The grammar has no owner slot.
+- for `depends_on`, a totality oracle bullet listing the declared modules.
+  Reliance stays computed, never declared.
+- for each `[[interfaces]]` entry whose `from` pattern matches the module, a
+  totality oracle bullet listing everything it exposes, and one chokepoint bullet
+  per exposed path. That path is the chokepoint when it names a package folder,
+  a module file or a symbol in its file on disk. Otherwise it is a placeholder
+  showing the pattern.
+
+The protected internal, `because:`, `crossing:` and `kinds:` stay
+placeholders. The totality oracle bullets name pytest functions (`via:
+test_tach_dependencies_<module>`, `test_tach_interface_<module>`). The command
+prints those on stderr: tach has no per-module flag, so they run `tach check
+--dependencies --interfaces --output json` once and keep one module's
+diagnostics.
+
+The command cannot express everything tach does:
+
+- A chokepoint counts every reference outside it, the module's own included,
+  whereas tach checks only imports from other modules. Choose a protected internal
+  that nothing but the exposed path references.
+- One chokepoint bullet names one site, whereas tach lets a module expose
+  several at once. The totality oracle bullet carries the union.
+- Patterns that name no single path, `layer`, `utility` and `visibility` have
+  no slot. They are printed as notes.
+
+Drafts print by default. `--write` creates a spec only in a folder that exists
+and holds none, and it reports every module it skipped. It never overwrites a
+spec. A malformed `tach.toml` is refused with its line, and so is a module it
+does not declare, and nothing is drafted. Each source is named for the tool
+whose file it reads, so others can follow.
 
 ## The bullet
 

@@ -524,6 +524,11 @@ export type InterfaceReading =
   | {
       kind: "read";
       language: string;
+      /**
+       * A multi-language project: the languages whose files this reading did not read. The Structure reading reads
+       * the primary language (the first the config lists) alone, and says which it left out. Absent for one language.
+       */
+      unreadLanguages?: string[];
       declarations: number;
       symbols: InterfaceSymbol[];
       entrances: EntranceResolution[];
@@ -543,8 +548,24 @@ export type InterfaceReading =
       partial?: InterfacePartial;
       /** The entrances the language's rules detect in the tree, each with its rule and why: what the declared entrances' coverage is measured against. Absent from a reading taken before detection. */
       candidates?: EntranceCandidate[];
+      /** Present when the reading was scoped to some entrances' routes rather than read whole: never recorded as the tree's reading. */
+      scoped?: ScopedReading;
     }
   | { kind: "unread"; because: string };
+
+/**
+ * What a scoped reading read: the entrances it started from (the named ones
+ * and every entrance declared where one of them is, the only ones that can
+ * share their routes), the components whose interfaces it read whole (where
+ * those entrances are declared and handled, and every component their reach
+ * enters), and, into every other component, each caller the word index says
+ * could reference it: an interface that may exist, never asked.
+ */
+export interface ScopedReading {
+  entrances: { component: string; name: string }[];
+  components: string[];
+  maybe: { from: string; to: string }[];
+}
 
 /** One proposed crossing added to an ephemeral Structure page, never to the spec model. */
 export interface StructurePreview {

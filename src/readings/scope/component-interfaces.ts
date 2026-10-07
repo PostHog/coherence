@@ -82,7 +82,7 @@ import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
 import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
-import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, ReachReference } from "./model.ts";
+import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, ReachReference, ScopedReading } from "./model.ts";
 
 /** Whether a declaration line declares a type only (an interface or a type alias): a route never follows one. */
 export function isTypeDeclaration(line: string, language: string): boolean {
@@ -494,6 +494,11 @@ export interface ReadOptions {
   memory?: () => Promise<number | undefined>;
   /** How often memory is sampled, in milliseconds (default 2000). */
   sampleMs?: number;
+  /**
+   * Read only what these entrances' routes need (see readComponentInterfaces):
+   * the reading carries `scoped` and is never the tree's reading. Absent: whole.
+   */
+  scope?: { entrances: readonly { component: string; name: string }[] };
 }
 
 const STOPPED = Symbol("stopped");
@@ -524,17 +529,68 @@ export function detectedEntrances(root: string, model: Pick<SpecModel, "componen
   return detectEntranceCandidates(root, { language, files, wrappers: entranceWrappers(model), testFolders });
 }
 
-/** Read every component interface of the project at `root` through `adapter` (started here when not given). */
+/** The budget a reading spends: each part the options give over the config's, over the default. */
+function budgetOf(root: string, given: Partial<InterfaceBudget> = {}): InterfaceBudget {
+  return { ...configuredBudget(root), ...Object.fromEntries(Object.entries(given).filter(([, v]) => typeof v === "number" && v > 0)) };
+}
+
+/**
+ * The adapter readComponentInterfaces starts for itself when given none, for
+ * a caller that reads more than once through one server (a scoped reading,
+ * then the whole one when it cannot settle): the caller closes it.
+ */
+export function readingAdapter(root: string, budget: Partial<InterfaceBudget> = {}): LanguageAdapter {
+  return boundedAdapter(readEnforcementConfig(root).language, root, configIgnore(root), budgetOf(root, budget).memoryMB);
+}
+
+/**
+ * The entrances a scoped reading starts from: the named ones, and every
+ * entrance declared in a component that stands, at the map's opening zoom,
+ * for the same one as a named entrance's. A route starts where its entrance
+ * is declared, so only those can share a named entrance's route, and a
+ * route's traced controls and the closures proposed on it depend on every
+ * entrance it carries.
+ */
+export function scopeStarts(model: Pick<SpecModel, "components">, named: readonly { component: string; name: string }[]): { component: string; name: string }[] {
+  const parent = new Map(model.components.map((c) => [c.folder, c.parent]));
+  const open = new Set(model.components.filter((c) => c.parent === undefined).map((c) => c.folder));
+  const represent = (folder: string): string => {
+    const chain: string[] = [];
+    for (let at: string | undefined = folder; at !== undefined; at = parent.get(at)) chain.unshift(at);
+    for (let i = 0; i < chain.length - 1; i++) if (!open.has(chain[i]!)) return chain[i]!;
+    return folder;
+  };
+  const declaredAt = new Set(named.map((e) => represent(e.component)));
+  return model.components.flatMap((c) => (declaredAt.has(represent(c.folder)) ? c.entrances.map((e) => ({ component: c.folder, name: e.name })) : []));
+}
+
+/**
+ * Read every component interface of the project at `root` through `adapter`
+ * (started here when not given), or, with `options.scope`, only what those
+ * entrances' routes need.
+ *
+ * A scoped reading resolves the handlers of the entrances scopeStarts names
+ * and no other, follows their reach to its fixed point exactly as the whole
+ * reading does, and reads whole the interfaces of every component where they
+ * are declared or handled or their reach enters, then follows the reach
+ * again, until neither asks anything new. A component no such route enters
+ * is never asked about. What it did not read it says (`scoped`): each
+ * component it read, and, into every other, each caller the word index says
+ * could reference it, so what a route depends on and the reading did not read
+ * can be settled (scopedUnsettled) before the reading stands for a whole one.
+ */
 export async function readComponentInterfaces(root: string, given?: LanguageAdapter, options: ReadOptions = {}): Promise<InterfaceReading> {
   const config = readEnforcementConfig(root);
   const model = loadSpecModel(root, { runs: false });
-  const budget: InterfaceBudget = { ...configuredBudget(root), ...Object.fromEntries(Object.entries(options.budget ?? {}).filter(([, v]) => typeof v === "number" && v > 0)) };
+  const budget = budgetOf(root, options.budget);
   const started = Date.now();
   const deadline = started + budget.seconds * 1000;
   // Started here, the server reads only the config's bounds: nothing past them is ever counted, and a monorepo's
   // server that scans every file spelling a name would spend its memory on code the reading never draws.
   const ignore = configIgnore(root);
   const adapter = given ?? boundedAdapter(config.language, root, ignore, budget.memoryMB);
+  const starting = options.scope === undefined ? undefined : scopeStarts(model, options.scope.entrances);
+  const inScope = (component: string, name: string): boolean => starting === undefined || starting.some((e) => e.component === component && e.name === name);
   let stop: { limit: "time" | "memory"; observed?: number } | undefined;
   let memory: number | undefined;
   const measure = options.memory ?? (() => languageServerMemory(adapter.serverPid?.()));
@@ -578,6 +634,8 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
     const testFolders = config.testFolders;
     const skip = boundsOf(root, ignore);
     const language = config.language;
+    // One language per reading: a multi-language project's other languages are named as unread, never silently left out.
+    const unreadLanguages = config.languages.length > 1 ? { unreadLanguages: config.languages.filter((l) => l !== language) } : {};
     // The component code: every bounded non-test file of the language whose nearest spec folder is a component.
     const code = new Map<string, string>();
     const unowned = { files: 0, lines: 0 };
@@ -694,9 +752,11 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
       return true;
     };
 
-    // The interface pass: an exported declaration another component's text could reference.
-    const exhaustive = options.exhaustive === true;
-    const interfacePass = declared.filter((d) => exhaustive || (d.exported && namedElsewhere(index, d.name, d.file, d.component, d.isDefault)));
+    // The interface pass: an exported declaration another component's text could reference. Scoped, it is taken
+    // component by component with the reach pass, as the reach enters each.
+    const exhaustive = options.exhaustive === true && starting === undefined;
+    const candidate = (d: Declared): boolean => exhaustive || (d.exported && namedElsewhere(index, d.name, d.file, d.component, d.isDefault));
+    const interfacePass = starting === undefined ? declared.filter(candidate) : [];
     let reading = true;
     for (const d of interfacePass) {
       if (!(await ask(d))) {
@@ -740,6 +800,10 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
     const starts: { at: number; start: string; definition?: Definition }[] = [];
     for (const component of model.components) {
       for (const entrance of component.entrances) {
+        if (!inScope(component.folder, entrance.name)) {
+          entrances.push({ component: component.folder, name: entrance.name, reason: "scoped out: the reading followed only other entrances' routes" });
+          continue;
+        }
         if (entrance.handler === undefined) {
           entrances.push({ component: component.folder, name: entrance.name, reason: "no handler is named" });
           continue;
@@ -776,26 +840,43 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
     }
 
     // The reach pass, to a fixed point: ask what a file the reach has entered spells, until nothing new is spelled.
+    // Scoped, it alternates with the interface pass: once the reach is at its fixed point, the interfaces of every
+    // component where a start is declared or handled, or the reach enters, are read whole, and the reach followed again.
     let reachRead = reading;
+    const scopeComponents = new Set<string>();
+    if (starting !== undefined) {
+      for (const { at } of starts) {
+        scopeComponents.add(entrances[at]!.component);
+        const holder = code.get(entrances[at]!.file ?? "");
+        if (holder !== undefined) scopeComponents.add(holder);
+      }
+    }
+    const askAll = async (next: readonly Declared[]): Promise<boolean> => {
+      for (const d of next) if (!(await ask(d))) return false;
+      return true;
+    };
     if (reading && starts.length > 0 && !exhaustive) {
       for (;;) {
         const entered = new Set<number>();
         for (const { start } of starts) {
           for (const id of reachedFrom(start, nodes, calls)) {
-            const file = nodes.get(id)?.file ?? id.slice(0, id.lastIndexOf("#"));
+            const node = nodes.get(id);
+            if (node !== undefined && starting !== undefined) scopeComponents.add(node.component);
+            const file = node?.file ?? id.slice(0, id.lastIndexOf("#"));
             const at = fileIndex.get(file);
             if (at !== undefined) entered.add(at);
           }
         }
-        const next = declared.filter((d) => !asked.has(d.id) && namedIn(index, d.name, fileIndex.get(d.file), entered, d.isDefault));
-        if (next.length === 0) break;
-        for (const d of next) {
-          if (!(await ask(d))) {
-            reading = false;
-            break;
-          }
+        let next = declared.filter((d) => !asked.has(d.id) && namedIn(index, d.name, fileIndex.get(d.file), entered, d.isDefault));
+        if (next.length === 0 && starting !== undefined) {
+          next = declared.filter((d) => !asked.has(d.id) && scopeComponents.has(d.component) && candidate(d));
+          interfacePass.push(...next);
         }
-        if (!reading) break;
+        if (next.length === 0) break;
+        if (!(await askAll(next))) {
+          reading = false;
+          break;
+        }
       }
       reachRead = reading;
     }
@@ -825,8 +906,11 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
       files: outsideFiles.size,
       into: [...outsideInto].map(([component, sites]) => ({ component, sites })).sort((a, b) => a.component.localeCompare(b.component)),
     };
-    const bounds = { components: model.components.length, files: code.size, candidates: interfacePass.length, asked: asked.size };
+    // Scoped, the candidates are those of the components it read whole, the reach having asked some of them first.
+    const candidateCount = starting === undefined ? interfacePass.length : declared.filter((d) => scopeComponents.has(d.component) && candidate(d)).length;
+    const bounds = { components: model.components.length, files: code.size, candidates: candidateCount, asked: asked.size };
     const candidates = detectedEntrances(root, model, language, testFolders, ignore);
+    const scoped = starting === undefined ? undefined : { scoped: scopedFacts(model, starting, scopeComponents, declared, asked, index) };
     if (stop !== undefined) {
       // Whose declarations were not all read: a component with a declaration the reading meant to ask and never
       // had answered, and, when the reach was cut short, every component an entrance with a handler is declared in.
@@ -836,6 +920,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
       return {
         kind: "read",
         language,
+        ...unreadLanguages,
         declarations,
         symbols,
         entrances,
@@ -850,15 +935,44 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
           seconds: Math.round((Date.now() - started) / 1000),
           unread: [...unread].sort(),
         },
+        ...scoped,
       };
     }
-    return { kind: "read", language, declarations, symbols, entrances, unowned, bounds, outside, candidates };
+    return { kind: "read", language, ...unreadLanguages, declarations, symbols, entrances, unowned, bounds, outside, candidates, ...scoped };
   } catch (error) {
     return { kind: "unread", because: `the ${config.language} instrument failed: ${error instanceof Error ? error.message : String(error)}` };
   } finally {
     clearInterval(sampler);
     if (given === undefined) await adapter.close();
   }
+}
+
+/**
+ * What a scoped reading says of itself: its starts, the components it read
+ * whole, and every interface into another component that may exist: each
+ * caller whose code could reference a declaration there the reading never
+ * asked, by the word index's own test (namedElsewhere), so a default export
+ * may be called from anywhere.
+ */
+function scopedFacts(model: SpecModel, starting: readonly { component: string; name: string }[], read: ReadonlySet<string>, declared: readonly Declared[], asked: ReadonlySet<string>, index: WordIndex): ScopedReading {
+  const maybe = new Set<string>();
+  const folders = model.components.map((c) => c.folder);
+  for (const d of declared) {
+    if (read.has(d.component) || asked.has(d.id) || !d.exported) continue;
+    const callers = new Set<string>();
+    if (d.isDefault || index.defaults.has(d.name)) for (const f of folders) callers.add(f);
+    for (const c of index.wildcards.get(d.file) ?? []) callers.add(c);
+    for (const spelling of spellings(index, d.name)) for (const c of index.owners.get(spelling) ?? []) callers.add(c);
+    for (const from of callers) if (from !== d.component) maybe.add(`${from}\u0000${d.component}`);
+  }
+  return {
+    entrances: [...starting],
+    components: [...read].sort(),
+    maybe: [...maybe].sort().map((key) => {
+      const [from, to] = key.split("\u0000") as [string, string];
+      return { from, to };
+    }),
+  };
 }
 
 /** Why an entrance has no resolution when a budget stopped the reading first. */

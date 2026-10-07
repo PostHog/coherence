@@ -335,6 +335,12 @@ export function projectSites<T extends { file: string }>(root: string, sites: re
   return sites.filter((site) => own.has(site.file));
 }
 
+/** The reference sites a chokepoint check may classify: the project's own (projectSites), and those in a folder of the config's reference horizon. */
+export function horizonSites<T extends { file: string }>(root: string, sites: readonly T[]): T[] {
+  const kept = keepHorizonFiles(root, sites.map((site) => site.file));
+  return sites.filter((site) => kept.has(site.file));
+}
+
 /** Whether one path (absolute or project-relative) is a project file. */
 export function isProjectFile(root: string, path: string): boolean {
   return keepProjectFiles(root, [path]).size === 1;
@@ -353,16 +359,93 @@ export function repositoryTop(root: string): string | undefined {
 }
 
 /**
- * Where a project's reference search reached, when that is less than the
- * repository: the project folder relative to the repository top, or
- * undefined when the project is the whole repository (or lies in none). A
- * chokepoint verdict over a nested project covers that folder only.
+ * The project folder relative to its repository's top, when the project is
+ * nested below the top; undefined when the project is the whole repository
+ * (or lies in none).
  */
-export function referenceHorizon(root: string): string | undefined {
+export function nestedFolder(root: string): string | undefined {
   const top = repositoryTop(root);
   if (top === undefined) return undefined;
   const rel = relative(top, resolve(root)).split(sep).join("/");
   return rel === "" || rel.startsWith("..") ? undefined : rel;
+}
+
+/**
+ * Where a chokepoint check searches for references, from the config's
+ * `references`: the project alone ("project", the default), the whole
+ * repository ("repository"), or the project and the listed folders, each
+ * relative to the repository top. A value of any other shape is the default.
+ */
+export type ReferenceScope = "project" | "repository" | readonly string[];
+
+export function configReferences(root: string): ReferenceScope {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(join(resolve(root), CONFIG_FILE), "utf8"));
+    const value = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>)["references"] : undefined;
+    if (value === "repository") return "repository";
+    if (Array.isArray(value) && value.every((v) => typeof v === "string")) return value.map(folderKey).filter((f) => f !== "");
+    return "project";
+  } catch {
+    return "project";
+  }
+}
+
+/**
+ * The folders outside a nested project that its reference search also
+ * reads, absolute and outermost only: none for "project" or for a project
+ * at the repository top, the top itself for "repository", and each listed
+ * folder otherwise, less any that is the project, lies inside it, or leaves
+ * the repository.
+ */
+export function horizonFolders(root: string, scope: ReferenceScope = configReferences(root)): string[] {
+  const base = resolve(root);
+  const top = repositoryTop(base);
+  if (top === undefined || nestedFolder(base) === undefined || scope === "project") return [];
+  if (scope === "repository") return [top];
+  const inside = (outer: string, inner: string): boolean => {
+    const rel = relative(outer, inner);
+    return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+  };
+  const folders = [...new Set(scope.map((f) => resolve(top, f)))].filter((f) => inside(top, f) && !inside(base, f));
+  return folders.filter((f) => !folders.some((other) => other !== f && inside(other, f))).sort();
+}
+
+/**
+ * What a chokepoint verdict says its reference search covered, when that is
+ * less than the repository: the project folder and every horizon folder,
+ * each relative to the repository top; undefined when the search covered
+ * the whole repository (a project at the top, or "repository").
+ */
+export function searchedHorizon(root: string, scope: ReferenceScope = configReferences(root)): string | undefined {
+  const own = nestedFolder(root);
+  if (own === undefined || scope === "repository") return undefined;
+  const top = repositoryTop(root)!;
+  const names = [own, ...horizonFolders(root, scope).map((f) => relative(top, f).split(sep).join("/"))];
+  return names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/**
+ * The given root-relative paths that are evidence for a reference search:
+ * the project's own files (keepProjectFiles), and a path that leaves the
+ * root ("../../posthog/api/x.py") when it lies in a horizon folder and git
+ * lists it at the repository top, outside any nested checkout there.
+ */
+export function keepHorizonFiles(root: string, paths: readonly string[], listing?: ProjectListing, folders: readonly string[] = horizonFolders(root)): Set<string> {
+  const base = resolve(root);
+  const kept = keepProjectFiles(base, paths, listing);
+  if (folders.length === 0) return kept;
+  const top = repositoryTop(base)!;
+  const outside = new Map<string, string>();
+  for (const path of paths) {
+    const absolute = resolve(base, path);
+    const rel = relative(base, absolute);
+    if (!(rel.startsWith("..") || isAbsolute(rel))) continue;
+    if (!folders.some((f) => { const r = relative(f, absolute); return r !== "" && !r.startsWith("..") && !isAbsolute(r); })) continue;
+    outside.set(relative(top, absolute).split(sep).join("/"), path);
+  }
+  if (outside.size === 0) return kept;
+  for (const rel of keepProjectFiles(top, [...outside.keys()])) kept.add(outside.get(rel)!);
+  return kept;
 }
 
 /**

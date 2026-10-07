@@ -980,6 +980,25 @@ async function voiced(root: string, input: HookInput, canonical: string, voice: 
   return composeVoice(canonical, voice, { session: sessionOf(input), agent: agentOf(input), cli: await cliName(root) });
 }
 
+/** Where a session's orient in a nested project is marked delivered: transient, as the feed cursors and practice firings are. */
+function orientedPath(root: string, session: string): string {
+  return join(root, ".coherence", "orient", session.replace(/[^\w.-]/g, "_"));
+}
+
+/** Whether this session has had orient in this project. */
+function oriented(root: string, session: string): boolean {
+  return existsSync(orientedPath(root, session));
+}
+
+function markOriented(root: string, session: string): void {
+  try {
+    mkdirSync(dirname(orientedPath(root, session)), { recursive: true });
+    writeFileSync(orientedPath(root, session), new Date().toISOString() + "\n");
+  } catch {
+    // Without the marker the next tool use orients again; nothing is lost but words.
+  }
+}
+
 /** The tools whose event names the files it writes, so the files, not the cwd, say which project it is about. */
 const FILE_TOOLS: ReadonlySet<string> = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 
@@ -1007,9 +1026,21 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
   const place = installed !== undefined && !within(installed, given) ? undefined : eventProject(event, input, installed ?? given, given);
   try {
     if (place !== undefined && place.kind !== "project") return quiet(place);
+    // A session at the repository root has not entered the project below until a tool use inside it delivers orient: until then it hears one line at its start and nothing else.
+    if (place?.kind === "project" && place.above === true) {
+      const session = sessionOf(input);
+      if (session === undefined || !oriented(place.root, session)) return pointer(place.root);
+    }
     return timed(await answer());
   } finally {
     eventModels = outer;
+  }
+
+  /** A session start above a project it has not entered names the project in one line; every other event says nothing. Nothing is read or written. */
+  function pointer(root: string): HookResult {
+    if (event !== "SessionStart" && event !== "SubagentStart") return { stdout: "", stderr: "", exit: 0 };
+    const context = `Coherence is adopted in ${relative(given, root) || "."} below this folder; its orient arrives with the first edit or command inside it, and work elsewhere hears nothing from it.`;
+    return { stdout: JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n", stderr: "", exit: 0 };
   }
 
   /** An event outside every project is ignored: nothing read, nothing written, nothing said; a session start above several says so in one line. */
@@ -1041,7 +1072,37 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     }
   }
 
+  /**
+   * A project nested below the folder holding the host's settings is
+   * oriented lazily: the first tool use inside it this session carries the
+   * orient a session start would have, once; its commit keeps the baseline,
+   * the gaps and the marker, as a start's does.
+   */
   async function answer(): Promise<HookResult> {
+    const result = await respond();
+    if (place?.kind !== "project" || within(place.root, installed ?? given) || !TOOL_HOOKS.has(event) || result.exit !== 0) return result;
+    const session = sessionOf(input);
+    if (session === undefined || oriented(place.root, session)) return result;
+    const root = place.root;
+    const reading = await lexiconCoverage(root);
+    const gaps = await gapReading(root);
+    const text = (await startReading(root, input, reading, gaps)).text;
+    const answered = (result.stdout.trim() === "" ? {} : JSON.parse(result.stdout)) as { hookSpecificOutput?: { additionalContext?: string } };
+    const before = answered.hookSpecificOutput?.additionalContext;
+    const context = before === undefined || before === "" ? text : `${text}\n${before}`;
+    const stdout = JSON.stringify({ ...answered, hookSpecificOutput: { ...answered.hookSpecificOutput, hookEventName: event, additionalContext: context } }) + "\n";
+    const commit = (): void => {
+      result.commit?.();
+      openFeed(root, session);
+      saveBaseline(root, session, reading);
+      const found = gaps.now ?? gaps.last;
+      if (found !== undefined) saveSessionGaps(root, session, found);
+      markOriented(root, session);
+    };
+    return { ...result, stdout, commit };
+  }
+
+  async function respond(): Promise<HookResult> {
     // The cwd arrives on stdin from the harness; a tree that is not the one this hook was installed for is none of its business.
     if (place === undefined) {
       return { stdout: "", stderr: `hook ${event}: the working directory "${given}" is not inside the project root this hook was installed for (${installed}); nothing was read and nothing was written\n`, exit: OUTSIDE_ROOT_EXIT };
@@ -1072,6 +1133,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const stdout = context === "" ? "" : JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
         const commit = (): void => {
           saveBaseline(root, session!, reading);
+          // A project nested below the settings is oriented once per session; this start was it.
+          if (!within(root, host)) markOriented(root, session!);
           // The gaps as this session found them, for regulate once its own edits make the reading stale.
           const found = gaps.now ?? gaps.last;
           if (found !== undefined) saveSessionGaps(root, session!, found);

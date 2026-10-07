@@ -959,6 +959,10 @@
       ],
       "provenance": {
         "defined_by": "owner, 2026-09-17"
+      },
+      "properties": {
+        "test setup": "One runner's way of running tests: its commands, the test files it claims (by language or file globs), and the folder it starts in. The single test keys are one setup; the tests key lists several, for a project whose languages run under different runners.",
+        "languages": "A project may list more than one language; each file's language is its extension, the first listed is the primary, and each language has its own warm server."
       }
     },
     {

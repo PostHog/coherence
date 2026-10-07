@@ -236,9 +236,12 @@ adopt (say `apps/billing`), and nothing at the repository root. Run
 `coherence hooks install --host claude` from that folder: it writes the hooks
 into the root's `.claude/settings.json`, where an agent host started at the
 repository root reads them, and into the folder's own, for a session started
-there. The project is the folder holding the nearest `coherence.config.json`
-to the file an edit writes, or to the folder a command or prompt runs in; a
-session at the root belongs to the one project below it. Everything else in
+there; `--local` writes your personal `.claude/settings.local.json` at the
+root instead, so you can adopt without committing hooks for every team. The
+project is the folder holding the nearest `coherence.config.json` to the file
+an edit writes, or to the folder a command or prompt runs in. A session at the
+root hears one line at its start and gets the project's orient with its first
+edit or command inside the folder. Everything else in
 the repository is outside the project: an edit, command or prompt there gets
 no orient, practice or check and leaves no record. A chokepoint verdict says
 its reference search covered the project folder only, since callers elsewhere
@@ -247,7 +250,10 @@ in the repository are not read. More in [docs/config.md](docs/config.md).
 ## Platform
 
 Coherence runs on Node 22.18 or newer, on macOS (Apple Silicon) or Linux, and
-reads TypeScript and Python projects. It works inside Claude Code and Codex.
+reads TypeScript and Python projects, and projects that span both (a Python
+backend beside a TypeScript frontend: list both languages and a test setup
+per runner, as [docs/config.md](docs/config.md#more-than-one-language) shows).
+It works inside Claude Code and Codex.
 Coherence verifies itself: every screenshot here is its own Scope reading.
 
 ## Working on Coherence itself
@@ -263,11 +269,13 @@ node src/cli.ts spec --check [root]       # components, invariants with state, p
 node src/cli.ts spec --json [root]        # the spec model
 node src/cli.ts scaffold component <folder> "<intent>"
 node src/cli.ts scaffold invariant <folder> "<sentence>" --kinds a,b [--chokepoint|--totality-oracle] [--write]
+node src/cli.ts scaffold control "<entrance>" [--whole]   # the closure for an entrance with no traced control; unrecorded, it reads only the components its route enters
+node src/cli.ts scaffold import tach [<module>...] | --all [--write]   # a draft spec per module from tach.toml; --write creates only specs that do not exist
 node src/cli.ts enact "<practice>" --step <n>=done[:<evidence>]|deviated:<why>|skipped:<why>...   # record a practice carried out
 node src/cli.ts run [--session --agent]   # the chokepoint check and the totality oracle pass, one run appended; exit 1 on a structural defect
 node src/cli.ts run --status              # the latest verdict per enforcement, a view over every run
 node src/cli.ts run --each                # after the batched pass, each totality oracle's test in its own invocation, a second run; exit 1 if one fails alone
-node src/cli.ts serve                     # the warm language server for this project (spawned on demand otherwise)
+node src/cli.ts serve [--language <l>]    # the warm language server for this project and language (spawned on demand otherwise)
 node src/cli.ts hook <event>              # answer one harness event (event JSON on stdin)
 node src/cli.ts hooks install --host claude|codex [--command "<prefix>"]
 node src/cli.ts hooks uninstall --host claude|codex   # removes only Coherence's commands; other hooks and settings stay byte for byte

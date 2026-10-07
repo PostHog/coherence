@@ -18,8 +18,16 @@ import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import type { EnforcementConfig } from "./config.ts";
+import { join, resolve } from "node:path";
+import type { TestSetup } from "./config.ts";
+
+/** What running a test needs from a setup: its commands, and the folder it runs from (relative to the root; the root when absent). The whole config is one, for its first setup. */
+export type RunnerSetup = Pick<TestSetup, "test" | "testJson" | "testMatch" | "testFilterForm"> & { cwd?: string | undefined };
+
+/** The folder a setup's runner starts in. */
+export function runnerCwd(root: string, setup: RunnerSetup): string {
+  return setup.cwd === undefined ? root : resolve(root, setup.cwd);
+}
 import type { Verdict } from "./record.ts";
 
 export interface TotalityResult {
@@ -39,7 +47,7 @@ export interface TotalityResult {
 
 export const TOTALITY_TIMEOUT_MS = 10 * 60 * 1000;
 
-function commandFor(config: EnforcementConfig, filter: string): { command: string; args: string[]; shell: boolean } | undefined {
+function commandFor(config: RunnerSetup, filter: string): { command: string; args: string[]; shell: boolean } | undefined {
   if (config.test === undefined) return undefined;
   if (Array.isArray(config.test)) {
     const [command, ...args] = config.test;
@@ -53,7 +61,7 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-export async function runTotalityOracle(root: string, config: EnforcementConfig, filter: string, timeoutMs = TOTALITY_TIMEOUT_MS): Promise<TotalityResult> {
+export async function runTotalityOracle(root: string, config: RunnerSetup, filter: string, timeoutMs = TOTALITY_TIMEOUT_MS): Promise<TotalityResult> {
   const spec = commandFor(config, config.testFilterForm === "pytest" ? filter : escapeRegExp(filter));
   if (spec === undefined) {
     return { verdict: "not run", reason: "no test command configured; set test in coherence.config.json (an argv array the filter is appended to, or a string with {filter})", command: undefined, tail: "" };
@@ -69,7 +77,7 @@ export async function runTotalityOracle(root: string, config: EnforcementConfig,
     };
     let child;
     try {
-      child = spawn(spec.command, spec.args, { cwd: root, shell: spec.shell, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: process.env["CI"] ?? "1" } });
+      child = spawn(spec.command, spec.args, { cwd: runnerCwd(root, config), shell: spec.shell, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: process.env["CI"] ?? "1" } });
     } catch (error) {
       finish({ verdict: "not run", reason: `test command could not start: ${error instanceof Error ? error.message : String(error)}`, command: shown, tail: "" });
       return;
@@ -257,7 +265,7 @@ export interface BatchObserver {
   report(report: JsonReport | undefined): void;
 }
 
-export async function runTotalityBatch(root: string, config: EnforcementConfig, filters: readonly string[], timeoutMs = TOTALITY_TIMEOUT_MS, observer?: BatchObserver): Promise<Map<string, TotalityResult> | undefined> {
+export async function runTotalityBatch(root: string, config: RunnerSetup, filters: readonly string[], timeoutMs = TOTALITY_TIMEOUT_MS, observer?: BatchObserver): Promise<Map<string, TotalityResult> | undefined> {
   if (config.testJson === undefined || filters.length === 0) return undefined;
   const out = join(tmpdir(), `coherence-totality-${randomBytes(4).toString("hex")}.${config.testFilterForm === "pytest" ? "xml" : "json"}`);
   const filter = combinedFilter(filters, config.testFilterForm);
@@ -280,7 +288,7 @@ export async function runTotalityBatch(root: string, config: EnforcementConfig, 
   try {
     const output = await new Promise<{ code: number | null; text: string }>((resolve, reject) => {
       let text = "";
-      const child = spawn(spec.command, spec.args, { cwd: root, shell: spec.shell, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: process.env["CI"] ?? "1", ...spec.env } });
+      const child = spawn(spec.command, spec.args, { cwd: runnerCwd(root, config), shell: spec.shell, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, CI: process.env["CI"] ?? "1", ...spec.env } });
       const timer = setTimeout(() => {
         // The runner's own children (a test file each) outlive a killed parent and keep looping: the whole tree goes.
         killTree(child.pid);

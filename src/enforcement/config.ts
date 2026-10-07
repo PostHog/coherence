@@ -1,7 +1,10 @@
 /**
  * What enforcement reads from `coherence.config.json`:
  *
- *   language   typescript (default) or python
+ *   language   typescript (default) or python, or a list of both for a
+ *              project that spans them: each file's language is chosen by
+ *              its extension, and the first listed is the primary (the one a
+ *              single-language reading, such as Structure, reads)
  *   test       the test command: an argv array the filter is appended to,
  *              or a string template with {filter}; absent means not configured
  *   testMatch  a regular expression the test output must match to pass
@@ -24,17 +27,44 @@
  *              beside the built-in __tests__, test, tests
  *   latencyBudget  the latency budget: the most seconds a tool hook
  *              (PreToolUse, PostToolUse) may take; absent means 3
+ *   tests      a list of test setups, one per runner, in place of the single
+ *              test keys: each holds test, testJson, testMatch,
+ *              testFilterForm, testDir/testDirs, and optionally language (the
+ *              extension of the test files it claims), files (globs of the
+ *              test files it claims, relative to the root), and cwd (the
+ *              folder it runs from, relative to the root). The test a
+ *              totality oracle names runs through the setup whose test files spell it
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { isLanguage, type Language } from "../adapters/index.ts";
+import { isAbsolute, resolve } from "node:path";
+import { isLanguage, LANGUAGES, type Language } from "../adapters/index.ts";
 
 export const CONFIG_FILE = "coherence.config.json";
 export const DEFAULT_TEST_FOLDERS: readonly string[] = ["__tests__", "test", "tests"];
 
+/** One runner's test setup: how the tests it claims run, and which test files those are. */
+export interface TestSetup {
+  /** The language whose test files this setup claims, when it names one. */
+  language: Language | undefined;
+  /** Globs (project-relative, `*` within a folder, `**` across folders) of the test files this setup claims, when it names them. */
+  files: string[] | undefined;
+  /** The folder the runner is started in, relative to the root; undefined runs it at the root. */
+  cwd: string | undefined;
+  test: string[] | string | undefined;
+  testMatch: RegExp | undefined;
+  testJson: string[] | string | undefined;
+  testFilterForm: "regex" | "pytest";
+  testFolders: string[];
+}
+
 export interface EnforcementConfig {
+  /** The primary language: the first of `languages`. */
   language: Language;
+  /** Every language the project spans, the primary first; one for a single-language project. */
+  languages: Language[];
+  /** Every test setup, the first being the one the single keys below describe. */
+  tests: TestSetup[];
   /** Undefined when no test command is configured. */
   test: string[] | string | undefined;
   testMatch: RegExp | undefined;
@@ -53,8 +83,57 @@ function commandValue(value: unknown): string[] | string | undefined {
   return undefined;
 }
 
+/** The language a file is written in, by its extension, among the languages given; undefined for any other file. */
+export function languageOfFile(file: string, languages: readonly Language[] = LANGUAGES): Language | undefined {
+  const base = file.trim();
+  const found: Language | undefined = /\.pyi?$/.test(base) ? "python" : /\.(?:[cm]?[tj]sx?)$/.test(base) && !/\.d\.ts$/.test(base) ? "typescript" : undefined;
+  return found !== undefined && languages.includes(found) ? found : undefined;
+}
+
+/** A file glob as a regular expression: `**` crosses folders, `*` and `?` stay within one. */
+export function globPattern(glob: string): RegExp {
+  let out = "";
+  for (let i = 0; i < glob.length; i += 1) {
+    const c = glob[i]!;
+    if (c === "*" && glob[i + 1] === "*") {
+      i += 1;
+      if (glob[i + 1] === "/") {
+        i += 1;
+        out += "(?:.*/)?";
+      } else out += ".*";
+    } else if (c === "*") out += "[^/]*";
+    else if (c === "?") out += "[^/]";
+    else out += c.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  }
+  return new RegExp(`^${out}$`);
+}
+
+/** Whether a setup claims a project-relative file as one of its test files: its globs match it, else its language is the file's. */
+export function setupClaims(setup: TestSetup, file: string): boolean {
+  if (setup.files !== undefined) return setup.files.some((glob) => globPattern(glob).test(file));
+  return setup.language === undefined || languageOfFile(file) === setup.language;
+}
+
+function testSetupOf(record: Record<string, unknown>, path: string, where: string): TestSetup {
+  const setup: TestSetup = { language: undefined, files: undefined, cwd: undefined, test: commandValue(record["test"]), testMatch: undefined, testJson: commandValue(record["testJson"]), testFilterForm: record["testFilterForm"] === "pytest" ? "pytest" : "regex", testFolders: [...DEFAULT_TEST_FOLDERS] };
+  const testMatch = record["testMatch"];
+  if (typeof testMatch === "string" && testMatch !== "") {
+    try {
+      setup.testMatch = new RegExp(testMatch);
+    } catch (error) {
+      throw new Error(`${path}: ${where}testMatch is not a regular expression (${(error as Error).message})`);
+    }
+  }
+  const folders = new Set(setup.testFolders);
+  if (typeof record["testDir"] === "string") folders.add(record["testDir"]);
+  if (Array.isArray(record["testDirs"])) for (const dir of record["testDirs"]) if (typeof dir === "string") folders.add(dir);
+  setup.testFolders = [...folders];
+  return setup;
+}
+
 export function readEnforcementConfig(root: string): EnforcementConfig {
-  const config: EnforcementConfig = { language: "typescript", test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined };
+  const config: EnforcementConfig = { language: "typescript", languages: ["typescript"], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined };
+  config.tests = [{ language: undefined, files: undefined, cwd: undefined, test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS] }];
   const path = resolve(root, CONFIG_FILE);
   if (!existsSync(path)) return config;
   let parsed: unknown;
@@ -66,26 +145,53 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   if (typeof parsed !== "object" || parsed === null) return config;
   const record = parsed as Record<string, unknown>;
   const language = record["language"];
-  if (typeof language === "string" && isLanguage(language)) config.language = language;
-  config.test = commandValue(record["test"]);
-  config.testJson = commandValue(record["testJson"]);
-  if (record["testFilterForm"] === "pytest") config.testFilterForm = "pytest";
+  if (typeof language === "string" && isLanguage(language)) config.languages = [language];
+  else if (Array.isArray(language)) {
+    const named = language.filter((l): l is Language => typeof l === "string" && isLanguage(l));
+    const unknown = language.filter((l) => typeof l !== "string" || !isLanguage(l));
+    if (unknown.length > 0) throw new Error(`${path}: language lists ${unknown.map((l) => JSON.stringify(l)).join(", ")}; each is one of ${LANGUAGES.join(", ")}`);
+    if (named.length > 0) config.languages = [...new Set(named)];
+  }
+  config.language = config.languages[0]!;
   const budget = record["latencyBudget"];
   if (budget !== undefined) {
     if (typeof budget !== "number" || !Number.isFinite(budget) || budget <= 0) throw new Error(`${path}: latencyBudget is a number of seconds above 0`);
     config.latencyBudget = budget;
   }
-  const testMatch = record["testMatch"];
-  if (typeof testMatch === "string" && testMatch !== "") {
-    try {
-      config.testMatch = new RegExp(testMatch);
-    } catch (error) {
-      throw new Error(`${path}: testMatch is not a regular expression (${(error as Error).message})`);
-    }
+  const tests = record["tests"];
+  if (tests !== undefined) {
+    if (!Array.isArray(tests) || tests.length === 0 || !tests.every((t) => typeof t === "object" && t !== null && !Array.isArray(t))) throw new Error(`${path}: tests is a list of test setups, each an object with test or testJson`);
+    config.tests = (tests as Record<string, unknown>[]).map((t, i) => {
+      const where = `tests[${i}].`;
+      const setup = testSetupOf(t, path, where);
+      if (setup.test === undefined && setup.testJson === undefined) throw new Error(`${path}: ${where.slice(0, -1)} names neither test nor testJson`);
+      const lang = t["language"];
+      if (lang !== undefined) {
+        if (typeof lang !== "string" || !isLanguage(lang)) throw new Error(`${path}: ${where}language is one of ${LANGUAGES.join(", ")}`);
+        setup.language = lang;
+      }
+      const files = t["files"];
+      if (files !== undefined) {
+        const list = typeof files === "string" ? [files] : files;
+        if (!Array.isArray(list) || list.length === 0 || !list.every((f): f is string => typeof f === "string" && f !== "")) throw new Error(`${path}: ${where}files is a glob or a list of globs`);
+        setup.files = list;
+      }
+      const cwd = t["cwd"];
+      if (cwd !== undefined) {
+        if (typeof cwd !== "string" || cwd === "" || isAbsolute(cwd)) throw new Error(`${path}: ${where}cwd is a folder relative to the project root`);
+        setup.cwd = cwd;
+      }
+      return setup;
+    });
+  } else {
+    config.tests = [testSetupOf(record, path, "")];
   }
-  const folders = new Set(config.testFolders);
-  if (typeof record["testDir"] === "string") folders.add(record["testDir"]);
-  if (Array.isArray(record["testDirs"])) for (const dir of record["testDirs"]) if (typeof dir === "string") folders.add(dir);
-  config.testFolders = [...folders];
+  // The single keys read as the first setup, so every reader of one setup keeps working.
+  const first = config.tests[0]!;
+  config.test = first.test;
+  config.testJson = first.testJson;
+  config.testMatch = first.testMatch;
+  config.testFilterForm = first.testFilterForm;
+  config.testFolders = [...new Set(config.tests.flatMap((t) => t.testFolders))];
   return config;
 }

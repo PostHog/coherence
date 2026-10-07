@@ -452,10 +452,18 @@ export function flowBoundaryId(folder: string): string {
   return `structure--boundary-${flowSlug(folder)}`;
 }
 
+/** A multi-language project's languages the reading left unread, as a clause; empty for one language. */
+export function unreadLanguagesText(model: Pick<FlowModel, "language" | "unreadLanguages">): string {
+  const unread = model.unreadLanguages ?? [];
+  return unread.length === 0 ? "" : ` (${unread.join(" and ")} files not read: the Structure reading reads the primary language, ${model.language}, alone)`;
+}
+
 export interface FlowModel {
   evidence: FlowEvidence;
   /** The language the adapter read, when it read. */
   language: string | undefined;
+  /** A multi-language project: the languages the reading left unread (it reads the primary one alone). */
+  unreadLanguages?: string[] | undefined;
   /** Why the adapter's reading is absent, when it is. */
   unread: string | undefined;
   /** Visible components in folder order (their column order). */
@@ -558,6 +566,13 @@ function flowRepresentative(components: Map<string, SpecComponent>, expanded: Se
   for (let at: string | undefined = folder; at !== undefined; at = components.get(at)?.parent) chain.unshift(at);
   for (let index = 0; index < chain.length - 1; index++) if (!expanded.has(chain[index]!)) return chain[index]!;
   return folder;
+}
+
+/** The visible component that stands for each folder at the state's zoom, as flowOf folds them. */
+export function flowRepresentOf(state: ShellState): (folder: string) => string {
+  const byFolder = new Map(state.spec.components.map((component) => [component.folder, component]));
+  const expanded = flowExpanded(state);
+  return (folder) => flowRepresentative(byFolder, expanded, folder);
 }
 
 /* ---------------------------------------------------------- the model */
@@ -1057,6 +1072,7 @@ export function flowOf(state: ShellState): FlowModel {
   return {
     evidence: reading.kind === "read" ? "language adapter" : "run sites only",
     language: reading.kind === "read" ? reading.language : undefined,
+    ...(reading.kind === "read" && reading.unreadLanguages !== undefined ? { unreadLanguages: reading.unreadLanguages } : {}),
     unread: reading.kind === "read" ? undefined : reading.because,
     nodes,
     edges,

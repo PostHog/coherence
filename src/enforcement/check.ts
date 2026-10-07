@@ -45,7 +45,7 @@
  */
 
 import { isTestPath, rangeContains, type Definition, type LanguageAdapter, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
-import { projectSites, referenceHorizon } from "../adapters/project-files.ts";
+import { horizonSites, projectSites, searchedHorizon } from "../adapters/project-files.ts";
 import type { Bypass, Grade, ReferenceTarget, RefutationState, SiteClass, Verdict } from "./record.ts";
 
 export interface ClassifiedSite extends ReferenceSite {
@@ -146,7 +146,7 @@ export function horizonNote(horizon: string): string {
 export async function checkChokepoint(adapter: LanguageAdapter, input: ChokepointInput): Promise<ChokepointResult> {
   const result = await checkWithinProject(adapter, input);
   // A graded verdict over a nested project says where its search reached; one never graded (nothing resolved) searched nothing.
-  const horizon = result.siteEvidence === "complete" ? referenceHorizon(input.root) : undefined;
+  const horizon = result.siteEvidence === "complete" ? searchedHorizon(input.root) : undefined;
   return horizon === undefined ? result : { ...result, horizon, reason: result.reason + horizonNote(horizon) };
 }
 
@@ -201,10 +201,10 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
   // chokepoint references describe legal reliance on the door. A run records
   // sites only after both queries complete, so a failed second query cannot
   // turn partial evidence into a confirmed empty set.
-  // Only the project's own files are evidence (projectSites): a site in a nested checkout or an ignored file
+  // Only the project's own files and its reference horizon's are evidence (horizonSites): a site in a nested checkout or an ignored file
   // is someone else's working text, never a bypass, even from an instrument that still reports one.
-  const protectedReferences = projectSites(input.root, await adapter.references(protectedThing));
-  const chokepointReferences = projectSites(input.root, await adapter.references(chokepoint));
+  const protectedReferences = horizonSites(input.root, await adapter.references(protectedThing));
+  const chokepointReferences = horizonSites(input.root, await adapter.references(chokepoint));
   const sites: ClassifiedSite[] = [
     ...protectedReferences.map((site) => ({ ...site, of: "protected" as const, test: isTestPath(site.file, input.testFolders), class: classifySite(site, protectedThing, chokepoint, input.testFolders) })),
     ...chokepointReferences.map((site) => ({ ...site, of: "chokepoint" as const, test: isTestPath(site.file, input.testFolders), class: classifyChokepointSite(site, chokepoint) })),

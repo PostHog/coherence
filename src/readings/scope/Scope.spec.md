@@ -540,3 +540,17 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   because: the strips, amendments and pitfall links are derived from those records, so a window that dropped them would draw a practice that seems never enacted and pitfalls that link nowhere; they are few, so keeping them costs little
   refuted: stopped keeping enactments in the journal window -> "the journal window keeps every enactment, every decision that cites one, and every record the practices cite, whatever its age" went red in practices.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
   kinds: none
+- a scoped reading proposes what the whole reading proposes: A reading scoped to some entrances resolves their handlers and those of every entrance declared beside them, follows their reach as the whole reading does, and reads the interfaces of a component only when a route of theirs enters it, never asking about any other; where every fact the route rule reads beyond those routes is settled for each tree the unread interfaces allow, its routes, traced controls and proposed closures for those entrances are the whole reading's, and where one is not, it names that fact.
+  over: a route of two entrances crossing three components, one passing a verified chokepoint its route-mate does not, beside a component with an entrance of its own that no route of theirs enters and that code off their routes calls, read whole and scoped through a server that counts every question, and the same scoped reading with a component on the route left unread
+  via: a scoped reading proposes for its entrances what the whole reading proposes, and never asks about a component their routes do not reach
+  because: on a large adopter the whole reading takes minutes, the cost of asking about one entrance; a route's own facts (its reach, the interfaces it takes, the guards it passes, its route-mates) are exact once the components it enters are read whole, but whether a component is a core dependency and which column it stands in are counted over every interface, so a scoped answer that differed from the whole one would propose a closure the whole map contradicts
+  crossing: instrument -> reading
+  refuted: made scopeStarts return only the named entrances, dropping the entrances declared beside them that can share their route -> "a scoped reading proposes for its entrances what the whole reading proposes, and never asks about a component their routes do not reach" went red in component-interfaces.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- a scoped reading is never recorded: A reading scoped to some entrances' routes is never kept as the tree's Structure reading, while a whole reading of the same tree is.
+  over: a scoped and a whole reading of the routed fixture, each offered to the record for the tree it read
+  via: a scoped reading is never recorded as the tree's reading
+  because: orient, Stop and the session's gaps read the recorded reading as every entrance's routes; a scoped one would leave every entrance off its routes looking resolved to nothing, and drop the gaps it never read
+  crossing: reading -> record
+  refuted: dropped the scoped test from recordReading, so a scoped reading was kept like a whole one -> "a scoped reading is never recorded as the tree's reading" went red in component-interfaces.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none

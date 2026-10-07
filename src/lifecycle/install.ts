@@ -46,13 +46,18 @@ import { mkdir, readFile, rm, rmdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
-import { DURABLE_FOLDERS, HOSTS, PACKAGE_NAME, SETTINGS_FILE, isHost, type Host } from "./project.ts";
-import { referenceHorizon, repositoryTop } from "../adapters/project-files.ts";
+import { DURABLE_FOLDERS, HOSTS, LOCAL_SETTINGS_FILE, PACKAGE_NAME, SETTINGS_FILE, isHost, type Host } from "./project.ts";
+import { nestedFolder, repositoryTop } from "../adapters/project-files.ts";
 export { DURABLE_FOLDERS };
 
 // Where each host keeps its settings, and which hosts there are, live in the project
 // layer: the hook reads them to know which tree it was installed for.
-export { HOSTS, SETTINGS_FILE, isHost, type Host };
+export { HOSTS, LOCAL_SETTINGS_FILE, SETTINGS_FILE, isHost, type Host };
+
+/** The settings file install writes for a host: the shared one, or with `local` the host's personal one (undefined for a host that has none). */
+export function settingsFile(host: Host, local = false): string | undefined {
+  return local ? LOCAL_SETTINGS_FILE[host] : SETTINGS_FILE[host];
+}
 
 /** How long a hook may run, in seconds. The check reads every changed file once. */
 const TIMEOUT_SECONDS = 60;
@@ -113,6 +118,10 @@ export const SIBLING = "coherence";
 const ROOT_WALK =
   'root="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$root" != / ] && [ ! -f "$root/.claude/settings.json" ] && [ ! -f "$root/.codex/hooks.json" ]; do root=$(dirname "$root"); done';
 
+/** The same walk for hooks kept in the personal settings, which stops at a folder holding either file. */
+const LOCAL_ROOT_WALK =
+  'root="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$root" != / ] && [ ! -f "$root/.claude/settings.json" ] && [ ! -f "$root/.claude/settings.local.json" ] && [ ! -f "$root/.codex/hooks.json" ]; do root=$(dirname "$root"); done';
+
 /**
  * Shell that sets `$coherence` to the cli to run, or to nothing: $COHERENCE_HOME,
  * the sibling folder, the sibling of a worktree's main checkout, the installed
@@ -123,11 +132,11 @@ const ROOT_WALK =
  * folder from the top) look in that project's own node_modules first, where
  * the project installed Coherence.
  */
-export function locateShell(sub = ""): string {
+export function locateShell(sub = "", local = false): string {
   const quoted = sub.replace(/["$`\\]/g, "\\$&");
   const own = sub === "" ? "" : `"$root/${quoted}/node_modules/${PACKAGE_NAME}/dist/cli.js" "$root/${quoted}/node_modules/.bin/coherence" `;
   return [
-    ROOT_WALK,
+    local ? LOCAL_ROOT_WALK : ROOT_WALK,
     'main=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)',
     "coherence=",
     `for c in "\${${HOME_VAR}:+\$${HOME_VAR}/src/cli.ts}" "$root/../${SIBLING}/src/cli.ts" "\${main:+\${main%/*}/../${SIBLING}/src/cli.ts}" ${own}"$root/node_modules/${PACKAGE_NAME}/dist/cli.js" "$root/node_modules/.bin/coherence"; do if [ -n "$c" ] && [ -f "$c" ]; then coherence=$c; break; fi; done`,
@@ -163,8 +172,8 @@ function atSessionStart(output: object): string {
  * exits 0 in silence but the session start, which tells the user in one line
  * and, when Coherence is missing, tells the agent how to supply it.
  */
-export function locatedPrefix(sub = ""): string {
-  return `${locateShell(sub)}; coherence() { if [ -z "$coherence" ]; then ${atSessionStart({ systemMessage: NOT_INSTALLED, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: MISSING_CONTEXT } })}; fi; if ! command -v node >/dev/null 2>&1; then ${atSessionStart({ systemMessage: NO_NODE })}; fi; exec node "$coherence" "$@"; }; coherence`;
+export function locatedPrefix(sub = "", local = false): string {
+  return `${locateShell(sub, local)}; coherence() { if [ -z "$coherence" ]; then ${atSessionStart({ systemMessage: NOT_INSTALLED, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: MISSING_CONTEXT } })}; fi; if ! command -v node >/dev/null 2>&1; then ${atSessionStart({ systemMessage: NO_NODE })}; fi; exec node "$coherence" "$@"; }; coherence`;
 }
 
 export const LOCATED_PREFIX = locatedPrefix();
@@ -322,11 +331,13 @@ export interface InstallResult {
   ignore: { path: string; action: IgnoreAction };
 }
 
-export async function install(options: InstallOptions & { ignoreRoot?: string }): Promise<InstallResult> {
-  const path = resolve(options.root, SETTINGS_FILE[options.host]);
-  const file = await readSettingsFile(path);
-  const merged = mergeHooks(file.value, options);
-  const changed = await writeSettings(path, file, merged);
+export async function install(options: InstallOptions & { ignoreRoot?: string; local?: boolean }): Promise<InstallResult> {
+  const file = settingsFile(options.host, options.local);
+  if (file === undefined) throw new Error(`${options.host} keeps no personal settings file Coherence can write; install without --local`);
+  const path = resolve(options.root, file);
+  const read = await readSettingsFile(path);
+  const merged = mergeHooks(read.value, options);
+  const changed = await writeSettings(path, read, merged);
   const ignoreRoot = options.ignoreRoot ?? options.root;
   const ignore = { path: resolve(ignoreRoot, IGNORE_FILE), action: await writeIgnore(ignoreRoot) };
   return { path, events: [...HOOK_EVENTS], changed, ignore };
@@ -346,7 +357,7 @@ export interface SettingsRoot {
  * parent's). The hooks at the top find the nested project from the event.
  */
 export function settingsRoots(root: string): SettingsRoot[] {
-  const sub = referenceHorizon(root);
+  const sub = nestedFolder(root);
   const top = sub === undefined ? undefined : repositoryTop(root);
   return top === undefined || sub === undefined ? [{ dir: root, sub: "" }] : [{ dir: top, sub }, { dir: root, sub: "" }];
 }
@@ -399,8 +410,11 @@ export interface UninstallResult {
 /** Whether any agent host's settings still hold a command of ours. */
 async function anyHostInstalled(root: string): Promise<boolean> {
   for (const host of HOSTS) {
-    const file = await readSettingsFile(resolve(root, SETTINGS_FILE[host]));
-    if (Object.values(hooksOf(file.value)).some((entries) => entries.some(isCoherenceEntry))) return true;
+    for (const name of [SETTINGS_FILE[host], LOCAL_SETTINGS_FILE[host]]) {
+      if (name === undefined) continue;
+      const file = await readSettingsFile(resolve(root, name));
+      if (Object.values(hooksOf(file.value)).some((entries) => entries.some(isCoherenceEntry))) return true;
+    }
   }
   return false;
 }
@@ -415,8 +429,10 @@ async function removeIgnore(root: string): Promise<boolean> {
 }
 
 /** Remove what install wrote for a host, and nothing else; a second pass changes nothing. */
-export async function uninstall(root: string, host: Host): Promise<UninstallResult> {
-  const path = resolve(root, SETTINGS_FILE[host]);
+export async function uninstall(root: string, host: Host, local = false): Promise<UninstallResult> {
+  const name = settingsFile(host, local);
+  const path = resolve(root, name ?? SETTINGS_FILE[host]);
+  if (name === undefined) return { path, removed: [], changed: false, removedIgnore: false };
   const file = await readSettingsFile(path);
   if (!file.exists) return { path, removed: [], changed: false, removedIgnore: await removeIgnore(root) };
   const { settings, removed } = stripHooks(file.value);
@@ -504,8 +520,8 @@ export function driftOf(settings: Record<string, unknown>, options: Pick<Install
 }
 
 /** Compare one host's installed hooks with what install would write with this command prefix. */
-export async function check(root: string, host: Host, command: string): Promise<CheckResult> {
-  const path = resolve(root, SETTINGS_FILE[host]);
+export async function check(root: string, host: Host, command: string, local = false): Promise<CheckResult> {
+  const path = resolve(root, settingsFile(host, local) ?? SETTINGS_FILE[host]);
   const file = await readSettingsFile(path);
   return { host, path, present: file.exists, drift: driftOf(file.value, { command, host }) };
 }
@@ -537,8 +553,8 @@ export interface HostStatus {
   others: Record<string, number>;
 }
 
-export async function status(root: string, host: Host): Promise<HostStatus> {
-  const path = resolve(root, SETTINGS_FILE[host]);
+export async function status(root: string, host: Host, local = false): Promise<HostStatus> {
+  const path = resolve(root, settingsFile(host, local) ?? SETTINGS_FILE[host]);
   let settings: Record<string, unknown>;
   let present = true;
   try {

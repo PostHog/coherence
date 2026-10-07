@@ -82,6 +82,7 @@ import {
   type FlowSelection,
   type FlowState,
   flowBoundsText,
+  unreadLanguagesText,
   flowPartialText,
 } from "./structure-flow.ts";
 import { textWidth } from "./structure-measure.ts";
@@ -1941,7 +1942,7 @@ function renderEvidence(model: FlowModel): Markup {
   const bounded = flowBoundsText(model);
   const partial = flowPartialText(model);
   return html`${partial === undefined ? null : html`<p class="flow-evidence flow-partial" data-field="partial" data-partial="${model.partial!.limit}">${partial[0]!.toUpperCase()}${partial.slice(1)}.</p>`}<p class="flow-evidence" data-field="evidence">Evidence: ${model.evidence === "language adapter"
-    ? `resolved references from the ${model.language} language adapter${bounded === undefined ? "" : `, ${bounded}`}; declared entrances, and invariants`
+    ? `resolved references from the ${model.language} language adapter${bounded === undefined ? "" : `, ${bounded}`}${unreadLanguagesText(model)}; declared entrances, and invariants`
     : html`the references the latest runs recorded to chokepoints and protected things, declared entrances, and invariants; plain component interfaces are unknown (${model.unread})`}. Observed runtime behavior is not shown.</p>`;
 }
 

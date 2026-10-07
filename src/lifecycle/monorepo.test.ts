@@ -77,17 +77,63 @@ test("a hook at the repository top answers for the one project nested below it, 
   try {
     const start = await runHook("SessionStart", { cwd: top, session_id: "s1" }, top);
     start.commit?.();
-    const orient = context(start.stdout);
+    assert.match(context(start.stdout), /adopted in apps\/billing below this folder/, "the start names the project below");
+    const edit = await runHook("PreToolUse", { cwd: top, session_id: "s1", tool_name: "Edit", tool_input: { file_path: join(billing, "src/mask.ts"), new_string: "x" } }, top);
+    edit.commit?.();
+    const orient = context(edit.stdout);
     assert.match(orient, /card numbers masked/, "orient reads the nested project's spec");
     assert.doesNotMatch(orient, /outside door|outside practice/, "and nothing of another team's");
+    assert.match(orient, /list before charging \(version/, "an edit inside the project fires its practice, matched against the project's own paths");
     const ls = await runHook("PreToolUse", { cwd: top, session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } }, top);
     assert.match(context(ls.stdout), /list before charging/, "a command run at the top fires the nested project's practice");
     assert.doesNotMatch(context(ls.stdout), /outside practice/);
     ls.commit?.();
-    const edit = await runHook("PreToolUse", { cwd: top, session_id: "s2", tool_name: "Edit", tool_input: { file_path: join(billing, "src/mask.ts"), new_string: "x" } }, top);
-    assert.match(context(edit.stdout), /list before charging \(version/, "an edit inside the project fires its practice, matched against the project's own paths");
     assert.ok(existsSync(join(billing, ".coherence")), "the project's records are kept in the project");
     assert.ok(!existsSync(join(top, ".coherence")), "nothing is written at the repository top");
+  } finally {
+    rmSync(top, { recursive: true, force: true });
+  }
+});
+
+test("a session at the repository top gets orient once, at its first tool use inside the project, and nothing for work elsewhere", async () => {
+  const { top, billing } = monorepo();
+  const { countingGit } = await import("../adapters/git-count-fixture.ts");
+  try {
+    const hook = async (event: "SessionStart" | "UserPromptSubmit" | "PreToolUse" | "PostToolUse" | "Stop", input: Record<string, unknown>): Promise<string> => {
+      const result = await runHook(event, { cwd: top, session_id: "s1", ...input }, top);
+      assert.equal(result.exit, 0, result.stderr);
+      result.commit?.();
+      return context(result.stdout) || result.stdout;
+    };
+    const ORIENT = /Coherence vocabulary \(/;
+    assert.doesNotMatch(await hook("SessionStart", {}), ORIENT, "the start carries one line, not orient");
+    const git = countingGit();
+    const elsewhere: string[] = [];
+    let calls: string[] = [];
+    try {
+      for (const input of [
+        { prompt: "fix the other team's door" },
+        { tool_name: "Edit", tool_input: { file_path: join(top, "libs/other/door.ts"), new_string: "x" } },
+        { tool_name: "Bash", tool_input: { command: "ls libs/other" } },
+      ]) {
+        const event = "prompt" in input ? "UserPromptSubmit" : "PreToolUse";
+        elsewhere.push(await hook(event, input));
+        if (event === "PreToolUse") elsewhere.push(await hook("PostToolUse", input));
+      }
+      elsewhere.push(await hook("Stop", {}));
+      calls = git.calls();
+    } finally {
+      git.restore();
+    }
+    assert.deepEqual(elsewhere, ["", "", "", "", "", ""], "work outside the project, and a prompt and a stop before entering it, hear nothing");
+    assert.ok(calls.length <= 6 && calls.every((c) => c.includes("coherence.config.json")), `one listing of where the projects are per event at most: ${calls.join("; ")}`);
+    assert.ok(!existsSync(join(billing, ".coherence")) && !existsSync(join(top, ".coherence")), "and nothing is written anywhere");
+    const first = await hook("PostToolUse", { tool_name: "Edit", tool_input: { file_path: join(billing, "src/mask.ts") } });
+    assert.match(first, ORIENT, "the first tool use inside the project carries orient");
+    assert.match(first, /card numbers masked/);
+    const second = await hook("PreToolUse", { tool_name: "Edit", tool_input: { file_path: join(billing, "src/store.ts"), new_string: "x" } });
+    assert.doesNotMatch(second, ORIENT, "and only the first");
+    assert.doesNotMatch(await hook("PreToolUse", { tool_name: "Bash", tool_input: { command: "ls" } }), ORIENT, "nor a command at the top once the session has entered");
   } finally {
     rmSync(top, { recursive: true, force: true });
   }
@@ -167,6 +213,27 @@ test("hooks install from a nested project writes the host settings at the reposi
   }
 });
 
+test("hooks install --local writes the host's personal settings at the repository top alone, and uninstall removes them", () => {
+  const { top, billing } = monorepo();
+  try {
+    const cli = (...args: string[]) => spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, ...args], { cwd: billing, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: "" } });
+    const shared = readFileSync(join(top, ".claude/settings.json"), "utf8");
+    const installed = cli("hooks", "install", "--host", "claude", "--local", "--command", "npx coherence");
+    assert.equal(installed.status, 0, installed.stderr);
+    const local = JSON.parse(readFileSync(join(top, ".claude/settings.local.json"), "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
+    assert.equal(local.hooks["Stop"]!.at(-1)!.hooks[0]!.command, "npx coherence hook Stop");
+    assert.equal(readFileSync(join(top, ".claude/settings.json"), "utf8"), shared, "the committed settings are untouched");
+    assert.ok(!existsSync(join(billing, ".claude")), "nothing in the folder's own settings");
+    assert.ok(existsSync(join(billing, ".coherence/.gitignore")), "the ignore file as before");
+    assert.equal(cli("hooks", "--check", "--host", "claude", "--local", "--command", "npx coherence").status, 0);
+    assert.notEqual(cli("hooks", "install", "--host", "codex", "--local").status, 0, "a host with no personal settings file is refused");
+    assert.equal(cli("hooks", "uninstall", "--host", "claude").status, 0);
+    assert.doesNotMatch(readFileSync(join(top, ".claude/settings.local.json"), "utf8"), /coherence hook/, "uninstall removes ours from the personal settings too");
+  } finally {
+    rmSync(top, { recursive: true, force: true });
+  }
+});
+
 test("a chokepoint verdict over a nested project says its reference search covered that folder alone", { timeout: 120_000 }, async () => {
   const { top, billing } = monorepo();
   const adapter = new TypeScriptAdapter(billing);
@@ -198,5 +265,52 @@ test("a nested Python project's imports written from the repository top resolve,
   } finally {
     await adapter.close();
     rmSync(top, { recursive: true, force: true });
+  }
+});
+
+/** A chokepoint check of the nested project under each reference horizon, with a bypass planted in another team's folder. */
+async function underHorizon(language: "typescript" | "python", references: unknown): Promise<{ grade: string; bypasses: string[]; reason: string }> {
+  const ts = language === "typescript";
+  const { top } = monorepo({
+    "apps/nb/coherence.config.json": JSON.stringify({ name: "nb", language, ...(references === undefined ? {} : { references }) }) + "\n",
+    ...(ts
+      ? {
+          "apps/nb/tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["**/*.ts"] }) + "\n",
+          "apps/nb/query.ts": "export const KINDS = new Set([\"a\"]);\nexport function normalize(q: string): boolean {\n  return KINDS.has(q);\n}\n",
+          "libs/leaky/leak.ts": "import { KINDS } from \"../../apps/nb/query.ts\";\nexport const leaked = KINDS.size;\n",
+        }
+      : {
+          "apps/nb/query.py": "KINDS = {\"a\"}\n\n\ndef normalize(q):\n    return q in KINDS\n",
+          "libs/leaky/leak.py": "from apps.nb.query import KINDS\n\nleaked = len(KINDS)\n",
+        }),
+  });
+  const root = join(top, "apps/nb");
+  const { PythonAdapter } = await import("../adapters/python.ts");
+  const adapter = ts ? new TypeScriptAdapter(root) : new PythonAdapter(root);
+  try {
+    const result = await checkChokepoint(adapter, { protects: "KINDS", chokepoint: "normalize", component: ".", testFolders: [], root });
+    return { grade: result.grade, bypasses: result.bypasses.map((b) => `${b.file}:${b.line}`), reason: result.reason };
+  } finally {
+    await adapter.close();
+    rmSync(top, { recursive: true, force: true });
+  }
+}
+
+test("the reference horizon widens a chokepoint check past the project: a bypass in another folder is found under repository and under a list naming it, and named as not searched under project", { timeout: 240_000 }, async () => {
+  for (const language of ["typescript", "python"] as const) {
+    const leak = language === "typescript" ? "../../libs/leaky/leak.ts:1" : "../../libs/leaky/leak.py:1";
+    const project = await underHorizon(language, undefined);
+    assert.deepEqual(project.bypasses, [], `${language}: the project alone does not see it`);
+    assert.match(project.reason, /references searched inside apps\/nb only: callers elsewhere in the repository were not read$/, `${language}: and says so`);
+    const repository = await underHorizon(language, "repository");
+    assert.equal(repository.grade, "broken", `${language}: ${repository.reason}`);
+    assert.ok(repository.bypasses.includes(leak), `${language}: ${repository.bypasses.join(", ")}`);
+    assert.doesNotMatch(repository.reason, /references searched inside/, `${language}: the whole repository was searched, so no qualifier`);
+    const listed = await underHorizon(language, ["libs/leaky"]);
+    assert.ok(listed.bypasses.includes(leak), `${language}: a list naming the folder finds it: ${listed.reason}`);
+    assert.match(listed.reason, /references searched inside apps\/nb and libs\/leaky only/, language);
+    const elsewhere = await underHorizon(language, ["libs/other"]);
+    assert.deepEqual(elsewhere.bypasses, [], `${language}: a list naming another folder does not`);
+    assert.match(elsewhere.reason, /references searched inside apps\/nb and libs\/other only/, language);
   }
 });
