@@ -54,3 +54,15 @@ The context closure of a change, the read traces that record what sessions actua
   crossing: project-source -> reading
   refuted: skipped the scan for files importing a deleted or renamed-away path -> "economy of the working change: the files still importing a deleted path ..." went red in change.test.ts with src/api/uses-gone.ts missing from the closure; restored, green (2026-09-23)
   kinds: none
+- a stop predicts for the session's own writes: The prediction a stop records is for the files the session's own tool uses wrote, that still exist, are the project's, and lie outside every folder the config ignores; another session's or a person's uncommitted change is never predicted for.
+  over: a file the session wrote, a file someone else changed, a written file in an ignored folder, a written file since removed, and a session that wrote nothing
+  via: a stop predicts for the session's own writes: never another session's or a person's uncommitted change, an ignored folder, or a file since removed
+  because: the prediction is calibrate's estimate of what this session needed to read; predicting for the whole dirty tree compared a session against other people's edits, and on a checkout with uncommitted promo work it asked the language server about ignored files for 28 of a 37 s stop (df-ccecbb4a)
+  refuted: let the session patch keep files in ignored folders -> "a stop predicts for the session's own writes: never another session's or a person's uncommitted change, an ignored folder, or a file since removed" went red in hook-speed.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+- the prediction resolves only what a given file could define: A chokepoint invariant is resolved for the prediction only when a given file spells its protected or chokepoint name as a whole word, or is the module it names; a name no given file spells cannot be defined in one, so skipping it changes nothing the prediction finds.
+  over: a symbol, a symbol in a file, a longer word containing the name, a module path given and not, and prose
+  via: the prediction resolves a chokepoint invariant only when a given file spells its protected or chokepoint name, or is the module it names
+  because: resolving every chokepoint invariant at every stop cost about two language-server requests each whatever the session wrote; the predictions before and after are identical on three file sets, two holding real chokepoints, and two to three and a half times faster
+  refuted: matched a name anywhere in a given file's text, not as a whole word -> "the prediction resolves a chokepoint invariant only when a given file spells its protected or chokepoint name, or is the module it names" went red in hook-speed.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none

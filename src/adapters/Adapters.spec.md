@@ -145,3 +145,21 @@ The language adapter seam: how to ask a language's server for definitions, refer
   because: the same per-question git cost the TypeScript adapter carried (d-55040f81) sat in the Python adapter's resolve and reference filter, which is what reads a Python adopter such as PostHog; a listing kept past a forget would hide a new module from the chokepoint check
   refuted: kept the Python adapter's walked file list across a forget -> "the Python adapter reads the project's files once per forget: a module created after the listing is found only after a forget" went red in listing.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
   kinds: none
+- a cold server resolves what the project declares: The TypeScript adapter loads the project through a source file inside a component folder, and a name the server does not know yet is looked for in the files whose text spells it and confirmed by their document symbols, so a fresh server never answers no symbol for a name the project declares.
+  over: a project whose first source file lies outside the tsconfig, on a fresh server, at the first question
+  via: a cold server resolves a name the project declares even when the first source file of the walk lies outside the TypeScript project
+  because: a bench script outside the tsconfig became the first source file the walk met, so a fresh server loaded only an inferred project around it and answered no symbol for every bare name; the check at an edit then recorded not run and printed nothing, which let a bypass of run appended never rewritten reach main unseen
+  refuted: chose the first source file of the walk as the seed again, inside a component or not -> "a cold server resolves a name the project declares even when the first source file of the walk lies outside the TypeScript project" went red in listing.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
+  kinds: none
+- the adapter's git spawns do not grow with the names asked: Between forgets, the TypeScript adapter spawns git a fixed number of times however many names are resolved and asked for their references.
+  over: a project of two declarations and one of eight, every name resolved and asked for its references after one forget
+  via: the TypeScript adapter spawns git a fixed number of times between forgets, whatever the number of names asked
+  because: one git listing per references question made the Structure reading and npm test about five times slower for two weeks (d-55040f81) before anyone looked; a count of spawns is the same under any load, so the shape that cost the time alarms the day it returns, where a timing would flake
+  refuted: took git's listing afresh at every references question instead of once per forget -> "the TypeScript adapter spawns git a fixed number of times between forgets, whatever the number of names asked" went red in listing.test.ts on its own assertion (4 spawns against 10); restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is a count of child processes per forget
+  checklist: execution-budget declared as the adapter's git spawns do not grow with the names asked
+  checklist: memory-budget dismissed: the bound is on spawned processes, not on allocation
+  checklist: circuit-breaker-policy dismissed: no dependency failures are observed
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window

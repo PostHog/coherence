@@ -46,7 +46,7 @@ import {
   type WorkKind,
 } from "./record.ts";
 import { projectPractices } from "../spec/model.ts";
-import type { ModelPractice } from "../spec/practices.ts";
+import { amendCommand, floorGaps, type ModelPractice } from "../spec/practices.ts";
 import { JOURNAL_DIR, appendRecord, gitState, loadJournal, type Loaded } from "./store.ts";
 import { describeBinding, loadWork } from "./work.ts";
 import { recordsOnOtherBranches } from "./branches.ts";
@@ -413,13 +413,24 @@ function stepOutcome(pair: string): { n: string; outcome: StepOutcome } {
  * Record a practice carried out. Every step needs an outcome: done, with its
  * evidence where the step names what it leaves, or deviated or skipped with
  * a because. The record keeps the text of the steps and pitfalls enacted, so
- * a later change to the practice is read against what was carried out.
+ * a later change to the practice is read against what was carried out. A
+ * practice that has lost a step or pitfall an enactment taught, with no
+ * decision amending it, is refused until that decision is recorded: enacting
+ * the edited practice must not stand in for the reason.
  */
 export function enact(argv: string[], ctx: Context): Written {
   const parsed = parseFlags(argv, withCommon({ step: "many", trigger: "one", ...CITE }));
   const who = attribution(parsed);
   const given = onePositional(parsed, "the practice (its id, or its name when only one practice carries it)");
   const practice = findPractice(projectPractices(ctx.cwd), given);
+  const gaps = floorGaps(practice, loadJournal(ctx.cwd).records);
+  if (gaps.length > 0) {
+    throw new JournalError(
+      `enact: ${practice.id} has lost what an enactment taught, with no decision saying why:\n` +
+        gaps.map((g) => `  ${g.what}, enacted in ${g.taughtIn.id}`).join("\n") +
+        `\nRecord the amendment first: ${amendCommand(practice.id, gaps[gaps.length - 1]!.taughtIn.id)}`,
+    );
+  }
   const results: Record<string, StepOutcome> = {};
   for (const pair of parsed.many.get("step") ?? []) {
     const { n, outcome } = stepOutcome(pair);

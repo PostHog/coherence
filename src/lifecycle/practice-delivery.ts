@@ -12,11 +12,13 @@
  * method, and a refusal would train a session to work around it.
  */
 
+import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { loadSpecModel, projectPractices } from "../spec/model.ts";
-import { firedBy, renderPractice, triggerText, type ToolUse } from "../spec/practice.ts";
-import { KERNEL_PREFIX, type ModelPractice } from "../spec/practices.ts";
+import { basename, dirname, join } from "node:path";
+import { loadSpecModel, projectPractices, type SpecModel } from "../spec/model.ts";
+import { PRACTICE_SUFFIX, firedBy, parsePractices, renderPractice, triggerText, type ToolUse } from "../spec/practice.ts";
+import { KERNEL_PREFIX, isCoherenceTree, kernelPractices, type ModelPractice } from "../spec/practices.ts";
+import { configIgnore, underIgnored } from "../adapters/project-files.ts";
 import { loadJournal } from "../journal/store.ts";
 import type { Enactment } from "../journal/record.ts";
 import { enactTemplate } from "../journal/verbs.ts";
@@ -82,9 +84,11 @@ export interface PracticeContext {
 
 /** The practices this tool use fires: each whole on its first firing at its version this session, one line after. */
 export function practiceContext(root: string, session: string | undefined, use: ToolUse, cli: string, agent: string, now: () => Date = () => new Date()): PracticeContext {
+  // A tool use that runs no command and writes nothing can fire no trigger: nothing is read for it.
+  if (use.command === undefined && use.writes.length === 0) return { text: "", commit: () => {} };
   let practices: ModelPractice[];
   try {
-    practices = projectPractices(root);
+    practices = deliveryPractices(root);
   } catch {
     return { text: "", commit: () => {} };
   }
@@ -143,7 +147,7 @@ export function practiceOrientText(root: string, cli: string): string {
  * that the session has not enacted since, with the command that records it,
  * and a step enacted done without the evidence it names.
  */
-export function practiceStopText(root: string, session: string | undefined, cli: string, agent: string): string {
+export function practiceStopText(root: string, session: string | undefined, cli: string, agent: string, model?: SpecModel): string {
   if (session === undefined) return "";
   const fired = firings(root, session);
   let records: Enactment[];
@@ -162,7 +166,7 @@ export function practiceStopText(root: string, session: string | undefined, cli:
   for (const [id, f] of owed) {
     practices ??= (() => {
       try {
-        return projectPractices(root);
+        return projectPractices(root, model);
       } catch {
         return [];
       }
@@ -210,4 +214,30 @@ function hasSpec(root: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * The practices a tool use may fire, read the light way the hook can afford
+ * before every command and edit: git lists the practice files alone, each is
+ * kept only beside its spec of the same stem and outside every ignored
+ * folder, and is parsed; the kernel practices join in an adopter. No spec
+ * model, no journal: delivery needs a practice's triggers, steps and version,
+ * never its state, and the spec check is what holds the pairing and the
+ * evidence. Outside git, the spec model's own reading stands in.
+ */
+export function deliveryPractices(root: string): ModelPractice[] {
+  const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", `:(glob)**/*${PRACTICE_SUFFIX}`], { cwd: root, encoding: "utf8" });
+  if (listed.status !== 0) return projectPractices(root);
+  const skip = new Set(configIgnore(root));
+  const out: ModelPractice[] = [];
+  for (const rel of listed.stdout.split("\0").filter((f) => f !== "" && !underIgnored(f, skip)).sort()) {
+    const path = join(root, rel);
+    const stem = basename(rel).slice(0, -PRACTICE_SUFFIX.length);
+    const folder = dirname(rel) === "." ? "." : dirname(rel);
+    if (!existsSync(path) || !existsSync(join(root, folder, `${stem}.spec.md`))) continue;
+    for (const practice of parsePractices(readFileSync(path, "utf8"), rel).practices) {
+      out.push({ ...practice, id: `${folder}/${practice.name}`, component: folder, file: rel, state: "candidate", enactments: 0 });
+    }
+  }
+  return isCoherenceTree(root) ? out : [...out, ...kernelPractices()];
 }

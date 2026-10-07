@@ -77,7 +77,8 @@ import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
-import { recordReadTrace, snapshotTrace } from "../economy/trace.ts";
+import { recordReadTrace, recordWriteTrace, sessionPatch, snapshotTrace, type Snapshot } from "../economy/trace.ts";
+import { spawn } from "node:child_process";
 import { loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
@@ -378,12 +379,26 @@ export async function sessionBlock(root: string, input: HookInput): Promise<stri
 
 const OPEN_REQUIREMENT_LINES = 12;
 
+/**
+ * The spec model each part of one event reads, loaded once per event: a
+ * stop's spec text, its gap check, its refresh check and its practice lines
+ * all read the same tree, which nothing changes while the event runs. Kept
+ * only for the length of one runHook call, so a caller outside an event (a
+ * test, a reading) always loads afresh.
+ */
+let eventModels: Map<string, SpecModel | { error: string }> | undefined;
+
 function specModelOrNull(root: string): SpecModel | { error: string } {
+  const held = eventModels?.get(root);
+  if (held !== undefined) return held;
+  let model: SpecModel | { error: string };
   try {
-    return loadSpecModel(root);
+    model = loadSpecModel(root);
   } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
+    model = { error: e instanceof Error ? e.message : String(e) };
   }
+  eventModels?.set(root, model);
+  return model;
 }
 
 /** Requirements still short of invariant, and grammar problems, for orient. */
@@ -496,6 +511,13 @@ export function writtenFiles(root: string, input: HookInput): string[] {
   }))];
 }
 
+/** The written files that are the project's own: a nested checkout's or an ignored file is not this session's patch. */
+function keepProjectFilesOf(root: string, files: readonly string[]): string[] {
+  if (files.length === 0) return [];
+  const own = keepProjectFiles(root, files);
+  return files.filter((f) => own.has(f));
+}
+
 /** Compatibility for a caller asking about one ordinary edit; patch-aware callers use every path. */
 export function writtenFile(root: string, input: HookInput): string | undefined {
   return writtenFiles(root,input)[0];
@@ -524,7 +546,10 @@ export async function editContext(root: string, input: HookInput, options: HookO
   const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: touched, model, adapter: options.adapter, refresh: files });
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
-  if (failed.length === 0) return "";
+  // A check the instrument could not make is said, never silent: a quiet not-run would read as a clean edit. A value written as prose is the spec's own lack, reported by spec --check instead.
+  const unchecked = outcome.details.filter((d) => d.entry.verdict === "not run" && !/\bis prose\b/.test(d.entry.reason));
+  const uncheckedText = unchecked.length === 0 ? "" : `Coherence could not check ${unchecked.length} chokepoint invariant${unchecked.length === 1 ? "" : "s"} at this edit:\n${unchecked.map((d) => `  ○ ${d.entry.component}/${d.entry.name}: ${d.entry.reason}`).join("\n")}\n`;
+  if (failed.length === 0) return uncheckedText;
   const cli = await cliName(root);
   const lines = [`Structural defect revealed at this edit (${files.join(", ")}); recorded in ${outcome.file ?? "the run"}:`];
   for (const d of failed) {
@@ -539,7 +564,7 @@ export async function editContext(root: string, input: HookInput, options: HookO
   lines.push("Two honest options: route the reference through the chokepoint, or escalate a retirement for a human, who must acknowledge it:");
   lines.push(`  ${cli} escalate "retire <invariant>" --because "<what changed and why the chokepoint no longer holds>" --session ${session} --agent ${agent}`);
   lines.push("The invariant stays in force, and alarming, until a person acknowledges.");
-  return lines.join("\n") + "\n";
+  return uncheckedText + lines.join("\n") + "\n";
 }
 
 /**
@@ -715,6 +740,13 @@ export interface HookOptions {
   door?: WarmDoor | undefined;
   /** How long a session start may wait for a nearly done refresh; START_WAIT_MS by default. */
   startWaitMs?: number | undefined;
+  /**
+   * Start warming the instrument without waiting for it: at a session's
+   * start and at each prompt, so the stop that ends the turn finds the warm
+   * server loaded and its idle timer fresh. The command line passes
+   * WARM_UP; absent (a test), nothing is started.
+   */
+  warm?: ((root: string) => void) | undefined;
 }
 
 /**
@@ -741,14 +773,42 @@ export function refreshAtStop(root: string, options: HookOptions): void {
  * computed through references rather than skipped. A door that cannot connect
  * hands back its reason, which the snapshot records as the instrument it had.
  */
-async function snapshotAtStop(root: string, session: string, changed: readonly string[], options: HookOptions): Promise<void> {
-  if (options.adapter !== undefined) {
-    await snapshotTrace(root, session, { adapter: options.adapter, changed });
-    return;
-  }
+async function snapshotAtStop(root: string, session: string, options: HookOptions): Promise<Snapshot | undefined> {
+  // The session's own patch: what its tool uses wrote, outside every ignored folder; another session's or a person's edits are not predicted for.
+  const changed = sessionPatch(root, session);
+  if (options.adapter !== undefined) return snapshotTrace(root, session, { adapter: options.adapter, changed });
   const door = options.door ?? WARM_DOOR;
-  await door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed }));
+  return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed }));
 }
+
+/**
+ * Regulate's economy line: the files the prediction names besides the ones
+ * the session wrote (who relies on them, what they rely on), and which of
+ * those the session never read; advisory, nothing when there are none.
+ */
+export function economyStopText(snapshot: Snapshot | undefined): string {
+  if (snapshot === undefined || snapshot.changed.length === 0) return "";
+  const changed = new Set(snapshot.changed);
+  const others = snapshot.predicted.filter((f) => !changed.has(f));
+  if (others.length === 0) return "";
+  const read = new Set(snapshot.read);
+  const unread = others.filter((f) => !read.has(f));
+  const files = (n: number, one: string): string => `${n} ${one}${n === 1 ? "" : "s"}`;
+  const head = `Economy: this session wrote ${files(changed.size, "file")}; the prediction names ${files(others.length, "other file")} that rely on them or that they rely on, and the session read ${others.length - unread.length} of them.`;
+  if (unread.length === 0) return head;
+  return `${head} Not read: ${unread.slice(0, 6).join(", ")}${unread.length > 6 ? `, and ${unread.length - 6} more` : ""}.`;
+}
+
+/** The warm-up the command line starts: this checkout's warm verb, detached and never waited on. */
+export const WARM_UP = (root: string): void => {
+  try {
+    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", OWN_CLI, "warm"], { cwd: root, detached: true, stdio: "ignore" });
+    child.on("error", () => {});
+    child.unref();
+  } catch {
+    // A warm-up that cannot start only means the stop starts the server itself.
+  }
+};
 
 /** The refresh the command line starts: this checkout's query structure, which records the reading it takes. */
 export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
@@ -762,7 +822,8 @@ export async function gapStopText(root: string, input: HookInput, changed: reado
     const session = sessionOf(input);
     const now = currentGaps(root);
     const start = session === undefined ? undefined : sessionGaps(root, session);
-    const spec = loadSpec(root);
+    const model = specModelOrNull(root);
+    const spec = loadSpec(root, "error" in model ? undefined : model);
     const declared = declaredThisSession(root, changed, spec);
     return regulateGapText({ changed, now, start, declared, spec, cli: await cliName(root) });
   } catch {
@@ -846,110 +907,130 @@ async function voiced(root: string, input: HookInput, canonical: string, voice: 
 
 /** Run one event. `input` is the parsed stdin the host sent; `root` defaults to its cwd. */
 export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: string, options: HookOptions = {}): Promise<HookResult> {
-  const project = installedRoot(fallbackRoot);
-  const given = typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : fallbackRoot;
-  // The cwd arrives on stdin from the harness; a tree that is not the one this hook was installed for is none of its business.
-  if (project !== undefined && !within(project, given)) {
-    return { stdout: "", stderr: `hook ${event}: the working directory "${given}" is not inside the project root this hook was installed for (${project}); nothing was read and nothing was written\n`, exit: OUTSIDE_ROOT_EXIT };
+  // One spec model per event, shared by every part of its answer; the body stays inside runHook, the chokepoint for its exit codes.
+  const outer = eventModels;
+  eventModels = new Map();
+  try {
+    return await answer();
+  } finally {
+    eventModels = outer;
   }
-  const root = project ?? given;
-  const voice = readHookVoice(root, event);
-  switch (event) {
-    case "SessionStart":
-    case "SubagentStart": {
-      const reading=await lexiconCoverage(root);
-      // Only a session start waits, and only for a refresh of this tree that is nearly done; a subagent starts at once.
-      let gaps = await gapReading(root, event === "SessionStart" ? { waitMs: options.startWaitMs ?? START_WAIT_MS } : {});
-      // A stale or absent reading starts one in the background (a no-op while one of this tree runs), then orient reads the last one, labeled.
-      // Only a session start: a subagent inherits the session's reading, and one refresh per tree is enough.
-      if (event === "SessionStart" && gaps.now === undefined && gaps.fingerprint !== undefined) {
-        options.refresh?.(root, gaps.fingerprint);
-        gaps = { ...gaps, refreshing: refreshUnderWay(root) !== undefined };
+
+  async function answer(): Promise<HookResult> {
+    const project = installedRoot(fallbackRoot);
+    const given = typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : fallbackRoot;
+    // The cwd arrives on stdin from the harness; a tree that is not the one this hook was installed for is none of its business.
+    if (project !== undefined && !within(project, given)) {
+      return { stdout: "", stderr: `hook ${event}: the working directory "${given}" is not inside the project root this hook was installed for (${project}); nothing was read and nothing was written\n`, exit: OUTSIDE_ROOT_EXIT };
+    }
+    const root = project ?? given;
+    const voice = readHookVoice(root, event);
+    switch (event) {
+      case "SessionStart":
+      case "SubagentStart": {
+        if (event === "SessionStart") options.warm?.(root);
+        const reading=await lexiconCoverage(root);
+        // Only a session start waits, and only for a refresh of this tree that is nearly done; a subagent starts at once.
+        let gaps = await gapReading(root, event === "SessionStart" ? { waitMs: options.startWaitMs ?? START_WAIT_MS } : {});
+        // A stale or absent reading starts one in the background (a no-op while one of this tree runs), then orient reads the last one, labeled.
+        // Only a session start: a subagent inherits the session's reading, and one refresh per tree is enough.
+        if (event === "SessionStart" && gaps.now === undefined && gaps.fingerprint !== undefined) {
+          options.refresh?.(root, gaps.fingerprint);
+          gaps = { ...gaps, refreshing: refreshUnderWay(root) !== undefined };
+        }
+        const context = await voiced(root, input, (await startReading(root, input, reading, gaps)).text, voice);
+        const session = sessionOf(input);
+        if (session !== undefined) openFeed(root, session);
+        // A subagent's start is kept so its stop can find what it wrote under the coordinator's session.
+        if (event === "SubagentStart" && session !== undefined && !isMainThread(input)) markChildStart(root, session);
+        // An empty override silences the start; the session still began, so its baseline is still kept.
+        const stdout = context === "" ? "" : JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
+        const commit = (): void => {
+          saveBaseline(root, session!, reading);
+          // The gaps as this session found them, for regulate once its own edits make the reading stale.
+          const found = gaps.now ?? gaps.last;
+          if (found !== undefined) saveSessionGaps(root, session!, found);
+        };
+        return { stdout, stderr: "", exit: 0, ...(session ? { commit } : {}) };
       }
-      const context = await voiced(root, input, (await startReading(root, input, reading, gaps)).text, voice);
-      const session = sessionOf(input);
-      if (session !== undefined) openFeed(root, session);
-      // A subagent's start is kept so its stop can find what it wrote under the coordinator's session.
-      if (event === "SubagentStart" && session !== undefined && !isMainThread(input)) markChildStart(root, session);
-      // An empty override silences the start; the session still began, so its baseline is still kept.
-      const stdout = context === "" ? "" : JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
-      const commit = (): void => {
-        saveBaseline(root, session!, reading);
-        // The gaps as this session found them, for regulate once its own edits make the reading stale.
-        const found = gaps.now ?? gaps.last;
-        if (found !== undefined) saveSessionGaps(root, session!, found);
-      };
-      return { stdout, stderr: "", exit: 0, ...(session ? { commit } : {}) };
-    }
-    case "PreToolUse": {
-      // Before the act: a practice whose trigger this tool use fires is delivered now, when its first steps can still be taken.
-      const session = sessionOf(input);
-      const practice = practiceContext(root, session, toolUseOf(input, writtenFiles(root, input)), await cliName(root), agentOf(input));
-      const context = await voiced(root, input, practice.text, voice);
-      if (context === "") return { stdout: "", stderr: "", exit: 0 };
-      const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
-      return { stdout, stderr: "", exit: 0, ...(practice.text !== "" && voice.override === undefined ? { commit: practice.commit } : {}) };
-    }
-    case "UserPromptSubmit":
-    case "PostToolUse": {
-      const feed = feedContext(root, input);
-      const session=sessionOf(input);
-      if (event === "PostToolUse" && session) recordReadTrace(root, session, input);
-      const edit = event === "PostToolUse" ? await editContext(root, input, options) : "";
-      const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
-      const changes=reading && session ? coverageChanges(reading,priorBaseline(root,session)) : [];
-      const vocabulary=changes.length ? await vocabularyAtEdit(root, changes) : "";
-      const context = await voiced(root, input, [feed.text,edit,vocabulary].filter(Boolean).join("\n"), voice);
-      if (context === "") return { stdout: "", stderr: "", exit: 0 };
-      const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
-      // An override took the feed's and the vocabulary line's place, so neither reached the host and neither advances.
-      const delivered = voice.override === undefined && (feed.text !== "" || changes.length > 0);
-      const commit=()=> { if(feed.text) feed.commit(); if(changes.length && reading && session) saveBaseline(root,session,reading); };
-      return {stdout:stdout+"\n",stderr:"",exit:0,...(delivered ? {commit} : {})};
-    }
-    case "Stop":
-    case "SubagentStop": {
-      // The tree this session leaves is the one the next starts on: read it now, in the background, never waited on (df-84db9e4f).
-      if (event === "Stop") refreshAtStop(root, options);
-      const changed = await changedFiles(root);
-      const report = await checkChanged(root, changed.files);
-      const session=sessionOf(input);
-      if (session) await snapshotAtStop(root, session, changed.files, options);
-      const walls = unableWalls(root, input);
-      const spec = specStopText(root, changed.files, walls);
-      const lexicon = lexiconStopText(report, walls);
-      const workText = workStopText(root, input);
-      const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
-      const coverageText=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : "";
-      const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the lexicon check ran over nothing`;
-      const gapText = await gapStopText(root, input, changed.files);
-      const undeclaredText = await undeclaredStopText(root, changed.files);
-      const practiceText = practiceStopText(root, session, await cliName(root), agentOf(input));
-      const parts: string[] = [];
-      if (changedText !== "") parts.push(changedText);
-      if (lexicon.text !== "") parts.push(`Lexicon check:\n${lexicon.text}`);
-      if (spec.text !== "") parts.push(`Spec:\n${spec.text}`);
-      if (workText !== "") parts.push(`Work:\n${workText}`);
-      if (coverageText) parts.push(coverageText);
-      if (gapText !== "") parts.push(gapText);
-      if (undeclaredText !== "") parts.push(undeclaredText);
-      if (practiceText !== "") parts.push(practiceText);
-      const text = parts.join("\n");
-      // A refusal is spent only on what the tool can prove is owed and no recorded wall excuses: a rejected name in a changed file, a spec problem, a structural defect.
-      // A spec gap is not among them: no traced control is not a demonstrated bypass, so gapText never counts toward the refusal; nor does an undeclared entrance.
-      const refuse = event === "SubagentStop" && input.stop_hook_active !== true && lexicon.owed + spec.owed > 0;
-      if (refuse) {
-        // The refusal is enforcement: no override reaches its reason, and an append only follows it.
-        const { override: _unheard, ...heard } = voice;
-        const reason = await voiced(root, input, `Regulate found what this session owes; settle it before stopping.\n${text}`, heard);
-        return { stdout: "", stderr: reason, exit: REFUSE_EXIT };
+      case "PreToolUse": {
+        // Before the act: a practice whose trigger this tool use fires is delivered now, when its first steps can still be taken.
+        const session = sessionOf(input);
+        const practice = practiceContext(root, session, toolUseOf(input, writtenFiles(root, input)), await cliName(root), agentOf(input));
+        const context = await voiced(root, input, practice.text, voice);
+        if (context === "") return { stdout: "", stderr: "", exit: 0 };
+        const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
+        return { stdout, stderr: "", exit: 0, ...(practice.text !== "" && voice.override === undefined ? { commit: practice.commit } : {}) };
       }
-      // The stop goes through: what this subagent recorded waits for its coordinator's next boundary.
-      const parent = typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
-      if (event === "SubagentStop" && session !== undefined && parent !== undefined && !isMainThread(input)) leaveReturn(root, parent, session, agentOf(input));
-      const message = await voiced(root, input, parts.length === 0 ? "" : `Regulate (${event}):\n${text}`, voice);
-      if (message === "") return { stdout: "", stderr: "", exit: 0 };
-      return { stdout: JSON.stringify({ systemMessage: message }) + "\n", stderr: "", exit: 0 };
+      case "UserPromptSubmit":
+      case "PostToolUse": {
+        const feed = feedContext(root, input);
+        const session=sessionOf(input);
+        if (event === "PostToolUse" && session) {
+          recordReadTrace(root, session, input);
+          // What this tool use wrote is the session's own patch, which the stop predicts for.
+          recordWriteTrace(root, session, keepProjectFilesOf(root, writtenFiles(root, input)));
+        }
+        if (event === "UserPromptSubmit") options.warm?.(root);
+        const edit = event === "PostToolUse" ? await editContext(root, input, options) : "";
+        const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
+        const changes=reading && session ? coverageChanges(reading,priorBaseline(root,session)) : [];
+        const vocabulary=changes.length ? await vocabularyAtEdit(root, changes) : "";
+        const context = await voiced(root, input, [feed.text,edit,vocabulary].filter(Boolean).join("\n"), voice);
+        if (context === "") return { stdout: "", stderr: "", exit: 0 };
+        const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
+        // An override took the feed's and the vocabulary line's place, so neither reached the host and neither advances.
+        const delivered = voice.override === undefined && (feed.text !== "" || changes.length > 0);
+        const commit=()=> { if(feed.text) feed.commit(); if(changes.length && reading && session) saveBaseline(root,session,reading); };
+        return {stdout:stdout+"\n",stderr:"",exit:0,...(delivered ? {commit} : {})};
+      }
+      case "Stop":
+      case "SubagentStop": {
+        // The tree this session leaves is the one the next starts on: read it now, in the background, never waited on (df-84db9e4f).
+        if (event === "Stop") refreshAtStop(root, options);
+        const changed = await changedFiles(root);
+        const report = await checkChanged(root, changed.files);
+        const session=sessionOf(input);
+        const snapshot = session ? await snapshotAtStop(root, session, options) : undefined;
+        const walls = unableWalls(root, input);
+        const spec = specStopText(root, changed.files, walls);
+        const lexicon = lexiconStopText(report, walls);
+        const workText = workStopText(root, input);
+        const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
+        const coverageText=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : "";
+        const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the lexicon check ran over nothing`;
+        const gapText = await gapStopText(root, input, changed.files);
+        const undeclaredText = await undeclaredStopText(root, changed.files);
+        const heldModel = specModelOrNull(root);
+        const practiceText = practiceStopText(root, session, await cliName(root), agentOf(input), "error" in heldModel ? undefined : heldModel);
+        const economyText = economyStopText(snapshot);
+        const parts: string[] = [];
+        if (changedText !== "") parts.push(changedText);
+        if (lexicon.text !== "") parts.push(`Lexicon check:\n${lexicon.text}`);
+        if (spec.text !== "") parts.push(`Spec:\n${spec.text}`);
+        if (workText !== "") parts.push(`Work:\n${workText}`);
+        if (coverageText) parts.push(coverageText);
+        if (gapText !== "") parts.push(gapText);
+        if (undeclaredText !== "") parts.push(undeclaredText);
+        if (practiceText !== "") parts.push(practiceText);
+        if (economyText !== "") parts.push(economyText);
+        const text = parts.join("\n");
+        // A refusal is spent only on what the tool can prove is owed and no recorded wall excuses: a rejected name in a changed file, a spec problem, a structural defect.
+        // A spec gap is not among them: no traced control is not a demonstrated bypass, so gapText never counts toward the refusal; nor does an undeclared entrance.
+        const refuse = event === "SubagentStop" && input.stop_hook_active !== true && lexicon.owed + spec.owed > 0;
+        if (refuse) {
+          // The refusal is enforcement: no override reaches its reason, and an append only follows it.
+          const { override: _unheard, ...heard } = voice;
+          const reason = await voiced(root, input, `Regulate found what this session owes; settle it before stopping.\n${text}`, heard);
+          return { stdout: "", stderr: reason, exit: REFUSE_EXIT };
+        }
+        // The stop goes through: what this subagent recorded waits for its coordinator's next boundary.
+        const parent = typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
+        if (event === "SubagentStop" && session !== undefined && parent !== undefined && !isMainThread(input)) leaveReturn(root, parent, session, agentOf(input));
+        const message = await voiced(root, input, parts.length === 0 ? "" : `Regulate (${event}):\n${text}`, voice);
+        if (message === "") return { stdout: "", stderr: "", exit: 0 };
+        return { stdout: JSON.stringify({ systemMessage: message }) + "\n", stderr: "", exit: 0 };
+      }
     }
   }
 }

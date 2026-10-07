@@ -13,6 +13,7 @@ import { test } from "node:test";
 import { keepProjectFiles, projectListing } from "./project-files.ts";
 import { TypeScriptAdapter } from "./typescript.ts";
 import { PythonAdapter } from "./python.ts";
+import { countingGit } from "./git-count-fixture.ts";
 
 function repo(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "coherence-listing-"));
@@ -81,4 +82,56 @@ test("the Python adapter reads the project's files once per forget: a module cre
     await adapter.close();
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("a cold server resolves a name the project declares even when the first source file of the walk lies outside the TypeScript project", { timeout: 120_000 }, async () => {
+  const { seedFile } = await import("./typescript.ts");
+  const root = repo({
+    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+    "bench/a-measure.ts": "export const measured = 1;\n",
+    "src/w/W.spec.md": "# W\n\nWidgets.\n\n## invariants\n",
+    "src/w/thing.ts": "export function thing(): number {\n  return 1;\n}\n",
+  });
+  assert.equal(seedFile(["bench/a-measure.ts", "src/w/W.spec.md", "src/w/thing.ts"]), "src/w/thing.ts", "the seed is a source file inside a component folder");
+  const adapter = new TypeScriptAdapter(root);
+  try {
+    const resolved = await adapter.resolve("thing", { component: "src/w", testFolders: [] });
+    assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.reason);
+  } finally {
+    await adapter.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("the TypeScript adapter spawns git a fixed number of times between forgets, whatever the number of names asked", { timeout: 120_000 }, async () => {
+  const counts: number[] = [];
+  for (const n of [2, 8]) {
+    const definitions = Array.from({ length: n }, (_, i) => `export function f${i}(): number {\n  return ${i};\n}\n`).join("");
+    const uses = `import { ${Array.from({ length: n }, (_, i) => `f${i}`).join(", ")} } from "../a/a.ts";\n${Array.from({ length: n }, (_, i) => `f${i}();\n`).join("")}`;
+    const root = repo({
+      "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
+      "src/a/a.ts": definitions,
+      "src/b/b.ts": uses,
+    });
+    const adapter = new TypeScriptAdapter(root);
+    const git = countingGit();
+    try {
+      await adapter.ready();
+      git.reset();
+      await adapter.forget([]);
+      let sites = 0;
+      for (let i = 0; i < n; i++) {
+        const resolved = await adapter.resolve(`f${i} in a.ts`, { component: "src/a", testFolders: [] });
+        assert.equal(resolved.ok, true, `f${i} resolves`);
+        if (resolved.ok) sites += (await adapter.references(resolved.definition)).length;
+      }
+      assert.ok(sites >= n, `every name has its use in b.ts (${sites} sites)`);
+      counts.push(git.calls().length);
+    } finally {
+      git.restore();
+      await adapter.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+  assert.equal(counts[1], counts[0], `asking 8 names spawns git as often as asking 2: ${counts.join(" vs ")}`);
 });

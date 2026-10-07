@@ -73,6 +73,8 @@ export interface EntryDetail {
   entry: RunEntry;
   chokepoint?: ChokepointResult;
   totality?: TotalityResult;
+  /** A totality oracle's test filter as the runner was given it, so a second pass re-runs this test and no other. */
+  filter?: string;
 }
 
 export interface RunOutcome {
@@ -256,6 +258,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
             mode: fromBatch === undefined ? "one-at-a-time" : "batched",
           },
           totality: result,
+          filter,
         });
       }
     }
@@ -305,7 +308,9 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     if (batchedDetails.length === 0) {
       outcome.eachSkipped = !wantTotality ? "the run checked no totality oracle" : "no totality oracle ran in the batched invocation, so each already ran in its own";
     } else {
-      outcome.each = await confirmEach(root, config, model, options, batchedDetails, adapter, instrument, recorded, now);
+      // The one function that performs a pass is the only one that appends: confirmEach builds the second record, performRun writes it.
+      const each = await confirmEach(root, config, options, batchedDetails, instrument, recorded, now);
+      outcome.each = { ...each, file: appendRun(root, each.record) };
     }
   }
   return outcome;
@@ -335,30 +340,23 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
 async function confirmEach(
   root: string,
   config: EnforcementConfig,
-  model: SpecModel,
   options: RunOptions,
   batchedDetails: readonly EntryDetail[],
-  adapter: LanguageAdapter | undefined,
   instrument: RunRecord["instrument"],
   recorded: ReadonlySet<string>,
   now: () => Date,
-): Promise<EachOutcome> {
+): Promise<Omit<EachOutcome, "file">> {
   const started = Date.now();
   const details: EntryDetail[] = [];
   const hidden: EntryDetail[] = [];
   const unconfirmed: EntryDetail[] = [];
-  // The batched details of one invariant come in the order of its totality forms, so the k-th is the k-th via.
-  const seen = new Map<string, number>();
+  // Each batched detail carries the filter it ran under, so the confirmation re-runs that test, whichever of an invariant's vias it was.
   for (const batched of batchedDetails) {
     const { component, name } = batched.entry;
-    const key = `${component} ${name}`;
-    const index = seen.get(key) ?? 0;
-    seen.set(key, index + 1);
-    const invariant = model.components.find((c) => c.folder === component)?.invariants.find((i) => i.name === name);
-    const via = invariant === undefined ? undefined : totalityEnforcements(invariant)[index]?.via;
-    if (via !== undefined) {
+    const filter = batched.filter;
+    if (filter !== undefined) {
       const t0 = Date.now();
-      const result = await runTotalityOracle(root, config, adapter?.testFilter(via) ?? via, options.timeoutMs);
+      const result = await runTotalityOracle(root, config, filter, options.timeoutMs);
       const reason = batched.entry.verdict === "pass" && result.verdict !== "pass" ? `passed in the batched invocation, ${result.verdict === "fail" ? "failed" : "did not run"} in its own: ${result.reason}` : result.reason;
       const detail: EntryDetail = {
         entry: {
@@ -393,7 +391,7 @@ async function confirmEach(
     latency: Date.now() - started,
     invariants: details.map((d) => d.entry),
   };
-  return { record, file: appendRun(root, record), details, hidden, unconfirmed };
+  return { record, details, hidden, unconfirmed };
 }
 
 /**
@@ -425,6 +423,17 @@ export async function withWarmAdapter<T>(
   } finally {
     if (remote !== undefined) await remote.close();
   }
+}
+
+/**
+ * Warm the project's instrument: connect to its warm server, which a
+ * connection spawns when none listens and which loads the project as it
+ * starts, then let go. A hook starts this detached at a session's start and
+ * at each prompt, so the stop that ends the turn finds the server loaded and
+ * its idle timer fresh. Nothing is printed and nothing is recorded.
+ */
+export async function warmInstrument(root: string): Promise<void> {
+  await withWarmAdapter(root, async () => {});
 }
 
 function entryOf(component: string, name: string, form: Form, rest: Omit<RunEntry, "component" | "name" | "form" | "grade"> & { grade: RunEntry["grade"] | undefined }): RunEntry {

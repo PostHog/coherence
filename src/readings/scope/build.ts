@@ -34,7 +34,7 @@ import { loadJournal } from "../../journal/store.ts";
 import { WORK_DIR, foldOrders, loadWork as loadWorkRecords, workDir } from "../../journal/work.ts";
 import { lexiconCoverage } from "../../lifecycle/lexicon-coverage.ts";
 import { COHERENCE_LEXICON, projectLexiconPath } from "../../lifecycle/project.ts";
-import { loadSpecModel, projectPractices } from "../../spec/model.ts";
+import { loadSpecModel, projectPractices, type SpecModel } from "../../spec/model.ts";
 import { KERNEL_PREFIX } from "../../spec/practices.ts";
 import { projectLexiconCoverage } from "./lexicon-projection.ts";
 import { windowJournal, windowRuns } from "./derive.ts";
@@ -156,8 +156,8 @@ export function ladderFor(root: string): Ladder {
  * field the model left undefined is absent, exactly as the page will embed
  * it: the state in memory and the state in the page are the same value.
  */
-export function loadSpec(root: string): SpecData {
-  const model = loadSpecModel(root);
+export function loadSpec(root: string, held?: SpecModel): SpecData {
+  const model = held ?? loadSpecModel(root);
   const data: SpecData = {
     entry: model.entry,
     trustLevels: model.trustLevels.map((level) => ({ name: level.name, meaning: level.meaning, outside: level.outside })),

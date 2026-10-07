@@ -13,7 +13,7 @@ import { loadJournal } from "../journal/store.ts";
 import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
 import { BOUNDARY_RULE, CONTEXT_BUDGET, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, adopterExample, adopterInstruction, runHook, sessionBlock, type WarmDoor } from "./hook.ts";
 import { withWarmAdapter } from "../enforcement/run.ts";
-import { TRACES_DIR, recordReadTrace } from "../economy/trace.ts";
+import { TRACES_DIR, recordReadTrace, recordWriteTrace } from "../economy/trace.ts";
 import { COHERENCE_LEXICON, installedRoot, PACKAGE_NAME } from "./project.ts";
 import { loadLexicon, rejectedNames } from "./lexicon.ts";
 import { gapProject } from "../readings/scope/gaps-fixture.ts";
@@ -374,9 +374,11 @@ test("the Stop snapshot reaches the instrument through enforcement's one door, i
     seed("init", "-q");
     seed("add", ".");
     seed("commit", "-q", "-m", "seed");
-    // One untracked file is the patch the snapshot predicts a closure for.
+    // One file the session wrote is the patch the snapshot predicts a closure for: its own writes, as PostToolUse records them.
     await writeFile(join(dir, "note.md"), "A file this session changed.\n");
     recordReadTrace(dir, "child", { tool_name: "Read", tool_input: { file_path: join(dir, "note.md") } });
+    recordWriteTrace(dir, "child", ["note.md"]);
+    recordWriteTrace(dir, "child2", ["note.md"]);
 
     // A door that hands back an adapter, as the warm server does when one answers.
     let asked: string | undefined;

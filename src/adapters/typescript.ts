@@ -126,9 +126,22 @@ function walkedFiles(root: string): string[] {
   return walkedProjectFiles(walkBounds(root, [])).files;
 }
 
-/** The first source file of the project: opening it makes the language server load the project. */
+/**
+ * The source file opening which makes the language server load the project:
+ * the first one inside a component folder (a folder holding a spec) when
+ * there is one, since a source file the tsconfig does not include (a bench
+ * script, a promo build) loads only an inferred project around itself and
+ * leaves the project's own symbols unsearchable; otherwise the first source
+ * file of the walk.
+ */
+export function seedFile(files: readonly string[]): string | undefined {
+  const sources = files.filter((rel) => SOURCE_EXTENSIONS.has(extensionOf(rel)) && !/\.d\.ts$/.test(rel));
+  const components = [...new Set(files.filter((rel) => rel.endsWith(".spec.md")).map((rel) => (rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : ".")))].filter((f) => f !== ".");
+  return sources.find((rel) => components.some((folder) => rel.startsWith(`${folder}/`))) ?? sources[0];
+}
+
 function firstSourceFile(root: string): string | undefined {
-  const found = walkedFiles(root).find((rel) => SOURCE_EXTENSIONS.has(extensionOf(rel)) && !/\.d\.ts$/.test(rel));
+  const found = seedFile(walkedFiles(root));
   return found === undefined ? undefined : join(root, found);
 }
 
@@ -448,9 +461,22 @@ export class TypeScriptAdapter implements LanguageAdapter {
       if (file.startsWith("..") || file.startsWith("node_modules/")) continue;
       files.add(file);
     }
-    const own = keepProjectFiles(this.root, [...files]);
+    const own = keepProjectFiles(this.root, [...files], this.listingNow());
     const candidates: Candidate[] = [];
     for (const file of [...files].filter((f) => own.has(f)).sort()) candidates.push(...(await this.declarationsIn(file, name)));
+    if (candidates.length > 0) return candidates;
+    // The server searches only the projects it has loaded: a name it does not know yet (a cold server, a second tsconfig) is
+    // looked for in the files whose text spells it, and confirmed by their document symbols, never by the text alone.
+    const spelled = new RegExp(`(^|[^\\w$])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\w$]|$)`);
+    for (const file of this.walkedNow().filter((rel) => SOURCE_EXTENSIONS.has(extensionOf(rel)) && !/\.d\.ts$/.test(rel))) {
+      let text: string;
+      try {
+        text = readFileSync(join(this.root, file), "utf8");
+      } catch {
+        continue;
+      }
+      if (spelled.test(text)) candidates.push(...(await this.declarationsIn(file, name)));
+    }
     return candidates;
   }
 

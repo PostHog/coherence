@@ -36,10 +36,11 @@ import { fileURLToPath } from "node:url";
 import { LEXICON_WORK_USAGE, lexiconWorkCommand } from "./lifecycle/lexicon-cli.ts";
 import { ECONOMY_USAGE, calibrateCommand, economyCommand, massCommand } from "./economy/cli.ts";
 import { ENFORCEMENT_USAGE, refuteCommand, runCommand, serveCommand } from "./enforcement/cli.ts";
+import { warmInstrument } from "./enforcement/run.ts";
 import { JOURNAL_USAGE, journalVerbs, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, recordVetter, runCheck } from "./lifecycle/check.ts";
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
-import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH } from "./lifecycle/hook.ts";
+import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
 import { check, formatCheck, formatStatus, formatUninstall, HOME_VAR, HOSTS, install, isHost, LOCATED_PREFIX, locate, SIBLING, status, uninstall } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectLexicons, PACKAGE_NAME, projectRoot } from "./lifecycle/project.ts";
@@ -188,7 +189,7 @@ async function hookCommand(args: string[], root: string): Promise<number> {
   const event = args[0];
   if (event === undefined || !isHookEvent(event)) fail(`hook: expected one of ${HOOK_EVENTS.join(", ")}\n${USAGE}`);
   const input = await readStdinJson(process.stdin);
-  const result = await runHook(event, input, root, { refresh: STRUCTURE_REFRESH });
+  const result = await runHook(event, input, root, { refresh: STRUCTURE_REFRESH, warm: WARM_UP });
   if (result.stderr !== "") process.stderr.write(result.stderr);
   if (result.stdout !== "") {
     try {
@@ -284,6 +285,10 @@ async function main(argv: string[]): Promise<number> {
       return runCommand(rest, io);
     case "refute":
       return refuteCommand(rest, io);
+    case "warm":
+      // Internal: the hook starts this detached so the instrument is loaded before the stop that needs it.
+      await warmInstrument(root);
+      return 0;
     case "serve":
       // The warm server answers the live Scope reading over HTTP besides the instrument over its socket.
       return serveCommand(rest, io, { http: scopeApp() });

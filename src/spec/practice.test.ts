@@ -13,7 +13,7 @@ import { test } from "node:test";
 import { commandMatches, firedBy, globMatches, parsePractices, type ToolUse } from "./practice.ts";
 import { loadSpecModel, projectPractices } from "./model.ts";
 import { journalVerbs, type Io } from "../journal/cli.ts";
-import { loadJournal } from "../journal/store.ts";
+import { appendRecord, loadJournal } from "../journal/store.ts";
 import type { Enactment } from "../journal/record.ts";
 import { runHook } from "../lifecycle/hook.ts";
 import { installedEntry } from "../lifecycle/install.ts";
@@ -166,8 +166,36 @@ test("a step enacted and since removed is a problem until a decision cites an en
   writeFileSync(join(root, "src/widget/Widget.practice.md"), practiceText(cite).replace("  step: turn it once\n", "  step: turn it once\n  step: listen for a squeak\n"));
   assert.deepEqual(loadSpecModel(root, { runs: false }).problems, []);
   writeFileSync(join(root, "src/widget/Widget.practice.md"), practiceText(cite).replace("  step: wipe the knob\n", ""));
+  // Re-enacting the edited version does not clear it: what an older enactment taught still counts.
+  const first = loadJournal(root).records.find((r): r is Enactment => r.id === id)!;
+  const edited = projectPractices(root).find((p) => p.name === "oil the knob")!;
+  appendRecord(root, { ...first, id: "e-0000beef", at: new Date(Date.parse(first.at) + 500).toISOString(), version: edited.version, steps: edited.steps.map((s) => ({ text: s.text })), results: { "1": { result: "done" }, "2": { result: "done" } } });
+  const again = loadSpecModel(root, { runs: false }).problems.map((p) => p.message);
+  assert.equal(again.length, 1, again.join("\n"));
+  assert.match(again[0]!, new RegExp(`step "wipe the knob" was enacted in ${id} and is gone.*decide "amend src/widget/oil the knob: <what changed>" .*--cite ${id}`));
+  // A decision citing an enactment but not naming the practice amends nothing.
+  run("decide", "rename the oil can", "--because", "unrelated", "--cite", "e-0000beef", ...WHO);
+  assert.equal(loadSpecModel(root, { runs: false }).problems.length, 1);
   run("decide", "amend src/widget/oil the knob: the oil cloth wipes as it oils", "--because", "wiping first was redundant", "--cite", id, ...WHO);
   assert.deepEqual(loadSpecModel(root, { runs: false }).problems, []);
+});
+
+test("enact refuses a practice that has lost a step an enactment taught until a decision amends it", () => {
+  const { root, cite, run } = widget();
+  const steps = ["--step", "1=done", "--step", "2=done:oil record 7", "--step", "3=done"];
+  const id = run("enact", "oil the knob", ...steps, ...WHO).out[0]!.split(/\s+/)[0]!;
+  writeFileSync(join(root, "src/widget/Widget.practice.md"), practiceText(cite).replace("  step: wipe the knob\n", ""));
+  const before = loadJournal(root).records.length;
+  const refused = run("enact", "oil the knob", "--step", "1=done:oil record 8", "--step", "2=done", ...WHO);
+  assert.notEqual(refused.code, 0);
+  const said = refused.err.join("\n");
+  assert.match(said, new RegExp(`step "wipe the knob", enacted in ${id}`));
+  assert.match(said, new RegExp(`decide "amend src/widget/oil the knob: <what changed>" --because "<why>" --cite ${id}`));
+  assert.equal(loadJournal(root).records.length, before, "nothing is written while the floor is open");
+  run("decide", "amend src/widget/oil the knob: the oil cloth wipes as it oils", "--because", "wiping first was redundant", "--cite", id, ...WHO);
+  const enacted = run("enact", "oil the knob", "--step", "1=done:oil record 8", "--step", "2=done", ...WHO);
+  assert.equal(enacted.code, 0, enacted.err.join("\n"));
+  assert.equal(loadJournal(root).records.filter((r) => r.kind === "enactment").length, 2);
 });
 
 test("PreToolUse delivers a fired practice whole once per version per session, then one line, and never blocks", async () => {
