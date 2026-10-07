@@ -33,7 +33,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { INVARIANTS_SECTION } from "../spec/grammar.ts";
 import { loadSeed } from "../spec/seed.ts";
 import { componentDir, renderInvariant, ScaffoldError, specFileName, specsIn } from "./scaffold.ts";
-import { lineOf, parseToml, TomlError, type TomlTable, type TomlValue } from "./toml.ts";
+import { lineOf, parseToml, TomlError, type TomlTable, type TomlValue } from "../adapters/toml.ts";
 
 /** One boundary a source declares, in the source's terms resolved against the tree. */
 export interface BoundaryModule {

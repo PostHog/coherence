@@ -551,7 +551,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   refuted: resolved shell-written paths against the root instead of the folder the command runs in -> "writtenFiles counts a shell command's writes beside an edit tool's, resolved against the folder the command runs in and confined to the project" went red in shell-writes.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
   kinds: none
 
-- a turn's instrument is warmed before its stop: A session start and every prompt start warming the instrument in the background and never wait for it; no other event does.
+- a turn's instrument is warmed before its stop: A session start and every prompt start warming the instrument in the background and never wait for it; no other event does in a project at the folder holding the hooks (a nested project's first tool use is the other, under entering a nested project warms its instrument).
   over: SessionStart, UserPromptSubmit, PreToolUse and PostToolUse
   via: a session start and every prompt warm the instrument without waiting for it, and no other event does
   because: the stop regulates with the economy prediction, which needs the warm server; it idles out after five minutes, and every turn begins with a prompt, so warming there makes the stop find it loaded without the hook ever waiting on it
@@ -677,4 +677,41 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   via: hooks install --local writes the host's personal settings at the repository top alone, and uninstall removes them
   because: in a monorepo the committed settings at the top reach every team's sessions, so one engineer adopting a folder must be able to wire the hooks for themselves without committing hook configuration for everyone
   refuted: settingsFile named the shared settings for --local, so the personal install wrote the committed file -> "hooks install --local writes the host's personal settings at the repository top alone, and uninstall removes them" went red in monorepo.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- a registry routes events by its list: With a registry at the repository top, an event belongs to the listed leaf holding the file it writes, or else its cwd, the longest listed prefix winning, with no walk up; a cwd above two leaves belongs to the one the session last entered, and before it entered any a start there is answered by one line naming them; a leaf with no config of its own is a project with its records in its folder, and an event in no leaf, a folder holding a config the registry does not list among them, answers nothing and writes nothing.
+  over: a start at the top, an edit in each of two leaves, a stop at the top after both, an edit in a stray configured folder and one in a folder outside both, and commands run in a leaf with no config
+  via: with a registry, events from the repository top route to the leaf with the longest listed prefix, and anything in no leaf is ignored
+  because: a repository that opts in leaves explicitly must not let a config someone left in another folder, or the registry's own file at the top, make that folder a project; the list is the one place adoption is decided
+  refuted: hookProject skipped the registry and routed by the nearest config as without one -> "with a registry, events from the repository top route to the leaf with the longest listed prefix, and anything in no leaf is ignored" went red in registry.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  refuted: an event above several leaves stayed with the several answer, never the leaf the session last entered -> "with a registry, events from the repository top route to the leaf with the longest listed prefix, and anything in no leaf is ignored" went red in registry.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- an event outside every leaf costs no git: With a registry, a tool event whose files or cwd lie in no listed leaf spawns no git and writes nothing: the registry's list decides from one small read.
+  over: an edit and a command in a folder outside every leaf, at PreToolUse and PostToolUse
+  via: an event outside every leaf of a registry spawns no git and writes nothing
+  because: the hooks at the repository top run around every tool call of every team; without a registry the outside answer costs a listing of the repository's configs, and with one the list is already known
+  refuted: hookProject listed the repository's configs with git before routing by the registry -> "an event outside every leaf of a registry spawns no git and writes nothing" went red in registry.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: execution-budget declared as an event outside every leaf costs no git
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is on one hook call's work
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on spawned processes, not on allocation
+  checklist: circuit-breaker-policy dismissed: an ignored event has no dependency to fail
+- adopt opts a folder in: adopt <folder> lists the folder in the registry at the repository top, creating it when there is none, keeping the file's indentation, key order and final newline, and prints the adopt practice as the next step; it refuses a path outside the repository or the top itself, a path that is no folder, one already listed, one inside a listed leaf or holding one, and a top whose config is a whole-repository project.
+  over: a folder added to a registry, a registry created, and each refused path
+  via: adopt lists a folder in the registry, keeping its layout, creates one when there is none, and refuses every bad case
+  because: opting a leaf in is one edit to a shared file that people also edit by hand, so it must not reformat it, and every refusal names a state the routing could not answer for: nested leaves, a folder that is not there, or a whole-repository project silently turned into a registry
+  refuted: adopt stopped refusing a folder inside a listed leaf -> "adopt lists a folder in the registry, keeping its layout, creates one when there is none, and refuses every bad case" went red in registry.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- install with a registry writes once at the top: hooks install in a repository with a registry writes the host's settings at the repository top alone, never a leaf's, and .coherence/.gitignore in each listed leaf, never at the top.
+  over: an install run from a leaf with no config of its own
+  via: hooks install with a registry writes the host settings once, at the repository top, and an ignore file in each leaf
+  because: the registry's top is the one place a host launched at the repository root reads, every leaf is routed from there, and the top is no project, so a .coherence there would be a second store
+  refuted: settingsRoots named the leaf beside the repository top under a registry -> "hooks install with a registry writes the host settings once, at the repository top, and an ignore file in each leaf" went red in registry.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- entering a nested project warms its instrument: The first tool use of a session inside a project nested below the folder holding the hooks starts warming that project's instrument in the background, beside the orient it delivers, and never waits for it; later tool uses there do not.
+  over: the first and second tool use of a session at a registry's top inside one leaf
+  via: the first tool use inside a nested project warms its instrument, once
+  because: a session at a registry's top above several leaves has no start or prompt that belongs to a project, so nothing warmed the language server before the first edit's check; on PostHog that edit took 3.1 s cold against the 3 s latency budget, and 2.4 s once the entry had warmed it
+  refuted: the first tool use inside a nested project delivered orient without warming its instrument -> "the first tool use inside a nested project warms its instrument, once" went red in registry.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none

@@ -39,17 +39,23 @@ export type Grade = "closure-choked" | "visibility-choked" | "checker-choked" | 
  * `refused by the language`: the rung's enforcer is the compiler or the
  * interpreter, and it refused the synthetic outside reference; the diagnostic
  * is the proof and Coherence's own check never has to be made to fire
- * (ruling rs-e93ecdd6). `witnessed`: a refutation record for a bullet's
+ * (ruling rs-e93ecdd6). `refused by the checker`: the rung's enforcer is a
+ * checker that draws a module boundary (tach), and it refused a synthetic
+ * outside import staged in a throwaway copy of the project; its error is the
+ * proof, since the module's own code is free to use the thing and a staged
+ * site there would prove nothing. `witnessed`: a refutation record for a bullet's
  * totality oracle, with a later run that found the same enforcement
  * passing. `missing`: none of these.
  */
-export type RefutationState = "automatic" | "refused by the language" | "witnessed" | "missing";
+export type RefutationState = "automatic" | "refused by the language" | "refused by the checker" | "witnessed" | "missing";
 
 export interface Bypass {
   file: string;
   line: number;
   /** The referencing symbol, or "module top level". */
   symbol: string;
+  /** The checker that refuses this import, with its error, when one does (tach). */
+  checker?: string;
 }
 
 /** What a persisted reference site points at. */

@@ -21,6 +21,7 @@ import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type Latest } from "../enforcement/record.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
 import { walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
+import { effectiveConfig } from "../adapters/project-config.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
 import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPractice, practiceProblems, stemOf, type ModelPractice } from "./practices.ts";
 
@@ -100,17 +101,11 @@ interface Config {
 }
 
 function readConfig(root: string): Config {
-  const path = resolve(root, CONFIG_FILE);
   const config: Config = { ignore: [], entryDir: "." };
-  if (!existsSync(path)) return config;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(readFileSync(path, "utf8"));
-  } catch (error) {
-    throw new Error(`${path}: not valid JSON (${(error as Error).message})`);
-  }
-  if (typeof parsed !== "object" || parsed === null) return config;
-  const record = parsed as Record<string, unknown>;
+  // The project's own config over its registry's keys (project-config.ts); a malformed file is refused with its path.
+  const found = effectiveConfig(root);
+  if (found === undefined) return config;
+  const record = found.record;
   if (Array.isArray(record["ignore"])) config.ignore = record["ignore"].filter((v): v is string => typeof v === "string");
   if (typeof record["entryDir"] === "string") config.entryDir = record["entryDir"];
   return config;

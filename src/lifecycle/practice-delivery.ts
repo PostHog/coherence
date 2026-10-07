@@ -22,7 +22,7 @@ import { configIgnore, underIgnored } from "../adapters/project-files.ts";
 import { loadJournal } from "../journal/store.ts";
 import type { Enactment } from "../journal/record.ts";
 import { enactTemplate } from "../journal/verbs.ts";
-import { projectRoot } from "./project.ts";
+import { holdsProject, projectRoot } from "./project.ts";
 import { shellCommandOf, simpleCommands, type SimpleCommand } from "./shell-writes.ts";
 
 export const PRACTICES_DIR = join(".coherence", "practices");
@@ -99,7 +99,7 @@ function useByRoot(root: string, cwd: string, use: ToolUse): Map<string, ToolUse
     const target = command.dir === undefined || command.dir === "" ? undefined : resolve(cwd, command.dir);
     const other = target === undefined || inside(root, target) ? root : projectRoot(target);
     if (other === root) home.push(command);
-    else if (existsSync(join(other, "coherence.config.json")) || existsSync(join(other, ".coherence"))) away.set(other, [...(away.get(other) ?? []), command]);
+    else if (holdsProject(other)) away.set(other, [...(away.get(other) ?? []), command]);
   }
   const out = new Map<string, ToolUse>([[root, use.commands === undefined ? use : { ...use, commands: home }]]);
   for (const [other, commands] of away) out.set(other, { command: use.command, commands, writes: [], added: "" });

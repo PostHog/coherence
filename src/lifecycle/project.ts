@@ -13,6 +13,7 @@ import { access, readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadLexicon, rejectedNames, type Lexicon } from "./lexicon.ts";
+import { effectiveConfig, leafOf, registryOf, under, type Registry } from "../adapters/project-config.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -106,6 +107,7 @@ async function exists(path: string): Promise<boolean> {
 /** The project lexicon path the config names, or the default when present, or undefined. */
 export async function projectLexiconPath(root: string): Promise<string | undefined> {
   const configPath = resolve(root, CONFIG_FILE);
+  // The lexicon key is the project's own, never inherited from a registry, so only its own file is read here.
   if (await exists(configPath)) {
     let config: unknown;
     try {
@@ -159,16 +161,10 @@ export interface VocabularyFacts {
 
 export async function vocabularyFacts(root: string): Promise<VocabularyFacts> {
   const facts: VocabularyFacts = { name: undefined, wellKnown: [] };
-  const configPath = resolve(root, CONFIG_FILE);
-  if (!(await exists(configPath))) return facts;
-  let config: unknown;
-  try {
-    config = JSON.parse(await readFile(configPath, "utf8"));
-  } catch (error) {
-    throw new Error(`${configPath}: not valid JSON (${(error as Error).message})`);
-  }
-  if (typeof config !== "object" || config === null || Array.isArray(config)) return facts;
-  const record = config as Record<string, unknown>;
+  // wellKnown is inherited from a registry and added to; name is the project's own.
+  const found = effectiveConfig(root);
+  if (found === undefined) return facts;
+  const record = found.record;
   if (typeof record["name"] === "string" && record["name"].trim() !== "") facts.name = record["name"].trim();
   const named = record["wellKnown"];
   if (Array.isArray(named)) facts.wellKnown = named.filter((n): n is string => typeof n === "string" && n.trim() !== "").map((n) => n.trim());
@@ -187,6 +183,12 @@ export const DURABLE_FOLDERS: readonly string[] = ["journal", "runs", "work", "h
  */
 export function projectRoot(cwd: string): string {
   const start = resolve(cwd);
+  // A registry at the repository top decides first, with no walk up: the leaf the cwd lies in, or the one leaf below it.
+  const registry = registryOf(start);
+  if (registry !== undefined) {
+    const route = registryRoute(registry, [], start);
+    return route.kind === "project" ? route.root : start;
+  }
   const top = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: start, encoding: "utf8" });
   const ceiling = top.status === 0 && top.stdout.trim() !== "" ? realpathOr(top.stdout.trim()) : undefined;
   const found = enclosingProject(start, ceiling);
@@ -205,9 +207,35 @@ function holds(dir: string, name: string, folder: boolean): boolean {
   }
 }
 
-/** Whether `dir` is itself a project's root: it holds coherence.config.json or .coherence. */
+/** Whether `dir` is itself a project's root: a leaf its repository's registry lists, or, with no registry, a folder holding coherence.config.json or .coherence. */
 export function holdsProject(dir: string): boolean {
+  const registry = registryOf(dir);
+  if (registry !== undefined) return registry.leaves.includes(real(dir));
   return holds(dir, CONFIG_FILE, false) || holds(dir, ".coherence", true);
+}
+
+/**
+ * Where an event belongs in a repository with a registry: each subject (a
+ * file a tool writes) in the leaf whose folder is its longest listed prefix;
+ * with no subjects, the leaf the cwd lies in, else the one leaf below the cwd
+ * (`above`), else several or none. Anything in no leaf is outside, whatever
+ * config it holds. No walk up and no git: the registry's list decides.
+ */
+export function registryRoute(registry: Registry, subjects: readonly string[], cwd: string): HookProject {
+  const spelled = real;
+  if (subjects.length > 0) {
+    for (const subject of subjects) {
+      const leaf = leafOf(registry, spelled(subject));
+      if (leaf !== undefined) return { kind: "project", root: leaf };
+    }
+    return { kind: "outside" };
+  }
+  const here = spelled(cwd);
+  const leaf = leafOf(registry, here);
+  if (leaf !== undefined) return { kind: "project", root: leaf };
+  const below = registry.leaves.filter((l) => under(here, l));
+  if (below.length === 1) return { kind: "project", root: below[0]!, above: true };
+  return below.length === 0 ? { kind: "outside" } : { kind: "several", projects: below };
 }
 
 /**
@@ -270,6 +298,9 @@ export type HookProject = { kind: "project"; root: string; above?: true } | { ki
  * outside: the rest of the repository is not the project's.
  */
 export function hookProject(base: string, subjects: readonly string[], cwd: string): HookProject {
+  // The registry is the first lookup: with one, the leaves it lists are the only projects.
+  const registry = registryOf(base);
+  if (registry !== undefined) return registryRoute(registry, subjects, cwd);
   if (holdsProject(base)) return { kind: "project", root: base };
   const ceiling = realpathOr(base);
   const starts = subjects.length > 0 ? subjects.map((file) => dirname(file)) : [cwd];

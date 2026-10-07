@@ -54,10 +54,11 @@ const NONE: LatestFor = { chokepoint: undefined, totality: undefined };
  * The refutation states that witness a chokepoint form: the check's own
  * classification called every staged synthetic site a bypass, or the rung's
  * enforcer is the language itself and it refused the synthetic outside
- * reference (ruling rs-e93ecdd6). A refusal is the firing of the enforcement
+ * reference (ruling rs-e93ecdd6), or a checker that draws a module boundary
+ * (tach) refused a staged outside import. A refusal is the firing of the enforcement
  * the rung names, so it satisfies the requirement the same way.
  */
-const CHOKEPOINT_WITNESSED: ReadonlySet<RefutationState> = new Set<RefutationState>(["automatic", "refused by the language"]);
+const CHOKEPOINT_WITNESSED: ReadonlySet<RefutationState> = new Set<RefutationState>(["automatic", "refused by the language", "refused by the checker"]);
 
 /**
  * `totalityWitnessed` is the run store's answer for this bullet's totality oracle:

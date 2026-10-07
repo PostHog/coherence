@@ -31,7 +31,7 @@
  */
 
 import { realpathSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LEXICON_WORK_USAGE, lexiconWorkCommand } from "./lifecycle/lexicon-cli.ts";
 import { ECONOMY_USAGE, calibrateCommand, economyCommand, massCommand } from "./economy/cli.ts";
@@ -40,7 +40,7 @@ import { warmInstrument } from "./enforcement/run.ts";
 import { JOURNAL_USAGE, journalVerbs, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, recordVetter, runCheck } from "./lifecycle/check.ts";
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
-import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
+import { cliName, CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
 import { check, formatCheck, formatStatus, formatUninstall, HOME_VAR, HOSTS, install, isHost, locatedPrefix, locate, settingsFile, settingsRoots, SIBLING, status, uninstall, type SettingsRoot } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectLexicons, PACKAGE_NAME, projectRoot } from "./lifecycle/project.ts";
@@ -50,6 +50,8 @@ import { scopeApp } from "./readings/scope/live.ts";
 import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
 import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
 import { nestedFolder, repositoryTop } from "./adapters/project-files.ts";
+import { registryOf } from "./adapters/project-config.ts";
+import { adopt, AdoptError, adoptText } from "./lifecycle/adopt.ts";
 
 type CommandResult = number | Promise<number>;
 type RootCommand = (argv: string[], io: Io) => CommandResult;
@@ -66,6 +68,7 @@ ${ENFORCEMENT_USAGE}
 ${ECONOMY_USAGE}
 ${QUERY_USAGE}
 ${SCOPE_USAGE}
+  coherence adopt <folder>   list the folder in the registry (projects in coherence.config.json at the repository top), creating it when absent
   coherence hook <${HOOK_EVENTS.join("|")}>
   coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"] [--local]   --local: the host's personal settings (.claude/settings.local.json), never committed
   coherence hooks uninstall --host <${HOSTS.join("|")}>
@@ -214,6 +217,20 @@ const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {
   status: new Set(),
 };
 
+/** adopt <folder>: one folder, relative to where the command runs; never the project root the other commands resolve to. */
+async function adoptCommand(args: string[]): Promise<number> {
+  if (args.length !== 1 || args[0]!.startsWith("--")) fail(`adopt: one folder\n${USAGE}`);
+  try {
+    const adopted = adopt(process.cwd(), args[0]!);
+    process.stdout.write(adoptText(adopted, await cliName(resolve(dirname(adopted.path), adopted.folder))));
+    return 0;
+  } catch (error) {
+    if (!(error instanceof AdoptError)) throw error;
+    process.stderr.write(`${error.message}\n`);
+    return 1;
+  }
+}
+
 async function hooksCommand(args: string[], root: string): Promise<number> {
   const { flags, positionals } = parse(args, new Set(["host", "command"]));
   // The check is the noun's --check, as lexicon --check and spec --check are; the other actions are verbs.
@@ -271,7 +288,8 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   }
   for (const place of places) {
     const command = await commandAt(place.sub);
-    const result = await install({ root: place.dir, host, command, ignoreRoot: root, local });
+    const registry = registryOf(root);
+    const result = await install({ root: place.dir, host, command, ignoreRoots: registry === undefined ? [root] : registry.leaves, local });
     process.stdout.write(`${result.changed ? "wrote" : "unchanged"} ${result.path}: ${result.events.join(", ")}\n`);
     if (command === locatedPrefix(place.sub, local)) process.stdout.write(locateNote(place.dir, place.sub));
   }
@@ -324,6 +342,8 @@ async function main(argv: string[]): Promise<number> {
       return economyCommand(rest, io);
     case "calibrate":
       return calibrateCommand(rest, io);
+    case "adopt":
+      return adoptCommand(rest);
     case "mass":
       return massCommand(rest, io);
     case "query":

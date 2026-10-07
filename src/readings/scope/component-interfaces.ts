@@ -75,6 +75,7 @@ import { join } from "node:path";
 import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite } from "../../adapters/adapter.ts";
 import { detectEntranceCandidates, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 import { configIgnore, exclusionOf, projectFiles, projectListing, projectSites, walkBounds, type Bounds } from "../../adapters/project-files.ts";
+import { configRecord } from "../../adapters/project-config.ts";
 import { adapterFor, type Language } from "../../adapters/index.ts";
 import { resolveDotted } from "../../adapters/python.ts";
 import { resolveSpecifier } from "../../adapters/typescript.ts";
@@ -417,9 +418,7 @@ export const BUDGET_KEY = "interfaceBudget";
 export function configuredBudget(root: string): InterfaceBudget {
   const budget = { ...DEFAULT_INTERFACE_BUDGET };
   try {
-    const path = join(root, "coherence.config.json");
-    if (!existsSync(path)) return budget;
-    const value = (JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>)[BUDGET_KEY];
+    const value = configRecord(root)[BUDGET_KEY];
     if (typeof value !== "object" || value === null) return budget;
     const { seconds, memoryMB } = value as Record<string, unknown>;
     if (typeof seconds === "number" && seconds > 0) budget.seconds = seconds;
