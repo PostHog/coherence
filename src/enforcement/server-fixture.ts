@@ -12,14 +12,17 @@ import { serverPaths } from "./server.ts";
 
 const WAIT_MS = 10_000;
 
-/** The pids of every `serve` process for this root, whatever its language. */
-function servePids(real: string): number[] {
-  const marker = `--root ${real}`;
+/** Every `serve` process whose root is `real` or a folder inside it, whatever its language, with that root. */
+function servers(real: string): { pid: number; root: string }[] {
   const table = execFileSync("ps", ["-axww", "-o", "pid=,command="], { encoding: "utf8" });
-  return table
-    .split("\n")
-    .filter((line) => line.includes("cli.ts serve") && (line.endsWith(marker) || line.includes(`${marker} `)))
-    .map((line) => Number(line.trim().split(/\s+/)[0]));
+  const found: { pid: number; root: string }[] = [];
+  for (const line of table.split("\n")) {
+    const match = /^\s*(\d+)\s+.*cli\.ts serve .*--root (\S+)/.exec(line);
+    if (match === null) continue;
+    const root = match[2]!;
+    if (root === real || root.startsWith(`${real}/`)) found.push({ pid: Number(match[1]), root });
+  }
+  return found;
 }
 
 function alive(pid: number): boolean {
@@ -31,7 +34,7 @@ function alive(pid: number): boolean {
   }
 }
 
-/** Ask every warm server for the root to stop (SIGTERM, its clean shutdown), wait for each, and kill one that will not go. */
+/** Ask every warm server for `root`, or for a project inside it, to stop (SIGTERM, its clean shutdown), wait for each, and kill one that will not go. */
 export async function stopWarmServers(root: string): Promise<void> {
   let real: string;
   try {
@@ -39,9 +42,10 @@ export async function stopWarmServers(root: string): Promise<void> {
   } catch {
     return;
   }
-  const socket = serverPaths(root).socket;
-  const pids = servePids(real);
-  for (const pid of pids) {
+  const found = servers(real);
+  // Taken while each root still exists: a socket too long for its root lives in the temp folder.
+  const sockets = [...new Set([serverPaths(real).socket, ...found.map((s) => serverPaths(s.root).socket)])];
+  for (const { pid } of found) {
     try {
       process.kill(pid, "SIGTERM");
     } catch {
@@ -49,14 +53,14 @@ export async function stopWarmServers(root: string): Promise<void> {
     }
   }
   const deadline = Date.now() + WAIT_MS;
-  while (pids.some(alive) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
-  for (const pid of pids.filter(alive)) {
+  while (found.some((s) => alive(s.pid)) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
+  for (const { pid } of found.filter((s) => alive(s.pid))) {
     try {
       process.kill(pid, "SIGKILL");
     } catch {
       // Gone between the check and the signal.
     }
   }
-  // A killed server never unlinked its socket, which may live outside the root.
-  rmSync(socket, { force: true });
+  // A killed server never unlinked its socket.
+  for (const socket of sockets) rmSync(socket, { force: true });
 }
