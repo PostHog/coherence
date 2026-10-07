@@ -26,6 +26,7 @@ import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/mode
 import { checkChokepoint, type ChokepointResult } from "./check.ts";
 import { languageOfFile, readEnforcementConfig, setupClaims, type EnforcementConfig } from "./config.ts";
 import { appendRun, entryKey, loadRuns, machineLoad, type Form, type RunEntry, type RunRecord } from "./record.ts";
+import { enforcesOf } from "../spec/floor.ts";
 import { connectAdapter, type RemoteAdapter } from "./server.ts";
 import { escapeRegExp, runTotalityBatch, runTotalityOracle, type TotalityResult } from "./totality.ts";
 import { readLatency, type LatencyReading } from "./latency.ts";
@@ -483,6 +484,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     ...(batched.size === 0 ? {} : { batch: { ms: totalBatch } }),
     invariants: details.map((d) => d.entry),
   };
+  gradeRecord(root, record);
   const file = appendRun(root, record);
   const outcome: RunOutcome = { record, file, details, instrumentReason, instrumentDied: needsAdapter && instrumentReason !== undefined };
   if (batched.size > 0) {
@@ -521,6 +523,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     } else {
       // The one function that performs a pass is the only one that appends: confirmEach builds the second record, performRun writes it.
       const each = await confirmEach(root, config, options, batchedDetails, instrument, recorded, now);
+      gradeRecord(root, each.record);
       outcome.each = { ...each, file: appendRun(root, each.record) };
     }
   }
@@ -723,6 +726,24 @@ export async function withWarmAdapters<T>(
  */
 export async function warmInstrument(root: string): Promise<void> {
   await withWarmAdapter(root, async () => {});
+}
+
+/**
+ * Each entry's bullet state as this record leaves it, with what its form
+ * enforces through, set on the entries before the record is appended: the
+ * model is loaded with the record read in as the latest run, so the state is
+ * the one loadSpecModel derives and no other. The invariant floor
+ * (src/spec/floor.ts) reads it.
+ */
+export function gradeRecord(root: string, record: RunRecord): void {
+  const after = loadSpecModel(root, { pending: record });
+  const byKey = new Map(after.components.flatMap((c) => c.invariants.map((i) => [`${c.folder}\u0000${i.name}`, i] as const)));
+  for (const entry of record.invariants) {
+    const invariant = byKey.get(`${entry.component}\u0000${entry.name}`);
+    if (invariant === undefined) continue;
+    entry.state = invariant.state;
+    entry.enforces = enforcesOf(invariant, entry.form);
+  }
 }
 
 function entryOf(component: string, name: string, form: Form, rest: Omit<RunEntry, "component" | "name" | "form" | "grade"> & { grade: RunEntry["grade"] | undefined }): RunEntry {

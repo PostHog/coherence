@@ -18,11 +18,12 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
-import { entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type Latest } from "../enforcement/record.ts";
+import { entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type Latest, type LoadedRuns, type RunRecord } from "../enforcement/record.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
 import { walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
 import { effectiveConfig } from "../adapters/project-config.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
+import { invariantFloorGaps, invariantFloorProblems, rawFloorGaps } from "./floor.ts";
 import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPractice, practiceProblems, stemOf, type ModelPractice } from "./practices.ts";
 
 export const SPEC_SUFFIX = ".spec.md";
@@ -148,6 +149,8 @@ export interface LoadOptions {
   seed?: Seed | undefined;
   /** Read .coherence/runs and derive run-informed state (default true). */
   runs?: boolean | undefined;
+  /** A run not yet appended, read in as the latest: the run grades each entry's bullet with it before it writes. */
+  pending?: RunRecord | undefined;
 }
 
 export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): SpecModel {
@@ -156,7 +159,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   const seed = options.seed ?? loadSeed();
   const config = readConfig(root);
   const problems: Problem[] = [];
-  const loadedRuns = options.runs === false ? { records: [], refutations: [], damaged: [] } : loadRuns(root);
+  const loadedRuns: LoadedRuns = options.runs === false ? { records: [], refutations: [], damaged: [] } : loadRuns(root);
+  if (options.pending !== undefined) loadedRuns.records.push(options.pending);
   const latest = latestByEnforcement(loadedRuns.records);
   // A totality oracle's refutation is witnessed by the record, never by the bullet's own refuted: line.
   const witnessed = witnessedRefutations(loadedRuns.records, loadedRuns.refutations);
@@ -281,6 +285,9 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   components.sort((a, b) => a.folder.localeCompare(b.folder));
   problems.push(...entranceTrustProblems(components, trustLevels));
   problems.push(...entranceGuardProblems(root, components));
+  // The invariant floor (df-f3826eaa): a bullet the run store graded an invariant is not demoted without a decision; the journal is read only when one was.
+  const demoted = rawFloorGaps(components, loadedRuns.records, loadedRuns.refutations);
+  if (demoted.length > 0) problems.push(...invariantFloorProblems(components, invariantFloorGaps(demoted, practiceFiles.size === 0 ? journalRecords(root) : records)));
   problems.push(
     ...practiceProblems({
       root,
