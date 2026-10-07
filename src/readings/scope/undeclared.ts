@@ -19,6 +19,7 @@
 
 import { posix } from "node:path";
 import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
+import { allLanguagesRead, type LanguagesRead } from "./languages-read.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import { loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import { detectedEntrances } from "./component-interfaces.ts";
@@ -31,15 +32,18 @@ export interface Undeclared {
   covered: number;
   /** In file order. */
   undeclared: EntranceCandidate[];
+  /** Which of the project's languages detection read: every one, by its own rules. */
+  languages: LanguagesRead;
 }
 
 /** Detect now and measure against a spec model: undefined when nothing is detected. Throws what detection throws. */
 export function undeclaredOf(root: string, model: Pick<SpecModel, "components">): Undeclared | undefined {
   const config = readEnforcementConfig(root);
-  const candidates = detectedEntrances(root, model, config.language, config.testFolders);
+  const languages = allLanguagesRead(config);
+  const candidates = detectedEntrances(root, model, languages.read, config.testFolders);
   const coverage = coverageOf(model.components, candidates);
   if (coverage === undefined || coverage.detected === 0) return undefined;
-  return { declared: coverage.declared, detected: coverage.detected, covered: coverage.individually + coverage.grouped, undeclared: coverage.uncovered };
+  return { declared: coverage.declared, detected: coverage.detected, covered: coverage.individually + coverage.grouped, undeclared: coverage.uncovered, languages };
 }
 
 /**
@@ -97,7 +101,7 @@ function quotedPath(path: string): string {
  * rules, and the command that proposes their bullets. Nothing when every
  * detected entrance is covered. Bounded: one line, one folder, never a list.
  */
-export function orientUndeclaredText(state: Undeclared | undefined, cli: string): string {
+export function orientUndeclaredText(state: Omit<Undeclared, "languages"> | undefined, cli: string): string {
   if (state === undefined || state.undeclared.length === 0) return "";
   const busiest = busiestFolder(state.undeclared)!;
   const n = state.undeclared.length;
@@ -114,7 +118,7 @@ const REGULATE_FILES = 8;
  * entrance is never owed, so the caller never counts it toward a refusal.
  * Empty when the session changed no file holding one.
  */
-export function regulateUndeclaredText(changed: readonly string[], state: Undeclared | undefined, cli: string): string {
+export function regulateUndeclaredText(changed: readonly string[], state: Omit<Undeclared, "languages"> | undefined, cli: string): string {
   if (state === undefined) return "";
   const files = new Set(changed);
   const byFile = new Map<string, EntranceCandidate[]>();

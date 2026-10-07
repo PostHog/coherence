@@ -37,8 +37,9 @@ import { writeStructurePreview } from "../readings/scope/build.ts";
 import type { StructurePreview } from "../readings/scope/derive.ts";
 import { loadSeed } from "../spec/seed.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
+import { allLanguagesRead, languagesReadLine } from "../readings/scope/languages-read.ts";
 import { cliName } from "../lifecycle/hook.ts";
-import { BUDGET_FLAGS, budgetFlags, readComponentInterfaces, readingAdapter } from "../readings/scope/component-interfaces.ts";
+import { BUDGET_FLAGS, budgetFlags, readComponentInterfaces, readingAdapters } from "../readings/scope/component-interfaces.ts";
 import type { ScopedReading } from "../readings/scope/model.ts";
 import { scopedUnsettled } from "../readings/scope/scoped-route.ts";
 import { freshReading, gapsOf, readAndRecord, recordGapBaseline, structureState } from "../readings/scope/gaps.ts";
@@ -163,7 +164,8 @@ async function controlModel(root: string, io: Io, values: ReadonlyMap<string, st
   if (reading === undefined) {
     const budget = budgetFlags(values);
     if (typeof budget === "string") usage(budget);
-    const adapter = readingAdapter(root, budget);
+    const adapters = readingAdapters(root, budget);
+    const adapter = adapters.of;
     try {
       if (asked !== undefined) {
         io.err(`reading only the component interfaces the routes of ${asked.map((e) => e.name).join(", ")} need (no recorded reading describes this tree; --whole reads and records every one)`);
@@ -181,7 +183,7 @@ async function controlModel(root: string, io: Io, values: ReadonlyMap<string, st
         reading = await readAndRecord(root, () => readComponentInterfaces(root, adapter, { budget }));
       }
     } finally {
-      await adapter.close();
+      await adapters.close();
     }
   }
   if (reading.kind !== "read") throw new ScaffoldError(`the component interfaces could not be read (${reading.because}), so no route's controls are known`);
@@ -189,6 +191,9 @@ async function controlModel(root: string, io: Io, values: ReadonlyMap<string, st
   const model = flowOf(state);
   const partial = flowPartialText(model);
   if (partial !== undefined) io.err(`${partial}; a gap below may only be a route the reading did not finish`);
+  // A multi-language project: which languages the reading the proposals rest on read, and each one it did not, with why.
+  const languages = languagesReadLine(model.languages);
+  if (languages !== undefined) io.out(languages);
   return { state, model, scope };
 }
 
@@ -267,7 +272,7 @@ async function controlVerb(argv: string[], io: Io): Promise<void> {
     io.out(recordGapBaseline(root, gapsOf(state, model), { session, agent, ...(work === undefined ? {} : { work }), ...(cite === undefined ? {} : { cite }) }, parsed.one.get("because")));
     return;
   }
-  const proposals = proposeClosures(root, state, model, readEnforcementConfig(root).language);
+  const proposals = proposeClosures(root, state, model, readEnforcementConfig(root).languages);
   const cli = await cliName(root);
   const as = parsed.one.get("as");
   const guard = parsed.one.get("guard");
@@ -325,7 +330,8 @@ async function entrancesVerb(argv: string[], io: Io): Promise<void> {
   const measured = undeclaredOf(root, model);
   const undeclared = (measured?.undeclared ?? []).filter((c) => under(c.file, within));
   const groups = proposeEntrances(undeclared, model.components);
-  io.out(renderEntrances({ groups, detected: measured?.detected ?? 0, declared: measured?.declared ?? 0, target: within, levels: model.trustLevels, cli: await cliName(root) }));
+  const languages = measured?.languages ?? allLanguagesRead(readEnforcementConfig(root));
+  io.out(renderEntrances({ groups, detected: measured?.detected ?? 0, declared: measured?.declared ?? 0, target: within, levels: model.trustLevels, cli: await cliName(root), languages }));
 }
 
 function scaffoldFailure(error: unknown, io: Io): number {

@@ -7,6 +7,7 @@ import type { Latest } from "../enforcement/record.ts";
 import { fromText } from "./grammar.ts";
 import type { Component, ModelInvariant, SpecModel } from "./model.ts";
 import { LACKS } from "./state.ts";
+import { defectFloorLines } from "../journal/defects.ts";
 
 /** How the latest run left one enforcement, or "declared, unverified" when no run has checked it. */
 export function verdictText(latest: Latest | undefined): string {
@@ -89,6 +90,8 @@ export function formatReport(model: SpecModel): string {
   if (model.components.length === 0) lines.push(`no spec under ${model.root}`);
   for (const problem of model.problems) lines.push(`PROBLEM  ${problem.file}:${problem.line}  ${problem.message}`);
   lines.push(formatCounts(model));
+  // Advisory, after the counts: a close with neither a guard nor a decision, and each guard failure (defects.ts).
+  lines.push(...defectFloorLines(model.defects));
   return lines.join("\n") + "\n";
 }
 

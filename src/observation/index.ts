@@ -7,12 +7,13 @@
 import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
+import { primaryOnly } from "../readings/scope/languages-read.ts";
 import type { EnforcementConfig } from "../enforcement/config.ts";
 import { workBinding } from "../journal/work.ts";
 import type { SpecModel } from "../spec/model.ts";
 import type { Capture } from "./capture.ts";
 import { readInterfaceMap, type InterfaceMap } from "./interfaces.ts";
-import { buildObservation, type TotalityVia } from "./observe.ts";
+import { buildObservation, OBSERVED_PRIMARY_ONLY, type TotalityVia } from "./observe.ts";
 import { appendObservation, type ObservationRecord } from "./record.ts";
 
 export { createObserver, type Capture } from "./capture.ts";
@@ -57,9 +58,12 @@ export async function recordObservation(input: RecordInput): Promise<Observation
   const t0 = Date.now();
   let map: InterfaceMap = { symbols: [], entrances: [] };
   let reason = input.instrumentReason;
+  // One language: a multi-language project's others are named as not read, on the record and in the line the run prints.
+  const { language, languages } = primaryOnly(input.config, OBSERVED_PRIMARY_ONLY);
+
   if (input.adapter !== undefined && reason === undefined) {
     const ready = await input.adapter.ready();
-    if (ready.ok) map = await readInterfaceMap(input.root, input.adapter, input.model, input.config);
+    if (ready.ok) map = await readInterfaceMap(input.root, input.adapter, input.model, input.config, language);
     else reason = ready.reason;
   }
   const unread = reason ?? (input.adapter === undefined ? "no adapter" : undefined);
@@ -87,6 +91,7 @@ export async function recordObservation(input: RecordInput): Promise<Observation
     commit,
     dirty,
     latency: { pass: input.passLatency, map: Date.now() - t0 },
+    languages,
   });
   return { record, file: appendObservation(input.root, record) };
 }

@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { attention, attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { runHook } from "./hook.ts";
+import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { lexiconWorkCommand } from "./lexicon-cli.ts";
 import { FUNCTION_WORDS, STOPLIST } from "./stoplist.ts";
 
@@ -181,6 +182,8 @@ test("no hook injection carries a total: orient names the ranked terms or says n
     assert.match(injected(stop.stdout), /this session left "surcharge" recurring without a definition/);
     assert.ok(!carriesTotal(attentionText(await lexiconCoverage(root))), "the shared signal never counts");
   } finally {
+    // The stop reaches the instrument through a warm server, which outlives the test unless it is stopped.
+    await stopWarmServers(root);
     rmSync(root, { recursive: true, force: true });
   }
 });

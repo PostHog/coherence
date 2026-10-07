@@ -6,10 +6,10 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { commandMatches, firedBy, globMatches, parsePractices, type ToolUse } from "./practice.ts";
 import { loadSpecModel, projectPractices } from "./model.ts";
 import { journalVerbs, type Io } from "../journal/cli.ts";
@@ -19,6 +19,7 @@ import { runHook } from "../lifecycle/hook.ts";
 import { installedEntry } from "../lifecycle/install.ts";
 import { practiceAnswer, practiceOrientText } from "../lifecycle/practice-delivery.ts";
 import { scaffoldCommand } from "../scaffold/cli.ts";
+import { stopWarmServers } from "../enforcement/server-fixture.ts";
 
 const SPEC = "# Widget\n\nWidgets turn.\n\n## invariants\n- knob turns: The knob turns.\n  over: every knob\n  via: the knob turns\n  because: a stuck knob is a broken widget\n  kinds: none\n";
 
@@ -37,8 +38,19 @@ function practiceText(cite: string, extra = ""): string {
   ].filter((l) => l !== "").join("\n") + "\n";
 }
 
+/** Every fixture project this file made: a stop hook among them starts a warm server, and each is removed after the tests. */
+const projects: string[] = [];
+
+after(async () => {
+  for (const root of projects) {
+    await stopWarmServers(root);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 function project(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "coherence-practice-"));
+  projects.push(root);
   for (const [path, text] of Object.entries(files)) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), text);

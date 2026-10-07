@@ -20,7 +20,7 @@
 
 import { JournalError } from "./args.ts";
 import type { Elsewhere } from "./branches.ts";
-import { GLYPH, enactmentTally, anySubjectOf, citedBy, citesOf, isKind, kindLabel, pointsAt, subjectOf, type AnyRecord, type Escalation, type JournalRecord, type Kind } from "./record.ts";
+import { GLYPH, enactmentTally, anySubjectOf, citedBy, citesOf, isKind, kindLabel, pointsAt, subjectOf, type AnyRecord, type DefectOrigin, type Escalation, type JournalRecord, type Kind } from "./record.ts";
 import { compareRecords, type Damaged, type Loaded } from "./store.ts";
 
 export interface Filters {
@@ -83,6 +83,12 @@ function verbPast(kind: Kind): string {
   }
 }
 
+/** A defect's class, origin and catch as given on one record, or "" when it gives none. */
+function originText(record: DefectOrigin): string {
+  const parts = [record.class === undefined ? "" : `class ${record.class}`, record.introduced === undefined ? "" : `introduced ${record.introduced}`, record.caught === undefined ? "" : `caught ${record.caught}`];
+  return parts.filter((p) => p !== "").join(", ");
+}
+
 function stamp(at: string): string {
   return `${at.slice(0, 10)} ${at.slice(11, 16)}`;
 }
@@ -123,12 +129,16 @@ function renderBody(record: JournalRecord, status: string | undefined): string[]
     case "resolution":
       detail.push(`because: ${record.because}`);
       if (record.as !== undefined) detail.push(`as: ${record.as}`);
+      if (record.guard !== undefined) detail.push(`guard: ${record.guard}`);
+      if (record.decision !== undefined) detail.push(`decision: ${record.decision}`);
+      if (originText(record) !== "") detail.push(originText(record));
       return [line(`resolved ${record.of}`), ...indent(detail)];
     case "dismissal":
       return [line(`dismissed ${record.of}`), ...indent([`because: ${record.because}`])];
     case "defect":
       detail.push(`evidence: ${record.evidence}`);
       if (record.files.length > 0) detail.push(`files: ${record.files.join(", ")}`);
+      if (originText(record) !== "") detail.push(originText(record));
       return [line(record.what), ...indent(detail)];
     case "experiment":
       if (record.context.length > 0) detail.push(`context: ${record.context.join(", ")}`);

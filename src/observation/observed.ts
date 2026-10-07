@@ -10,6 +10,7 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import type { Io } from "../journal/cli.ts";
 import { gitState } from "../journal/store.ts";
+import { languagesReadLine } from "../readings/scope/languages-read.ts";
 import { freshness, freshnessLabel, loadObservations, RELATION, type ObservationRecord, type ObservedInterface } from "./record.ts";
 
 /** Lines per list before the rest is counted, so an answer stays under a few hundred tokens. */
@@ -32,6 +33,7 @@ export function formatObservationSummary(record: ObservationRecord): string {
     `observation recorded in .coherence/observations/${record.session}.jsonl: ${record.source.kind} (${record.source.runner}, ${record.source.attribution}); ${plural(t.tests, "test")}, ${t.failed} failed`,
     `  component interfaces ${RELATION}: ${t.exercised} exercised, ${t.neverObserved} never observed, ${t.noBody} with no runtime body, of ${t.interfaces}; entrances ${t.entrancesExercised} of ${t.entrances} exercised`,
     `  ${record.source.note}; pass ${Math.round(record.latency.pass / 100) / 10} s, mapping ${Math.round(record.latency.map / 100) / 10} s`,
+    ...(languagesReadLine(record.languages) === undefined ? [] : [`  ${languagesReadLine(record.languages)!}`]),
   ].join("\n");
 }
 

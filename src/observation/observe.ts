@@ -13,7 +13,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { componentOf, declarationsOf, isTest } from "../economy/source.ts";
-import type { EnforcementConfig } from "../enforcement/config.ts";
+import { languageOfFile, type EnforcementConfig } from "../enforcement/config.ts";
+import { primaryOnly, type LanguagesRead } from "../readings/scope/languages-read.ts";
 import type { SpecModel } from "../spec/model.ts";
 import { belongsTo } from "../enforcement/totality.ts";
 import type { Capture, CapturedTest } from "./capture.ts";
@@ -77,7 +78,8 @@ export function likelySiteOf(failure: string, realRoot: string, root: string, ma
     if (carrying !== undefined) symbol = carrying.symbol;
     else {
       try {
-        const above = declarationsOf(readFileSync(join(root, file), "utf8"), config.language).filter((d) => d.line <= frame.line);
+        const language = languageOfFile(file, config.languages);
+        const above = language === undefined ? [] : declarationsOf(readFileSync(join(root, file), "utf8"), language).filter((d) => d.line <= frame.line);
         symbol = above[above.length - 1]?.name;
       } catch {
         symbol = undefined;
@@ -110,7 +112,12 @@ export interface BuildInput {
   commit: string | null;
   dirty: boolean;
   latency: { pass: number; map: number };
+  /** Which of the project's languages the map read; absent: the primary alone, as observation reads it. */
+  languages?: LanguagesRead;
 }
+
+/** Why observation reads the primary language alone: the pass it maps is the first test setup's, through one instrument. */
+export const OBSERVED_PRIMARY_ONLY = "observation maps the first test setup's one invocation through the primary language's instrument alone";
 
 /** The observation record for one captured pass. */
 export function buildObservation(input: BuildInput): ObservationRecord {
@@ -177,5 +184,6 @@ export function buildObservation(input: BuildInput): ObservationRecord {
       entrancesExercised: entrances.filter((e) => e.exercisedBy > 0).length,
     },
     latency: input.latency,
+    languages: input.languages ?? primaryOnly(config, OBSERVED_PRIMARY_ONLY).languages,
   };
 }

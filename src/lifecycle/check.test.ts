@@ -50,7 +50,10 @@ async function write(rel: string, text: string): Promise<void> {
   await writeFile(join(root, rel), text);
 }
 
-before(async () => {
+// Node 22 runs the after hook without waiting for an async before when a name filter selects none of this file's tests, so the after waits for it.
+let setup: Promise<void> | undefined;
+
+before(() => (setup = (async () => {
   coherence = await loadLexicon(COHERENCE_LEXICON);
   coherence.project = "coherence";
   REJ = rejectedNames(coherence).find((n) => n.concept === "invariant" && !n.name.includes(" "))!.name;
@@ -92,9 +95,10 @@ before(async () => {
   project = await loadLexicon(join(root, "lexicon.json"));
   // The fixture is read as Coherence's own repository, where both layers bind everywhere; the adopter's reading is tested below.
   report = await runCheck({ root, coherence, project, coherenceItself: true });
-});
+})()));
 
 after(async () => {
+  await setup?.catch(() => undefined);
   if (root !== undefined) await rm(root, { recursive: true, force: true });
 });
 
