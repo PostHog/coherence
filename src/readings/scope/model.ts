@@ -406,6 +406,7 @@ export type JournalStepOutcome = { result: "done"; evidence?: string } | { resul
  */
 import type { WorkOrder } from "../../journal/work.ts";
 import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
+import type { LanguagesRead } from "./languages-read.ts";
 export type { WorkOrder };
 
 /** The work orders under .coherence/work, or their absence with the reason. */
@@ -528,10 +529,10 @@ export type InterfaceReading =
       kind: "read";
       language: string;
       /**
-       * A multi-language project: the languages whose files this reading did not read. The Structure reading reads
-       * the primary language (the first the config lists) alone, and says which it left out. Absent for one language.
+       * Which of the project's declared languages the reading read, each through its own adapter, and each one it
+       * did not read with why. Every reading taken now carries it; absent only from one recorded before.
        */
-      unreadLanguages?: string[];
+      languages?: LanguagesRead;
       declarations: number;
       symbols: InterfaceSymbol[];
       entrances: EntranceResolution[];
