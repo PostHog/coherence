@@ -64,7 +64,7 @@ test("a hook call's kept time carries the Coherence version that answered it", (
   const kept = hookTimes(root, "s1");
   assert.equal(kept.length, 1);
   assert.equal(kept[0]!.version, version);
-  assert.match(readFileSync(join(root, HOOK_TIMES_DIR, "s1.jsonl"), "utf8"), new RegExp(`"version":"${version.replace(/\./g, "\\.")}"`));
+  assert.match(readFileSync(join(root, HOOK_TIMES_DIR, "s1.jsonl"), "utf8"), new RegExp(`"version":"${version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
   // A time kept before versions were written still reads, as unknown.
   appendFileSync(join(root, HOOK_TIMES_DIR, "s1.jsonl"), JSON.stringify({ at: "2026-10-01T10:00:00.000Z", event: "Stop", ms: 900 }) + "\n");
   assert.equal(hookTimes(root, "s1")[1]!.version, undefined);
