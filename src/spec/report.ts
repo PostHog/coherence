@@ -4,6 +4,7 @@
  */
 
 import type { Latest } from "../enforcement/record.ts";
+import { fromText } from "./grammar.ts";
 import type { Component, ModelInvariant, SpecModel } from "./model.ts";
 import { LACKS } from "./state.ts";
 
@@ -29,7 +30,8 @@ function invariantLines(invariant: ModelInvariant): string[] {
   for (const enforcement of invariant.enforcements) {
     const latest = invariant.latest.find((l) => l.form === enforcement.form);
     if (enforcement.form === "chokepoint") {
-      lines.push(`      chokepoint ${enforcement.chokepoint} protects ${enforcement.protects}: ${verdictText(latest)}`);
+      const from = enforcement.from === undefined || enforcement.from === "anywhere" ? "" : ` from ${fromText(enforcement.from)}`;
+      lines.push(`      chokepoint ${enforcement.chokepoint} protects ${enforcement.protects}${from}: ${verdictText(latest)}`);
     } else {
       lines.push(`      totality oracle "${enforcement.via}" over ${enforcement.over}: ${verdictText(latest)}`);
     }
@@ -49,6 +51,7 @@ function invariantLines(invariant: ModelInvariant): string[] {
 
 function componentLines(component: Component): string[] {
   const lines: string[] = [`${component.name}  ${component.specPath}`];
+  if (component.owners !== undefined) lines.push(`  owners: ${component.owners.join(", ")}`);
   if (component.trustLevels !== undefined) lines.push(`  trust levels: ${component.trustLevels.map((level) => level.name).join(", ")}`);
   if (component.invariants.length === 0) lines.push("  (no invariants)");
   for (const invariant of component.invariants) lines.push(...invariantLines(invariant));

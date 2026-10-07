@@ -15,8 +15,12 @@
  *   interfaces     -> a totality oracle bullet (outside code imports the
  *                     module only through what it exposes), and one
  *                     chokepoint bullet per exposed path, the path as the
- *                     chokepoint and the protected internal a placeholder
- *   owners         -> the intent line; the grammar has no owner slot
+ *                     chokepoint, the protected internal a placeholder, and
+ *                     from: outside the component, since tach checks only
+ *                     imports from other modules and the module's own code
+ *                     may use its internals
+ *   owners         -> the header's owners: line; the product.yaml name
+ *                     stays in the intent
  *   layer, utility, visibility -> no slot; reported as notes
  *
  * Drafts are printed; written only where the folder exists and holds no
@@ -248,11 +252,10 @@ export function renderDraft(projectRoot: string, m: BoundaryModule, source: stri
   const where = m.folder ?? `<the folder of ${m.id}, outside this project>`;
   const specPath = m.folder === undefined ? undefined : posix(join(m.folder, specFileName(m.folder, projectRoot)));
   const title = specPath === undefined ? m.id : specFileName(m.folder!, projectRoot).replace(/\.spec\.md$/, "");
-  const owned =
-    m.owners === undefined
-      ? ""
-      : `${m.owners.name === undefined ? "" : `${m.owners.name}, `}owned by ${m.owners.owners.length === 0 ? "<no owners listed>" : m.owners.owners.join(", ")} (${m.owners.file}); `;
-  const intent = `<what ${m.id} is for, in one line> ${owned}drafted from ${source} module ${m.id} (${m.declaredAt}).`;
+  const named = m.owners?.name === undefined ? "" : `${m.owners.name}, `;
+  const intent = `<what ${m.id} is for, in one line> ${named}drafted from ${source} module ${m.id} (${m.declaredAt}).`;
+  // Owners are declared in the header, never folded into the intent; a product.yaml that lists none leaves the line out.
+  const owners = m.owners === undefined || m.owners.owners.length === 0 ? "" : `owners: ${m.owners.owners.join(", ")}\n`;
   const bullets: string[] = [];
   const bullet = (name: string, sentence: string, form: "chokepoint" | "totality oracle", values: Record<string, string>): void => {
     const { bullet: b } = renderInvariant(seed, { sentence, name, kinds: undefined, form });
@@ -279,12 +282,14 @@ export function renderDraft(projectRoot: string, m: BoundaryModule, source: stri
       const label = e.path ?? e.pattern;
       const chokepoint = e.chokepoint ?? `<the module or symbol '${e.pattern}' names under ${where}; ${e.path === undefined ? "a pattern names no single path" : "not found on disk"}>`;
       bullet(`internals only through ${label}`, `Code outside ${where} reaches the internal it protects only through ${label}.`, "chokepoint", {
-        protects: `<an internal of ${where} that nothing but ${label} references; Coherence counts the module's own references too>`,
+        protects: `<an internal of ${where} that code outside it reaches only through ${label}>`,
         chokepoint,
+        // tach checks only imports from other modules: the module's own references are exempt, and reported as such.
+        from: "outside the component",
       });
     }
   }
-  const text = `# ${title}\n\n${intent}\n\n## ${INVARIANTS_SECTION}\n${bullets.join("")}`;
+  const text = `# ${title}\n\n${intent}\n${owners}\n## ${INVARIANTS_SECTION}\n${bullets.join("")}`;
   return { module: m, specPath, text };
 }
 

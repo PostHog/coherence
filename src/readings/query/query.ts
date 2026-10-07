@@ -167,6 +167,8 @@ function answerReliesOn(state: ShellState, args: string[]): Answer {
         continue;
       }
       lines.push(`  from the check at ${stamp(reliance.entry.at)}${reliance.entry.grade === undefined ? "" : `, ${reliance.entry.grade}`}: complete evidence, ${reliance.evidence.sites.length} reference${reliance.evidence.sites.length === 1 ? "" : "s"} to either endpoint`);
+      const governed = reliance.entry.from;
+      if (governed?.exempt !== undefined) lines.push(`  governs only references from outside ${governed.exempt} (from: ${governed.value}, by the ${governed.by}); a reference from inside it is exempt, never a bypass`);
       if (reliance.evidence.sites.length === 0) lines.push("  both endpoint queries completed and returned zero references");
       for (const entry of reliance.entries) {
         const who = entry.component === undefined ? "in no component" : `${entry.component.folder === "." ? "(root)" : entry.component.folder} (${entry.component.name})`;
@@ -184,7 +186,9 @@ function relianceSiteText(site: RelianceSite): string {
     ? "bypass, not a legal chokepoint reference"
     : site.target === "chokepoint" && site.siteClass === "chokepoint-reference"
       ? "reference; runtime call not established"
-      : site.siteClass;
+      : site.siteClass === "exempt"
+        ? "exempt, from where the chokepoint does not govern; never a bypass"
+        : site.siteClass;
   return `${target}; ${classification}${site.form === undefined ? "" : `; ${site.form}`}${site.test ? "; test" : ""}`;
 }
 
@@ -331,6 +335,7 @@ function answerComponent(state: ShellState, args: string[]): Answer {
   const lines = [
     `${component.name}  ${component.folder === "." ? "(root)" : component.folder}  ${component.specPath}`,
     `  ${component.intent === "" ? "no intent line" : component.intent}`,
+    ...(component.owners === undefined ? [] : [`  owners: ${component.owners.join(", ")}`]),
     `  ${component.invariants.length} bullets: ${invariants} invariants, ${requirements} requirements, ${defects} structural defects; mass: not measured`,
   ];
   if (component.trustLevels !== undefined) lines.push(`  trust levels: ${component.trustLevels.map((l) => l.name).join(", ")}`);

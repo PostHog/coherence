@@ -175,8 +175,12 @@ export interface LanguageAdapter {
   /** The chokepoint is passed so a ladder whose top rung depends on where the thing is defined can decide. */
   visibility(definition: Definition, chokepoint?: Definition): Promise<Visibility>;
   testFilter(via: string): string;
-  /** Open an unsaved document outside `outsideOf` that references `protected`, ask for references, report the site the instrument named, close. */
-  refute(protectedThing: Definition, outsideOf: Definition | undefined): Promise<Refutation>;
+  /**
+   * Open an unsaved document outside `outsideOf` that references `protected`, ask for references, report the site the instrument named, close.
+   * With `exempt`, the folder whose references the chokepoint does not govern, the same-module site is not staged where the folder holds
+   * the chokepoint, and a use from an unsaved document outside the folder is staged instead, so the classifier's exemption is put to the test.
+   */
+  refute(protectedThing: Definition, outsideOf: Definition | undefined, exempt?: string): Promise<Refutation>;
   /**
    * Drop what is cached about file contents and make the instrument see the current disk text of every
    * document it may have open and of the named files, resolving only once the instrument has acknowledged
@@ -247,6 +251,18 @@ export function positionBefore(a: Position, b: Position): boolean {
 
 export function rangeContains(range: Range, position: Position): boolean {
   return !positionBefore(position, range.start) && !positionBefore(range.end, position);
+}
+
+/** Whether a project-relative file lies under a folder ("." holds every file). */
+export function withinFolder(file: string, folder: string): boolean {
+  return folder === "." || file === folder || file.startsWith(`${folder}/`);
+}
+
+/** Where a refutation stages its use from outside an exempted folder: beside the folder, in its parent; undefined when the folder is the root, which leaves no outside. */
+export function outsideOfFolder(folder: string): string | undefined {
+  if (folder === ".") return undefined;
+  const parent = folder.includes("/") ? folder.slice(0, folder.lastIndexOf("/")) : ".";
+  return parent === "." ? "" : `${parent}/`;
 }
 
 /** Whether a project-relative path lies in a test folder or is a test file by name (`.test.ts`, `.spec.ts`, pytest's `test_*.py` and `*_test.py`). */

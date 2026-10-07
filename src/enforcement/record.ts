@@ -59,9 +59,24 @@ export type ReferenceTarget = "protected" | "chokepoint";
  * The check's classification of a persisted site. `chokepoint-reference` makes only the
  * fact the adapter established: an outside reference to the chokepoint. It
  * does not claim the site is a runtime call; `form` separately retains an
- * import or re-export form when the adapter supplied one.
+ * import or re-export form when the adapter supplied one. `exempt` is a
+ * protected reference from where the bullet's from: line says the chokepoint
+ * does not govern (the component's own code, or a named folder): reported,
+ * never a bypass, and never dropped.
  */
-export type SiteClass = "inside" | "chokepoint-reference" | "test" | "bypass";
+export type SiteClass = "inside" | "chokepoint-reference" | "test" | "exempt" | "bypass";
+
+/**
+ * Which references a chokepoint check governed: the from: value as written,
+ * who said it (the bullet's own from: line, the config's chokepointFrom, or
+ * the default, anywhere), and the folder whose references it exempted.
+ */
+export interface Governed {
+  value: string;
+  by: "bullet" | "config" | "default";
+  /** The project-relative folder whose references the chokepoint does not govern; absent for anywhere. */
+  exempt?: string;
+}
 
 /** The syntactic forms the adapter can establish at a reference site. */
 export type ReferenceForm = "import" | "re-export";
@@ -89,6 +104,8 @@ export interface RunEntry {
   grade?: Grade;
   /** Chokepoint form only: who refuses a bypass at the graded rung (the compiler, the interpreter, a checker, Coherence's check, nobody). */
   enforcer?: string;
+  /** Chokepoint form only: which references the check governed. Absent on a record from before from: lines, which governed anywhere. */
+  from?: Governed;
   /** Totality oracle form only: whether the test ran in the one batched invocation or in its own. */
   mode?: "batched" | "one-at-a-time";
   refutation: RefutationState;

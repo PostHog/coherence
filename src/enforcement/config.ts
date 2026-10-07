@@ -34,11 +34,15 @@
  *              test files it claims, relative to the root), and cwd (the
  *              folder it runs from, relative to the root). The test a
  *              totality oracle names runs through the setup whose test files spell it
+ *   chokepointFrom  which references a chokepoint governs when its bullet
+ *              has no from: line: "anywhere" (default), "outside the
+ *              component", or "outside <folder>"
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { isLanguage, LANGUAGES, type Language } from "../adapters/index.ts";
+import { FROM_FORM, parseFrom, type ChokepointFrom } from "../spec/grammar.ts";
 
 export const CONFIG_FILE = "coherence.config.json";
 export const DEFAULT_TEST_FOLDERS: readonly string[] = ["__tests__", "test", "tests"];
@@ -75,6 +79,8 @@ export interface EnforcementConfig {
   testFolders: string[];
   /** The latency budget: the most seconds a tool hook may take, or undefined for the default (src/lifecycle/hook-latency.ts). */
   latencyBudget: number | undefined;
+  /** Which references a chokepoint governs when its bullet says nothing (a from: line); undefined is anywhere. */
+  chokepointFrom: ChokepointFrom | undefined;
 }
 
 function commandValue(value: unknown): string[] | string | undefined {
@@ -132,7 +138,7 @@ function testSetupOf(record: Record<string, unknown>, path: string, where: strin
 }
 
 export function readEnforcementConfig(root: string): EnforcementConfig {
-  const config: EnforcementConfig = { language: "typescript", languages: ["typescript"], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined };
+  const config: EnforcementConfig = { language: "typescript", languages: ["typescript"], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined, chokepointFrom: undefined };
   config.tests = [{ language: undefined, files: undefined, cwd: undefined, test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS] }];
   const path = resolve(root, CONFIG_FILE);
   if (!existsSync(path)) return config;
@@ -157,6 +163,12 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   if (budget !== undefined) {
     if (typeof budget !== "number" || !Number.isFinite(budget) || budget <= 0) throw new Error(`${path}: latencyBudget is a number of seconds above 0`);
     config.latencyBudget = budget;
+  }
+  const from = record["chokepointFrom"];
+  if (from !== undefined) {
+    const parsed = typeof from === "string" ? parseFrom(from) : undefined;
+    if (parsed === undefined) throw new Error(`${path}: chokepointFrom reads ${FROM_FORM}`);
+    config.chokepointFrom = parsed;
   }
   const tests = record["tests"];
   if (tests !== undefined) {

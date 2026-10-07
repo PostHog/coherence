@@ -54,12 +54,30 @@ function renderVerdict(state: ShellState, entry: LatestEntry | undefined): Marku
     <p class="reason quiet">${entry.reason}</p>`;
 }
 
+/**
+ * Which references the chokepoint governs, as the latest run applied it, with
+ * the exempt references counted, so the component's own references read as
+ * exempted rather than absent. Nothing is drawn for anywhere, the default.
+ */
+function renderGoverned(enforcement: Extract<SpecEnforcement, { form: "chokepoint" }>, entry: LatestEntry | undefined): Markup | null {
+  const ran = entry?.from;
+  if (ran?.exempt !== undefined) {
+    const exempt = entry!.sites?.filter((s) => s.of === "protected" && s.class === "exempt").length;
+    const by = ran.by === "bullet" ? "its from: line" : ran.by === "config" ? "the config default" : "the default";
+    return html`<p class="governs" data-field="from" data-exempt="${ran.exempt}"><span class="label">from</span> ${ran.value} <span class="quiet">(${by}): governs only references from outside <code>${ran.exempt}</code>; ${exempt === undefined ? "exempt references unrecorded" : `${plural(exempt, "reference", "references")} from inside it exempt, reported and never a bypass`}</span></p>`;
+  }
+  const declared = enforcement.from;
+  if (declared === undefined || declared === "anywhere") return null;
+  return html`<p class="governs" data-field="from"><span class="label">from</span> ${typeof declared === "string" ? declared : `outside ${declared.outside}`} <span class="quiet">declared; no run has applied it yet</span></p>`;
+}
+
 export function renderEnforcement(state: ShellState, invariant: SpecInvariant, enforcement: SpecEnforcement): Markup {
   const entry = latestOf(invariant, state.runs.records).find((l) => l.form === enforcement.form);
   if (enforcement.form === "chokepoint") {
     return html`<li class="enforcement" data-form="chokepoint">
       <p><span class="label">chokepoint</span> <code>${enforcement.chokepoint}</code> <span class="label">protects</span> <code>${enforcement.protects}</code></p>
       ${renderVerdict(state, entry)}
+      ${renderGoverned(enforcement, entry)}
       ${entry !== undefined && entry.testReferences > 0 ? html`<p class="quiet">${plural(entry.testReferences, "test reference", "test references")}, reported and never a bypass.</p>` : null}
     </li>`;
   }

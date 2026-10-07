@@ -169,3 +169,10 @@ The language adapter seam: how to ask a language's server for definitions, refer
   because: PostHog's code imports its own modules from the repository top (products.notebooks.backend.query_validation); Pyright started on the nested folder could not resolve them, so a bypass inside the project went unreported and the chokepoint graded reference-choked (df-0d235229)
   refuted: the Python adapter left the repository top out of Pyright's import search -> "a nested Python project's imports written from the repository top resolve, so a bypass inside the project through one is found" went red in monorepo.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- Python stages a use from outside an exempted folder: Under a from: line that exempts a folder, the Python adapter's refutation stages an unsaved use of the protected thing from outside that folder, and the check classes the package's own references exempt and another package's a bypass.
+  over: a Python package whose own module references its protected internal, a facade module chokepoint, and a reference from a sibling package, under from anywhere and outside the component
+  via: Python: a chokepoint from outside the component exempts its own references and still catches a bypass from another component; from anywhere calls both bypasses
+  because: the exemption is classified in the check, but what the refutation can stage is the adapter's: a use beside the protected thing lies inside the exempted folder, so without a document outside it the refutation would prove only that a re-export is caught, never that the exemption stops at the folder
+  crossing: instrument -> reading
+  refuted: stopped the Python adapter expecting its staged use from outside the exempted folder -> "Python: a chokepoint from outside the component exempts its own references and still catches a bypass from another component; from anywhere calls both bypasses" went red in python-from.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none

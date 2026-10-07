@@ -21,6 +21,7 @@ import { isLanguage, type Language } from "../adapters/index.ts";
 import { projectFiles } from "../adapters/project-files.ts";
 import { gitState } from "../journal/store.ts";
 import { workBinding } from "../journal/work.ts";
+import type { ChokepointFrom } from "../spec/grammar.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
 import { checkChokepoint, type ChokepointResult } from "./check.ts";
 import { languageOfFile, readEnforcementConfig, setupClaims, type EnforcementConfig } from "./config.ts";
@@ -106,8 +107,8 @@ export interface RunOutcome {
   latency?: LatencyReading;
 }
 
-function chokepointEnforcements(invariant: ModelInvariant): { protects: string; chokepoint: string }[] {
-  return invariant.enforcements.flatMap((e) => (e.form === "chokepoint" ? [{ protects: e.protects, chokepoint: e.chokepoint }] : []));
+function chokepointEnforcements(invariant: ModelInvariant): { protects: string; chokepoint: string; from: ChokepointFrom | undefined }[] {
+  return invariant.enforcements.flatMap((e) => (e.form === "chokepoint" ? [{ protects: e.protects, chokepoint: e.chokepoint, from: e.from }] : []));
 }
 
 function totalityEnforcements(invariant: ModelInvariant): { over: string; via: string }[] {
@@ -190,6 +191,8 @@ interface ChokepointPlan {
   invariant: ModelInvariant;
   protects: string;
   chokepoint: string;
+  /** The bullet's own from: line, when it has one. */
+  from: ChokepointFrom | undefined;
   languages: Language[];
 }
 
@@ -288,7 +291,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   let listed: string[] | undefined;
   const files = (): string[] => (listed ??= projectFiles(root));
   const plans: ChokepointPlan[] = wantChokepoints
-    ? selected.flatMap(({ component, invariant }) => chokepointEnforcements(invariant).map(({ protects, chokepoint }) => ({ component, invariant, protects, chokepoint, languages: enforcementLanguages(config, component, invariant, protects, chokepoint, files) })))
+    ? selected.flatMap(({ component, invariant }) => chokepointEnforcements(invariant).map(({ protects, chokepoint, from }) => ({ component, invariant, protects, chokepoint, from, languages: enforcementLanguages(config, component, invariant, protects, chokepoint, files) })))
     : [];
   const chooseSetup = setupChooser(root, config);
   const multiSetup = config.tests.length > 1;
@@ -346,7 +349,9 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   for (const { component, invariant } of selected) {
     if (wantChokepoints) {
       for (const plan of plans.filter((p) => p.component === component && p.invariant === invariant)) {
-        const { protects, chokepoint } = plan;
+        const { protects, chokepoint, from } = plan;
+        // The bullet's own from: line governs; a silent bullet takes the config's default, and with none, anywhere.
+        const governs = from !== undefined ? { from, fromBy: "bullet" as const } : config.chokepointFrom !== undefined ? { from: config.chokepointFrom, fromBy: "config" as const } : {};
         const t0 = Date.now();
         let firstReason: string | undefined;
         for (const [i, language] of plan.languages.entries()) {
@@ -374,7 +379,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
           }
           let result: ChokepointResult;
           try {
-            result = await checkChokepoint(door.adapter, { protects, chokepoint, component, testFolders: config.testFolders, root });
+            result = await checkChokepoint(door.adapter, { protects, chokepoint, component, testFolders: config.testFolders, root, ...governs });
           } catch (error) {
             const message = error instanceof Error ? error.message.split("\n")[0]! : String(error);
             instruments.fail(language, message);
@@ -403,6 +408,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
               verdict: result.verdict,
               grade: result.grade,
               ...(result.enforcer === undefined ? {} : { enforcer: result.enforcer }),
+              ...(result.governed === undefined ? {} : { from: result.governed }),
               refutation: result.refutation,
               bypasses: result.bypasses,
               ...(result.siteEvidence !== "complete" ? {} : { sites: result.sites.map((site) => ({

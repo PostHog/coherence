@@ -156,7 +156,7 @@ test("an unfilled slot is one of the forms the scaffold prints, not any prose in
     const scaffolded = loadSpecModel(root, { seed }).components[0]!.invariants[0]!;
     assert.deepEqual(
       scaffolded.unfilled.sort(),
-      ["because", "chokepoint", "crossing", "kinds", "name", "protects", "refuted"].sort(),
+      ["because", "chokepoint", "crossing", "from", "kinds", "name", "protects", "refuted"].sort(),
       "the scaffold's own forms are unfilled, every one of them",
     );
 

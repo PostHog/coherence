@@ -1923,6 +1923,8 @@ function flowSite(site: RelianceSite): Markup {
     ? "protected thing · bypass (not a legal chokepoint reference)"
     : site.target === "chokepoint" && site.siteClass === "chokepoint-reference"
       ? "chokepoint · reference (runtime call not established)"
+      : site.siteClass === "exempt"
+        ? "protected thing · exempt (from where the chokepoint does not govern; never a bypass)"
       : site.siteClass === "inside"
         ? `${site.target === "protected" ? "protected thing" : "chokepoint"} · inside chokepoint`
         : `${site.target === "protected" ? "protected thing" : "chokepoint"} · ${site.siteClass}`;
