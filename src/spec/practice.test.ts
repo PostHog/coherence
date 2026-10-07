@@ -313,3 +313,24 @@ test("a shell command that writes a file fires an edit trigger the way an edit t
   assert.equal(await fire("cat > src/widget/a/c.ts <<'EOF'\nconst dial = 1\nEOF"), "", "the edit adds no knob");
   assert.equal(await fire("cat src/widget/a/b.ts"), "", "reading the file writes nothing");
 });
+
+test("in an adopter, a kernel practice a Coherence release changed asks no amendment: enact goes through and spec --check names no floor gap", () => {
+  const { root, run } = widget();
+  const kernel = "coherence:src/enforcement/witness a refutation";
+  const steps = projectPractices(root).find((p) => p.id === kernel)!.steps.map((s) => ["--step", `${s.n}=skipped:a fixture`]).flat();
+  const first = run("enact", kernel, ...steps, ...WHO);
+  assert.equal(first.code, 0, first.err.join("\n"));
+  // As an earlier release left it: the recorded enactment carried a step the kernel practice no longer has.
+  const file = join(root, ".coherence", "journal", "s1.jsonl");
+  const lines = readFileSync(file, "utf8").split("\n").map((line) => {
+    if (!line.includes('"kind":"enactment"')) return line;
+    const record = JSON.parse(line) as { steps: { text: string }[] };
+    record.steps.push({ text: "a step an earlier Coherence release taught" });
+    return JSON.stringify(record);
+  });
+  writeFileSync(file, lines.join("\n"));
+  const again = run("enact", kernel, ...steps, ...WHO);
+  assert.equal(again.code, 0, `the adopter is not asked to decide for a change it did not make: ${again.err.join("\n")}`);
+  const floor = loadSpecModel(root, { runs: false }).problems.filter((p) => /is gone; a practice keeps what it taught/.test(p.message));
+  assert.deepEqual(floor.map((p) => p.message), [], "no floor gap is named for a kernel practice");
+});
