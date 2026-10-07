@@ -275,9 +275,11 @@ function coverageLines(model: FlowModel): string[] {
   if (coverage.beyond > 0) lines.push(`  ${coverage.beyond} declared ${coverage.beyond === 1 ? "entrance covers" : "entrances cover"} nothing detected: declared where the rules do not reach, or finer than they detect`);
   lines.push(`  undeclared (${coverage.uncovered.length})${coverage.uncovered.length === 0 ? "" : ", each detected and covered by no declared entrance:"}`);
   for (const c of coverage.uncovered) lines.push(`    ${c.file}:${c.line}  ${c.symbol === "" ? "(the file)" : c.symbol}  ${c.rule}: ${c.why}`);
-  const language = model.language ?? "";
-  const rules = CANDIDATE_RULES[language] ?? [];
-  if (rules.length > 0) lines.push(`  detected by (${language}): ${rules.map((r) => `${r.rule}, ${r.detects}`).join("; ")}; ${NOT_DETECTED[language]}`);
+  // Each language read, by its own rules.
+  for (const language of model.languages?.read ?? [model.language ?? ""]) {
+    const rules = CANDIDATE_RULES[language] ?? [];
+    if (rules.length > 0) lines.push(`  detected by (${language}): ${rules.map((r) => `${r.rule}, ${r.detects}`).join("; ")}; ${NOT_DETECTED[language]}`);
+  }
   return lines;
 }
 

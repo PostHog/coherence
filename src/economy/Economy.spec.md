@@ -66,3 +66,9 @@ The context closure of a change, the read traces that record what sessions actua
   because: resolving every chokepoint invariant at every stop cost about two language-server requests each whatever the session wrote; the predictions before and after are identical on three file sets, two holding real chokepoints, and two to three and a half times faster
   refuted: matched a name anywhere in a given file's text, not as a whole word -> "the prediction resolves a chokepoint invariant only when a given file spells its protected or chokepoint name, or is the module it names" went red in hook-speed.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
   kinds: none
+- mass counts every language: Mass of a multi-language project counts each declared language's source files, each read in its own language, and says which languages it read.
+  over: the two-language fixture's Python and TypeScript files across two components
+  via: mass of a two-language project counts every language's files and says which languages it read
+  because: mass read the primary language alone, so a frontend's code was neither reached nor unreached and the report looked complete (df-f47a5c05)
+  crossing: project-source -> reading
+  kinds: none

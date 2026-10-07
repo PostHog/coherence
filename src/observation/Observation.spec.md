@@ -38,3 +38,9 @@ Runtime behavior recorded as a separate, labeled layer of evidence: per-test cov
   because: vitest's coverage covers the run, not a test; a per-test region derived from it would be invented, and a reader would trust it as observed. A runner that gives nothing is recorded as nothing, with the reason
   crossing: instrument -> record
   kinds: none
+- observation names the languages it did not read: An observation of a multi-language project, which maps the pass through the primary language's instrument alone, names every other language as not read, with why, on its record and in the line the run prints.
+  over: an observation built for the two-language fixture's config
+  via: an observation of a multi-language project names the languages it did not read
+  because: observation rides the first test setup's one invocation through one instrument; a record silent about the other language would read as every interface observed (df-f47a5c05)
+  crossing: instrument -> record
+  kinds: none

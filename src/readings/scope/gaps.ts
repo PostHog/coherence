@@ -151,19 +151,19 @@ function specShape(root: string): string {
 const MANIFESTS: ReadonlySet<string> = new Set(["coherence.config.json", "package.json", "pyproject.toml"]);
 
 /**
- * The fingerprint of what a reading reads: every source file of the
- * project's language inside the config's bounds, the config and the
+ * The fingerprint of what a reading reads: every source file of each of
+ * the project's languages inside the config's bounds, the config and the
  * manifests, by path and content, and the specs' shape as the reading
  * depends on it. Equal fingerprints mean the reading still describes the tree.
  */
 export function structureFingerprint(root: string): string {
-  const language = readEnforcementConfig(root).language;
+  const languages = readEnforcementConfig(root).languages;
   const skip = boundsOf(root, configIgnore(root));
   const hash = createHash("sha256");
   hash.update(specShape(root)).update("\u0000");
   for (const file of projectFiles(root)) {
     // The manifests too: the entrances the reading detects include what package.json and pyproject.toml run.
-    const counted = MANIFESTS.has(file) || (withinBounds(file, skip) && isSourceFile(file, language));
+    const counted = MANIFESTS.has(file) || (withinBounds(file, skip) && languages.some((language) => isSourceFile(file, language)));
     if (!counted) continue;
     let text: Buffer;
     try {

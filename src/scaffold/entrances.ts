@@ -19,6 +19,7 @@
 
 import { posix } from "node:path";
 import type { EntranceCandidate } from "../adapters/entrance-candidates.ts";
+import { languagesReadLine, type LanguagesRead } from "../readings/scope/languages-read.ts";
 import { isModuleHandler } from "../spec/grammar.ts";
 import { componentHolding } from "../spec/model.ts";
 import { rulesText } from "../readings/scope/undeclared.ts";
@@ -135,11 +136,13 @@ export function renderEntrance(p: ProposedEntrance, trust: string): string {
  * component's bullets under the spec to paste them into, then what to do
  * with each.
  */
-export function renderEntrances(input: { groups: readonly EntranceGroup[]; detected: number; declared: number; target: string | undefined; levels: readonly { name: string }[]; cli: string }): string {
+export function renderEntrances(input: { groups: readonly EntranceGroup[]; detected: number; declared: number; target: string | undefined; levels: readonly { name: string }[]; cli: string; languages: LanguagesRead }): string {
   const { groups, detected, declared, target, levels, cli } = input;
   const count = groups.reduce((n, g) => n + g.entrances.length, 0);
   const where = target === undefined || target === "." ? "" : ` under ${target}`;
-  if (count === 0) return `Every detected entrance${where} is declared (${declared} declared, ${detected} detected in the project).`;
+  const read = languagesReadLine(input.languages);
+  const said = read === undefined ? "" : `\n${read}`;
+  if (count === 0) return `Every detected entrance${where} is declared (${declared} declared, ${detected} detected in the project).${said}`;
   const trust = trustPlaceholder(levels);
   const lines = [`${count} undeclared ${count === 1 ? "entrance" : "entrances"}${where} (${detected} detected in the project, ${declared} declared). Paste each group under ## entrances in the spec named; write each meaning, and set trust: to the level its caller or data carries in.`];
   for (const g of groups) {
@@ -149,5 +152,6 @@ export function renderEntrances(input: { groups: readonly EntranceGroup[]; detec
   }
   lines.push("");
   lines.push(`A bullet whose work several entrances share can be one grouped entrance whose handler is what they are registered through. For one that is not an entrance, record why with ${cli} decide; it stays counted as undeclared.`);
+  if (read !== undefined) lines.push(read);
   return lines.join("\n");
 }

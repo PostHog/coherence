@@ -72,6 +72,7 @@
 import { allInvariants, componentOfFile, flowChokepointId, flowLevelId, invariantVerdict, latestOf, openEscalations, plural, subjectOf, type InvariantVerdict, type RelianceSite } from "./derive.ts";
 import { coverageOf, type EntranceCoverage } from "./entrance-coverage.ts";
 import { slug } from "./html.ts";
+import { languagesReadLine, type LanguagesRead } from "./languages-read.ts";
 import type { EntranceGuard, InterfacePartial, InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, ShellState, SpecComponent, SpecInvariant } from "./model.ts";
 
 type ReadInterfaces = Extract<InterfaceReading, { kind: "read" }>;
@@ -452,18 +453,18 @@ export function flowBoundaryId(folder: string): string {
   return `structure--boundary-${flowSlug(folder)}`;
 }
 
-/** A multi-language project's languages the reading left unread, as a clause; empty for one language. */
-export function unreadLanguagesText(model: Pick<FlowModel, "language" | "unreadLanguages">): string {
-  const unread = model.unreadLanguages ?? [];
-  return unread.length === 0 ? "" : ` (${unread.join(" and ")} files not read: the Structure reading reads the primary language, ${model.language}, alone)`;
+/** A multi-language project's languages as the reading read them, as a clause: each one read and each one not, with why; empty for one language. */
+export function unreadLanguagesText(model: Pick<FlowModel, "languages">): string {
+  const line = languagesReadLine(model.languages);
+  return line === undefined ? "" : ` (${line})`;
 }
 
 export interface FlowModel {
   evidence: FlowEvidence;
   /** The language the adapter read, when it read. */
   language: string | undefined;
-  /** A multi-language project: the languages the reading left unread (it reads the primary one alone). */
-  unreadLanguages?: string[] | undefined;
+  /** Which of the project's languages the reading read, and each one it did not with why; absent when the adapter did not read. */
+  languages?: LanguagesRead | undefined;
   /** Why the adapter's reading is absent, when it is. */
   unread: string | undefined;
   /** Visible components in folder order (their column order). */
@@ -1072,7 +1073,7 @@ export function flowOf(state: ShellState): FlowModel {
   return {
     evidence: reading.kind === "read" ? "language adapter" : "run sites only",
     language: reading.kind === "read" ? reading.language : undefined,
-    ...(reading.kind === "read" && reading.unreadLanguages !== undefined ? { unreadLanguages: reading.unreadLanguages } : {}),
+    ...(reading.kind === "read" && reading.languages !== undefined ? { languages: reading.languages } : {}),
     unread: reading.kind === "read" ? undefined : reading.because,
     nodes,
     edges,

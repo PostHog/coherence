@@ -108,3 +108,9 @@ The command that makes the complete shape the cheapest thing to produce: a compo
   crossing: project-source -> reading
   refuted: let importVerb drop a module tach.toml does not declare instead of refusing it, drafting the known ones -> "scaffold import tach refuses a malformed tach.toml with its line, and an unknown module, and drafts nothing" went red in src/scaffold/import.test.ts; restored, green (2026-10-07)
   kinds: none
+- scaffold control reads every language: scaffold control in a multi-language project proposes from a Structure reading of every language, says which languages it read, and reads each handler's declaration in its own file's language for the chokepoint it calls.
+  over: an entrance in each language on a route with no traced control, with its chokepoint verified and not
+  via: scaffold control on a two-language project reads both languages and proposes from each language's handlers
+  because: its reading and its handler scan took the primary language alone, so a TypeScript handler's guard: line was never proposed and its route's gap was never read (df-f47a5c05)
+  crossing: instrument -> reading
+  kinds: none

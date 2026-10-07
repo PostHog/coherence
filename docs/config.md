@@ -220,10 +220,19 @@ totality oracle). The run's `instrument.language` is the language whose server
 answered, or the languages joined with `+` when several did, each listed
 under `instrument.languages`.
 
-**What reads one language.** The economy prediction reads each given file in
-its own language. The Structure reading (Scope, `query structure`) reads the
-primary language alone and says which languages it left unread (df-56343a7c).
-Mass, the entrance detection, observation and `scaffold control` read the
-primary language alone too (df-f47a5c05).
+**What each reading reads.** Every reading says, in its output and in its
+JSON (`languages`: `declared`, `read`, and each language `unread` with why),
+which of the project's languages it read; with one language the line is not
+printed and nothing changes. The economy prediction reads each given file in
+its own language. The Structure reading (Scope, `query structure`) reads each
+component's code with the adapter of each language its files use, starting a
+language's server only when that language has component code or a handled
+entrance, and merges the languages side by side over the components
+they share: no language server reports a reference from Python into
+TypeScript, so none is drawn. A language whose server does not answer is
+named as not read, with why. Mass, the entrance detection (`scaffold
+entrances`) and `scaffold control` read every language. Observation maps the
+first test setup's pass through the primary language alone and says so on its
+record and in the line the run prints.
 
 The spec grammar is in [spec.md](spec.md).

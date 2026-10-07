@@ -19,6 +19,7 @@ import type { LanguageAdapter, Range, SiteForm } from "../adapters/adapter.ts";
 import { configIgnore, projectSites } from "../adapters/project-files.ts";
 import { componentOf, declarationsOf, isTest, sourceFiles } from "../economy/source.ts";
 import type { EnforcementConfig } from "../enforcement/config.ts";
+import type { Language } from "../adapters/index.ts";
 import type { SpecModel } from "../spec/model.ts";
 
 export interface InterfaceSite {
@@ -93,20 +94,20 @@ function entrancesOf(model: SpecModel): { component: string; name: string; handl
 }
 
 /** Read every component interface with its positions, and every entrance's handler, through the adapter. */
-export async function readInterfaceMap(root: string, adapter: LanguageAdapter, model: SpecModel, config: EnforcementConfig): Promise<InterfaceMap> {
+export async function readInterfaceMap(root: string, adapter: LanguageAdapter, model: SpecModel, config: EnforcementConfig, language: Language): Promise<InterfaceMap> {
   const testFolders = config.testFolders;
-  const files = sourceFiles(root, config.language, configIgnore(root)).filter((file) => !isTest(file, testFolders));
+  const files = sourceFiles(root, language, configIgnore(root)).filter((file) => !isTest(file, testFolders));
   const tally = new Map<string, InterfaceSymbol>();
   for (const file of files) {
     const owner = componentOf(model, file)?.folder;
     if (owner === undefined) continue;
     const text = readFileSync(join(root, file), "utf8");
     const lines = text.split("\n");
-    for (const declaration of declarationsOf(text, config.language)) {
+    for (const declaration of declarationsOf(text, language)) {
       if (!declaration.exported) continue;
       const resolved = await adapter.resolve(`${declaration.name} in ${file}`, { component: owner, testFolders });
       if (!resolved.ok || resolved.definition.file !== file) continue;
-      const kind = declares(lines[declaration.line - 1] ?? "", config.language);
+      const kind = declares(lines[declaration.line - 1] ?? "", language);
       for (const site of projectSites(root, await adapter.references(resolved.definition))) {
         if (isTest(site.file, testFolders)) continue;
         const from = componentOf(model, site.file)?.folder;

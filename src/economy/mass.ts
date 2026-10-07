@@ -24,8 +24,8 @@ import { readFileSync } from "node:fs";
 import { posix, resolve } from "node:path";
 import { parseName } from "../adapters/adapter.ts";
 import { configIgnore, exclusionSummary, walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
-import type { Language } from "../adapters/index.ts";
-import { readEnforcementConfig } from "../enforcement/config.ts";
+import { allLanguagesRead, languagesReadLine, type LanguagesRead } from "../readings/scope/languages-read.ts";
+import { languageOfFile, readEnforcementConfig } from "../enforcement/config.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
 import { componentOf, declarationsOf, isSourceFile, isTest, sourceFiles } from "./source.ts";
 
@@ -59,6 +59,8 @@ export const UNIT_FILES = 3;
 
 export interface MassReport {
   language: string;
+  /** Which of the project's languages mass read: every one, each file in its own language. */
+  languages: LanguagesRead;
   total: Numbers;
   unreached: Numbers;
   /** Code in no component. */
@@ -129,16 +131,17 @@ function reachOf(invariant: ModelInvariant, files: readonly { file: string; name
 export function computeMass(rootGiven: string, options: MassOptions = {}): MassReport {
   const root = resolve(rootGiven);
   const config = readEnforcementConfig(root);
-  const language: Language = config.language;
+  // Every declared language, each file read in its own: a multi-language project's mass is the mass of all its code.
+  const languages = allLanguagesRead(config);
   const model = options.model ?? loadSpecModel(root);
   const ignore = configIgnore(root);
-  const all = sourceFiles(root, language, ignore);
+  const all = languages.read.length === 1 ? sourceFiles(root, languages.read[0]!, ignore) : [...new Set(languages.read.flatMap((l) => sourceFiles(root, l, ignore)))].sort();
   const tests = all.filter((f) => isTest(f, config.testFolders));
   const code = all.filter((f) => !isTest(f, config.testFolders));
 
   const scanned = code.map((file) => {
     const text = readFileSync(resolve(root, file), "utf8");
-    const declarations = declarationsOf(text, language);
+    const declarations = declarationsOf(text, languageOfFile(file, languages.read) ?? languages.read[0]!);
     const lines = text === "" ? 0 : text.split("\n").length - (text.endsWith("\n") ? 1 : 0);
     return { file, lines, symbols: declarations.length, names: new Set(declarations.map((d) => d.name)) };
   });
@@ -184,7 +187,8 @@ export function computeMass(rootGiven: string, options: MassOptions = {}): MassR
 
   const unreached = add(sum(outsideFiles), components.reduce((acc, c) => add(acc, c.unreached), ZERO));
   return {
-    language,
+    language: languages.read.join("+"),
+    languages,
     total: sum(files),
     unreached,
     outside: { total: sum(outsideFiles), files: outsideFiles.map((f) => f.file).sort() },
@@ -193,7 +197,7 @@ export function computeMass(rootGiven: string, options: MassOptions = {}): MassR
     reachFrom: [...reachFrom].sort(),
     silentTotalityOracles,
     testsExcluded: tests.length,
-    leftOut: exclusionSummary(walkedProjectFiles(walkBounds(root, ignore)).excluded.filter((e) => isSourceFile(e.file, language))),
+    leftOut: exclusionSummary(walkedProjectFiles(walkBounds(root, ignore)).excluded.filter((e) => languages.read.some((l) => isSourceFile(e.file, l)))),
   };
 }
 
@@ -230,6 +234,8 @@ export function formatMass(report: MassReport): string {
     const n = report.leftOut.reduce((total, r) => total + r.files, 0);
     lines.push(`left out of every walk: ${n} source file${n === 1 ? "" : "s"} — ${report.leftOut.slice(0, SHOWN).map((r) => `${r.reason} (${r.files})`).join(", ")}${report.leftOut.length > SHOWN ? `, and ${report.leftOut.length - SHOWN} more` : ""}`);
   }
+  const read = languagesReadLine(report.languages);
+  if (read !== undefined) lines.push(read);
   if (report.silentTotalityOracles.length > 0) {
     const n = report.silentTotalityOracles.length;
     lines.push(`${n} totality oracle${n === 1 ? "'s" : "s'"} run record does not say which files its test touched, so nothing is counted reached through it: ${report.silentTotalityOracles.join(", ")}`);
