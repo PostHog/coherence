@@ -135,6 +135,14 @@ export interface RunEntry {
    * totality oracle's test. Absent in a single-language project, where the record's instrument says it.
    */
   language?: string;
+  /**
+   * The bullet's lifecycle state as this run left it, with this entry's verdict and refutation read in. The
+   * invariant floor (src/spec/floor.ts) reads it: a bullet graded an invariant is not demoted silently. Absent
+   * on a record from before it was kept.
+   */
+  state?: "requirement" | "invariant" | "structural defect";
+  /** What this form of the bullet enforces through: its via: test titles, or its chokepoints. The floor recognizes a rename by it. */
+  enforces?: string[];
 }
 
 export interface RunRecord {
