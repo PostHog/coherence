@@ -302,7 +302,12 @@ Coherence runs on Node 22.18 or newer, on macOS (Apple Silicon) or Linux, and
 reads TypeScript and Python projects, and projects that span both (a Python
 backend beside a TypeScript frontend: list both languages and a test setup
 per runner, as [docs/config.md](docs/config.md#more-than-one-language) shows).
-It works inside Claude Code and Codex.
+It works inside Claude Code and Codex. Where the project already runs a
+checker that refuses a boundary crossing, Coherence grades by it: Pyright's
+private-usage rule, an import-linter rule, or a `tach.toml` interface
+(where tach's own check refuses a planted outside import, and the chokepoint is
+graded checker-choked by tach). Coherence's own reference search still covers
+what such a checker cannot see.
 Coherence verifies itself: every screenshot here is its own Scope reading.
 
 The language adapters ask tsserver and Pyright for references. Where a Python

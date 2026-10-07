@@ -1,22 +1,24 @@
 /**
- * A reader for the subset of TOML a tach.toml uses: tables, arrays of tables,
- * bare, quoted and dotted keys, basic and literal single-line strings,
- * integers, booleans, arrays spanning lines with comments and trailing
- * commas, and inline tables (a dependency written { path = "x", deprecated =
- * true }). Anything outside the subset (a multi-line string, a float, a date)
- * is refused by name, with the line, so a configuration the reader cannot
- * carry faithfully is never half read.
+ * A reader for the subset of TOML a boundary declaration file uses: tables,
+ * arrays of tables, bare, quoted and dotted keys, basic and literal strings
+ * (single- and multi-line), integers, floats, booleans, arrays spanning lines
+ * with comments and trailing commas, and inline tables. Dates and times are
+ * refused, as anything else outside the subset is: by name, with the line.
  *
- * Adapted from the fuller reader on the import-boundaries branch
- * (src/scaffold/toml.ts), which drafts specs from tach.toml; that branch
- * reconciles the two.
+ * It exists so drafting specs from tach.toml needs no new dependency. Every
+ * table remembers the line its header (or first key) stood on, so what is
+ * drafted from it can say where it came from.
  */
 
 export class TomlError extends Error {
+  readonly file: string;
   readonly line: number;
+  readonly reason: string;
   constructor(file: string, line: number, reason: string) {
     super(`${file}:${line}: ${reason}`);
+    this.file = file;
     this.line = line;
+    this.reason = reason;
   }
 }
 
@@ -25,16 +27,28 @@ export interface TomlTable {
   [key: string]: TomlValue;
 }
 
+/** The line a table's header stood on; arrays of tables give each element its own. */
+const LINES = new WeakMap<TomlTable, number>();
+export function lineOf(table: TomlTable): number | undefined {
+  return LINES.get(table);
+}
+
 const BARE_KEY = /[A-Za-z0-9_-]/;
 
 export function parseToml(text: string, file: string): TomlTable {
   let at = 0;
   let line = 1;
   const root: TomlTable = {};
+  LINES.set(root, 1);
+  /** Tables made by a header, so a second [x] for the same x is refused. */
   const headed = new Set<TomlTable>();
+  /** Tables defined inline, which are closed to later additions. */
+  const closed = new Set<TomlTable>();
+  /** Arrays made by [[x]] headers, the only arrays a header may extend. */
   const tableArrays = new Set<TomlValue[]>();
-  const fail = (reason: string): never => {
-    throw new TomlError(file, line, reason);
+
+  const fail = (reason: string, where = line): never => {
+    throw new TomlError(file, where, reason);
   };
   const peek = (offset = 0): string => text[at + offset] ?? "";
   const advance = (): string => {
@@ -49,6 +63,7 @@ export function parseToml(text: string, file: string): TomlTable {
   const skipComment = (): void => {
     if (peek() === "#") while (at < text.length && peek() !== "\n") advance();
   };
+  /** Whitespace, newlines and comments, as inside an array. */
   const skipBlank = (): void => {
     for (;;) {
       skipSpaces();
@@ -64,16 +79,22 @@ export function parseToml(text: string, file: string): TomlTable {
     if (at < text.length && peek() !== "\n") fail(`unexpected ${JSON.stringify(peek())} after a value; one key = value per line`);
     if (peek() === "\n") advance();
   };
-  const string = (): string => {
-    const quote = peek();
-    if (text.startsWith(quote.repeat(3), at)) fail("a multi-line string is outside the TOML this reader accepts");
-    advance();
+
+  const basicString = (): string => {
+    const multi = text.startsWith('"""', at);
+    at += multi ? 3 : 1;
+    if (multi && peek() === "\n") advance();
+    else if (multi && peek() === "\r" && peek(1) === "\n") { advance(); advance(); }
     let out = "";
     for (;;) {
-      if (at >= text.length || peek() === "\n") fail("an unterminated string");
+      if (at >= text.length) fail("an unterminated string");
+      if (multi ? text.startsWith('"""', at) : peek() === '"') {
+        at += multi ? 3 : 1;
+        return out;
+      }
       const ch = advance();
-      if (ch === quote) return out;
-      if (ch !== "\\" || quote === "'") {
+      if (ch === "\n" && !multi) fail("a newline inside a single-line string", line - 1);
+      if (ch !== "\\") {
         out += ch;
         continue;
       }
@@ -86,15 +107,42 @@ export function parseToml(text: string, file: string): TomlTable {
         if (!/^[0-9A-Fa-f]+$/.test(hex) || hex.length !== width) fail(`a malformed \\${esc} escape`);
         out += String.fromCodePoint(parseInt(hex, 16));
         at += width;
+      } else if (multi && (esc === "\n" || esc === " " || esc === "\t" || esc === "\r")) {
+        while (/[ \t\r\n]/.test(peek())) advance();
       } else fail(`an unknown escape \\${esc}`);
     }
   };
+
+  const literalString = (): string => {
+    const multi = text.startsWith("'''", at);
+    at += multi ? 3 : 1;
+    if (multi && peek() === "\n") advance();
+    let out = "";
+    for (;;) {
+      if (at >= text.length) fail("an unterminated string");
+      if (multi ? text.startsWith("'''", at) : peek() === "'") {
+        at += multi ? 3 : 1;
+        return out;
+      }
+      const ch = advance();
+      if (ch === "\n" && !multi) fail("a newline inside a single-line string", line - 1);
+      out += ch;
+    }
+  };
+
   const keyPart = (): string => {
     skipSpaces();
-    if (peek() === '"' || peek() === "'") return string();
+    if (peek() === '"') {
+      if (text.startsWith('"""', at)) fail("a key cannot be a multi-line string");
+      return basicString();
+    }
+    if (peek() === "'") {
+      if (text.startsWith("'''", at)) fail("a key cannot be a multi-line string");
+      return literalString();
+    }
     let out = "";
-    while (peek() !== "" && BARE_KEY.test(peek())) out += advance();
-    if (out === "") fail(`unexpected ${JSON.stringify(peek() || "the end")} where a key belongs`);
+    while (BARE_KEY.test(peek()) && peek() !== "") out += advance();
+    if (out === "") fail(peek() === "" || peek() === "\n" ? "a key is missing" : `unexpected ${JSON.stringify(peek())} where a key belongs`);
     return out;
   };
   const dottedKey = (): string[] => {
@@ -107,10 +155,12 @@ export function parseToml(text: string, file: string): TomlTable {
     }
     return parts;
   };
+
   const value = (): TomlValue => {
     skipSpaces();
     const ch = peek();
-    if (ch === '"' || ch === "'") return string();
+    if (ch === '"') return basicString();
+    if (ch === "'") return literalString();
     if (ch === "[") {
       advance();
       const items: TomlValue[] = [];
@@ -130,9 +180,11 @@ export function parseToml(text: string, file: string): TomlTable {
     if (ch === "{") {
       advance();
       const table: TomlTable = {};
+      LINES.set(table, line);
       skipSpaces();
       if (peek() === "}") {
         advance();
+        closed.add(table);
         return table;
       }
       for (;;) {
@@ -148,6 +200,7 @@ export function parseToml(text: string, file: string): TomlTable {
         }
         if (peek() === "}") {
           advance();
+          closed.add(table);
           return table;
         }
         fail(`expected , or } in an inline table, found ${JSON.stringify(peek() || "the end")}`);
@@ -158,25 +211,37 @@ export function parseToml(text: string, file: string): TomlTable {
     if (word === "true") return true;
     if (word === "false") return false;
     if (/^[+-]?(0|[1-9](_?[0-9])*)$/.test(word)) return Number(word.replace(/_/g, ""));
-    return fail(word === "" ? `unexpected ${JSON.stringify(ch || "the end")} where a value belongs` : `${JSON.stringify(word)} is outside the TOML this reader accepts (a string, an integer, a boolean, an array, an inline table)`);
+    if (/^0x[0-9A-Fa-f_]+$|^0o[0-7_]+$|^0b[01_]+$/.test(word)) return Number(word.replace(/_/g, ""));
+    if (/^[+-]?(0|[1-9](_?[0-9])*)(\.[0-9](_?[0-9])*)?([eE][+-]?[0-9](_?[0-9])*)?$/.test(word)) return Number(word.replace(/_/g, ""));
+    if (/^\d{4}-\d{2}-\d{2}|^\d{2}:\d{2}/.test(word)) fail("dates and times are outside the TOML this reader accepts");
+    return fail(word === "" ? (ch === "" || ch === "\n" ? "a value is missing after =" : `unexpected ${JSON.stringify(ch)} where a value belongs`) : `${JSON.stringify(word)} is not a TOML value; quote a string`);
   };
+
+  /** Walk to (creating) the table a dotted key's prefix names. */
   const descend = (from: TomlTable, keys: readonly string[], forHeader: boolean): TomlTable => {
     let table = from;
     for (const key of keys) {
       const existing = table[key];
       if (existing === undefined) {
         const made: TomlTable = {};
+        LINES.set(made, line);
         table[key] = made;
         table = made;
-      } else if (Array.isArray(existing)) {
+        continue;
+      }
+      if (Array.isArray(existing)) {
+        if (!forHeader || !tableArrays.has(existing)) fail(`${key} is an array, not a table`);
         const last = existing[existing.length - 1];
-        if (!forHeader || !tableArrays.has(existing) || last === undefined || typeof last !== "object" || Array.isArray(last)) fail(`${key} is an array, not a table`);
+        if (last === undefined || typeof last !== "object" || Array.isArray(last)) fail(`${key} is an array, not a table`);
         table = last as TomlTable;
-      } else if (typeof existing === "object") table = existing;
-      else fail(`${key} is already defined`);
+        continue;
+      }
+      if (typeof existing !== "object" || closed.has(existing)) fail(`${key} is already defined`);
+      table = existing as TomlTable;
     }
     return table;
   };
+
   function assign(table: TomlTable, keys: readonly string[], v: TomlValue): void {
     const parent = descend(table, keys.slice(0, -1), false);
     const last = keys[keys.length - 1]!;
@@ -189,6 +254,7 @@ export function parseToml(text: string, file: string): TomlTable {
     skipBlank();
     if (at >= text.length) return root;
     if (peek() === "[") {
+      const headerLine = line;
       const isArray = peek(1) === "[";
       at += isArray ? 2 : 1;
       const keys = dottedKey();
@@ -198,32 +264,43 @@ export function parseToml(text: string, file: string): TomlTable {
       endOfLine();
       const parent = descend(root, keys.slice(0, -1), true);
       const last = keys[keys.length - 1]!;
-      const existing = parent[last];
       if (isArray) {
+        const existing = parent[last];
         const made: TomlTable = {};
+        LINES.set(made, headerLine);
         if (existing === undefined) {
-          const array: TomlValue[] = [made];
-          tableArrays.add(array);
-          parent[last] = array;
+          const arr: TomlValue[] = [made];
+          tableArrays.add(arr);
+          parent[last] = arr;
         } else if (Array.isArray(existing) && tableArrays.has(existing)) existing.push(made);
-        else fail(`${keys.join(".")} is already defined, not as an array of tables`);
+        else fail(`${keys.join(".")} is already defined, not as an array of tables`, headerLine);
         current = made;
       } else {
+        const existing = parent[last];
         if (existing === undefined) {
           const made: TomlTable = {};
+          LINES.set(made, headerLine);
           parent[last] = made;
           current = made;
-        } else if (typeof existing === "object" && !Array.isArray(existing) && !headed.has(existing)) current = existing;
-        else fail(`[${keys.join(".")}] is defined twice`);
+        } else if (typeof existing === "object" && !Array.isArray(existing) && !headed.has(existing) && !closed.has(existing)) {
+          current = existing;
+        } else fail(`[${keys.join(".")}] is defined twice`, headerLine);
         headed.add(current);
       }
       continue;
     }
     const key = dottedKey();
     skipSpaces();
-    if (peek() !== "=") fail(`expected = after the key ${key.join(".")}`);
+    if (peek() !== "=") fail(`expected = after the key ${keys(key)}`);
     advance();
-    assign(current, key, value());
+    const keyLine = line;
+    const v = value();
+    if (typeof v === "object" && !Array.isArray(v) && !LINES.has(v)) LINES.set(v, keyLine);
+    assign(current, key, v);
     endOfLine();
+  }
+
+  function keys(parts: readonly string[]): string {
+    return parts.join(".");
   }
 }
