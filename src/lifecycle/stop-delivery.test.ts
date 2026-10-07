@@ -52,6 +52,16 @@ test("a practice fires on a command's own words, in the project the command runs
     assert.equal(fire(`node src/cli.ts enact "oil the knob" --trigger "command turn-knob"`).text, "", "a trigger's words inside a quoted argument are no command");
     assert.equal(fire("cat > notes.md <<'EOF'\nturn-knob\nEOF").text, "", "a heredoc's body is text, not a command");
     assert.match(fire("./bin/turn-knob --hard").text, /fires a practice/, "a program named by its path is the command");
+    // A folder that is no Coherence project (here, specs and practices but neither config nor .coherence) is never read for practices.
+    const plain = mkdtempSync(join(tmpdir(), "coherence-plain-"));
+    mkdirSync(join(plain, "w"), { recursive: true });
+    writeFileSync(join(plain, "w/W.spec.md"), "# W\n\nA folder.\n");
+    writeFileSync(join(plain, "w/W.practice.md"), PRACTICE);
+    try {
+      assert.equal(fire(`cd ${plain} && turn-knob`).text, "", "a command that a cd took out of every project fires nothing");
+    } finally {
+      rmSync(plain, { recursive: true, force: true });
+    }
     const away = fire(`cd ${other} && turn-knob`);
     assert.match(away.text, new RegExp(`in ${other.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), "the practice is the other project's, and the delivery says where");
     away.commit();

@@ -440,6 +440,8 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: made outsideBounds in check.ts answer false for every path, so the corpus walk entered every folder the config's ignore list names -> "coverage reads only inside the config's bounds: a folder the ignore list names is never entered, and the journal's records still are" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
   kinds: read
+  checklist: scoped-reads dismissed: this invariant is the scope of the read itself; the corpus is the project's files inside the config's bounds, plus the records
+  checklist: redaction dismissed: an ignored folder is reported by its path alone, and nothing under it is read
 - lexicon setup reads only the paths it is given: lexicon coverage and lexicon draft given folders or files, each relative to the project root or absolute inside it, observe uses and nominate candidates only from the project's files under those paths, with the config's ignore list and the project-file rules still applied, and say which paths they read; a path outside the root or one that does not exist is refused, and with no paths the whole project is read as before.
   over: a coverage and a draft with no paths, with a relative folder, with an absolute folder inside the root, with a folder holding an ignored subfolder, and with a path outside the root, a parent path and a missing path
   via: coverage and draft read only under the paths they are given: candidates come from those files alone, the ignore list still holds, and a path outside the root or one that does not exist is refused
@@ -447,8 +449,8 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: project-source -> reading
   refuted: made lexiconCoverage read every corpus file whatever paths it is given, dropping the underPaths filter on the files it reads -> "coverage and draft read only under the paths they are given: candidates come from those files alone, the ignore list still holds, and a path outside the root or one that does not exist is refused" went red in vocabulary-signal.test.ts on its own assertion; restored byte for byte, green (2026-10-07)
   kinds: read
-  checklist: scoped-reads dismissed: this invariant is the scope of the read itself; the corpus is the project's files inside the config's bounds, plus the records
-  checklist: redaction dismissed: an ignored folder is reported by its path alone, and nothing under it is read
+  checklist: scoped-reads declared as lexicon setup reads only the paths it is given
+  checklist: redaction dismissed: narrowing the paths prints nothing the whole-tree reading would not, and a use's secret value is redacted as it is there
 - function words are never candidates: A preposition, conjunction, determiner, pronoun, auxiliary, particle or contraction fragment of English is never a vocabulary candidate, however prose writes it (backticked, as a heading word, or capitalized mid-sentence), and the stoplist holds every one of those closed classes.
   over: every word of every closed class in FUNCTION_WORDS and an independently written core of each, each written three ways on lines in every component
   via: function words are never candidates: every preposition, conjunction, determiner, pronoun and auxiliary is refused however prose writes it
@@ -603,11 +605,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: the host shows a stop hook's systemMessage to the user and never to the model, so regulate at a main-thread stop reached the one reader who could not act on it in the moment; repeating every line at every stop made it 2.6 KB of what had been said before
   refuted: held back only a stop the block itself caused, so a practice owed never reached the agent -> "a stop says each line once, blocks once for a practice owed, and carries the rest into the next prompt" went red in stop-delivery.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
-- a practice fires where its command runs: A command trigger matches whole words of one simple command, never text inside a quoted argument or a heredoc's body; a command a cd took into another project is read against that project's practices, and its enactment is looked for in that project's journal.
-  over: a trigger word as a command, inside a quoted argument, inside a heredoc, and after a cd into another checkout, with its enactment recorded there
+- a practice fires where its command runs: A command trigger matches whole words of one simple command, never text inside a quoted argument or a heredoc's body; a command a cd took into another project is read against that project's practices, and its enactment is looked for in that project's journal; a command a cd took out of every project fires nothing, and no folder that is not a project is read for practices.
+  over: a trigger word as a command, inside a quoted argument, inside a heredoc, after a cd into another checkout with its enactment recorded there, and after a cd into a folder that is no Coherence project
   via: a practice fires on a command's own words, in the project the command runs in, and its enactment counts there
   because: a practice fired on enact --trigger "command refute" and on the words of a heredoc, and a session whose commands ran in a second worktree was told at every stop that practices it had enacted there were owed, because the firing was kept by the session's root and the enactment by the worktree's journal
   refuted: read every command against the session's own root, wherever a cd took it -> "a practice fires on a command's own words, in the project the command runs in, and its enactment counts there" went red in stop-delivery.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  refuted: read a folder a cd landed in for practices whether or not it is a Coherence project -> "a practice fires on a command's own words, in the project the command runs in, and its enactment counts there" went red in stop-delivery.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
 - the coverage reading runs only when the text can have moved: A tool hook reads the vocabulary's coverage only after a tool use that wrote a project file, and a prompt only when git's changed and untracked files, with their sizes and times, differ from the session's last reading; the stop always reads in full.
   over: a read, a command that writes nothing, a write, two prompts over one tree, and a prompt after a file was added
