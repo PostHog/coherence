@@ -11,7 +11,8 @@
  */
 
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 
 /** Not .coherence/hooks, which holds the project's own hook voice and is committed; these are regenerated. */
@@ -27,6 +28,23 @@ export interface HookTime {
   at: string;
   event: string;
   ms: number;
+  /** The Coherence version that answered; absent on records kept before it was written, read as unknown. */
+  version?: string;
+}
+
+const here = dirname(fileURLToPath(import.meta.url));
+let ownVersion: string | null | undefined;
+
+/** This installation's Coherence version, read once from its package.json; null when it cannot be read. */
+export function coherenceVersion(): string | null {
+  if (ownVersion !== undefined) return ownVersion;
+  try {
+    const pkg = JSON.parse(readFileSync(resolve(here, "..", "..", "package.json"), "utf8")) as { version?: unknown };
+    ownVersion = typeof pkg.version === "string" ? pkg.version : null;
+  } catch {
+    ownVersion = null;
+  }
+  return ownVersion;
 }
 
 function sessionFile(root: string, session: string): string {
@@ -46,13 +64,14 @@ export function latencyBudget(root: string): number {
 export function recordHookTime(root: string, session: string, time: HookTime): void {
   try {
     mkdirSync(join(root, HOOK_TIMES_DIR), { recursive: true });
-    appendFileSync(sessionFile(root, session), JSON.stringify(time) + "\n");
+    const version = time.version ?? coherenceVersion();
+    appendFileSync(sessionFile(root, session), JSON.stringify(version === null ? time : { ...time, version }) + "\n");
   } catch {
     // Timing is a reading of the hook, not part of its answer.
   }
 }
 
-function parse(text: string): HookTime[] {
+export function parseHookTimes(text: string): HookTime[] {
   return text.split("\n").flatMap((line) => {
     try {
       const value = JSON.parse(line) as Partial<HookTime>;
@@ -65,7 +84,7 @@ function parse(text: string): HookTime[] {
 
 export function hookTimes(root: string, session: string): HookTime[] {
   try {
-    return parse(readFileSync(sessionFile(root, session), "utf8"));
+    return parseHookTimes(readFileSync(sessionFile(root, session), "utf8"));
   } catch {
     return [];
   }
@@ -110,7 +129,7 @@ export function hookLatencyOrientText(root: string, now: () => number = Date.now
     try {
       // A session file untouched for a week holds nothing the window reads.
       if (statSync(join(dir, name)).mtimeMs < since) continue;
-      all.push(...parse(readFileSync(join(dir, name), "utf8")).filter((t) => Date.parse(t.at) >= since));
+      all.push(...parseHookTimes(readFileSync(join(dir, name), "utf8")).filter((t) => Date.parse(t.at) >= since));
     } catch {
       continue;
     }
