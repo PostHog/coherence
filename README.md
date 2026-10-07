@@ -125,6 +125,24 @@ the chokepoint, or escalate to a human. At the end of a session, the
 regulate step reports what the session still owes; a subagent's stop is
 refused only for what the tool can prove.
 
+A host shows a main-thread stop hook's message to you and never to the agent,
+so regulate says each line once per session and puts it where the agent reads
+it. A practice the session fired and never recorded holds the stop once, with
+the reason in front of the agent; everything else is shown to you and carried
+into the agent's next prompt.
+
+### The hooks stay out of the way
+
+The hooks around every tool call are the cost every session pays, and a call
+cycle that feels sluggish is how a check gets switched off. Each hook call's
+time is kept. A tool hook (PreToolUse, PostToolUse) over the latency budget,
+3 s unless `latencyBudget` says otherwise, says so in its own answer, and
+regulate and orient name the calls over it. A tool use that writes nothing
+reads no vocabulary, a prompt over an unchanged tree reads none either, and
+a command or edit outside every adopted project costs a constant: on this
+repository a tool hook takes about 0.3 s, and 0.4 to 2.4 s in the PostHog
+monorepo with two products adopted.
+
 ### Decisions are never buried in a transcript
 
 The **journal** compresses hundreds of thousands of session tokens into a
@@ -229,30 +247,52 @@ To add the project's own words to an event, write
 the event). `{{session}}`, `{{agent}}` and `{{cli}}` are filled in; a refused
 subagent stop keeps its reason whatever the override says.
 
-### Adopting one folder of a monorepo
+### Adopting part of a monorepo
 
-Put `coherence.config.json`, the specs and `.coherence/` in the folder you
-adopt (say `apps/billing`), and nothing at the repository root. Run
-`coherence hooks install --host claude` from that folder: it writes the hooks
-into the root's `.claude/settings.json`, where an agent host started at the
-repository root reads them, and into the folder's own, for a session started
-there; `--local` writes your personal `.claude/settings.local.json` at the
-root instead, so you can adopt without committing hooks for every team. The
-project is the folder holding the nearest `coherence.config.json` to the file
-an edit writes, or to the folder a command or prompt runs in. A session at the
-root hears one line at its start and gets the project's orient with its first
-edit or command inside the folder. Everything else in
-the repository is outside the project: an edit, command or prompt there gets
-no orient, practice or check and leaves no record. A chokepoint verdict says
-its reference search covered the project folder only, since callers elsewhere
-in the repository are not read.
+Coherence can own one folder of a large repository, or several, and leave the
+rest alone: an edit, command or prompt outside every adopted folder gets no
+orient, practice or check, leaves no record, and costs a constant.
 
-To opt in several folders, run `coherence adopt <folder>` for each. This lists
-them under `projects` in a `coherence.config.json` at the repository root, a
-registry whose keys every listed folder inherits unless its own config sets
-them. Only the listed folders are projects. A config elsewhere is named by
-`spec --check` as adopted but not opted in. More in
-[docs/config.md](docs/config.md).
+**Try it on one folder, alone.** Put `coherence.config.json`, the specs and
+`.coherence/` in the folder (say `products/billing`), and nothing at the
+repository root. Run `coherence hooks install --host claude --local` from that
+folder: it writes your personal `.claude/settings.local.json` at the root, so
+nobody else's sessions change. (Without `--local` it writes the shared
+`.claude/settings.json` at the root, where a host started there reads it.
+`--local` is Claude Code only; Codex has no personal settings file.) A session
+at the root hears one line at its start and gets the folder's orient with its
+first edit or command inside it.
+
+**Commit to it, folder by folder.** Run `coherence adopt <folder>` for each
+folder a team takes on. It lists the folder under `projects` in a
+`coherence.config.json` at the repository root: a registry, not a project. Every
+listed folder inherits the registry's keys (languages, test setups, `ignore`,
+`references`, `latencyBudget`) unless its own config overrides one, and keeps
+its own specs, journal and runs. Hooks are installed once, at the root. A
+nested config the registry does not list is named by `spec --check` as
+adopted but not opted in. `adopt` will not turn a whole-repository config into
+a registry; that move is yours to make by hand.
+
+**Callers outside the folder.** A product boundary's bypasses usually live
+elsewhere in the repository. By default a chokepoint's reference search covers
+the adopted folder only, and its verdict says so. `references` widens it:
+`"repository"`, or a list of folders such as `["posthog/api", "ee"]`.
+
+**Boundaries the repository already declares.** Where a `tach.toml` declares
+the modules, `coherence scaffold import tach <module>` drafts each one's spec:
+its dependencies, its exposed facade as a chokepoint governing references from
+outside the component (`from: outside the component`), and its owners from
+`product.yaml`.
+
+Paste this into your agent to adopt one folder:
+
+```text
+Adopt Coherence for <folder> only. Install @posthog/coherence as a dev dependency and run `npx --no coherence hooks install --host claude --local` from <folder>.
+Run `npx --no coherence adopt <folder>` from the repository root if this repository keeps a registry of adopted folders.
+Then run `npx --no coherence query practice "adopt Coherence"` from <folder>, work through it, record it with `enact`, and tell me what each step found.
+```
+
+Every key is in [docs/config.md](docs/config.md).
 
 ## Platform
 
