@@ -624,3 +624,39 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: rate-budget dismissed: nothing is counted against a time window
   checklist: memory-budget dismissed: the bound is on time, not on allocation
   checklist: circuit-breaker-policy dismissed: a skipped reading is caught by the stop's full one
+- a hook at the repository top answers for the nested project: With the host's settings at a repository's top and the only coherence.config.json in a folder below it, every hook event belongs to the project folder nearest to what it is about, the files a tool writes or else the event's cwd, and an event whose cwd is above exactly one project belongs to that one; orient, practices, the checks and every record are that project's, and nothing is written at the top.
+  over: a session start, a command and an edit, each with the session at the repository top of a repository holding one nested project and another team's spec and practice
+  via: a hook at the repository top answers for the one project nested below it, from the event's cwd or the file it writes
+  because: a monorepo adopts Coherence one folder at a time, and the host runs at the repository root, where its settings live; the hook took the folder holding the settings as the project, so orient counted another team's specs, their practices fired, the language server started on the whole repository (19.8 s for one edit on a fixture, past 180 s for a session start on PostHog), and .coherence was written at the top (df-0b68c987, df-7dd85e50, df-7fba7918)
+  refuted: hookProject answered an event whose cwd is above the one nested project with the installation's own folder instead of that project -> "a hook at the repository top answers for the one project nested below it, from the event's cwd or the file it writes" went red in monorepo.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- an event outside every project is ignored: A tool event whose files, or whose cwd, lie outside every project nested below the hook's installation, and any event whose cwd does, answers nothing and writes nothing, before any spec model, corpus walk or language server; with a project at the installation's own root, every event is that project's as before.
+  over: an edit and a write to another team's file with the session at the top, and a command, a shell write, a prompt and a stop with the cwd in another team's folder
+  via: an event outside every project is ignored: no answer, nothing written, wherever the session started
+  because: the rest of the repository is not the project's, and the hooks run around every tool call of every session in it; an event that is not the project's must cost one listing of where the projects are and nothing more, or adopting one folder slows every other team's work
+  refuted: hookProject answered a tool event whose files lie outside every nested project with the installation's own folder instead of ignoring it -> "an event outside every project is ignored: no answer, nothing written, wherever the session started" went red in monorepo.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: execution-budget declared as an event outside every project is ignored
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is on one hook call's work
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on what is read, not on allocation
+  checklist: circuit-breaker-policy dismissed: an ignored event has no dependency to fail
+- git paths are relative to the project root: Every file list Coherence asks git for in a project nested below the repository top, the stop's changed files, the economy's patch and query observed's changes, names the project's files relative to the project root and none of another folder's.
+  over: a changed and an untracked file in the nested project, and a changed and an untracked file in another folder of the repository
+  via: git paths in a nested project are relative to its root and never another folder's
+  because: git diff --name-only names paths from the repository top while git ls-files names them from the cwd, so a nested project's stop read the whole repository's changes under the wrong prefix (df-f14bc626)
+  refuted: changedFiles asked for the diff without --relative, so its paths were named from the repository top -> "git paths in a nested project are relative to its root and never another folder's" went red in monorepo.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- a command at the repository top acts on the nested project: A command run at a repository's top, where no project encloses the cwd, acts on the one project nested below it, so the enact, decide and defect lines the hooks print are recorded in that project's journal; with no project below, or more than one, it acts where it stands, as before.
+  over: the repository top with one nested project, a folder holding none, and a folder above two
+  via: a command run at the repository top acts on the one project nested below it, and on the top when two are
+  because: the hooks print commands the agent runs from the session's cwd, which in a monorepo is the repository top, and the walk up from there found no project and wrote a second .coherence at the top (df-4539bb14)
+  refuted: projectRoot acted where the command stood when no project enclosed it, never on the one project below -> "a command run at the repository top acts on the one project nested below it, and on the top when two are" went red in monorepo.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- install from a nested project reaches where the host reads: hooks install run in a project nested below its repository's top writes the host's settings at the top, where a host launched at the repository root reads them, and in the project, where a session started there reads them, with the adopter's other settings kept in both and .coherence/.gitignore in the project alone; hooks --check and uninstall cover both.
+  over: an install, a check and an uninstall run in a nested project whose repository top already holds the adopter's own settings
+  via: hooks install from a nested project writes the host settings at the repository top and in the project, and its ignore file in the project alone
+  because: install wrote the settings in the nested folder, where Claude Code launched at the repository root never reads them (it reads only the session's primary working directory's .claude/settings.json), so the hooks never fired in the usual monorepo session (df-7e5a7645)
+  refuted: settingsRoots named the project folder alone, so install wrote no settings at the repository top -> "hooks install from a nested project writes the host settings at the repository top and in the project, and its ignore file in the project alone" went red in monorepo.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none

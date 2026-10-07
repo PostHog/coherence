@@ -220,3 +220,9 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   because: an absolute threshold would page constantly (the warm-server test failed only under four parallel suites, df-a67fad63) while a test measured against other tests says nothing about what grew; a ratio with a floor and a load allowance alarms on the shape that cost two weeks (d-55040f81) and stays quiet on a busy machine
   refuted: dropped the load allowance, so a test on a machine twice as busy met the same bar -> "a test is slower only against its own history: over twice its median and over the floor, allowing for a busier machine" went red in latency.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- a nested verdict names its horizon: A chokepoint verdict over a project nested below its repository's top says that its reference search covered the project folder alone and callers elsewhere in the repository were not read, and keeps that folder as the result's horizon; a project at the repository top says nothing of it.
+  over: a clean chokepoint in a project nested below the repository top
+  via: a chokepoint verdict over a nested project says its reference search covered that folder alone
+  because: in a monorepo the callers outside the adopted folder are the bypasses a product-boundary invariant exists for, and the language server is started on the project alone, so a clean grade with no qualifier claims more than the search read (df-0d235229)
+  refuted: checkChokepoint returned the verdict over a nested project with no horizon and no qualifier -> "a chokepoint verdict over a nested project says its reference search covered that folder alone" went red in monorepo.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none

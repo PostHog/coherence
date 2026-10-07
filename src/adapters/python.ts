@@ -75,7 +75,7 @@ import {
   type Visibility,
 } from "./adapter.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
-import { isVirtualEnvironment, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
+import { isVirtualEnvironment, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, referenceHorizon, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
 
 /** The small JSON-RPC surface the adapter needs, exposed so a test can control server ordering. */
 export interface PythonLanguageClient {
@@ -610,11 +610,14 @@ export class PythonAdapter implements LanguageAdapter {
       }
     };
     const exclude = workspace === this.root ? workspaceExclusions(this.root) : undefined;
+    // A project nested below the repository top imports its own modules from that top (products.notebooks.backend.x): the top joins
+    // the import search, never the workspace, so those imports resolve and their references are reported, and no file above is indexed.
+    const top = workspace === this.root && referenceHorizon(this.root) !== undefined ? repositoryTop(this.root) : undefined;
     client.onRequest = (method, params) => {
       if (method !== "workspace/configuration") return null;
       const items = (params as { items?: { section?: string }[] }).items ?? [];
       // Diagnostics for open files only: the check asks for references and symbols, never for a workspace-wide type check.
-      return items.map((item) => (item.section === "python" ? { analysis: { diagnosticMode: "openFilesOnly", ...(exclude === undefined ? {} : { exclude }) } } : null));
+      return items.map((item) => (item.section === "python" ? { analysis: { diagnosticMode: "openFilesOnly", ...(exclude === undefined ? {} : { exclude }), ...(top === undefined ? {} : { extraPaths: [top] }) } } : null));
     };
     try {
       await client.request("initialize", {
