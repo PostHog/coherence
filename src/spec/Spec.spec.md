@@ -156,3 +156,9 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: made buildInvariant attach a parsed from: value only to a totality oracle form, so no chokepoint carried one -> "from: reads anywhere, outside the component, or outside a folder on a chokepoint bullet, and refuses anything else" went red in from.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- a kernel practice's floor is Coherence's: In an adopter, a kernel practice (its id led by coherence:) has no floor: a step or pitfall a Coherence release removed asks the adopter for no amendment, at enact or at spec --check, and the adopter's earlier enactments stand as its history; a project's own practices keep their floor, and in Coherence's own tree the kernel practices keep theirs.
+  over: an adopter's enactment of a kernel practice whose recorded steps include one the current release dropped, re-enacted and checked
+  via: in an adopter, a kernel practice a Coherence release changed asks no amendment: enact goes through and spec --check names no floor gap
+  because: Coherence amended witness a refutation in its own tree with decisions recorded there (d-33275b1c, d-8f2cbc3b), and every adopter that had enacted the earlier version was then refused at enact until it recorded an amend decision of its own; that decision is not the adopter's to make, so an agent in the PostHog adoption left its enactment unrecorded rather than attribute Coherence's amendment to the adopter
+  refuted: read a kernel practice's floor in an adopter like the project's own -> "in an adopter, a kernel practice a Coherence release changed asks no amendment: enact goes through and spec --check names no floor gap" went red in practice.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none

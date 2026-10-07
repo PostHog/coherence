@@ -210,8 +210,15 @@ function namesPractice(chose: string, id: string): boolean {
  * unless a decision recorded at or after the latest enactment that still
  * carried it out cites an enactment of the practice and names the practice's
  * id in what it chose. Re-enacting the edited practice never clears it.
+ *
+ * A kernel practice in an adopter (its id led by coherence:) has no floor
+ * there: its text is Coherence's, it changes with a Coherence release, and
+ * the decision that amends it is recorded in Coherence's own tree, where the
+ * floor holds it. An adopter is never asked to decide for a change it did not
+ * make; its enactments of an earlier version stand as its history.
  */
 export function floorGaps(practice: Pick<Practice, "steps" | "pitfalls"> & { id: string }, records: readonly JournalRecord[]): FloorGap[] {
+  if (practice.id.startsWith(KERNEL_PREFIX)) return [];
   const mine = enactmentsIn(records).filter((e) => e.practice === practice.id);
   if (mine.length === 0) return [];
   const steps = new Set(practice.steps.map((s) => normalize(s.text)));
