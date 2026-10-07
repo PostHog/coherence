@@ -38,7 +38,7 @@
   when: explicit
   step: confirm the hooks are wired as install would write them: coherence hooks --check --host <claude or codex>
     leaves: hooks --check exits 0
-  step: write coherence.config.json at the root: name, language, the folders that are not this project's code or prose under ignore (vendored code, generated output, fixtures), and, where the project has tests, test with testMatch and testJson; every key is in docs/config.md in the installed package
+  step: write coherence.config.json where the project lives: at the repository root for a whole repository; in a monorepo, in the folder you adopt, after coherence adopt <folder> from the root when the repository keeps a registry (a root config with projects), writing only the keys the folder overrides; name, language (a list when the folder spans Python and TypeScript, the first the primary), the folders that are not this project's code or prose under ignore (vendored code, generated output, fixtures), and, where the project has tests, test with testMatch and testJson, or tests, one setup per runner with its own cwd; every key is in docs/config.md in the installed package
   step: settle the vocabulary: coherence lexicon coverage, then declare the terms that carry the project's meaning (the practice settle a domain term)
   step: to settle one part of the project first, name its folders or files: coherence lexicon coverage src/billing docs, and coherence lexicon draft src/billing for its unsettled candidates; each path is relative to the root or absolute inside it, and the config's ignore list still holds inside it
   step: where the repository already declares its module boundaries in a file coherence scaffold import reads (tach.toml today), draft the component specs from it first: coherence scaffold import tach --all prints one draft per module with its dependencies and exposed paths as bullets, and --write creates only the specs that do not exist; fill each placeholder, and place the via: tests it prints where the project's tests run
@@ -46,15 +46,15 @@
   step: declare the components and where work enters them: the entry spec with its trust levels, one spec per component folder, then every entrance (the practice declare entrances); the grammar is in docs/spec.md in the installed package
   step: give each real unit its own spec at whatever depth it sits, not one per top-level folder: run coherence mass, and for each folder it names as having no spec of its own, write its spec or record with decide why it belongs to the component above; repeat until mass names none you have not decided
     leaves: mass names no folder without a spec or a decision
-  step: declare the few invariants that matter most (security, tenant isolation, data integrity), each through the practice declare a requirement
+  step: declare the few invariants that matter most (security, tenant isolation, data integrity), each through the practice declare a requirement; for a module boundary whose own code may use its internals, say which references the chokepoint governs (from: outside the component), and in a folder of a larger repository, where the boundary's callers live outside it, choose the references horizon in the config (a list of folders, or repository)
   step: run, then witness each refutation (the practice witness a refutation); a broken chokepoint is a finding to report with its bypass sites, not a failure to hide; a requirement the code already breaks stays a requirement, with a defect per site and an escalation, and a test that cannot run here is recorded as unable
     leaves: spec --check with 0 problems
   step: baseline what the project already held: coherence lexicon baseline, and coherence scaffold control --baseline for entrances with no traced control
     leaves: the baseline records in the journal
   step: find the methods the project already has (the practice harvest practices)
-  step: commit coherence.config.json, the lexicon, the specs and practice files, the hook settings, .coherence/.gitignore (hooks install wrote it so git sees nothing Coherence regenerates), and .coherence/journal, .coherence/runs and .coherence/work
+  step: commit coherence.config.json (and the registry's change, when adopt wrote one), the lexicon, the specs and practice files, the hook settings unless they were installed --local, .coherence/.gitignore (hooks install wrote it so git sees nothing Coherence regenerates), and .coherence/journal, .coherence/runs and .coherence/work
     leaves: the commit
-  step: from the project's own root, run coherence scope and report what the reading shows: health, broken chokepoints, entrances with no traced control, and components no enforcement covers
+  step: from the project's own folder (the adopted folder in a monorepo), run coherence scope and report what the reading shows: health, broken chokepoints, entrances with no traced control, and components no enforcement covers
   pitfall: both outside adopters' checks were red on arrival from Coherence's rejected names in their own prose, and npm link broke a pnpm build; install as a dev dependency and baseline what was already there (d-127ab8e4)
   pitfall: Scope failed when run from an adopter's own folder, because every page until then had been built from Coherence's checkout with --root (d-01976691)
   pitfall: a coverage report redirected into the adopter's root was read back as its source and grew on every run (df-79ac2d4e)
