@@ -287,7 +287,8 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   const details: EntryDetail[] = [];
   const needsAdapter = wantChokepoints && selected.some(({ invariant }) => chokepointEnforcements(invariant).length > 0);
   // A totality oracle's refutation is the record `refute` wrote, never the bullet's own refuted: line.
-  const recorded = new Set(loadRuns(root).refutations.map((r) => entryKey(r.component, r.name, r.form)));
+  // Read only when a totality oracle is checked: an edit's chokepoint check never reads the run history.
+  const recorded = wantTotality ? new Set(loadRuns(root).refutations.map((r) => entryKey(r.component, r.name, r.form))) : new Set<string>();
   let listed: string[] | undefined;
   const files = (): string[] => (listed ??= projectFiles(root));
   const plans: ChokepointPlan[] = wantChokepoints

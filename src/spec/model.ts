@@ -21,9 +21,8 @@ import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, parseLine as parseRunLine, witnessedRefutations, type Latest } from "../enforcement/record.ts";
 import { latestSeeing } from "../enforcement/run-index.ts";
-import { keptParses, listedContent, readContent } from "../lifecycle/kept-parse.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
-import { underIgnored, walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
+import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
 import { effectiveConfig } from "../adapters/project-config.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
 import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPractice, practiceProblems, stemOf, type ModelPractice } from "./practices.ts";
@@ -155,44 +154,39 @@ export interface ChokepointEntry {
   latest: { form: "chokepoint"; files: string[] }[];
 }
 
-/** The shape of a kept spec parse for the chokepoint index; a store of another shape, or one other code made, is read again. */
-const CHOKEPOINT_PARSE_SHAPE = "chokepoints-1";
-
 /**
  * Every chokepoint invariant in the project, the light way an edit can
- * afford: the specs the spec model would read, named by content and each
- * parsed once and kept while its content stands (kept-parse.ts), with no
- * state derived and no practice, handler or journal read; and, for each of
- * `written`, whether an invariant's latest run saw it, from the run index
- * (run-index.ts), never from the run history. An edit to no spec reads no
- * spec; one that touches an invariant runs the check, which loads the model.
+ * afford: each spec the spec model would read, read and parsed (specs are
+ * small; nothing of them is kept between calls), with no state derived and
+ * no practice, handler or journal read; and, for each of `written`, whether
+ * an invariant's latest run saw it, from the run index (run-index.ts). Throws
+ * when a spec or the index cannot be read; the caller falls back to the
+ * whole model and says so. An edit that touches an invariant runs the check
+ * over these entries alone.
  */
 export function chokepointIndex(rootGiven: string, written: readonly string[] = []): ChokepointEntry[] {
   const root = resolve(rootGiven);
   const config = readConfig(root);
-  const skip = new Set(config.ignore);
-  // git names each spec by its content; outside git every spec is read and hashed.
-  const listed =
-    listedContent(root, [`:(glob)**/*${SPEC_SUFFIX}`], "spec")?.filter((f) => !underIgnored(f.rel, skip)) ??
-    readContent(root, findSpecs(root, config.ignore).map((path) => relative(root, path).split(sep).join("/")), "spec");
-  const parsed = keptParses(root, "chokepoint-index", CHOKEPOINT_PARSE_SHAPE, ["spec/grammar.ts"], listed, "spec", (text, rel) =>
-    parseSpec(text, rel).invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint")).map((i) => ({ name: i.name, enforcements: i.enforcements })),
-  );
-  const seeing = written.length === 0 ? new Map<string, Set<string>>() : latestSeeing(root, written, parseRunLine);
-  const out: ChokepointEntry[] = [];
+  const seeing = written.length === 0 ? undefined : latestSeeing(root, written, parseRunLine);
+  const entries: ChokepointEntry[] = [];
   const seen = new Set<string>();
-  for (const { rel } of listed) {
-    const folder = folderOf(root, join(root, rel));
+  // The specs findSpecs would find, from a listing of the specs alone.
+  const bounds = walkBounds(root, config.ignore);
+  const specs = projectFilesEnding(root, SPEC_SUFFIX).filter((rel) => exclusionOf(rel, bounds) === undefined).map((rel) => join(root, rel));
+  for (const specPath of specs) {
+    const folder = folderOf(root, specPath);
     // A folder holds one spec, as the model reads it: a second is a problem there, and nothing here.
     if (seen.has(folder)) continue;
     seen.add(folder);
-    for (const invariant of parsed.get(rel) ?? []) {
+    const rel = relative(root, specPath).split(sep).join("/");
+    for (const invariant of parseSpec(readProjectText(specPath, "spec"), rel).invariants) {
+      if (!invariant.enforcements.some((e) => e.form === "chokepoint")) continue;
       const key = entryKey(folder, invariant.name, "chokepoint");
-      const files = written.filter((file) => seeing.get(file)?.has(key) === true);
-      out.push({ component: folder, name: invariant.name, enforcements: invariant.enforcements, latest: files.length === 0 ? [] : [{ form: "chokepoint", files }] });
+      const files = written.filter((file) => seeing?.get(file)?.has(key) === true);
+      entries.push({ component: folder, name: invariant.name, enforcements: invariant.enforcements, latest: files.length === 0 ? [] : [{ form: "chokepoint", files }] });
     }
   }
-  return out;
+  return entries;
 }
 
 export interface LoadOptions {

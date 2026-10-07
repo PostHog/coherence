@@ -198,20 +198,35 @@ server alone. The primary language's server keeps the plain file names under
 its name (`server-typescript.json`). Only the primary server answers the live
 Scope reading over HTTP.
 
-**What the hooks keep between calls.** `.coherence/cache/` is transient:
-the `.coherence/.gitignore` install writes leaves it out with everything
-else but the journal, runs, work orders and hook voice. Deleting it costs
-time, never a result. It holds what lets a tool hook pay for what changed
-rather than for the project. That covers the spec and practice parses, each
-keyed by its file's content (git's blob id, or a hash of the text for a file
-git reports changed). It also holds the latest chokepoint verdict's files,
-indexed from the run store by byte offset; the journal's tail log, which
-the peer feed reads instead of the whole journal; and the vocabulary a full
-reading leaves, which an edit compares its own files against. Every store is
-keyed by the identity of the Coherence code that made it, so an upgrade
-never serves an old parse. Each store is written aside and renamed into
-place, so two hooks at once never tear one, and an aside a crash left
-behind is removed by a later write.
+**What the hooks keep between calls.** `.coherence/cache/` is transient.
+The `.coherence/.gitignore` that install writes leaves it out, along with
+everything else except the journal, runs, work orders and hook voice.
+Deleting it costs time, never a result. It holds two things that let a tool
+hook pay for what changed rather than for the whole project:
+
+- the run index: the latest chokepoint verdict's files, checked against one
+  stat per run file on every read and rebuilt when it does not match;
+- the vocabulary a full reading leaves, which an edit compares its own files
+  against.
+
+Both are optimizations of a check, so each fails toward the slow, correct
+path and says so. A run index that cannot be read, rebuilt or written
+(for example, a read-only or root-owned folder, or a lock held past the
+wait) makes the edit's check read the whole spec model and run store, and
+the edit says it ran without its index and why. A kept vocabulary that is
+half-written or unreadable makes the edit take a full coverage reading,
+and the edit says so.
+
+Every store is keyed by the identity of the Coherence code that made it, so
+an upgrade discards it. Every store is written aside and renamed into
+place, so two hooks at once never tear one, and an aside that a crash left
+behind is removed by a later write. Nothing parsed from a spec or practice
+file is kept between calls: those files are small and are read as they are.
+
+The peer feed keeps, beside its cursor in `.coherence/feed/`, each journal
+file's identity (inode, size, modification and change time) as its last
+look found them, and reads only the files that changed. Without that memo,
+it reads every file.
 
 **Which setup runs a test.** Each test setup takes the keys of the table
 above (`test`, `testJson`, `testMatch`, `testFilterForm`, `testDir` /

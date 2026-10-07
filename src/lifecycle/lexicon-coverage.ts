@@ -27,7 +27,8 @@
  * rejected for that same concept, or a Coherence concept an adopter's code
  * declares with its own sense.
  */
-import { existsSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
+import { exclusionOf, projectFilesEnding, walkBounds } from "../adapters/project-files.ts";
 import { readFile } from "node:fs/promises";
 import { createHash, type Hash } from "node:crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -480,33 +481,10 @@ export interface Contribution {
   uses: string[];
 }
 
-/** The deepest folder at or above a file's folder that holds a spec: its component, by listing only the folders above it. */
-function componentAbove(root: string, rel: string, held: Map<string, string>): string {
-  let dir = dirname(rel);
-  const climbed: string[] = [];
-  for (;;) {
-    const known = held.get(dir);
-    if (known !== undefined) {
-      for (const d of climbed) held.set(d, known);
-      return known;
-    }
-    climbed.push(dir);
-    let holds = false;
-    try {
-      holds = readdirSync(join(root, dir)).some((name) => name.endsWith(".spec.md"));
-    } catch {
-      holds = false;
-    }
-    if (holds) {
-      for (const d of climbed) held.set(d, dir);
-      return dir;
-    }
-    if (dir === "." || dir === "") {
-      for (const d of climbed) held.set(d, "(no declared component)");
-      return "(no declared component)";
-    }
-    dir = dirname(dir);
-  }
+/** The component folders, from a listing of the specs alone: what a reading of a few files needs to know whose they are. */
+function specFolders(root: string): string[] {
+  const bounds = walkBounds(root);
+  return componentFolders(projectFilesEnding(root, ".spec.md").filter((rel) => exclusionOf(rel, bounds) === undefined));
 }
 
 export async function lexiconCoverage(
@@ -592,10 +570,9 @@ export async function lexiconReading(
     const first = phrase.split(" ")[0]!;
     byFirstWord.set(first, [...(byFirstWord.get(first) ?? []), n]);
   });
-  const components = scope.files !== undefined ? [] : componentFolders(corpus.listed);
+  const components = scope.files !== undefined ? specFolders(root) : componentFolders(corpus.listed);
   const uses = new Map<string, VocabularyUse[]>();
-  const held = new Map<string, string>();
-  const componentFor = (file: string): string => (scope.files !== undefined ? componentAbove(root, file, held) : componentOf(file, components));
+  const componentFor = (file: string): string => componentOf(file, components);
   // Each term's uses by file and line, so adding one is a lookup, never a scan of the uses so far.
   const useKeys = new Map<string, Set<string>>();
   const add = (term: string, use: VocabularyUse): void => {

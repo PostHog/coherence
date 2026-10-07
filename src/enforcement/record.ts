@@ -15,10 +15,10 @@
  * the code was restored, and the detector went green again.
  */
 
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { availableParallelism, loadavg } from "node:os";
-import { join } from "node:path";
-import { reconcileRunIndex } from "./run-index.ts";
+import { basename, join } from "node:path";
+import { noteRunAppend, runFileIdentity } from "./run-index.ts";
 
 export const RUNS_DIR = join(".coherence", "runs");
 
@@ -205,14 +205,26 @@ export function machineLoad(): { average: number; cores: number } {
 
 const SESSION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
+/**
+ * Append one line to a run file, then fold it into the run index the edit
+ * hook reads (run-index.ts). The fold is best effort and never throws: the
+ * line is recorded once it is appended, and an index the fold could not
+ * bring up to date no longer matches the store, so its next reader rebuilds it.
+ */
+function appendLine(root: string, file: string, line: string): void {
+  const name = basename(file);
+  const before = runFileIdentity(root, name);
+  const offset = existsSync(file) ? statSync(file).size : 0;
+  appendFileSync(file, line, "utf8");
+  noteRunAppend(root, name, before, offset, parseLine);
+}
+
 /** Append one run as one line; the file and folder are created on first write. */
 export function appendRun(root: string, record: RunRecord): string {
   if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
   mkdirSync(runsDir(root), { recursive: true });
   const file = join(runsDir(root), `${record.session}.jsonl`);
-  appendFileSync(file, `${JSON.stringify(record)}\n`, "utf8");
-  // The index an edit reads is brought up to date by the append itself, reading only the bytes since its last look.
-  reconcileRunIndex(root, parseLine);
+  appendLine(root, file, `${JSON.stringify(record)}\n`);
   return file;
 }
 
@@ -221,9 +233,7 @@ export function appendRefutation(root: string, record: RefutationRecord): string
   if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
   mkdirSync(runsDir(root), { recursive: true });
   const file = join(runsDir(root), `${record.session}.jsonl`);
-  appendFileSync(file, `${JSON.stringify(record)}\n`, "utf8");
-  // The index an edit reads is brought up to date by the append itself, reading only the bytes since its last look.
-  reconcileRunIndex(root, parseLine);
+  appendLine(root, file, `${JSON.stringify(record)}\n`);
   return file;
 }
 

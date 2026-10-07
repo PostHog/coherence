@@ -88,13 +88,15 @@ function decision(at: string, n: number): string {
 /** The project at `scale` (1 or 10, any positive integer), committed in a fresh repository. */
 export function sizedProject(scale: number): SizedProject {
   // Spelled as the hook spells it: a temporary folder reached through a link (macOS /var) would read as outside the project.
-  const top = realpathSync(mkdtempSync(join(tmpdir(), `coherence-sized-${scale}-`)));
+  const top = realpathSync(mkdtempSync(join(tmpdir(), `coherence-sized-${String(scale).padStart(3, "0")}-`)));
   const root = join(top, "proj");
   const other = join(top, "other");
   const concepts = Array.from({ length: 10 * scale }, (_, n) => ({ name: `gizmo ${n}`, definition: `the fixture's gizmo number ${n}` }));
   const files: Record<string, string> = {
     ".claude/settings.json": "{}\n",
     "proj/.claude/settings.json": "{}\n",
+    // What install writes: the transient state under .coherence is no file of the project, git lists none of it.
+    "proj/.coherence/.gitignore": "/*\n!/.gitignore\n!/journal/\n!/runs/\n!/work/\n!/hooks/\n",
     "proj/coherence.config.json": JSON.stringify({ name: "sized", lexicon: "lexicon.json" }) + "\n",
     "proj/lexicon.json": JSON.stringify({ project: "sized", concepts }, null, 2) + "\n",
     "proj/Sized.spec.md": spec("Sized"),
