@@ -86,7 +86,7 @@ import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
 import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, type Lexicon } from "./lexicon.ts";
-import { COHERENCE_LEXICON, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, within, type HookProject } from "./project.ts";
+import { COHERENCE_LEXICON, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, real as realSpelling, within, type HookProject } from "./project.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
@@ -549,7 +549,8 @@ const READING_TOOLS: ReadonlySet<string> = new Set(["Read", "Glob", "Grep", "LS"
 export function writtenFiles(root: string, input: HookInput, host: string = root): string[] {
   return writtenPaths(input, host).flatMap((absolute) => {
     if (!within(root, absolute)) return [];
-    const rel = relative(resolve(root), absolute).split(sep).join("/");
+    // Both sides as real paths: a root and a file reached through different symbolic links name one tree (df-ccfd4309).
+    const rel = relative(realSpelling(root), realSpelling(absolute)).split(sep).join("/");
     return rel && rel !== ".." && !rel.startsWith("../") ? [rel] : [];
   });
 }

@@ -22,7 +22,7 @@ import { configIgnore, underIgnored } from "../adapters/project-files.ts";
 import { loadJournal } from "../journal/store.ts";
 import type { Enactment } from "../journal/record.ts";
 import { enactTemplate } from "../journal/verbs.ts";
-import { holdsProject, projectRoot } from "./project.ts";
+import { holdsProject, projectRoot, within } from "./project.ts";
 import { shellCommandOf, simpleCommands, type SimpleCommand } from "./shell-writes.ts";
 
 export const PRACTICES_DIR = join(".coherence", "practices");
@@ -79,10 +79,6 @@ export function toolUseOf(input: Record<string, unknown>, writes: string[]): Too
   return { command, ...(command === undefined ? {} : { commands: simpleCommands(command) }), writes, added: texts.join("\n") };
 }
 
-function inside(root: string, path: string): boolean {
-  return path === root || path.startsWith(root.endsWith(sep) ? root : root + sep);
-}
-
 /**
  * The tool use split by the project each part acts on: the session's own
  * root takes the writes and every command that runs in it; a command a cd
@@ -97,7 +93,7 @@ function useByRoot(root: string, cwd: string, use: ToolUse): Map<string, ToolUse
   const away = new Map<string, SimpleCommand[]>();
   for (const command of (use.commands ?? []) as SimpleCommand[]) {
     const target = command.dir === undefined || command.dir === "" ? undefined : resolve(cwd, command.dir);
-    const other = target === undefined || inside(root, target) ? root : projectRoot(target);
+    const other = target === undefined || within(root, target) ? root : projectRoot(target);
     if (other === root) home.push(command);
     else if (holdsProject(other)) away.set(other, [...(away.get(other) ?? []), command]);
   }
