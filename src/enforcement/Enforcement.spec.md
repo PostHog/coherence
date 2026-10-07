@@ -107,7 +107,7 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   kinds: none
 - warm server the only path: From a hook or a reading, the language server is reached only through the warm server: one door connects over the socket, spawns the server detached when none listens, and hands the adapter to the run or to the reading that asked.
   protects: connectAdapter
-  chokepoint: withWarmAdapter
+  chokepoint: withWarmAdapters
   over: every hook event that re-checks a chokepoint and every reading that needs the instrument itself
   via: two clients ask the same questions; the second finds the server warm
   because: a hook is short-lived and a cold project load is too slow for a check at the edit; every run and every reading (the economy's closure) connects through one door that finds the warm server or spawns it detached, so no hook and no reading can start its own cold instrument and wait on it
