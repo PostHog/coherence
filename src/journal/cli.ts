@@ -4,7 +4,8 @@
  *   node src/cli.ts decide "<chose>" [--over "<rejected>"]... --because "<why>" [--human "<what the human said>"] [--cite <id>]...
  *   node src/cli.ts retract <id> --because "<what refuted it>"
  *   node src/cli.ts conjecture "<observation>" [--could-be "<candidate>"]... --discriminated-by "<test>" [--cite <id>]...
- *   node src/cli.ts resolved <id> --because "<what the test showed>" [--as "<candidate>"]
+ *   node src/cli.ts resolved <id> --because "<what the test showed>" [--as "<candidate>"]   (a defect: [--guard <component>/<invariant>] [--decision <id>])
+ *   node src/cli.ts classify <defect-id> [--class <name>] [--introduced <origin>] [--caught <how>] --because "<evidence>"
  *   node src/cli.ts dismiss <id> --because "<why nobody will chase it>"
  *   node src/cli.ts defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]...
  *   node src/cli.ts experiment create "<expectation>" [--context <file>]... --action "<step>"... --success "<criterion>"...
@@ -33,6 +34,7 @@ import { gitBranch, loadJournal } from "./store.ts";
 import { loadWork } from "./work.ts";
 import {
   acknowledge,
+  classify,
   conjecture,
   decide,
   defect,
@@ -137,6 +139,7 @@ export const journalVerbs: Record<string, Command> = {
   retract: writing(retract),
   conjecture: writing(conjecture),
   resolved: writing(resolved),
+  classify: writing(classify),
   dismiss: writing(dismiss),
   defect: writing(defect),
   experiment: writing(experiment),
@@ -155,9 +158,13 @@ export const JOURNAL_USAGE = [
   '  decide "<chose>" [--over "<rejected>"]... --because "<why>" [--human "<what the human said>"] [--cite <id>]...',
   '  retract <id> --because "<what refuted it>"',
   '  conjecture "<observation>" [--could-be "<candidate>"]... --discriminated-by "<test>" [--cite <id>]...',
-  '  resolved <id> --because "<what the test showed>" [--as "<candidate>"]',
+  '  resolved <conjecture-id> --because "<what the test showed>" [--as "<candidate>"]',
+  '  resolved <defect-id> --because "<what fixed it>" [--guard <component>/<invariant>] [--decision <id>] [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <review|ci|probe|adopter|self|test>]',
+  '      a defect\'s close owes a guard for its class (an invariant whose refutation is witnessed) or a decision saying why the fix suffices; spec --check names a close with neither',
   '  dismiss <id> --because "<why nobody will chase it>"',
-  '  defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--cite <id>]...',
+  '  defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <review|ci|probe|adopter|self|test>] [--cite <id>]...',
+  '      --class is a kebab-case name declared once as the property "class <name>" of defect in a lexicon; give all three: they are what the convergence reading counts',
+  '  classify <defect-id> [--class <name>] [--introduced <...>] [--caught <...>] --because "<the evidence>" [--over "<rejected>"]...   a decision citing the defect; the defect is never edited',
   '  experiment create "<expectation>" [--context <file>]... --action "<step>"... --success "<criterion>"... [--cite <id>]...',
   "  experiment close <id> --result <stepId>=<pass|fail|unknown>...",
   '  unable "<what you could not do>" --because "<the wall>" [--cite <id>]...',

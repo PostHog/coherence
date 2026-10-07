@@ -467,6 +467,13 @@ export function specBlock(root: string): string {
     for (const { c, i } of open.slice(0, OPEN_REQUIREMENT_LINES)) lines.push(`○ ${c.folder}/${i.name} — lacks: ${i.lacks.join(", ")}`);
     if (open.length > OPEN_REQUIREMENT_LINES) lines.push(`  and ${open.length - OPEN_REQUIREMENT_LINES} more; run: spec --check`);
   }
+  // A defect in a class already guarded: the protection was weaker than claimed (journal/defects.ts).
+  const failures = model.defects?.guardFailures ?? [];
+  if (failures.length > 0) {
+    lines.push(`Guard failures (${failures.length}): a defect arrived in a class a guard already covered, so the guard was weaker than claimed; strengthen it and refute it again.`);
+    for (const g of failures.slice(0, OPEN_REQUIREMENT_LINES)) lines.push(`✕ ${g.id} in class ${g.class}, guarded by ${g.guard} since ${g.resolution}`);
+    if (failures.length > OPEN_REQUIREMENT_LINES) lines.push(`  and ${failures.length - OPEN_REQUIREMENT_LINES} more; run: spec --check`);
+  }
   return lines.length === 0 ? "" : lines.join("\n") + "\n\n";
 }
 
@@ -853,6 +860,12 @@ export interface HookOptions {
   warm?: ((root: string) => void) | undefined;
   /** When the hook's process started (epoch ms), so a call's time counts loading the code; the call's own start when absent. */
   startedAt?: number | undefined;
+  /**
+   * Start the detached telemetry flush at a session start and a stop, once
+   * the answer is made, never waited on. The command line passes startTelemetry, which starts nothing
+   * unless the user opted in; absent (a test), nothing is started.
+   */
+  telemetry?: ((root: string, event: string, input: HookInput) => void) | undefined;
 }
 
 /**
@@ -1116,6 +1129,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     const root = place?.kind === "project" ? place.root : installed ?? given;
     const session = sessionOf(input);
     if (session !== undefined) recordHookTime(root, session, { at: new Date().toISOString(), event, ms });
+    // Last, once the answer is made: a detached flush started earlier would compete with the hook's own work.
+    if (event === "SessionStart" || event === "Stop") options.telemetry?.(root, event, input);
     if (!TOOL_HOOKS.has(event) || result.exit !== 0) return result;
     const line = overBudgetLine(event, ms, latencyBudget(root));
     if (line === "") return result;

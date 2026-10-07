@@ -264,6 +264,45 @@ unverified and every bullet is a requirement: nothing in the tree has been
 seen to fire. A missing `because` is reported as a lack but does not change
 the state.
 
+### The invariant floor
+
+An invariant is not demoted silently (df-f3826eaa: a bullet inserted between
+an invariant and its `checklist:` lines took them, and the check stayed
+clean). Each run entry records the state the run left its bullet in, and
+what its form enforces through (its `via:` test titles or its chokepoints).
+The latest entry that graded a bullet an invariant is its floor; an entry
+from before the state was recorded counts when it passed with a witnessed
+refutation. A bullet with a floor is a problem when it is now:
+
+- missing: it lost the bullet itself;
+- a requirement: it lost its enforcement, refutation, kinds or checklist;
+- without an enforcement form it was graded with.
+
+The problem names the bullet, what it lost, and the command that clears it:
+
+```sh
+node src/cli.ts decide "demote <component>/<name>: <retired, the code changed, or moved to where>" --because "<why>"
+```
+
+The decision must be recorded at or after the floor, and name the bullet as
+`<component>/<name>` in what it chose or what it turned away (`--over`, where
+a name the lexicon has since rejected may still be quoted). A run of the
+demoted bullet grades it a requirement and leaves the floor where it was, so
+the decision keeps clearing it. If the bullet is promoted again and then
+demoted, the floor moves and a new decision is needed.
+
+A rename or a move needs no decision when the bullet it became carries an
+enforcement the floor recorded: the same `via:` test title, or the same
+chokepoint, in the same form. That bullet must lack nothing but its
+refutation, which the run store keys by name, so a rename costs it until the
+next run or `refute`. A floor recorded before enforcements were recorded
+names none, so its rename needs the decision. A bullet that no run graded an
+invariant is free to change.
+
+The reference point is the run store, never git: it is already read by every
+check, it is committed, and in CI `HEAD` is the commit under review, so a
+comparison with it would compare a change with itself.
+
 ## Coherence's own spec
 
 Coherence carries its own spec in this grammar. `Coherence.spec.md` at the root

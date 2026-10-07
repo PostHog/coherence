@@ -19,12 +19,14 @@ import { countWork, readProjectText } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
-import { entryKey, latestByEnforcement, latestFor, loadRuns, parseLine as parseRunLine, witnessedRefutations, type Latest } from "../enforcement/record.ts";
+import { entryKey, latestByEnforcement, latestFor, loadRuns, parseLine as parseRunLine, witnessedRefutations, type Latest, type LoadedRuns, type RunRecord } from "../enforcement/record.ts";
 import { latestSeeing } from "../enforcement/run-index.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
 import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
 import { effectiveConfig } from "../adapters/project-config.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
+import { invariantFloorGaps, invariantFloorProblems, rawFloorGaps } from "./floor.ts";
+import { declaredClasses, defectFloor, defectStates, type DefectFloor, type GuardStanding } from "../journal/defects.ts";
 import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPractice, practiceProblems, stemOf, type ModelPractice } from "./practices.ts";
 
 export const SPEC_SUFFIX = ".spec.md";
@@ -95,6 +97,8 @@ export interface SpecModel {
   counts: Counts;
   /** When runs exist: the time of the latest, and how many run lines were unreadable. */
   runs: { latest: string; count: number; damaged: number } | undefined;
+  /** The floor on defects: closes with neither a guard nor a decision, and guard failures; advisory, never a problem. */
+  defects?: DefectFloor;
 }
 
 interface Config {
@@ -193,6 +197,8 @@ export interface LoadOptions {
   seed?: Seed | undefined;
   /** Read .coherence/runs and derive run-informed state (default true). */
   runs?: boolean | undefined;
+  /** A run not yet appended, read in as the latest: the run grades each entry's bullet with it before it writes. */
+  pending?: RunRecord | undefined;
 }
 
 export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): SpecModel {
@@ -202,7 +208,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   const seed = options.seed ?? loadSeed();
   const config = readConfig(root);
   const problems: Problem[] = [];
-  const loadedRuns = options.runs === false ? { records: [], refutations: [], damaged: [] } : loadRuns(root);
+  const loadedRuns: LoadedRuns = options.runs === false ? { records: [], refutations: [], damaged: [] } : loadRuns(root);
+  if (options.pending !== undefined) loadedRuns.records.push(options.pending);
   const latest = latestByEnforcement(loadedRuns.records);
   // A totality oracle's refutation is witnessed by the record, never by the bullet's own refuted: line.
   const witnessed = witnessedRefutations(loadedRuns.records, loadedRuns.refutations);
@@ -327,6 +334,9 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   components.sort((a, b) => a.folder.localeCompare(b.folder));
   problems.push(...entranceTrustProblems(components, trustLevels));
   problems.push(...entranceGuardProblems(root, components));
+  // The invariant floor (df-f3826eaa): a bullet the run store graded an invariant is not demoted without a decision; the journal is read only when one was.
+  const demoted = rawFloorGaps(components, loadedRuns.records, loadedRuns.refutations);
+  if (demoted.length > 0) problems.push(...invariantFloorProblems(components, invariantFloorGaps(demoted, practiceFiles.size === 0 ? journalRecords(root) : records)));
   problems.push(
     ...practiceProblems({
       root,
@@ -343,7 +353,20 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   problems.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
 
   const counts = countModel(components, problems);
-  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs };
+  // The journal is read for defects even where no practice file asked for it; a project with no spec reads none.
+  const journal = practiceFiles.size === 0 && components.length > 0 ? journalRecords(root) : records;
+  const defects = defectFloor(defectStates(journal), guardStanding(components), declaredClasses(root));
+  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs, defects };
+}
+
+/** How a defect's guard stands in this model: the invariant <folder>/<name> is declared and its refutation witnessed, declared only, or missing. */
+export function guardStanding(components: readonly Component[]): (guard: string) => GuardStanding {
+  return (guard) => {
+    const slash = guard.lastIndexOf("/");
+    const invariant = components.find((c) => c.folder === guard.slice(0, slash))?.invariants.find((i) => i.name === guard.slice(slash + 1));
+    if (slash === -1 || invariant === undefined) return "missing";
+    return invariant.enforcements.length > 0 && !invariant.lacks.includes("refutation") ? "witnessed" : "unwitnessed";
+  };
 }
 
 /** The component whose folder holds a project-relative file: the deepest component folder above it. */

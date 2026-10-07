@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import type { Io } from "../journal/cli.ts";
 import { KEYS } from "../spec/grammar.ts";
 import { loadSpecModel } from "../spec/model.ts";
@@ -18,6 +18,16 @@ import { componentDir, scaffoldComponent } from "./scaffold.ts";
 import { renderInvariant } from "./scaffold.ts";
 
 const seed = loadSeed();
+
+// A preview is written to the system temp folder for a human to open, and stays there; this file's previews go to a temp folder of its own, removed after its tests.
+const systemTemp = process.env["TMPDIR"];
+const previewTemp = mkdtempSync(join(tmpdir(), "coherence-scaffold-previews-"));
+process.env["TMPDIR"] = previewTemp;
+after(() => {
+  if (systemTemp === undefined) delete process.env["TMPDIR"];
+  else process.env["TMPDIR"] = systemTemp;
+  rmSync(previewTemp, { recursive: true, force: true });
+});
 
 // Compile-time coverage: the exported command result must publicly include its
 // asynchronous preview path rather than hiding it behind a number overload.
@@ -221,12 +231,16 @@ test("the entry component is named for the project, not the checkout folder", as
   const { join: j } = await import("node:path");
   const { specFileName } = await import("./scaffold.ts");
   const root = mkdtempSync(j(tmpdir(), "agent-0123abcd-"));
-  assert.match(specFileName(".", root), /^Agent-0123abcd.*\.spec\.md$/, "no project name: the folder's");
-  write(j(root, "package.json"), JSON.stringify({ name: "widgetry" }));
-  assert.equal(specFileName(".", root), "Widgetry.spec.md", "package.json names the project");
-  write(j(root, "coherence.config.json"), JSON.stringify({ name: "gadgetry" }));
-  assert.equal(specFileName(".", root), "Gadgetry.spec.md", "coherence.config.json wins");
-  assert.equal(specFileName("src/journal", root), "Journal.spec.md", "a component keeps its folder name");
+  try {
+    assert.match(specFileName(".", root), /^Agent-0123abcd.*\.spec\.md$/, "no project name: the folder's");
+    write(j(root, "package.json"), JSON.stringify({ name: "widgetry" }));
+    assert.equal(specFileName(".", root), "Widgetry.spec.md", "package.json names the project");
+    write(j(root, "coherence.config.json"), JSON.stringify({ name: "gadgetry" }));
+    assert.equal(specFileName(".", root), "Gadgetry.spec.md", "coherence.config.json wins");
+    assert.equal(specFileName("src/journal", root), "Journal.spec.md", "a component keeps its folder name");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 interface AsyncRun {

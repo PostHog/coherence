@@ -30,6 +30,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { declarationsOf } from "../economy/source.ts";
 import type { Language } from "../adapters/index.ts";
+import { languageOfFile } from "../enforcement/config.ts";
 import { NO_CONTROL, NO_CONTROL_FORM } from "../spec/grammar.ts";
 import { declaresAtTop } from "../spec/model.ts";
 import { loadSeed } from "../spec/seed.ts";
@@ -151,10 +152,13 @@ function verifiedChokepoints(root: string, state: ShellState): Verified[] {
 
 /**
  * The closures for every entrance on a route marked no traced control, one
- * proposal per entrance, in route order. `language` names how a handler's
+ * proposal per entrance, in route order. `languages` name how a handler's
  * declaration is read; `inside` defaults to the levels not marked outside.
  */
-export function proposeClosures(root: string, state: ShellState, model: FlowModel, language: Language): Proposal[] {
+export function proposeClosures(root: string, state: ShellState, model: FlowModel, languages: Language | readonly Language[]): Proposal[] {
+  const each = typeof languages === "string" ? [languages] : languages;
+  // A handler's declaration is read in its own file's language: a Python view and a TypeScript route alike.
+  const languageOf = (file: string | undefined): Language => (file === undefined ? undefined : languageOfFile(file, each)) ?? each[0]!;
   const verified = verifiedChokepoints(root, state);
   const inside = state.spec.trustLevels.filter((l) => l.outside !== true).map((l) => l.name);
   const seed = loadSeed();
@@ -165,7 +169,7 @@ export function proposeClosures(root: string, state: ShellState, model: FlowMode
   for (const entrance of model.entrances) {
     const component = entrance.owners[0] ?? entrance.declaredBy;
     const declared = state.spec.components.find((c) => c.folder === component)?.entrances.find((e) => e.name === entrance.name);
-    const text = handlerText(root, declared?.file, entrance.handler, language);
+    const text = handlerText(root, declared?.file, entrance.handler, languageOf(declared?.file));
     const found: { verified: Verified; symbol: string }[] = [];
     for (const v of verified) for (const symbol of v.symbols) if (text !== "" && spells(text, symbol)) found.push({ verified: v, symbol });
     calls.set(entrance.id, found);

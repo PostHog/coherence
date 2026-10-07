@@ -45,11 +45,13 @@ import {
   type StepOutcome,
   type WorkKind,
 } from "./record.ts";
-import { projectPractices } from "../spec/model.ts";
+import { loadSpecModel, projectPractices } from "../spec/model.ts";
+import { originFields } from "./defects.ts";
 import { amendCommand, floorGaps, type ModelPractice } from "../spec/practices.ts";
 import { JOURNAL_DIR, appendRecord, gitState, loadJournal, type Loaded } from "./store.ts";
 import { describeBinding, loadWork } from "./work.ts";
 import { recordsOnOtherBranches } from "./branches.ts";
+import { recordDefectTelemetry } from "../lifecycle/telemetry.ts";
 
 export interface Context {
   cwd: string;
@@ -178,7 +180,9 @@ function pointers(loaded: Loaded, id: string): JournalRecord[] {
 }
 
 function refuseIfAnswered(loaded: Loaded, id: string, verb: string, kinds: readonly Kind[]): void {
-  const prior = pointers(loaded, id).find((record) => kinds.includes(record.kind));
+  // A retracted answer answers nothing: a defect closed without a guard can be closed again after its resolution is retracted.
+  const withdrawn = new Set(loaded.records.flatMap((r) => (r.kind === "retraction" ? [r.of] : [])));
+  const prior = pointers(loaded, id).find((record) => kinds.includes(record.kind) && !withdrawn.has(record.id));
   if (prior !== undefined) {
     throw new JournalError(`${verb}: ${id} was already answered by ${prior.id} (${prior.kind})`);
   }
@@ -234,21 +238,96 @@ export function conjecture(argv: string[], ctx: Context): Written {
   return write(ctx, record);
 }
 
+/** The --class, --introduced and --caught flags a defect, its classification and its close take. */
+const ORIGIN: Record<string, FlagShape> = { class: "one", introduced: "one", caught: "one" };
+
+function originGiven(parsed: Parsed): { class?: string | undefined; introduced?: string | undefined; caught?: string | undefined } {
+  return { class: parsed.one.get("class"), introduced: parsed.one.get("introduced"), caught: parsed.one.get("caught") };
+}
+
+/**
+ * Resolve a conjecture, or close a defect. A defect's close names a guard for
+ * its whole class (--guard <component folder>/<invariant>, an invariant some
+ * spec declares) or a decision saying why fixing the instance suffices
+ * (--decision <id>), or both; a close with neither is written and spec
+ * --check names it. A retracted resolution no longer answers its target.
+ */
 export function resolved(argv: string[], ctx: Context): Written {
-  const parsed = parseFlags(argv, withCommon({ because: "one", as: "one" }));
+  const parsed = parseFlags(argv, withCommon({ because: "one", as: "one", guard: "one", decision: "one", ...ORIGIN }));
   const who = attribution(parsed);
-  const of = onePositional(parsed, "the conjecture id");
-  const because = required(parsed, "because", "a resolution records what the test showed");
+  const of = onePositional(parsed, "the conjecture or defect id");
+  const because = required(parsed, "because", "a resolution records what the test showed, or what fixed the defect");
   const loaded = loadJournal(ctx.cwd);
-  target(loaded, of, "conjecture", "resolved");
+  const found = target(loaded, of, null, "resolved");
+  if (found.kind !== "conjecture" && found.kind !== "defect") throw new JournalError(`resolved: ${of} is a ${found.kind}, not a conjecture or a defect`);
   refuseIfAnswered(loaded, of, "resolved", ["resolution", "dismissal"]);
   const as = parsed.one.get("as");
+  const guard = parsed.one.get("guard");
+  const decision = parsed.one.get("decision");
+  const given = originGiven(parsed);
+  if (found.kind === "conjecture") {
+    const defectOnly = [guard === undefined ? "" : "--guard", decision === undefined ? "" : "--decision", ...Object.entries(given).map(([k, v]) => (v === undefined ? "" : `--${k}`))].filter((f) => f !== "");
+    if (defectOnly.length > 0) throw new JournalError(`resolved: ${defectOnly.join(", ")} close a defect; ${of} is a conjecture`);
+    const record: Resolution = { ...head("resolution", who, ctx, `${of}\n${because}`), of, because, ...(as === undefined ? {} : { as }) };
+    return write(ctx, record);
+  }
+  if (as !== undefined) throw new JournalError(`resolved: --as names a conjecture's winning candidate; ${of} is a defect`);
+  if (guard !== undefined) checkGuard(ctx.cwd, guard);
+  if (decision !== undefined) {
+    const d = loaded.records.find((r) => r.id === decision);
+    if (d === undefined) throw new JournalError(`resolved: --decision ${decision}: no record with that id`);
+    if (d.kind !== "decision") throw new JournalError(`resolved: --decision ${decision} is a ${d.kind}, not a decision`);
+  }
   const record: Resolution = {
     ...head("resolution", who, ctx, `${of}\n${because}`),
     of,
     because,
-    ...(as === undefined ? {} : { as }),
+    ...(guard === undefined ? {} : { guard }),
+    ...(decision === undefined ? {} : { decision }),
+    ...originFields(given, ctx.cwd),
   };
+  const extra =
+    guard === undefined && decision === undefined
+      ? [`  closed with neither a guard nor a decision: spec --check names it; a guard for the class (--guard <component>/<invariant>) or a decision (--decision <id>) is what a close owes`]
+      : [];
+  return write(ctx, record, extra);
+}
+
+/** A guard names an invariant a spec in this project declares, as <component folder>/<name>. */
+function checkGuard(root: string, guard: string): void {
+  const slash = guard.lastIndexOf("/");
+  const folder = slash === -1 ? "" : guard.slice(0, slash);
+  const name = slash === -1 ? guard : guard.slice(slash + 1);
+  let model;
+  try {
+    model = loadSpecModel(root, { runs: false });
+  } catch (error) {
+    throw new JournalError(`resolved: --guard ${guard}: the specs cannot be read (${error instanceof Error ? error.message : String(error)})`);
+  }
+  const component = model.components.find((c) => c.folder === folder);
+  if (slash === -1 || component === undefined) throw new JournalError(`resolved: --guard ${guard} reads <component folder>/<invariant name>; components: ${model.components.map((c) => c.folder).join(", ")}`);
+  if (!component.invariants.some((i) => i.name === name)) throw new JournalError(`resolved: --guard ${guard}: ${folder} declares no invariant named "${name}"`);
+}
+
+/**
+ * Classify a defect after the fact: a decision citing it, carrying the class,
+ * origin and catch it gives. The defect is never edited; every reader folds
+ * the classification into it (defects.ts).
+ */
+export function classify(argv: string[], ctx: Context): Written {
+  const parsed = parseFlags(argv, withCommon({ because: "one", over: "many", ...ORIGIN }));
+  const who = attribution(parsed);
+  const of = onePositional(parsed, "the defect id");
+  const because = required(parsed, "because", "a classification records the evidence it rests on");
+  const loaded = loadJournal(ctx.cwd);
+  target(loaded, of, "defect", "classify");
+  const fields = originFields(originGiven(parsed), ctx.cwd);
+  if (Object.keys(fields).length === 0) throw new JournalError("classify: give at least one of --class, --introduced, --caught");
+  const said = [fields.class === undefined ? "" : `class ${fields.class}`, fields.introduced === undefined ? "" : `introduced ${fields.introduced}`, fields.caught === undefined ? "" : `caught ${fields.caught}`].filter((s) => s !== "");
+  const chose = `classify ${of}: ${said.join(", ")}`;
+  const given = parsed.many.get("over") ?? [];
+  const over: string[] | "none" = given.length === 1 && given[0]!.trim().toLowerCase() === "none" ? "none" : given;
+  const record: Decision = { ...head("decision", who, ctx, chose), classifies: { of, ...fields }, chose, over, because, cites: [of] };
   return write(ctx, record);
 }
 
@@ -265,13 +344,15 @@ export function dismiss(argv: string[], ctx: Context): Written {
 }
 
 export function defect(argv: string[], ctx: Context): Written {
-  const parsed = parseFlags(argv, withCommon({ evidence: "one", file: "many", ...CITE }));
+  const parsed = parseFlags(argv, withCommon({ evidence: "one", file: "many", ...ORIGIN, ...CITE }));
   const who = attribution(parsed);
   const what = onePositional(parsed, "what failed");
   const evidence = required(parsed, "evidence", "a defect carries the reproducer or report that made it one");
   const files = parsed.many.get("file") ?? [];
-  const record: Defect = { ...head("defect", who, ctx, what), what, evidence, files, ...citations(parsed, ctx.cwd) };
-  return write(ctx, record);
+  const record: Defect = { ...head("defect", who, ctx, what), what, evidence, files, ...originFields(originGiven(parsed), ctx.cwd), ...citations(parsed, ctx.cwd) };
+  const written = write(ctx, record);
+  recordDefectTelemetry(ctx.cwd, record);
+  return written;
 }
 
 export function experiment(argv: string[], ctx: Context): Written {

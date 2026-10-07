@@ -535,14 +535,17 @@ test("a bounded Python server gets the heap its reading asks for; an unbounded o
     seen.push(env);
     throw new Error("stopped after the spawn arguments were seen");
   };
+  const adapters = [new PythonAdapter(root, factory, { exclude: ["vendor"], heapMB: 14336 }), new PythonAdapter(root, factory)];
   try {
-    for (const adapter of [new PythonAdapter(root, factory, { exclude: ["vendor"], heapMB: 14336 }), new PythonAdapter(root, factory)]) {
+    for (const adapter of adapters) {
       await adapter.ready().catch(() => undefined);
     }
     assert.equal(seen.length, 2, "both adapters reached the spawn");
     assert.match(seen[0]?.["NODE_OPTIONS"] ?? "", /--max-old-space-size=14336\b/, "the bounded server's heap is raised");
     assert.equal(seen[1], undefined, "the whole-workspace server keeps the environment it inherits");
   } finally {
+    // Closing removes the bounded adapter's scratch workspace folder.
+    for (const adapter of adapters) await adapter.close();
     rmSync(root, { recursive: true, force: true });
   }
 });

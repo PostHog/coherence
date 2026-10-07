@@ -18,6 +18,7 @@ import { patchFiles } from "../economy/trace.ts";
 import { changedSince } from "../observation/observed.ts";
 import { checkChokepoint } from "../enforcement/check.ts";
 import { TypeScriptAdapter } from "../adapters/typescript.ts";
+import { stopWarmServers } from "../enforcement/server-fixture.ts";
 
 const CLI = fileURLToPath(new URL("../cli.ts", import.meta.url));
 
@@ -136,6 +137,8 @@ test("a session at the repository top gets orient once, at its first tool use in
     assert.doesNotMatch(second, ORIENT, "and only the first");
     assert.doesNotMatch(await hook("PreToolUse", { tool_name: "Bash", tool_input: { command: "ls" } }), ORIENT, "nor a command at the top once the session has entered");
   } finally {
+    // An edit inside the project reaches its instrument through a warm server, which outlives the test unless it is stopped.
+    await stopWarmServers(top);
     rmSync(top, { recursive: true, force: true });
   }
 });
