@@ -60,6 +60,9 @@
       "optional": true
     }
   },
+  "overrides": {
+    "simple-git": "^4.0.2"
+  },
   "publishConfig": {
     "access": "public",
     "provenance": true
