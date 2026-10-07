@@ -18,6 +18,7 @@ to be a candidate yet, so its live uses can be read before it is named.
 ```sh
 node src/cli.ts lexicon coverage
 node src/cli.ts lexicon coverage --json
+node src/cli.ts lexicon coverage src/billing docs
 node src/cli.ts lexicon review exposure
 node src/cli.ts query lexicon exposure
 npm run scope
@@ -35,6 +36,14 @@ A known spelling in a new component is still an unanswered sense question. Revie
 shows the definition, confusables, properties (including units), current contexts,
 and an evidence key. Scope renders that same evidence in its Lexicon view and
 writes nothing. The fixed agent query reads the same page state.
+
+Coverage and draft take folders or files to read instead of the whole project
+(`lexicon coverage src/billing docs`, `lexicon draft src/billing`), so an adoption
+can settle one subsystem's vocabulary first. Each path is relative to the project
+root or absolute inside it; a path outside the root, or one that does not exist,
+is refused. The config's `ignore` list and the project-file rules still apply
+inside the paths, components still come from every spec, and the output names the
+paths it read (`population.paths` in `--json`, `read` in a draft).
 
 ## Propose and apply a change
 
@@ -167,6 +176,7 @@ claim that a fresh live host session has been observed.
 ```sh
 node src/cli.ts lexicon draft
 node src/cli.ts lexicon draft --out .coherence/lexicon/draft.json
+node src/cli.ts lexicon draft src/billing docs
 ```
 
 A draft lists candidates, usage-based collision questions, existing vocabulary, and

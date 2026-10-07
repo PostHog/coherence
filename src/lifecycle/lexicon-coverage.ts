@@ -27,9 +27,10 @@
  * rejected for that same concept, or a Coherence concept an adopter's code
  * declares with its own sense.
  */
+import { existsSync, realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createHash, type Hash } from "node:crypto";
-import { dirname } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { loadJournal } from "../journal/store.ts";
 import {
   readCorpus,
@@ -42,7 +43,7 @@ import {
   type Concept,
   type Lexicon,
 } from "./lexicon.ts";
-import { isCoherenceItself, loadProjectLexicons, vocabularyFacts } from "./project.ts";
+import { isCoherenceItself, loadProjectLexicons, vocabularyFacts, within } from "./project.ts";
 import { BASELINE_CHOSE } from "./lexicon-baseline.ts";
 import { FUNCTION_WORD_SET, STOPLIST } from "./stoplist.ts";
 import { clean, proseNominations, type Nomination } from "./nomination.ts";
@@ -101,6 +102,8 @@ export interface Coverage {
   fingerprint: string;
   population: {
     files: { file: string; kind: string; lines: number }[];
+    /** The project-relative paths the reading was narrowed to; absent when it read the whole project. */
+    paths?: string[];
     excluded: UnreadablePath[];
     unreadable: UnreadablePath[];
     extraction: string;
@@ -398,9 +401,35 @@ export async function liveUses(
   return { uses: found.slice(0, limit), total: found.length };
 }
 
+/**
+ * The paths a reading is narrowed to, each as the project-relative path its
+ * corpus files are named under: relative to the root or absolute inside it,
+ * and existing. A path outside the root, or one that does not exist, is
+ * refused rather than read as nothing. The root itself is "".
+ */
+export function readingPaths(root: string, given: readonly string[]): string[] {
+  const base = realpathSync(resolve(root));
+  const outside = (path: string): Error =>
+    new Error(`${path} is outside the project root ${resolve(root)}; name a folder or file inside it`);
+  return [...new Set(given.map((path) => {
+    const full = resolve(root, path);
+    if (!within(root, full)) throw outside(path);
+    if (!existsSync(full)) throw new Error(`${path} does not exist under the project root ${resolve(root)}`);
+    const rel = relative(base, realpathSync(full));
+    if (rel.startsWith("..") || isAbsolute(rel)) throw outside(path);
+    return rel.split(sep).join("/");
+  }))].sort();
+}
+
+/** Whether a corpus file lies under one of the reading's paths; every file does when the reading is not narrowed. */
+function underPaths(file: string, paths: readonly string[] | undefined): boolean {
+  return paths === undefined || paths.some((p) => p === "" || file === p || file.startsWith(p + "/"));
+}
+
 export async function lexiconCoverage(
   root: string,
   layers?: { coherence: Lexicon; project: Lexicon | undefined },
+  paths?: readonly string[],
 ): Promise<Coverage> {
   const { coherence, project } = layers ?? (await loadProjectLexicons(root));
   // Coherence's own lexicon is the project's only in Coherence's own checkout; an adopter without lexicon.json has none yet.
@@ -500,7 +529,9 @@ export async function lexiconCoverage(
     if (site && !entry.sites.some((u) => u.file === site.file && u.line === site.line)) entry.sites.push(site);
     pool.set(term, entry);
   };
-  for (const f of corpus.files) {
+  // Components come from every spec in the corpus; only the files under the given paths are read for uses.
+  const read = corpus.files.filter((f) => underPaths(f.rel, paths));
+  for (const f of read) {
     const fileFingerprint = digest(
       f.lines.filter(
         (line) => !(f.kind === "record" && isLexiconDecision(line)),
@@ -746,11 +777,15 @@ export async function lexiconCoverage(
       };
     });
   const population: Coverage["population"] = {
-    files: corpus.files
+    files: read
       .map((f) => ({ file: f.rel, kind: f.kind, lines: f.lines.length }))
       .sort((a, b) => a.file.localeCompare(b.file)),
-    excluded: corpus.excluded.sort((a, b) => a.file.localeCompare(b.file)),
-    unreadable: corpus.unreadable,
+    ...(paths ? { paths: [...paths] } : {}),
+    // A narrowed reading reports what was left out under its paths, and any excluded folder a path lies inside.
+    excluded: corpus.excluded
+      .filter((e) => underPaths(e.file, paths) || (paths ?? []).some((p) => p.startsWith(e.file + "/")))
+      .sort((a, b) => a.file.localeCompare(b.file)),
+    unreadable: corpus.unreadable.filter((u) => underPaths(u.file, paths)),
     extraction:
       `Exact declared phrases in every kind. Candidates: from code, declared and exported names and the fields of exported types only; from prose and records, Title Case away from a sentence start, heading words, and single backticked words; declared component folders. A candidate stands only when prose writes it as a name on three lines, or on two across two components, or, for a name code declares (fields of exported types included), when prose writes it as words on ten lines across four components. Never candidates: ids, paths, fragments, punctuation-bearing tokens, general English and programming words, well-known names (list version ${famous.version}, the config's wellKnown, the project's own name), and names the lexicon declares or lists under "not:".`,
     limits: [
@@ -859,6 +894,13 @@ export function attentionText(report: Coverage, cli = "coherence", limit = 5): s
   return lines.join("\n");
 }
 
+/** The line that says which paths a narrowed reading read, and how many files it found under them. */
+export function readLine(report: Coverage): string {
+  const paths = report.population.paths ?? [];
+  const n = report.population.files.length;
+  return `Read only under ${paths.map((p) => p || ".").join(", ")}: ${n} ${n === 1 ? "file" : "files"}.`;
+}
+
 export function coverageText(
   report: Coverage,
   term?: string,
@@ -895,6 +937,7 @@ export function coverageText(
   const { undefinedTerms, senses } = attention(report);
   const lead = attentionText(report, "coherence", 5);
   return [
+    ...(report.population.paths ? [readLine(report), ""] : []),
     lead === "" ? "No recurring term lacks a definition, and no use's sense is at risk." : lead,
     ...(undefinedTerms.length
       ? ["", "Recurring terms without a definition (prose lines, components, first prose use):",

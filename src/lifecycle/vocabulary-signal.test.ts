@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { attention, attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { runHook } from "./hook.ts";
+import { lexiconWorkCommand } from "./lexicon-cli.ts";
 import { FUNCTION_WORDS, STOPLIST } from "./stoplist.ts";
 
 const COMPONENTS = ["books", "sales", "stock", "staff"];
@@ -290,5 +291,48 @@ test("coverage reads only inside the config's bounds: a folder the ignore list n
     assert.ok(found.includes("premium"), `a term inside the bounds is still observed: ${found.join(", ")}`);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("coverage and draft read only under the paths they are given: candidates come from those files alone, the ignore list still holds, and a path outside the root or one that does not exist is refused", async () => {
+  const root = project({ ignore: ["books/vendor"] });
+  const outside = mkdtempSync(join(tmpdir(), "coherence-vocabulary-outside-"));
+  const out: string[] = [];
+  const err: string[] = [];
+  const io = { cwd: root, out: (line: string) => out.push(line), err: (line: string) => err.push(line) };
+  try {
+    writeFileSync(join(root, "books", "notes.md"), "The `Folio` is new.\nEvery `Folio` is billed.\nA `Folio` closes.\n");
+    writeFileSync(join(root, "sales", "notes.md"), "The `Tender` is new.\nEvery `Tender` is billed.\nA `Tender` closes.\n");
+    mkdirSync(join(root, "books", "vendor"));
+    writeFileSync(join(root, "books", "vendor", "lib.md"), "The `Gizmotron` runs.\nEach `Gizmotron` stops.\nA `Gizmotron` waits.\n");
+    // With no paths the whole project is read, as before.
+    const whole = await lexiconCoverage(root);
+    assert.equal(whole.population.paths, undefined, "a reading with no paths names none");
+    assert.ok(candidates(whole).includes("folio") && candidates(whole).includes("tender"), `the whole project: ${candidates(whole).join(", ")}`);
+    // A relative path and an absolute one inside the root read the same files.
+    assert.equal(await lexiconWorkCommand(["coverage", "books", "--json"], io), 0, err.join("\n"));
+    const narrowed = JSON.parse(out.join("\n")) as Coverage;
+    assert.deepEqual(narrowed.population.paths, ["books"]);
+    assert.ok(narrowed.population.files.every((f) => f.file.startsWith("books/")), `a file outside the path was read: ${narrowed.population.files.map((f) => f.file).join(", ")}`);
+    assert.ok(candidates(narrowed).includes("folio"), `a term under the path is a candidate: ${candidates(narrowed).join(", ")}`);
+    assert.ok(!terms(narrowed).includes("tender"), "a term only another folder writes is not observed");
+    assert.ok(!terms(narrowed).includes("gizmotron"), "the ignore list still holds inside the given path");
+    out.length = 0;
+    assert.equal(await lexiconWorkCommand(["coverage", join(root, "books")], io), 0, err.join("\n"));
+    assert.match(out.join("\n").split("\n")[0] ?? "", /^Read only under books: \d+ files?\.$/,"the text names the paths it read");
+    out.length = 0;
+    assert.equal(await lexiconWorkCommand(["draft", "sales"], io), 0, err.join("\n"));
+    const draft = JSON.parse(out.join("\n")) as { read: { paths: string[] }; candidates: { name: string }[] };
+    assert.deepEqual(draft.read.paths, ["sales"], "the draft names the paths it read");
+    assert.deepEqual(draft.candidates.map((c) => c.name), ["tender"]);
+    // Outside the root, or missing: refused, never read as nothing.
+    for (const [given, reason] of [[outside, /outside the project root/], ["..", /outside the project root/], ["orders-missing", /does not exist/]] as const) {
+      err.length = 0;
+      assert.equal(await lexiconWorkCommand(["draft", given], io), 1, `${given} was not refused`);
+      assert.match(err.join("\n"), reason);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
   }
 });
