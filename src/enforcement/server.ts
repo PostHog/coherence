@@ -58,6 +58,7 @@ import { fileURLToPath } from "node:url";
 import type { Definition, Ladder, LanguageAdapter, Refutation, ReferenceSite, ResolveHint, Resolved, Visibility } from "../adapters/adapter.ts";
 import { adapterFor, type Language } from "../adapters/index.ts";
 import { readEnforcementConfig } from "./config.ts";
+import { codeFingerprint } from "./code-fingerprint.ts";
 
 export const RUN_DIR = join(".coherence", "run");
 export const DEFAULT_IDLE_MS = 5 * 60 * 1000;
@@ -82,50 +83,11 @@ const HTTP_REQUEST_MS = 10_000;
 const HTTP_MAX_CONNECTIONS = 64;
 const CODE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CLI = join(CODE_DIR, `cli${extname(fileURLToPath(import.meta.url))}`);
-const PACKAGE_JSON = join(CODE_DIR, "..", "package.json");
-const CODE_FILE = /\.(ts|mts|cts|js|mjs|cjs|json)$/;
 
 /* ------------------------------------------------------ code fingerprint */
 
-/**
- * Mixed into the fingerprint when set: a test's way to make two processes
- * disagree about their code without editing it. Inherited by a spawned server.
- */
-export const CODE_SALT_ENV = "COHERENCE_CODE_SALT";
-
-function codeFiles(dir: string, into: string[]): string[] {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) codeFiles(path, into);
-    else if (entry.isFile() && CODE_FILE.test(entry.name) && !entry.name.includes(".test.")) into.push(path);
-  }
-  return into;
-}
-
-/**
- * The identity of the Coherence code on disk: a hash of every source file
- * under this installation's src (tests aside) and of package.json. Read from
- * disk each time, so a client compares a running server with the code as it
- * is now.
- */
-export function codeFingerprint(): string {
-  const hash = createHash("sha256");
-  const files = codeFiles(CODE_DIR, []).sort();
-  if (existsSync(PACKAGE_JSON)) files.push(PACKAGE_JSON);
-  for (const file of files) {
-    hash.update(relative(CODE_DIR, file)).update("\0");
-    try {
-      hash.update(readFileSync(file));
-    } catch {
-      hash.update("<unreadable>");
-    }
-    hash.update("\0");
-  }
-  const salt = process.env[CODE_SALT_ENV];
-  if (salt !== undefined && salt !== "") hash.update(`salt\0${salt}`);
-  return hash.digest("hex").slice(0, 16);
-}
+// The fingerprint lives beside the parses keyed by it; the server reports it and replaces a server running other code.
+export { CODE_SALT_ENV, codeFingerprint } from "./code-fingerprint.ts";
 
 /* ---------------------------------------------------------------- paths */
 

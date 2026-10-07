@@ -1,23 +1,30 @@
 /**
  * One synthetic project at any size, for the hooks' size-independence tests:
  * the same shape at 1× and at 10×, with ten times the components, the
- * practices, the files and the lines. Every component is the same size, so a
- * hook whose work is its own component's does the same work at both sizes,
- * and one whose work grows with the project does not.
+ * practices, the files, the lines, the lexicon and the history, at the same
+ * folder depth. Every small component is the same size, so a hook whose
+ * work is its own files' does the same work at both sizes, and one whose
+ * work grows with the project, its breadth or its history does not.
  *
- *   <top>/                      a git repository whose host settings sit here
+ *   <top>/                         a git repository whose host settings sit here
  *     .claude/settings.json
- *     other/note-<k>.md         a folder that is no project, 4 × scale files
- *     proj/                     the project, with its own host settings
+ *     other/note-<k>.md            a folder that is no project, 4 × scale files
+ *     proj/                        the project, with its own host settings
  *       .claude/settings.json
- *       coherence.config.json
- *       src/c<i>/C<i>.spec.md   3 × scale components, each with a chokepoint
- *       src/c<i>/C<i>.practice.md     invariant and a practice fired by
- *       src/c<i>/m.ts                 `deploy<i>`, its source and its notes;
- *       src/c<i>/secret.ts            m.ts spells no chokepoint name, so an
- *                                     edit to it touches no invariant
- *       src/c<i>/README.md
- *       docs/note-<k>.md        4 × scale notes in no component
+ *       coherence.config.json      names the project lexicon
+ *       lexicon.json               10 × scale concepts
+ *       Sized.spec.md              the root component: every file below in no
+ *       README.md                  other component is its own
+ *       src/c<i>/C<i>.spec.md      3 × scale small components, each with a
+ *       src/c<i>/C<i>.practice.md  chokepoint invariant and a practice fired by
+ *       src/c<i>/m.ts              `deploy<i>`, its source and its notes;
+ *       src/c<i>/secret.ts         m.ts spells no chokepoint name, so an edit
+ *       src/c<i>/README.md         to it touches no invariant
+ *       src/big/Big.spec.md        one component of 6 × scale notes
+ *       src/big/part-<k>.md
+ *       docs/note-<k>.md           4 × scale notes in the root component
+ *       .coherence/runs/h<k>.jsonl     2 × scale run files of 3 runs each
+ *       .coherence/journal/h<k>.jsonl  2 × scale journal files of 5 records each
  */
 
 import { spawnSync } from "node:child_process";
@@ -32,7 +39,7 @@ export interface SizedProject {
   root: string;
   /** A folder inside the repository that is no project. */
   other: string;
-  /** The components, project-relative. */
+  /** The small components, project-relative. */
   components: string[];
 }
 
@@ -54,24 +61,28 @@ function secret(i: number): string {
   return [`export const SECRET_${i} = "s${i}";`, `export function seal${i}(): string {`, `  return SECRET_${i}.slice(1);`, "}", ""].join("\n");
 }
 
-function spec(i: number): string {
-  return [
-    `# C${i}`,
-    "",
-    `Component ${i} of the sized fixture.`,
-    "",
-    "## invariants",
-    `- secret ${i} leaves through its seal: SECRET_${i} is read only by seal${i}.`,
-    `  protects: SECRET_${i}`,
-    `  chokepoint: seal${i}`,
-    "  because: a fixture",
-    "  kinds: none",
-    "",
-  ].join("\n");
+function spec(title: string, invariant?: number): string {
+  const lines = [`# ${title}`, "", `The ${title} part of the sized fixture.`, ""];
+  if (invariant !== undefined) {
+    const i = invariant;
+    lines.push("## invariants", `- secret ${i} leaves through its seal: SECRET_${i} is read only by seal${i}.`, `  protects: SECRET_${i}`, `  chokepoint: seal${i}`, "  because: a fixture", "  kinds: none", "");
+  }
+  return lines.join("\n");
 }
 
 function practice(i: number): string {
   return [`- release ${i}: A release is cut only from a green line.`, `  when: command deploy${i}`, "  step: run the checks", "  step: cut the release", "  reach: internal", "  because: fixture", ""].join("\n");
+}
+
+/** One run record, as `run` appends it, checking component i's chokepoint invariant. */
+function run(at: string, i: number): string {
+  const entry = { component: `src/c${i}`, name: `secret ${i} leaves through its seal`, form: "chokepoint", verdict: "pass", refutation: "automatic", bypasses: [], testReferences: 0, files: [`src/c${i}/secret.ts`], latency: 5, reason: "fixture" };
+  return JSON.stringify({ at, session: "history", agent: "fixture", binding: "none", commit: null, dirty: false, instrument: { language: "typescript", server: "warm" }, latency: 5, invariants: [entry] });
+}
+
+/** One journal decision, as decide appends it, long before any session the tests run. */
+function decision(at: string, n: number): string {
+  return JSON.stringify({ id: `d-${n.toString(16).padStart(8, "0")}`, kind: "decision", at, session: `history-${n}`, agent: "fixture", commit: null, dirty: false, chose: `choice ${n}`, over: [`another ${n}`], because: "fixture history" });
 }
 
 /** The project at `scale` (1 or 10, any positive integer), committed in a fresh repository. */
@@ -80,24 +91,35 @@ export function sizedProject(scale: number): SizedProject {
   const top = realpathSync(mkdtempSync(join(tmpdir(), `coherence-sized-${scale}-`)));
   const root = join(top, "proj");
   const other = join(top, "other");
+  const concepts = Array.from({ length: 10 * scale }, (_, n) => ({ name: `gizmo ${n}`, definition: `the fixture's gizmo number ${n}` }));
   const files: Record<string, string> = {
     ".claude/settings.json": "{}\n",
     "proj/.claude/settings.json": "{}\n",
-    "proj/coherence.config.json": JSON.stringify({ name: "sized" }) + "\n",
+    "proj/coherence.config.json": JSON.stringify({ name: "sized", lexicon: "lexicon.json" }) + "\n",
+    "proj/lexicon.json": JSON.stringify({ project: "sized", concepts }, null, 2) + "\n",
+    "proj/Sized.spec.md": spec("Sized"),
+    "proj/README.md": "# Sized\n\n" + notes(20, 0),
+    "proj/src/big/Big.spec.md": spec("Big"),
   };
   const components: string[] = [];
   for (let i = 0; i < 3 * scale; i++) {
     const folder = `src/c${i}`;
     components.push(folder);
-    files[`proj/${folder}/C${i}.spec.md`] = spec(i);
+    files[`proj/${folder}/C${i}.spec.md`] = spec(`C${i}`, i);
     files[`proj/${folder}/C${i}.practice.md`] = practice(i);
     files[`proj/${folder}/m.ts`] = source(i);
     files[`proj/${folder}/secret.ts`] = secret(i);
     files[`proj/${folder}/README.md`] = `# Notes on c${i}\n\n` + notes(12, i);
   }
+  for (let k = 0; k < 6 * scale; k++) files[`proj/src/big/part-${k}.md`] = `# Part ${k}\n\n` + notes(30, k);
   for (let k = 0; k < 4 * scale; k++) {
     files[`proj/docs/note-${k}.md`] = `# Note ${k}\n\n` + notes(40, k);
     files[`other/note-${k}.md`] = notes(40, k);
+  }
+  for (let k = 0; k < 2 * scale; k++) {
+    const day = `2026-01-${String((k % 28) + 1).padStart(2, "0")}`;
+    files[`proj/.coherence/runs/h${k}.jsonl`] = [0, 1, 2].map((r) => run(`${day}T0${r}:00:00.000Z`, (k + r) % (3 * scale)) + "\n").join("");
+    files[`proj/.coherence/journal/h${k}.jsonl`] = [0, 1, 2, 3, 4].map((r) => decision(`${day}T1${r}:00:00.000Z`, k * 5 + r) + "\n").join("");
   }
   for (const [path, text] of Object.entries(files)) {
     mkdirSync(dirname(join(top, path)), { recursive: true });
