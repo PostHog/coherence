@@ -28,7 +28,7 @@
  * Without a registry, a project's config is its own file, as before.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "../lifecycle/work-meter.ts";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 

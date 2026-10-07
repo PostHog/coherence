@@ -12,8 +12,9 @@
  * method, and a refusal would train a session to work around it.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "./work-meter.ts";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { keptParses } from "./kept-parse.ts";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { loadSpecModel, projectPractices, type SpecModel } from "../spec/model.ts";
 import { PRACTICE_SUFFIX, firedBy, parsePractices, renderPractice, triggerText, type ToolUse } from "../spec/practice.ts";
@@ -260,21 +261,30 @@ function hasSpec(root: string): boolean {
  * folder, and is parsed; the kernel practices join in an adopter. No spec
  * model, no journal: delivery needs a practice's triggers, steps and version,
  * never its state, and the spec check is what holds the pairing and the
- * evidence. Outside git, the spec model's own reading stands in.
+ * evidence. Outside git, the spec model's own reading stands in. Each
+ * file's parse is kept while its stat stands (kept-parse.ts), so a tool use
+ * reads only a practice file that changed since the last one.
  */
 export function deliveryPractices(root: string): ModelPractice[] {
   const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", `:(glob)**/*${PRACTICE_SUFFIX}`], { cwd: root, encoding: "utf8" });
   if (listed.status !== 0) return projectPractices(root);
   const skip = new Set(configIgnore(root));
+  const folderOf = (rel: string): string => (dirname(rel) === "." ? "." : dirname(rel));
+  const paired = listed.stdout
+    .split("\0")
+    .filter((f) => f !== "" && !underIgnored(f, skip))
+    .sort()
+    .filter((rel) => existsSync(join(root, rel)) && existsSync(join(root, folderOf(rel), `${basename(rel).slice(0, -PRACTICE_SUFFIX.length)}.spec.md`)));
+  const parsed = keptParses(root, "delivery-practices", DELIVERY_PARSE_VERSION, paired, "practice", (text, rel) => parsePractices(text, rel).practices);
   const out: ModelPractice[] = [];
-  for (const rel of listed.stdout.split("\0").filter((f) => f !== "" && !underIgnored(f, skip)).sort()) {
-    const path = join(root, rel);
-    const stem = basename(rel).slice(0, -PRACTICE_SUFFIX.length);
-    const folder = dirname(rel) === "." ? "." : dirname(rel);
-    if (!existsSync(path) || !existsSync(join(root, folder, `${stem}.spec.md`))) continue;
-    for (const practice of parsePractices(readFileSync(path, "utf8"), rel).practices) {
+  for (const rel of paired) {
+    const folder = folderOf(rel);
+    for (const practice of parsed.get(rel) ?? []) {
       out.push({ ...practice, id: `${folder}/${practice.name}`, component: folder, file: rel, state: "candidate", enactments: 0 });
     }
   }
   return isCoherenceTree(root) ? out : [...out, ...kernelPractices()];
 }
+
+/** The shape of a kept practice parse; a store of another shape is read again. */
+const DELIVERY_PARSE_VERSION = "practices-1";

@@ -15,7 +15,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PRACTICE_SUFFIX, RECORD_ID, parsePractices, type Practice } from "./practice.ts";

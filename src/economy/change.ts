@@ -18,7 +18,7 @@
  * sorted by path and every path's sources are in one fixed order.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "../lifecycle/work-meter.ts";
 import { lstatSync } from "node:fs";
 import { resolve } from "node:path";
 import { keepProjectFiles, nestedCheckouts } from "../adapters/project-files.ts";

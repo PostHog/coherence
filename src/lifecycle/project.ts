@@ -7,7 +7,7 @@
  * exists. Coherence's own lexicon travels with this package.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "./work-meter.ts";
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";

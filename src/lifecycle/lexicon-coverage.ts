@@ -32,6 +32,7 @@ import { readFile } from "node:fs/promises";
 import { createHash, type Hash } from "node:crypto";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { loadJournal } from "../journal/store.ts";
+import { countWork } from "./work-meter.ts";
 import {
   readCorpus,
   type UnreadablePath,
@@ -104,6 +105,8 @@ export interface Coverage {
     files: { file: string; kind: string; lines: number }[];
     /** The project-relative paths the reading was narrowed to; absent when it read the whole project. */
     paths?: string[];
+    /** The written files whose components alone the reading read (a reading at an edit), and those components; absent when it read the whole project. */
+    around?: { files: string[]; components: string[] };
     excluded: UnreadablePath[];
     unreadable: UnreadablePath[];
     extraction: string;
@@ -426,11 +429,37 @@ function underPaths(file: string, paths: readonly string[] | undefined): boolean
   return paths === undefined || paths.some((p) => p === "" || file === p || file.startsWith(p + "/"));
 }
 
+/** The component folders the corpus's specs declare, deepest first. */
+function componentFolders(listed: readonly string[]): string[] {
+  return listed
+    .filter((rel) => rel.endsWith(".spec.md"))
+    .map((rel) => dirname(rel))
+    .sort((a, b) => b.length - a.length);
+}
+
+/** The component a file belongs to: the deepest declared folder holding it. */
+function componentOf(file: string, components: readonly string[]): string {
+  return components.find((c) => c === "." || file.startsWith(c + "/")) ?? "(no declared component)";
+}
+
+export interface CoverageScope {
+  /**
+   * Written files: read only the files of the components they lie in (a
+   * reading at an edit). Every context in those components is read whole, so
+   * its evidence and its risk are exact; a candidate that recurs only across
+   * other components is left to the readings that read everything.
+   */
+  around?: readonly string[] | undefined;
+}
+
 export async function lexiconCoverage(
   root: string,
   layers?: { coherence: Lexicon; project: Lexicon | undefined },
   paths?: readonly string[],
+  scope: CoverageScope = {},
 ): Promise<Coverage> {
+  countWork("coverage reading");
+  const around = scope.around;
   const { coherence, project } = layers ?? (await loadProjectLexicons(root));
   // Coherence's own lexicon is the project's only in Coherence's own checkout; an adopter without lexicon.json has none yet.
   const own = await isCoherenceItself(root);
@@ -445,7 +474,19 @@ export async function lexiconCoverage(
         c,
       );
   }
-  const corpus = await readCorpus({ root, coherence, project });
+  // A narrowed reading reads only its files: under the paths, or in the components of the files an edit wrote; the listing still names every component.
+  let wanted: Set<string> | undefined;
+  const select =
+    paths !== undefined
+      ? (rel: string) => underPaths(rel, paths)
+      : around !== undefined
+        ? (rel: string, listed: readonly string[]) => {
+            const folders = componentFolders(listed);
+            wanted ??= new Set(around.map((file) => componentOf(file, folders)));
+            return wanted.has(componentOf(rel, folders));
+          }
+        : undefined;
+  const corpus = await readCorpus({ root, coherence, project }, select);
   const known = new Map<string, KnownMeaning>();
   const senses = new Map<string, Set<string>>();
   const propertyOwners = new Map<string, { concept: Concept; layer: "coherence" | "project" }[]>();
@@ -492,14 +533,9 @@ export async function lexiconCoverage(
     const first = phrase.split(" ")[0]!;
     byFirstWord.set(first, [...(byFirstWord.get(first) ?? []), n]);
   });
-  const components = corpus.files
-    .filter((f) => f.rel.endsWith(".spec.md"))
-    .map((f) => dirname(f.rel))
-    .sort((a, b) => b.length - a.length);
+  const components = componentFolders(corpus.listed);
   const uses = new Map<string, VocabularyUse[]>();
-  const componentFor = (file: string): string =>
-    components.find((c) => c === "." || file.startsWith(c + "/")) ??
-    "(no declared component)";
+  const componentFor = (file: string): string => componentOf(file, components);
   const add = (term: string, use: VocabularyUse): void => {
     if (!term) return;
     const list = uses.get(term) ?? [];
@@ -535,8 +571,10 @@ export async function lexiconCoverage(
     if (site && !entry.sites.some((u) => u.file === site.file && u.line === site.line)) entry.sites.push(site);
     pool.set(term, entry);
   };
-  // Components come from every spec in the corpus; only the files under the given paths are read for uses.
-  const read = corpus.files.filter((f) => underPaths(f.rel, paths));
+  // Components come from every spec in the corpus; only the files the reading was narrowed to were read for uses.
+  const read = corpus.files;
+  // Each test of a line against one phrase, counted here and handed to the work meter once: the scan's per-line cost.
+  let comparisons = 0;
   for (const f of read) {
     const fileFingerprint = digest(
       f.lines.filter(
@@ -564,6 +602,12 @@ export async function lexiconCoverage(
         kind: f.kind,
         fingerprint: f.kind === "record" ? digest(source) : fileFingerprint,
       };
+      // Every test of this line against a phrase goes through here, so the work meter counts the scan's real per-line cost.
+      const writes = (phrase: string, plural = false): boolean => {
+        comparisons += 1;
+        if (normalized.includes(" " + phrase + " ")) return true;
+        return plural && (normalized.includes(" " + phrase + "s ") || normalized.includes(" " + phrase + "es "));
+      };
       const spans: string[] = [];
       const candidates: number[] = [];
       for (const word of new Set(normalized.split(" "))) {
@@ -573,7 +617,7 @@ export async function lexiconCoverage(
       candidates.sort((a, b) => a - b);
       for (const i of candidates) {
         const phrase = phrases[i]!;
-        if (normalized.includes(" " + phrase + " ")) {
+        if (writes(phrase)) {
           add(phrase, use);
           spans.push(phrase);
         }
@@ -616,9 +660,11 @@ export async function lexiconCoverage(
       if (fenced) continue;
       const texts = f.kind === "record" ? recordProse(observed) : [observed];
       // Words inside a known multi-word name on this line are that name's ("order" in "work order"), not another candidate's.
+      // Only the phrases this line's own words start can be on it: a plural changes the last word, never the first.
       const inside = new Set(
-        phrases
-          .filter((p) => p.includes(" ") && (normalized.includes(" " + p + " ") || normalized.includes(" " + p + "s ") || normalized.includes(" " + p + "es ")))
+        candidates
+          .map((i) => phrases[i]!)
+          .filter((p) => p.includes(" ") && writes(p, true))
           .flatMap((p) => p.split(" ").flatMap((w) => [w, w + "s", w + "es"])),
       );
       const runs: Word[][] = [];
@@ -634,6 +680,7 @@ export async function lexiconCoverage(
       proseLines.push({ use, runs });
     }
   }
+  countWork("phrase comparison", comparisons);
   for (const c of components)
     if (c !== ".") {
       const folder = c.split("/").at(-1)!;
@@ -795,6 +842,7 @@ export async function lexiconCoverage(
       .map((f) => ({ file: f.rel, kind: f.kind, lines: f.lines.length }))
       .sort((a, b) => a.file.localeCompare(b.file)),
     ...(paths ? { paths: [...paths] } : {}),
+    ...(around ? { around: { files: [...around], components: [...(wanted ?? [])].sort() } } : {}),
     // A narrowed reading reports what was left out under its paths, and any excluded folder a path lies inside.
     excluded: corpus.excluded
       .filter((e) => underPaths(e.file, paths) || (paths ?? []).some((p) => p.startsWith(e.file + "/")))

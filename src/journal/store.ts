@@ -8,7 +8,7 @@
  * partial last line, and the reader must say so rather than hide it.
  */
 
-import { execFileSync } from "node:child_process";
+import { execFileSync } from "../lifecycle/work-meter.ts";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { JournalError } from "./args.ts";

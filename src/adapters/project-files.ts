@@ -19,7 +19,7 @@
  * this project, so it is never a bypass, never vocabulary, never mass.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "../lifecycle/work-meter.ts";
 import { existsSync, lstatSync, readdirSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { configRecord, repositoryTop } from "./project-config.ts";

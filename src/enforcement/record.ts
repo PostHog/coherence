@@ -18,6 +18,7 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { availableParallelism, loadavg } from "node:os";
 import { join } from "node:path";
+import { keptParses } from "../lifecycle/kept-parse.ts";
 
 export const RUNS_DIR = join(".coherence", "runs");
 
@@ -316,4 +317,32 @@ export function latestFor(latest: ReadonlyMap<string, Latest>, component: string
     chokepoint: latest.get(entryKey(component, name, "chokepoint")),
     totality: latest.get(entryKey(component, name, "totality oracle")),
   };
+}
+
+/** The shape of a kept run-file parse; a store of another shape is read again. */
+const RUN_PARSE_VERSION = "run-chokepoints-1";
+
+/**
+ * The files each chokepoint enforcement's latest run saw, by entryKey: the
+ * view latestByEnforcement gives, narrowed to what the check at an edit asks
+ * of the runs. Each run file's parse is kept while its stat stands
+ * (kept-parse.ts), so an edit reads only a run file that grew since the last.
+ */
+export function latestChokepointFiles(root: string): Map<string, string[]> {
+  const dir = runsDir(root);
+  if (!existsSync(dir)) return new Map();
+  const rels = readdirSync(dir).filter((n) => n.endsWith(".jsonl")).sort().map((n) => `${RUNS_DIR}/${n}`.split("\\").join("/"));
+  const kept = keptParses(root, "run-chokepoints", RUN_PARSE_VERSION, rels, "record", (text) =>
+    text.split("\n").flatMap((line) => {
+      if (line.trim() === "") return [];
+      const parsed = parseLine(line);
+      if (typeof parsed === "string" || "kind" in parsed) return [];
+      return [{ at: parsed.at, entries: parsed.invariants.filter((e) => e.form === "chokepoint").map((e) => ({ key: entryKey(e.component, e.name, e.form), files: e.files })) }];
+    }),
+  );
+  // Ordered as loadRuns orders the records: by time, file order kept between equals.
+  const runs = rels.flatMap((rel) => kept.get(rel) ?? []).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  const out = new Map<string, string[]>();
+  for (const run of runs) for (const entry of run.entries) out.set(entry.key, entry.files);
+  return out;
 }

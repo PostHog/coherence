@@ -715,3 +715,91 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: a session at a registry's top above several leaves has no start or prompt that belongs to a project, so nothing warmed the language server before the first edit's check; on PostHog that edit took 3.1 s cold against the 3 s latency budget, and 2.4 s once the entry had warmed it
   refuted: the first tool use inside a nested project delivered orient without warming its instrument -> "the first tool use inside a nested project warms its instrument, once" went red in registry.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- a tool use that writes nothing costs the same at any size: Around a tool use that writes no file, a Read or an ls, PreToolUse and PostToolUse do the same counted work over a project of 30 components and 30 practices as over one of 3: the same file reads, spawns and requests, with no corpus read, no coverage reading and no spec model.
+  over: a Read and an ls, at PreToolUse and at PostToolUse, over the sized fixture at 1× and at 10×, once practice delivery has kept its parses
+  via: a tool use that writes nothing does the same work at 1× and 10×, and reads no corpus and no coverage
+  because: these two hooks run around every tool call, and each of the three slowdowns that reached users was work that grew with the project on that path: a coverage reading at every PostToolUse, a spec model of a whole folder after a cd, every phrase tested against every line. A count of the work holds under any load and at any size, where a timing flakes and misses scale. Practice delivery keeps each practice file's parse while its stat stands, so only the first command after a practice file changed reads it again; a stat, a walk and a git listing's length are not counted
+  refuted: took the coverage reading at every PostToolUse and prompt again, write or none, over the whole corpus -> "a tool use that writes nothing does the same work at 1× and 10×, and reads no corpus and no coverage" went red in work-meter.test.ts on its own assertion (PostToolUse Read did more work over 30 components than over 3); restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is on one hook call's work
+  checklist: execution-budget declared as a tool use that writes nothing costs the same at any size
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on reads, spawns and readings, not on allocation
+  checklist: circuit-breaker-policy dismissed: no dependency failures are observed
+- an edit costs its own component: An edit to a file inside one component reads, at PreToolUse and at PostToolUse together, each corpus file of the components holding the files it wrote, once, and each file it wrote, once, plus every spec, practice or run file whose stat moved since its parse was kept; its spawns, readings and requests are a constant, and none of it grows with the number of other components, so the counts beside 29 other components equal those beside 2.
+  over: an edit to one component's source at PreToolUse and at PostToolUse over the sized fixture at 1× and at 10×, after the session's first edit kept the parses, touching no chokepoint invariant
+  via: an edit inside one component reads that component and the file it wrote, the same at 1× and 10×
+  because: the edit hooks ran the coverage reading over the whole corpus and loaded the whole spec model at every write, work that grows with every component the edit never touched. The reading at the edit now reads only the edited components, whose contexts it reads whole, and the chokepoint check reads specs parsed once and kept; a term that recurs only across other components is named at the next prompt and at the stop, which read in full. An edit that touches a chokepoint invariant still loads the spec model and asks the instrument: that check is the edit's own requirement, and this bound does not cover it
+  refuted: read the whole corpus for the coverage reading at an edit again, not only the edited component -> "an edit inside one component reads that component and the file it wrote, the same at 1× and 10×" went red in work-meter.test.ts on its own assertion (more reads beside 29 other components than beside 2); restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is on one hook call's work
+  checklist: execution-budget declared as an edit costs its own component
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on reads, spawns and readings, not on allocation
+  checklist: circuit-breaker-policy dismissed: no dependency failures are observed
+- an event outside every project costs a constant: A command or an edit in a folder that is no project, at PreToolUse, PostToolUse or a prompt, and a command a cd took out of the project, read no project file and take no reading, and do the same counted work whatever the size of the project beside them.
+  over: a command, an edit and a prompt in a folder beside the project with the host's settings above both, and a command that cds out of the project, over the sized fixture at 1× and at 10×
+  via: an event outside every project does the same work at 1× and 10×, and reads nothing
+  because: a cd into a folder that is no project once loaded a spec model of the whole folder above it, 5.7 s for one command in a folder of checkouts; an event outside every project is none of the hook's business, so its cost must not depend on what lies around it
+  refuted: hookProject answered a command in a folder that holds no project, beside the nested one, as the repository top's own project -> "an event outside every project does the same work at 1× and 10×, and reads nothing" went red in work-meter.test.ts on its own assertion (the outside events' work grew with the project); restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is on one hook call's work
+  checklist: execution-budget declared as an event outside every project costs a constant
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on reads, spawns and readings, not on allocation
+  checklist: circuit-breaker-policy dismissed: an ignored event has no dependency to fail
+- a prompt over an unchanged tree reads no corpus: A prompt over a tree that has not moved since the session's last prompt reads no project file and takes no coverage reading, and does the same counted work over 30 components as over 3.
+  over: the second of two prompts over the sized fixture at 1× and at 10×
+  via: a prompt over an unchanged tree reads no corpus, the same at 1× and 10×
+  because: the coverage reading walks the whole corpus, and it ran at every prompt; its tree key is two git listings and a stat per changed file, which a count holds where the reading's own seconds would only show as time
+  refuted: took the coverage reading at every prompt again, moved tree or not -> "a prompt over an unchanged tree reads no corpus, the same at 1× and 10×" went red in work-meter.test.ts on its own assertion (the second prompt read the corpus, more of it over 30 components); restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is on one hook call's work
+  checklist: execution-budget declared as a prompt over an unchanged tree reads no corpus
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on reads, spawns and readings, not on allocation
+  checklist: circuit-breaker-policy dismissed: a skipped reading is caught by the stop's full one
+- the coverage scan compares a line with its own words' phrases: The coverage scan tests each line only against the lexicon phrases one of the line's own words starts, so its phrase comparisons grow with the lines and with a line's words, and a lexicon a hundred times larger of names no line's words start adds none.
+  over: the coverage reading of 200 and 400 lines, with a lexicon of 10 and of 1000 unwritten names, and with a word on every line that starts two names
+  via: the coverage scan compares a line only with the phrases its own words start, never with the whole lexicon
+  because: the scan once tested every line against every phrase, about 100 million substring searches on a 434,000-line project; the per-line cost must be the line's own, and every test of a line against a phrase passes one counted function, added to the work meter once per reading so the count costs the scan nothing
+  refuted: tested every prose line against every multi-word phrase of the lexicon again for the words inside a known name -> "the coverage scan compares a line only with the phrases its own words start, never with the whole lexicon" went red in work-meter.test.ts on its own assertion (the larger lexicon added comparisons); restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is on the comparisons per line
+  checklist: execution-budget declared as the coverage scan compares a line with its own words' phrases
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on comparisons, not on allocation
+  checklist: circuit-breaker-policy dismissed: the scan has no dependency to fail
+- every spawn passes the work meter: No source module takes child_process itself: every child process Coherence starts, git or any other, is spawned through the work meter's spawnSync, execFileSync, execFile or spawn, which count it in the open hook scope; tests and test fixtures aside.
+  over: every TypeScript module under src that is not a test or a test fixture
+  via: no source module spawns a child process except through the work meter
+  because: a spawn in a hook is tens of milliseconds paid around every tool call, and a spawn the meter cannot see is one no count can hold; child_process is Node's, so no chokepoint can protect it where the instrument resolves it outside the project, and a scan of every module's imports stands in
+  refuted: practice delivery took spawnSync from node:child_process again -> "no source module spawns a child process except through the work meter" went red in work-meter.test.ts on its own assertion, naming practice-delivery.ts; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is on where a spawn may start
+  checklist: execution-budget declared as a tool call's hooks spawn git a fixed number of times
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on spawned processes, not on allocation
+  checklist: circuit-breaker-policy dismissed: no dependency failures are observed
+- the work meter sees every git a hook spawns: At PreToolUse, PostToolUse and a prompt, the git spawns the work meter counts are the git invocations a shim first on the PATH logs, one for one, at 1× and at 10×.
+  over: a command at PreToolUse and PostToolUse and a prompt over the sized fixture at both sizes, against the counting git shim
+  via: the hooks' git spawns all pass the work meter
+  because: the meter's counts stand in for the shim's in every other size invariant, so they must agree where both can see; the shim proves the meter misses no git, and the meter adds the reads and readings the shim cannot see
+  refuted: project-files.ts took spawnSync from node:child_process again -> "the hooks' git spawns all pass the work meter" went red in work-meter.test.ts on its own assertion (at PostToolUse the meter counted fewer git spawns than the shim logged); restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- the corpus is read only through readCorpus: The corpus listing is reached only by readCorpus, which reads each file through the work meter's door, so every corpus read a reading makes is counted.
+  protects: collectFiles
+  chokepoint: readCorpus
+  because: the coverage reading's corpus reads were the slowdown at every PostToolUse; a reading that listed the corpus and read it on its own would read where no count sees it. The protection is of Coherence's own listing: a module that reads a project file with fs directly is not caught here, and the size invariants are what catch that
+  kinds: none
+- only runHook opens a work scope: A work scope is opened only by runHook, which closes it as the call returns, so the counts a test reads are exactly one hook call's; tests aside.
+  protects: openWork
+  chokepoint: runHook
+  because: a scope opened elsewhere would split a hook call's work between two counts or swallow another's, and a size invariant would then compare the wrong numbers
+  kinds: none

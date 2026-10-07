@@ -69,7 +69,7 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { execFile } from "node:child_process";
+import { closeWork, execFile, openWork, readProjectText, spawn } from "./work-meter.ts";
 import { promisify } from "node:util";
 import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
@@ -80,15 +80,14 @@ import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
 import { recordReadTrace, recordWriteTrace, sessionPatch, snapshotTrace, type Snapshot } from "../economy/trace.ts";
-import { spawn } from "node:child_process";
-import { loadSpecModel, type SpecModel } from "../spec/model.ts";
+import { chokepointIndex, loadSpecModel, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
 import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, type Lexicon } from "./lexicon.ts";
 import { COHERENCE_LEXICON, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, within, type HookProject } from "./project.ts";
 
-import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
+import { attentionText, lexiconCoverage, type Coverage, type CoverageScope } from "./lexicon-coverage.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
@@ -603,13 +602,23 @@ export async function editContext(root: string, input: HookInput, options: HookO
   const own = keepProjectFiles(root, written);
   const files = written.filter((file) => own.has(file));
   if (files.length === 0) return "";
+  // Every chokepoint invariant, from specs parsed once and kept (chokepointIndex): an edit pays for the files it wrote, never for every spec again.
+  let index: ReturnType<typeof chokepointIndex>;
+  try {
+    index = chokepointIndex(root);
+  } catch {
+    return "";
+  }
+  if (index.length === 0) return "";
+  const texts = new Map(files.map((file) => {
+    const absolute = resolve(root, file);
+    return [file, existsSync(absolute) ? readProjectText(absolute, "source") : undefined] as const;
+  }));
+  const touched = [...new Set(index.filter((i) => files.some((file) => mayTouch(i, file, texts.get(file)))).map((i) => i.name))];
+  if (touched.length === 0) return "";
+  // Only a touched invariant is checked, and only then is the whole model loaded: the run needs its states.
   const model = specModelOrNull(root);
   if ("error" in model || model.components.length === 0) return "";
-  const touched = model.components.flatMap((c) => c.invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint") && files.some(file=> {
-    const absolute=resolve(root,file);
-    return mayTouch(i,file,existsSync(absolute) ? readFileSync(absolute,"utf8") : undefined);
-  })).map((i) => i.name));
-  if (touched.length === 0) return "";
   const session = sessionOf(input) ?? "unknown-session";
   const agent = agentOf(input);
   const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: touched, model, adapter: options.adapter, refresh: files });
@@ -818,8 +827,8 @@ export interface HookOptions {
    * WARM_UP; absent (a test), nothing is started.
    */
   warm?: ((root: string) => void) | undefined;
-  /** The vocabulary coverage reading (tests count it); lexiconCoverage by default. */
-  coverage?: ((root: string) => Promise<Coverage>) | undefined;
+  /** The vocabulary coverage reading (tests count it); lexiconCoverage by default. At an edit it is scoped to the components the edit wrote in. */
+  coverage?: ((root: string, scope?: CoverageScope) => Promise<Coverage>) | undefined;
   /** When the hook's process started (epoch ms), so a call's time counts loading the code; the call's own start when absent. */
   startedAt?: number | undefined;
 }
@@ -1040,6 +1049,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
   // One spec model per event, shared by every part of its answer; the body stays inside runHook, the chokepoint for its exit codes.
   const outer = eventModels;
   eventModels = new Map();
+  // The work this call does is counted in its own scope (work-meter.ts), which a test reads once the call returns.
+  const work = openWork();
   const began = options.startedAt ?? Date.now();
   const installed = installedRoot(fallbackRoot);
   const given = typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : fallbackRoot;
@@ -1057,6 +1068,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     return timed(await answer());
   } finally {
     eventModels = outer;
+    closeWork(work);
   }
 
   /** A session start above a project it has not entered names the project in one line; every other event says nothing. Nothing is read or written. */
@@ -1189,10 +1201,14 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const edit = event === "PostToolUse" ? await editContext(root, input, { ...options, host }) : "";
         // The coverage reading walks the whole corpus (seconds on a real project), so it runs only when the text can have moved:
         // after a tool use that wrote a project file, and at a prompt when the tree moved since this session's last reading.
+        // At an edit it reads only the components the edit wrote in, so an edit costs its own component, never the project;
+        // a term that recurs only across other components is named at the next prompt and at the stop, which read in full.
         // A write no command line shows is read at the stop, which always reads in full.
         const tree = event === "UserPromptSubmit" && session ? await treeKey(root) : undefined;
         const moved = event === "PostToolUse" ? written.length > 0 : tree === undefined || tree !== lastTreeKey(root, session!);
-        const reading=session && moved && existsSync(baselinePath(root,session)) ? await (options.coverage ?? lexiconCoverage)(root) : undefined;
+        const scope: CoverageScope = event === "PostToolUse" ? { around: written } : {};
+        const coverage = options.coverage ?? ((at: string, narrowed?: CoverageScope) => lexiconCoverage(at, undefined, undefined, narrowed));
+        const reading=session && moved && existsSync(baselinePath(root,session)) ? await coverage(root, scope) : undefined;
         if (reading && session && tree !== undefined) keepTreeKey(root, session, tree);
         const changes=reading && session ? coverageChanges(reading,priorBaseline(root,session)) : [];
         const vocabulary=changes.length ? await vocabularyAtEdit(root, changes) : "";

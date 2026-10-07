@@ -46,7 +46,7 @@
  * before.
  */
 
-import { spawn } from "node:child_process";
+import { countWork, spawn } from "../lifecycle/work-meter.ts";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { createServer as createHttpServer, type IncomingHttpHeaders, type IncomingMessage, type Server as HttpServer, type ServerResponse } from "node:http";
@@ -774,6 +774,7 @@ export class LineClient {
   }
 
   request<T>(method: string, params: unknown[] = [], timeoutMs: number = IMMEDIATE.has(method) ? QUICK_REQUEST_MS : REQUEST_MS): Promise<T> {
+    countWork("server request");
     if (this.closed !== undefined) return Promise.reject(this.closed);
     const id = this.nextId++;
     return new Promise<T>((resolve, reject) => {

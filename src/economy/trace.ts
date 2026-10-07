@@ -19,7 +19,7 @@
  * session ran on.
  */
 
-import { execFileSync } from "node:child_process";
+import { execFileSync } from "../lifecycle/work-meter.ts";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";

@@ -14,11 +14,13 @@
  * declared, unverified.
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
+import { countWork, readProjectText } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
-import { entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type Latest } from "../enforcement/record.ts";
+import { entryKey, latestByEnforcement, latestChokepointFiles, latestFor, loadRuns, witnessedRefutations, type Latest } from "../enforcement/record.ts";
+import { keptParses } from "../lifecycle/kept-parse.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
 import { walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
 import { effectiveConfig } from "../adapters/project-config.ts";
@@ -144,6 +146,47 @@ function parentOf(folder: string, folders: ReadonlySet<string>): string | undefi
   }
 }
 
+/** One chokepoint invariant as the check at an edit reads it: its component, its enforcements, and the files its latest run saw. */
+export interface ChokepointEntry {
+  component: string;
+  name: string;
+  enforcements: Invariant["enforcements"];
+  latest: { form: "chokepoint"; files: string[] }[];
+}
+
+/** The shape of a kept spec parse for the chokepoint index; a store of another shape is read again. */
+const CHOKEPOINT_PARSE_VERSION = "chokepoints-1";
+
+/**
+ * Every chokepoint invariant in the project, the light way an edit can
+ * afford: the specs the spec model would read, each parsed once and kept
+ * while its stat stands (kept-parse.ts), with no state derived, no practice,
+ * handler or journal read. An edit that touches none of them reads no spec;
+ * one that does runs the check, which loads the whole model.
+ */
+export function chokepointIndex(rootGiven: string): ChokepointEntry[] {
+  const root = resolve(rootGiven);
+  const config = readConfig(root);
+  const specs = findSpecs(root, config.ignore).map((path) => relative(root, path).split(sep).join("/"));
+  const parsed = keptParses(root, "chokepoint-index", CHOKEPOINT_PARSE_VERSION, specs, "spec", (text, rel) =>
+    parseSpec(text, rel).invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint")).map((i) => ({ name: i.name, enforcements: i.enforcements })),
+  );
+  const latest = latestChokepointFiles(root);
+  const out: ChokepointEntry[] = [];
+  const seen = new Set<string>();
+  for (const rel of specs) {
+    const folder = folderOf(root, join(root, rel));
+    // A folder holds one spec, as the model reads it: a second is a problem there, and nothing here.
+    if (seen.has(folder)) continue;
+    seen.add(folder);
+    for (const invariant of parsed.get(rel) ?? []) {
+      const files = latest.get(entryKey(folder, invariant.name, "chokepoint"));
+      out.push({ component: folder, name: invariant.name, enforcements: invariant.enforcements, latest: files === undefined ? [] : [{ form: "chokepoint", files }] });
+    }
+  }
+  return out;
+}
+
 export interface LoadOptions {
   seed?: Seed | undefined;
   /** Read .coherence/runs and derive run-informed state (default true). */
@@ -151,6 +194,7 @@ export interface LoadOptions {
 }
 
 export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): SpecModel {
+  countWork("spec model");
   const root = resolve(rootGiven);
   if (!existsSync(root) || !statSync(root).isDirectory()) throw new Error(`${root}: not a folder`);
   const seed = options.seed ?? loadSeed();
@@ -174,7 +218,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       problems.push({ file: rel, line: 1, message: `a folder holds one spec; ${existing.specPath} is already this component's` });
       continue;
     }
-    const parsed = parseSpec(readFileSync(specPath, "utf8"), rel, { seed });
+    const parsed = parseSpec(readProjectText(specPath, "spec"), rel, { seed });
     problems.push(...parsed.problems);
     byFolder.set(folder, { folder, specPath: rel, parsed });
   }
@@ -196,7 +240,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       problems.push({ file: rel, line: 1, message: `a folder holds one practice file; ${practiceFiles.get(folder)!.file} is already this component's` });
       continue;
     }
-    const parsed = parsePractices(readFileSync(join(root, rel), "utf8"), rel);
+    const parsed = parsePractices(readProjectText(join(root, rel), "practice"), rel);
     problems.push(...parsed.problems);
     practiceFiles.set(folder, { file: rel, parsed });
   }
@@ -374,7 +418,7 @@ function entranceGuardProblems(root: string, components: readonly Component[]): 
         if (!SOURCE.test(value)) return false;
         return [owner.folder === "." ? value : `${owner.folder}/${value}`, value].some((path) => {
           const at = resolve(root, path);
-          return existsSync(at) && statSync(at).isFile() && declaresAtTop(readFileSync(at, "utf8"), name);
+          return existsSync(at) && statSync(at).isFile() && declaresAtTop(readProjectText(at, "source"), name);
         });
       });
       if (!named) {
@@ -473,7 +517,7 @@ function handlerFile(root: string, folder: string, handler: string, ignore: read
   for (const candidate of candidates) {
     const path = resolve(root, candidate);
     if (!existsSync(path) || !statSync(path).isFile()) continue;
-    if (declaresAtTop(readFileSync(path, "utf8"), name)) return candidate;
+    if (declaresAtTop(readProjectText(path, "source"), name)) return candidate;
   }
   return {
     reason:

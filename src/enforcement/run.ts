@@ -107,7 +107,7 @@ export interface RunOutcome {
   latency?: LatencyReading;
 }
 
-function chokepointEnforcements(invariant: ModelInvariant): { protects: string; chokepoint: string; from: ChokepointFrom | undefined }[] {
+function chokepointEnforcements(invariant: Pick<ModelInvariant, "enforcements">): { protects: string; chokepoint: string; from: ChokepointFrom | undefined }[] {
   return invariant.enforcements.flatMap((e) => (e.form === "chokepoint" ? [{ protects: e.protects, chokepoint: e.chokepoint, from: e.from }] : []));
 }
 
@@ -116,7 +116,7 @@ function totalityEnforcements(invariant: ModelInvariant): { over: string; via: s
 }
 
 /** Whether a chokepoint invariant may involve a file: its latest run touched it, or the file's text carries one of its names. */
-export function mayTouch(invariant: ModelInvariant, file: string, text: string | undefined): boolean {
+export function mayTouch(invariant: Pick<ModelInvariant, "enforcements"> & { latest: readonly { form: string; files: readonly string[] }[] }, file: string, text: string | undefined): boolean {
   const latest = invariant.latest.find((l) => l.form === "chokepoint");
   if (latest !== undefined && latest.files.includes(file)) return true;
   if (text === undefined) return false;

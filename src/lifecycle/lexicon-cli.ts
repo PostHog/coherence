@@ -184,9 +184,15 @@ export function saveBaseline(
 ): void {
   const path = baselinePath(root, session);
   const previous = existsSync(path) ? priorBaseline(root, session) : undefined;
+  // A reading at an edit read only some components: their contexts replace the baseline's, every other component's stand, and no candidate is dropped.
+  const scoped = report.population.around;
+  const kept = scoped === undefined || previous === undefined
+    ? []
+    : Object.entries(previous).filter(([key]) => key.startsWith(CANDIDATE) || !scoped.components.includes(key.slice(key.indexOf("\n") + 1)));
   cleanWrite(
     path,
     Object.fromEntries([
+      ...kept,
       ...report.terms.flatMap((t) =>
         t.contexts.map((c) => [t.term + "\n" + c.component, c.fingerprint]),
       ),
