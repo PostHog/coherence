@@ -12,8 +12,8 @@
  * order-of-magnitude regression and not noise. A tool hook's budget never
  * exceeds a multiple of the latency budget (3 s) either. On ubuntu-latest
  * (2026-10-07) an event above the products or outside them took about
- * 0.5 s, a tool hook inside a product 4.0 to 4.6 s (over the 3 s latency
- * budget), and the prompt after the change and the stop about 4.3 s.
+ * 0.5 s, a tool hook inside a product 4.0 to 5.3 s (over the 3 s latency
+ * budget), and the prompt after the change and the stop 4.2 to 5.0 s.
  *
  * usage: node bench/scale/run.ts [--keep] [--json <file>]
  * With GITHUB_STEP_SUMMARY set, the timings go to the job summary too.
