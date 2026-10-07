@@ -319,6 +319,8 @@ function relianceEvidenceOf(
   entry: LatestEntry | undefined,
 ): RelianceEvidence {
   if (entry === undefined) return { status: "unknown", reason: "reliance unknown: no run has checked this chokepoint" };
+  // A reference to sites no record holds is unknown evidence, said as such: never an empty set, never legacy.
+  if (entry.sitesUnresolved !== undefined) return { status: "unknown", reason: `reliance unknown: ${entry.sitesUnresolved}` };
   if (entry.sites === undefined) {
     return { status: "unknown", reason: "reliance unknown: run carries no sites; evidence is incomplete (legacy or unavailable)" };
   }
