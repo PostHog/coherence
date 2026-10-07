@@ -6,6 +6,7 @@
  *   node src/cli.ts scaffold control "<entrance>" | --all [--component <folder>] [--whole] [--as guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write]
  *   node src/cli.ts scaffold control --baseline --session <id> --agent <name>
  *   node src/cli.ts scaffold entrances [<folder or file>]
+ *   node src/cli.ts scaffold import tach [<module>...] | --all [--write]
  *
  * The control verb proposes the closure for an entrance with no traced
  * control (control.ts) from the recorded Structure reading when it still
@@ -47,6 +48,7 @@ import { proposeEntrances, renderEntrances, under } from "./entrances.ts";
 import { undeclaredOf } from "../readings/scope/undeclared.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { existsSync } from "node:fs";
+import { IMPORT_USAGE, importVerb } from "./import.ts";
 import { appendInvariant, appendPractice, componentDir, parseCrossing, practiceFileFor, renderGuidance, renderInvariant, renderPractice, scaffoldComponent, ScaffoldError, specsIn, type Form } from "./scaffold.ts";
 
 export const SCAFFOLD_USAGE = [
@@ -56,6 +58,7 @@ export const SCAFFOLD_USAGE = [
   "  scaffold control --baseline --session <id> --agent <name>   record the entrances with no traced control at adoption, so orient names only new ones",
   '  scaffold practice <componentFolder> "<name>" "<sentence>" [--when "<trigger>"] [--write]   a practice bullet with every slot to fill; --write appends it to the practice file beside the spec',
   "  scaffold entrances [<folder or file>]   the ## entrances bullets for the detected entrances no spec declares, by the component that owns each; printed, never written",
+  IMPORT_USAGE,
 ].join("\n");
 
 function usage(message: string): never {
@@ -369,8 +372,12 @@ export function scaffoldCommand(argv: string[], io: Io): number | Promise<number
       return 0;
     }
     if (shape === "control") return controlVerb(rest, io).then(() => 0, (error: unknown) => scaffoldFailure(error, io));
+    if (shape === "import") {
+      importVerb(rest, io);
+      return 0;
+    }
     if (shape === "entrances") return entrancesVerb(rest, io).then(() => 0, (error: unknown) => scaffoldFailure(error, io));
-    usage('scaffold takes "component", "invariant", "practice", "control" or "entrances"');
+    usage('scaffold takes "component", "invariant", "practice", "control", "entrances" or "import"');
   } catch (error) {
     return scaffoldFailure(error, io);
   }

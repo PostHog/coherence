@@ -85,3 +85,25 @@ The command that makes the complete shape the cheapest thing to produce: a compo
   crossing: record -> reading
   refuted: inverted the --whole test in controlVerb, so a named entrance was read whole and recorded and --whole read scoped -> "scaffold control on named entrances with no recorded reading reads only their routes' components, says so, and records nothing; --all alone and --whole read every one and record it" went red in control.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- a boundary draft follows its declaration: scaffold import tach prints one draft spec per module tach.toml declares: the folder its dotted path names, an intent line carrying the product.yaml name and owners and where the module was declared, a totality oracle bullet listing its depends_on, and where an interface names it, a totality oracle bullet listing what it exposes and one chokepoint bullet per exposed path, that path as the chokepoint when it names a package, module file or symbol on disk; every slot only a human can fill stays a placeholder, and each draft names via: tests it prints on stderr, which run tach check once and keep one module's diagnostics.
+  over: a synthetic tach.toml of three modules, one with a product.yaml and a layer, one utility, one depending on a module by an inline table, and one interface exposing a package and a pattern, drafted by name and with --all
+  via: scaffold import tach drafts each module's spec from tach.toml: its folder, its intent with the product.yaml owners, its declared dependencies, and a chokepoint per exposed path
+  because: a repository that already declares its boundaries by machine, as PostHog's tach.toml does for 101 modules, should not pay an adopter to transcribe them; a draft that guessed a because or a protected internal would pass for a decision nobody made, so only what the declaration states is filled
+  crossing: project-source -> reading
+  refuted: dropped the product.yaml owners from the drafted intent line in renderDraft -> "scaffold import tach drafts each module's spec from tach.toml: its folder, its intent with the product.yaml owners, its declared dependencies, and a chokepoint per exposed path" went red in src/scaffold/import.test.ts; restored, green (2026-10-07)
+  kinds: none
+- a boundary draft never overwrites: scaffold import tach --write creates a draft spec only where the module's folder exists and holds no spec, reports each module it skipped and why, and leaves every existing spec byte for byte; what it writes parses as a component.
+  over: every module of the synthetic tach.toml with --all --write, one folder already holding a spec, and a second --write after a written draft was edited
+  via: scaffold import tach --write creates only the specs that do not exist, reports each one skipped, and what it writes parses
+  because: a spec is the settled claims of a component; drafting from a declaration is worth nothing if a rerun could replace what a human has filled since
+  crossing: reading -> project-source
+  refuted: made writeDrafts see no existing spec and open its file for overwrite -> "scaffold import tach --write creates only the specs that do not exist, reports each one skipped, and what it writes parses" went red in src/scaffold/import.test.ts; restored, green (2026-10-07)
+  kinds: revision
+  checklist: revision-preservation declared as a boundary draft never overwrites
+- a boundary draft refuses what it cannot read: scaffold import tach refuses a malformed tach.toml naming the file and line, refuses a module the file does not declare, and in either case prints and writes no draft.
+  over: an unquoted path value, an expose that is no array, an unknown module named beside a known one, no module named, and an unknown source
+  via: scaffold import tach refuses a malformed tach.toml with its line, and an unknown module, and drafts nothing
+  because: a draft read from a half-parsed file would declare boundaries the repository never declared; a misspelt module drafted as nothing would look like a module with no boundaries
+  crossing: project-source -> reading
+  refuted: let importVerb drop a module tach.toml does not declare instead of refusing it, drafting the known ones -> "scaffold import tach refuses a malformed tach.toml with its line, and an unknown module, and drafts nothing" went red in src/scaffold/import.test.ts; restored, green (2026-10-07)
+  kinds: none
