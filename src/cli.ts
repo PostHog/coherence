@@ -23,6 +23,7 @@
  *   coherence hooks uninstall --host <claude|codex> remove exactly those entries; every other hook stays
  *   coherence hooks --check --host <claude|codex>   exit 1 with each event's drift from what install would write
  *   coherence hooks status             the wiring per agent host and what each event delivers for this project
+ *   coherence telemetry on | off | status | show | reset-id   opt-in fleet telemetry (telemetry.ts)
  *   coherence decide | retract | conjecture | ... | journal   (see JOURNAL_USAGE)
  *   coherence work create | move | close | owner | inspect   (see WORK_USAGE)
  *
@@ -52,6 +53,8 @@ import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
 import { nestedFolder, repositoryTop } from "./adapters/project-files.ts";
 import { registryOf } from "./adapters/project-config.ts";
 import { adopt, AdoptError, adoptText } from "./lifecycle/adopt.ts";
+import { TELEMETRY_USAGE, telemetryCommand } from "./lifecycle/telemetry-cli.ts";
+import { startTelemetry } from "./lifecycle/telemetry.ts";
 
 type CommandResult = number | Promise<number>;
 type RootCommand = (argv: string[], io: Io) => CommandResult;
@@ -74,6 +77,7 @@ ${SCOPE_USAGE}
   coherence hooks uninstall --host <${HOSTS.join("|")}>
   coherence hooks --check --host <${HOSTS.join("|")}> [--command "<prefix>"] [--local]
   coherence hooks status
+${TELEMETRY_USAGE}
 ${JOURNAL_USAGE}
 `;
 
@@ -194,7 +198,7 @@ async function hookCommand(args: string[], root: string): Promise<number> {
   const event = args[0];
   if (event === undefined || !isHookEvent(event)) fail(`hook: expected one of ${HOOK_EVENTS.join(", ")}\n${USAGE}`);
   const input = await readStdinJson(process.stdin);
-  const result = await runHook(event, input, root, { refresh: STRUCTURE_REFRESH, warm: WARM_UP, startedAt: Math.round(performance.timeOrigin) });
+  const result = await runHook(event, input, root, { refresh: STRUCTURE_REFRESH, warm: WARM_UP, telemetry: startTelemetry, startedAt: Math.round(performance.timeOrigin) });
   if (result.stderr !== "") process.stderr.write(result.stderr);
   if (result.stdout !== "") {
     try {
@@ -352,6 +356,8 @@ async function main(argv: string[]): Promise<number> {
       return hookCommand(rest, root);
     case "hooks":
       return hooksCommand(rest, root);
+    case "telemetry":
+      return telemetryCommand(rest, io);
     default:
       fail(verb === undefined ? USAGE : `unknown verb "${verb}"\n${USAGE}`);
   }

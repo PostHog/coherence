@@ -18,6 +18,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# CI never sends telemetry, whatever a user config on the runner says.
+env:
+  COHERENCE_TELEMETRY: "0"
+  DO_NOT_TRACK: "1"
+
 jobs:
   verify:
     runs-on: ubuntu-latest

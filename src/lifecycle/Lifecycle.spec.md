@@ -730,3 +730,48 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: harness -> reading
   refuted: made writtenFiles relative to the root's own spelling again, the file's path unresolved -> "a project behind a symbolic link hears its hooks whichever spelling the host, the cwd and the edited file use" went red in symlink.test.ts on its own assertion, and with the writtenFiles assertions set aside the hook still delivered no practice; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- telemetry is sent only on opt-in: Fleet telemetry queues and sends nothing until the user runs telemetry on, which keeps the choice and a random installation id under the user's config directory, never in the project; DO_NOT_TRACK, COHERENCE_TELEMETRY=0, a build with no PostHog key, and a project's or its registry's "telemetry": false each refuse whatever the user chose, and off forgets the id and drops the queue.
+  over: a user who never opted in, one who did, each environment override, a build with no key, a project that refuses, and an opt-out with events queued
+  via: nothing is queued or sent unless the user opted in, and a project's refusal or the environment always wins
+  because: Coherence runs in other people's code, so the widest self-correction loop may learn from an installation only when its user chose it, and a project or a machine that says no must be heard over any one user's yes (d-c00e7997)
+  refuted: telemetryState ignored a project's "telemetry": false -> "nothing is queued or sent unless the user opted in, and a project's refusal or the environment always wins" went red in telemetry.test.ts on its own assertion (a project's "telemetry": false refuses); restored byte for byte, green batched and alone (2026-10-07)
+  kinds: output
+  checklist: destination-confinement dismissed: events go to one destination, the batch endpoint of the host in telemetry-config.ts, and a redirect is refused
+  checklist: redaction declared as a telemetry event carries only its schema's fields
+  checklist: commit-ordered-effects dismissed: the queue is taken before the send and dropped after it whatever the answer; at most once is the design, and nothing else waits on the send
+  checklist: circuit-breaker-policy dismissed: one attempt per flush with a 5 s timeout and no retry, so a failing PostHog costs one request per session start or stop
+  checklist: declared-target-coverage dismissed: one target, PostHog's batch endpoint, not a registry of targets
+- a telemetry event carries only its schema's fields: Every telemetry event is checked against the schema of the keys and values its kind may carry before it is queued and again before it is sent; a key the schema does not list, or a value outside it, keeps the event out of the queue and out of the batch.
+  over: a session summary and a defect event as built, one with a field added, one with prose in a slug, and one with an extra top-level key, queued and written straight into the queue
+  via: every telemetry event carries only the fields its schema allows, and a field outside it is refused
+  because: the README names each field, and a field added in passing (a path, a project name) would leave every installation that opted in; checking the keys against a list makes the new field fail the day it is written, where a review would have to notice it
+  refuted: schemaProblems let a property its schema does not list through -> "every telemetry event carries only the fields its schema allows, and a field outside it is refused" went red in telemetry.test.ts on its own assertion (the event with a field added had no problems); restored byte for byte, green batched and alone (2026-10-07)
+  kinds: output
+  checklist: destination-confinement dismissed: events go to one destination, the batch endpoint of the host in telemetry-config.ts, and a redirect is refused
+  checklist: redaction declared as a telemetry event carries only its schema's fields
+  checklist: commit-ordered-effects dismissed: the queue is taken before the send and dropped after it whatever the answer; at most once is the design, and nothing else waits on the send
+  checklist: circuit-breaker-policy dismissed: one attempt per flush with a 5 s timeout and no retry, so a failing PostHog costs one request per session start or stop
+  checklist: declared-target-coverage dismissed: one target, PostHog's batch endpoint, not a registry of targets
+- a defect's telemetry carries no defect text: The defect event carries the defect's class as a slug, the kind of its origin (fix, pre-existing or unknown) and how it was caught, from fixed lists, and never its text, evidence, files, the commit or pull request it names, or prose put where a class belongs.
+  over: defects whose text, evidence and files name a path and a project, one whose class is prose, one whose origin names a commit and a pull request, and one with no class, origin or catch
+  via: a defect's telemetry event carries its class, origin and catch, never its text
+  because: a defect's text is the most specific thing Coherence records about a project's code, and the fleet needs only its shape to learn which classes recur (d-c00e7997)
+  refuted: defectClass turned prose put where a class belongs into a slug of its words -> "a defect's telemetry event carries its class, origin and catch, never its text" went red in telemetry.test.ts on its own assertion (a name from the defect's prose reached the queue); restored byte for byte, green batched and alone (2026-10-07)
+  kinds: output
+  checklist: destination-confinement dismissed: events go to one destination, the batch endpoint of the host in telemetry-config.ts, and a redirect is refused
+  checklist: redaction declared as a telemetry event carries only its schema's fields
+  checklist: commit-ordered-effects dismissed: the queue is taken before the send and dropped after it whatever the answer; at most once is the design, and nothing else waits on the send
+  checklist: circuit-breaker-policy dismissed: one attempt per flush with a 5 s timeout and no retry, so a failing PostHog costs one request per session start or stop
+  checklist: declared-target-coverage dismissed: one target, PostHog's batch endpoint, not a registry of targets
+- telemetry adds no wait to a hook: A hook starts telemetry only at a session start or a stop, after its answer is made, and only by spawning the flush detached with its output ignored and unreferenced, when something is queued or a session that is over awaits its summary; queuing an event appends one line and reads nothing back; the send happens in the detached flush, one request with a timeout, dropped after one attempt.
+  over: every hook event with telemetry on, an empty queue, a queued event, a session that is over, and a queue of 500 events taking one more
+  via: telemetry adds no wait to a hook: the flush starts detached at a session start or a stop, and queuing is one appended line
+  because: the tool hooks hold a 3 s latency budget and run around every tool call; a send inside a hook would make the network's latency the user's, and a non-writing PostToolUse on this repository measured 191 ms with telemetry on against 192 ms with it off
+  refuted: startTelemetry left the flush referenced, so the hook's process waits for it -> "telemetry adds no wait to a hook: the flush starts detached at a session start or a stop, and queuing is one appended line" went red in telemetry.test.ts on its own assertion (the hook never holds the child); restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: execution-budget declared as telemetry adds no wait to a hook
+  checklist: bounded-admission dismissed: a flush starts only at a session start or a stop, and only with something to send
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: at most one flush per session start or stop, and one collection summarizes at most 20 sessions
+  checklist: memory-budget dismissed: the queue holds one line per event and is drained at each flush
+  checklist: circuit-breaker-policy dismissed: a send that fails is dropped after one attempt with a 5 s timeout, in the detached flush

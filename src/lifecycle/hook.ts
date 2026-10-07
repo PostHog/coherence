@@ -823,6 +823,12 @@ export interface HookOptions {
   coverage?: ((root: string) => Promise<Coverage>) | undefined;
   /** When the hook's process started (epoch ms), so a call's time counts loading the code; the call's own start when absent. */
   startedAt?: number | undefined;
+  /**
+   * Start the detached telemetry flush at a session start and a stop, once
+   * the answer is made, never waited on. The command line passes startTelemetry, which starts nothing
+   * unless the user opted in; absent (a test), nothing is started.
+   */
+  telemetry?: ((root: string, event: string, input: HookInput) => void) | undefined;
 }
 
 /**
@@ -1083,6 +1089,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     const root = place?.kind === "project" ? place.root : installed ?? given;
     const session = sessionOf(input);
     if (session !== undefined) recordHookTime(root, session, { at: new Date().toISOString(), event, ms });
+    // Last, once the answer is made: a detached flush started earlier would compete with the hook's own work.
+    if (event === "SessionStart" || event === "Stop") options.telemetry?.(root, event, input);
     if (!TOOL_HOOKS.has(event) || result.exit !== 0) return result;
     const line = overBudgetLine(event, ms, latencyBudget(root));
     if (line === "") return result;
