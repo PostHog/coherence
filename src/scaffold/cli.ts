@@ -3,13 +3,19 @@
  *
  *   node src/cli.ts scaffold component <folder> "<intent>"
  *   node src/cli.ts scaffold invariant <componentFolder> "<sentence>" [--name "<name>"] --kinds a,b [--chokepoint|--totality-oracle] [--crossing "a -> b"] [--preview] [--write]
- *   node src/cli.ts scaffold control "<entrance>" | --all [--as guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write]
+ *   node src/cli.ts scaffold control "<entrance>" | --all [--component <folder>] [--whole] [--as guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write]
  *   node src/cli.ts scaffold control --baseline --session <id> --agent <name>
  *   node src/cli.ts scaffold entrances [<folder or file>]
  *
  * The control verb proposes the closure for an entrance with no traced
  * control (control.ts) from the recorded Structure reading when it still
- * describes the tree, else from a reading taken now and recorded.
+ * describes the tree. Else, when the request names entrances (one by name,
+ * or every one --all --component declares), from a reading scoped to their
+ * routes: only the components those routes enter are asked about, the
+ * output says which, and the reading is never recorded; it stands only when
+ * every fact the route rule reads is settled (scopedUnsettled), and the
+ * whole reading is taken otherwise. --all alone, --baseline and --whole read
+ * every component interface now and record the reading.
  *
  * The invariant bullet prints on stdout with every absent slot as a
  * placeholder; the applicable checklist shapes print on stderr as guidance.
@@ -31,7 +37,9 @@ import type { StructurePreview } from "../readings/scope/derive.ts";
 import { loadSeed } from "../spec/seed.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { cliName } from "../lifecycle/hook.ts";
-import { BUDGET_FLAGS, budgetFlags, readComponentInterfaces } from "../readings/scope/component-interfaces.ts";
+import { BUDGET_FLAGS, budgetFlags, readComponentInterfaces, readingAdapter } from "../readings/scope/component-interfaces.ts";
+import type { ScopedReading } from "../readings/scope/model.ts";
+import { scopedUnsettled } from "../readings/scope/scoped-route.ts";
 import { freshReading, gapsOf, readAndRecord, recordGapBaseline, structureState } from "../readings/scope/gaps.ts";
 import { flowOf, flowPartialText } from "../readings/scope/structure-flow.ts";
 import { proposeClosures, renderAll, renderProposal, writeClosure, type Closure, type Proposal } from "./control.ts";
@@ -44,7 +52,7 @@ import { appendInvariant, appendPractice, componentDir, parseCrossing, practiceF
 export const SCAFFOLD_USAGE = [
   '  scaffold component <folder> "<intent>"',
   '  scaffold invariant <componentFolder> "<sentence>" [--name "<name>"] --kinds <a,b|none> [--chokepoint|--totality-oracle] [--crossing "<level> -> <level>"] [--preview] [--write]',
-  `  scaffold control "<entrance>" | --all [--component <folder>] [--as guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write] ${BUDGET_FLAGS}   the closure for an entrance with no traced control: a guard: line, an invariant, or control: none`,
+  `  scaffold control "<entrance>" | --all [--component <folder>] [--whole] [--as guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write] ${BUDGET_FLAGS}   the closure for an entrance with no traced control: a guard: line, an invariant, or control: none; with no recorded reading of the tree, an entrance or a component reads only the components its routes enter, unrecorded (--whole reads and records every one)`,
   "  scaffold control --baseline --session <id> --agent <name>   record the entrances with no traced control at adoption, so orient names only new ones",
   '  scaffold practice <componentFolder> "<name>" "<sentence>" [--when "<trigger>"] [--write]   a practice bullet with every slot to fill; --write appends it to the practice file beside the spec',
   "  scaffold entrances [<folder or file>]   the ## entrances bullets for the detected entrances no spec declares, by the component that owns each; printed, never written",
@@ -135,22 +143,72 @@ function invariantVerb(argv: string[], io: Io): void | Promise<void> {
   );
 }
 
-/** The Structure model the control verb proposes from: the recorded reading while it describes the tree, else one read now (and recorded). */
-async function controlModel(root: string, io: Io, values: ReadonlyMap<string, string>) {
+/** The entrances a request names, when it names some: one by name (in one component), or every one a component declares. */
+type Asked = readonly { component: string; name: string }[] | undefined;
+
+/**
+ * The Structure model the control verb proposes from: the recorded reading
+ * while it describes the tree; else, when the request names entrances, a
+ * reading scoped to their routes, never recorded, standing only when
+ * scopedUnsettled finds nothing it could not settle; else one read whole now
+ * (and recorded). `scope` says what the scoped reading read, when it stood.
+ */
+async function controlModel(root: string, io: Io, values: ReadonlyMap<string, string>, asked: Asked) {
   const fresh = freshReading(root);
   let reading = fresh?.reading;
+  let scope: ScopedReading | undefined;
   if (reading === undefined) {
     const budget = budgetFlags(values);
     if (typeof budget === "string") usage(budget);
-    io.err("reading the component interfaces through the language adapter (no recorded reading describes this tree); this can take minutes");
-    reading = await readAndRecord(root, () => readComponentInterfaces(root, undefined, { budget }));
+    const adapter = readingAdapter(root, budget);
+    try {
+      if (asked !== undefined) {
+        io.err(`reading only the component interfaces the routes of ${asked.map((e) => e.name).join(", ")} need (no recorded reading describes this tree; --whole reads and records every one)`);
+        const scoped = await readComponentInterfaces(root, adapter, { budget, scope: { entrances: asked } });
+        // A budget the scoped reading spent, the whole one would spend sooner: the partial reading is shown as partial.
+        const state = structureState(root, scoped);
+        const unsettled = scoped.kind === "read" && scoped.partial === undefined ? scopedUnsettled(state, flowOf(state)) : undefined;
+        if (unsettled === undefined) {
+          reading = scoped;
+          scope = scoped.kind === "read" ? scoped.scoped : undefined;
+        } else io.err(`the scoped reading cannot settle ${unsettled} without the interfaces it did not read; reading them all`);
+      }
+      if (reading === undefined) {
+        io.err("reading the component interfaces through the language adapter (no recorded reading describes this tree); this can take minutes");
+        reading = await readAndRecord(root, () => readComponentInterfaces(root, adapter, { budget }));
+      }
+    } finally {
+      await adapter.close();
+    }
   }
   if (reading.kind !== "read") throw new ScaffoldError(`the component interfaces could not be read (${reading.because}), so no route's controls are known`);
   const state = structureState(root, reading);
   const model = flowOf(state);
   const partial = flowPartialText(model);
   if (partial !== undefined) io.err(`${partial}; a gap below may only be a route the reading did not finish`);
-  return { state, model };
+  return { state, model, scope };
+}
+
+/**
+ * The entrances a control request names, read from the specs before any
+ * reading: every entrance called `name` (in `component`, when given), or,
+ * with no name, every entrance `component` declares; undefined for every
+ * entrance (--all alone). A name or a component no spec declares is refused
+ * here, so no reading is spent on it.
+ */
+function askedOf(root: string, name: string | undefined, component: string | undefined): Asked {
+  if (name === undefined && component === undefined) return undefined;
+  const components = loadSpecModel(root, { runs: false }).components;
+  if (component !== undefined && !components.some((c) => c.folder === component)) throw new ScaffoldError(`no component's spec is at ${component}; --component takes a component's folder, as query structure lists them`);
+  const asked = components.flatMap((c) => (component === undefined || c.folder === component ? c.entrances.filter((e) => name === undefined || e.name === name).map((e) => ({ component: c.folder, name: e.name })) : []));
+  if (name !== undefined && asked.length === 0) throw new ScaffoldError(`no entrance is named ${JSON.stringify(name)}; query structure lists them`);
+  return asked;
+}
+
+/** The line that says a proposal came from a scoped reading, and what it read. */
+function scopedLine(scope: ScopedReading | undefined): string | undefined {
+  if (scope === undefined) return undefined;
+  return `scoped reading, not recorded: only the interfaces of ${scope.components.join(", ")}, which the routes of ${scope.entrances.map((e) => e.name).join(", ")} enter, were read; every other component was never asked (--whole reads and records every one)`;
 }
 
 const CLOSURE_KINDS = ["guard", "invariant", "none"] as const;
@@ -173,6 +231,7 @@ function chosen(p: Proposal, as: string | undefined, guard: string | undefined):
 async function controlVerb(argv: string[], io: Io): Promise<void> {
   const parsed = parseFlags(argv, {
     all: "switch",
+    whole: "switch",
     write: "switch",
     baseline: "switch",
     as: "one",
@@ -194,7 +253,8 @@ async function controlVerb(argv: string[], io: Io): Promise<void> {
   const baseline = parsed.switches.has("baseline");
   if (baseline && (all || name !== undefined || parsed.switches.has("write"))) usage("--baseline takes no entrance, --all or --write");
   if (!baseline && (name === undefined) === !all) usage("scaffold control takes an entrance's name, or --all");
-  const { state, model } = await controlModel(root, io, parsed.one);
+  const component = parsed.one.get("component");
+  const { state, model, scope } = await controlModel(root, io, parsed.one, baseline || parsed.switches.has("whole") ? undefined : askedOf(root, all ? undefined : name, component));
   if (baseline) {
     const session = parsed.one.get("session");
     const agent = parsed.one.get("agent");
@@ -208,12 +268,16 @@ async function controlVerb(argv: string[], io: Io): Promise<void> {
   const cli = await cliName(root);
   const as = parsed.one.get("as");
   const guard = parsed.one.get("guard");
+  const scoped = scopedLine(scope);
   if (all) {
-    io.out(renderAll(proposals, cli));
+    // --component names whose gaps: the entrances that component declares.
+    const theirs = component === undefined ? proposals : proposals.filter((p) => p.entrance.owners[0] === component);
+    io.out(renderAll(theirs, cli));
+    if (scoped !== undefined) io.out(scoped);
     if (!parsed.switches.has("write")) return;
     if (as !== undefined && as !== "guard") usage("--all --write writes only guard: lines; write an invariant or control: none one entrance at a time");
     // Bottom-up within each spec, so an inserted line never moves a bullet still to be written.
-    const writable = proposals
+    const writable = theirs
       .filter((p) => p.closures[0]!.kind === "guard")
       .filter((p) => { const c = p.closures[0]!; return c.kind === "guard" && (guard === undefined ? c.rivals.length === 0 : c.symbol === guard); })
       .sort((a, b) => a.specPath.localeCompare(b.specPath) || b.declared.line - a.declared.line);
@@ -221,7 +285,6 @@ async function controlVerb(argv: string[], io: Io): Promise<void> {
     if (writable.length === 0) io.err("no guard: line was written: none is proposed, or each is a choice between symbols (--guard <symbol> makes it)");
     return;
   }
-  const component = parsed.one.get("component");
   const matches = proposals.filter((p) => p.entrance.name === name && (component === undefined || p.entrance.owners[0] === component));
   if (matches.length === 0) {
     const declared = model.entrances.filter((e) => e.name === name && (component === undefined || e.owners[0] === component));
@@ -229,6 +292,7 @@ async function controlVerb(argv: string[], io: Io): Promise<void> {
     const e = declared[0]!;
     const route = model.routes.find((r) => r.entrances.includes(e.id));
     io.out(`${e.name} needs no closure: ${e.noControl !== undefined ? `it declares control: none — ${e.noControl}` : route === undefined ? `it has no route (${e.reason ?? "unresolved"})` : route.traced.length > 0 ? `its route is controlled (${route.traced.map((c) => c.name).join(", ")})` : "it carries trust inside the system's control in"}.`);
+    if (scoped !== undefined) io.out(scoped);
     return;
   }
   if (matches.length > 1) usage(`${matches.length} components declare an entrance named ${JSON.stringify(name)} (${matches.map((p) => p.entrance.owners[0]).join(", ")}); choose with --component <folder>`);
@@ -237,6 +301,7 @@ async function controlVerb(argv: string[], io: Io): Promise<void> {
   // --as puts the chosen closure first, so what is printed is what --write would write.
   const shown: Proposal = as === undefined ? p : { ...p, closures: [...p.closures.filter((c) => c.kind === as), ...p.closures.filter((c) => c.kind !== as)] };
   io.out(renderProposal(shown, cli));
+  if (scoped !== undefined) io.out(scoped);
   if (!parsed.switches.has("write")) return;
   io.out(`wrote ${writeClosure(root, p, chosen(p, as, guard), parsed.one.get("reason"))}`);
 }

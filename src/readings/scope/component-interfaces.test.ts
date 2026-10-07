@@ -15,6 +15,7 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -27,9 +28,14 @@ import { projectFiles } from "../../adapters/project-files.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { answerStructure } from "../query/query.ts";
 import { buildScopePage } from "./build.ts";
+import { proposeClosures, renderProposal, type Proposal } from "../../scaffold/control.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
+import { lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
 import type { InterfaceReading } from "./model.ts";
+import { checked, routedProject } from "./routed-fixture.ts";
+import { scopedUnsettled } from "./scoped-route.ts";
 import { renderView } from "./shell.ts";
+import { flowOf } from "./structure-flow.ts";
 
 const COHERENCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -55,6 +61,8 @@ class TextServer implements LanguageAdapter {
   readonly language = "typescript";
   readonly ladder = { top: "reference-choked" as const, because: "stub", rungs: [] };
   readonly asked: string[] = [];
+  /** Every question put to it, a resolve or a references, by the file it is about. */
+  readonly questions: string[] = [];
   readonly stall = new Set<string>();
   private readonly root: string;
   constructor(root: string) {
@@ -68,6 +76,7 @@ class TextServer implements LanguageAdapter {
   }
   async resolve(name: string): Promise<Resolved> {
     const [symbol, file] = name.split(/\s+in\s+/) as [string, string];
+    this.questions.push(file);
     const line = this.lines(file).findIndex((l) => DECLARATION.exec(l)?.[1] === symbol);
     if (line === -1) return { ok: false, reason: `no ${symbol} in ${file}` };
     const character = this.lines(file)[line]!.indexOf(symbol);
@@ -76,6 +85,7 @@ class TextServer implements LanguageAdapter {
   }
   async references(definition: Definition): Promise<ReferenceSite[]> {
     this.asked.push(definition.name);
+    this.questions.push(definition.file);
     if (this.stall.has(definition.name)) return new Promise(() => {});
     const sites: ReferenceSite[] = [];
     for (const file of projectFiles(this.root).filter((f) => /\.(ts|py)$/.test(f))) {
@@ -281,5 +291,65 @@ test("the interface reading is bounded in time and says when it is partial", { t
     assert.equal(byFlag.kind === "read" && byFlag.partial?.budget, "50 MB", "the flag's memory ceiling outranks the config's");
   } finally {
     configured.remove();
+  }
+});
+
+/** What a proposal says, as the scaffold prints it and as the route it stands on carries it. */
+function proposalShape(p: Proposal): unknown {
+  const { route } = p;
+  return { text: renderProposal(p, "coherence"), entrance: p.entrance.name, closures: p.closures, route: { names: route.names, stops: route.stops, rail: route.rail, trust: route.trust, controls: route.controls, traced: route.traced, partial: route.partial, noTracedControl: route.noTracedControl } };
+}
+
+test("a scoped reading proposes for its entrances what the whole reading proposes, and never asks about a component their routes do not reach", async () => {
+  const { root, remove } = routedProject();
+  try {
+    const whole = await readComponentInterfaces(root, new TextServer(root));
+    const server = new TextServer(root);
+    const scoped = await readComponentInterfaces(root, server, { scope: { entrances: [{ component: "src/api", name: "look" }] } });
+    assert.equal(scoped.kind, "read");
+    if (scoped.kind !== "read" || whole.kind !== "read") return;
+    assert.deepEqual(scoped.scoped?.entrances.map((e) => e.name), ["look", "grab"], "grab is declared where look is, so it may share look's route, and is read too");
+    assert.deepEqual(scoped.scoped?.components, ["src/api", "src/service", "src/store"], "where the routes are declared and handled, and every component their reach enters");
+    assert.ok(scoped.scoped?.maybe.some((m) => m.from === "src/api" && m.to === "src/report"), "the admin code's call into src/report may be an interface, never asked");
+    assert.deepEqual(server.questions.filter((file) => file.startsWith("src/report/")), [], `src/report is never asked about: ${server.questions.join(", ")}`);
+    assert.ok(server.questions.length > 0 && !server.asked.includes("summary") && !server.asked.includes("daily"));
+    const wholeState = checked(structureState(root, whole));
+    const scopedState = checked(structureState(root, scoped));
+    const wholeModel = flowOf(wholeState);
+    const scopedModel = flowOf(scopedState);
+    assert.equal(scopedUnsettled(scopedState, scopedModel), undefined, "every fact the route rule reads is settled");
+    const route = scopedModel.routes.find((r) => r.names.includes("look"))!;
+    assert.deepEqual(route.stops, ["src/api", "src/service", "src/store"], "a route crossing three components");
+    assert.deepEqual(route.names, ["look", "grab"]);
+    const ours = (ps: Proposal[]): unknown[] => ps.filter((p) => ["look", "grab"].includes(p.entrance.name)).map(proposalShape);
+    const fromScoped = proposeClosures(root, scopedState, scopedModel, "typescript");
+    const fromWhole = proposeClosures(root, wholeState, wholeModel, "typescript");
+    assert.deepEqual(fromScoped.map((p) => p.entrance.name), ["look", "grab"], "the scoped reading proposes for its entrances only");
+    assert.deepEqual(ours(fromScoped), ours(fromWhole), "the same route, traced controls and closures as the whole reading");
+    const look = fromScoped.find((p) => p.entrance.name === "look")!.closures[0]!;
+    assert.deepEqual(look.kind === "guard" ? [look.line, look.how] : look.kind, ["guard: check", "traced"], "look passes the verified check its route-mate does not");
+    assert.equal(fromScoped.find((p) => p.entrance.name === "grab")!.closures[0]!.kind, "invariant");
+    // Where a fact the route reads was not read, the reading cannot stand for the whole one, and says which.
+    const unread = structuredClone(scoped);
+    unread.scoped = { ...unread.scoped!, components: ["src/api", "src/service"], maybe: [...unread.scoped!.maybe, { from: "src/service", to: "src/store" }] };
+    const unreadState = checked(structureState(root, unread));
+    assert.match(scopedUnsettled(unreadState, flowOf(unreadState)) ?? "", /src\/store/);
+  } finally {
+    remove();
+  }
+});
+
+test("a scoped reading is never recorded as the tree's reading", async () => {
+  const { root, remove } = routedProject();
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    const scoped = await readComponentInterfaces(root, new TextServer(root), { scope: { entrances: [{ component: "src/api", name: "look" }] } });
+    assert.ok(scoped.kind === "read" && scoped.scoped !== undefined);
+    assert.equal(recordReading(root, scoped, structureFingerprint(root)), false, "a scoped reading is refused");
+    assert.equal(lastReading(root), undefined, "and nothing is kept");
+    const whole = await readComponentInterfaces(root, new TextServer(root));
+    assert.equal(recordReading(root, whole, structureFingerprint(root)), true, "the whole reading of the same tree is kept");
+  } finally {
+    remove();
   }
 });

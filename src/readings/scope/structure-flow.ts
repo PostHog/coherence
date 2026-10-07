@@ -568,6 +568,13 @@ function flowRepresentative(components: Map<string, SpecComponent>, expanded: Se
   return folder;
 }
 
+/** The visible component that stands for each folder at the state's zoom, as flowOf folds them. */
+export function flowRepresentOf(state: ShellState): (folder: string) => string {
+  const byFolder = new Map(state.spec.components.map((component) => [component.folder, component]));
+  const expanded = flowExpanded(state);
+  return (folder) => flowRepresentative(byFolder, expanded, folder);
+}
+
 /* ---------------------------------------------------------- the model */
 
 /**

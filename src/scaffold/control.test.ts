@@ -5,13 +5,15 @@
  */
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { Io } from "../journal/cli.ts";
 import { parseSpec } from "../spec/grammar.ts";
 import { gapProject } from "../readings/scope/gaps-fixture.ts";
-import { readAndRecord, readGapBaseline, structureState } from "../readings/scope/gaps.ts";
+import { lastReading, readAndRecord, readGapBaseline, STRUCTURE_DIR, structureState } from "../readings/scope/gaps.ts";
+import { routedProject } from "../readings/scope/routed-fixture.ts";
 import type { ShellState } from "../readings/scope/model.ts";
 import { flowOf } from "../readings/scope/structure-flow.ts";
 import { scaffoldCommand } from "./cli.ts";
@@ -134,6 +136,41 @@ test("the scaffold control command reads the recorded reading, prints one entran
     assert.equal(await scaffoldCommand(["control", "--baseline", "--session", "s-control", "--agent", "test"], base), 0);
     assert.match(base.lines.join("\n"), /^Baseline taken \(d-[0-9a-f]+\): 2 entrances with no traced control/);
     assert.equal(readGapBaseline(root)?.entrances.size, 2);
+  } finally {
+    remove();
+  }
+});
+
+test("scaffold control on named entrances with no recorded reading reads only their routes' components, says so, and records nothing; --all alone and --whole read every one and record it", { timeout: 120_000 }, async () => {
+  const { root, remove } = routedProject();
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    const one = io(root);
+    assert.equal(await scaffoldCommand(["control", "look"], one), 0, one.errors.join("\n"));
+    const said = one.lines.join("\n");
+    assert.match(said, /^look {2}\(src\/api\/Api\.spec\.md:\d+, trust public\)\n {2}no traced control on its route: look and 1 more, src\/api -> src\/service -> src\/store\n/);
+    assert.match(said, /\nscoped reading, not recorded: only the interfaces of src\/api, src\/service, src\/store, which the routes of look, grab enter, were read; every other component was never asked/);
+    assert.match(one.errors.join("\n"), /reading only the component interfaces the routes of look need/);
+    assert.equal(lastReading(root), undefined, "a scoped reading is never the tree's reading");
+    const theirs = io(root);
+    assert.equal(await scaffoldCommand(["control", "--all", "--component", "src/api"], theirs), 0, theirs.errors.join("\n"));
+    assert.match(theirs.lines.join("\n"), /^2 entrances with no traced control/);
+    assert.match(theirs.lines.at(-1)!, /^scoped reading, not recorded: only the interfaces of src\/api, src\/service, src\/store/);
+    assert.equal(lastReading(root), undefined);
+    const every = io(root);
+    assert.equal(await scaffoldCommand(["control", "--all"], every), 0, every.errors.join("\n"));
+    assert.match(every.errors.join("\n"), /^reading the component interfaces through the language adapter/, "--all alone asks about every entrance: a whole reading");
+    assert.doesNotMatch(every.lines.join("\n"), /scoped reading/);
+    assert.notEqual(lastReading(root), undefined, "and it is recorded");
+    rmSync(join(root, STRUCTURE_DIR), { recursive: true, force: true });
+    const whole = io(root);
+    assert.equal(await scaffoldCommand(["control", "look", "--whole"], whole), 0, whole.errors.join("\n"));
+    assert.equal(whole.lines.join("\n"), one.lines.slice(0, -1).join("\n"), "the same proposal as the whole reading's, less the scoped line");
+    assert.notEqual(lastReading(root), undefined, "the whole reading is recorded");
+    const recorded = io(root);
+    assert.equal(await scaffoldCommand(["control", "look"], recorded), 0);
+    assert.deepEqual(recorded.errors, [], "the recorded reading describes the tree: nothing is read");
+    assert.equal(recorded.lines.join("\n"), whole.lines.join("\n"));
   } finally {
     remove();
   }

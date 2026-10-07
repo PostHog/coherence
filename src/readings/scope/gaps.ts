@@ -198,11 +198,12 @@ function writeAtomically(path: string, text: string): void {
 
 /**
  * Keep a reading for the hooks: only a complete one (read through the
- * adapter, no budget spent), and only when the tree it read is still the tree
+ * adapter, no budget spent, read whole rather than scoped), and only when the tree it read is still the tree
  * (`before`, the fingerprint taken as it started, holds now). True when kept.
  */
 export function recordReading(root: string, reading: InterfaceReading, before: string, ms?: number): boolean {
-  if (reading.kind !== "read" || reading.partial !== undefined) return false;
+  // A scoped reading read only some routes: the gaps orient and Stop read from the record need every one.
+  if (reading.kind !== "read" || reading.partial !== undefined || reading.scoped !== undefined) return false;
   try {
     if (structureFingerprint(root) !== before) return false;
     writeAtomically(readingPath(root), JSON.stringify({ version: RECORD_VERSION, at: new Date().toISOString(), fingerprint: before, reading, ...(ms === undefined ? {} : { ms }) } satisfies Recorded));
