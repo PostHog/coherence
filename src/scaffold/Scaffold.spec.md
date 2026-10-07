@@ -78,3 +78,9 @@ The command that makes the complete shape the cheapest thing to produce: a compo
   crossing: project-source -> reading
   refuted: dropped the page route naming in entranceName, so every page was named page by its file stem -> "scaffold entrances on a Next.js app shaped like ai-chatbot proposes the request proxy, the GET and POST its NextAuth route re-exports, and its page routes, and the filled bullets resolve and cover them" went red in src/scaffold/entrances.test.ts; restored, green (2026-10-05)
   kinds: none
+- scaffold control reads only what a named request needs: With no recorded reading of the tree, scaffold control for an entrance by name, or for every entrance --all --component declares, reads only the components their routes enter, says the reading was scoped and which components it read, and records nothing; --all alone and --whole read every component interface and record the reading, which a later request then reads without a new one.
+  over: one entrance by name, a component's entrances, every entrance, the same entrance with --whole, and the same again after the whole reading was recorded, through the TypeScript adapter
+  via: scaffold control on named entrances with no recorded reading reads only their routes' components, says so, and records nothing; --all alone and --whole read every one and record it
+  because: on a large adopter the whole reading takes minutes, which asking about one entrance should not cost; the gaps orient and Stop read need every route, so only a whole reading is recorded
+  crossing: record -> reading
+  kinds: none

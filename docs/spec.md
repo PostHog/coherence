@@ -36,7 +36,29 @@ node src/cli.ts spec --check [root]   # components, invariants with state, probl
 node src/cli.ts spec --json [root]    # the model
 node src/cli.ts scaffold component <folder> "<intent>"
 node src/cli.ts scaffold invariant <folder> "<sentence>" --kinds a,b [--chokepoint|--totality-oracle] [--crossing "a -> b"] [--preview] [--write]
+node src/cli.ts scaffold control "<entrance>" | --all [--component <folder>] [--whole] [--write]
+node src/cli.ts scaffold control --baseline --session <id> --agent <name>
 ```
+
+`scaffold control` proposes the closure for an entrance with no traced
+control: a `guard:` line, an invariant, or `control: none`. It proposes from
+the recorded Structure reading while that reading still describes the tree.
+When no recorded reading does, and the request names entrances (`"<entrance>"`,
+or `--all --component <folder>` for every entrance that component declares),
+it reads only what their routes need. It resolves those handlers and the
+handlers of every entrance declared beside them, since only those can share
+their route. It follows their reach as the whole reading does, and reads the
+interfaces of a component only when a route enters it. A component no route
+enters is never asked about. The output says the reading was scoped and names
+the components it read. A scoped reading is never recorded, because orient
+and Stop read their gaps from a whole one.
+
+The scoped reading stands only when the facts the route rule needs beyond the
+routes themselves are settled for every tree the unread interfaces allow.
+Those facts are whether a component is a core dependency and which column it
+stands in. When they are not settled, the command reads whole. `--all` alone,
+`--baseline` and `--whole` always read every component interface and record
+the reading. The interface budget flags apply to either reading.
 
 ## The bullet
 
