@@ -166,6 +166,9 @@ export async function vocabularyFacts(root: string): Promise<VocabularyFacts> {
   return facts;
 }
 
+/** The folders under .coherence a project commits: the durable records, and the project's own hook voice. Everything else there is regenerated. */
+export const DURABLE_FOLDERS: readonly string[] = ["journal", "runs", "work", "hooks"];
+
 /**
  * The project a command run from `cwd` acts on: the nearest folder, up to the
  * top of the git checkout it is in, that holds coherence.config.json; failing

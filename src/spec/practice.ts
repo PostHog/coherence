@@ -300,6 +300,8 @@ export function globMatches(glob: string, path: string): boolean {
 /** What a tool use offers a trigger: the command it runs, or the files it writes and the text it adds. */
 export interface ToolUse {
   command: string | undefined;
+  /** The command's simple commands as the shell reads them, when the caller read it so: a trigger then matches whole words of one command, never text inside a quoted argument or a heredoc's body. */
+  commands?: readonly { words: readonly string[] }[];
   writes: string[];
   added: string;
 }
@@ -310,10 +312,24 @@ export function commandMatches(words: string, command: string): boolean {
   return new RegExp(`(?:^|[\\s;&|(/'"])${escaped}(?=$|[\\s;&|)'"])`).test(command);
 }
 
+/** Whether the trigger's words are adjacent words of one simple command; the first may be a program named by its path (./bin/turn-knob). */
+export function commandWordsMatch(words: string, command: readonly string[]): boolean {
+  const wanted = words.trim().split(/\s+/);
+  for (let i = 0; i + wanted.length <= command.length; i += 1) {
+    const first = command[i]!;
+    if (first !== wanted[0] && first.slice(first.lastIndexOf("/") + 1) !== wanted[0]) continue;
+    if (wanted.every((w, k) => k === 0 || command[i + k] === w)) return true;
+  }
+  return false;
+}
+
 /** The first trigger of a practice this tool use fires, described, or undefined. */
 export function firedBy(practice: Practice, use: ToolUse): string | undefined {
   for (const trigger of practice.triggers) {
-    if (trigger.kind === "command" && use.command !== undefined && commandMatches(trigger.words, use.command)) return `command ${trigger.words}`;
+    if (trigger.kind === "command" && use.command !== undefined) {
+      const matched = use.commands === undefined ? commandMatches(trigger.words, use.command) : use.commands.some((c) => commandWordsMatch(trigger.words, c.words));
+      if (matched) return `command ${trigger.words}`;
+    }
     if (trigger.kind === "edit") {
       const file = use.writes.find((w) => globMatches(trigger.glob, w));
       if (file === undefined) continue;

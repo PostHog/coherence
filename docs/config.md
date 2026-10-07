@@ -37,6 +37,7 @@ A totality oracle names a test (its `via:` line); these keys say how to run one.
 | `testJson` | none | One invocation for every test the bullets name at once: an argv array or a string with `{filter}` (a combined name pattern) and `{out}` (where the runner writes its report). The report may be jest-shaped JSON (`testResults[].assertionResults[]` with `ancestorTitles`, `title`, `status`), pytest's JUnit XML, or pytest-json-report's JSON. Without it, tests run one per invocation through `test`. |
 | `testFilterForm` | `regex` | How a name filter is written: `regex` (titles escaped and joined with `\|`, as jest, vitest and node:test read a name pattern) or `pytest` (a `-k` expression). |
 | `testDir` / `testDirs` | `__tests__`, `test`, `tests` | A folder name, or a list, whose files are tests, beside the built-in ones. |
+| `latencyBudget` | `3` | The latency budget: the most seconds a tool hook (PreToolUse, PostToolUse) may take, counted from its process's start. A tool hook over it says so in its own answer; regulate names the session's calls over it, and orient the last week's. These hooks run around every tool call, and a call cycle that feels sluggish is how a hook gets switched off. |
 
 A runner whose report is in none of those shapes (Playwright's JSON report,
 for one) works through `test` and `testMatch` alone, one test per invocation.

@@ -6,7 +6,7 @@
  */
 
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -142,6 +142,12 @@ test("one refresh at a time, started detached without waiting: never twice for o
     writeFileSync(join(root, STRUCTURE_DIR, "refresh.json"), JSON.stringify({ pid: process.pid, at: new Date().toISOString(), fingerprint: "tree-c" }));
     assert.equal(refreshInBackground(root, command, "tree-d"), false, "an unrecognized live process is left alone");
     assert.equal(mark(root).pid, process.pid);
+    // A process whose arguments only spell the question (a test runner handed every test name as its pattern) is no structure query either.
+    const spelled = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)", "--", "--test-name-pattern=query structure prints the routes|another test"], { stdio: "ignore" });
+    pids.push(spelled.pid!);
+    writeFileSync(join(root, STRUCTURE_DIR, "refresh.json"), JSON.stringify({ pid: spelled.pid, at: new Date().toISOString(), fingerprint: "tree-e" }));
+    assert.equal(refreshInBackground(root, command, "tree-f"), false, "a process whose argument spells query structure inside a longer value is left alone");
+    assert.ok(running(spelled.pid!), "and never signalled");
   } finally {
     for (const pid of pids) if (running(pid)) process.kill(pid, "SIGKILL");
     remove();

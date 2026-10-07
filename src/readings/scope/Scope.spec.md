@@ -488,6 +488,7 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   via: one refresh at a time, started detached without waiting: never twice for one tree, a live refresh of an older tree is superseded, and a process that is not a structure query is never signalled
   because: a reading takes a minute to three and holds a language server, so two at once only compete; the tree a session leaves at its stop is the one the next starts on, and a reading of an older tree is refused when it finishes (df-84db9e4f); a pid can be reused, so only a structure query is ever stopped
   crossing: record -> reading
+  refuted: matched query structure anywhere in the command line, not only at its end -> "one refresh at a time, started detached without waiting: never twice for one tree, a live refresh of an older tree is superseded, and a process that is not a structure query is never signalled" went red in gaps.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
 - a session start waits only for a nearly done refresh: A session start that finds the reading stale waits for a refresh of this very tree only when the last reading's duration says it finishes within the wait limit, fifteen seconds, and stops waiting when the reading is kept; it never waits on one that will not, nor on a refresh of another tree.
   over: a refresh of this tree that finishes in under a second, one the last reading's three minutes say will not, and a refresh of another tree

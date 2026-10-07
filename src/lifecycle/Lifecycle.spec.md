@@ -578,3 +578,27 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: a not-run verdict read as a clean edit: on a fresh server every check at the edit came back not run and nothing was said, so the alarm that should have fired on a bypass was quiet; a silent alarm is a vacuous check
   refuted: said nothing for a check the edit could not make -> "an edit says which chokepoint invariants it could not check, and stays silent only for a value the spec writes as prose" went red in hook-speed.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
   kinds: none
+- a tool hook over the latency budget says so: Every hook call's time is kept, counted from its process's start; a PreToolUse or PostToolUse over the latency budget (3 s unless the config declares one) names its own time in its own answer, regulate names the session's calls over it with what the tool hooks cost in all, and orient the last week's.
+  over: a tool hook within the budget, one over it, a session and a week of recorded calls, and a config's own budget
+  via: a tool hook over the latency budget says so in its own answer, and regulate and orient name the calls over it
+  because: the tool hooks run around every tool call, so their time is paid over and over, and a call cycle that feels sluggish gets Coherence switched off, which loses every check at once; a count of git spawns guards the known shape, and the measured time catches what no count names
+  refuted: counted a hook call's time from the call's own start, leaving out its process's start -> "a tool hook over the latency budget says so in its own answer, and regulate and orient name the calls over it" went red in stop-delivery.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: execution-budget declared as a tool call's hooks spawn git a fixed number of times
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is on one hook call's time
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on time, not on allocation
+  checklist: circuit-breaker-policy dismissed: a hook over the budget still answers; the alarm is the response
+- a stop reaches the agent: A main-thread stop says each line once per session; a line naming a practice owed blocks the stop once, so the agent reads the reason, and anything else is shown to the user and carried into the next prompt's context.
+  over: a stop with a practice owed, the stop the block causes, a stop with only advisory lines, the prompt after it, and a stop with nothing new
+  via: a stop says each line once, blocks once for a practice owed, and carries the rest into the next prompt
+  because: the host shows a stop hook's systemMessage to the user and never to the model, so regulate at a main-thread stop reached the one reader who could not act on it in the moment; repeating every line at every stop made it 2.6 KB of what had been said before
+  refuted: held back only a stop the block itself caused, so a practice owed never reached the agent -> "a stop says each line once, blocks once for a practice owed, and carries the rest into the next prompt" went red in stop-delivery.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- a practice fires where its command runs: A command trigger matches whole words of one simple command, never text inside a quoted argument or a heredoc's body; a command a cd took into another project is read against that project's practices, and its enactment is looked for in that project's journal.
+  over: a trigger word as a command, inside a quoted argument, inside a heredoc, and after a cd into another checkout, with its enactment recorded there
+  via: a practice fires on a command's own words, in the project the command runs in, and its enactment counts there
+  because: a practice fired on enact --trigger "command refute" and on the words of a heredoc, and a session whose commands ran in a second worktree was told at every stop that practices it had enacted there were owed, because the firing was kept by the session's root and the enactment by the worktree's journal
+  refuted: read every command against the session's own root, wherever a cd took it -> "a practice fires on a command's own words, in the project the command runs in, and its enactment counts there" went red in stop-delivery.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none

@@ -16,7 +16,7 @@
 
 interface TestEvent {
   type: string;
-  data: { name?: string; nesting?: number; file?: string; skip?: boolean | string; todo?: boolean | string; details?: { error?: unknown } };
+  data: { name?: string; nesting?: number; file?: string; skip?: boolean | string; todo?: boolean | string; details?: { error?: unknown; duration_ms?: number } };
 }
 
 interface AssertionResult {
@@ -26,6 +26,8 @@ interface AssertionResult {
   status: "passed" | "failed" | "skipped";
   /** For a failure, jest's field: the stack of what the test threw (node:test wraps it as the cause of a test failure). */
   failureMessages?: string[];
+  /** Jest's field: how long the test ran, in milliseconds, as the runner measured it. */
+  duration?: number;
 }
 
 /** The stack of the error a failing test threw, unwrapped from node:test's own test-failure error. */
@@ -58,7 +60,8 @@ export default async function* nodeTestReporter(source: AsyncIterable<TestEvent>
     const status: AssertionResult["status"] = event.type === "test:fail" ? "failed" : skipped ? "skipped" : "passed";
     const results = files.get(file) ?? [];
     const failure = status === "failed" ? failureText(data.details?.error) : undefined;
-    results.push({ ancestorTitles, title: name, fullName: [...ancestorTitles, name].join(" "), status, ...(failure === undefined ? {} : { failureMessages: [failure] }) });
+    const duration = data.details?.duration_ms;
+    results.push({ ancestorTitles, title: name, fullName: [...ancestorTitles, name].join(" "), status, ...(failure === undefined ? {} : { failureMessages: [failure] }), ...(typeof duration === "number" ? { duration } : {}) });
     files.set(file, results);
   }
   const testResults = [...files].map(([name, assertionResults]) => ({ name, assertionResults }));

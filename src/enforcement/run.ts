@@ -20,9 +20,10 @@ import { workBinding } from "../journal/work.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
 import { checkChokepoint, type ChokepointResult } from "./check.ts";
 import { readEnforcementConfig, type EnforcementConfig } from "./config.ts";
-import { appendRun, entryKey, loadRuns, type Form, type RunEntry, type RunRecord } from "./record.ts";
+import { appendRun, entryKey, loadRuns, machineLoad, type Form, type RunEntry, type RunRecord } from "./record.ts";
 import { connectAdapter, type RemoteAdapter } from "./server.ts";
 import { runTotalityBatch, runTotalityOracle, type TotalityResult } from "./totality.ts";
+import { readLatency, type LatencyReading } from "./latency.ts";
 import { createObserver, recordObservation, type ObservationOutcome, type TotalityVia } from "../observation/index.ts";
 
 export interface RunOptions {
@@ -93,6 +94,8 @@ export interface RunOutcome {
   each?: EachOutcome;
   /** With `each`: why no per-test record was appended (no totality oracle ran batched). */
   eachSkipped?: string;
+  /** The timing debt this run showed: its tests over their own history. */
+  latency?: LatencyReading;
 }
 
 function chokepointEnforcements(invariant: ModelInvariant): { protects: string; chokepoint: string }[] {
@@ -121,6 +124,7 @@ export function mayTouch(invariant: ModelInvariant, file: string, text: string |
 export async function performRun(root: string, options: RunOptions): Promise<RunOutcome> {
   const now = options.now ?? (() => new Date());
   const started = Date.now();
+  const load = machineLoad();
   const model = options.model ?? loadSpecModel(root);
   const config = readEnforcementConfig(root);
   const wantChokepoints = options.form === undefined || options.form === "chokepoint";
@@ -255,6 +259,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
               latency: fromBatch === undefined ? Date.now() - t0 : batchLatency,
               reason: result.reason,
             }),
+            ...(result.testMs === undefined ? {} : { testMs: result.testMs }),
             mode: fromBatch === undefined ? "one-at-a-time" : "batched",
           },
           totality: result,
@@ -274,10 +279,16 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     dirty,
     instrument,
     latency: Date.now() - started,
+    load,
+    ...(batched === undefined ? {} : { batch: { ms: batchLatency } }),
     invariants: details.map((d) => d.entry),
   };
   const file = appendRun(root, record);
   const outcome: RunOutcome = { record, file, details, instrumentReason, instrumentDied: needsAdapter && instrumentReason !== undefined };
+  if (batched !== undefined) {
+    // Read against the whole store: a test is slower only against its own earlier runs.
+    outcome.latency = { slower: readLatency(loadRuns(root).records).slower.filter((s) => s.at === record.at) };
+  }
   if (options.observe === true) {
     if (observing === undefined || batched === undefined) {
       outcome.observationSkipped = !wantTotality
@@ -389,6 +400,7 @@ async function confirmEach(
     dirty,
     instrument,
     latency: Date.now() - started,
+    load: machineLoad(),
     invariants: details.map((d) => d.entry),
   };
   return { record, details, hidden, unconfirmed };

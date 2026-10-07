@@ -31,6 +31,8 @@ export interface TotalityResult {
   tail: string;
   /** How many reported tests mapped to this via, when the runner reported per test: 0 says no test of that name ran. */
   matched?: number;
+  /** Milliseconds the tests under this via ran, as the runner measured them; absent when the report carried no duration for one of them. */
+  testMs?: number;
   /** The detector did not finish inside its time: the reason says how long it had, and nothing it did counts. */
   unfinished?: true;
 }
@@ -105,6 +107,8 @@ export interface AssertionResult {
   status?: string;
   /** Jest's field: for a failure, the message and stack the runner reported. */
   failureMessages?: string[];
+  /** Jest's field: how long the test ran, in milliseconds. */
+  duration?: number;
 }
 
 export interface JsonReport {
@@ -146,22 +150,27 @@ export function reportFromJunit(xml: string): JsonReport {
     const status = /<(failure|error)\b/.test(inner) ? "failed" : /<skipped\b/.test(inner) ? "skipped" : "passed";
     const classname = attribute("classname");
     const title = attribute("name");
+    const seconds = Number.parseFloat(attribute("time"));
     const ancestorTitles = classname === "" ? [] : classname.split(".");
     const failure = status === "failed" ? /<(?:failure|error)\b[^>]*>([\s\S]*?)<\/(?:failure|error)>/.exec(inner)?.[1] : undefined;
-    results.push({ ancestorTitles, title, fullName: classname === "" ? title : `${classname}.${title}`, status, ...(failure === undefined ? {} : { failureMessages: [decodeXml(failure)] }) });
+    results.push({ ancestorTitles, title, fullName: classname === "" ? title : `${classname}.${title}`, status, ...(failure === undefined ? {} : { failureMessages: [decodeXml(failure)] }), ...(Number.isFinite(seconds) ? { duration: seconds * 1000 } : {}) });
   }
   return { testResults: [{ assertionResults: results }] };
 }
 
 /** pytest-json-report's shape (`tests[].nodeid`, `tests[].outcome`) as the jest shape. */
-function reportFromPytestJson(report: { tests?: { nodeid?: string; outcome?: string; call?: { longrepr?: unknown } }[] }): JsonReport {
+type PytestPhase = { longrepr?: unknown; duration?: number };
+
+function reportFromPytestJson(report: { tests?: { nodeid?: string; outcome?: string; setup?: PytestPhase; call?: PytestPhase; teardown?: PytestPhase }[] }): JsonReport {
   const results: AssertionResult[] = (report.tests ?? []).map((t) => {
     const segments = (t.nodeid ?? "").split("::");
     const title = segments[segments.length - 1] ?? "";
     const outcome = t.outcome ?? "";
     const status = outcome === "passed" || outcome === "xfailed" ? "passed" : outcome === "failed" || outcome === "error" || outcome === "xpassed" ? "failed" : "skipped";
     const longrepr = t.call?.longrepr;
-    return { ancestorTitles: segments.slice(0, -1), title, fullName: t.nodeid ?? title, status, ...(typeof longrepr === "string" ? { failureMessages: [longrepr] } : {}) };
+    // A test's time is its three phases, in seconds, as pytest-json-report measured each.
+    const phases = [t.setup, t.call, t.teardown].map((phase) => phase?.duration).filter((d): d is number => typeof d === "number");
+    return { ancestorTitles: segments.slice(0, -1), title, fullName: t.nodeid ?? title, status, ...(typeof longrepr === "string" ? { failureMessages: [longrepr] } : {}), ...(phases.length === 0 ? {} : { duration: phases.reduce((a, b) => a + b, 0) * 1000 }) };
   });
   return { testResults: [{ assertionResults: results }] };
 }
@@ -211,12 +220,13 @@ export function verdictsFromReport(report: JsonReport, filters: readonly string[
     }
     const failed = mine.filter((r) => r.status === "failed");
     const passed = mine.filter((r) => r.status === "passed");
+    const timed = mine.every((r) => typeof r.duration === "number") ? { testMs: Math.round(mine.reduce((sum, r) => sum + (r.duration ?? 0), 0)) } : {};
     if (failed.length > 0) {
-      out.set(via, { verdict: "fail", reason: `${failed.length} of ${mine.length} tests under "${via}" failed: ${failed.map((r) => r.fullName ?? r.title ?? "?").slice(0, 3).join("; ")}`, command, tail: "", matched: mine.length });
+      out.set(via, { verdict: "fail", reason: `${failed.length} of ${mine.length} tests under "${via}" failed: ${failed.map((r) => r.fullName ?? r.title ?? "?").slice(0, 3).join("; ")}`, command, tail: "", matched: mine.length, ...timed });
     } else if (passed.length === mine.length) {
-      out.set(via, { verdict: "pass", reason: `${passed.length} test${passed.length === 1 ? "" : "s"} under "${via}" passed in one invocation of ${command}`, command, tail: "", matched: mine.length });
+      out.set(via, { verdict: "pass", reason: `${passed.length} test${passed.length === 1 ? "" : "s"} under "${via}" passed in one invocation of ${command}`, command, tail: "", matched: mine.length, ...timed });
     } else {
-      out.set(via, { verdict: "not run", reason: `${mine.length - passed.length} of ${mine.length} tests under "${via}" were skipped or pending`, command, tail: "", matched: mine.length });
+      out.set(via, { verdict: "not run", reason: `${mine.length - passed.length} of ${mine.length} tests under "${via}" were skipped or pending`, command, tail: "", matched: mine.length, ...timed });
     }
   }
   return out;

@@ -16,6 +16,7 @@
  */
 
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { availableParallelism, loadavg } from "node:os";
 import { join } from "node:path";
 
 export const RUNS_DIR = join(".coherence", "runs");
@@ -102,6 +103,8 @@ export interface RunEntry {
   files: string[];
   /** Milliseconds this entry took. */
   latency: number;
+  /** Totality oracle form only: milliseconds its tests ran, as the runner measured them, apart from the invocation around them. */
+  testMs?: number;
   /** One line: why the verdict is what it is. */
   reason: string;
 }
@@ -119,6 +122,10 @@ export interface RunRecord {
   /** Which instrument answered and whether it was already warm. */
   instrument: { language: string; server: "cold" | "warm" | "none" };
   latency: number;
+  /** The machine's one-minute load average and core count as the run started, so a slower test on a busy machine is read against its load. */
+  load?: { average: number; cores: number };
+  /** The one batched test invocation's milliseconds. */
+  batch?: { ms: number };
   invariants: RunEntry[];
 }
 
@@ -154,6 +161,11 @@ export interface Latest extends RunEntry {
 
 export function runsDir(root: string): string {
   return join(root, RUNS_DIR);
+}
+
+/** The machine's one-minute load average and core count, now. */
+export function machineLoad(): { average: number; cores: number } {
+  return { average: Math.round(loadavg()[0]! * 100) / 100, cores: availableParallelism() };
 }
 
 const SESSION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;

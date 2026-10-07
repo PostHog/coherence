@@ -208,3 +208,15 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   checklist: rate-budget dismissed: every answer needs the token, and the server is the user's own
   checklist: memory-budget dismissed: requests carry no body, and answers are the bounded first load and history pages capped at 500 records
   checklist: circuit-breaker-policy dismissed: the server depends on nothing remote
+- a run keeps each test's own time: A totality oracle's entry in a batched run carries the time its tests ran as the runner measured them, read from a jest-shaped report, JUnit XML, or pytest-json-report, and the run carries the machine's load and the batched invocation's time; a test the report gave no time is left untimed, never zero.
+  over: every report shape the batched pass reads, with a test timed and one untimed
+  via: a run records each test's time as its runner measured it, from a jest-shaped report, JUnit XML, and pytest-json-report
+  because: one test's latency inside the one invocation is the whole invocation's (every batched entry carried the same number), so timing debt was invisible per test; the runner already measures each test and the reporter threw it away. An untimed test counted as zero would read as the fastest run it ever had
+  refuted: counted a test the report gave no time as zero milliseconds -> "a run records each test's time as its runner measured it, from a jest-shaped report, JUnit XML, and pytest-json-report" went red in latency.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- a test is slower only against its own history: A test is named slower when its latest time is over 2 s and over twice the median of its own previous timed runs (at least three, at most ten), and the bar rises with how much busier the machine was than its median load for that test.
+  over: a test that doubled, one under the floor, one steadily slow, one with too little history, and one on a machine twice as busy, with and without a session
+  via: a test is slower only against its own history: over twice its median and over the floor, allowing for a busier machine
+  because: an absolute threshold would page constantly (the warm-server test failed only under four parallel suites, df-a67fad63) while a test measured against other tests says nothing about what grew; a ratio with a floor and a load allowance alarms on the shape that cost two weeks (d-55040f81) and stays quiet on a busy machine
+  refuted: dropped the load allowance, so a test on a machine twice as busy met the same bar -> "a test is slower only against its own history: over twice its median and over the floor, allowing for a busier machine" went red in latency.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none

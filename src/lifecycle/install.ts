@@ -46,7 +46,8 @@ import { mkdir, readFile, rm, rmdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
-import { HOSTS, PACKAGE_NAME, SETTINGS_FILE, isHost, type Host } from "./project.ts";
+import { DURABLE_FOLDERS, HOSTS, PACKAGE_NAME, SETTINGS_FILE, isHost, type Host } from "./project.ts";
+export { DURABLE_FOLDERS };
 
 // Where each host keeps its settings, and which hosts there are, live in the project
 // layer: the hook reads them to know which tree it was installed for.
@@ -263,8 +264,6 @@ const STATE_DIR = ".coherence";
 /** The ignore file install writes inside Coherence's own folder. */
 export const IGNORE_FILE = join(STATE_DIR, ".gitignore");
 
-/** The folders under .coherence a project commits: the durable records, and the project's own hook voice. */
-export const DURABLE_FOLDERS: readonly string[] = ["journal", "runs", "work", "hooks"];
 
 /** The exact text install writes; only a file holding exactly this is Coherence's to remove. */
 export const IGNORE_TEXT = [
