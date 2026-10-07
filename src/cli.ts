@@ -42,13 +42,14 @@ import { formatReport, hasFindings, recordVetter, runCheck } from "./lifecycle/c
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
 import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
-import { check, formatCheck, formatStatus, formatUninstall, HOME_VAR, HOSTS, install, isHost, locatedPrefix, locate, settingsRoots, SIBLING, status, uninstall } from "./lifecycle/install.ts";
+import { check, formatCheck, formatStatus, formatUninstall, HOME_VAR, HOSTS, install, isHost, locatedPrefix, locate, settingsFile, settingsRoots, SIBLING, status, uninstall, type SettingsRoot } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectLexicons, PACKAGE_NAME, projectRoot } from "./lifecycle/project.ts";
 import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
 import { SCOPE_USAGE, scopeCommand } from "./readings/scope/cli.ts";
 import { scopeApp } from "./readings/scope/live.ts";
 import { SCAFFOLD_USAGE, scaffoldCommand } from "./scaffold/cli.ts";
 import { SPEC_USAGE, specCommand } from "./spec/cli.ts";
+import { referenceHorizon, repositoryTop } from "./adapters/project-files.ts";
 
 type CommandResult = number | Promise<number>;
 type RootCommand = (argv: string[], io: Io) => CommandResult;
@@ -66,9 +67,9 @@ ${ECONOMY_USAGE}
 ${QUERY_USAGE}
 ${SCOPE_USAGE}
   coherence hook <${HOOK_EVENTS.join("|")}>
-  coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"]
+  coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"] [--local]   --local: the host's personal settings (.claude/settings.local.json), never committed
   coherence hooks uninstall --host <${HOSTS.join("|")}>
-  coherence hooks --check --host <${HOSTS.join("|")}> [--command "<prefix>"]
+  coherence hooks --check --host <${HOSTS.join("|")}> [--command "<prefix>"] [--local]
   coherence hooks status
 ${JOURNAL_USAGE}
 `;
@@ -116,9 +117,10 @@ function parse(args: string[], valued: Set<string>): Parsed {
  * project and fails softly when it is not there (LOCATED_PREFIX), never
  * through npx, which would fetch a stranger's package of the same name.
  */
-async function defaultCommand(root: string, sub = ""): Promise<string> {
-  const dir = '$(dir="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$dir" != "/" ] && [ ! -f "$dir/.claude/settings.json" ] && [ ! -f "$dir/.codex/hooks.json" ]; do dir=$(dirname "$dir"); done; printf "%s" "$dir")';
-  return (await isCoherenceItself(root)) ? `node "${dir}/src/cli.ts"` : locatedPrefix(sub);
+async function defaultCommand(root: string, sub = "", local = false): Promise<string> {
+  const personal = local ? ' && [ ! -f "$dir/.claude/settings.local.json" ]' : "";
+  const dir = `$(dir="\${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$dir" != "/" ] && [ ! -f "$dir/.claude/settings.json" ]${personal} && [ ! -f "$dir/.codex/hooks.json" ]; do dir=$(dirname "$dir"); done; printf "%s" "$dir")`;
+  return (await isCoherenceItself(root)) ? `node "${dir}/src/cli.ts"` : locatedPrefix(sub, local);
 }
 
 /** This checkout's cli, as the located command would name it once resolved. */
@@ -206,9 +208,9 @@ async function hookCommand(args: string[], root: string): Promise<number> {
 
 /** The flags each hooks verb takes; anything else is a usage error rather than silently ignored. */
 const HOOKS_FLAGS: Record<string, ReadonlySet<string>> = {
-  install: new Set(["host", "command"]),
+  install: new Set(["host", "command", "local"]),
   uninstall: new Set(["host"]),
-  check: new Set(["check", "host", "command"]),
+  check: new Set(["check", "host", "command", "local"]),
   status: new Set(),
 };
 
@@ -220,29 +222,44 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   if (allowed === undefined || positionals.length > (verb === "check" ? 0 : 1)) fail(USAGE);
   const unknown = [...flags.keys()].filter((flag) => !allowed.has(flag));
   if (unknown.length > 0) fail(`hooks ${verb}: unknown flag${unknown.length === 1 ? "" : "s"} ${unknown.map((f) => `--${f}`).join(", ")}\n${USAGE}`);
+  const local = flags.get("local") === true;
   // A project nested below its repository's top keeps its hooks at the top too, where a host launched at the repository root reads them.
-  const places = settingsRoots(root);
+  // Personal settings are one file at the repository top, which the host reads launched there or in any folder below.
+  const shared = settingsRoots(root);
+  const personal: SettingsRoot[] = [{ dir: repositoryTop(root) ?? root, sub: referenceHorizon(root) ?? "" }];
+  const places = local ? personal : shared;
   if (verb === "status") {
-    const statuses = (await Promise.all(places.map((place) => Promise.all(HOSTS.map((host) => status(place.dir, host)))))).flat();
+    const statuses = [
+      ...(await Promise.all(shared.map((place) => Promise.all(HOSTS.map((host) => status(place.dir, host)))))).flat(),
+      ...(await Promise.all(personal.map((place) => Promise.all(HOSTS.filter((host) => settingsFile(host, true) !== undefined).map((host) => status(place.dir, host, true)))))).flat(),
+    ];
     process.stdout.write(formatStatus(statuses) + "\n" + formatDeliveries(await deliveries(root), statuses));
     return 0;
   }
   const host = flags.get("host");
   const label = verb === "check" ? "hooks --check" : `hooks ${verb}`;
   if (typeof host !== "string" || !isHost(host)) fail(`${label}: --host must be one of ${HOSTS.join(", ")}\n${USAGE}`);
+  if (local && settingsFile(host, true) === undefined) fail(`${label} --local: ${host} keeps no personal settings file Coherence knows of; install without --local`);
   const given = flags.get("command");
   if (given === true) fail(`${label}: --command needs a value\n${USAGE}`);
   if (verb === "uninstall") {
-    for (const place of places) process.stdout.write(formatUninstall(host, await uninstall(place.dir, host)));
+    // Ours leave both the shared and the personal settings, wherever install put them.
+    for (const place of shared) process.stdout.write(formatUninstall(host, await uninstall(place.dir, host)));
+    if (settingsFile(host, true) !== undefined) {
+      for (const place of personal) {
+        const result = await uninstall(place.dir, host, true);
+        if (result.removed.length > 0 || result.removedIgnore) process.stdout.write(formatUninstall(host, result));
+      }
+    }
     return 0;
   }
-  const commandAt = async (sub: string): Promise<string> => given ?? (await defaultCommand(root, sub));
+  const commandAt = async (sub: string): Promise<string> => given ?? (await defaultCommand(root, sub, local));
   if (verb === "check") {
     let drifted = false;
     for (const place of places) {
       let result;
       try {
-        result = await check(place.dir, host, await commandAt(place.sub));
+        result = await check(place.dir, host, await commandAt(place.sub), local);
       } catch (error) {
         process.stderr.write(`hooks --check: ${error instanceof Error ? error.message : String(error)}\n`);
         return 2;
@@ -254,9 +271,9 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   }
   for (const place of places) {
     const command = await commandAt(place.sub);
-    const result = await install({ root: place.dir, host, command, ignoreRoot: root });
+    const result = await install({ root: place.dir, host, command, ignoreRoot: root, local });
     process.stdout.write(`${result.changed ? "wrote" : "unchanged"} ${result.path}: ${result.events.join(", ")}\n`);
-    if (command === locatedPrefix(place.sub)) process.stdout.write(locateNote(place.dir, place.sub));
+    if (command === locatedPrefix(place.sub, local)) process.stdout.write(locateNote(place.dir, place.sub));
   }
   return 0;
 }

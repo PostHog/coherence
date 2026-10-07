@@ -236,9 +236,12 @@ adopt (say `apps/billing`), and nothing at the repository root. Run
 `coherence hooks install --host claude` from that folder: it writes the hooks
 into the root's `.claude/settings.json`, where an agent host started at the
 repository root reads them, and into the folder's own, for a session started
-there. The project is the folder holding the nearest `coherence.config.json`
-to the file an edit writes, or to the folder a command or prompt runs in; a
-session at the root belongs to the one project below it. Everything else in
+there; `--local` writes your personal `.claude/settings.local.json` at the
+root instead, so you can adopt without committing hooks for every team. The
+project is the folder holding the nearest `coherence.config.json` to the file
+an edit writes, or to the folder a command or prompt runs in. A session at the
+root hears one line at its start and gets the project's orient with its first
+edit or command inside the folder. Everything else in
 the repository is outside the project: an edit, command or prompt there gets
 no orient, practice or check and leaves no record. A chokepoint verdict says
 its reference search covered the project folder only, since callers elsewhere
