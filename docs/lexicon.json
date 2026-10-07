@@ -962,7 +962,8 @@
       },
       "properties": {
         "test setup": "One runner's way of running tests: its commands, the test files it claims (by language or file globs), and the folder it starts in. The single test keys are one setup; the tests key lists several, for a project whose languages run under different runners.",
-        "languages": "A project may list more than one language; each file's language is its extension, the first listed is the primary, and each language has its own warm server."
+        "languages": "A project may list more than one language; each file's language is its extension, the first listed is the primary, and each language has its own warm server.",
+        "registry": "A config at a repository top that lists projects: the folders opted in, each a project inheriting the registry keys its own config does not set, and the top no project of its own. A config the registry does not list is a problem, never half adopted."
       }
     },
     {

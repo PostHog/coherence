@@ -36,9 +36,9 @@
  *              totality oracle names runs through the setup whose test files spell it
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute } from "node:path";
 import { isLanguage, LANGUAGES, type Language } from "../adapters/index.ts";
+import { effectiveConfig } from "../adapters/project-config.ts";
 
 export const CONFIG_FILE = "coherence.config.json";
 export const DEFAULT_TEST_FOLDERS: readonly string[] = ["__tests__", "test", "tests"];
@@ -134,16 +134,10 @@ function testSetupOf(record: Record<string, unknown>, path: string, where: strin
 export function readEnforcementConfig(root: string): EnforcementConfig {
   const config: EnforcementConfig = { language: "typescript", languages: ["typescript"], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined };
   config.tests = [{ language: undefined, files: undefined, cwd: undefined, test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS] }];
-  const path = resolve(root, CONFIG_FILE);
-  if (!existsSync(path)) return config;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(readFileSync(path, "utf8"));
-  } catch (error) {
-    throw new Error(`${path}: not valid JSON (${(error as Error).message})`);
-  }
-  if (typeof parsed !== "object" || parsed === null) return config;
-  const record = parsed as Record<string, unknown>;
+  // The project's own config over its registry's keys (project-config.ts), each inherited path rebased to the project.
+  const found = effectiveConfig(root);
+  if (found === undefined) return config;
+  const { record, path } = found;
   const language = record["language"];
   if (typeof language === "string" && isLanguage(language)) config.languages = [language];
   else if (Array.isArray(language)) {

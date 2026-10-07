@@ -245,7 +245,14 @@ edit or command inside the folder. Everything else in
 the repository is outside the project: an edit, command or prompt there gets
 no orient, practice or check and leaves no record. A chokepoint verdict says
 its reference search covered the project folder only, since callers elsewhere
-in the repository are not read. More in [docs/config.md](docs/config.md).
+in the repository are not read.
+
+To opt in several folders, run `coherence adopt <folder>` for each. This lists
+them under `projects` in a `coherence.config.json` at the repository root, a
+registry whose keys every listed folder inherits unless its own config sets
+them. Only the listed folders are projects. A config elsewhere is named by
+`spec --check` as adopted but not opted in. More in
+[docs/config.md](docs/config.md).
 
 ## Platform
 

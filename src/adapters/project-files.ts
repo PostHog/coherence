@@ -20,8 +20,10 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { configRecord, repositoryTop } from "./project-config.ts";
+export { repositoryTop };
 
 /** The most bytes one git listing may carry; a larger project is a failure worth reporting, not a truncated answer. */
 const GIT_LISTING_LIMIT = 256 * 1024 * 1024;
@@ -130,9 +132,6 @@ export function projectFiles(root: string): string[] {
   return [...new Set(listed)].filter((rel) => !insideNested(base, rel, memo) && isFileOnDisk(base, rel)).sort();
 }
 
-/** The config file whose ignore list bounds every walk. */
-const CONFIG_FILE = "coherence.config.json";
-
 /** A folder as the ignore list compares it: project-relative, forward slashes, no leading "./" and no trailing "/". */
 function folderKey(folder: string): string {
   return folder.split(sep).join("/").replace(/^(\.\/)+/, "").replace(/\/+$/, "");
@@ -146,8 +145,8 @@ function folderKey(folder: string): string {
  */
 export function configIgnore(root: string): string[] {
   try {
-    const parsed: unknown = JSON.parse(readFileSync(join(resolve(root), CONFIG_FILE), "utf8"));
-    const ignore = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>)["ignore"] : undefined;
+    // The project's own ignore list over its registry's (project-config.ts).
+    const ignore = configRecord(root)["ignore"];
     return Array.isArray(ignore) ? ignore.filter((value): value is string => typeof value === "string").map(folderKey).filter((f) => f !== "") : [];
   } catch {
     return [];
@@ -347,18 +346,6 @@ export function isProjectFile(root: string, path: string): boolean {
 }
 
 /**
- * The top of the repository holding `root`: the nearest folder at or above
- * it with a `.git` (a folder, or a worktree's file); undefined outside one.
- * Stats only, no git call.
- */
-export function repositoryTop(root: string): string | undefined {
-  for (let dir = resolve(root); ; dir = resolve(dir, "..")) {
-    if (existsSync(join(dir, ".git"))) return dir;
-    if (resolve(dir, "..") === dir) return undefined;
-  }
-}
-
-/**
  * The project folder relative to its repository's top, when the project is
  * nested below the top; undefined when the project is the whole repository
  * (or lies in none).
@@ -380,8 +367,7 @@ export type ReferenceScope = "project" | "repository" | readonly string[];
 
 export function configReferences(root: string): ReferenceScope {
   try {
-    const parsed: unknown = JSON.parse(readFileSync(join(resolve(root), CONFIG_FILE), "utf8"));
-    const value = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>)["references"] : undefined;
+    const value = configRecord(root)["references"];
     if (value === "repository") return "repository";
     if (Array.isArray(value) && value.every((v) => typeof v === "string")) return value.map(folderKey).filter((f) => f !== "");
     return "project";

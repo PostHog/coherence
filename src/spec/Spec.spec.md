@@ -143,3 +143,9 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   because: a practice whose reach was never decided either fails silently to reach adopters or puts Coherence's own steps into every adopter's sessions; never examined and examined are different facts (d-8ed21083), so the reach is said, and as a value set so a later reach is one more value (owner, 2026-10-05)
   refuted: dropped the problem for a practice in Coherence's tree with no reach line -> "in Coherence's own tree every practice declares its reach, kernel or internal; anywhere else a reach line is a problem" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
   kinds: none
+- a config the registry does not list is a problem: spec --check at a registry's top reads each listed leaf, never the rest of the repository, and names every coherence.config.json below the top that no listed leaf holds as adopted there but not opted in; a check in a leaf names it too.
+  over: a registry listing two leaves beside a folder holding a config and a spec it does not list, checked at the top and in a leaf
+  via: spec --check names a nested config the registry does not list as adopted there but not opted in, at the top and in a leaf
+  because: with a registry the list decides adoption, so a config outside it is ignored by every hook; said nowhere, that folder would look adopted to whoever wrote it and be half adopted in fact
+  refuted: registryProblems named the listed leaves' configs instead of the unlisted one -> "spec --check names a nested config the registry does not list as adopted there but not opted in, at the top and in a leaf" went red in registry.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none

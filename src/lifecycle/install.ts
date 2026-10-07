@@ -48,6 +48,7 @@ import { isDeepStrictEqual } from "node:util";
 import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
 import { DURABLE_FOLDERS, HOSTS, LOCAL_SETTINGS_FILE, PACKAGE_NAME, SETTINGS_FILE, isHost, type Host } from "./project.ts";
 import { nestedFolder, repositoryTop } from "../adapters/project-files.ts";
+import { registryOf } from "../adapters/project-config.ts";
 export { DURABLE_FOLDERS };
 
 // Where each host keeps its settings, and which hosts there are, live in the project
@@ -331,15 +332,20 @@ export interface InstallResult {
   ignore: { path: string; action: IgnoreAction };
 }
 
-export async function install(options: InstallOptions & { ignoreRoot?: string; local?: boolean }): Promise<InstallResult> {
+export async function install(options: InstallOptions & { ignoreRoot?: string; ignoreRoots?: readonly string[]; local?: boolean }): Promise<InstallResult> {
   const file = settingsFile(options.host, options.local);
   if (file === undefined) throw new Error(`${options.host} keeps no personal settings file Coherence can write; install without --local`);
   const path = resolve(options.root, file);
   const read = await readSettingsFile(path);
   const merged = mergeHooks(read.value, options);
   const changed = await writeSettings(path, read, merged);
-  const ignoreRoot = options.ignoreRoot ?? options.root;
-  const ignore = { path: resolve(ignoreRoot, IGNORE_FILE), action: await writeIgnore(ignoreRoot) };
+  // Each project keeps its own ignore file: a registry's leaves each get one, and the registry's top, no project, none.
+  const ignoreRoots = options.ignoreRoots ?? [options.ignoreRoot ?? options.root];
+  let ignore = { path: resolve(ignoreRoots[0] ?? options.root, IGNORE_FILE), action: "unchanged" as IgnoreAction };
+  for (const [i, dir] of ignoreRoots.entries()) {
+    const action = await writeIgnore(dir);
+    if (i === 0) ignore = { path: resolve(dir, IGNORE_FILE), action };
+  }
   return { path, events: [...HOOK_EVENTS], changed, ignore };
 }
 
@@ -357,6 +363,9 @@ export interface SettingsRoot {
  * parent's). The hooks at the top find the nested project from the event.
  */
 export function settingsRoots(root: string): SettingsRoot[] {
+  // With a registry, the hooks are installed once, at the repository top, and find each listed project from the event.
+  const registry = registryOf(root);
+  if (registry !== undefined) return [{ dir: registry.top, sub: "" }];
   const sub = nestedFolder(root);
   const top = sub === undefined ? undefined : repositoryTop(root);
   return top === undefined || sub === undefined ? [{ dir: root, sub: "" }] : [{ dir: top, sub }, { dir: root, sub: "" }];

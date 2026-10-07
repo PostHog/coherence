@@ -990,6 +990,21 @@ function oriented(root: string, session: string): boolean {
   return existsSync(orientedPath(root, session));
 }
 
+/** Of the projects given, the one this session was last oriented in, as a project reached from above; undefined when it entered none. */
+function lastEntered(projects: readonly string[], session: string | undefined): HookProject | undefined {
+  if (session === undefined) return undefined;
+  let found: { root: string; at: number } | undefined;
+  for (const root of projects) {
+    try {
+      const at = statSync(orientedPath(root, session)).mtimeMs;
+      if (found === undefined || at > found.at) found = { root, at };
+    } catch {
+      // not entered
+    }
+  }
+  return found === undefined ? undefined : { kind: "project", root: found.root, above: true };
+}
+
 function markOriented(root: string, session: string): void {
   try {
     mkdirSync(dirname(orientedPath(root, session)), { recursive: true });
@@ -1023,7 +1038,9 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
   const installed = installedRoot(fallbackRoot);
   const given = typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : fallbackRoot;
   // The project is the folder holding the nearest coherence.config.json (or .coherence) to what the event is about; the rest of the repository is outside it.
-  const place = installed !== undefined && !within(installed, given) ? undefined : eventProject(event, input, installed ?? given, given);
+  const routed = installed !== undefined && !within(installed, given) ? undefined : eventProject(event, input, installed ?? given, given);
+  // Above several projects, an event belongs to the one this session last entered: a stop at the repository root regulates the project the session worked in.
+  const place = routed?.kind === "several" ? lastEntered(routed.projects, sessionOf(input)) ?? routed : routed;
   try {
     if (place !== undefined && place.kind !== "project") return quiet(place);
     // A session at the repository root has not entered the project below until a tool use inside it delivers orient: until then it hears one line at its start and nothing else.
@@ -1084,6 +1101,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     const session = sessionOf(input);
     if (session === undefined || oriented(place.root, session)) return result;
     const root = place.root;
+    // The session has just entered the project, which no start or prompt warmed: its instrument starts now, before the edit that needs it.
+    options.warm?.(root);
     const reading = await lexiconCoverage(root);
     const gaps = await gapReading(root);
     const text = (await startReading(root, input, reading, gaps)).text;

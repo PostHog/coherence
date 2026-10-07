@@ -61,10 +61,73 @@ config, the specs and `.coherence/` in the folder you adopt, say
 
 With the config at the repository root, nothing here changes.
 
+### Several folders: a registry
+
+To opt in several folders and state their shared settings once, put a
+`coherence.config.json` at the repository root that lists them:
+
+```json
+{
+  "projects": ["products/notebooks", "products/error_tracking"],
+  "language": "python",
+  "ignore": ["__pycache__", "migrations"],
+  "tests": [{ "test": "pytest -q -k {filter}", "testFilterForm": "pytest", "cwd": "." }]
+}
+```
+
+- **The registry is not a project.** With `projects`, the root is a
+  registry. Each listed folder (a leaf) is a project, with its own
+  `.coherence/`, journal, runs and lexicon state, whether or not it has a
+  config of its own. Without `projects`, a root config is one whole-repository
+  project, as before.
+- **Adding a leaf.** `coherence adopt <folder>` adds a folder to `projects`
+  and creates the registry if there is none. It keeps the file's
+  indentation, key order and final newline, and prints the next step: the
+  adopt practice, and `scaffold import tach <module>` when `tach.toml`
+  declares the folder as a module. It refuses:
+  - a path outside the repository;
+  - a path that is not a folder;
+  - a path already listed;
+  - a path inside a listed leaf, or one holding a listed leaf;
+  - a root config without `projects`. Adding the key would turn a
+    whole-repository project into a registry, so make that change by hand.
+- **Inheritance.** A leaf reads the registry's keys unless its own
+  `coherence.config.json` sets them. The rules, key by key:
+
+  | Key | Rule |
+  |---|---|
+  | `name`, `entryDir`, `lexicon`, `projects` | Never inherited. Each belongs to the leaf. |
+  | `ignore` | Combined. A folder name from the registry applies anywhere. A path from the registry is kept only if it lies inside the leaf, and is rewritten relative to it. |
+  | `wellKnown` | Combined. |
+  | `tests`, `test`, `testJson`, `testMatch`, `testFilterForm`, `testDir`, `testDirs` | One group. A leaf that sets any of them replaces the registry's whole group. An inherited setup's `cwd` is rewritten from the registry's folder to the leaf, so the registry's `"cwd": "."` runs the tests from the repository root. A setup without `cwd` runs in the leaf. |
+  | everything else (`language`, `references`, `latencyBudget`, `interfaceBudget`, ...) | Replaced whole. |
+
+  A relative path in an inherited key resolves against the file that
+  declared it. `references` folders are relative to the repository root in
+  either file.
+- **Routing.** An event belongs to the leaf whose listed folder is the
+  longest prefix of the file it writes, or else of its working directory.
+  Nothing walks up from there. An event in no listed folder is ignored and
+  spawns no git. A session at the root above several leaves hears one line
+  naming them.
+- **Stray configs.** A `coherence.config.json` the registry does not list
+  is never half adopted. `spec --check` at the root (which checks each leaf
+  and the registry) and in any leaf names it as "adopted here but not opted
+  in".
+- **Hooks.** Install once, at the root: `hooks install` writes the settings
+  there, never in a leaf, and writes `.coherence/.gitignore` in each leaf.
+  `--local` works as above.
+
+A single folder with its own config and no registry works as described
+earlier, so one engineer can try Coherence without editing a shared file. A
+repository-level lexicon between Coherence's and each leaf's is not read
+yet. For now, every leaf keeps its own `lexicon.json`.
+
 ## The project
 
 | Key | Default | Meaning |
 |---|---|---|
+| `projects` | none | At the repository root only: the folders opted in, which makes this file a registry. See [Several folders](#several-folders-a-registry). |
 | `name` | the folder's name | The project's name, as Scope and the lexicon's project layer show it. |
 | `language` | `typescript` | `typescript` or `python`: which language server the chokepoint check asks. A list (`["python", "typescript"]`) for a project that spans both; see [More than one language](#more-than-one-language). |
 | `entryDir` | `.` | The folder holding the entry spec, the one that declares the trust levels. |
