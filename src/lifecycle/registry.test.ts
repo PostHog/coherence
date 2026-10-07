@@ -17,6 +17,7 @@ import { adopt, AdoptError } from "./adopt.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { configIgnore, configReferences } from "../adapters/project-files.ts";
 import { countingGit } from "../adapters/git-count-fixture.ts";
+import { stopWarmServers } from "../enforcement/server-fixture.ts";
 
 const CLI = fileURLToPath(new URL("../cli.ts", import.meta.url));
 
@@ -123,6 +124,8 @@ test("with a registry, events from the repository top route to the leaf with the
     assert.equal(projectRoot(join(top, "products/errors/src")), join(top, "products/errors"), "a command in a leaf with no config acts on the leaf, never walking up to the registry");
     assert.equal(projectRoot(join(top, "products/notebooks")), join(top, "products/notebooks"));
   } finally {
+    // The stop reaches a leaf's instrument through a warm server, which outlives the test unless it is stopped.
+    await stopWarmServers(top);
     rmSync(top, { recursive: true, force: true });
   }
 });

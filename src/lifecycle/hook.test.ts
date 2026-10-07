@@ -13,6 +13,7 @@ import { loadJournal } from "../journal/store.ts";
 import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
 import { BOUNDARY_RULE, CONTEXT_BUDGET, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, adopterExample, adopterInstruction, runHook, sessionBlock, type WarmDoor } from "./hook.ts";
 import { withWarmAdapter } from "../enforcement/run.ts";
+import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { TRACES_DIR, recordReadTrace, recordWriteTrace } from "../economy/trace.ts";
 import { COHERENCE_LEXICON, installedRoot, PACKAGE_NAME } from "./project.ts";
 import { loadLexicon, rejectedNames } from "./lexicon.ts";
@@ -37,7 +38,10 @@ function git(...args: string[]): string {
   return execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: root, encoding: "utf8" });
 }
 
-before(async () => {
+// Node 22 runs the after hook without waiting for an async before when a name filter selects none of this file's tests, so the after waits for it.
+let setup: Promise<void> | undefined;
+
+before(() => (setup = (async () => {
   root = await mkdtemp(join(tmpdir(), "coherence-hook-"));
   await writeFile(join(root, "coherence.config.json"), JSON.stringify({ lexicon: "vocab/lexicon.json" }));
   await mkdir(join(root, "vocab"));
@@ -54,10 +58,23 @@ before(async () => {
   git("init", "-q");
   git("add", ".");
   git("commit", "-q", "-m", "seed");
-});
+})()));
+
+/** Every other fixture project this file makes, as a real path taken while it existed: a hook in one may start a warm server that outlives its removal. */
+const fixtures: string[] = [];
+
+function track<T extends { root: string }>(fixture: T): T {
+  fixtures.push(realpathSync(fixture.root));
+  return fixture;
+}
 
 after(async () => {
-  if (root !== undefined) await rm(root, { recursive: true, force: true });
+  await setup?.catch(() => undefined);
+  // The hooks reach the instrument through a warm server, which outlives the test unless it is stopped.
+  for (const fixture of fixtures) await stopWarmServers(fixture);
+  if (root === undefined) return;
+  await stopWarmServers(root);
+  await rm(root, { recursive: true, force: true });
 });
 
 test("the block after the lexicon is under 120 words: session, decide template, and the rule", async () => {
@@ -433,6 +450,10 @@ test("orient lists open requirements and regulate reports them; only spec proble
   const { join } = await import("node:path");
   const { specBlock, specStopText } = await import("./hook.ts");
   const root = mkdtempSync(join(tmpdir(), "coherence-spec-hook-"));
+  after(async () => {
+    await stopWarmServers(root);
+    await rm(root, { recursive: true, force: true });
+  });
   writeFileSync(join(root, "Root.spec.md"), "# Root\n\nA fixture project.\n\n## invariants\n- secure access: Only a member with permission reads a secured resource.\n  because: the resource is private to its member.\n");
   const start = specBlock(root);
   assert.match(start, /^Open requirements \(1 of 1 bullets\)/);
@@ -457,6 +478,7 @@ test("orient lists open requirements and regulate reports them; only spec proble
 /** A project of its own for the work and feed tests, so the shared root's journal stays as the earlier tests left it. */
 async function freshRoot(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "coherence-hook-work-"));
+  fixtures.push(realpathSync(dir));
   await writeFile(join(dir, "coherence.config.json"), JSON.stringify({ lexicon: "lexicon.json" }));
   await writeFile(join(dir, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, concepts: [], rejected: [] }));
   return dir;
@@ -731,7 +753,7 @@ function gapLine(text: string): string | undefined {
 }
 
 test("orient names the spec gaps in one bounded line from a recorded reading that still describes the tree, starts one background reading when it is stale or absent, says only that the gaps are not read yet when no reading was ever kept, and counts, without naming, the gaps the adoption baseline holds", async () => {
-  const { root: project, reading, remove } = gapProject();
+  const { root: project, reading, remove } = track(gapProject());
   try {
     const { start, started } = gapStarter(project, "gap-orient");
     const unread = gapLine(await start());
@@ -759,7 +781,7 @@ test("orient names the spec gaps in one bounded line from a recorded reading tha
 });
 
 test("orient names the gaps as the last reading had them when it no longer describes the tree, labeled as the reading before the latest changes, with the current trust, and never one the current spec visibly closes by guard:, control: none or removing the entrance, within the start budget", async () => {
-  const { root: project, reading, remove } = gapProject();
+  const { root: project, reading, remove } = track(gapProject());
   try {
     await readAndRecord(project, async () => reading);
     const { start } = gapStarter(project, "gap-stale");
@@ -794,7 +816,7 @@ test("orient names the gaps as the last reading had them when it no longer descr
 });
 
 test("the session's stop starts one background reading of the tree it leaves when the recorded one no longer describes it, and returns without waiting; a subagent stop starts none", async () => {
-  const { root: project, reading, remove } = gapProject();
+  const { root: project, reading, remove } = track(gapProject());
   try {
     await readAndRecord(project, async () => reading);
     const started: string[] = [];
@@ -815,7 +837,7 @@ test("the session's stop starts one background reading of the tree it leaves whe
 });
 
 test("regulate names the gaps a session touched, a changed handler file and an untrusted entrance it declared, and never refuses a subagent stop for them", async () => {
-  const { root: project, reading, remove } = gapProject();
+  const { root: project, reading, remove } = track(gapProject());
   try {
     await readAndRecord(project, async () => reading);
     const opened = await runHook("SessionStart", { session_id: "gap-stop", cwd: project }, project);
@@ -844,7 +866,7 @@ function coverageLine(text: string): string | undefined {
 
 test("orient names the undeclared entrances in one bounded line: the count against what is detected now, the folder holding the most, and the scaffold command that proposes their bullets, with no reading and no gap needed", async () => {
   // Every declared entrance carries an inside level: nothing could be a gap, and no reading was ever kept.
-  const { root: project, remove } = undeclaredProject({ trust: "operator" });
+  const { root: project, remove } = track(undeclaredProject({ trust: "operator" }));
   try {
     const { start, started } = gapStarter(project, "cov-orient");
     const text = await start();
@@ -860,7 +882,7 @@ test("orient names the undeclared entrances in one bounded line: the count again
   } finally {
     remove();
   }
-  const { root: crowded, remove: gone } = undeclaredProject({ functions: 400 });
+  const { root: crowded, remove: gone } = track(undeclaredProject({ functions: 400 }));
   try {
     const text = await gapStarter(crowded, "cov-crowded").start();
     const line = coverageLine(text)!;
@@ -875,7 +897,7 @@ test("orient names the undeclared entrances in one bounded line: the count again
 });
 
 test("regulate names the undeclared entrances in the files a session changed, by file, and never refuses a subagent stop for them", async () => {
-  const { root: project, remove } = undeclaredProject();
+  const { root: project, remove } = track(undeclaredProject());
   try {
     const opened = await runHook("SessionStart", { session_id: "cov-stop", cwd: project }, project);
     opened.commit?.();
