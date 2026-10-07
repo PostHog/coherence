@@ -5,6 +5,7 @@
  *   # Name
  *
  *   One-line intent.
+ *   owners: <who owns it, comma separated>       optional; declared, never routed on
  *
  *   ## trust levels            (entry spec only)
  *   - owner-trusted: full kernel access
@@ -21,6 +22,7 @@
  *   - <name>: <sentence>
  *     protects: <symbol or module>            chokepoint form, with
  *     chokepoint: <symbol>
+ *     from: anywhere | outside the component | outside <folder>   optional; which references the chokepoint governs
  *     over: <the set the detector is total over>   totality oracle form, with
  *     via: <the test>
  *     because: <why it exists, what it protects against>
@@ -64,7 +66,7 @@ export const INVARIANTS_SECTION = "invariants";
 const SECTIONS_SENTENCE = "a spec holds ## trust levels (entry spec only), ## entrances and ## invariants";
 
 /** The keys an invariant bullet may carry, in the order the scaffold prints them. */
-export const KEYS = ["protects", "chokepoint", "over", "via", "because", "crossing", "refuted", "kinds", "checklist"] as const;
+export const KEYS = ["protects", "chokepoint", "from", "over", "via", "because", "crossing", "refuted", "kinds", "checklist"] as const;
 export type Key = (typeof KEYS)[number];
 const MANY: ReadonlySet<Key> = new Set<Key>(["refuted", "checklist"]);
 
@@ -134,8 +136,39 @@ export function isModuleHandler(handler: string): boolean {
   return /^[A-Za-z0-9_./@()[\]-]+\.[A-Za-z]+$/.test(handler.trim()) && !/\s/.test(handler.trim());
 }
 
+/**
+ * Which references to the protected thing a chokepoint governs: every one
+ * (anywhere, the default), only those from outside the component whose spec
+ * holds the bullet, or only those from outside a named folder. A reference
+ * the chokepoint does not govern is classed exempt and reported, never
+ * dropped and never a bypass: a module boundary lets the module's own code
+ * use its internals, and a narrow invariant does not.
+ */
+export type ChokepointFrom = "anywhere" | "outside the component" | { outside: string };
+
+/** How a from: value is written, for the problems that name it. */
+export const FROM_FORM = "anywhere, outside the component, or outside <folder>";
+
+/** A from: value read, or undefined when it is none of the three forms. A folder is project-relative and stays under the root. */
+export function parseFrom(value: string): ChokepointFrom | undefined {
+  const text = value.trim().replace(/\s+/g, " ");
+  if (text === "anywhere") return "anywhere";
+  if (text === "outside the component") return "outside the component";
+  const named = /^outside (.+)$/.exec(text);
+  if (named === null) return undefined;
+  const folder = named[1]!.trim().replace(/^\.\//, "").replace(/\/+$/, "");
+  if (folder === "" || folder === "." || folder.startsWith("/") || /\s/.test(folder)) return undefined;
+  if (folder.split("/").some((segment) => segment === ".." || segment === "" || segment === ".")) return undefined;
+  return { outside: folder };
+}
+
+/** A from: value as a spec writes it. */
+export function fromText(from: ChokepointFrom): string {
+  return typeof from === "string" ? from : `outside ${from.outside}`;
+}
+
 export type Enforcement =
-  | { form: "chokepoint"; protects: string; chokepoint: string; line: number }
+  | { form: "chokepoint"; protects: string; chokepoint: string; line: number; from?: ChokepointFrom }
   | { form: "totality oracle"; over: string; via: string; line: number };
 
 export interface Refutation {
@@ -174,6 +207,8 @@ export interface ParsedSpec {
   file: string;
   title: string | undefined;
   intent: string | undefined;
+  /** Who owns the component, as an owners: line in the header declares; absent when it declares none. Declared, never routed on. */
+  owners?: string[] | undefined;
   /** Undefined when the spec has no trust levels section. */
   trustLevels: TrustLevel[] | undefined;
   trustLevelsLine: number | undefined;
@@ -239,6 +274,8 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
 
   let title: string | undefined;
   let intent: string | undefined;
+  let owners: string[] | undefined;
+  let ownersLine: number | undefined;
   let trustLevels: TrustLevel[] | undefined;
   let trustLevelsLine: number | undefined;
   let entrancesSeen = false;
@@ -326,6 +363,17 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
       case "head": {
         if (raw.trim() === "") {
           closeParagraph();
+          return;
+        }
+        // The one header line that is not prose: who owns the component.
+        const owned = /^owners:\s*(.*)$/.exec(raw.trim());
+        if (owned !== null) {
+          closeParagraph();
+          if (ownersLine !== undefined) problem(line, "owners: given twice; one owners: line lists every owner, comma separated");
+          ownersLine = line;
+          const list = owned[1]!.split(",").map((owner) => owner.trim()).filter((owner) => owner !== "");
+          if (list.length === 0) problem(line, "owners: names no owner; list them comma separated, or leave the line out");
+          else if (!list.some(isPlaceholder)) owners = list;
           return;
         }
         if (paragraph.length === 0) paragraphLine = line;
@@ -480,7 +528,7 @@ export function parseSpec(text: string, file: string, options: ParseOptions = {}
     }
   }
   const invariants = bullets.map((bullet) => buildInvariant(bullet, problem, options.seed));
-  return { file, title, intent, trustLevels, trustLevelsLine, entrances, invariants, problems };
+  return { file, title, intent, ...(owners === undefined ? {} : { owners }), trustLevels, trustLevelsLine, entrances, invariants, problems };
 }
 
 function buildInvariant(bullet: RawBullet, problem: (line: number, message: string) => void, seed: Seed | undefined): Invariant {
@@ -537,6 +585,19 @@ function buildInvariant(bullet: RawBullet, problem: (line: number, message: stri
   };
   pair("protects", "chokepoint", (protects, chokepoint, line) => ({ form: "chokepoint", protects, chokepoint, line }), "the chokepoint form");
   pair("over", "via", (over, via, line) => ({ form: "totality oracle", over, via, line }), "the totality oracle form");
+
+  // Which references the chokepoint governs: a from: line belongs to the chokepoint form and nothing else.
+  const fromField = single.get("from");
+  if (fromField !== undefined) {
+    const value = filled("from");
+    const chokepoint = enforcements.find((e) => e.form === "chokepoint");
+    if (!single.has("protects") && !single.has("chokepoint")) problem(fromField.line, `from: on ${bullet.name} belongs to the chokepoint form (protects: and chokepoint:); it names which references the chokepoint governs`);
+    else if (value !== undefined) {
+      const from = parseFrom(value);
+      if (from === undefined) problem(fromField.line, `from: on ${bullet.name} reads ${FROM_FORM}; "${value}" is none of them`);
+      else if (chokepoint !== undefined && chokepoint.form === "chokepoint") chokepoint.from = from;
+    }
+  }
 
   const because = filled("because");
 

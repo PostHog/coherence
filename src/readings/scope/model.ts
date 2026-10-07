@@ -186,7 +186,7 @@ export interface ViewIdentity {
  */
 
 export type SpecEnforcement =
-  | { form: "chokepoint"; protects: string; chokepoint: string; line: number }
+  | { form: "chokepoint"; protects: string; chokepoint: string; line: number; from?: ChokepointFrom }
   | { form: "totality oracle"; over: string; via: string; line: number };
 
 export interface SpecRefutation {
@@ -211,7 +211,8 @@ export type LifecycleState = "requirement" | "invariant" | "structural defect";
 
 export type Lack = "enforcement" | "refutation" | "kinds" | "checklist" | "because";
 
-export type { Form, Verdict, Grade, RefutationState, Bypass, RecordedSite, ReferenceForm, ReferenceTarget, RunEntry, RunRecord, SiteClass } from "../../enforcement/record.ts";
+export type { Form, Verdict, Grade, Governed, RefutationState, Bypass, RecordedSite, ReferenceForm, ReferenceTarget, RunEntry, RunRecord, SiteClass } from "../../enforcement/record.ts";
+import type { ChokepointFrom } from "../../spec/grammar.ts";
 import type { Bypass, Form, Grade, RefutationState, RunEntry, RunRecord, Verdict } from "../../enforcement/record.ts";
 
 /** A run entry with the run it came from: the latest verdict for one enforcement. */
@@ -273,6 +274,8 @@ export interface SpecComponent {
   name: string;
   specPath: string;
   intent: string;
+  /** Who owns it, as the spec's owners: line declares; absent when it declares none. */
+  owners?: string[] | undefined;
   trustLevels: TrustLevel[] | undefined;
   entrances: SpecEntrance[];
   invariants: SpecInvariant[];

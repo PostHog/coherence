@@ -28,9 +28,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomBytes } from "node:crypto";
 import {
   isTestPath,
+  outsideOfFolder,
   parseName,
   rangeContains,
   statementStartLine,
+  withinFolder,
   type Definition,
   type Ladder,
   type LanguageAdapter,
@@ -675,7 +677,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
    * range, and a re-export of it from a document beside it. The adapter only
    * reports what the instrument said about each; the check classifies them.
    */
-  async refute(protectedThing: Definition, outsideOf: Definition | undefined): Promise<Refutation> {
+  async refute(protectedThing: Definition, outsideOf: Definition | undefined, exempt?: string): Promise<Refutation> {
     const client = await this.live();
     const symbols = await this.documentSymbols(protectedThing.file);
     let name: string | undefined;
@@ -687,7 +689,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
       if (name === undefined) return { seen: false, staged: [], account: `no declaration at ${protectedThing.file}:${protectedThing.selection.line + 1}` };
       if (!this.visibilityOf(protectedThing.file, name, protectedThing.range.start.line).visible) return this.refusedByCompiler(client, protectedThing, name);
     }
-    return this.stage(client, protectedThing, outsideOf, name);
+    return this.stage(client, protectedThing, outsideOf, name, exempt);
   }
 
   /** The compiler refuses an import of a thing its module does not export: open the synthetic outside document and read the diagnostic back. */
@@ -731,7 +733,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
   }
 
   /** Stage the two synthetic sites the import ruling could otherwise swallow, in one references query, and restore. */
-  private async stage(client: JsonRpcClient, protectedThing: Definition, chokepoint: Definition | undefined, name: string): Promise<Refutation> {
+  private async stage(client: JsonRpcClient, protectedThing: Definition, chokepoint: Definition | undefined, name: string, exempt?: string): Promise<Refutation> {
     const dir = dirname(protectedThing.file);
     const base = protectedThing.file.slice(dir === "." ? 0 : dir.length + 1);
     const synthetic = `${dir === "." ? "" : dir + "/"}coherence-refutation-${randomBytes(4).toString("hex")}.ts`;
@@ -741,11 +743,25 @@ export class TypeScriptAdapter implements LanguageAdapter {
     this.symbolCache.set(synthetic, []);
     this.probes.add(synthetic);
 
-    // A module chokepoint has no inside that is outside its own range, so there is no same-module site to stage.
-    const sameModule = chokepoint !== undefined && chokepoint.kind === "symbol" ? this.editChokepointModule(chokepoint, protectedThing, name) : undefined;
+    // A module chokepoint has no inside that is outside its own range, so there is no same-module site to stage;
+    // nor is there where the exempted folder holds the chokepoint's module, which the exemption covers on purpose.
+    const exempted = exempt !== undefined && chokepoint !== undefined && withinFolder(chokepoint.file, exempt);
+    const sameModule = chokepoint !== undefined && chokepoint.kind === "symbol" && !exempted ? this.editChokepointModule(chokepoint, protectedThing, name) : undefined;
     const expected: { what: string; file: string; line: number }[] = [];
     if (sameModule !== undefined) expected.push({ what: `a use of ${name} in ${chokepoint!.file} outside ${chokepoint!.name}`, file: chokepoint!.file, line: sameModule.line });
     expected.push({ what: `a re-export of ${name} from the unsaved document ${synthetic}`, file: synthetic, line: 1 });
+    // Where the chokepoint governs only references from outside a folder, a plain use from outside it must still be a bypass.
+    const beside = exempt === undefined ? undefined : outsideOfFolder(exempt);
+    const outside = beside === undefined ? undefined : `${beside}coherence-refutation-${randomBytes(4).toString("hex")}.ts`;
+    if (outside !== undefined) {
+      const specifier = `./${relative(dirname(outside), protectedThing.file).split(sep).join("/")}`.replace(/^\.\/\.\.\//, "../");
+      const use = `import { ${name} as coherenceRefutationName } from "${specifier}";\nexport const coherenceRefutationUse = coherenceRefutationName;\n`;
+      client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(outside), languageId: "typescript", version: 1, text: use } });
+      this.lineCache.set(outside, use.split("\n"));
+      this.symbolCache.set(outside, []);
+      this.probes.add(outside);
+      expected.push({ what: `a use of ${name} from the unsaved document ${outside}, outside ${exempt}`, file: outside, line: 2 });
+    }
 
     try {
       const sites = await this.references(protectedThing);
@@ -764,10 +780,12 @@ export class TypeScriptAdapter implements LanguageAdapter {
       };
     } finally {
       sameModule?.restore();
-      client.notify("textDocument/didClose", { textDocument: { uri: this.uri(synthetic) } });
-      this.lineCache.delete(synthetic);
-      this.symbolCache.delete(synthetic);
-      this.probes.delete(synthetic);
+      for (const file of outside === undefined ? [synthetic] : [synthetic, outside]) {
+        client.notify("textDocument/didClose", { textDocument: { uri: this.uri(file) } });
+        this.lineCache.delete(file);
+        this.symbolCache.delete(file);
+        this.probes.delete(file);
+      }
     }
   }
 

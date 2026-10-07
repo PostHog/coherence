@@ -56,6 +56,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomBytes } from "node:crypto";
 import {
   isTestPath,
+  outsideOfFolder,
+  withinFolder,
   parseName,
   rangeContains,
   statementStartLine,
@@ -1101,7 +1103,7 @@ export class PythonAdapter implements LanguageAdapter {
    * ruling could otherwise swallow (d-7abd1ba8): a use in the chokepoint's own
    * module past the chokepoint's body, and a re-export through `__all__`.
    */
-  async refute(protectedThing: Definition, outsideOf: Definition | undefined): Promise<Refutation> {
+  async refute(protectedThing: Definition, outsideOf: Definition | undefined, exempt?: string): Promise<Refutation> {
     const client = await this.indexed();
     let importName: string;
     let access: string;
@@ -1117,7 +1119,7 @@ export class PythonAdapter implements LanguageAdapter {
       access = entry.path.join(".");
       if (entry.parents.some((k) => k === KIND_FUNCTION || k === KIND_METHOD)) return this.refusedByInterpreter(client, protectedThing, entry.symbol.name);
     }
-    return this.stage(client, protectedThing, outsideOf, importName, access);
+    return this.stage(client, protectedThing, outsideOf, importName, access, exempt);
   }
 
   /** Where a synthetic document beside the protected thing stands, and how it names the module to import from. */
@@ -1166,7 +1168,7 @@ export class PythonAdapter implements LanguageAdapter {
   }
 
   /** Stage the two synthetic sites in one references query, and restore. */
-  private async stage(client: PythonLanguageClient, protectedThing: Definition, chokepoint: Definition | undefined, importName: string, access: string): Promise<Refutation> {
+  private async stage(client: PythonLanguageClient, protectedThing: Definition, chokepoint: Definition | undefined, importName: string, access: string, exempt?: string): Promise<Refutation> {
     const { where, from } = this.syntheticFrom(protectedThing);
     const synthetic = `${where}coherence_refutation_${randomBytes(4).toString("hex")}.py`;
     // A class member is reached through its class, and `__all__` cannot name it: there the outside document uses it instead.
@@ -1182,11 +1184,25 @@ export class PythonAdapter implements LanguageAdapter {
     this.symbolCache.set(synthetic, []);
     this.probes.add(synthetic);
 
-    // A module chokepoint has no inside that is outside its own range, so there is no same-module site to stage.
-    const sameModule = chokepoint !== undefined && chokepoint.kind === "symbol" ? this.editChokepointModule(chokepoint, protectedThing, importName, access) : undefined;
+    // A module chokepoint has no inside that is outside its own range, so there is no same-module site to stage;
+    // nor is there where the exempted folder holds the chokepoint's module, which the exemption covers on purpose.
+    const exempted = exempt !== undefined && chokepoint !== undefined && withinFolder(chokepoint.file, exempt);
+    const sameModule = chokepoint !== undefined && chokepoint.kind === "symbol" && !exempted ? this.editChokepointModule(chokepoint, protectedThing, importName, access) : undefined;
     const expected: { what: string; file: string; line: number }[] = [];
     if (sameModule !== undefined) expected.push({ what: `a use of ${access} in ${chokepoint!.file} outside ${chokepoint!.name}`, file: chokepoint!.file, line: sameModule.line });
-    expected.push(outside);
+    // A use beside the protected thing is exempt where the folder holds it; only a re-export there must still be a bypass.
+    if (direct || exempt === undefined || !withinFolder(synthetic, exempt)) expected.push(outside);
+    // Where the chokepoint governs only references from outside a folder, a plain use from outside it must still be a bypass.
+    const beside = exempt === undefined ? undefined : outsideOfFolder(exempt);
+    const farther = beside === undefined ? undefined : `${beside}coherence_refutation_${randomBytes(4).toString("hex")}.py`;
+    if (farther !== undefined) {
+      const use = `from ${this.dottedModule(protectedThing.file)} import ${importName}\ncoherence_refutation_use = ${access}\n`;
+      client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(farther), languageId: "python", version: 1, text: use } });
+      this.lineCache.set(farther, use.split("\n"));
+      this.symbolCache.set(farther, []);
+      this.probes.add(farther);
+      expected.push({ what: `a use of ${access} from the unsaved document ${farther}, outside ${exempt}`, file: farther, line: 2 });
+    }
 
     try {
       const sites = await this.references(protectedThing);
@@ -1205,10 +1221,12 @@ export class PythonAdapter implements LanguageAdapter {
       };
     } finally {
       sameModule?.restore();
-      client.notify("textDocument/didClose", { textDocument: { uri: this.uri(synthetic) } });
-      this.lineCache.delete(synthetic);
-      this.symbolCache.delete(synthetic);
-      this.probes.delete(synthetic);
+      for (const file of farther === undefined ? [synthetic] : [synthetic, farther]) {
+        client.notify("textDocument/didClose", { textDocument: { uri: this.uri(file) } });
+        this.lineCache.delete(file);
+        this.symbolCache.delete(file);
+        this.probes.delete(file);
+      }
     }
   }
 

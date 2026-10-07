@@ -16,6 +16,12 @@
  *             and makes no stronger semantic claim
  *   test      under a test folder or a test file by name; retained separately
  *             on every site and used as the protected-site class
+ *   exempt    under the folder the bullet's from: line (or the config's
+ *             chokepointFrom) says the chokepoint does not govern: the
+ *             component's own code for `outside the component`, the named
+ *             folder for `outside <folder>`; never under `anywhere`, the
+ *             default. Read after the forms, the range and the test folders,
+ *             so a re-export is still a bypass there
  *   bypass   an export-from specifier or a wildcard re-export of the protected thing, wherever it
  *            stands, because it widens the thing's reach with no call at
  *            all; an import of the protected thing in any other module; and
@@ -33,7 +39,10 @@
  * adapter stages the synthetic sites the form rule could otherwise swallow —
  * a use in the chokepoint's own module past its range, and a re-export — and
  * the check classifies each with the same function every other site goes
- * through; only when it calls every one `bypass` does the refutation fire. A
+ * through; only when it calls every one `bypass` does the refutation fire.
+ * Where the chokepoint governs only references from outside a folder, the
+ * adapter stages a use from outside that folder in place of any site the
+ * exemption covers, so the refutation still proves an outside use is caught. A
  * staged site the instrument could not see, or one the check would call
  * `inside` (the chokepoint covers everywhere the language lets the thing be
  * named) or `test` (the protected thing lives under a test folder, so nothing
@@ -44,9 +53,10 @@
  * reference is the refutation instead (ruling rs-e93ecdd6).
  */
 
-import { isTestPath, rangeContains, type Definition, type LanguageAdapter, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
+import { isTestPath, rangeContains, withinFolder, type Definition, type LanguageAdapter, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
 import { horizonSites, projectSites, searchedHorizon } from "../adapters/project-files.ts";
-import type { Bypass, Grade, ReferenceTarget, RefutationState, SiteClass, Verdict } from "./record.ts";
+import { fromText, type ChokepointFrom } from "../spec/grammar.ts";
+import type { Bypass, Governed, Grade, ReferenceTarget, RefutationState, SiteClass, Verdict } from "./record.ts";
 
 export interface ClassifiedSite extends ReferenceSite {
   class: SiteClass;
@@ -71,6 +81,8 @@ export interface ChokepointResult {
   /** Whether `sites` is complete; unavailable results keep an empty transient array but are never persisted as evidence. */
   siteEvidence: "complete" | "unavailable";
   bypasses: Bypass[];
+  /** Which references the check governed; absent where it never got as far as classifying. */
+  governed?: Governed;
   /** Protected-reference counts retained for grading and compatibility; chokepoint callers live in `sites`. */
   counts: Record<Exclude<SiteClass, "chokepoint-reference">, number>;
   visibility: string | undefined;
@@ -87,9 +99,21 @@ export interface ChokepointInput {
   testFolders: readonly string[];
   /** The project root: only its own files are evidence, so a site outside them is never classified. */
   root: string;
+  /** Which references the chokepoint governs; absent is anywhere. */
+  from?: ChokepointFrom | undefined;
+  /** Who said it: the bullet's own from: line, or the config's chokepointFrom; absent is the default. */
+  fromBy?: "bullet" | "config" | undefined;
 }
 
-export function classifySite(site: ReferenceSite, protectedThing: Definition, chokepoint: Definition, testFolders: readonly string[]): Exclude<SiteClass, "chokepoint-reference"> {
+/** Which references a check governs, and the folder it exempts: the component's for `outside the component`, the named one for `outside <folder>`. */
+export function governedOf(input: Pick<ChokepointInput, "from" | "fromBy" | "component">): Governed {
+  const from = input.from ?? "anywhere";
+  const by = input.from === undefined ? "default" : (input.fromBy ?? "bullet");
+  if (from === "anywhere") return { value: "anywhere", by };
+  return { value: fromText(from), by, exempt: from === "outside the component" ? input.component : from.outside };
+}
+
+export function classifySite(site: ReferenceSite, protectedThing: Definition, chokepoint: Definition, testFolders: readonly string[], exempt?: string): Exclude<SiteClass, "chokepoint-reference"> {
   const position = { line: site.line - 1, character: site.character };
   // A re-export widens the thing's reach with no call at all, so it is a bypass wherever it stands.
   if (site.form === "re-export") return "bypass";
@@ -99,6 +123,8 @@ export function classifySite(site: ReferenceSite, protectedThing: Definition, ch
   if (chokepoint.kind === "module" ? inChokepointModule : site.file === chokepoint.file && rangeContains(chokepoint.range, position)) return "inside";
   if (protectedThing.kind === "module" && withinModule(site.file, protectedThing.file)) return "inside";
   if (isTestPath(site.file, testFolders)) return "test";
+  // A use from where the chokepoint does not govern: reported as exempt, never a bypass and never dropped.
+  if (exempt !== undefined && withinFolder(site.file, exempt)) return "exempt";
   return "bypass";
 }
 
@@ -130,7 +156,18 @@ const NOT_CHOKEABLE_NOTE = "the totality oracle form (over + via) is the comprom
 const LANGUAGE_ENFORCED = new Set<Grade>(["visibility-choked", "closure-choked"]);
 
 function nameOf(site: SiteClass | undefined): string {
-  return site === undefined ? "as unreported" : site === "test" ? "a test reference" : site === "chokepoint-reference" ? "an outside chokepoint reference" : "a reference inside the chokepoint";
+  return site === undefined ? "as unreported" : site === "test" ? "a test reference" : site === "chokepoint-reference" ? "an outside chokepoint reference" : site === "exempt" ? "exempt, from where the chokepoint does not govern" : "a reference inside the chokepoint";
+}
+
+/** Who said which references a check governs, in words. */
+export function governedBy(governed: Governed): string {
+  return governed.by === "bullet" ? "its from: line" : governed.by === "config" ? "the config's chokepointFrom" : "the default";
+}
+
+/** The clause a reason carries when the check governed less than anywhere, so an exempt reference never reads as an absent one. */
+function governedClause(governed: Governed, exempt: number): string {
+  if (governed.exempt === undefined) return "";
+  return `; governs only references from outside ${governed.exempt} (from: ${governed.value}, by ${governedBy(governed)}), so ${exempt} reference${exempt === 1 ? "" : "s"} from inside it ${exempt === 1 ? "is" : "are"} exempt`;
 }
 
 /**
@@ -152,7 +189,8 @@ export async function checkChokepoint(adapter: LanguageAdapter, input: Chokepoin
 
 async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInput): Promise<ChokepointResult> {
   const hint = { component: input.component, testFolders: input.testFolders };
-  const empty: Record<Exclude<SiteClass, "chokepoint-reference">, number> = { inside: 0, test: 0, bypass: 0 };
+  const empty: Record<Exclude<SiteClass, "chokepoint-reference">, number> = { inside: 0, test: 0, exempt: 0, bypass: 0 };
+  const governed = governedOf(input);
   const base = { input, sites: [] as ClassifiedSite[], siteEvidence: "unavailable" as const, bypasses: [], counts: empty, visibility: undefined, files: [] as string[], refutation: "missing" as RefutationState, refutationAccount: "not attempted" };
 
   const protectedResolved = await adapter.resolve(input.protects, hint);
@@ -206,20 +244,20 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
   const protectedReferences = horizonSites(input.root, await adapter.references(protectedThing));
   const chokepointReferences = horizonSites(input.root, await adapter.references(chokepoint));
   const sites: ClassifiedSite[] = [
-    ...protectedReferences.map((site) => ({ ...site, of: "protected" as const, test: isTestPath(site.file, input.testFolders), class: classifySite(site, protectedThing, chokepoint, input.testFolders) })),
+    ...protectedReferences.map((site) => ({ ...site, of: "protected" as const, test: isTestPath(site.file, input.testFolders), class: classifySite(site, protectedThing, chokepoint, input.testFolders, governed.exempt) })),
     ...chokepointReferences.map((site) => ({ ...site, of: "chokepoint" as const, test: isTestPath(site.file, input.testFolders), class: classifyChokepointSite(site, chokepoint) })),
   ].sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.character - b.character || a.of.localeCompare(b.of));
-  const counts: Record<Exclude<SiteClass, "chokepoint-reference">, number> = { inside: 0, test: 0, bypass: 0 };
+  const counts: Record<Exclude<SiteClass, "chokepoint-reference">, number> = { inside: 0, test: 0, exempt: 0, bypass: 0 };
   for (const site of sites) if (site.of === "protected" && site.class !== "chokepoint-reference") counts[site.class] += 1;
   const bypasses: Bypass[] = sites.filter((s) => s.of === "protected" && s.class === "bypass").map((s) => ({ file: s.file, line: s.line, symbol: s.symbol ?? "module top level" }));
   const files = [...new Set([protectedThing.file, chokepoint.file, ...sites.map((s) => s.file)])].sort();
 
   const visibility = await adapter.visibility(protectedThing, chokepoint);
   const earned = rungFor(adapter, visibility);
-  const refutation = await adapter.refute(protectedThing, chokepoint);
+  const refutation = await adapter.refute(protectedThing, chokepoint, governed.exempt);
   const classified = refutation.staged.map((staged) => ({
     what: staged.what,
-    class: staged.site === undefined ? undefined : classifySite(staged.site, protectedThing, chokepoint, input.testFolders),
+    class: staged.site === undefined ? undefined : classifySite(staged.site, protectedThing, chokepoint, input.testFolders, governed.exempt),
   }));
   // The rung whose enforcer is the language refutes itself: a synthetic reference the compiler or the interpreter
   // refuses is the proof, and Coherence's own check never has to be made to fire (ruling rs-e93ecdd6).
@@ -251,7 +289,8 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
       counts,
       visibility: visibility.evidence,
       files,
-      reason: `${bypasses.length} reference${bypasses.length === 1 ? "" : "s"} to ${protectedThing.name} outside ${chokepoint.name}: ${bypasses.map((b) => `${b.file}:${b.line} in ${b.symbol}`).join(", ")}`,
+      governed,
+      reason: `${bypasses.length} reference${bypasses.length === 1 ? "" : "s"} to ${protectedThing.name} outside ${chokepoint.name}: ${bypasses.map((b) => `${b.file}:${b.line} in ${b.symbol}`).join(", ")}${governedClause(governed, counts.exempt)}`,
     };
   }
   // When the instrument could not see the synthetic site, Coherence's own check enforces nothing: a ladder may name the rung that is left.
@@ -276,7 +315,8 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
     counts,
     visibility: visibility.evidence,
     files,
-    reason: `${protectedThing.name} is ${graded.grade}, enforced by ${graded.enforcer}: ${graded.fact}${tests}${vacuous}`,
+    governed,
+    reason: `${protectedThing.name} is ${graded.grade}, enforced by ${graded.enforcer}: ${graded.fact}${tests}${governedClause(governed, counts.exempt)}${vacuous}`,
   };
 }
 

@@ -143,3 +143,10 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   because: a practice whose reach was never decided either fails silently to reach adopters or puts Coherence's own steps into every adopter's sessions; never examined and examined are different facts (d-8ed21083), so the reach is said, and as a value set so a later reach is one more value (owner, 2026-10-05)
   refuted: dropped the problem for a practice in Coherence's tree with no reach line -> "in Coherence's own tree every practice declares its reach, kernel or internal; anywhere else a reach line is a problem" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
   kinds: none
+- from and owners lines are declared and checked: A chokepoint bullet's from: line reads anywhere, outside the component or outside a folder under the root, anything else or a from: on a bullet with no chokepoint form is a problem, and a header's owners: line lists the component's owners without joining its intent.
+  over: every from: form, a value no form reads, a folder that climbs above the root, a from: on a totality oracle bullet, and a header with an owners: line
+  via: from: reads anywhere, outside the component, or outside a folder on a chokepoint bullet, and refuses anything else
+  because: which references a chokepoint governs decides its grade, so a misspelt value must be a problem rather than silently governing anywhere; owners are a declared fact a human reads beside the intent, and folding them into the intent made them prose no reading could list
+  crossing: project-source -> reading
+  refuted: made buildInvariant attach a parsed from: value only to a totality oracle form, so no chokepoint carried one -> "from: reads anywhere, outside the component, or outside a folder on a chokepoint bullet, and refuses anything else" went red in from.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
