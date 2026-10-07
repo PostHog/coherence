@@ -224,19 +224,23 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   over: every config written before languages and test setups could be listed: one language, the single test keys, and no language at all
   via: a single-language config reads as it always did: one language, one test setup from the single keys, the plain server names
   because: every adopter's config predates the lists; a reading that changed what one language or the single keys mean would break each of them silently, and a server that moved to new file names would leave the old one running beside it
+  refuted: made a config naming one language also list TypeScript, so a single-language config read as multi-language -> "a single-language config reads as it always did: one language, one test setup from the single keys, the plain server names" went red in languages.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
 - a multi-language config is read whole or refused by name: A config may list its languages, the first the primary, and its test setups, each with its own runner, test files and folder; a file's language is its extension; a setup with no command, an unknown language, or a folder outside the root is refused with the key that is wrong.
   over: every language list and test setup a config can hold, and every file extension the two languages use
   via: a multi-language config lists its languages and test setups; a file's language is its extension; a malformed setup is refused by name
   because: one product in the PostHog monorepo is a Python backend and a TypeScript frontend, so a config with one language could adopt half of it; a malformed setup read as absent would leave a totality oracle silently not run
+  refuted: dropped the refusal of a test setup that names neither test nor testJson -> "a multi-language config lists its languages and test setups; a file's language is its extension; a malformed setup is refused by name" went red in languages.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
 - each test runs through its own setup: A totality oracle's test runs through the test setup whose test files define it, in one batched invocation per setup, started in that setup's folder, and its entry names the setup's language.
   over: every totality oracle of a project with more than one test setup, batched and each one alone
   via: each totality oracle's test runs through the setup whose test files hold it, one batched invocation per setup, from the setup's own folder
   because: a pytest test given to jest is no test at all, and a no-match exit can read as a pass; PostHog runs a product's tests from the product folder against the repository's own pytest configuration, so the folder is part of the setup
+  refuted: made the setup chooser send every test to the first setup, whatever test files define it -> "each totality oracle's test runs through the setup whose test files hold it, one batched invocation per setup, from the setup's own folder" went red in languages.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
 - each chokepoint is graded by its own language's server: A chokepoint is resolved and graded by the warm server of the language its protected thing is written in, one server per root and language, each reached only when a check needs it; the record names the language of each entry and of the run's instrument.
   over: every chokepoint of a project that spans languages, at a run, at a run of one invariant, and at the edit check
   via: each chokepoint resolves and grades through its own language's warm server, and a run or an edit reaches only the languages its checks need
   because: Pyright cannot resolve a TypeScript name, nor the TypeScript server a Python one, so one instrument for the project could grade only half of it; starting both servers at every edit would spend the latency budget on a language the edit never touched
+  refuted: made every chokepoint take the primary language alone, so a TypeScript chokepoint was asked of Pyright -> "each chokepoint resolves and grades through its own language's warm server, and a run or an edit reaches only the languages its checks need" went red in languages.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none

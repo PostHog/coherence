@@ -32,8 +32,8 @@
  *              testFilterForm, testDir/testDirs, and optionally language (the
  *              extension of the test files it claims), files (globs of the
  *              test files it claims, relative to the root), and cwd (the
- *              folder it runs from, relative to the root). A totality
- *              oracle's test runs through the setup whose test files spell it
+ *              folder it runs from, relative to the root). The test a
+ *              totality oracle names runs through the setup whose test files spell it
  */
 
 import { existsSync, readFileSync } from "node:fs";

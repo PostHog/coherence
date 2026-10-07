@@ -232,7 +232,10 @@ subagent stop keeps its reason whatever the override says.
 ## Platform
 
 Coherence runs on Node 22.18 or newer, on macOS (Apple Silicon) or Linux, and
-reads TypeScript and Python projects. It works inside Claude Code and Codex.
+reads TypeScript and Python projects, and projects that span both (a Python
+backend beside a TypeScript frontend: list both languages and a test setup
+per runner, as [docs/config.md](docs/config.md#more-than-one-language) shows).
+It works inside Claude Code and Codex.
 Coherence verifies itself: every screenshot here is its own Scope reading.
 
 ## Working on Coherence itself
@@ -252,7 +255,7 @@ node src/cli.ts enact "<practice>" --step <n>=done[:<evidence>]|deviated:<why>|s
 node src/cli.ts run [--session --agent]   # the chokepoint check and the totality oracle pass, one run appended; exit 1 on a structural defect
 node src/cli.ts run --status              # the latest verdict per enforcement, a view over every run
 node src/cli.ts run --each                # after the batched pass, each totality oracle's test in its own invocation, a second run; exit 1 if one fails alone
-node src/cli.ts serve                     # the warm language server for this project (spawned on demand otherwise)
+node src/cli.ts serve [--language <l>]    # the warm language server for this project and language (spawned on demand otherwise)
 node src/cli.ts hook <event>              # answer one harness event (event JSON on stdin)
 node src/cli.ts hooks install --host claude|codex [--command "<prefix>"]
 node src/cli.ts hooks uninstall --host claude|codex   # removes only Coherence's commands; other hooks and settings stay byte for byte
