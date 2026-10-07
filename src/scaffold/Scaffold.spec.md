@@ -83,4 +83,5 @@ The command that makes the complete shape the cheapest thing to produce: a compo
   via: scaffold control on named entrances with no recorded reading reads only their routes' components, says so, and records nothing; --all alone and --whole read every one and record it
   because: on a large adopter the whole reading takes minutes, which asking about one entrance should not cost; the gaps orient and Stop read need every route, so only a whole reading is recorded
   crossing: record -> reading
+  refuted: inverted the --whole test in controlVerb, so a named entrance was read whole and recorded and --whole read scoped -> "scaffold control on named entrances with no recorded reading reads only their routes' components, says so, and records nothing; --all alone and --whole read every one and record it" went red in control.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
