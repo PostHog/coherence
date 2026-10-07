@@ -13,6 +13,7 @@ import { loadJournal } from "../journal/store.ts";
 import { FEED_CAP, FEED_DIR, readCursor } from "../journal/feed.ts";
 import { BOUNDARY_RULE, CONTEXT_BUDGET, HOOK_EVENTS, INSTRUCTION, OUTSIDE_ROOT_EXIT, REFUSE_EXIT, WARM_DOOR, changedFiles, cliName, feedContext, readStdinJson, adopterExample, adopterInstruction, runHook, sessionBlock, type WarmDoor } from "./hook.ts";
 import { withWarmAdapter } from "../enforcement/run.ts";
+import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { TRACES_DIR, recordReadTrace, recordWriteTrace } from "../economy/trace.ts";
 import { COHERENCE_LEXICON, installedRoot, PACKAGE_NAME } from "./project.ts";
 import { loadLexicon, rejectedNames } from "./lexicon.ts";
@@ -37,7 +38,10 @@ function git(...args: string[]): string {
   return execFileSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: root, encoding: "utf8" });
 }
 
-before(async () => {
+// Node 22 runs the after hook without waiting for an async before when a name filter selects none of this file's tests, so the after waits for it.
+let setup: Promise<void> | undefined;
+
+before(() => (setup = (async () => {
   root = await mkdtemp(join(tmpdir(), "coherence-hook-"));
   await writeFile(join(root, "coherence.config.json"), JSON.stringify({ lexicon: "vocab/lexicon.json" }));
   await mkdir(join(root, "vocab"));
@@ -54,10 +58,14 @@ before(async () => {
   git("init", "-q");
   git("add", ".");
   git("commit", "-q", "-m", "seed");
-});
+})()));
 
 after(async () => {
-  if (root !== undefined) await rm(root, { recursive: true, force: true });
+  await setup?.catch(() => undefined);
+  if (root === undefined) return;
+  // The stop hooks reach the instrument through a warm server, which outlives the test unless it is stopped.
+  await stopWarmServers(root);
+  await rm(root, { recursive: true, force: true });
 });
 
 test("the block after the lexicon is under 120 words: session, decide template, and the rule", async () => {
@@ -433,6 +441,10 @@ test("orient lists open requirements and regulate reports them; only spec proble
   const { join } = await import("node:path");
   const { specBlock, specStopText } = await import("./hook.ts");
   const root = mkdtempSync(join(tmpdir(), "coherence-spec-hook-"));
+  after(async () => {
+    await stopWarmServers(root);
+    await rm(root, { recursive: true, force: true });
+  });
   writeFileSync(join(root, "Root.spec.md"), "# Root\n\nA fixture project.\n\n## invariants\n- secure access: Only a member with permission reads a secured resource.\n  because: the resource is private to its member.\n");
   const start = specBlock(root);
   assert.match(start, /^Open requirements \(1 of 1 bullets\)/);

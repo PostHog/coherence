@@ -696,13 +696,17 @@ test("rename --qualify gives the concept a qualified name and leaves the old nam
   const { join } = await import("node:path");
   const { propose } = await import("./lexicon-maintain.ts");
   const root = mkdtempSync(join(tmpdir(), "coherence-qualify-"));
-  write(join(root, "lexicon.json"), JSON.stringify({ version: 1, project: "p", concepts: [{ name: "interface", definition: "d", rejected: [] }] }));
-  const plain = await propose(root, { action: "rename", name: "interface", value: "component interface", because: "b" });
-  assert.match(plain.after, /"alternative": "interface"/, "a plain rename rejects the old name");
-  const qualified = await propose(root, { action: "rename", name: "interface", value: "component interface", qualify: true, because: "b" });
-  assert.doesNotMatch(qualified.after, /"alternative": "interface"/, "a qualifying rename leaves the old name free");
-  assert.match(qualified.after, /"name": "component interface"/);
-  void read;
+  try {
+    write(join(root, "lexicon.json"), JSON.stringify({ version: 1, project: "p", concepts: [{ name: "interface", definition: "d", rejected: [] }] }));
+    const plain = await propose(root, { action: "rename", name: "interface", value: "component interface", because: "b" });
+    assert.match(plain.after, /"alternative": "interface"/, "a plain rename rejects the old name");
+    const qualified = await propose(root, { action: "rename", name: "interface", value: "component interface", qualify: true, because: "b" });
+    assert.doesNotMatch(qualified.after, /"alternative": "interface"/, "a qualifying rename leaves the old name free");
+    assert.match(qualified.after, /"name": "component interface"/);
+    void read;
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("a project carrying its lexicon under the retired name is refused with the one-line migration, and the old name is never read", async () => {
