@@ -45,7 +45,7 @@ import {
   type Visibility,
 } from "./adapter.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
-import { keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
+import { horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..");
@@ -506,6 +506,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const client = await this.live();
     this.open(definition.file);
     this.touched.add(definition.file);
+    this.openHorizon();
     const starts: Position[] = [];
     if (definition.kind === "module") {
       for (const symbol of await this.documentSymbols(definition.file)) {
@@ -523,9 +524,9 @@ export class TypeScriptAdapter implements LanguageAdapter {
       });
       reported.push(...(locations ?? []));
     }
-    // Only the project's own files are evidence, and a site outside them is dropped before it is read or opened:
-    // opening a nested checkout's copy would load that checkout into the instrument as if it were this project.
-    const own = keepProjectFiles(this.root, reported.map((location) => this.relative(location.uri)), this.listingNow());
+    // Only the project's own files and its reference horizon's are evidence, and a site outside them is dropped before it is read or
+    // opened: opening a nested checkout's copy would load that checkout into the instrument as if it were this project.
+    const own = keepHorizonFiles(this.root, reported.map((location) => this.relative(location.uri)), this.listingNow(), this.horizon());
     const seen = new Set<string>();
     const sites: ReferenceSite[] = [];
     for (const location of reported) {
@@ -552,6 +553,32 @@ export class TypeScriptAdapter implements LanguageAdapter {
     }
     sites.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.character - b.character);
     return sites;
+  }
+
+  /** The folders outside the project the config's `references` adds to the search, absolute; read once. */
+  private horizonAt: string[] | undefined;
+  private horizon(): string[] {
+    return (this.horizonAt ??= horizonFolders(this.root));
+  }
+
+  /**
+   * Load each horizon folder into the server: every source file git lists
+   * there outside the project is opened, so the server holds the projects
+   * they belong to (a tsconfig's, or the inferred one for loose files) and a
+   * references query searches them too. Once per adapter; the cost grows
+   * with the folders the config names, which is why the default is none.
+   */
+  private horizonOpened = false;
+  private openHorizon(): void {
+    if (this.horizonOpened) return;
+    this.horizonOpened = true;
+    for (const folder of this.horizon()) {
+      for (const rel of walkedFiles(folder)) {
+        if (!SOURCE_EXTENSIONS.has(extensionOf(rel)) || /\.d\.ts$/.test(rel)) continue;
+        const file = relative(this.root, join(folder, rel)).split(sep).join("/");
+        if (file.startsWith("../")) this.open(file);
+      }
+    }
   }
 
   /** The sites where another module re-exports this file wholesale, scanned once per forget because the reference query never reports them. */

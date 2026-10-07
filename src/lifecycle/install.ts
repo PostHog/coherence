@@ -47,7 +47,7 @@ import { dirname, join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
 import { DURABLE_FOLDERS, HOSTS, PACKAGE_NAME, SETTINGS_FILE, isHost, type Host } from "./project.ts";
-import { referenceHorizon, repositoryTop } from "../adapters/project-files.ts";
+import { nestedFolder, repositoryTop } from "../adapters/project-files.ts";
 export { DURABLE_FOLDERS };
 
 // Where each host keeps its settings, and which hosts there are, live in the project
@@ -346,7 +346,7 @@ export interface SettingsRoot {
  * parent's). The hooks at the top find the nested project from the event.
  */
 export function settingsRoots(root: string): SettingsRoot[] {
-  const sub = referenceHorizon(root);
+  const sub = nestedFolder(root);
   const top = sub === undefined ? undefined : repositoryTop(root);
   return top === undefined || sub === undefined ? [{ dir: root, sub: "" }] : [{ dir: top, sub }, { dir: root, sub: "" }];
 }

@@ -200,3 +200,50 @@ test("a nested Python project's imports written from the repository top resolve,
     rmSync(top, { recursive: true, force: true });
   }
 });
+
+/** A chokepoint check of the nested project under each reference horizon, with a bypass planted in another team's folder. */
+async function underHorizon(language: "typescript" | "python", references: unknown): Promise<{ grade: string; bypasses: string[]; reason: string }> {
+  const ts = language === "typescript";
+  const { top } = monorepo({
+    "apps/nb/coherence.config.json": JSON.stringify({ name: "nb", language, ...(references === undefined ? {} : { references }) }) + "\n",
+    ...(ts
+      ? {
+          "apps/nb/tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["**/*.ts"] }) + "\n",
+          "apps/nb/query.ts": "export const KINDS = new Set([\"a\"]);\nexport function normalize(q: string): boolean {\n  return KINDS.has(q);\n}\n",
+          "libs/leaky/leak.ts": "import { KINDS } from \"../../apps/nb/query.ts\";\nexport const leaked = KINDS.size;\n",
+        }
+      : {
+          "apps/nb/query.py": "KINDS = {\"a\"}\n\n\ndef normalize(q):\n    return q in KINDS\n",
+          "libs/leaky/leak.py": "from apps.nb.query import KINDS\n\nleaked = len(KINDS)\n",
+        }),
+  });
+  const root = join(top, "apps/nb");
+  const { PythonAdapter } = await import("../adapters/python.ts");
+  const adapter = ts ? new TypeScriptAdapter(root) : new PythonAdapter(root);
+  try {
+    const result = await checkChokepoint(adapter, { protects: "KINDS", chokepoint: "normalize", component: ".", testFolders: [], root });
+    return { grade: result.grade, bypasses: result.bypasses.map((b) => `${b.file}:${b.line}`), reason: result.reason };
+  } finally {
+    await adapter.close();
+    rmSync(top, { recursive: true, force: true });
+  }
+}
+
+test("the reference horizon widens a chokepoint check past the project: a bypass in another folder is found under repository and under a list naming it, and named as not searched under project", { timeout: 240_000 }, async () => {
+  for (const language of ["typescript", "python"] as const) {
+    const leak = language === "typescript" ? "../../libs/leaky/leak.ts:1" : "../../libs/leaky/leak.py:1";
+    const project = await underHorizon(language, undefined);
+    assert.deepEqual(project.bypasses, [], `${language}: the project alone does not see it`);
+    assert.match(project.reason, /references searched inside apps\/nb only: callers elsewhere in the repository were not read$/, `${language}: and says so`);
+    const repository = await underHorizon(language, "repository");
+    assert.equal(repository.grade, "broken", `${language}: ${repository.reason}`);
+    assert.ok(repository.bypasses.includes(leak), `${language}: ${repository.bypasses.join(", ")}`);
+    assert.doesNotMatch(repository.reason, /references searched inside/, `${language}: the whole repository was searched, so no qualifier`);
+    const listed = await underHorizon(language, ["libs/leaky"]);
+    assert.ok(listed.bypasses.includes(leak), `${language}: a list naming the folder finds it: ${listed.reason}`);
+    assert.match(listed.reason, /references searched inside apps\/nb and libs\/leaky only/, language);
+    const elsewhere = await underHorizon(language, ["libs/other"]);
+    assert.deepEqual(elsewhere.bypasses, [], `${language}: a list naming another folder does not`);
+    assert.match(elsewhere.reason, /references searched inside apps\/nb and libs\/other only/, language);
+  }
+});

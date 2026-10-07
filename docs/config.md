@@ -41,9 +41,14 @@ config, the specs and `.coherence/` in the folder you adopt, say
   Python, the repository root is added to Pyright's import search, so
   `from products.billing.models import ...` resolves. No file above the
   folder is indexed.
-- **Chokepoint verdicts.** A verdict covers the folder alone. It says
-  "references searched inside apps/billing only: callers elsewhere in the
-  repository were not read" in the reason the run records.
+- **Chokepoint verdicts.** By default a verdict covers the folder alone. It
+  says "references searched inside apps/billing only: callers elsewhere in
+  the repository were not read" in the reason the run records. The
+  `references` key widens the search. A reference found in a folder it names
+  is classified like any other and named from the project root
+  (`../../posthog/api/search.py:26`). The edit-time check runs only for edits
+  inside the project, so a bypass added in another folder is found by the
+  next `run`.
 
 With the config at the repository root, nothing here changes.
 
@@ -57,6 +62,7 @@ With the config at the repository root, nothing here changes.
 | `ignore` | none | Folders that are not this project's code or prose: vendored code, generated output, fixtures, promo material. A name matches that folder anywhere; a path matches from the root. Every walk (the spec, the lexicon check, the reading) leaves them out. |
 | `lexicon` | `lexicon.json` | The project's lexicon file, relative to the root. |
 | `wellKnown` | none | Names the project vouches for as well known (its vendors, its own product names), so the lexicon check does not nominate them as nouns to declare. |
+| `references` | `"project"` | Where a chokepoint check searches for references: `"project"` (the project alone), `"repository"` (the whole repository), or a list of folders relative to the repository top (`["posthog/api", "ee"]`), searched beside the project. A verdict over less than the whole repository names every folder it searched. Each folder adds to the language server's work: on PostHog, `products/notebooks` with `["posthog", "ee"]` took 15.5 s and 1.1 GB for one check, against 4.8 s and 380 MB for the project alone. |
 | `interfaceBudget` | `{ "seconds": 600, "memoryMB": 12288 }` | The most time and memory the Structure reading's interface pass may take; when it runs out, the reading says it is partial. |
 
 ## Tests: how a totality oracle is run
