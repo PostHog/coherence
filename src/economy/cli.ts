@@ -19,7 +19,8 @@
  */
 
 import { resolve } from "node:path";
-import { withWarmAdapter } from "../enforcement/run.ts";
+import { withWarmAdapter, withWarmAdapters } from "../enforcement/run.ts";
+import { readEnforcementConfig } from "../enforcement/config.ts";
 import { ChangeError, workingChange, type WorkingChange } from "./change.ts";
 import { JournalError, parseFlags } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
@@ -42,6 +43,8 @@ export const ECONOMY_USAGE = [
  * none; the hook's snapshot passes the adapter it already holds.
  */
 export async function economyFor(root: string, paths: readonly string[], change?: WorkingChange): Promise<Closure> {
+  // A multi-language project reaches each language's instrument only for the given files written in it.
+  if (readEnforcementConfig(root).languages.length > 1) return withWarmAdapters(root, (open) => predictClosure(root, paths, { adapterOf: open, change }));
   return withWarmAdapter(root, (adapter, server, reason) => predictClosure(root, paths, { adapter, server, instrumentReason: reason, change }));
 }
 

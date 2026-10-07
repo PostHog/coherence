@@ -14,15 +14,19 @@
  * and in `instrumentDied`, and the command exits non-zero.
  */
 
-import type { LanguageAdapter } from "../adapters/adapter.ts";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { isTestPath, parseName, type LanguageAdapter } from "../adapters/adapter.ts";
+import { isLanguage, type Language } from "../adapters/index.ts";
+import { projectFiles } from "../adapters/project-files.ts";
 import { gitState } from "../journal/store.ts";
 import { workBinding } from "../journal/work.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
 import { checkChokepoint, type ChokepointResult } from "./check.ts";
-import { readEnforcementConfig, type EnforcementConfig } from "./config.ts";
+import { languageOfFile, readEnforcementConfig, setupClaims, type EnforcementConfig } from "./config.ts";
 import { appendRun, entryKey, loadRuns, machineLoad, type Form, type RunEntry, type RunRecord } from "./record.ts";
 import { connectAdapter, type RemoteAdapter } from "./server.ts";
-import { runTotalityBatch, runTotalityOracle, type TotalityResult } from "./totality.ts";
+import { escapeRegExp, runTotalityBatch, runTotalityOracle, type TotalityResult } from "./totality.ts";
 import { readLatency, type LatencyReading } from "./latency.ts";
 import { createObserver, recordObservation, type ObservationOutcome, type TotalityVia } from "../observation/index.ts";
 
@@ -35,8 +39,10 @@ export interface RunOptions {
   invariants?: readonly string[] | undefined;
   /** Files (project-relative) whose text changed since the instrument last read them; the warm server re-reads them first. */
   refresh?: readonly string[] | undefined;
-  /** An adapter to use instead of the warm server (tests, and `--no-server`). */
+  /** An adapter to use instead of the warm server (tests, and `--no-server`); in a multi-language project, for its own language. */
   adapter?: LanguageAdapter | undefined;
+  /** Adapters by language to use instead of the warm servers (tests, and `--no-server` in a multi-language project). */
+  adapters?: Partial<Record<string, LanguageAdapter>> | undefined;
   /** Whether to talk to the warm server (default true when no adapter is given). */
   server?: boolean | undefined;
   model?: SpecModel | undefined;
@@ -76,6 +82,8 @@ export interface EntryDetail {
   totality?: TotalityResult;
   /** A totality oracle's test filter as the runner was given it, so a second pass re-runs this test and no other. */
   filter?: string;
+  /** A totality oracle's test setup (its index in the config's tests), so a second pass runs it through the same runner. */
+  setup?: number;
 }
 
 export interface RunOutcome {
@@ -121,6 +129,143 @@ export function mayTouch(invariant: ModelInvariant, file: string, text: string |
   return false;
 }
 
+/** One language's instrument as the run reached it: the adapter, how it was reached, or why there is none. */
+interface Door {
+  adapter: LanguageAdapter | undefined;
+  server: "cold" | "warm" | undefined;
+  reason: string | undefined;
+}
+
+/**
+ * The run's instruments, one per language, each opened only when a check
+ * first asks for it: a multi-language project never starts a language's
+ * server that no check needs. `open` reaches one; `ready` also asks it
+ * whether it is loaded, once, and keeps the answer.
+ */
+class Instruments {
+  private readonly opened = new Map<string, Promise<Door>>();
+  private readonly checked = new Map<string, Promise<Door>>();
+  private readonly connect: (language: string) => Promise<Door>;
+  constructor(connect: (language: string) => Promise<Door>) {
+    this.connect = connect;
+  }
+
+  open(language: string): Promise<Door> {
+    let door = this.opened.get(language);
+    if (door === undefined) {
+      door = this.connect(language).catch((error: unknown): Door => ({ adapter: undefined, server: undefined, reason: error instanceof Error ? error.message : String(error) }));
+      this.opened.set(language, door);
+    }
+    return door;
+  }
+
+  ready(language: string): Promise<Door> {
+    let door = this.checked.get(language);
+    if (door === undefined) {
+      door = this.open(language).then(async (d) => {
+        if (d.adapter === undefined || d.reason !== undefined) return d;
+        const state = await d.adapter.ready();
+        return state.ok ? d : { ...d, reason: state.reason };
+      });
+      this.checked.set(language, door);
+    }
+    return door;
+  }
+
+  /** Mark a language's instrument unavailable from here on, with why. */
+  fail(language: string, reason: string): void {
+    const failed = this.open(language).then((d): Door => ({ ...d, reason: d.reason ?? reason }));
+    this.checked.set(language, failed);
+  }
+
+  /** The languages opened, with what each answered. */
+  async doors(): Promise<{ language: string; door: Door }[]> {
+    return Promise.all([...this.opened.keys()].map(async (language) => ({ language, door: await (this.checked.get(language) ?? this.opened.get(language)!) })));
+  }
+}
+
+/** One chokepoint enforcement of a selected invariant, with the languages it may be written in, the likeliest first. */
+interface ChokepointPlan {
+  component: string;
+  invariant: ModelInvariant;
+  protects: string;
+  chokepoint: string;
+  languages: Language[];
+}
+
+/**
+ * The languages a chokepoint enforcement may be written in, the likeliest
+ * first: the language of a file either value names (`X in backend/a.py`, a
+ * module path); else the language the invariant's latest run graded it with,
+ * or of the files that run touched; else the languages whose files the
+ * component holds, in the config's order; else every language. A
+ * single-language project has the one.
+ */
+export function enforcementLanguages(config: EnforcementConfig, component: string, invariant: ModelInvariant, protects: string, chokepoint: string, files: () => readonly string[]): Language[] {
+  if (config.languages.length === 1) return [config.language];
+  const named = [protects, chokepoint].flatMap((value) => {
+    const form = parseName(value);
+    const file = form.form === "symbol" ? form.fileHint : form.form === "module" ? form.path : undefined;
+    const language = file === undefined ? undefined : languageOfFile(file, config.languages);
+    return language === undefined ? [] : [language];
+  });
+  if (named.length > 0) return [...new Set(named)];
+  const latest = invariant.latest.find((l) => l.form === "chokepoint");
+  const graded = latest?.language !== undefined && isLanguage(latest.language) && config.languages.includes(latest.language) ? [latest.language] : [];
+  const touched = (latest?.files ?? []).flatMap((f) => {
+    const language = languageOfFile(f, config.languages);
+    return language === undefined ? [] : [language];
+  });
+  const seen = [...new Set([...graded, ...touched])];
+  if (seen.length > 0) return seen;
+  const prefix = component === "." ? "" : `${component}/`;
+  const held = new Set(files().filter((f) => f.startsWith(prefix)).flatMap((f) => languageOfFile(f, config.languages) ?? []));
+  const ordered = config.languages.filter((l) => held.has(l));
+  return ordered.length > 0 ? ordered : [...config.languages];
+}
+
+/**
+ * Which test setup runs a totality oracle's test: the one setup a
+ * single-setup project has; else the first setup whose test files define a
+ * test of that name (a pytest `def` or `class` for a pytest setup, a quoted
+ * title for any other), else the first whose test files spell it at all,
+ * else the first setup. Test files are read once per run, and only when the
+ * config has more than one setup.
+ */
+export function setupChooser(root: string, config: EnforcementConfig): (via: string) => number {
+  if (config.tests.length <= 1) return () => 0;
+  let claimed: string[][] | undefined;
+  const texts = new Map<string, string>();
+  const text = (file: string): string => {
+    let t = texts.get(file);
+    if (t === undefined) {
+      try {
+        t = readFileSync(join(root, file), "utf8");
+      } catch {
+        t = "";
+      }
+      texts.set(file, t);
+    }
+    return t;
+  };
+  const claims = (): string[][] => {
+    if (claimed !== undefined) return claimed;
+    const all = projectFiles(root);
+    claimed = config.tests.map((setup) => all.filter((f) => isTestPath(f, setup.testFolders) && setupClaims(setup, f)));
+    return claimed;
+  };
+  return (via) => {
+    const files = claims();
+    const escaped = escapeRegExp(via);
+    const defines = config.tests.map((setup) =>
+      setup.testFilterForm === "pytest" && /^[A-Za-z_][\w]*$/.test(via) ? new RegExp(`^\\s*(?:async\\s+)?(?:def|class)\\s+${escaped}\\b`, "m") : new RegExp(`["'\`]${escaped}["'\`]`),
+    );
+    for (let i = 0; i < files.length; i += 1) if (files[i]!.some((f) => defines[i]!.test(text(f)))) return i;
+    for (let i = 0; i < files.length; i += 1) if (files[i]!.some((f) => text(f).includes(via))) return i;
+    return 0;
+  };
+}
+
 export async function performRun(root: string, options: RunOptions): Promise<RunOutcome> {
   const now = options.now ?? (() => new Date());
   const started = Date.now();
@@ -130,6 +275,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   const wantChokepoints = options.form === undefined || options.form === "chokepoint";
   const wantTotality = options.form === undefined || options.form === "totality oracle";
   const chosen = new Set(options.invariants ?? []);
+  const multi = config.languages.length > 1;
 
   const selected = model.components.flatMap((c) =>
     c.invariants.filter((i) => (chosen.size === 0 || chosen.has(i.name)) && i.enforcements.length > 0).map((i) => ({ component: c.folder, invariant: i })),
@@ -139,114 +285,155 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   const needsAdapter = wantChokepoints && selected.some(({ invariant }) => chokepointEnforcements(invariant).length > 0);
   // A totality oracle's refutation is the record `refute` wrote, never the bullet's own refuted: line.
   const recorded = new Set(loadRuns(root).refutations.map((r) => entryKey(r.component, r.name, r.form)));
+  let listed: string[] | undefined;
+  const files = (): string[] => (listed ??= projectFiles(root));
+  const plans: ChokepointPlan[] = wantChokepoints
+    ? selected.flatMap(({ component, invariant }) => chokepointEnforcements(invariant).map(({ protects, chokepoint }) => ({ component, invariant, protects, chokepoint, languages: enforcementLanguages(config, component, invariant, protects, chokepoint, files) })))
+    : [];
+  const chooseSetup = setupChooser(root, config);
+  const multiSetup = config.tests.length > 1;
 
-  // The pass itself, once the instrument question is settled: an adapter, where it came from, or why there is none.
-  const pass = async (adapter: LanguageAdapter | undefined, instrument: RunRecord["instrument"], unavailable: string | undefined): Promise<RunOutcome> => {
+  // The pass itself, once the instrument question is settled: the instruments, the record's instrument when it is fixed, or why there is none.
+  const pass = async (instruments: Instruments, fixed: RunRecord["instrument"] | undefined, unavailable: string | undefined): Promise<RunOutcome> => {
   let instrumentReason = unavailable;
-  if (adapter !== undefined && instrumentReason === undefined && needsAdapter) {
-    const state = await adapter.ready();
-    if (!state.ok) instrumentReason = state.reason;
-  }
+  // The likeliest language of every chokepoint is asked first, before the test pass, so its server loads while the tests run.
+  const upfront = [...new Set(plans.map((p) => p.languages[0]!))];
+  for (const language of upfront) await instruments.ready(language);
+  const primary = multi ? undefined : (await instruments.open(config.language)).adapter;
 
-  // Every test a bullet names in one invocation, when the runner can report per test; else one at a time below.
-  let batched: Map<string, TotalityResult> | undefined;
-  let batchLatency = 0;
-  // An observed run rides the same one invocation: the observer only adds coverage to it.
+  // Every test a bullet names in one invocation per setup, when the runner can report per test; else one at a time below.
+  const batched = new Map<number, Map<string, TotalityResult>>();
+  const batchLatency = new Map<number, number>();
+  // An observed run rides the first setup's one invocation: the observer only adds coverage to it.
   const observing = options.observe === true && wantTotality && config.testJson !== undefined ? createObserver(root, config) : undefined;
-  const vias: TotalityVia[] = selected.flatMap(({ component, invariant }) => totalityEnforcements(invariant).map(({ via }) => ({ component, name: invariant.name, filter: adapter?.testFilter(via) ?? via })));
+  // An observed pass reads through the primary language's instrument after it, so that one is reached first and kept awake.
+  if (observing !== undefined) await instruments.open(config.language);
+  const allVias = selected.flatMap(({ component, invariant }) => totalityEnforcements(invariant).map(({ via }) => ({ component, name: invariant.name, filter: primary?.testFilter(via) ?? via, setup: chooseSetup(via) })));
+  const vias: TotalityVia[] = allVias.filter((v) => v.setup === 0).map(({ component, name, filter }) => ({ component, name, filter }));
   if (wantTotality) {
-    const filters = vias.map((o) => o.filter);
-    const t0 = Date.now();
-    // The test suite can outlast the warm server's idle timeout, and its timer only resets on a request line.
-    const beat = adapter === undefined || (!needsAdapter && observing === undefined) ? undefined : setInterval(() => void adapter.ready().catch(() => {}), options.heartbeatMs ?? HEARTBEAT_MS);
+    // The test suite can outlast a warm server's idle timeout, and its timer only resets on a request line.
+    const live = (await instruments.doors()).flatMap(({ door }) => (door.adapter !== undefined && door.reason === undefined ? [door.adapter] : []));
+    const beat = live.length === 0 || (!needsAdapter && observing === undefined) ? undefined : setInterval(() => { for (const a of live) void a.ready().catch(() => {}); }, options.heartbeatMs ?? HEARTBEAT_MS);
     beat?.unref();
     try {
-      batched = await runTotalityBatch(root, config, filters, options.timeoutMs, observing?.observer);
+      for (const [index, setup] of config.tests.entries()) {
+        const filters = allVias.filter((v) => v.setup === index).map((v) => v.filter);
+        if (filters.length === 0 && !(index === 0 && observing !== undefined)) continue;
+        const t0 = Date.now();
+        const result = await runTotalityBatch(root, setup, filters, options.timeoutMs, index === 0 ? observing?.observer : undefined);
+        batchLatency.set(index, Date.now() - t0);
+        if (result !== undefined) batched.set(index, result);
+      }
     } finally {
       if (beat !== undefined) clearInterval(beat);
     }
-    batchLatency = Date.now() - t0;
-    // The instrument is asked again before the first chokepoint: a suite that outlived it must not read as not run.
-    if (adapter !== undefined && instrumentReason === undefined && needsAdapter) {
-      let alive: { ok: true } | { ok: false; reason: string };
-      try {
-        alive = await adapter.ready();
-      } catch (error) {
-        alive = { ok: false, reason: error instanceof Error ? error.message : String(error) };
+    // Each instrument is asked again before the first chokepoint: a suite that outlived it must not read as not run.
+    if (needsAdapter) {
+      const spent = [...batchLatency.values()].reduce((a, b) => a + b, 0);
+      for (const { language, door } of await instruments.doors()) {
+        if (door.adapter === undefined || door.reason !== undefined) continue;
+        let alive: { ok: true } | { ok: false; reason: string };
+        try {
+          alive = await door.adapter.ready();
+        } catch (error) {
+          alive = { ok: false, reason: error instanceof Error ? error.message : String(error) };
+        }
+        if (!alive.ok) instruments.fail(language, `the instrument did not survive the test pass (${Math.round(spent / 1000)} s): ${alive.reason}`);
       }
-      if (!alive.ok) instrumentReason = `the instrument did not survive the test pass (${Math.round(batchLatency / 1000)} s): ${alive.reason}`;
     }
   }
 
   for (const { component, invariant } of selected) {
     if (wantChokepoints) {
-      for (const { protects, chokepoint } of chokepointEnforcements(invariant)) {
+      for (const plan of plans.filter((p) => p.component === component && p.invariant === invariant)) {
+        const { protects, chokepoint } = plan;
         const t0 = Date.now();
-        if (adapter === undefined || instrumentReason !== undefined) {
+        let firstReason: string | undefined;
+        for (const [i, language] of plan.languages.entries()) {
+          const last = i === plan.languages.length - 1;
+          const tag = multi ? { language } : {};
+          const door = await instruments.ready(language);
+          if (door.adapter === undefined || door.reason !== undefined) {
+            firstReason ??= door.reason ?? "no adapter";
+            if (!last) continue;
+            instrumentReason ??= firstReason;
+            details.push({
+              entry: entryOf(component, invariant.name, "chokepoint", {
+                verdict: "not run",
+                grade: undefined,
+                refutation: "missing",
+                bypasses: [],
+                testReferences: 0,
+                files: [],
+                latency: Date.now() - t0,
+                reason: `instrument unavailable: ${firstReason}`,
+                ...(multi ? { language: plan.languages[0]! } : {}),
+              }),
+            });
+            break;
+          }
+          let result: ChokepointResult;
+          try {
+            result = await checkChokepoint(door.adapter, { protects, chokepoint, component, testFolders: config.testFolders, root });
+          } catch (error) {
+            const message = error instanceof Error ? error.message.split("\n")[0]! : String(error);
+            instruments.fail(language, message);
+            firstReason ??= message;
+            if (!last) continue;
+            details.push({
+              entry: entryOf(component, invariant.name, "chokepoint", {
+                verdict: "not run",
+                grade: undefined,
+                refutation: "missing",
+                bypasses: [],
+                testReferences: 0,
+                files: [],
+                latency: Date.now() - t0,
+                reason: `instrument failed: ${message}`,
+                ...tag,
+              }),
+            });
+            instrumentReason ??= message;
+            break;
+          }
+          // A protected thing this language's server cannot find may be written in the next language the component holds.
+          if (!last && result.verdict === "not run" && result.protectedThing === undefined) continue;
           details.push({
             entry: entryOf(component, invariant.name, "chokepoint", {
-              verdict: "not run",
-              grade: undefined,
-              refutation: "missing",
-              bypasses: [],
-              testReferences: 0,
-              files: [],
+              verdict: result.verdict,
+              grade: result.grade,
+              ...(result.enforcer === undefined ? {} : { enforcer: result.enforcer }),
+              refutation: result.refutation,
+              bypasses: result.bypasses,
+              ...(result.siteEvidence !== "complete" ? {} : { sites: result.sites.map((site) => ({
+                file: site.file,
+                line: site.line,
+                symbol: site.symbol ?? "module top level",
+                class: site.class,
+                of: site.of,
+                test: site.test,
+                ...(site.form === undefined ? {} : { form: site.form }),
+              })) }),
+              testReferences: result.counts.test,
+              files: result.files,
               latency: Date.now() - t0,
-              reason: `instrument unavailable: ${instrumentReason ?? "no adapter"}`,
+              reason: result.reason,
+              ...tag,
             }),
+            chokepoint: result,
           });
-          continue;
+          break;
         }
-        let result: ChokepointResult;
-        try {
-          result = await checkChokepoint(adapter, { protects, chokepoint, component, testFolders: config.testFolders, root });
-        } catch (error) {
-          details.push({
-            entry: entryOf(component, invariant.name, "chokepoint", {
-              verdict: "not run",
-              grade: undefined,
-              refutation: "missing",
-              bypasses: [],
-              testReferences: 0,
-              files: [],
-              latency: Date.now() - t0,
-              reason: `instrument failed: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`,
-            }),
-          });
-          instrumentReason ??= error instanceof Error ? error.message.split("\n")[0] : String(error);
-          continue;
-        }
-        details.push({
-          entry: entryOf(component, invariant.name, "chokepoint", {
-            verdict: result.verdict,
-            grade: result.grade,
-            ...(result.enforcer === undefined ? {} : { enforcer: result.enforcer }),
-            refutation: result.refutation,
-            bypasses: result.bypasses,
-            ...(result.siteEvidence !== "complete" ? {} : { sites: result.sites.map((site) => ({
-              file: site.file,
-              line: site.line,
-              symbol: site.symbol ?? "module top level",
-              class: site.class,
-              of: site.of,
-              test: site.test,
-              ...(site.form === undefined ? {} : { form: site.form }),
-            })) }),
-            testReferences: result.counts.test,
-            files: result.files,
-            latency: Date.now() - t0,
-            reason: result.reason,
-          }),
-          chokepoint: result,
-        });
       }
     }
     if (wantTotality) {
       for (const { via } of totalityEnforcements(invariant)) {
         const t0 = Date.now();
-        const filter = adapter?.testFilter(via) ?? via;
-        const fromBatch = batched?.get(filter);
-        const result = fromBatch ?? (await runTotalityOracle(root, config, filter, options.timeoutMs));
+        const filter = primary?.testFilter(via) ?? via;
+        const index = chooseSetup(via);
+        const setup = config.tests[index]!;
+        const fromBatch = batched.get(index)?.get(filter);
+        const result = fromBatch ?? (await runTotalityOracle(root, setup, filter, options.timeoutMs));
         details.push({
           entry: {
             ...entryOf(component, invariant.name, "totality oracle", {
@@ -256,20 +443,27 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
               bypasses: [],
               testReferences: 0,
               files: [],
-              latency: fromBatch === undefined ? Date.now() - t0 : batchLatency,
+              latency: fromBatch === undefined ? Date.now() - t0 : (batchLatency.get(index) ?? 0),
               reason: result.reason,
+              ...(multiSetup && setup.language !== undefined ? { language: setup.language } : {}),
             }),
             ...(result.testMs === undefined ? {} : { testMs: result.testMs }),
             mode: fromBatch === undefined ? "one-at-a-time" : "batched",
           },
           totality: result,
           filter,
+          setup: index,
         });
       }
     }
   }
 
+  const doors = await instruments.doors();
+  const instrument: RunRecord["instrument"] = fixed ?? instrumentOf(config, doors);
+  // The observation reads interfaces through the primary language's instrument: opened only for an observed run.
+  const observed = options.observe === true && observing !== undefined && batched.has(0) ? await instruments.open(config.language) : undefined;
   const { commit, dirty } = gitState(root);
+  const totalBatch = [...batchLatency.entries()].filter(([index]) => batched.has(index)).reduce((sum, [, ms]) => sum + ms, 0);
   const record: RunRecord = {
     at: now().toISOString(),
     session: options.session,
@@ -280,17 +474,17 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     instrument,
     latency: Date.now() - started,
     load,
-    ...(batched === undefined ? {} : { batch: { ms: batchLatency } }),
+    ...(batched.size === 0 ? {} : { batch: { ms: totalBatch } }),
     invariants: details.map((d) => d.entry),
   };
   const file = appendRun(root, record);
   const outcome: RunOutcome = { record, file, details, instrumentReason, instrumentDied: needsAdapter && instrumentReason !== undefined };
-  if (batched !== undefined) {
+  if (batched.size > 0) {
     // Read against the whole store: a test is slower only against its own earlier runs.
     outcome.latency = { slower: readLatency(loadRuns(root).records).slower.filter((s) => s.at === record.at) };
   }
   if (options.observe === true) {
-    if (observing === undefined || batched === undefined) {
+    if (observing === undefined || !batched.has(0)) {
       outcome.observationSkipped = !wantTotality
         ? "the run checked no totality oracle, so no test ran to observe"
         : config.testJson === undefined
@@ -301,15 +495,15 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
       outcome.observation = await recordObservation({
         root,
         capture: observing.collect(),
-        adapter,
-        instrumentReason: needsAdapter ? instrumentReason : unavailable,
+        adapter: observed?.adapter,
+        instrumentReason: needsAdapter ? instrumentReason : (observed?.reason ?? unavailable),
         model,
         config,
         vias,
         session: options.session,
         agent: options.agent,
         at: record.at,
-        passLatency: batchLatency,
+        passLatency: batchLatency.get(0) ?? 0,
         commit,
       });
     }
@@ -327,19 +521,57 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   return outcome;
   };
 
-  if ((needsAdapter || options.observe === true) && options.adapter === undefined && options.server !== false) {
-    return withWarmAdapter(root, (remote, server, reason) => pass(remote, { language: remote?.language ?? config.language, server: server ?? "none" }, reason), {
-      refresh: options.refresh ?? [],
-      idleMs: options.idleMs,
-    });
+  if (!multi) {
+    // One language: the one instrument is settled before the pass, as it always was.
+    const one = (door: Door): Instruments => new Instruments(async () => door);
+    if ((needsAdapter || options.observe === true) && options.adapter === undefined && options.adapters === undefined && options.server !== false) {
+      return withWarmAdapter(root, (remote, server, reason) => pass(one({ adapter: remote, server, reason }), { language: remote?.language ?? config.language, server: server ?? "none" }, reason), {
+        refresh: options.refresh ?? [],
+        idleMs: options.idleMs,
+      });
+    }
+    const given = options.adapter ?? options.adapters?.[config.language];
+    if (given !== undefined) {
+      // An adapter handed in lives in this process: no server was warm before it.
+      await given.forget(options.refresh ?? []);
+      return pass(one({ adapter: given, server: "cold", reason: undefined }), { language: given.language, server: "cold" }, undefined);
+    }
+    return pass(one({ adapter: undefined, server: undefined, reason: undefined }), { language: config.language, server: "none" }, undefined);
   }
-  const given = options.adapter;
-  if (given !== undefined) {
-    // An adapter handed in lives in this process: no server was warm before it.
-    await given.forget(options.refresh ?? []);
-    return pass(given, { language: given.language, server: "cold" }, undefined);
+
+  // Several languages: each language's instrument is reached only when a check first asks for it, and let go after.
+  const remotes: RemoteAdapter[] = [];
+  const instruments = new Instruments(async (language): Promise<Door> => {
+    const given = options.adapters?.[language] ?? (options.adapter?.language === language ? options.adapter : undefined);
+    if (given !== undefined) {
+      await given.forget(options.refresh ?? []);
+      return { adapter: given, server: "cold", reason: undefined };
+    }
+    if (options.adapter !== undefined || options.adapters !== undefined || options.server === false) return { adapter: undefined, server: undefined, reason: `no ${language} adapter was handed to this run` };
+    const connected = await connectAdapter(root, { language, ...(options.idleMs === undefined ? {} : { idleMs: options.idleMs }) });
+    remotes.push(connected.adapter);
+    await connected.adapter.forget(options.refresh ?? []);
+    return { adapter: connected.adapter, server: connected.server, reason: undefined };
+  });
+  try {
+    return await pass(instruments, undefined, undefined);
+  } finally {
+    for (const remote of remotes) await remote.close();
   }
-  return pass(undefined, { language: config.language, server: "none" }, undefined);
+}
+
+/**
+ * The record's instrument for a multi-language run: the one language whose
+ * server answered, as before; or, when several did, their names joined with
+ * `+`, cold when any was, and each one under `languages`; the primary
+ * language with no server when none was asked.
+ */
+function instrumentOf(config: EnforcementConfig, doors: readonly { language: string; door: Door }[]): RunRecord["instrument"] {
+  const used = doors.map(({ language, door }) => ({ language, server: door.adapter === undefined ? ("none" as const) : (door.server ?? "none") }));
+  if (used.length === 0) return { language: config.language, server: "none" };
+  if (used.length === 1) return used[0]!;
+  const server = used.some((u) => u.server === "none") ? "none" : used.some((u) => u.server === "cold") ? "cold" : "warm";
+  return { language: used.map((u) => u.language).join("+"), server, languages: used };
 }
 
 /**
@@ -361,13 +593,14 @@ async function confirmEach(
   const details: EntryDetail[] = [];
   const hidden: EntryDetail[] = [];
   const unconfirmed: EntryDetail[] = [];
-  // Each batched detail carries the filter it ran under, so the confirmation re-runs that test, whichever of an invariant's vias it was.
+  // Each batched detail carries the filter it ran under and its setup, so the confirmation re-runs that test, whichever of an invariant's vias it was, through the same runner.
   for (const batched of batchedDetails) {
     const { component, name } = batched.entry;
     const filter = batched.filter;
     if (filter !== undefined) {
       const t0 = Date.now();
-      const result = await runTotalityOracle(root, config, filter, options.timeoutMs);
+      const setup = config.tests[batched.setup ?? 0] ?? config;
+      const result = await runTotalityOracle(root, setup, filter, options.timeoutMs);
       const reason = batched.entry.verdict === "pass" && result.verdict !== "pass" ? `passed in the batched invocation, ${result.verdict === "fail" ? "failed" : "did not run"} in its own: ${result.reason}` : result.reason;
       const detail: EntryDetail = {
         entry: {
@@ -380,10 +613,12 @@ async function confirmEach(
             files: [],
             latency: Date.now() - t0,
             reason,
+            ...(batched.entry.language === undefined ? {} : { language: batched.entry.language }),
           }),
           mode: "one-at-a-time",
         },
         totality: result,
+        ...(batched.setup === undefined ? {} : { setup: batched.setup }),
       };
       details.push(detail);
       if (batched.entry.verdict === "pass" && result.verdict === "fail") hidden.push(detail);
@@ -417,13 +652,13 @@ async function confirmEach(
 export async function withWarmAdapter<T>(
   root: string,
   fn: (adapter: RemoteAdapter | undefined, server: "cold" | "warm" | undefined, reason: string | undefined) => Promise<T>,
-  options: { refresh?: readonly string[] | undefined; idleMs?: number | undefined } = {},
+  options: { refresh?: readonly string[] | undefined; idleMs?: number | undefined; language?: string | undefined } = {},
 ): Promise<T> {
   let remote: RemoteAdapter | undefined;
   let server: "cold" | "warm" | undefined;
   let reason: string | undefined;
   try {
-    const connected = await connectAdapter(root, options.idleMs === undefined ? {} : { idleMs: options.idleMs });
+    const connected = await connectAdapter(root, { ...(options.idleMs === undefined ? {} : { idleMs: options.idleMs }), ...(options.language === undefined ? {} : { language: options.language }) });
     remote = connected.adapter;
     server = connected.server;
     await remote.forget(options.refresh ?? []);
@@ -434,6 +669,41 @@ export async function withWarmAdapter<T>(
     return await fn(remote, server, reason);
   } finally {
     if (remote !== undefined) await remote.close();
+  }
+}
+
+/**
+ * The door to several languages' warm instruments, for a reading in a
+ * multi-language project: `open` connects to one language's warm server the
+ * first time it is asked (spawning it when none listens), never before, and
+ * every connection is ended after `fn`. A language whose server cannot be
+ * reached answers with the reason, so a caller says so rather than crashing.
+ */
+export async function withWarmAdapters<T>(
+  root: string,
+  fn: (open: (language: string) => Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }>) => Promise<T>,
+  options: { idleMs?: number | undefined } = {},
+): Promise<T> {
+  const remotes: RemoteAdapter[] = [];
+  const opened = new Map<string, Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }>>();
+  const open = (language: string): Promise<{ adapter: RemoteAdapter | undefined; server?: "cold" | "warm" | undefined; reason?: string | undefined }> => {
+    let door = opened.get(language);
+    if (door === undefined) {
+      door = connectAdapter(root, { language, ...(options.idleMs === undefined ? {} : { idleMs: options.idleMs }) }).then(
+        (connected) => {
+          remotes.push(connected.adapter);
+          return { adapter: connected.adapter, server: connected.server };
+        },
+        (error: unknown) => ({ adapter: undefined, reason: error instanceof Error ? error.message : String(error) }),
+      );
+      opened.set(language, door);
+    }
+    return door;
+  };
+  try {
+    return await fn(open);
+  } finally {
+    for (const remote of remotes) await remote.close();
   }
 }
 

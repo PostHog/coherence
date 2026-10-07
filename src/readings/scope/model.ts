@@ -524,6 +524,11 @@ export type InterfaceReading =
   | {
       kind: "read";
       language: string;
+      /**
+       * A multi-language project: the languages whose files this reading did not read. The Structure reading reads
+       * the primary language (the first the config lists) alone, and says which it left out. Absent for one language.
+       */
+      unreadLanguages?: string[];
       declarations: number;
       symbols: InterfaceSymbol[];
       entrances: EntranceResolution[];

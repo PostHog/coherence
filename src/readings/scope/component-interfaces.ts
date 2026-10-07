@@ -578,6 +578,8 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
     const testFolders = config.testFolders;
     const skip = boundsOf(root, ignore);
     const language = config.language;
+    // One language per reading: a multi-language project's other languages are named as unread, never silently left out.
+    const unreadLanguages = config.languages.length > 1 ? { unreadLanguages: config.languages.filter((l) => l !== language) } : {};
     // The component code: every bounded non-test file of the language whose nearest spec folder is a component.
     const code = new Map<string, string>();
     const unowned = { files: 0, lines: 0 };
@@ -836,6 +838,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
       return {
         kind: "read",
         language,
+        ...unreadLanguages,
         declarations,
         symbols,
         entrances,
@@ -852,7 +855,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
         },
       };
     }
-    return { kind: "read", language, declarations, symbols, entrances, unowned, bounds, outside, candidates };
+    return { kind: "read", language, ...unreadLanguages, declarations, symbols, entrances, unowned, bounds, outside, candidates };
   } catch (error) {
     return { kind: "unread", because: `the ${config.language} instrument failed: ${error instanceof Error ? error.message : String(error)}` };
   } finally {

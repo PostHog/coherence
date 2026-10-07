@@ -452,10 +452,18 @@ export function flowBoundaryId(folder: string): string {
   return `structure--boundary-${flowSlug(folder)}`;
 }
 
+/** A multi-language project's languages the reading left unread, as a clause; empty for one language. */
+export function unreadLanguagesText(model: Pick<FlowModel, "language" | "unreadLanguages">): string {
+  const unread = model.unreadLanguages ?? [];
+  return unread.length === 0 ? "" : ` (${unread.join(" and ")} files not read: the Structure reading reads the primary language, ${model.language}, alone)`;
+}
+
 export interface FlowModel {
   evidence: FlowEvidence;
   /** The language the adapter read, when it read. */
   language: string | undefined;
+  /** A multi-language project: the languages the reading left unread (it reads the primary one alone). */
+  unreadLanguages?: string[] | undefined;
   /** Why the adapter's reading is absent, when it is. */
   unread: string | undefined;
   /** Visible components in folder order (their column order). */
@@ -1057,6 +1065,7 @@ export function flowOf(state: ShellState): FlowModel {
   return {
     evidence: reading.kind === "read" ? "language adapter" : "run sites only",
     language: reading.kind === "read" ? reading.language : undefined,
+    ...(reading.kind === "read" && reading.unreadLanguages !== undefined ? { unreadLanguages: reading.unreadLanguages } : {}),
     unread: reading.kind === "read" ? undefined : reading.because,
     nodes,
     edges,
