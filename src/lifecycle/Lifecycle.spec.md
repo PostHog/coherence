@@ -560,6 +560,18 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: PreToolUse runs before every command and edit (every tool under Codex), and loading the whole spec model there cost about 0.34 s on this repository and 0.7 s on a 40,000-file one (df-f1b7e11a); delivery needs triggers, steps and versions, and the spec check is what holds the pairing
   refuted: dropped the pairing check from practice delivery -> "practice delivery reads the same practices as the spec model, through git's listing of practice files alone" went red in hook-speed.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-06)
   kinds: none
+- a tool call's hooks spawn git a fixed number of times: PreToolUse and PostToolUse spawn git as often over a project of many components and practices as over a project of one.
+  over: a command that fires a practice in each of one component and of six, at PreToolUse and at PostToolUse
+  via: a tool call's hooks spawn git a fixed number of times, whatever the number of components and practices
+  because: these two hooks run around every tool call, thousands a day, so a spawn per component or per practice there is paid on every one of them (df-f1b7e11a); a count of spawns holds under any load, where a timing alarm would flake
+  refuted: asked git whether each practice's spec is tracked, one spawn per practice file -> "a tool call's hooks spawn git a fixed number of times, whatever the number of components and practices" went red in hook-speed.test.ts on its own assertion (PreToolUse 2 spawns against 7); restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is a count of child processes per hook
+  checklist: execution-budget declared as a tool call's hooks spawn git a fixed number of times
+  checklist: memory-budget dismissed: the bound is on spawned processes, not on allocation
+  checklist: circuit-breaker-policy dismissed: no dependency failures are observed
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
 - an edit never stays silent about a check it could not make: When a chokepoint invariant an edit may touch could not be checked, the edit names it with the reason; only a value the spec writes as prose, which spec --check already reports, goes unnamed there.
   over: a touched invariant whose protected thing resolves to nothing, and one whose value is prose
   via: an edit says which chokepoint invariants it could not check, and stays silent only for a value the spec writes as prose

@@ -16,6 +16,7 @@ import { economyStopText, editContext, runHook } from "./hook.ts";
 import { TypeScriptAdapter } from "../adapters/typescript.ts";
 import { deliveryPractices } from "./practice-delivery.ts";
 import { projectPractices } from "../spec/model.ts";
+import { countingGit } from "../adapters/git-count-fixture.ts";
 
 function repo(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "coherence-hook-speed-"));
@@ -119,4 +120,33 @@ test("an edit says which chokepoint invariants it could not check, and stays sil
     await adapter.close();
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("a tool call's hooks spawn git a fixed number of times, whatever the number of components and practices", async () => {
+  const counts: string[] = [];
+  for (const n of [1, 6]) {
+    const files: Record<string, string> = { "coherence.config.json": JSON.stringify({ name: "p" }) };
+    for (let i = 0; i < n; i++) {
+      files[`src/c${i}/C${i}.spec.md`] = `# C${i}\n\nA component.\n`;
+      files[`src/c${i}/C${i}.practice.md`] = `- list the folder ${i}: Look before you change.\n  when: command ls\n  step: list the folder\n  reach: internal\n  because: fixture\n`;
+      files[`src/c${i}/m.ts`] = `export const m${i} = ${i};\n`;
+    }
+    const root = repo(files);
+    const git = countingGit();
+    try {
+      const input = { cwd: root, session_id: "s", tool_name: "Bash", tool_input: { command: "ls" } };
+      const per: number[] = [];
+      for (const event of ["PreToolUse", "PostToolUse"] as const) {
+        git.reset();
+        const answered = await runHook(event, input, root, {});
+        per.push(git.calls().length);
+        if (event === "PreToolUse") assert.match(JSON.stringify(answered), new RegExp(`list the folder ${n - 1}`), "every practice the command fires is delivered, so the count covers the delivery");
+      }
+      counts.push(per.join(" "));
+    } finally {
+      git.restore();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+  assert.equal(counts[1], counts[0], `PreToolUse and PostToolUse over 6 components and practices spawn git as often as over 1: ${counts.join(" vs ")}`);
 });
