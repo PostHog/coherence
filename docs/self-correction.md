@@ -103,12 +103,29 @@ Repeated friction and repeated deviation also propose practices, or
 amendments to the ones that exist: method harvested from evidence, beside
 prevention harvested from defects.
 
+## Fleet telemetry (d-c00e7997)
+
+The widest loop learns from every installation, not only the ones
+Coherence's maintainers can see. It goes through PostHog, and it is opt-in:
+off unless a user turns it on, and never on by default.
+
+- **What is sent.** Two events. A per-session summary of hook cost: for each
+  event and phase, the count and the median and 95th-percentile time, with
+  Coherence's version, the host, the languages, and the project's size as a
+  bucket. And a defect event, sent when a defect is recorded: its class, its
+  origin (introduced by a fix, pre-existing, unknown), how it was caught, and
+  the version. Never a defect's text, a path, code, a name from the project,
+  a prompt or a command.
+- **Who sent it.** An anonymous installation id, random and local, which the
+  user can reset.
+- **How.** Events go to a local queue and are flushed in the background, off
+  the tool path; a send that fails is dropped, never retried inside a hook.
+- **Seen before sent.** A command shows exactly what is queued, and turns
+  telemetry on, off, or reports its state; the README says what each event
+  carries, field by field.
+
 ## Open questions for the owner
 
-- **Fleet telemetry.** Learning from adopters' hook costs and friction across
-  installations would close the widest loop, but Coherence runs in other
-  people's code: it would be opt-in, minimal (phase timings per version, never
-  content), and a deliberate decision, not a default.
 - **Thresholds.** Where a candidate becomes a proposal, and which reductions
   count as mechanical enough to take without the owner, are policy to settle
   once the reading shows real numbers.
