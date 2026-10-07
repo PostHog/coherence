@@ -86,7 +86,7 @@ import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
 import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, type Lexicon } from "./lexicon.ts";
-import { COHERENCE_LEXICON, DURABLE_FOLDERS, installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
+import { COHERENCE_LEXICON, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, within, type HookProject } from "./project.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
@@ -257,7 +257,7 @@ function transientState(path: string): boolean {
 
 export async function changedFiles(root: string): Promise<ChangedFiles> {
   const listings: string[] = [];
-  for (const args of [["diff", "--name-only", "HEAD"], ["ls-files", "--others", "--exclude-standard"]]) {
+  for (const args of [["diff", "--name-only", "--relative", "HEAD"], ["ls-files", "--others", "--exclude-standard"]]) {
     try {
       listings.push((await run("git", args, { cwd: root, maxBuffer: GIT_LISTING_LIMIT })).stdout);
     } catch (error) {
@@ -540,8 +540,28 @@ export function lexiconStopText(report: CheckReport | undefined, walls: readonly
 /** Tools that read a file and name it the same way a writing tool does. */
 const READING_TOOLS: ReadonlySet<string> = new Set(["Read", "Glob", "Grep", "LS", "NotebookRead", "read_file", "list_files", "search"]);
 
-/** The project-relative path a tool event wrote, or undefined when the event wrote no file under the root. */
-export function writtenFiles(root: string, input: HookInput): string[] {
+/**
+ * The project-relative paths a tool event wrote under the root; none when it
+ * wrote no file there. `host` is the folder the host runs in, which a tool's
+ * relative path is written from: the root, unless the project is nested below
+ * the folder holding the host's settings.
+ */
+export function writtenFiles(root: string, input: HookInput, host: string = root): string[] {
+  return writtenPaths(input, host).flatMap((absolute) => {
+    if (!within(root, absolute)) return [];
+    const rel = relative(resolve(root), absolute).split(sep).join("/");
+    return rel && rel !== ".." && !rel.startsWith("../") ? [rel] : [];
+  });
+}
+
+/**
+ * Every path a tool event writes, absolute: an edit tool's file and a patch's
+ * files, a relative one resolved against `host`, the folder the host runs in;
+ * and what a shell command writes, against the folder it runs in (the event's
+ * cwd, else `host`). A reading tool writes nothing. Words only: nothing is
+ * read or stat'd.
+ */
+export function writtenPaths(input: HookInput, host: string): string[] {
   if (typeof input.tool_name === "string" && READING_TOOLS.has(input.tool_name)) return [];
   const record = typeof input.tool_input === "object" && input.tool_input !== null ? input.tool_input as Record<string,unknown> : {};
   const paths = [record["file_path"],record["notebook_path"],record["path"]].filter((v):v is string=>typeof v === "string" && v !== "");
@@ -556,12 +576,8 @@ export function writtenFiles(root: string, input: HookInput): string[] {
   const shellPaths: string[] = [];
   const command = isPatch ? undefined : shellCommandOf(record);
   if(command !== undefined) shellPaths.push(...shellWrittenPaths(command));
-  const ran = typeof input.cwd === "string" && input.cwd !== "" && within(root, resolve(root, input.cwd)) ? resolve(root, input.cwd) : root;
-  return [...new Set([...paths.map((path)=>resolve(root,path)), ...shellPaths.map((path)=>resolve(ran,path))].flatMap(absolute=> {
-    if(!within(root,absolute)) return [];
-    const rel=relative(resolve(root),absolute).split(sep).join("/");
-    return rel && rel!==".." && !rel.startsWith("../") ? [rel] : [];
-  }))];
+  const ran = typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : host;
+  return [...new Set([...paths.map((path) => resolve(host, path)), ...shellPaths.map((path) => resolve(ran, path))])];
 }
 
 /** The written files that are the project's own: a nested checkout's or an ignored file is not this session's patch. */
@@ -583,7 +599,7 @@ export function writtenFile(root: string, input: HookInput): string | undefined 
 export async function editContext(root: string, input: HookInput, options: HookOptions = {}): Promise<string> {
   // Only the project's own files are evidence: an edit in a nested checkout (an agent's worktree under the root) or to an
   // ignored file is not an edit to this project, and re-checking it would load that checkout into this project's instrument.
-  const written = writtenFiles(root, input);
+  const written = writtenFiles(root, input, options.host);
   const own = keepProjectFiles(root, written);
   const files = written.filter((file) => own.has(file));
   if (files.length === 0) return "";
@@ -781,6 +797,8 @@ export type WarmDoor = typeof withWarmAdapter;
 export const WARM_DOOR: WarmDoor = withWarmAdapter;
 
 export interface HookOptions {
+  /** The folder the host runs in, which a tool's relative path is written from: the root unless the project is nested below it. */
+  host?: string;
   /** An adapter to check with instead of the warm server (tests). */
   adapter?: LanguageAdapter | undefined;
   /**
@@ -962,23 +980,52 @@ async function voiced(root: string, input: HookInput, canonical: string, voice: 
   return composeVoice(canonical, voice, { session: sessionOf(input), agent: agentOf(input), cli: await cliName(root) });
 }
 
+/** The tools whose event names the files it writes, so the files, not the cwd, say which project it is about. */
+const FILE_TOOLS: ReadonlySet<string> = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
+
+/**
+ * The project an event belongs to, for a hook installed at `base`: a tool
+ * event that writes named files belongs where its files are; every other
+ * event, a shell command among them, where its cwd is (hookProject).
+ */
+function eventProject(event: HookEvent, input: HookInput, base: string, cwd: string): HookProject {
+  const tool = typeof input.tool_name === "string" ? input.tool_name : "";
+  const fileTool = FILE_TOOLS.has(tool) || tool.split(".").at(-1) === "apply_patch";
+  const subjects = (event === "PreToolUse" || event === "PostToolUse") && fileTool ? writtenPaths(input, base) : [];
+  return hookProject(base, subjects, cwd);
+}
+
 /** Run one event. `input` is the parsed stdin the host sent; `root` defaults to its cwd. */
 export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: string, options: HookOptions = {}): Promise<HookResult> {
   // One spec model per event, shared by every part of its answer; the body stays inside runHook, the chokepoint for its exit codes.
   const outer = eventModels;
   eventModels = new Map();
   const began = options.startedAt ?? Date.now();
+  const installed = installedRoot(fallbackRoot);
+  const given = typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : fallbackRoot;
+  // The project is the folder holding the nearest coherence.config.json (or .coherence) to what the event is about; the rest of the repository is outside it.
+  const place = installed !== undefined && !within(installed, given) ? undefined : eventProject(event, input, installed ?? given, given);
   try {
+    if (place !== undefined && place.kind !== "project") return quiet(place);
     return timed(await answer());
   } finally {
     eventModels = outer;
+  }
+
+  /** An event outside every project is ignored: nothing read, nothing written, nothing said; a session start above several says so in one line. */
+  function quiet(where: Exclude<HookProject, { kind: "project" }>): HookResult {
+    if (where.kind === "several" && (event === "SessionStart" || event === "SubagentStart")) {
+      const context = `Coherence: this folder holds ${where.projects.length} projects (${where.projects.map((p) => relative(given, p) || ".").join(", ")}); its hooks answer for one at a time, so they say nothing here. Start the session in one of them, or edit a file inside one.`;
+      return { stdout: JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n", stderr: "", exit: 0 };
+    }
+    return { stdout: "", stderr: "", exit: 0 };
   }
 
   /** Keep the call's time, and let a tool hook over the latency budget say so in its own answer. */
   function timed(result: HookResult): HookResult {
     if (result.exit === OUTSIDE_ROOT_EXIT) return result;
     const ms = Date.now() - began;
-    const root = installedRoot(fallbackRoot) ?? (typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : fallbackRoot);
+    const root = place?.kind === "project" ? place.root : installed ?? given;
     const session = sessionOf(input);
     if (session !== undefined) recordHookTime(root, session, { at: new Date().toISOString(), event, ms });
     if (!TOOL_HOOKS.has(event) || result.exit !== 0) return result;
@@ -995,13 +1042,13 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
   }
 
   async function answer(): Promise<HookResult> {
-    const project = installedRoot(fallbackRoot);
-    const given = typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : fallbackRoot;
     // The cwd arrives on stdin from the harness; a tree that is not the one this hook was installed for is none of its business.
-    if (project !== undefined && !within(project, given)) {
-      return { stdout: "", stderr: `hook ${event}: the working directory "${given}" is not inside the project root this hook was installed for (${project}); nothing was read and nothing was written\n`, exit: OUTSIDE_ROOT_EXIT };
+    if (place === undefined) {
+      return { stdout: "", stderr: `hook ${event}: the working directory "${given}" is not inside the project root this hook was installed for (${installed}); nothing was read and nothing was written\n`, exit: OUTSIDE_ROOT_EXIT };
     }
-    const root = project ?? given;
+    const root = place.kind === "project" ? place.root : given;
+    // A tool names a relative path from where the host runs: the folder holding its settings, which is the root unless the project is nested below it.
+    const host = installed ?? given;
     const voice = readHookVoice(root, event);
     switch (event) {
       case "SessionStart":
@@ -1034,7 +1081,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       case "PreToolUse": {
         // Before the act: a practice whose trigger this tool use fires is delivered now, when its first steps can still be taken.
         const session = sessionOf(input);
-        const practice = practiceContext(root, session, toolUseOf(input, writtenFiles(root, input)), await cliName(root), agentOf(input), undefined, given);
+        const practice = practiceContext(root, session, toolUseOf(input, writtenFiles(root, input, host)), await cliName(root), agentOf(input), undefined, given);
         const context = await voiced(root, input, practice.text, voice);
         if (context === "") return { stdout: "", stderr: "", exit: 0 };
         const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
@@ -1044,14 +1091,14 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       case "PostToolUse": {
         const feed = feedContext(root, input);
         const session=sessionOf(input);
-        const written = event === "PostToolUse" ? keepProjectFilesOf(root, writtenFiles(root, input)) : [];
+        const written = event === "PostToolUse" ? keepProjectFilesOf(root, writtenFiles(root, input, host)) : [];
         if (event === "PostToolUse" && session) {
           recordReadTrace(root, session, input);
           // What this tool use wrote is the session's own patch, which the stop predicts for.
           recordWriteTrace(root, session, written);
         }
         if (event === "UserPromptSubmit") options.warm?.(root);
-        const edit = event === "PostToolUse" ? await editContext(root, input, options) : "";
+        const edit = event === "PostToolUse" ? await editContext(root, input, { ...options, host }) : "";
         // The coverage reading walks the whole corpus (seconds on a real project), so it runs only when the text can have moved:
         // after a tool use that wrote a project file, and at a prompt when the tree moved since this session's last reading.
         // A write no command line shows is read at the stop, which always reads in full.

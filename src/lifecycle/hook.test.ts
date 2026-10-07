@@ -230,11 +230,11 @@ test("changedFiles reports a git failure instead of answering a clean tree; outs
     await writeFile(join(broken, "lexicon.json"), JSON.stringify({ project: "widgetry", version: 0, concepts: [], rejected: [] }));
     const failed = await changedFiles(broken);
     assert.deepEqual(failed.files, []);
-    assert.match(failed.failure ?? "", /git diff --name-only HEAD failed: .*gitfile/, "the failure names the command and git's reason");
+    assert.match(failed.failure ?? "", /git diff --name-only --relative HEAD failed: .*gitfile/, "the failure names the command and git's reason");
     const stop = await runHook("Stop", { cwd: broken, session_id: "s-git" }, broken);
     assert.equal(stop.exit, 0);
     const message = (JSON.parse(stop.stdout) as { systemMessage: string }).systemMessage;
-    assert.match(message, /Changed files: not known \(git diff --name-only HEAD failed: .*\); the lexicon check ran over nothing/);
+    assert.match(message, /Changed files: not known \(git diff --name-only --relative HEAD failed: .*\); the lexicon check ran over nothing/);
     const subagent = await runHook("SubagentStop", { cwd: broken, session_id: "s-git", stop_hook_active: false }, broken);
     assert.equal(subagent.exit, 0, "what the tool cannot see it cannot prove owed, so it reports and never refuses");
   } finally {

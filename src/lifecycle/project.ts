@@ -180,21 +180,99 @@ export function projectRoot(cwd: string): string {
   const start = resolve(cwd);
   const top = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd: start, encoding: "utf8" });
   const ceiling = top.status === 0 && top.stdout.trim() !== "" ? realpathOr(top.stdout.trim()) : undefined;
+  const found = enclosingProject(start, ceiling);
+  if (found !== undefined) return found;
+  // Above every project: a monorepo whose one adopted folder lies below the cwd is that folder's, so a command run at the repository root reads and writes its records.
+  const below = nestedProjects(start);
+  return below.length === 1 ? below[0]! : start;
+}
+
+function holds(dir: string, name: string, folder: boolean): boolean {
+  try {
+    const stat = statSync(join(dir, name));
+    return folder ? stat.isDirectory() : stat.isFile();
+  } catch {
+    return false;
+  }
+}
+
+/** Whether `dir` is itself a project's root: it holds coherence.config.json or .coherence. */
+export function holdsProject(dir: string): boolean {
+  return holds(dir, CONFIG_FILE, false) || holds(dir, ".coherence", true);
+}
+
+/**
+ * The nearest folder at or above `start`, up to `ceiling` (a real path,
+ * included) or the filesystem's root, that holds coherence.config.json;
+ * failing that, the nearest that holds .coherence; failing both, nothing.
+ * Stats only: no git, no read.
+ */
+export function enclosingProject(start: string, ceiling?: string): string | undefined {
   const ancestors: string[] = [];
-  for (let dir = start; ; dir = dirname(dir)) {
+  for (let dir = resolve(start); ; dir = dirname(dir)) {
     ancestors.push(dir);
     if ((ceiling !== undefined && realpathOr(dir) === ceiling) || dirname(dir) === dir) break;
   }
-  const holding = (name: string, folder: boolean): string | undefined =>
-    ancestors.find((dir) => {
-      try {
-        const stat = statSync(join(dir, name));
-        return folder ? stat.isDirectory() : stat.isFile();
-      } catch {
-        return false;
-      }
-    });
-  return holding(CONFIG_FILE, false) ?? holding(".coherence", true) ?? start;
+  return ancestors.find((dir) => holds(dir, CONFIG_FILE, false)) ?? ancestors.find((dir) => holds(dir, ".coherence", true));
+}
+
+/**
+ * The project folders at or below `dir`, absolute and sorted: each folder
+ * holding a coherence.config.json git lists there (tracked, or untracked and
+ * not ignored). One git call; outside a repository, none.
+ */
+export function nestedProjects(dir: string): string[] {
+  const base = resolve(dir);
+  // One process asks this of one folder more than once (the command's root, then the hook's event); a listing a moment old answers again.
+  const held = nestedListings.get(base);
+  if (held !== undefined && Date.now() - held.at < NESTED_LISTING_MS) return held.projects;
+  const projects = listNestedProjects(base);
+  nestedListings.set(base, { at: Date.now(), projects });
+  return projects;
+}
+
+/** How long one listing of the projects below a folder answers again within a process. */
+const NESTED_LISTING_MS = 2_000;
+const nestedListings = new Map<string, { at: number; projects: string[] }>();
+
+function listNestedProjects(base: string): string[] {
+  const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", `:(glob)**/${CONFIG_FILE}`], { cwd: base, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+  if (listed.status !== 0) return [];
+  return [...new Set(listed.stdout.split("\0").filter((f) => f !== "" && basename(f) === CONFIG_FILE).map((f) => resolve(base, dirname(f))))].sort();
+}
+
+/**
+ * Where a hook event belongs: to one project, to none (outside every
+ * project, ignored), or to several the event cannot choose between.
+ */
+export type HookProject = { kind: "project"; root: string } | { kind: "outside" } | { kind: "several"; projects: string[] };
+
+/**
+ * The project a hook event belongs to, for a hook installed at `base` (the
+ * folder holding the host's settings, or the cwd when none does). A project
+ * at `base` itself is the project, as it always was. Otherwise the event's
+ * subjects decide: the files a tool writes, or, for an event that names
+ * none, its cwd; the nearest project at or above a subject, up to `base`, is
+ * the event's. A cwd above the projects (the repository root, where the host
+ * runs) belongs to the one project below it. With no project anywhere under
+ * `base`, `base` is the project, as before any was nested. Anything else is
+ * outside: the rest of the repository is not the project's.
+ */
+export function hookProject(base: string, subjects: readonly string[], cwd: string): HookProject {
+  if (holdsProject(base)) return { kind: "project", root: base };
+  const ceiling = realpathOr(base);
+  const starts = subjects.length > 0 ? subjects.map((file) => dirname(file)) : [cwd];
+  for (const start of starts) {
+    if (!within(base, start)) continue;
+    const found = enclosingProject(start, ceiling);
+    if (found !== undefined) return { kind: "project", root: found };
+  }
+  const nested = nestedProjects(base);
+  if (nested.length === 0) return { kind: "project", root: base };
+  if (subjects.length > 0) return { kind: "outside" };
+  const below = nested.filter((project) => within(cwd, project));
+  if (below.length === 1) return { kind: "project", root: below[0]! };
+  return below.length === 0 ? { kind: "outside" } : { kind: "several", projects: below };
 }
 
 function realpathOr(path: string): string {

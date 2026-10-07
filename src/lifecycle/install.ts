@@ -47,6 +47,7 @@ import { dirname, join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
 import { DURABLE_FOLDERS, HOSTS, PACKAGE_NAME, SETTINGS_FILE, isHost, type Host } from "./project.ts";
+import { referenceHorizon, repositoryTop } from "../adapters/project-files.ts";
 export { DURABLE_FOLDERS };
 
 // Where each host keeps its settings, and which hosts there are, live in the project
@@ -117,14 +118,23 @@ const ROOT_WALK =
  * the sibling folder, the sibling of a worktree's main checkout, the installed
  * package's own cli, then the project's own bin. The package's cli comes
  * before the bin because a package manager may write the bin as a shell shim
- * that node cannot run. Nothing here names a path on one machine.
+ * that node cannot run. Nothing here names a path on one machine. Settings at
+ * a repository's top for a project nested below it (`sub`, the project's
+ * folder from the top) look in that project's own node_modules first, where
+ * the project installed Coherence.
  */
-export const LOCATE = [
-  ROOT_WALK,
-  'main=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)',
-  "coherence=",
-  `for c in "\${${HOME_VAR}:+\$${HOME_VAR}/src/cli.ts}" "$root/../${SIBLING}/src/cli.ts" "\${main:+\${main%/*}/../${SIBLING}/src/cli.ts}" "$root/node_modules/${PACKAGE_NAME}/dist/cli.js" "$root/node_modules/.bin/coherence"; do if [ -n "$c" ] && [ -f "$c" ]; then coherence=$c; break; fi; done`,
-].join("; ");
+export function locateShell(sub = ""): string {
+  const quoted = sub.replace(/["$`\\]/g, "\\$&");
+  const own = sub === "" ? "" : `"$root/${quoted}/node_modules/${PACKAGE_NAME}/dist/cli.js" "$root/${quoted}/node_modules/.bin/coherence" `;
+  return [
+    ROOT_WALK,
+    'main=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)',
+    "coherence=",
+    `for c in "\${${HOME_VAR}:+\$${HOME_VAR}/src/cli.ts}" "$root/../${SIBLING}/src/cli.ts" "\${main:+\${main%/*}/../${SIBLING}/src/cli.ts}" ${own}"$root/node_modules/${PACKAGE_NAME}/dist/cli.js" "$root/node_modules/.bin/coherence"; do if [ -n "$c" ] && [ -f "$c" ]; then coherence=$c; break; fi; done`,
+  ].join("; ");
+}
+
+export const LOCATE = locateShell();
 
 /** The one line the user is shown at session start when Coherence cannot be reached. No apostrophes: it sits in single quotes. */
 export const NOT_INSTALLED = "Coherence is configured for this project but not installed, so its hooks do nothing this session; the agent has been told how to install it.";
@@ -153,11 +163,15 @@ function atSessionStart(output: object): string {
  * exits 0 in silence but the session start, which tells the user in one line
  * and, when Coherence is missing, tells the agent how to supply it.
  */
-export const LOCATED_PREFIX = `${LOCATE}; coherence() { if [ -z "$coherence" ]; then ${atSessionStart({ systemMessage: NOT_INSTALLED, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: MISSING_CONTEXT } })}; fi; if ! command -v node >/dev/null 2>&1; then ${atSessionStart({ systemMessage: NO_NODE })}; fi; exec node "$coherence" "$@"; }; coherence`;
+export function locatedPrefix(sub = ""): string {
+  return `${locateShell(sub)}; coherence() { if [ -z "$coherence" ]; then ${atSessionStart({ systemMessage: NOT_INSTALLED, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: MISSING_CONTEXT } })}; fi; if ! command -v node >/dev/null 2>&1; then ${atSessionStart({ systemMessage: NO_NODE })}; fi; exec node "$coherence" "$@"; }; coherence`;
+}
+
+export const LOCATED_PREFIX = locatedPrefix();
 
 /** Where the located command would find Coherence from `root`, under `env`; undefined when it would find nothing. */
-export function locate(root: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
-  const run = spawnSync("sh", ["-c", `${LOCATE}; printf '%s' "$coherence"`], { cwd: root, env: { ...env, CLAUDE_PROJECT_DIR: root }, encoding: "utf8" });
+export function locate(root: string, env: NodeJS.ProcessEnv = process.env, sub = ""): string | undefined {
+  const run = spawnSync("sh", ["-c", `${locateShell(sub)}; printf '%s' "$coherence"`], { cwd: root, env: { ...env, CLAUDE_PROJECT_DIR: root }, encoding: "utf8" });
   const found = run.status === 0 ? run.stdout : "";
   return found === "" ? undefined : found;
 }
@@ -308,13 +322,33 @@ export interface InstallResult {
   ignore: { path: string; action: IgnoreAction };
 }
 
-export async function install(options: InstallOptions): Promise<InstallResult> {
+export async function install(options: InstallOptions & { ignoreRoot?: string }): Promise<InstallResult> {
   const path = resolve(options.root, SETTINGS_FILE[options.host]);
   const file = await readSettingsFile(path);
   const merged = mergeHooks(file.value, options);
   const changed = await writeSettings(path, file, merged);
-  const ignore = { path: resolve(options.root, IGNORE_FILE), action: await writeIgnore(options.root) };
+  const ignoreRoot = options.ignoreRoot ?? options.root;
+  const ignore = { path: resolve(ignoreRoot, IGNORE_FILE), action: await writeIgnore(ignoreRoot) };
   return { path, events: [...HOOK_EVENTS], changed, ignore };
+}
+
+/** One folder whose host settings carry a project's hooks, with the project's folder from there ("" for the project itself). */
+export interface SettingsRoot {
+  dir: string;
+  sub: string;
+}
+
+/**
+ * Where a project's hook settings go: the project root; and, for a project
+ * nested below its repository's top, the top first, since a host launched
+ * at the repository root reads only the settings there (Claude Code reads
+ * the session's primary working directory's .claude/settings.json and no
+ * parent's). The hooks at the top find the nested project from the event.
+ */
+export function settingsRoots(root: string): SettingsRoot[] {
+  const sub = referenceHorizon(root);
+  const top = sub === undefined ? undefined : repositoryTop(root);
+  return top === undefined || sub === undefined ? [{ dir: root, sub: "" }] : [{ dir: top, sub }, { dir: root, sub: "" }];
 }
 
 /** One command of ours, by the event it sits under. */

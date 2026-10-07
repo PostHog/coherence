@@ -14,6 +14,39 @@ root. Every key is optional; an absent key takes the default shown.
 }
 ```
 
+## Adopting one folder of a monorepo
+
+The project root is the folder holding the config. In a monorepo, put the
+config, the specs and `.coherence/` in the folder you adopt, say
+`apps/billing`, and nothing at the repository root:
+
+- **Hooks.** Run `hooks install` from the folder. It writes the host's
+  settings at the repository root, where a host started there reads them,
+  and in the folder, for a session started there. `.coherence/.gitignore`
+  goes in the folder only. `hooks --check` and `hooks uninstall` cover both
+  settings files.
+- **Which project an event belongs to.** An edit belongs to the folder
+  holding the nearest config to the file it writes. A command, prompt or
+  stop belongs to the folder nearest its working directory. At the
+  repository root, it belongs to the one project below. If there are
+  several projects below, the hooks stay silent until the session works
+  inside one of them.
+- **Outside the project.** An edit, command or prompt elsewhere in the
+  repository gets no answer. It reads no spec, walks no corpus and writes
+  nothing. A command run at the repository root, such as an `enact` or
+  `decide` the hooks printed, acts on the one project below it.
+- **Paths.** Every path is relative to the folder, including the `ignore`
+  list, `entryDir` and the files git reports as changed.
+- **Language servers.** The language server is started on the folder. For
+  Python, the repository root is added to Pyright's import search, so
+  `from products.billing.models import ...` resolves. No file above the
+  folder is indexed.
+- **Chokepoint verdicts.** A verdict covers the folder alone. It says
+  "references searched inside apps/billing only: callers elsewhere in the
+  repository were not read" in the reason the run records.
+
+With the config at the repository root, nothing here changes.
+
 ## The project
 
 | Key | Default | Meaning |

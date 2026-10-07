@@ -229,6 +229,21 @@ To add the project's own words to an event, write
 the event). `{{session}}`, `{{agent}}` and `{{cli}}` are filled in; a refused
 subagent stop keeps its reason whatever the override says.
 
+### Adopting one folder of a monorepo
+
+Put `coherence.config.json`, the specs and `.coherence/` in the folder you
+adopt (say `apps/billing`), and nothing at the repository root. Run
+`coherence hooks install --host claude` from that folder: it writes the hooks
+into the root's `.claude/settings.json`, where an agent host started at the
+repository root reads them, and into the folder's own, for a session started
+there. The project is the folder holding the nearest `coherence.config.json`
+to the file an edit writes, or to the folder a command or prompt runs in; a
+session at the root belongs to the one project below it. Everything else in
+the repository is outside the project: an edit, command or prompt there gets
+no orient, practice or check and leaves no record. A chokepoint verdict says
+its reference search covered the project folder only, since callers elsewhere
+in the repository are not read. More in [docs/config.md](docs/config.md).
+
 ## Platform
 
 Coherence runs on Node 22.18 or newer, on macOS (Apple Silicon) or Linux, and

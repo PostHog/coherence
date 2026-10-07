@@ -341,6 +341,31 @@ export function isProjectFile(root: string, path: string): boolean {
 }
 
 /**
+ * The top of the repository holding `root`: the nearest folder at or above
+ * it with a `.git` (a folder, or a worktree's file); undefined outside one.
+ * Stats only, no git call.
+ */
+export function repositoryTop(root: string): string | undefined {
+  for (let dir = resolve(root); ; dir = resolve(dir, "..")) {
+    if (existsSync(join(dir, ".git"))) return dir;
+    if (resolve(dir, "..") === dir) return undefined;
+  }
+}
+
+/**
+ * Where a project's reference search reached, when that is less than the
+ * repository: the project folder relative to the repository top, or
+ * undefined when the project is the whole repository (or lies in none). A
+ * chokepoint verdict over a nested project covers that folder only.
+ */
+export function referenceHorizon(root: string): string | undefined {
+  const top = repositoryTop(root);
+  if (top === undefined) return undefined;
+  const rel = relative(top, resolve(root)).split(sep).join("/");
+  return rel === "" || rel.startsWith("..") ? undefined : rel;
+}
+
+/**
  * The nested checkouts under the root, project-relative, outermost only: the
  * folders a language server must be told to leave out of its workspace.
  * node_modules and `.git` are never entered.

@@ -542,7 +542,7 @@ const REGULATE_LINES = 8;
 
 function gitShow(root: string, path: string): string | undefined {
   try {
-    return execFileSync("git", ["show", `HEAD:${path}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 16 * 1024 * 1024 });
+    return execFileSync("git", ["show", `HEAD:./${path}`], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 16 * 1024 * 1024 });
   } catch {
     return undefined;
   }

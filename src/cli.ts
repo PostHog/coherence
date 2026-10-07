@@ -42,7 +42,7 @@ import { formatReport, hasFindings, recordVetter, runCheck } from "./lifecycle/c
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
 import { CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
-import { check, formatCheck, formatStatus, formatUninstall, HOME_VAR, HOSTS, install, isHost, LOCATED_PREFIX, locate, SIBLING, status, uninstall } from "./lifecycle/install.ts";
+import { check, formatCheck, formatStatus, formatUninstall, HOME_VAR, HOSTS, install, isHost, locatedPrefix, locate, settingsRoots, SIBLING, status, uninstall } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectLexicons, PACKAGE_NAME, projectRoot } from "./lifecycle/project.ts";
 import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
 import { SCOPE_USAGE, scopeCommand } from "./readings/scope/cli.ts";
@@ -116,17 +116,17 @@ function parse(args: string[], valued: Set<string>): Parsed {
  * project and fails softly when it is not there (LOCATED_PREFIX), never
  * through npx, which would fetch a stranger's package of the same name.
  */
-async function defaultCommand(root: string): Promise<string> {
+async function defaultCommand(root: string, sub = ""): Promise<string> {
   const dir = '$(dir="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$dir" != "/" ] && [ ! -f "$dir/.claude/settings.json" ] && [ ! -f "$dir/.codex/hooks.json" ]; do dir=$(dirname "$dir"); done; printf "%s" "$dir")';
-  return (await isCoherenceItself(root)) ? `node "${dir}/src/cli.ts"` : LOCATED_PREFIX;
+  return (await isCoherenceItself(root)) ? `node "${dir}/src/cli.ts"` : locatedPrefix(sub);
 }
 
 /** This checkout's cli, as the located command would name it once resolved. */
 const THIS_CLI = realpathSync(fileURLToPath(import.meta.url));
 
 /** After an adopter's install: say where the hooks will find Coherence, or how to make them find it. */
-function locateNote(root: string): string {
-  const found = locate(root);
+function locateNote(root: string, sub = ""): string {
+  const found = locate(root, process.env, sub);
   const real = found === undefined ? undefined : realpathSync(found);
   if (real === THIS_CLI) return `the hooks reach this checkout (${dirname(dirname(THIS_CLI))})\n`;
   if (real !== undefined) return `note: the hooks will run the Coherence at ${real}, not this checkout (${THIS_CLI})\n`;
@@ -220,8 +220,10 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   if (allowed === undefined || positionals.length > (verb === "check" ? 0 : 1)) fail(USAGE);
   const unknown = [...flags.keys()].filter((flag) => !allowed.has(flag));
   if (unknown.length > 0) fail(`hooks ${verb}: unknown flag${unknown.length === 1 ? "" : "s"} ${unknown.map((f) => `--${f}`).join(", ")}\n${USAGE}`);
+  // A project nested below its repository's top keeps its hooks at the top too, where a host launched at the repository root reads them.
+  const places = settingsRoots(root);
   if (verb === "status") {
-    const statuses = await Promise.all(HOSTS.map((host) => status(root, host)));
+    const statuses = (await Promise.all(places.map((place) => Promise.all(HOSTS.map((host) => status(place.dir, host)))))).flat();
     process.stdout.write(formatStatus(statuses) + "\n" + formatDeliveries(await deliveries(root), statuses));
     return 0;
   }
@@ -231,24 +233,31 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   const given = flags.get("command");
   if (given === true) fail(`${label}: --command needs a value\n${USAGE}`);
   if (verb === "uninstall") {
-    process.stdout.write(formatUninstall(host, await uninstall(root, host)));
+    for (const place of places) process.stdout.write(formatUninstall(host, await uninstall(place.dir, host)));
     return 0;
   }
-  const command = given ?? (await defaultCommand(root));
+  const commandAt = async (sub: string): Promise<string> => given ?? (await defaultCommand(root, sub));
   if (verb === "check") {
-    let result;
-    try {
-      result = await check(root, host, command);
-    } catch (error) {
-      process.stderr.write(`hooks --check: ${error instanceof Error ? error.message : String(error)}\n`);
-      return 2;
+    let drifted = false;
+    for (const place of places) {
+      let result;
+      try {
+        result = await check(place.dir, host, await commandAt(place.sub));
+      } catch (error) {
+        process.stderr.write(`hooks --check: ${error instanceof Error ? error.message : String(error)}\n`);
+        return 2;
+      }
+      process.stdout.write(formatCheck(result));
+      drifted ||= result.drift.length > 0;
     }
-    process.stdout.write(formatCheck(result));
-    return result.drift.length === 0 ? 0 : 1;
+    return drifted ? 1 : 0;
   }
-  const result = await install({ root, host, command });
-  process.stdout.write(`${result.changed ? "wrote" : "unchanged"} ${result.path}: ${result.events.join(", ")}\n`);
-  if (command === LOCATED_PREFIX) process.stdout.write(locateNote(root));
+  for (const place of places) {
+    const command = await commandAt(place.sub);
+    const result = await install({ root: place.dir, host, command, ignoreRoot: root });
+    process.stdout.write(`${result.changed ? "wrote" : "unchanged"} ${result.path}: ${result.events.join(", ")}\n`);
+    if (command === locatedPrefix(place.sub)) process.stdout.write(locateNote(place.dir, place.sub));
+  }
   return 0;
 }
 
