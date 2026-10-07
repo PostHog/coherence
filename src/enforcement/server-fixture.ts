@@ -36,11 +36,12 @@ function alive(pid: number): boolean {
 
 /** Ask every warm server for `root`, or for a project inside it, to stop (SIGTERM, its clean shutdown), wait for each, and kill one that will not go. */
 export async function stopWarmServers(root: string): Promise<void> {
-  let real: string;
+  // A root already removed is matched as given, so pass one taken through realpath while it existed.
+  let real = root;
   try {
     real = realpathSync(root);
   } catch {
-    return;
+    // Gone: its servers may still be running.
   }
   const found = servers(real);
   // Taken while each root still exists: a socket too long for its root lives in the temp folder.
