@@ -248,6 +248,7 @@ node src/cli.ts spec --check [root]       # components, invariants with state, p
 node src/cli.ts spec --json [root]        # the spec model
 node src/cli.ts scaffold component <folder> "<intent>"
 node src/cli.ts scaffold invariant <folder> "<sentence>" --kinds a,b [--chokepoint|--totality-oracle] [--write]
+node src/cli.ts scaffold import tach [<module>...] | --all [--write]   # a draft spec per module from tach.toml; --write creates only specs that do not exist
 node src/cli.ts enact "<practice>" --step <n>=done[:<evidence>]|deviated:<why>|skipped:<why>...   # record a practice carried out
 node src/cli.ts run [--session --agent]   # the chokepoint check and the totality oracle pass, one run appended; exit 1 on a structural defect
 node src/cli.ts run --status              # the latest verdict per enforcement, a view over every run
