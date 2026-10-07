@@ -486,6 +486,12 @@ export async function lexiconCoverage(
   const phrases = [...new Set([...known.keys(), ...rejected.keys()])].sort(
     (a, b) => b.length - a.length || a.localeCompare(b),
   );
+  // Each phrase indexed by its first word: a line is tested only against the phrases its own words can start, in the phrases' order.
+  const byFirstWord = new Map<string, number[]>();
+  phrases.forEach((phrase, n) => {
+    const first = phrase.split(" ")[0]!;
+    byFirstWord.set(first, [...(byFirstWord.get(first) ?? []), n]);
+  });
   const components = corpus.files
     .filter((f) => f.rel.endsWith(".spec.md"))
     .map((f) => dirname(f.rel))
@@ -559,11 +565,19 @@ export async function lexiconCoverage(
         fingerprint: f.kind === "record" ? digest(source) : fileFingerprint,
       };
       const spans: string[] = [];
-      for (const phrase of phrases)
+      const candidates: number[] = [];
+      for (const word of new Set(normalized.split(" "))) {
+        const starting = byFirstWord.get(word);
+        if (starting !== undefined) candidates.push(...starting);
+      }
+      candidates.sort((a, b) => a - b);
+      for (const i of candidates) {
+        const phrase = phrases[i]!;
         if (normalized.includes(" " + phrase + " ")) {
           add(phrase, use);
           spans.push(phrase);
         }
+      }
       const refused = spans.filter((p) => binding.has(p));
       // Only prose a person can still edit puts a sense at risk: code shares words with the language (Promise), and a record is history.
       if (refused.length && f.kind === "prose") {
