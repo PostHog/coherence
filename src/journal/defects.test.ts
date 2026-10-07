@@ -7,10 +7,10 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { journalVerbs, type Io } from "./cli.ts";
 import { defectStates } from "./defects.ts";
 import { convergence, convergenceText } from "./convergence.ts";
@@ -18,6 +18,13 @@ import type { Decision, Defect, Resolution } from "./record.ts";
 import { loadJournal } from "./store.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { specCommand } from "../spec/cli.ts";
+
+// Every fixture folder this file makes is removed when the file is done; the leak guard fails a file that leaves one.
+const madeFolders: string[] = [];
+const made = (folder: string): string => (madeFolders.push(folder), folder);
+after(() => {
+  for (const folder of madeFolders) rmSync(folder, { recursive: true, force: true });
+});
 
 const SPEC = [
   "# Widget",
@@ -41,7 +48,7 @@ const SPEC = [
 const WHO = ["--session", "s1", "--agent", "alpha"];
 
 function project(files: Record<string, string> = {}): string {
-  const root = mkdtempSync(join(tmpdir(), "coherence-defects-"));
+  const root = made(mkdtempSync(join(tmpdir(), "coherence-defects-")));
   for (const [path, text] of Object.entries({ "widget/Widget.spec.md": SPEC, ...files })) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), text);

@@ -6,15 +6,22 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { loadSpecModel } from "./model.ts";
 import { gradeRecord } from "../enforcement/run.ts";
 import { applicableShapes, loadSeed } from "./seed.ts";
 import { journalVerbs, type Io } from "../journal/cli.ts";
 import { appendRefutation, appendRun, type RunEntry, type RunRecord } from "../enforcement/record.ts";
+
+// Every fixture folder this file makes is removed when the file is done; the leak guard fails a file that leaves one.
+const madeFolders: string[] = [];
+const made = (folder: string): string => (madeFolders.push(folder), folder);
+after(() => {
+  for (const folder of madeFolders) rmSync(folder, { recursive: true, force: true });
+});
 
 const seed = loadSeed();
 const WHO = ["--session", "s1", "--agent", "main"];
@@ -33,7 +40,7 @@ function knob(name = "the knob keeps its history", via = "the knob keeps every t
 const NEWCOMER = "- the knob has a stop: The knob stops at ten.\n";
 
 function project(spec: string): string {
-  const root = mkdtempSync(join(tmpdir(), "coherence-floor-"));
+  const root = made(mkdtempSync(join(tmpdir(), "coherence-floor-")));
   mkdirSync(dirname(join(root, SPEC_PATH)), { recursive: true });
   writeFileSync(join(root, SPEC_PATH), spec);
   execFileSync("git", ["init", "-q"], { cwd: root });

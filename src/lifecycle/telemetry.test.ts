@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { runHook } from "./hook.ts";
 import { HOOK_TIMES_DIR } from "./hook-latency.ts";
 import {
@@ -40,8 +40,15 @@ import {
 import { telemetryCommand } from "./telemetry-cli.ts";
 import { TELEMETRY_TARGET } from "./telemetry-config.ts";
 
+// Every fixture folder this file makes is removed when the file is done; the leak guard fails a file that leaves one.
+const madeFolders: string[] = [];
+const made = (folder: string): string => (madeFolders.push(folder), folder);
+after(() => {
+  for (const folder of madeFolders) rmSync(folder, { recursive: true, force: true });
+});
+
 function project(config: Record<string, unknown> = { name: "p" }): string {
-  const root = mkdtempSync(join(tmpdir(), "coherence-telemetry-"));
+  const root = made(mkdtempSync(join(tmpdir(), "coherence-telemetry-")));
   writeFileSync(join(root, "coherence.config.json"), JSON.stringify(config));
   writeFileSync(join(root, "README.md"), "x\n");
   const git = (...args: string[]) => spawnSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", ...args], { cwd: root, encoding: "utf8" });
@@ -53,7 +60,7 @@ function project(config: Record<string, unknown> = { name: "p" }): string {
 
 /** A user's environment of its own: a config folder in a temp directory, nothing inherited, so nothing reaches the real one. */
 function userEnv(extra: Record<string, string> = {}): Env {
-  return { XDG_CONFIG_HOME: mkdtempSync(join(tmpdir(), "coherence-telemetry-home-")), ...extra };
+  return { XDG_CONFIG_HOME: made(mkdtempSync(join(tmpdir(), "coherence-telemetry-home-"))), ...extra };
 }
 
 function capturing(ok = true): { send: Sender; sent: { url: string; body: string }[] } {
@@ -214,7 +221,12 @@ test("telemetry adds no wait to a hook: the flush starts detached at a session s
     assert.equal(after, before + JSON.stringify(event) + "\n");
     // The hook calls telemetry at a session start and a stop alone, and neither waits on it.
     const calls: string[] = [];
-    const options = { telemetry: (_r: string, e: string) => void calls.push(e) };
+    // No instrument and no structure refresh: a stop's prediction would otherwise start a warm server for the fixture that outlives the test.
+    const options = {
+      telemetry: (_r: string, e: string) => void calls.push(e),
+      refresh: () => {},
+      door: async <T>(_r: string, fn: (a: undefined, s: undefined, reason: string) => Promise<T>) => fn(undefined, undefined, "no instrument in this test"),
+    };
     for (const e of ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"] as const) {
       await runHook(e, { cwd: root, session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } }, root, options);
     }

@@ -6,20 +6,27 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { journalVerbs, type Io } from "../journal/cli.ts";
 import { specBlock } from "./hook.ts";
 import { HOOK_TIMES_DIR, hookTimes, recordHookTime } from "./hook-latency.ts";
 
+// Every fixture folder this file makes is removed when the file is done; the leak guard fails a file that leaves one.
+const madeFolders: string[] = [];
+const made = (folder: string): string => (madeFolders.push(folder), folder);
+after(() => {
+  for (const folder of madeFolders) rmSync(folder, { recursive: true, force: true });
+});
+
 const here = dirname(fileURLToPath(import.meta.url));
 const SPEC = "# Widget\n\nWidgets turn.\n\n## invariants\n- knob turns: The knob turns.\n  over: every knob\n  via: the knob turns\n  because: a stuck knob is a broken widget\n  kinds: none\n";
 
 function project(): string {
-  const root = mkdtempSync(join(tmpdir(), "coherence-defect-orient-"));
+  const root = made(mkdtempSync(join(tmpdir(), "coherence-defect-orient-")));
   mkdirSync(join(root, "widget"), { recursive: true });
   writeFileSync(join(root, "widget", "Widget.spec.md"), SPEC);
   execFileSync("git", ["init", "-q"], { cwd: root });
@@ -58,7 +65,7 @@ test("orient names each guard failure under the spec block", () => {
 });
 
 test("a hook call's kept time carries the Coherence version that answered it", () => {
-  const root = mkdtempSync(join(tmpdir(), "coherence-hook-version-"));
+  const root = made(mkdtempSync(join(tmpdir(), "coherence-hook-version-")));
   const version = (JSON.parse(readFileSync(resolve(here, "..", "..", "package.json"), "utf8")) as { version: string }).version;
   recordHookTime(root, "s1", { at: "2026-10-07T10:00:00.000Z", event: "PreToolUse", ms: 120 });
   const kept = hookTimes(root, "s1");
