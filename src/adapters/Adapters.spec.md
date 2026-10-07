@@ -163,3 +163,9 @@ The language adapter seam: how to ask a language's server for definitions, refer
   checklist: circuit-breaker-policy dismissed: no dependency failures are observed
   checklist: fair-admission dismissed: there are no contenders for the budget
   checklist: rate-budget dismissed: nothing is counted against a time window
+- a nested Python project resolves imports from the repository top: The Python adapter for a project nested below its repository's top adds the top to Pyright's import search, never to its workspace, so a reference in the project written through an import from the top resolves and is classified like any other.
+  over: a bypass in a nested Python project reached through an import written from the repository top
+  via: a nested Python project's imports written from the repository top resolve, so a bypass inside the project through one is found
+  because: PostHog's code imports its own modules from the repository top (products.notebooks.backend.query_validation); Pyright started on the nested folder could not resolve them, so a bypass inside the project went unreported and the chokepoint graded reference-choked (df-0d235229)
+  refuted: the Python adapter left the repository top out of Pyright's import search -> "a nested Python project's imports written from the repository top resolve, so a bypass inside the project through one is found" went red in monorepo.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none

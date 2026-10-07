@@ -168,7 +168,7 @@ function git(cwd: string, args: string[]): string | null {
 
 /** Files changed in the working tree at `root`: modified against HEAD plus untracked. Empty outside git. */
 export function patchFiles(root: string): string[] {
-  const diff = git(root, ["diff", "--name-only", "HEAD"]);
+  const diff = git(root, ["diff", "--name-only", "--relative", "HEAD"]);
   const untracked = git(root, ["ls-files", "--others", "--exclude-standard"]);
   if (diff === null && untracked === null) return [];
   const all = [...new Set(`${diff ?? ""}\n${untracked ?? ""}`.split("\n").map((l) => l.trim()).filter((l) => l !== ""))];

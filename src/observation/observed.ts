@@ -119,7 +119,7 @@ export function answerFailures(records: readonly ObservationRecord[], head: stri
 
 /** Files changed since a commit: the diff to the working tree, and untracked files. */
 export function changedSince(root: string, commit: string): string[] | string {
-  const diff = spawnSync("git", ["diff", "--name-only", commit, "--"], { cwd: root, encoding: "utf8" });
+  const diff = spawnSync("git", ["diff", "--name-only", "--relative", commit, "--"], { cwd: root, encoding: "utf8" });
   if (diff.status !== 0) return `git diff ${commit} failed: ${diff.stderr.trim()}`;
   const untracked = spawnSync("git", ["ls-files", "--others", "--exclude-standard"], { cwd: root, encoding: "utf8" });
   return [...new Set([...diff.stdout.split("\n"), ...(untracked.status === 0 ? untracked.stdout.split("\n") : [])].filter((l) => l.trim() !== ""))].sort();

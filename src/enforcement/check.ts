@@ -45,7 +45,7 @@
  */
 
 import { isTestPath, rangeContains, type Definition, type LanguageAdapter, type ReferenceSite, type Rung, type Visibility } from "../adapters/adapter.ts";
-import { projectSites } from "../adapters/project-files.ts";
+import { projectSites, referenceHorizon } from "../adapters/project-files.ts";
 import type { Bypass, Grade, ReferenceTarget, RefutationState, SiteClass, Verdict } from "./record.ts";
 
 export interface ClassifiedSite extends ReferenceSite {
@@ -76,6 +76,8 @@ export interface ChokepointResult {
   visibility: string | undefined;
   files: string[];
   reason: string;
+  /** The project folder, relative to the repository top, when the reference search covered that folder alone. */
+  horizon?: string;
 }
 
 export interface ChokepointInput {
@@ -131,7 +133,24 @@ function nameOf(site: SiteClass | undefined): string {
   return site === undefined ? "as unreported" : site === "test" ? "a test reference" : site === "chokepoint-reference" ? "an outside chokepoint reference" : "a reference inside the chokepoint";
 }
 
+/**
+ * What a verdict over a project nested below the repository top must say:
+ * its reference search covered the project folder alone, so a caller
+ * elsewhere in the repository was never read, and a clean grade claims no
+ * more than that folder.
+ */
+export function horizonNote(horizon: string): string {
+  return `; references searched inside ${horizon} only: callers elsewhere in the repository were not read`;
+}
+
 export async function checkChokepoint(adapter: LanguageAdapter, input: ChokepointInput): Promise<ChokepointResult> {
+  const result = await checkWithinProject(adapter, input);
+  // A graded verdict over a nested project says where its search reached; one never graded (nothing resolved) searched nothing.
+  const horizon = result.siteEvidence === "complete" ? referenceHorizon(input.root) : undefined;
+  return horizon === undefined ? result : { ...result, horizon, reason: result.reason + horizonNote(horizon) };
+}
+
+async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInput): Promise<ChokepointResult> {
   const hint = { component: input.component, testFolders: input.testFolders };
   const empty: Record<Exclude<SiteClass, "chokepoint-reference">, number> = { inside: 0, test: 0, bypass: 0 };
   const base = { input, sites: [] as ClassifiedSite[], siteEvidence: "unavailable" as const, bypasses: [], counts: empty, visibility: undefined, files: [] as string[], refutation: "missing" as RefutationState, refutationAccount: "not attempted" };
