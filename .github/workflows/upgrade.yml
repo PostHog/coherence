@@ -1,0 +1,52 @@
+# The upgrade test on every pull request and every push to main: an adopter
+# project installs a published release, uses it (hooks, spec --check, run and
+# refute, enact of every kernel practice and of its own, decide, every hook
+# event), then upgrades to this commit through npm pack, and nothing it did
+# may be turned against it. 1.5.0 refused every adopter that had enacted a
+# kernel practice until it recorded an amend decision for a change it never
+# made (df-36efa8f2), with every test green, because no test had installed
+# one release over another. It needs the npm registry for the earlier
+# release, so npm test leaves it out; its offline half, every kernel practice
+# of every tagged release read from git history, runs in npm test.
+name: Upgrade
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upgrade-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  upgrade:
+    # Two hops: from the newest published release, and from the oldest still supported.
+    strategy:
+      fail-fast: false
+      matrix:
+        from: ["newest", "1.4.0"]
+    name: upgrade (from ${{ matrix.from }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.18"
+
+      # npm run build, before the pack, needs the dev dependencies.
+      - name: Install
+        run: npm ci
+
+      # No global language server: the fixture installs its own, the earlier release's optional dependencies pinned, and the test fails if it did not.
+      - name: Upgrade from the earlier release
+        env:
+          COHERENCE_UPGRADE_FROM: ${{ matrix.from != 'newest' && matrix.from || '' }}
+        run: npm run test:upgrade

@@ -49,7 +49,7 @@ export const LOCAL_SETTINGS_FILE: Partial<Record<Host, string>> = {
 export const PROJECT_DIR_VAR = "CLAUDE_PROJECT_DIR";
 
 /** A path with its symbolic links followed where they can be, so two spellings of one directory compare equal. */
-function real(path: string): string {
+export function real(path: string): string {
   let existing=resolve(path); const suffix:string[]=[];
   while(!existsSync(existing) && dirname(existing)!==existing) { suffix.unshift(basename(existing)); existing=dirname(existing); }
   try { return resolve(realpathSync(existing),...suffix); }
