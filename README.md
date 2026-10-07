@@ -85,7 +85,8 @@ rejected for it and why. Your agent's own hooks deliver it at the start of
 every session and subagent, so agents do what you meant, not just what you
 said. `coherence lexicon --check` finds a rejected name anywhere in prose,
 specs, journal records, or identifiers, and `coherence lexicon coverage`
-ranks the recurring terms that still lack a definition.
+ranks the recurring terms that still lack a definition; give it folders or files
+(`coherence lexicon coverage src/billing docs`) to read only those.
 
 Each concept in Scope's Lexicon view carries its definition, the alternatives
 that were rejected and why, and its related concepts. When an agent reaches

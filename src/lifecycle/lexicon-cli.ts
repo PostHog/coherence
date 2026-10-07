@@ -18,6 +18,8 @@ import {
   digest,
   lexiconCoverage,
   liveUses,
+  readingPaths,
+  readLine,
   type Coverage,
 } from "./lexicon-coverage.ts";
 import {
@@ -32,7 +34,8 @@ import {
   type Who,
 } from "./lexicon-maintain.ts";
 
-export const LEXICON_WORK_USAGE = `  lexicon coverage [--json]              recurring terms without a definition and senses at risk, ranked; --json: every observed use and population fact
+export const LEXICON_WORK_USAGE = `  lexicon coverage [--json] [<path>...]   recurring terms without a definition and senses at risk, ranked; --json: every observed use and population fact
+                                          <path>: read only the project's files under these folders or files, relative to the root or absolute inside it
   lexicon review <term> [--json]          definition, live contexts, evidence keys and prior rulings
   lexicon review <term> --component <folder> --evidence <key> --disposition confirmed|not-domain|deferred|defect --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>] [--cite <id>]
   lexicon propose declare|define|alias|reject|lift|rename|retire <concept> [value] [--definition <text>] [--entry <file.json>] [--drop <field.key>]... [--qualify] --because <reason>
@@ -41,7 +44,8 @@ export const LEXICON_WORK_USAGE = `  lexicon coverage [--json]              recu
                                           rename --qualify: the old name keeps its other senses and is not rejected
   lexicon apply <proposal-id> --because <reason> --over <alternative> --session <id> --agent <name> [--human <acknowledgement>] [--work <id>] [--cite <id>]
   lexicon recover                        finish an interrupted application without overwriting intervening edits
-  lexicon draft [--out <file>]            unsettled candidates, collisions and review questions; never overwrites
+  lexicon draft [--out <file>] [<path>...] unsettled candidates, collisions and review questions; never overwrites
+                                          <path>: draft only from the project's files under these folders or files (src/billing, docs)
   lexicon baseline --session <id> --agent <name> [--because <reason>] [--cite <id>]
                                           remember what is here now: this session's observed uses (no meaning is marked covered) and, in an adopter,
                                           the lexicon check's findings as a journal record the check then fails only beyond; that record only shrinks
@@ -55,7 +59,12 @@ const WORKFLOWS = ["coverage", "review", "propose", "apply", "recover", "draft",
 export function lexiconHelp(verb?: string): string {
   if (verb === undefined || verb === "help") return `usage:
 ${LEXICON_WORK_USAGE}`;
-  const lines = LEXICON_WORK_USAGE.split("\n").filter((line) => line.trimStart().startsWith(`lexicon ${verb}`));
+  // A usage line's deeper-indented continuation lines belong to it.
+  let current = false;
+  const lines = LEXICON_WORK_USAGE.split("\n").filter((line) => {
+    if (!line.startsWith("   ")) current = line.trimStart().startsWith(`lexicon ${verb}`);
+    return current;
+  });
   return lines.length > 0
     ? `usage:
 ${lines.join("\n")}
@@ -243,6 +252,8 @@ export async function lexiconWorkCommand(
     }
     if (
       verb !== "propose" &&
+      verb !== "coverage" &&
+      verb !== "draft" &&
       p.positionals.length >
         (["review", "apply", "similar"].includes(verb ?? "") ? 1 : 0)
     )
@@ -332,7 +343,12 @@ export async function lexiconWorkCommand(
       )
     )
       throw new Error(`unknown lexicon workflow: ${verb}; run lexicon help`);
-    const report = await lexiconCoverage(io.cwd);
+    // coverage and draft read only under the paths they are given; with none, the whole project.
+    const paths =
+      (verb === "coverage" || verb === "draft") && p.positionals.length > 0
+        ? readingPaths(io.cwd, p.positionals)
+        : undefined;
+    const report = await lexiconCoverage(io.cwd, undefined, paths);
     if (verb === "review" && get(p, "disposition")) {
       if (!term) throw new Error("review needs a term");
       io.out(
@@ -355,6 +371,7 @@ export async function lexiconWorkCommand(
       const draft = {
         status: "proposed; nothing here is a settled definition",
         source: report.fingerprint,
+        ...(paths ? { read: { paths: report.population.paths, files: report.population.files.length } } : {}),
         existing:
           (
             project ??
@@ -395,6 +412,7 @@ export async function lexiconWorkCommand(
         writeFileSync(path, JSON.stringify(draft, null, 2) + "\n", {
           flag: "wx",
         });
+        if (paths) io.out(readLine(report));
         io.out(
           `Wrote unsettled draft ${relative(io.cwd, path)}; use propose/apply for actual changes.`,
         );
