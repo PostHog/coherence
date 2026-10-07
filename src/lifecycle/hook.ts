@@ -467,6 +467,13 @@ export function specBlock(root: string): string {
     for (const { c, i } of open.slice(0, OPEN_REQUIREMENT_LINES)) lines.push(`○ ${c.folder}/${i.name} — lacks: ${i.lacks.join(", ")}`);
     if (open.length > OPEN_REQUIREMENT_LINES) lines.push(`  and ${open.length - OPEN_REQUIREMENT_LINES} more; run: spec --check`);
   }
+  // A defect in a class already guarded: the protection was weaker than claimed (journal/defects.ts).
+  const failures = model.defects?.guardFailures ?? [];
+  if (failures.length > 0) {
+    lines.push(`Guard failures (${failures.length}): a defect arrived in a class a guard already covered, so the guard was weaker than claimed; strengthen it and refute it again.`);
+    for (const g of failures.slice(0, OPEN_REQUIREMENT_LINES)) lines.push(`✕ ${g.id} in class ${g.class}, guarded by ${g.guard} since ${g.resolution}`);
+    if (failures.length > OPEN_REQUIREMENT_LINES) lines.push(`  and ${failures.length - OPEN_REQUIREMENT_LINES} more; run: spec --check`);
+  }
   return lines.length === 0 ? "" : lines.join("\n") + "\n\n";
 }
 

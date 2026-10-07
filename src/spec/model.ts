@@ -24,6 +24,7 @@ import { walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
 import { effectiveConfig } from "../adapters/project-config.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
 import { invariantFloorGaps, invariantFloorProblems, rawFloorGaps } from "./floor.ts";
+import { declaredClasses, defectFloor, defectStates, type DefectFloor, type GuardStanding } from "../journal/defects.ts";
 import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPractice, practiceProblems, stemOf, type ModelPractice } from "./practices.ts";
 
 export const SPEC_SUFFIX = ".spec.md";
@@ -94,6 +95,8 @@ export interface SpecModel {
   counts: Counts;
   /** When runs exist: the time of the latest, and how many run lines were unreadable. */
   runs: { latest: string; count: number; damaged: number } | undefined;
+  /** The floor on defects: closes with neither a guard nor a decision, and guard failures; advisory, never a problem. */
+  defects?: DefectFloor;
 }
 
 interface Config {
@@ -304,7 +307,20 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   problems.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
 
   const counts = countModel(components, problems);
-  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs };
+  // The journal is read for defects even where no practice file asked for it; a project with no spec reads none.
+  const journal = practiceFiles.size === 0 && components.length > 0 ? journalRecords(root) : records;
+  const defects = defectFloor(defectStates(journal), guardStanding(components), declaredClasses(root));
+  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs, defects };
+}
+
+/** How a defect's guard stands in this model: the invariant <folder>/<name> is declared and its refutation witnessed, declared only, or missing. */
+export function guardStanding(components: readonly Component[]): (guard: string) => GuardStanding {
+  return (guard) => {
+    const slash = guard.lastIndexOf("/");
+    const invariant = components.find((c) => c.folder === guard.slice(0, slash))?.invariants.find((i) => i.name === guard.slice(slash + 1));
+    if (slash === -1 || invariant === undefined) return "missing";
+    return invariant.enforcements.length > 0 && !invariant.lacks.includes("refutation") ? "witnessed" : "unwitnessed";
+  };
 }
 
 /** The component whose folder holds a project-relative file: the deepest component folder above it. */

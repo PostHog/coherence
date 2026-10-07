@@ -171,3 +171,58 @@ Compression: one append-only file per session of attributed, durable outcomes, r
   checklist: durable-dispatch-intent dismissed: nothing is dispatched after the append
   checklist: declared-target-coverage dismissed: one session file, no fan-out
   checklist: completion-evidence dismissed: the append is complete when the call returns, or nothing is written
+- a defect carries its class and origin: defect takes --class, --introduced and --caught: a class is a kebab-case name that Coherence's lexicon or the project's declares as the property class <name> of defect, introduced is a commit git holds, PR #<n>, pre-existing or unknown, and caught is review, ci, probe, adopter, self or test; anything else is refused before anything is written, and a defect without them is written and read as before.
+  over: a defect with all three fields, one whose class only the project's own lexicon declares, one with none, and each field given a value outside its vocabulary
+  via: a defect carries a declared class, where it came in and what caught it, and a value outside each vocabulary is refused before anything is written
+  because: a defect that says only what failed cannot buy a guard for its class or say whether the work is converging; the fields are optional so every record written before them stays valid, and refused at the write because the store is append-only and a bad value could never be edited away
+  crossing: project-source -> record
+  refuted: made the class check refuse only when no class is declared anywhere, so an undeclared class was written -> "a defect carries a declared class, where it came in and what caught it, and a value outside each vocabulary is refused before anything is written" went red in defects.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: storage
+  checklist: scoped-reads dismissed: every reader sees every defect; there is no scope to narrow
+  checklist: encrypted-storage dismissed: the journal is plain text by design
+  checklist: key-rotation-compatibility dismissed: no key exists
+  checklist: input-validation declared as a defect carries its class and origin
+  checklist: revision-preservation declared as append-only store
+  checklist: commit-ordered-effects dismissed: the append is the only effect, and a refusal writes nothing
+  checklist: durable-dispatch-intent dismissed: nothing is dispatched after the append
+  checklist: declared-target-coverage dismissed: one session file, no fan-out
+  checklist: completion-evidence dismissed: the append is complete when the call returns, or nothing is written
+- a defect is classified by a later record, never edited: classify writes a decision citing the defect with the class, introduced and caught it gives, and every reader folds them oldest first: the defect's own fields, then each classification not retracted, then its close, a later field overriding an earlier one; a field no record gave stays absent and is read as unknown.
+  over: a defect classified twice and once more by a retracted classification, a defect nobody classified, a classification with no field, and one of a record that is no defect
+  via: classify folds into the defect without editing it: a later classification overrides, a retracted one gives nothing, and a field nobody gave stays unknown
+  because: this week's defects were recorded before the fields existed, and the journal is append-only, so the only honest way to give them a class is a later record a reader folds in; a reader that guessed a missing field would report convergence the records do not show
+  crossing: project-source -> record
+  refuted: let a retracted classification still fold into its defect -> "classify folds into the defect without editing it: a later classification overrides, a retracted one gives nothing, and a field nobody gave stays unknown" went red in defects.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: storage
+  checklist: scoped-reads dismissed: every reader sees every classification; there is no scope to narrow
+  checklist: encrypted-storage dismissed: the journal is plain text by design
+  checklist: key-rotation-compatibility dismissed: no key exists
+  checklist: input-validation declared as a defect carries its class and origin
+  checklist: revision-preservation declared as append-only store
+  checklist: commit-ordered-effects dismissed: the append is the only effect, and a refusal writes nothing
+  checklist: durable-dispatch-intent dismissed: nothing is dispatched after the append
+  checklist: declared-target-coverage dismissed: one session file, no fan-out
+  checklist: completion-evidence dismissed: the append is complete when the call returns, or nothing is written
+- a defect's close names a guard or a decision: resolved closes a defect as well as a conjecture: --guard names an invariant a spec declares, as <component folder>/<name>, --decision names a decision, and either is refused when it names nothing; --as stays a conjecture's and the defect's flags are refused on one; a defect closes once, unless its close is retracted; a close with neither is written and says spec --check names it.
+  over: a guard naming no bullet and no component, a decision id that is a conjecture, --as on a defect, a guard on a conjecture, a close with neither, a second close, and a close after the first was retracted
+  via: resolved closes a defect with a guard a spec declares or a decision, refuses a guard or decision that names nothing, and a retracted close can be closed again
+  because: each defect should buy a guard for its whole class or a recorded reason why the instance suffices; a close that named a bullet no spec has would count as protection that does not exist, and a close that could never be redone would leave a defect closed without its guard for good
+  crossing: project-source -> record
+  refuted: skipped the guard check in resolved, so a guard naming no invariant was written -> "resolved closes a defect with a guard a spec declares or a decision, refuses a guard or decision that names nothing, and a retracted close can be closed again" went red in defects.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: storage
+  checklist: scoped-reads dismissed: every reader sees every close; there is no scope to narrow
+  checklist: encrypted-storage dismissed: the journal is plain text by design
+  checklist: key-rotation-compatibility dismissed: no key exists
+  checklist: input-validation declared as a defect's close names a guard or a decision
+  checklist: revision-preservation declared as append-only store
+  checklist: commit-ordered-effects dismissed: the append is the only effect, and a refusal writes nothing
+  checklist: durable-dispatch-intent dismissed: nothing is dispatched after the append
+  checklist: declared-target-coverage dismissed: one session file, no fan-out
+  checklist: completion-evidence dismissed: the append is complete when the call returns, or nothing is written
+- the convergence reading never infers: query convergence reads the journal, the spec model, git and the kept hook times over a window, 14 days unless --days says otherwise, and reports defects arriving by origin (fix-induced, pre-existing, unknown) and by catch and class, escapes per release (introduced, by commit or by the pull request a merge subject names, inside a release's range and recorded after its tag), closes with a guard, repeats per class, bullets at each day and tag, the files most often changed, and hook latency p50 and p95 per event and Coherence version; a field a record lacks is counted as unknown.
+  over: a project with two release tags, defects introduced by a commit and by a pull request after the second tag, one pre-existing, one with no fields, a guarded close, a close with neither, a repeat, and hook times with a version, without one, and outside the window
+  via: query convergence counts arrivals by origin and catch, escapes per release, closes and repeats, bullets at each tag and hook latency per version, and says unknown wherever a record does not say
+  because: whether discoveries repay is a trend no single record shows; a reading that guessed an old record's origin or version would report the convergence it was built to measure rather than the one the records hold
+  crossing: record -> reading
+  refuted: made originOf read a defect with no introduced as fix-induced instead of unknown -> "query convergence counts arrivals by origin and catch, escapes per release, closes and repeats, bullets at each tag and hook latency per version, and says unknown wherever a record does not say" went red in defects.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none

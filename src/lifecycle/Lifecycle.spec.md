@@ -730,3 +730,17 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: harness -> reading
   refuted: made writtenFiles relative to the root's own spelling again, the file's path unresolved -> "a project behind a symbolic link hears its hooks whichever spelling the host, the cwd and the edited file use" went red in symlink.test.ts on its own assertion, and with the writtenFiles assertions set aside the hook still delivered no practice; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- orient names each guard failure: orient's spec block names every defect recorded in a class a guard already covered, with the guard and the close that set it, and says nothing when there is none.
+  over: a project before any guard, after the guarded close, and after a later defect in the guarded class
+  via: orient names each guard failure under the spec block
+  because: a repeat in a guarded class means the protection was weaker than claimed, and the session that starts next is the one that should strengthen it; spec --check alone is read only when someone runs it
+  crossing: record -> reading
+  refuted: made orient name guard failures only when there are two or more -> "orient names each guard failure under the spec block" went red in defect-orient.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- a hook time carries its version: every hook call's kept time carries the Coherence version that answered it, read once from the installed package; a time kept before versions were written still reads, with no version.
+  over: a kept time written now and one written before versions existed
+  via: a hook call's kept time carries the Coherence version that answered it
+  because: hook latency is read per Coherence version to see whether a release made the hooks slower; times without the version could only be grouped by guess
+  crossing: harness -> record
+  refuted: dropped the installed version from recordHookTime, so a kept time carried none -> "a hook call's kept time carries the Coherence version that answered it" went red in defect-orient.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
