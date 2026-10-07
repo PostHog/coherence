@@ -447,7 +447,8 @@ test("lexicon lifecycle uses child identities and installed roots, and advances 
       join(root, "money/model.ts"),
       "export const riskcharge = 12;\n",
     );
-    // The edit makes a new name recur in prose: that, and only that, is worth a line at the edit.
+    // The edit makes a new name recur in prose: that, and only that, is worth a line at the edit. The edit names both files it wrote,
+    // since an edit reads only the files it names against what the last full reading kept.
     writeFileSync(
       join(root, "money/charges.md"),
       "The `riskcharge` is new.\nEach `riskcharge` is billed.\nA `riskcharge` is refunded on cancel.\n",
@@ -458,11 +459,12 @@ test("lexicon lifecycle uses child identities and installed roots, and advances 
       tool_name: "apply_patch",
       tool_input: {
         command:
-          "*** Begin Patch\n*** Update File: money/model.ts\n@@\n+export const riskcharge = 12;\n*** Delete File: time/old.ts\n*** Move to: time/new.ts\n*** End Patch",
+          "*** Begin Patch\n*** Update File: money/model.ts\n@@\n+export const riskcharge = 12;\n*** Update File: money/charges.md\n@@\n+The `riskcharge` is new.\n*** Delete File: time/old.ts\n*** Move to: time/new.ts\n*** End Patch",
       },
     };
     assert.deepEqual(writtenFiles(root, patch), [
       "money/model.ts",
+      "money/charges.md",
       "time/old.ts",
       "time/new.ts",
     ]);

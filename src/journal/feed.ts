@@ -38,6 +38,7 @@ import { SESSION_TOKEN } from "./work.ts";
 import { cursorAfter, formatCursor, parseCursor, recordsAfter, subjectLine, type Cursor } from "./read.ts";
 import type { JournalRecord } from "./record.ts";
 import { loadJournal, type Loaded } from "./store.ts";
+import { journalTail } from "./tail.ts";
 
 export const FEED_DIR = join(".coherence", "feed");
 
@@ -81,7 +82,10 @@ function latestCursor(loaded: Loaded): Cursor | null {
  */
 export function openFeed(root: string, session: string): boolean {
   if (readCursor(root, session) !== null) return false;
-  const latest = latestCursor(loadJournal(root));
+  // The tail starts here too: what comes after this look is read from the log, never from the whole journal again.
+  const tail = journalTail(root, session);
+  tail.advance();
+  const latest = latestCursor(tail.whole ? { records: tail.records, damaged: [] } : loadJournal(root));
   if (latest === null) return false;
   writeCursor(root, session, latest);
   return true;
@@ -103,16 +107,19 @@ export interface Feed {
 export function peerFeed(root: string, session: string, ownAgent?: string, shown: ReadonlySet<string> = new Set()): Feed {
   const none: Feed = { text: "", commit: () => {} };
   if (cursorFile(root, session) === undefined) return none;
-  const loaded = loadJournal(root);
   const since = readCursor(root, session);
   if (since === null) {
     openFeed(root, session);
     return none;
   }
-  const all = recordsAfter(loaded, since, {});
+  // Only what was appended since the last look (tail.ts): the feed costs the new records, never the journal's history.
+  const tail = journalTail(root, session);
+  const all = recordsAfter({ records: tail.records, damaged: [] }, since, {});
   const peer = (record: JournalRecord): boolean => record.session !== session || (ownAgent !== undefined && record.agent !== ownAgent);
   const fresh = all.filter((record) => peer(record) && FEED_KINDS.has(record.kind) && !shown.has(record.id));
   const next = cursorAfter(all, since);
+  // Nothing to show: the lines just read are spent, so the next look does not read them again.
+  if (fresh.length === 0) tail.advance();
   if (fresh.length === 0 || next === null) return { text: "", commit: next === null ? () => {} : () => writeCursor(root, session, next) };
   const first = fresh.slice(0, FEED_CAP);
   const lines = [
@@ -120,7 +127,7 @@ export function peerFeed(root: string, session: string, ownAgent?: string, shown
     ...first.map(subjectLine),
   ];
   if (fresh.length > first.length) lines.push(`and ${fresh.length - first.length} more; run: journal --since ${formatCursor(since)}`);
-  return { text: lines.join("\n") + "\n", commit: () => writeCursor(root, session, next) };
+  return { text: lines.join("\n") + "\n", commit: () => { writeCursor(root, session, next); tail.advance(); } };
 }
 
 /* -------------------------------------------------------------- returns */

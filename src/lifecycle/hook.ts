@@ -87,11 +87,12 @@ import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.t
 import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, type Lexicon } from "./lexicon.ts";
 import { COHERENCE_LEXICON, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, real as realSpelling, within, type HookProject } from "./project.ts";
 
-import { attentionText, lexiconCoverage, type Coverage, type CoverageScope } from "./lexicon-coverage.ts";
+import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
+import { editVocabulary, keptReading } from "./vocabulary-state.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
-import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
+import { baselinePath, coverageChanges, heldCandidates, introducedCandidates, markCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
 import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
 import { shellCommandOf, shellWrittenPaths } from "./shell-writes.ts";
 
@@ -606,7 +607,7 @@ export async function editContext(root: string, input: HookInput, options: HookO
   // Every chokepoint invariant, from specs parsed once and kept (chokepointIndex): an edit pays for the files it wrote, never for every spec again.
   let index: ReturnType<typeof chokepointIndex>;
   try {
-    index = chokepointIndex(root);
+    index = chokepointIndex(root, files);
   } catch {
     return "";
   }
@@ -828,8 +829,6 @@ export interface HookOptions {
    * WARM_UP; absent (a test), nothing is started.
    */
   warm?: ((root: string) => void) | undefined;
-  /** The vocabulary coverage reading (tests count it); lexiconCoverage by default. At an edit it is scoped to the components the edit wrote in. */
-  coverage?: ((root: string, scope?: CoverageScope) => Promise<Coverage>) | undefined;
   /** When the hook's process started (epoch ms), so a call's time counts loading the code; the call's own start when absent. */
   startedAt?: number | undefined;
 }
@@ -1122,7 +1121,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     const root = place.root;
     // The session has just entered the project, which no start or prompt warmed: its instrument starts now, before the edit that needs it.
     options.warm?.(root);
-    const reading = await lexiconCoverage(root);
+    const reading = await keptReading(root, await loadProjectLexicons(root));
     const gaps = await gapReading(root);
     const text = (await startReading(root, input, reading, gaps)).text;
     const answered = (result.stdout.trim() === "" ? {} : JSON.parse(result.stdout)) as { hookSpecificOutput?: { additionalContext?: string } };
@@ -1153,7 +1152,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       case "SessionStart":
       case "SubagentStart": {
         if (event === "SessionStart") options.warm?.(root);
-        const reading=await lexiconCoverage(root);
+        const reading=await keptReading(root, await loadProjectLexicons(root));
         // Only a session start waits, and only for a refresh of this tree that is nearly done; a subagent starts at once.
         let gaps = await gapReading(root, event === "SessionStart" ? { waitMs: options.startWaitMs ?? START_WAIT_MS } : {});
         // A stale or absent reading starts one in the background (a no-op while one of this tree runs), then orient reads the last one, labeled.
@@ -1200,18 +1199,35 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         }
         if (event === "UserPromptSubmit") options.warm?.(root);
         const edit = event === "PostToolUse" ? await editContext(root, input, { ...options, host }) : "";
-        // The coverage reading walks the whole corpus (seconds on a real project), so it runs only when the text can have moved:
-        // after a tool use that wrote a project file, and at a prompt when the tree moved since this session's last reading.
-        // At an edit it reads only the components the edit wrote in, so an edit costs its own component, never the project;
-        // a term that recurs only across other components is named at the next prompt and at the stop, which read in full.
+        // The full reading walks the whole corpus (seconds on a real project), so it runs only at a prompt when the tree moved since this
+        // session's last reading, and it keeps the vocabulary state an edit reads (vocabulary-state.ts). An edit reads the files it wrote
+        // against that state, never the corpus; with no state valid for this code and lexicon, it takes the full reading once, which keeps one.
         // A write no command line shows is read at the stop, which always reads in full.
         const tree = event === "UserPromptSubmit" && session ? await treeKey(root) : undefined;
-        const moved = event === "PostToolUse" ? written.length > 0 : tree === undefined || tree !== lastTreeKey(root, session!);
-        const scope: CoverageScope = event === "PostToolUse" ? { around: written } : {};
-        const coverage = options.coverage ?? ((at: string, narrowed?: CoverageScope) => lexiconCoverage(at, undefined, undefined, narrowed));
-        const reading=session && moved && existsSync(baselinePath(root,session)) ? await coverage(root, scope) : undefined;
-        if (reading && session && tree !== undefined) keepTreeKey(root, session, tree);
-        const changes=reading && session ? coverageChanges(reading,priorBaseline(root,session)) : [];
+        const baseline = session !== undefined && existsSync(baselinePath(root, session));
+        let reading: Coverage | undefined;
+        let changes: { term: string; component: string; evidence: string; state: string; reason: string }[] = [];
+        let fresh: string[] = [];
+        let keep = (): void => {};
+        if (baseline && event === "PostToolUse" && written.length > 0) {
+          const layers = await loadProjectLexicons(root);
+          const prior = priorBaseline(root, session!);
+          const edited = await editVocabulary(root, layers, written, heldCandidates(prior));
+          if (edited !== undefined) {
+            changes = edited.changes;
+            fresh = changes.filter((c) => c.state === "unresolved").map((c) => c.term);
+            // Nothing to say: the kept state takes the edit in now; otherwise once the line reached the host.
+            if (changes.length === 0) edited.keep();
+            else keep = edited.keep;
+          } else {
+            reading = await keptReading(root, layers);
+            changes = coverageChanges(reading, prior);
+          }
+        } else if (baseline && event === "UserPromptSubmit" && (tree === undefined || tree !== lastTreeKey(root, session!))) {
+          reading = await keptReading(root, await loadProjectLexicons(root));
+          if (tree !== undefined) keepTreeKey(root, session!, tree);
+          changes = coverageChanges(reading, priorBaseline(root, session!));
+        }
         const vocabulary=changes.length ? await vocabularyAtEdit(root, changes) : "";
         // What the last stop said reached only the user; the prompt that follows it is where the agent reads it.
         const fromStop = event === "UserPromptSubmit" && session ? carried(root, session) : undefined;
@@ -1221,7 +1237,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
         // An override took the feed's and the vocabulary line's place, so neither reached the host and neither advances.
         const delivered = voice.override === undefined && (feed.text !== "" || changes.length > 0 || lastStop !== "");
-        const commit=()=> { if(feed.text) feed.commit(); if(changes.length && reading && session) saveBaseline(root,session,reading); if(lastStop && session) dropCarry(root,session); };
+        const commit=()=> { if(feed.text) feed.commit(); if(changes.length && session) { if (reading) saveBaseline(root,session,reading); else { keep(); markCandidates(root, session, fresh); } } if(lastStop && session) dropCarry(root,session); };
         return {stdout:stdout+"\n",stderr:"",exit:0,...(delivered ? {commit} : {})};
       }
       case "Stop":
@@ -1236,7 +1252,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const spec = specStopText(root, changed.files, walls);
         const lexicon = lexiconStopText(report, walls);
         const workText = workStopText(root, input);
-        const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
+        const reading=session && existsSync(baselinePath(root,session)) ? await keptReading(root, await loadProjectLexicons(root)) : undefined;
         const coverageText=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : "";
         const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the lexicon check ran over nothing`;
         const gapText = await gapStopText(root, input, changed.files);

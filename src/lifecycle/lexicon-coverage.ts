@@ -27,13 +27,14 @@
  * rejected for that same concept, or a Coherence concept an adopter's code
  * declares with its own sense.
  */
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readdirSync, realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createHash, type Hash } from "node:crypto";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { loadJournal } from "../journal/store.ts";
 import { countWork } from "./work-meter.ts";
 import {
+  corpusFiles,
   readCorpus,
   type UnreadablePath,
 } from "./check.ts";
@@ -105,8 +106,8 @@ export interface Coverage {
     files: { file: string; kind: string; lines: number }[];
     /** The project-relative paths the reading was narrowed to; absent when it read the whole project. */
     paths?: string[];
-    /** The written files whose components alone the reading read (a reading at an edit), and those components; absent when it read the whole project. */
-    around?: { files: string[]; components: string[] };
+    /** The files an edit's reading read, without walking the corpus; absent when it read the whole project or its paths. */
+    named?: string[];
     excluded: UnreadablePath[];
     unreadable: UnreadablePath[];
     extraction: string;
@@ -211,6 +212,11 @@ function table(
         properties.set(normalized, owners);
       }
   }
+}
+
+/** The singulars a word may be the plural of, as the reading merges a plural into its singular. */
+export function singularForms(word: string): string[] {
+  return singular(word);
 }
 
 function singular(word: string): string[] {
@@ -354,6 +360,8 @@ interface Pool {
   declared: boolean;
   spellings: Set<string>;
   sites: VocabularyUse[];
+  /** Each site's file and line, so a site is added once without a scan. */
+  siteKeys: Set<string>;
   words: VocabularyUse[];
 }
 
@@ -444,12 +452,61 @@ function componentOf(file: string, components: readonly string[]): string {
 
 export interface CoverageScope {
   /**
-   * Written files: read only the files of the components they lie in (a
-   * reading at an edit). Every context in those components is read whole, so
-   * its evidence and its risk are exact; a candidate that recurs only across
-   * other components is left to the readings that read everything.
+   * Read only these project-relative files, without walking the corpus: an
+   * edit's reading. Each file's component is the deepest folder above it
+   * holding a spec, found by listing only the folders above it.
    */
-  around?: readonly string[] | undefined;
+  files?: readonly string[] | undefined;
+  /** Terms code declares elsewhere in the project, so this reading counts their recurrence as words in its own files. */
+  declared?: ReadonlySet<string> | undefined;
+  /** Whether code elsewhere in a component declares a term: the sense a declaration puts at risk, for a reading of a few files. */
+  declaredIn?: ((term: string, component: string) => boolean) | undefined;
+  /** False skips the journal's review rulings: an edit's reading names only what it introduced, whose evidence no ruling has seen. */
+  rulings?: boolean | undefined;
+  /** Also hand back each file's contribution, the kept vocabulary state's unit (vocabulary-state.ts). */
+  contributions?: boolean | undefined;
+}
+
+/**
+ * What one file adds to the vocabulary: the names it nominates (sites it
+ * writes them at, as a name in prose or records, in code, and whether code
+ * declares them), the declared names it writes as words, and the known
+ * names it uses, each as the term and its line's digest.
+ */
+export interface Contribution {
+  component: string;
+  pool: Record<string, { named: number; code: number; sites: number; declared: boolean }>;
+  words: Record<string, number>;
+  uses: string[];
+}
+
+/** The deepest folder at or above a file's folder that holds a spec: its component, by listing only the folders above it. */
+function componentAbove(root: string, rel: string, held: Map<string, string>): string {
+  let dir = dirname(rel);
+  const climbed: string[] = [];
+  for (;;) {
+    const known = held.get(dir);
+    if (known !== undefined) {
+      for (const d of climbed) held.set(d, known);
+      return known;
+    }
+    climbed.push(dir);
+    let holds = false;
+    try {
+      holds = readdirSync(join(root, dir)).some((name) => name.endsWith(".spec.md"));
+    } catch {
+      holds = false;
+    }
+    if (holds) {
+      for (const d of climbed) held.set(d, dir);
+      return dir;
+    }
+    if (dir === "." || dir === "") {
+      for (const d of climbed) held.set(d, "(no declared component)");
+      return "(no declared component)";
+    }
+    dir = dirname(dir);
+  }
 }
 
 export async function lexiconCoverage(
@@ -458,8 +515,17 @@ export async function lexiconCoverage(
   paths?: readonly string[],
   scope: CoverageScope = {},
 ): Promise<Coverage> {
+  return (await lexiconReading(root, layers, paths, scope)).coverage;
+}
+
+/** The coverage reading, and, when asked, each file's contribution to it. */
+export async function lexiconReading(
+  root: string,
+  layers?: { coherence: Lexicon; project: Lexicon | undefined },
+  paths?: readonly string[],
+  scope: CoverageScope = {},
+): Promise<{ coverage: Coverage; contributions: Map<string, Contribution> }> {
   countWork("coverage reading");
-  const around = scope.around;
   const { coherence, project } = layers ?? (await loadProjectLexicons(root));
   // Coherence's own lexicon is the project's only in Coherence's own checkout; an adopter without lexicon.json has none yet.
   const own = await isCoherenceItself(root);
@@ -474,19 +540,12 @@ export async function lexiconCoverage(
         c,
       );
   }
-  // A narrowed reading reads only its files: under the paths, or in the components of the files an edit wrote; the listing still names every component.
-  let wanted: Set<string> | undefined;
-  const select =
-    paths !== undefined
-      ? (rel: string) => underPaths(rel, paths)
-      : around !== undefined
-        ? (rel: string, listed: readonly string[]) => {
-            const folders = componentFolders(listed);
-            wanted ??= new Set(around.map((file) => componentOf(file, folders)));
-            return wanted.has(componentOf(rel, folders));
-          }
-        : undefined;
-  const corpus = await readCorpus({ root, coherence, project }, select);
+  // A reading narrowed to paths reads only the files under them, and the listing still names every component; an edit's reading names its files and walks nothing.
+  const select = paths !== undefined ? (rel: string) => underPaths(rel, paths) : undefined;
+  const corpus =
+    scope.files !== undefined
+      ? { files: await corpusFiles({ root, coherence, project }, scope.files), listed: [] as string[], unreadable: [] as UnreadablePath[], excluded: [] as UnreadablePath[] }
+      : await readCorpus({ root, coherence, project }, select);
   const known = new Map<string, KnownMeaning>();
   const senses = new Map<string, Set<string>>();
   const propertyOwners = new Map<string, { concept: Concept; layer: "coherence" | "project" }[]>();
@@ -533,14 +592,22 @@ export async function lexiconCoverage(
     const first = phrase.split(" ")[0]!;
     byFirstWord.set(first, [...(byFirstWord.get(first) ?? []), n]);
   });
-  const components = componentFolders(corpus.listed);
+  const components = scope.files !== undefined ? [] : componentFolders(corpus.listed);
   const uses = new Map<string, VocabularyUse[]>();
-  const componentFor = (file: string): string => componentOf(file, components);
+  const held = new Map<string, string>();
+  const componentFor = (file: string): string => (scope.files !== undefined ? componentAbove(root, file, held) : componentOf(file, components));
+  // Each term's uses by file and line, so adding one is a lookup, never a scan of the uses so far.
+  const useKeys = new Map<string, Set<string>>();
   const add = (term: string, use: VocabularyUse): void => {
     if (!term) return;
     const list = uses.get(term) ?? [];
-    if (!list.some((u) => u.file === use.file && u.line === use.line))
+    const keys = useKeys.get(term) ?? new Set<string>();
+    const key = `${use.file}\n${use.line}`;
+    if (!keys.has(key)) {
+      keys.add(key);
       list.push(use);
+    }
+    useKeys.set(term, keys);
     uses.set(term, list);
   };
   /** Rejected names on each line, keyed by file then line: sense is at risk beside them. */
@@ -548,6 +615,8 @@ export async function lexiconCoverage(
   /** Names code declares, by their words: a Coherence concept an adopter declares carries the adopter's sense there. */
   const declarations = new Map<string, VocabularyUse[]>();
   const pool = new Map<string, Pool>();
+  /** The files whose code declares each nominated name. */
+  const declaredBy = new Map<string, Set<string>>();
   const proseLines: ProseLine[] = [];
   const nominate = (n: Nomination, site: VocabularyUse | undefined, declared = false): void => {
     const term = n.term;
@@ -564,11 +633,15 @@ export async function lexiconCoverage(
     if (!n.proper && allCommon(term)) return;
     // A participle is a state, not a thing: a declared "missing" or "resolved" is never a candidate.
     if (declared && /^[a-z]+[^e]ed$/.test(term)) return;
-    const entry = pool.get(term) ?? { proper: false, declared: false, spellings: new Set<string>(), sites: [], words: [] };
+    const entry = pool.get(term) ?? { proper: false, declared: false, spellings: new Set<string>(), sites: [], siteKeys: new Set<string>(), words: [] };
     entry.proper ||= n.proper;
     entry.declared ||= declared;
     entry.spellings.add(n.spelling);
-    if (site && !entry.sites.some((u) => u.file === site.file && u.line === site.line)) entry.sites.push(site);
+    if (site && !entry.siteKeys.has(`${site.file}\n${site.line}`)) {
+      entry.siteKeys.add(`${site.file}\n${site.line}`);
+      entry.sites.push(site);
+    }
+    if (declared && site) declaredBy.set(term, (declaredBy.get(term) ?? new Set<string>()).add(site.file));
     pool.set(term, entry);
   };
   // Components come from every spec in the corpus; only the files the reading was narrowed to were read for uses.
@@ -693,6 +766,28 @@ export async function lexiconCoverage(
         fingerprint: digest(c),
       });
     }
+  // Each file's contribution, taken before the plural merge: a kept reading merges its own way (vocabulary-state.ts).
+  const contributions = new Map<string, Contribution>();
+  const contributionOf = (file: string, component: string): Contribution => {
+    const found = contributions.get(file);
+    if (found !== undefined) return found;
+    const made: Contribution = { component, pool: {}, words: {}, uses: [] };
+    contributions.set(file, made);
+    return made;
+  };
+  if (scope.contributions === true) {
+    for (const f of corpus.files) contributionOf(f.rel, componentFor(f.rel));
+    for (const [term, entry] of pool)
+      for (const site of entry.sites) {
+        const c = contributionOf(site.file, site.component);
+        const stats = (c.pool[term] ??= { named: 0, code: 0, sites: 0, declared: false });
+        stats.sites += 1;
+        if (site.kind === "prose" || site.kind === "record") stats.named += 1;
+        if (site.kind === "code") stats.code += 1;
+        if (declaredBy.get(term)?.has(site.file) === true) stats.declared = true;
+      }
+    for (const [term, list] of uses) for (const u of list) contributionOf(u.file, u.component).uses.push(`${term}\t${digest(u.text)}`);
+  }
   // A plural nominated beside its singular is the singular's.
   const canonical = new Map<string, string>();
   for (const term of pool.keys()) {
@@ -707,7 +802,11 @@ export async function lexiconCoverage(
       to.proper ||= from.proper;
       to.declared ||= from.declared;
       for (const s of from.spellings) to.spellings.add(s);
-      for (const site of from.sites) if (!to.sites.some((u) => u.file === site.file && u.line === site.line)) to.sites.push(site);
+      for (const site of from.sites)
+        if (!to.siteKeys.has(`${site.file}\n${site.line}`)) {
+          to.siteKeys.add(`${site.file}\n${site.line}`);
+          to.sites.push(site);
+        }
       pool.delete(term);
     }
   // A declared name recurs wherever prose writes it as words, plural included; a well-known capitalized spelling is not a use.
@@ -720,11 +819,16 @@ export async function lexiconCoverage(
           if (words.some((w) => w.lower === "")) break;
           const last = words.at(-1)!.lower;
           const head = words.slice(0, -1).map((w) => w.lower);
-          const key = [last, ...singular(last)].map((w) => [...head, w].join(" ")).find((k) => pool.get(k)?.declared);
+          // A reading of a few files also counts the names code declares elsewhere: the kept reading holds where.
+          const key = [last, ...singular(last)].map((w) => [...head, w].join(" ")).find((k) => pool.get(k)?.declared || scope.declared?.has(k));
           if (key === undefined || seen.has(key)) continue;
           if (isWellKnown(famous, key, words.map((w) => w.original).join(" "))) continue;
           seen.add(key);
-          pool.get(key)!.words.push(line.use);
+          if (scope.contributions === true) {
+            const c = contributionOf(line.use.file, line.use.component);
+            c.words[key] = (c.words[key] ?? 0) + 1;
+          }
+          pool.get(key)?.words.push(line.use);
         }
   }
   const candidates = new Map<string, { uses: VocabularyUse[]; prose: number; components: number }>();
@@ -738,12 +842,12 @@ export async function lexiconCoverage(
     const byWord = entry.declared && entry.words.length >= 10 && wordSpread >= 4;
     if (!byName && !byWord) continue;
     const all = [...entry.sites];
-    for (const u of entry.words) if (!all.some((s) => s.file === u.file && s.line === u.line)) all.push(u);
+    for (const u of entry.words) if (!entry.siteKeys.has(`${u.file}\n${u.line}`)) all.push(u);
     const prose = all.filter((u) => u.kind === "prose" || u.kind === "record").length;
     candidates.set(term, { uses: all, prose, components: new Set(all.map((u) => u.component)).size });
   }
   for (const [term, found] of candidates) for (const u of found.uses) add(term, u);
-  const decisions = rulings(root);
+  const decisions = scope.rulings === false ? new Map<string, { disposition: string; because: string }>() : rulings(root);
   // A name refused for this very concept, written on or beside a line that uses the concept: the writer may be mixing the two.
   const near = (list: VocabularyUse[], concept: string): string | undefined => {
     for (const u of list) {
@@ -795,6 +899,7 @@ export async function lexiconCoverage(
         if (project && item.layer === "coherence") {
           const declared = (declarations.get(term) ?? []).find((u) => u.component === component);
           if (declared) return `declared in this project's code (${declared.file}:${declared.line}) with its own sense, while the definition is Coherence's`;
+          if (scope.declaredIn?.(term, component) === true) return `declared in this project's code (in ${component}) with its own sense, while the definition is Coherence's`;
         }
         return undefined;
       };
@@ -842,7 +947,7 @@ export async function lexiconCoverage(
       .map((f) => ({ file: f.rel, kind: f.kind, lines: f.lines.length }))
       .sort((a, b) => a.file.localeCompare(b.file)),
     ...(paths ? { paths: [...paths] } : {}),
-    ...(around ? { around: { files: [...around], components: [...(wanted ?? [])].sort() } } : {}),
+    ...(scope.files !== undefined ? { named: [...scope.files] } : {}),
     // A narrowed reading reports what was left out under its paths, and any excluded folder a path lies inside.
     excluded: corpus.excluded
       .filter((e) => underPaths(e.file, paths) || (paths ?? []).some((p) => p.startsWith(e.file + "/")))
@@ -858,7 +963,7 @@ export async function lexiconCoverage(
       "Totals are population facts about this reading, not a to-do count.",
     ],
   };
-  return {
+  const coverage: Coverage = {
     version: 1,
     projectLexicon: project?.path ?? (own ? coherence.path : null),
     fingerprint: digestAll([population.extraction, ...population.limits, ...population.files, ...population.excluded, ...population.unreadable, ...terms]),
@@ -874,6 +979,7 @@ export async function lexiconCoverage(
       unreviewedContexts: terms.reduce((n, t) => n + t.contexts.filter(awaitsReview).length, 0),
     },
   };
+  return { coverage, contributions };
 }
 
 /* -------------------------------------------------------------- attention */

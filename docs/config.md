@@ -198,6 +198,21 @@ server alone. The primary language's server keeps the plain file names under
 its name (`server-typescript.json`). Only the primary server answers the live
 Scope reading over HTTP.
 
+**What the hooks keep between calls.** `.coherence/cache/` is transient:
+the `.coherence/.gitignore` install writes leaves it out with everything
+else but the journal, runs, work orders and hook voice. Deleting it costs
+time, never a result. It holds what lets a tool hook pay for what changed
+rather than for the project. That covers the spec and practice parses, each
+keyed by its file's content (git's blob id, or a hash of the text for a file
+git reports changed). It also holds the latest chokepoint verdict's files,
+indexed from the run store by byte offset; the journal's tail log, which
+the peer feed reads instead of the whole journal; and the vocabulary a full
+reading leaves, which an edit compares its own files against. Every store is
+keyed by the identity of the Coherence code that made it, so an upgrade
+never serves an old parse. Each store is written aside and renamed into
+place, so two hooks at once never tear one, and an aside a crash left
+behind is removed by a later write.
+
 **Which setup runs a test.** Each test setup takes the keys of the table
 above (`test`, `testJson`, `testMatch`, `testFilterForm`, `testDir` /
 `testDirs`), and three of its own:

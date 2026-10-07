@@ -218,8 +218,8 @@ export async function similarTerms(
         vector.some((v) => !Number.isFinite(v))
       ) {
         if (!context) {
-          const moduleName = "node-llama-cpp";
-          const lib = (await import(moduleName)) as {
+          // An optional peer: named as a string, so the compiler resolves nothing when it is not installed.
+          const lib = (await import("node-llama-cpp" as string)) as {
             getLlama: (options: Record<string, unknown>) => Promise<LocalLlama>;
           };
           llama = await lib.getLlama({

@@ -9,8 +9,9 @@
  */
 
 import { execFileSync } from "../lifecycle/work-meter.ts";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
+import { basename, join } from "node:path";
+import { folderBefore, noteAppend } from "./tail.ts";
 import { JournalError } from "./args.ts";
 import { isKind, type JournalRecord } from "./record.ts";
 import { SESSION_TOKEN, workBinding } from "./work.ts";
@@ -41,8 +42,36 @@ export function appendRecord(cwd: string, record: JournalRecord): JournalRecord 
   const file = sessionFile(cwd, record.session);
   const bound: JournalRecord = { ...record, ...workBinding(cwd, record.session, record.work) };
   mkdirSync(journalDir(cwd), { recursive: true });
-  appendFileSync(file, `${JSON.stringify(bound)}\n`, "utf8");
+  const line = `${JSON.stringify(bound)}\n`;
+  const before = folderBefore(cwd);
+  const offset = existsSync(file) ? statSync(file).size : 0;
+  appendFileSync(file, line, "utf8");
+  // The journal's tail log names the append, so a reader of what is new never reads the history (tail.ts).
+  noteAppend(cwd, basename(file), offset, Buffer.byteLength(line, "utf8"), before);
   return bound;
+}
+
+/** The journal folder's identity (device, inode, modification and change time), which a file arriving any way changes; undefined when there is none. */
+export function journalFolderIdentity(cwd: string): string | undefined {
+  try {
+    const s = statSync(journalDir(cwd));
+    return `${s.dev}:${s.ino}:${s.mtimeMs}:${s.ctimeMs}`;
+  } catch {
+    return undefined;
+  }
+}
+
+/** One line of a session file by its byte range, as the journal's tail log names it (tail.ts); only a session file's own name is read. */
+export function readJournalRange(cwd: string, file: string, offset: number, length: number): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*\.jsonl$/.test(file)) throw new JournalError(`"${file}" is not a journal file`);
+  const fd = openSync(join(journalDir(cwd), file), "r");
+  try {
+    const buffer = Buffer.alloc(length);
+    readSync(fd, buffer, 0, length, offset);
+    return buffer.toString("utf8");
+  } finally {
+    closeSync(fd);
+  }
 }
 
 export interface Damaged {
@@ -76,7 +105,7 @@ export function loadJournal(cwd: string): Loaded {
     const lines = readFileSync(file, "utf8").split("\n");
     lines.forEach((line, index) => {
       if (line.trim() === "") return;
-      const verdict = parseLine(line);
+      const verdict = parseJournalLine(line);
       if (typeof verdict === "string") {
         loaded.damaged.push({ file: join(JOURNAL_DIR, name), line: index + 1, reason: verdict });
       } else {
@@ -89,7 +118,8 @@ export function loadJournal(cwd: string): Loaded {
 }
 
 /** A record, or the reason the line is not one. */
-function parseLine(line: string): JournalRecord | string {
+/** One journal line: a record, or the reason it is not one. */
+export function parseJournalLine(line: string): JournalRecord | string {
   let value: unknown;
   try {
     value = JSON.parse(line);

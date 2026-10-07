@@ -357,6 +357,41 @@ export async function readCorpus(options: CheckOptions, only?: (rel: string, lis
   return { files: out, listed, unreadable, excluded };
 }
 
+/**
+ * The named files of the corpus, read, without walking it: each kept only
+ * when the walk would keep it (its kind, the lexicons, the retired
+ * inventories, foreign vocabulary, generated state, an excluded or ignored
+ * folder), and read through the work meter's door. The caller has already
+ * kept only the project's own files. What an edit's reading reads.
+ */
+export async function corpusFiles(options: CheckOptions, rels: readonly string[]): Promise<CorpusFile[]> {
+  const root = resolve(options.root);
+  const excluded = new Set<string>([resolve(options.coherence.path), resolve(root, "docs", "retired.md"), resolve(root, "src", "spec", "retired-sections.json")]);
+  if (options.project !== undefined) excluded.add(resolve(options.project.path));
+  const foreignDocs = [resolve(root, "docs", "reference"), resolve(root, "docs", "reviews")];
+  const ignore = new Set(configIgnore(root));
+  const rules = walkBounds(root, [], { readHidden: true });
+  const out: CorpusFile[] = [];
+  for (const given of rels) {
+    const path = resolve(root, given);
+    const rel = relPath(root, path);
+    if (excluded.has(path) || foreignDocs.some((d) => path === d || path.startsWith(d + sep))) continue;
+    if (machineWritten(rel) || (rel.split("/")[0] === COHERENCE_DIR && !isRecordFile(rel))) continue;
+    if (outsideBounds(rel, ignore) || exclusionOf(rel, rules) !== undefined) continue;
+    const kind = kindOf(root, path);
+    if (kind === undefined) continue;
+    let text;
+    try {
+      text = await readProjectTextAsync(path, "corpus");
+    } catch {
+      continue;
+    }
+    if (isBinary(text)) continue;
+    out.push({ path, rel, kind, lines: text.split(/\r?\n/) });
+  }
+  return out;
+}
+
 /* ---------------------------------------------------------------- words */
 
 const WORD = "[A-Za-z0-9_]";

@@ -47,7 +47,7 @@ function wrap(target: Record<string, unknown>, name: string, label: string): voi
 let installed = false;
 
 /** Replace the counted functions once for this process; they count only while a count is open. */
-function install(): void {
+function installCounting(): void {
   if (installed) return;
   installed = true;
   for (const name of COUNTED_SYNC) wrap(fs, name, name);
@@ -58,7 +58,7 @@ function install(): void {
 
 /** Count every file system call `body` makes, and return the count with its result. */
 export async function countingFs<T>(body: () => Promise<T>): Promise<{ value: T; fs: FsCount }> {
-  install();
+  installCounting();
   const outer = open;
   const count: FsCount = { calls: {}, paths: [] };
   open = count;

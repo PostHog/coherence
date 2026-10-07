@@ -17,10 +17,11 @@
  *   phrase comparison  one test of a line against one lexicon phrase in the
  *                      coverage scan, added once per reading
  *
- * Not counted: a stat, a directory walk, a git listing's own length, and
+ * Not counted here: a stat, a directory walk, a git listing's own length, and
  * Coherence's own state under .coherence (feed cursors, traces, the kept
- * parses, run records, the journal). They are named here so a reader knows
- * what a count of zero does not say.
+ * parses and indexes, run records, the journal). The size tests count those
+ * too, below the meter, at the file system (fs-count-fixture.ts), so a read
+ * that slips past these doors still shows there.
  *
  * runHook opens the scope and closes it; a count outside any scope is one
  * comparison against undefined, so the meter costs nothing a hook can feel.
@@ -66,9 +67,18 @@ export function openWork(): WorkScope {
   return scope;
 }
 
-/** Close a scope, restore the one it replaced, and keep it as the last hook call's work. */
+/**
+ * Close a scope, restore the one it replaced, and keep it as the last hook
+ * call's work. The work an inner scope counted is the outer scope's too, so
+ * a scope opened inside another never hides work from it.
+ */
 export function closeWork(scope: WorkScope): Work {
   current = scope.outer;
+  if (scope.outer !== undefined) {
+    for (const kind of WORK_KINDS) scope.outer.counts[kind] += scope.work.counts[kind];
+    scope.outer.reads.push(...scope.work.reads);
+    scope.outer.spawns.push(...scope.work.spawns);
+  }
   lastHook = scope.work;
   return scope.work;
 }
