@@ -8,5 +8,5 @@
     "removeComments": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts", "src/build.ts"]
+  "exclude": ["src/**/*.test.ts", "src/**/*.e2e.ts", "src/build.ts"]
 }
