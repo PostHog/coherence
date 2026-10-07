@@ -333,7 +333,8 @@ export function refreshUnderWay(root: string, now: () => number = Date.now): Ref
 function supersede(pid: number): boolean {
   try {
     const command = execFileSync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 2000 });
-    if (!/\bquery\s+structure\b/.test(command)) return false;
+    // The question ends the command line, as refreshInBackground spawns it: a test runner whose name pattern merely spells it is no structure query.
+    if (!/(?:^|\s)query\s+structure\s*$/.test(command)) return false;
   } catch {
     return false;
   }

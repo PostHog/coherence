@@ -340,6 +340,55 @@ export function shellWrittenPaths(command: string): string[] {
   return [...new Set(written)];
 }
 
+/** One simple command of a line: its words as the shell passes them (a quoted argument stays one word), and the folder a `cd` earlier in the line left, "" for where the line began, undefined when this reading cannot follow it. */
+export interface SimpleCommand {
+  words: string[];
+  dir: string | undefined;
+}
+
+/**
+ * The simple commands of a line, in order, each with the folder it runs in:
+ * the same reading of quotes, heredocs (whose bodies are text, never
+ * commands), separators, `cd`, `pushd`/`popd` and subshells as the written
+ * files take.
+ */
+export function simpleCommands(command: string): SimpleCommand[] {
+  const tokens = tokenize(command.replace(/\r\n/g, "\n"));
+  const out: SimpleCommand[] = [];
+  let dir = "";
+  const subshells: string[] = [];
+  const pushed: string[] = [];
+  let words: Word[] = [];
+  const close = (): void => {
+    const name = words[0]?.text;
+    if (words.length > 0) out.push({ words: words.map((w) => w.text), dir: dir === UNKNOWN ? undefined : dir });
+    if (name === "cd") dir = movedTo(dir, words[1]);
+    else if (name === "pushd") {
+      pushed.push(dir);
+      dir = movedTo(dir, nonFlags(words.slice(1))[0]);
+    } else if (name === "popd") dir = words.length === 1 ? (pushed.pop() ?? UNKNOWN) : UNKNOWN;
+    words = [];
+  };
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i]!;
+    if (token.kind === "op") {
+      // A redirect's word is a file, not an argument.
+      if (WRITE_REDIRECT.test(token.text) || /^(?:<|<<-?|<<<|<&\d*)$/.test(token.text)) {
+        if (tokens[i + 1]?.kind === "word") i += 1;
+        continue;
+      }
+      if (SEPARATORS.has(token.text)) {
+        close();
+        if (token.text === "(") subshells.push(dir);
+        else if (token.text === ")" && subshells.length > 0) dir = subshells.pop()!;
+      }
+      continue;
+    }
+    words.push({ text: token.text, opaque: token.opaque });
+  }
+  close();
+  return out;
+}
 
 /** The shell command a tool event runs, as one string: a Bash command, or the argv a Codex shell tool names. */
 export function shellCommandOf(record: Record<string, unknown>): string | undefined {

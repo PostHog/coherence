@@ -847,7 +847,7 @@
     {
       "name": "mass",
       "status": "settled",
-      "definition": "A diagnostic reporting two numbers side by side for each component and the project: total mass (lines, files, symbols) and unreached mass (code in no component, or in a component that no invariant's chokepoint or oracle references). A large object with no definition is an unbalanced, wobbly load the agent should instinctively be cautious with.",
+      "definition": "A diagnostic reporting two numbers side by side for each component and the project: total mass and unreached mass. Total mass counts lines, files and symbols; unreached mass is code in no component, or in a component that no invariant's chokepoint or oracle references. A large object with no definition is an unbalanced, wobbly load the agent should instinctively be cautious with.",
       "related": [
         "component",
         "invariant"
@@ -1249,7 +1249,7 @@
     },
     {
       "name": "well-known name",
-      "definition": "A name with so much gravity in training data that no project definition could make it less ambiguous: the proper name of a widely used technology, language, platform, vendor, standard, or format (Python, Pyright, GitHub), the names a project vouches for in its config, and the project's own name. A well-known name is never a vocabulary candidate. A common word a project gives its own sense (hive, scope, core, run, session) is never one, even written as a proper noun; a name whose lowercase is an ordinary word (Node, Chrome) is well known only in its capitalized spelling.",
+      "definition": "A name with so much gravity in training data that no project definition could make it less ambiguous. It is the proper name of a widely used technology, language, platform, vendor, standard, or format (Python, Pyright, GitHub), a name a project vouches for in its config, or the project's own name. A well-known name is never a vocabulary candidate. A common word a project gives its own sense (hive, scope, core, run, session) is never one, even written as a proper noun; a name whose lowercase is an ordinary word (Node, Chrome) is well known only in its capitalized spelling.",
       "status": "proposed",
       "related": [
         "lexicon",
@@ -1423,6 +1423,23 @@
         "defined_by": "owner, 2026-10-05 (session 8efd6465)"
       },
       "name": "kernel practice"
+    },
+    {
+      "name": "latency budget",
+      "definition": "The most seconds a tool hook may take, counted from its process's start: 3 unless the config declares latencyBudget. A tool hook (PreToolUse, PostToolUse) runs around every tool call, so its time is paid over and over, and a call cycle that feels sluggish gets Coherence switched off, which loses every check at once. A tool hook over it names its own time in its answer; regulate names the session's calls over it with what the tool hooks cost in all, and orient the last week's. A count of work (an execution-budget invariant: git spawns per question, per tool call) guards the known shapes; the latency budget is the measured time, and alarms on what no count names. Not the budget checklist kind, whose shapes bound one operation's admission, memory and steps.",
+      "status": "settled",
+      "related": [
+        "hook",
+        "regulate",
+        "orient",
+        "config",
+        "economy"
+      ],
+      "provenance": {
+        "owner_words": "latency budget. no urgency on those terms",
+        "defined_by": "owner, 2026-10-07 (session 8efd6465), naming the declared suite time limit when asked, since budget alone already names a checklist kind (d-b2c62260)",
+        "redirected_by": "owner, 2026-10-07: \"I think the alarm we care about it aggregate hook time. if a hook costs more than n seconds, coherence will be bypassed ... I think a 3000ms tool hook budget would work fine, it's if we bloat the call cycle to something that makes dev feel unreasonably sluggish\" (d-f159ad7e)"
+      }
     }
   ],
   "metaphors": {

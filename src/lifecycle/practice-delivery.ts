@@ -14,7 +14,7 @@
 
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { loadSpecModel, projectPractices, type SpecModel } from "../spec/model.ts";
 import { PRACTICE_SUFFIX, firedBy, parsePractices, renderPractice, triggerText, type ToolUse } from "../spec/practice.ts";
 import { KERNEL_PREFIX, isCoherenceTree, kernelPractices, type ModelPractice } from "../spec/practices.ts";
@@ -22,7 +22,8 @@ import { configIgnore, underIgnored } from "../adapters/project-files.ts";
 import { loadJournal } from "../journal/store.ts";
 import type { Enactment } from "../journal/record.ts";
 import { enactTemplate } from "../journal/verbs.ts";
-import { shellCommandOf } from "./shell-writes.ts";
+import { projectRoot } from "./project.ts";
+import { shellCommandOf, simpleCommands, type SimpleCommand } from "./shell-writes.ts";
 
 export const PRACTICES_DIR = join(".coherence", "practices");
 
@@ -33,6 +34,8 @@ export interface Firing {
   version: string;
   trigger: string;
   whole: boolean;
+  /** The project the firing command ran in, when a cd took it out of the session's own (another worktree, another checkout): its journal holds the enactment. */
+  root?: string;
 }
 
 function firingsFile(root: string, session: string): string {
@@ -73,7 +76,32 @@ export function toolUseOf(input: Record<string, unknown>, writes: string[]): Too
   const edits = record["edits"];
   if (Array.isArray(edits)) for (const e of edits) if (typeof e === "object" && e !== null && typeof (e as Record<string, unknown>)["new_string"] === "string") texts.push((e as Record<string, string>)["new_string"]!);
   if (typeof input["tool_input"] === "string") texts.push(input["tool_input"]);
-  return { command, writes, added: texts.join("\n") };
+  return { command, ...(command === undefined ? {} : { commands: simpleCommands(command) }), writes, added: texts.join("\n") };
+}
+
+function inside(root: string, path: string): boolean {
+  return path === root || path.startsWith(root.endsWith(sep) ? root : root + sep);
+}
+
+/**
+ * The tool use split by the project each part acts on: the session's own
+ * root takes the writes and every command that runs in it; a command a cd
+ * took into another project (a second worktree, another checkout) is read
+ * against that project's practices, whose journal is where its enactment
+ * will be recorded. Only a cd out of the root asks where it landed.
+ */
+function useByRoot(root: string, cwd: string, use: ToolUse): Map<string, ToolUse> {
+  const home: SimpleCommand[] = [];
+  const away = new Map<string, SimpleCommand[]>();
+  for (const command of (use.commands ?? []) as SimpleCommand[]) {
+    const target = command.dir === undefined || command.dir === "" ? undefined : resolve(cwd, command.dir);
+    const other = target === undefined || inside(root, target) ? root : projectRoot(target);
+    if (other === root) home.push(command);
+    else away.set(other, [...(away.get(other) ?? []), command]);
+  }
+  const out = new Map<string, ToolUse>([[root, use.commands === undefined ? use : { ...use, commands: home }]]);
+  for (const [other, commands] of away) out.set(other, { command: use.command, commands, writes: [], added: "" });
+  return out;
 }
 
 export interface PracticeContext {
@@ -83,32 +111,36 @@ export interface PracticeContext {
 }
 
 /** The practices this tool use fires: each whole on its first firing at its version this session, one line after. */
-export function practiceContext(root: string, session: string | undefined, use: ToolUse, cli: string, agent: string, now: () => Date = () => new Date()): PracticeContext {
+export function practiceContext(root: string, session: string | undefined, use: ToolUse, cli: string, agent: string, now: () => Date = () => new Date(), cwd: string = root): PracticeContext {
   // A tool use that runs no command and writes nothing can fire no trigger: nothing is read for it.
   if (use.command === undefined && use.writes.length === 0) return { text: "", commit: () => {} };
-  let practices: ModelPractice[];
-  try {
-    practices = deliveryPractices(root);
-  } catch {
-    return { text: "", commit: () => {} };
+  const fired: { practice: ModelPractice; trigger: string; at: string }[] = [];
+  for (const [at, part] of useByRoot(root, cwd, use)) {
+    let practices: ModelPractice[];
+    try {
+      practices = deliveryPractices(at);
+    } catch {
+      continue;
+    }
+    for (const practice of practices) {
+      const trigger = firedBy(practice, part);
+      if (trigger !== undefined) fired.push({ practice, trigger, at });
+    }
   }
-  const fired = practices.flatMap((practice) => {
-    const trigger = firedBy(practice, use);
-    return trigger === undefined ? [] : [{ practice, trigger }];
-  });
   if (fired.length === 0) return { text: "", commit: () => {} };
   const before = session === undefined ? [] : firings(root, session);
   const lines: string[] = [];
   const kept: Firing[] = [];
-  for (const { practice, trigger } of fired) {
+  for (const { practice, trigger, at } of fired) {
     const delivered = before.some((f) => f.practice === practice.id && f.version === practice.version && f.whole);
+    const where = at === root ? "" : ` in ${at}`;
     if (delivered) {
-      lines.push(`Practice ${practice.id} applies here (${trigger}); delivered whole earlier this session. Enact it when done.`);
+      lines.push(`Practice ${practice.id} applies here (${trigger}${where}); delivered whole earlier this session. Enact it when done.`);
     } else {
-      lines.push(`This ${trigger} fires a practice. Follow it, and record it with enact when done.`, ...renderPractice(practice.id, practice));
+      lines.push(`This ${trigger}${where} fires a practice. Follow it, and record it with enact when done${where === "" ? "" : `, run from${where}`}.`, ...renderPractice(practice.id, practice));
       if (session !== undefined) lines.push("Record it:", enactTemplate(practice, cli, session, agent, trigger));
     }
-    kept.push({ at: now().toISOString(), practice: practice.id, version: practice.version, trigger, whole: !delivered });
+    kept.push({ at: now().toISOString(), practice: practice.id, version: practice.version, trigger, whole: !delivered, ...(at === root ? {} : { root: at }) });
   }
   return { text: lines.join("\n") + "\n", commit: () => (session === undefined ? undefined : keepFirings(root, session, kept)) };
 }
@@ -150,11 +182,14 @@ export function practiceOrientText(root: string, cli: string): string {
 export function practiceStopText(root: string, session: string | undefined, cli: string, agent: string, model?: SpecModel): string {
   if (session === undefined) return "";
   const fired = firings(root, session);
-  let records: Enactment[];
-  try {
-    records = loadJournal(root).records.filter((r): r is Enactment => r.kind === "enactment" && r.session === session);
-  } catch {
-    records = [];
+  // An enactment is recorded where its command ran: the session's own journal, and each other project a firing's command was in.
+  const records: Enactment[] = [];
+  for (const at of new Set([root, ...fired.flatMap((f) => (f.root === undefined ? [] : [f.root]))])) {
+    try {
+      records.push(...loadJournal(at).records.filter((r): r is Enactment => r.kind === "enactment" && r.session === session));
+    } catch {
+      // A journal that cannot be read holds no enactment this stop can see.
+    }
   }
   const lines: string[] = [];
   let practices: ModelPractice[] | undefined;
@@ -171,9 +206,9 @@ export function practiceStopText(root: string, session: string | undefined, cli:
         return [];
       }
     })();
-    const practice = practices.find((p) => p.id === id);
-    lines.push(`Practice ${id} fired (${f.trigger}) and has no enactment since; record what was done, and what was deviated from or skipped, with why:`);
-    if (practice !== undefined) lines.push(`  ${enactTemplate(practice, cli, session, agent, f.trigger).replace(/\n/g, "\n  ")}`);
+    const steps = practices.find((p) => p.id === id)?.steps.length;
+    const where = f.root === undefined ? "" : `, from ${f.root}`;
+    lines.push(`Practice ${id} fired (${f.trigger}${where}) and has no enactment since: ${cli} enact "${id}" --trigger "${f.trigger}" --session ${session} --agent ${agent}${steps === undefined ? "" : ` with --step <n>=done|deviated:<why>|skipped:<why> for each of its ${steps} steps`} (${cli} query practice "${id}" prints them).`);
   }
   for (const e of records) {
     e.steps.forEach((step, index) => {

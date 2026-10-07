@@ -22,6 +22,8 @@
  *              pass tells them apart by their content
  *   testDir    a folder name (or testDirs, a list) whose files are tests,
  *              beside the built-in __tests__, test, tests
+ *   latencyBudget  the latency budget: the most seconds a tool hook
+ *              (PreToolUse, PostToolUse) may take; absent means 3
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -41,6 +43,8 @@ export interface EnforcementConfig {
   /** How a name filter is written for the runner: an escaped regex (jest, vitest, node:test) or a pytest -k expression. */
   testFilterForm: "regex" | "pytest";
   testFolders: string[];
+  /** The latency budget: the most seconds a tool hook may take, or undefined for the default (src/lifecycle/hook-latency.ts). */
+  latencyBudget: number | undefined;
 }
 
 function commandValue(value: unknown): string[] | string | undefined {
@@ -50,7 +54,7 @@ function commandValue(value: unknown): string[] | string | undefined {
 }
 
 export function readEnforcementConfig(root: string): EnforcementConfig {
-  const config: EnforcementConfig = { language: "typescript", test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS] };
+  const config: EnforcementConfig = { language: "typescript", test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined };
   const path = resolve(root, CONFIG_FILE);
   if (!existsSync(path)) return config;
   let parsed: unknown;
@@ -66,6 +70,11 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   config.test = commandValue(record["test"]);
   config.testJson = commandValue(record["testJson"]);
   if (record["testFilterForm"] === "pytest") config.testFilterForm = "pytest";
+  const budget = record["latencyBudget"];
+  if (budget !== undefined) {
+    if (typeof budget !== "number" || !Number.isFinite(budget) || budget <= 0) throw new Error(`${path}: latencyBudget is a number of seconds above 0`);
+    config.latencyBudget = budget;
+  }
   const testMatch = record["testMatch"];
   if (typeof testMatch === "string" && testMatch !== "") {
     try {

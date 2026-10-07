@@ -104,12 +104,12 @@ test("the prediction resolves a chokepoint invariant only when a given file spel
 });
 
 test("an edit says which chokepoint invariants it could not check, and stays silent only for a value the spec writes as prose", { timeout: 120_000 }, async () => {
-  const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through gate.\n  protects: GHOST\n  chokepoint: gate\n  because: a fixture\n  kinds: none\n- prose door: the secret leaves only one way.\n  protects: the secret columns\n  chokepoint: gate\n  because: a fixture\n  kinds: none\n";
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- ghost door: GHOST leaves only through release.\n  protects: GHOST\n  chokepoint: release\n  because: a fixture\n  kinds: none\n- prose door: the secret leaves only one way.\n  protects: the secret columns\n  chokepoint: release\n  because: a fixture\n  kinds: none\n";
   const root = repo({
     "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", allowImportingTsExtensions: true, noEmit: true, strict: true }, include: ["src/**/*.ts"] }),
     "coherence.config.json": JSON.stringify({ language: "typescript" }),
     "Fixture.spec.md": spec,
-    "src/a.ts": "// GHOST was renamed away; gate stays\nexport function gate(): number {\n  return 1;\n}\n",
+    "src/a.ts": "// GHOST was renamed away; release stays\nexport function release(): number {\n  return 1;\n}\n",
   });
   const adapter = new TypeScriptAdapter(root);
   try {

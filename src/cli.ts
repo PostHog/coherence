@@ -189,7 +189,7 @@ async function hookCommand(args: string[], root: string): Promise<number> {
   const event = args[0];
   if (event === undefined || !isHookEvent(event)) fail(`hook: expected one of ${HOOK_EVENTS.join(", ")}\n${USAGE}`);
   const input = await readStdinJson(process.stdin);
-  const result = await runHook(event, input, root, { refresh: STRUCTURE_REFRESH, warm: WARM_UP });
+  const result = await runHook(event, input, root, { refresh: STRUCTURE_REFRESH, warm: WARM_UP, startedAt: Math.round(performance.timeOrigin) });
   if (result.stderr !== "") process.stderr.write(result.stderr);
   if (result.stdout !== "") {
     try {

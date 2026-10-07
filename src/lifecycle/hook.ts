@@ -74,6 +74,8 @@ import { promisify } from "node:util";
 import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
+import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
+import { TOOL_HOOKS, hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
@@ -84,7 +86,7 @@ import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
 import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, type Lexicon } from "./lexicon.ts";
-import { COHERENCE_LEXICON, installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
+import { COHERENCE_LEXICON, DURABLE_FOLDERS, installedRoot, isCoherenceItself, loadProjectLexicons, within } from "./project.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
@@ -203,6 +205,12 @@ const GIT_LISTING_LIMIT = 64 * 1024 * 1024;
  * tree to be clean or dirty; any other failure is reported, never read as a
  * clean tree.
  */
+/** A path under .coherence outside the folders a project commits: what install's ignore file leaves out. */
+function transientState(path: string): boolean {
+  const parts = path.split("/");
+  return parts[0] === ".coherence" && parts.length > 1 && parts[1] !== ".gitignore" && !DURABLE_FOLDERS.includes(parts[1]!);
+}
+
 export async function changedFiles(root: string): Promise<ChangedFiles> {
   const listings: string[] = [];
   for (const args of [["diff", "--name-only", "HEAD"], ["ls-files", "--others", "--exclude-standard"]]) {
@@ -215,7 +223,8 @@ export async function changedFiles(root: string): Promise<ChangedFiles> {
       return { files: [], failure: `git ${args.join(" ")} failed: ${reason}` };
     }
   }
-  const all = [...new Set(listings.join("\n").split("\n").map((l) => l.trim()).filter((l) => l !== ""))];
+  // Coherence's own regenerated state (feed cursors, traces, practice firings, hook times) is never the session's change, ignored by git or not; its durable records are.
+  const all = [...new Set(listings.join("\n").split("\n").map((l) => l.trim()).filter((l) => l !== "" && !transientState(l)))];
   // Only the project's own files (a nested repository lists as one folder entry, never the project's); a deletion stays.
   const own = keepProjectFiles(root, all);
   return { files: all.filter((f) => own.has(f) || !existsSync(resolve(root, f))) };
@@ -652,7 +661,7 @@ export async function startContext(root: string, input: HookInput = {}, report?:
 /** The start injection with the level the vocabulary was delivered at, so a reading of the hook can say what orient carries. */
 export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
   const { coherence, project } = await loadProjectLexicons(root);
-  const head = escalationBlock(root) + specBlock(root) + (await gapBlock(root, gaps)) + workBlock(root, input);
+  const head = escalationBlock(root) + specBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + workBlock(root, input);
   const reading=report ?? await lexiconCoverage(root);
   const commands=await cliName(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
@@ -747,6 +756,8 @@ export interface HookOptions {
    * WARM_UP; absent (a test), nothing is started.
    */
   warm?: ((root: string) => void) | undefined;
+  /** When the hook's process started (epoch ms), so a call's time counts loading the code; the call's own start when absent. */
+  startedAt?: number | undefined;
 }
 
 /**
@@ -910,10 +921,31 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
   // One spec model per event, shared by every part of its answer; the body stays inside runHook, the chokepoint for its exit codes.
   const outer = eventModels;
   eventModels = new Map();
+  const began = options.startedAt ?? Date.now();
   try {
-    return await answer();
+    return timed(await answer());
   } finally {
     eventModels = outer;
+  }
+
+  /** Keep the call's time, and let a tool hook over the latency budget say so in its own answer. */
+  function timed(result: HookResult): HookResult {
+    if (result.exit === OUTSIDE_ROOT_EXIT) return result;
+    const ms = Date.now() - began;
+    const root = installedRoot(fallbackRoot) ?? (typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : fallbackRoot);
+    const session = sessionOf(input);
+    if (session !== undefined) recordHookTime(root, session, { at: new Date().toISOString(), event, ms });
+    if (!TOOL_HOOKS.has(event) || result.exit !== 0) return result;
+    const line = overBudgetLine(event, ms, latencyBudget(root));
+    if (line === "") return result;
+    try {
+      const answered = (result.stdout.trim() === "" ? {} : JSON.parse(result.stdout)) as { hookSpecificOutput?: { hookEventName?: string; additionalContext?: string } };
+      const context = answered.hookSpecificOutput?.additionalContext;
+      const next = { ...answered, hookSpecificOutput: { ...answered.hookSpecificOutput, hookEventName: event, additionalContext: context === undefined || context === "" ? line : `${context}\n${line}` } };
+      return { ...result, stdout: JSON.stringify(next) + "\n" };
+    } catch {
+      return result;
+    }
   }
 
   async function answer(): Promise<HookResult> {
@@ -956,7 +988,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       case "PreToolUse": {
         // Before the act: a practice whose trigger this tool use fires is delivered now, when its first steps can still be taken.
         const session = sessionOf(input);
-        const practice = practiceContext(root, session, toolUseOf(input, writtenFiles(root, input)), await cliName(root), agentOf(input));
+        const practice = practiceContext(root, session, toolUseOf(input, writtenFiles(root, input)), await cliName(root), agentOf(input), undefined, given);
         const context = await voiced(root, input, practice.text, voice);
         if (context === "") return { stdout: "", stderr: "", exit: 0 };
         const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
@@ -976,12 +1008,15 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
         const changes=reading && session ? coverageChanges(reading,priorBaseline(root,session)) : [];
         const vocabulary=changes.length ? await vocabularyAtEdit(root, changes) : "";
-        const context = await voiced(root, input, [feed.text,edit,vocabulary].filter(Boolean).join("\n"), voice);
+        // What the last stop said reached only the user; the prompt that follows it is where the agent reads it.
+        const fromStop = event === "UserPromptSubmit" && session ? carried(root, session) : undefined;
+        const lastStop = fromStop === undefined ? "" : `At your last stop (shown to the user, not to you), ${fromStop.replace(/^Regulate \(Stop\):\n/, "regulate said:\n")}`;
+        const context = await voiced(root, input, [lastStop,feed.text,edit,vocabulary].filter(Boolean).join("\n"), voice);
         if (context === "") return { stdout: "", stderr: "", exit: 0 };
         const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
         // An override took the feed's and the vocabulary line's place, so neither reached the host and neither advances.
-        const delivered = voice.override === undefined && (feed.text !== "" || changes.length > 0);
-        const commit=()=> { if(feed.text) feed.commit(); if(changes.length && reading && session) saveBaseline(root,session,reading); };
+        const delivered = voice.override === undefined && (feed.text !== "" || changes.length > 0 || lastStop !== "");
+        const commit=()=> { if(feed.text) feed.commit(); if(changes.length && reading && session) saveBaseline(root,session,reading); if(lastStop && session) dropCarry(root,session); };
         return {stdout:stdout+"\n",stderr:"",exit:0,...(delivered ? {commit} : {})};
       }
       case "Stop":
@@ -1004,6 +1039,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const heldModel = specModelOrNull(root);
         const practiceText = practiceStopText(root, session, await cliName(root), agentOf(input), "error" in heldModel ? undefined : heldModel);
         const economyText = economyStopText(snapshot);
+        const latencyText = hookLatencyStopText(root, session);
         const parts: string[] = [];
         if (changedText !== "") parts.push(changedText);
         if (lexicon.text !== "") parts.push(`Lexicon check:\n${lexicon.text}`);
@@ -1014,6 +1050,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         if (undeclaredText !== "") parts.push(undeclaredText);
         if (practiceText !== "") parts.push(practiceText);
         if (economyText !== "") parts.push(economyText);
+        if (latencyText !== "") parts.push(latencyText);
         const text = parts.join("\n");
         // A refusal is spent only on what the tool can prove is owed and no recorded wall excuses: a rejected name in a changed file, a spec problem, a structural defect.
         // A spec gap is not among them: no traced control is not a demonstrated bypass, so gapText never counts toward the refusal; nor does an undeclared entrance.
@@ -1027,6 +1064,21 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         // The stop goes through: what this subagent recorded waits for its coordinator's next boundary.
         const parent = typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
         if (event === "SubagentStop" && session !== undefined && parent !== undefined && !isMainThread(input)) leaveReturn(root, parent, session, agentOf(input));
+        if (event === "Stop" && session !== undefined) {
+          // The host shows a stop's systemMessage to the user alone: each line is said once, what the session owes blocks once so
+          // the agent reads it, and the rest is carried into the next prompt, which the agent does read.
+          const fresh = unsaid(root, session, parts);
+          if (fresh.parts.length === 0) return { stdout: "", stderr: "", exit: 0 };
+          const freshText = fresh.parts.join("\n");
+          const owes = fresh.lines.some((line) => /^Practice \S.* has no enactment since/.test(line));
+          if (owes && input.stop_hook_active !== true) {
+            const reason = await voiced(root, input, `Regulate (Stop): before stopping, record what this session owes.\n${freshText}`, voice);
+            if (reason !== "") return { stdout: JSON.stringify({ decision: "block", reason }) + "\n", stderr: "", exit: 0, commit: () => rememberSaid(root, session, fresh.lines, undefined) };
+          }
+          const message = await voiced(root, input, `Regulate (Stop):\n${freshText}`, voice);
+          if (message === "") return { stdout: "", stderr: "", exit: 0 };
+          return { stdout: JSON.stringify({ systemMessage: message }) + "\n", stderr: "", exit: 0, commit: () => rememberSaid(root, session, fresh.lines, message) };
+        }
         const message = await voiced(root, input, parts.length === 0 ? "" : `Regulate (${event}):\n${text}`, voice);
         if (message === "") return { stdout: "", stderr: "", exit: 0 };
         return { stdout: JSON.stringify({ systemMessage: message }) + "\n", stderr: "", exit: 0 };
