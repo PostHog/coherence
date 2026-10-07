@@ -17,6 +17,7 @@ import { TypeScriptAdapter } from "../adapters/typescript.ts";
 import { deliveryPractices } from "./practice-delivery.ts";
 import { projectPractices } from "../spec/model.ts";
 import { countingGit } from "../adapters/git-count-fixture.ts";
+import { lexiconCoverage } from "./lexicon-coverage.ts";
 
 function repo(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "coherence-hook-speed-"));
@@ -149,4 +150,34 @@ test("a tool call's hooks spawn git a fixed number of times, whatever the number
     }
   }
   assert.equal(counts[1], counts[0], `PreToolUse and PostToolUse over 6 components and practices spawn git as often as over 1: ${counts.join(" vs ")}`);
+});
+
+test("the vocabulary coverage reading runs at a tool hook only after a write, and at a prompt only when the tree moved", async () => {
+  const root = repo({ "coherence.config.json": JSON.stringify({ name: "p" }), "src/a/A.spec.md": "# A\n\nA component.\n", "src/a/a.ts": "export const a = 1;\n" });
+  try {
+    const session = "cov";
+    mkdirSync(join(root, ".coherence", "lexicon", "sessions"), { recursive: true });
+    writeFileSync(join(root, ".coherence", "lexicon", "sessions", `${session}.json`), "{}");
+    let readings = 0;
+    const coverage = async (at: string) => {
+      readings += 1;
+      return lexiconCoverage(at);
+    };
+    const hook = (event: "PostToolUse" | "UserPromptSubmit", extra: Record<string, unknown>) => runHook(event, { cwd: root, session_id: session, ...extra }, root, { coverage, adapter: undefined, door: async (_r, fn) => fn(undefined, undefined, "no instrument in this test") });
+    await hook("PostToolUse", { tool_name: "Read", tool_input: { file_path: join(root, "src/a/a.ts") } });
+    await hook("PostToolUse", { tool_name: "Bash", tool_input: { command: "ls src" } });
+    assert.equal(readings, 0, "a tool use that writes nothing cannot move the vocabulary");
+    writeFileSync(join(root, "src/a/a.ts"), "export const a = 2;\n");
+    await hook("PostToolUse", { tool_name: "Write", tool_input: { file_path: join(root, "src/a/a.ts"), content: "export const a = 2;\n" } });
+    assert.equal(readings, 1, "a write reads it");
+    await hook("UserPromptSubmit", { prompt: "one" });
+    assert.equal(readings, 2, "the first prompt reads it: no tree key yet");
+    await hook("UserPromptSubmit", { prompt: "two" });
+    assert.equal(readings, 2, "a prompt over a tree that has not moved reads nothing");
+    writeFileSync(join(root, "src/a/b.ts"), "export const b = 1;\n");
+    await hook("UserPromptSubmit", { prompt: "three" });
+    assert.equal(readings, 3, "a file someone added between prompts moves the tree");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

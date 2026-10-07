@@ -66,7 +66,7 @@
  * that fired and has no enactment since, advisory, never refused.
  */
 
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { execFile } from "node:child_process";
@@ -205,6 +205,50 @@ const GIT_LISTING_LIMIT = 64 * 1024 * 1024;
  * tree to be clean or dirty; any other failure is reported, never read as a
  * clean tree.
  */
+/** Where a session keeps the tree key of its last prompt-time coverage reading. */
+function treeKeyPath(root: string, session: string): string {
+  return join(root, ".coherence", "lexicon", "sessions", `${session.replace(/[^\w.-]/g, "_")}.tree`);
+}
+
+/**
+ * What the coverage reading's text depends on, cheaply: every changed or
+ * untracked project file git lists, with its size and modification time. Two
+ * git listings and a stat each, never a read; a commit that changes no text
+ * leaves the key alone, as it leaves the reading.
+ */
+async function treeKey(root: string): Promise<string | undefined> {
+  const changed = await changedFiles(root);
+  if (changed.failure !== undefined) return undefined;
+  return changed.files
+    .sort()
+    .map((file) => {
+      try {
+        const stat = statSync(resolve(root, file));
+        return `${file} ${stat.size} ${stat.mtimeMs}`;
+      } catch {
+        return `${file} gone`;
+      }
+    })
+    .join("\n");
+}
+
+function lastTreeKey(root: string, session: string): string | undefined {
+  try {
+    return readFileSync(treeKeyPath(root, session), "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+function keepTreeKey(root: string, session: string, key: string): void {
+  try {
+    mkdirSync(dirname(treeKeyPath(root, session)), { recursive: true });
+    writeFileSync(treeKeyPath(root, session), key);
+  } catch {
+    // Without the key the next prompt reads again; nothing is lost but time.
+  }
+}
+
 /** A path under .coherence outside the folders a project commits: what install's ignore file leaves out. */
 function transientState(path: string): boolean {
   const parts = path.split("/");
@@ -756,6 +800,8 @@ export interface HookOptions {
    * WARM_UP; absent (a test), nothing is started.
    */
   warm?: ((root: string) => void) | undefined;
+  /** The vocabulary coverage reading (tests count it); lexiconCoverage by default. */
+  coverage?: ((root: string) => Promise<Coverage>) | undefined;
   /** When the hook's process started (epoch ms), so a call's time counts loading the code; the call's own start when absent. */
   startedAt?: number | undefined;
 }
@@ -998,14 +1044,21 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       case "PostToolUse": {
         const feed = feedContext(root, input);
         const session=sessionOf(input);
+        const written = event === "PostToolUse" ? keepProjectFilesOf(root, writtenFiles(root, input)) : [];
         if (event === "PostToolUse" && session) {
           recordReadTrace(root, session, input);
           // What this tool use wrote is the session's own patch, which the stop predicts for.
-          recordWriteTrace(root, session, keepProjectFilesOf(root, writtenFiles(root, input)));
+          recordWriteTrace(root, session, written);
         }
         if (event === "UserPromptSubmit") options.warm?.(root);
         const edit = event === "PostToolUse" ? await editContext(root, input, options) : "";
-        const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
+        // The coverage reading walks the whole corpus (seconds on a real project), so it runs only when the text can have moved:
+        // after a tool use that wrote a project file, and at a prompt when the tree moved since this session's last reading.
+        // A write no command line shows is read at the stop, which always reads in full.
+        const tree = event === "UserPromptSubmit" && session ? await treeKey(root) : undefined;
+        const moved = event === "PostToolUse" ? written.length > 0 : tree === undefined || tree !== lastTreeKey(root, session!);
+        const reading=session && moved && existsSync(baselinePath(root,session)) ? await (options.coverage ?? lexiconCoverage)(root) : undefined;
+        if (reading && session && tree !== undefined) keepTreeKey(root, session, tree);
         const changes=reading && session ? coverageChanges(reading,priorBaseline(root,session)) : [];
         const vocabulary=changes.length ? await vocabularyAtEdit(root, changes) : "";
         // What the last stop said reached only the user; the prompt that follows it is where the agent reads it.

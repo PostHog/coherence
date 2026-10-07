@@ -602,3 +602,15 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: a practice fired on enact --trigger "command refute" and on the words of a heredoc, and a session whose commands ran in a second worktree was told at every stop that practices it had enacted there were owed, because the firing was kept by the session's root and the enactment by the worktree's journal
   refuted: read every command against the session's own root, wherever a cd took it -> "a practice fires on a command's own words, in the project the command runs in, and its enactment counts there" went red in stop-delivery.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- the coverage reading runs only when the text can have moved: A tool hook reads the vocabulary's coverage only after a tool use that wrote a project file, and a prompt only when git's changed and untracked files, with their sizes and times, differ from the session's last reading; the stop always reads in full.
+  over: a read, a command that writes nothing, a write, two prompts over one tree, and a prompt after a file was added
+  via: the vocabulary coverage reading runs at a tool hook only after a write, and at a prompt only when the tree moved
+  because: the reading walks the whole corpus, 2.2 to 2.4 s on this repository, and it ran at every PostToolUse and every prompt, so each tool call cost about 3 s in hooks against a 3 s latency budget, the sluggishness that gets Coherence switched off; the hook latency alarm found it on its first day
+  refuted: read the whole corpus at every PostToolUse again, write or none -> "the vocabulary coverage reading runs at a tool hook only after a write, and at a prompt only when the tree moved" went red in hook-speed.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: execution-budget declared as the coverage reading runs only when the text can have moved
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is on how often one reading runs
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on time, not on allocation
+  checklist: circuit-breaker-policy dismissed: a skipped reading is caught by the stop's full one
