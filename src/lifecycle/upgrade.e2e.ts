@@ -1,13 +1,17 @@
 /**
- * The upgrade test: `npm run test:upgrade`. It installs the previous published
- * release of Coherence into a small adopter project, uses it the way an
- * adopter does (hooks, spec --check, run, refute, enact, decide, every hook
- * event), then upgrades the project to this checkout through `npm pack`, the
- * way the adopter's next `npm install` would, and asserts that nothing the
- * adopter already did is turned against it.
+ * The upgrade test over the network: `npm run test:upgrade`. It installs the
+ * previous published release of Coherence into a small adopter project, uses
+ * it the way an adopter does (hooks, spec --check, run, refute, enact of every
+ * kernel practice and of its own, decide, every hook event), then upgrades the
+ * project to this checkout through `npm pack`, the way the adopter's next
+ * `npm install` would, and asserts that nothing the adopter already did is
+ * turned against it.
  *
- * It needs the network to fetch the previous release, so it is not part of
- * `npm test`; CI runs it as its own workflow (.github/workflows/upgrade.yml).
+ * It needs the npm registry to fetch the previous release, so neither
+ * `npm test` nor the totality oracle pass runs it; the Upgrade workflow
+ * (.github/workflows/upgrade.yml) does, from the newest release and from the
+ * oldest still supported. The offline half, every kernel practice of every
+ * tagged release read from git history, is upgrade.test.ts.
  *
  *   COHERENCE_UPGRADE_FROM  the previous release: a published version or a .tgz
  *                           (default: the newest published version not above
@@ -24,7 +28,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
@@ -33,8 +37,6 @@ import { fileURLToPath } from "node:url";
 const CHECKOUT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PACKAGE = "@posthog/coherence";
 const KERNEL_PREFIX = "coherence:";
-/** The kernel practice 1.5.0 amended; enacted when the previous release lists it. */
-const AMENDED_KERNEL = "coherence:src/enforcement/witness a refutation";
 const OWN_PRACTICE = "src/tokens/rotate a token";
 const INVARIANT = "sealed display";
 const AGENT = "upgrade-test";
@@ -54,6 +56,7 @@ function sh(label: string, command: string, args: string[], cwd: string, input?:
   const inherited = { ...process.env };
   delete inherited["NODE_TEST_CONTEXT"];
   delete inherited["COHERENCE_HOME"];
+  // No hook or command of the fixture starts a warm instrument in the background: what it starts in the foreground is stopped before the folder goes.
   const result = spawnSync(command, args, { cwd, input, encoding: "utf8", env: { ...inherited, ...env, COHERENCE_NO_WARM_UP: "1" }, maxBuffer: 64 * 1024 * 1024, timeout: 600_000 });
   const ran: Ran = { label, code: result.status ?? (result.error ? 127 : 1), stdout: result.stdout ?? "", stderr: (result.stderr ?? "") + (result.error ? `\n${result.error.message}` : "") };
   transcript.push(ran);
@@ -90,17 +93,43 @@ function previousRelease(): string {
   return `${PACKAGE}@${latest}`;
 }
 
-/** The release under test as a tarball: packed from a checkout as npm publishes it, or the env's .tgz. */
-function currentTarball(scratch: string): string {
+/**
+ * The previous release's optional dependencies, each pinned to the lowest
+ * version its range admits. A published package carries no lockfile, so this
+ * is what holds the language server and the compiler still from one run to
+ * the next; a range with no plain floor is left to npm.
+ */
+function pinnedOptionals(previous: string, cwd: string): string[] {
+  const viewed = sh(`npm view ${previous} optionalDependencies --json`, "npm", ["view", previous, "optionalDependencies", "--json"], cwd);
+  if (viewed.code !== 0 || viewed.stdout.trim() === "") return [];
+  const ranges = JSON.parse(viewed.stdout) as Record<string, string>;
+  return Object.entries(ranges).flatMap(([name, range]) => {
+    const floor = /^[\^~]?(\d+\.\d+\.\d+)$/.exec(range.trim())?.[1];
+    return floor === undefined ? [] : [`${name}@${floor}`];
+  });
+}
+
+/** The release under test as a tarball: built, then packed from a checkout as npm publishes it, or the env's .tgz. */
+function currentTarball(scratch: string): { tarball: string; version: string } {
   const chosen = process.env["COHERENCE_UPGRADE_TO"];
-  if (chosen !== undefined && chosen.endsWith(".tgz")) return resolve(chosen);
+  if (chosen !== undefined && chosen.endsWith(".tgz")) {
+    const listed = sh(`tar -xOzf ${chosen} package/package.json`, "tar", ["-xOzf", resolve(chosen), "package/package.json"], scratch);
+    assert.equal(listed.code, 0, shown(listed));
+    return { tarball: resolve(chosen), version: (JSON.parse(listed.stdout) as { version: string }).version };
+  }
   const from = chosen !== undefined && chosen !== "" ? resolve(chosen) : CHECKOUT;
   const out = join(scratch, "pack");
   mkdirSync(out, { recursive: true });
-  const packed = sh(`npm pack ${from}`, "npm", ["pack", from, "--pack-destination", out, "--json"], from);
+  // The build first, so the pack runs no script and its stdout is npm's JSON alone.
+  const built = sh(`npm run build (${from})`, "npm", ["run", "build"], from);
+  assert.equal(built.code, 0, shown(built));
+  const packed = sh(`npm pack ${from}`, "npm", ["pack", from, "--ignore-scripts", "--pack-destination", out, "--json"], from);
   assert.equal(packed.code, 0, shown(packed));
-  const name = (JSON.parse(packed.stdout.slice(packed.stdout.indexOf("["))) as { filename: string }[])[0]!.filename;
-  return join(out, name.replace(/^@/, "").replace(/\//, "-"));
+  const report = JSON.parse(packed.stdout) as { filename: string; version: string }[];
+  assert.equal(report.length, 1, `npm pack reported ${report.length} packages\n${shown(packed)}`);
+  const tarballs = readdirSync(out).filter((f) => f.endsWith(".tgz"));
+  assert.deepEqual(tarballs, [report[0]!.filename.replace(/^@/, "").replace("/", "-")], `npm pack named ${report[0]!.filename}, the folder holds ${tarballs.join(", ")}`);
+  return { tarball: join(out, tarballs[0]!), version: report[0]!.version };
 }
 
 const TSCONFIG = JSON.stringify({ compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", strict: true, noEmit: true, allowImportingTsExtensions: true, types: ["node"] }, include: ["src/**/*.ts"] }, null, 2);
@@ -211,9 +240,15 @@ function problemKey(p: Problem): string {
   return `${p.file ?? ""}: ${p.message}`;
 }
 
-/** A problem the adopter did not cause: one that names a kernel practice, or asks for an amend decision of one. */
-function aboutCoherence(text: string): boolean {
-  return text.includes(KERNEL_PREFIX) || /\bkernel\b/i.test(text) || /node_modules\/@posthog\/coherence/.test(text);
+/** The kernel practices a release lists, by id, from its query practice. */
+function kernelIds(listing: string): string[] {
+  return [...new Set([...listing.matchAll(/coherence:src\/[a-z]+\/[^,\n]+/g)].map((m) => m[0].trim()))].sort();
+}
+
+/** Whether a text names one of Coherence's kernel practices: by its prefixed id, or by its bare name. */
+function namesKernel(text: string, kernels: readonly string[]): boolean {
+  const lower = text.toLowerCase();
+  return text.includes(KERNEL_PREFIX) || /\bkernel\b/i.test(text) || kernels.some((id) => lower.includes(id.slice(id.lastIndexOf("/") + 1).toLowerCase()));
 }
 
 /** Every step of a practice, numbered as query practice prints it. */
@@ -226,8 +261,9 @@ function stepsOf(root: string, practice: string): number[] {
   return steps;
 }
 
+/** Enact a practice with every step done, as a session that carried it out whole records it. */
 function enact(root: string, practice: string, session: string): Ran {
-  const steps = stepsOf(root, practice).flatMap((n) => ["--step", `${n}=skipped:the upgrade fixture carries no work`]);
+  const steps = stepsOf(root, practice).flatMap((n) => ["--step", `${n}=done:carried out in the upgrade fixture`]);
   return coherence(root, "enact", practice, ...steps, "--session", session, "--agent", AGENT);
 }
 
@@ -287,9 +323,11 @@ function hookText(output: string): string {
   return said.join("\n");
 }
 
-/** A line of hook output that tells the adopter to decide, amend or acknowledge something about Coherence's own practices or lexicon. */
-function asksAboutCoherence(text: string): string[] {
-  return hookText(text).split("\n").filter((line) => /\b(decide|amend|amendment|acknowledge)\b/i.test(line) && (line.includes(KERNEL_PREFIX) || /\bkernel practice\b/i.test(line) || /Coherence.s (own )?(lexicon|practice)/i.test(line)));
+/** Each line of hook output that asks the adopter to decide, amend or acknowledge something about a kernel practice or Coherence's lexicon. */
+function asksAboutCoherence(text: string, kernels: readonly string[]): string[] {
+  return hookText(text)
+    .split("\n")
+    .filter((line) => /\b(decide|decision|amend|amendment|acknowledge)\b/i.test(line) && (namesKernel(line, kernels) || /Coherence.s (own )?(lexicon|vocabulary|practice)/i.test(line) || /docs\/lexicon\.json/.test(line)));
 }
 
 function recordIds(text: string): string[] {
@@ -321,13 +359,89 @@ function stateOf(model: Model): string | undefined {
   return model.components.flatMap((c) => c.invariants).find((i) => i.name === INVARIANT)?.state;
 }
 
+/** The processes whose command line names the fixture folder, as ps shows them: pid, process group and command. */
+function fixtureProcesses(scratch: string): { pid: number; pgid: number; command: string }[] {
+  const listed = spawnSync("ps", ["-axww", "-o", "pid=,pgid=,command="], { encoding: "utf8" });
+  return (listed.stdout ?? "").split("\n").flatMap((line) => {
+    const match = /^\s*(\d+)\s+(\d+)\s+(.*)$/.exec(line);
+    if (match === null || Number(match[1]) === process.pid || !match[3]!.includes(scratch)) return [];
+    return [{ pid: Number(match[1]), pgid: Number(match[2]), command: match[3]! }];
+  });
+}
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function pause(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Stop everything the fixture started before its folder goes: each warm
+ * server its pointer and lock files name, with its whole process group (the
+ * language server it spawned), then anything else whose command line names
+ * the folder. Asked with SIGTERM, which the server answers by stopping, then
+ * SIGKILL. What is still alive afterwards is returned.
+ */
+function stopFixture(root: string, scratch: string): string[] {
+  const pids = new Set<number>();
+  const run = join(root, ".coherence", "run");
+  if (existsSync(run)) {
+    for (const name of readdirSync(run).filter((f) => /^server.*\.(json|lock)$/.test(f))) {
+      try {
+        const pid = (JSON.parse(readFileSync(join(run, name), "utf8")) as { pid?: unknown }).pid;
+        if (typeof pid === "number") pids.add(pid);
+      } catch {
+        // a torn pointer names no one
+      }
+    }
+  }
+  for (const p of fixtureProcesses(scratch)) pids.add(p.pid);
+  for (const signal of ["SIGTERM", "SIGKILL"] as const) {
+    for (const pid of pids) {
+      for (const target of [-pid, pid]) {
+        try {
+          process.kill(target, signal);
+        } catch {
+          // gone, or not a group leader
+        }
+      }
+    }
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline && [...pids].some(alive)) pause(100);
+    if (![...pids].some(alive)) break;
+  }
+  return [...[...pids].filter(alive).map((pid) => `pid ${pid}`), ...fixtureProcesses(scratch).map((p) => `pid ${p.pid}: ${p.command}`)];
+}
+
+function removeWithRetries(path: string): void {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      if (!existsSync(path)) return;
+    } catch (error) {
+      if (attempt >= 5) throw error;
+    }
+    if (attempt >= 5) throw new Error(`${path} is still there after ${attempt} removals`);
+    pause(500);
+  }
+}
+
 test("an adopter of the previous release upgrades to this one with nothing it did turned against it", { timeout: 1_800_000 }, () => {
-  const scratch = mkdtempSync(join(tmpdir(), "coherence-upgrade-"));
+  // The real path: on macOS the temporary folder is a link (/var -> /private/var), and the fixture must not lean on how Coherence spells it.
+  const scratch = realpathSync(mkdtempSync(join(tmpdir(), "coherence-upgrade-")));
   const root = join(scratch, "widgets");
   const failures: string[] = [];
   const fail = (what: string, ...ran: Ran[]): void => {
     failures.push([what, ...ran.map(shown)].join("\n"));
   };
+  let thrown: unknown;
   try {
     const previous = previousRelease();
     const current = currentTarball(scratch);
@@ -347,9 +461,11 @@ test("an adopter of the previous release upgrades to this one with nothing it di
     assert.equal(git(root, "add", "-A").code, 0);
     assert.equal(git(root, "commit", "-q", "-m", "widgets").code, 0);
 
-    // Under the previous release.
-    const installed = sh(`npm install --save-dev ${previous}`, "npm", ["install", "--save-dev", "--no-audit", "--no-fund", previous], root);
+    // Under the previous release, its optional dependencies pinned, so the language server is the fixture's own.
+    const pins = pinnedOptionals(previous, root);
+    const installed = sh(`npm install --save-dev ${previous} ${pins.join(" ")}`, "npm", ["install", "--save-dev", "--save-exact", "--no-audit", "--no-fund", previous, ...pins], root);
     assert.equal(installed.code, 0, shown(installed));
+    assert.ok(existsSync(join(root, "node_modules", ".bin", "typescript-language-server")), `the fixture installed no typescript-language-server of its own (pins: ${pins.join(", ") || "none"})\n${shown(installed)}`);
     const version = installedVersion(root);
     const hooks = coherence(root, "hooks", "install", "--host", "claude");
     assert.equal(hooks.code, 0, shown(hooks));
@@ -368,14 +484,17 @@ test("an adopter of the previous release upgrades to this one with nothing it di
     const secondRun = coherence(root, "run", "--session", before, "--agent", AGENT);
     if (firstRun.code !== 0 || secondRun.code !== 0 || refuted.code !== 0) fail("the previous release could not run and refute the fixture's invariant (the fixture, not the upgrade)", firstRun, refuted, secondRun);
 
+    // Every kernel practice the previous release lists, and the project's own, enacted with every step done.
     const listed = coherence(root, "query", "practice");
-    const kernel = listed.stdout.includes(AMENDED_KERNEL) ? AMENDED_KERNEL : /coherence:src\/[a-z]+\/[^,\n]+/.exec(listed.stdout)?.[0]?.trim();
-    assert.ok(kernel !== undefined, `the previous release lists no kernel practice\n${shown(listed)}`);
+    const kernels = kernelIds(listed.stdout);
+    assert.ok(kernels.length > 0, `the previous release lists no kernel practice\n${shown(listed)}`);
     assert.ok(listed.stdout.includes(OWN_PRACTICE), `the previous release does not list the project's own practice\n${shown(listed)}`);
-    for (const practice of [kernel, OWN_PRACTICE]) {
+    for (const practice of [...kernels, OWN_PRACTICE]) {
       const ran = enact(root, practice, before);
       if (ran.code !== 0) fail(`the previous release refused enact of ${practice} (the fixture, not the upgrade)`, ran);
     }
+    const established = coherence(root, "query", "practice");
+    if (!/\b[1-9]\d* (?:are|is) established\b/.test(established.stdout)) fail("no practice reached the established state under the previous release, so the floor had nothing to read (the fixture, not the upgrade)", established);
     const hooksBefore = driveHooks(root, before, { from: "tok-alpha-1", to: "tok-alpha-2" });
     const checkBefore = coherence(root, "spec", "--check");
     const modelBefore = specModel(root, "before");
@@ -384,16 +503,23 @@ test("an adopter of the previous release upgrades to this one with nothing it di
     assert.ok(idsBefore.includes(cite), `the previous release's journal --json does not list ${cite}\n${shown(journalBefore)}`);
     assert.equal(git(root, "add", "-A").code, 0);
     assert.equal(git(root, "commit", "-q", "-m", "adopt Coherence").code, 0);
+    const stoppedBefore = stopFixture(root, scratch);
+    if (stoppedBefore.length > 0) fail(`processes the previous release started outlived it:\n${stoppedBefore.join("\n")}`);
 
-    // The upgrade, as the adopter's next npm install.
-    const upgraded = sh(`npm install --save-dev ${current}`, "npm", ["install", "--save-dev", "--no-audit", "--no-fund", current], root);
+    // The upgrade, as the adopter's next npm install, and the installed package is the packed one.
+    const upgraded = sh(`npm install --save-dev ${current.tarball}`, "npm", ["install", "--save-dev", "--no-audit", "--no-fund", current.tarball], root);
     assert.equal(upgraded.code, 0, shown(upgraded));
     const versionAfter = installedVersion(root);
+    const lock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8")) as { packages?: Record<string, { version?: string; resolved?: string }> };
+    const locked = lock.packages?.["node_modules/@posthog/coherence"];
+    if (versionAfter !== current.version || locked?.resolved === undefined || !locked.resolved.startsWith("file:") || !locked.resolved.endsWith(current.tarball.split("/").pop()!)) {
+      fail(`the upgrade installed ${versionAfter} from ${locked?.resolved ?? "nowhere"}, not the packed ${current.version} at ${current.tarball}`, upgraded);
+    }
     const after = "upgrade-after";
 
-    // hooks --check passes, or says how to fix what the upgrade changed.
+    // hooks --check passes as it stands.
     const check = coherence(root, "hooks", "--check", "--host", "claude");
-    if (check.code !== 0 && !/hooks install/.test(check.stdout + check.stderr)) fail("hooks --check fails after the upgrade and does not say how to fix it", check);
+    if (check.code !== 0) fail("hooks --check fails after the upgrade", check);
 
     // spec --check: no problem the adopter did not cause.
     const checkAfter = coherence(root, "spec", "--check");
@@ -401,22 +527,28 @@ test("an adopter of the previous release upgrades to this one with nothing it di
     const known = new Set(modelBefore.problems.map(problemKey));
     const fresh = modelAfter.problems.filter((p) => !known.has(problemKey(p)));
     if (fresh.length > 0) fail(`spec --check names ${fresh.length} problem(s) the previous release did not, though the adopter changed nothing:\n${fresh.map((p) => `  - ${problemKey(p)}`).join("\n")}`, checkBefore, checkAfter);
-    const coherences = modelAfter.problems.filter((p) => aboutCoherence(problemKey(p)) || /\bamend\b/.test(p.message) && aboutCoherence(p.message));
+    const coherences = modelAfter.problems.filter((p) => namesKernel(p.message, kernels) || /node_modules\/@posthog\/coherence/.test(problemKey(p)));
     if (coherences.length > 0) fail(`spec --check names problem(s) about Coherence's own practices, which are not the adopter's to fix:\n${coherences.map((p) => `  - ${problemKey(p)}`).join("\n")}`, checkAfter);
     if (checkAfter.code !== 0 && checkBefore.code === 0) fail("spec --check passed before the upgrade and fails after it", checkBefore, checkAfter);
 
-    // enact of the kernel practice and of the project's own both go through.
-    for (const practice of [kernel, OWN_PRACTICE]) {
+    // Every kernel practice the previous release listed that this one still ships, and the project's own, enact again.
+    const listedAfter = coherence(root, "query", "practice");
+    const kernelsAfter = new Set(kernelIds(listedAfter.stdout));
+    for (const practice of [...kernels.filter((k) => kernelsAfter.has(k)), OWN_PRACTICE]) {
       const ran = enact(root, practice, after);
       if (ran.code !== 0) fail(`enact of ${practice} is refused after the upgrade`, ran);
     }
 
-    // Every hook event exits 0 and asks nothing about Coherence's own practices or lexicon.
+    // Every hook event exits 0, the tool hooks engage, and none asks anything about Coherence's own practices or lexicon.
     const hooksAfter = driveHooks(root, after, { from: "tok-beta-1", to: "tok-beta-2" });
     for (const { what, ran } of hooksAfter) {
       if (ran.code !== 0) fail(`${what} exits ${ran.code} after the upgrade; the fixture earns no refusal`, ran);
-      const asked = asksAboutCoherence(ran.stdout + "\n" + ran.stderr);
+      const asked = asksAboutCoherence(ran.stdout + "\n" + ran.stderr, kernels);
       if (asked.length > 0) fail(`${what} asks the adopter to decide, amend or acknowledge something about Coherence's own practices or lexicon:\n${asked.map((l) => `  > ${l}`).join("\n")}`, ran);
+    }
+    for (const [phase, calls] of [["under the previous release", hooksBefore], ["after the upgrade", hooksAfter]] as const) {
+      const edit = calls.find((c) => c.what === "PreToolUse Edit")!.ran;
+      if (!hookText(edit.stdout).includes("rotate a token")) fail(`PreToolUse for an edit of src/tokens/store.ts adding a token delivered no practice ${phase}: the tool hooks did not engage with the project`, edit);
     }
     for (const { what, ran } of hooksBefore) if (ran.code !== 0) fail(`${what} exited ${ran.code} under the previous release (the fixture, not the upgrade)`, ran);
 
@@ -434,13 +566,16 @@ test("an adopter of the previous release upgrades to this one with nothing it di
     const rerun = coherence(root, "run", "--session", after, "--agent", AGENT);
     if (rerun.code !== 0) fail("run fails after the upgrade, where it passed before it, with the config unchanged", secondRun, rerun);
 
-    process.stdout.write(`# upgrade ${version} -> ${versionAfter}; enacted ${kernel} and ${OWN_PRACTICE}; ${idsBefore.length} journal records; "${INVARIANT}" ${stateOf(modelAfter)}\n`);
-    assert.deepEqual(failures, [], `the upgrade from ${previous} to ${current} turned the adopter's own state against it:\n\n${failures.join("\n\n")}`);
+    process.stdout.write(`# upgrade ${version} -> ${versionAfter}; enacted ${kernels.length} kernel practices and ${OWN_PRACTICE}; ${idsBefore.length} journal records; "${INVARIANT}" ${stateOf(modelAfter)}\n`);
   } catch (error) {
-    process.stderr.write(`\nEverything the upgrade test ran, in order:\n\n${transcript.map(shown).join("\n\n")}\n`);
-    throw error;
+    thrown = error;
   } finally {
-    if (process.env["COHERENCE_UPGRADE_KEEP"] === undefined) rmSync(scratch, { recursive: true, force: true });
+    const outlived = stopFixture(root, scratch);
+    if (outlived.length > 0) failures.push(`processes the fixture started are still alive after it was stopped:\n${outlived.join("\n")}`);
+    if (process.env["COHERENCE_UPGRADE_KEEP"] === undefined) removeWithRetries(scratch);
     else process.stdout.write(`# fixture kept at ${root}\n`);
   }
+  if (thrown !== undefined || failures.length > 0) process.stderr.write(`\nEverything the upgrade test ran, in order:\n\n${transcript.map(shown).join("\n\n")}\n`);
+  if (thrown !== undefined) throw thrown;
+  assert.deepEqual(failures, [], `the upgrade turned the adopter's own state against it:\n\n${failures.join("\n\n")}`);
 });
