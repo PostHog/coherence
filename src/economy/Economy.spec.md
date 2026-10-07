@@ -71,4 +71,5 @@ The context closure of a change, the read traces that record what sessions actua
   via: mass of a two-language project counts every language's files and says which languages it read
   because: mass read the primary language alone, so a frontend's code was neither reached nor unreached and the report looked complete (df-f47a5c05)
   crossing: project-source -> reading
+  refuted: made computeMass take the primary language's source files alone -> "mass of a two-language project counts every language's files and says which languages it read" went red in multi-language.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none

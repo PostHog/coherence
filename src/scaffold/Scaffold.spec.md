@@ -113,4 +113,5 @@ The command that makes the complete shape the cheapest thing to produce: a compo
   via: scaffold control on a two-language project reads both languages and proposes from each language's handlers
   because: its reading and its handler scan took the primary language alone, so a TypeScript handler's guard: line was never proposed and its route's gap was never read (df-f47a5c05)
   crossing: instrument -> reading
+  refuted: made proposeClosures read every handler's declaration in the primary language -> "scaffold control on a two-language project reads both languages and proposes from each language's handlers" went red in multi-language.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
