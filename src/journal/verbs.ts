@@ -51,6 +51,7 @@ import { amendCommand, floorGaps, type ModelPractice } from "../spec/practices.t
 import { JOURNAL_DIR, appendRecord, gitState, loadJournal, type Loaded } from "./store.ts";
 import { describeBinding, loadWork } from "./work.ts";
 import { recordsOnOtherBranches } from "./branches.ts";
+import { recordDefectTelemetry } from "../lifecycle/telemetry.ts";
 
 export interface Context {
   cwd: string;
@@ -349,7 +350,9 @@ export function defect(argv: string[], ctx: Context): Written {
   const evidence = required(parsed, "evidence", "a defect carries the reproducer or report that made it one");
   const files = parsed.many.get("file") ?? [];
   const record: Defect = { ...head("defect", who, ctx, what), what, evidence, files, ...originFields(originGiven(parsed), ctx.cwd), ...citations(parsed, ctx.cwd) };
-  return write(ctx, record);
+  const written = write(ctx, record);
+  recordDefectTelemetry(ctx.cwd, record);
+  return written;
 }
 
 export function experiment(argv: string[], ctx: Context): Written {

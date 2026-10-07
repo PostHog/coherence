@@ -137,6 +137,7 @@ yet. For now, every leaf keeps its own `lexicon.json`.
 | `references` | `"project"` | Where a chokepoint check searches for references: `"project"` (the project alone), `"repository"` (the whole repository), or a list of folders relative to the repository top (`["posthog/api", "ee"]`), searched beside the project. A verdict over less than the whole repository names every folder it searched. Each folder adds to the language server's work: on PostHog, `products/notebooks` with `["posthog", "ee"]` took 15.5 s and 1.1 GB for one check, against 4.8 s and 380 MB for the project alone. |
 | `chokepointFrom` | `anywhere` | Which references a chokepoint governs when its bullet has no `from:` line: `anywhere`, `outside the component`, or `outside <folder>`. A bullet's own `from:` overrides it, and every run entry records which governed and who said it. Any other value is refused. See [spec.md](spec.md#which-references-a-chokepoint-governs). |
 | `interfaceBudget` | `{ "seconds": 600, "memoryMB": 12288 }` | The most time and memory the Structure reading's interface pass may take; when it runs out, the reading says it is partial. |
+| `telemetry` | none | `false` refuses fleet telemetry for this project, whatever each user chose with `coherence telemetry on`; a registry's `false` refuses for every leaf. Telemetry is off unless a user opts in; see the README's [Telemetry](../README.md#telemetry) section for what is sent. |
 
 ## Tests: how a totality oracle is run
 
