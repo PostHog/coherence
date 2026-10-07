@@ -182,3 +182,44 @@ The language adapter seam: how to ask a language's server for definitions, refer
   crossing: instrument -> reading
   refuted: stopped the Python adapter expecting its staged use from outside the exempted folder -> "Python: a chokepoint from outside the component exempts its own references and still catches a bypass from another component; from anywhere calls both bypasses" went red in python-from.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- tach configuration read as tach reads it: The nearest tach.toml at or above the project root governs a Python chokepoint only when one tach module holds both the protected thing and the chokepoint, and an interface from that module without a visibility list exposes the chokepoint while no interface exposes the protected thing or a package above it; from and expose match as whole regular expressions, and a module carrying the deprecated strict alone is not governed.
+  over: every tach.toml at or above the root and every combination of from pattern, expose pattern, interface visibility, strict, nested modules and the module's own path
+  via: tach reads tach.toml as tach 0.34 does: the nearest file at or above the root, regex from and expose matched whole, a visibility list constraining only its modules, an exposed package above the internal
+  because: the rung credits tach with a refusal, so it must stand exactly where tach refuses; read from tach 0.35 itself, "store" in expose covers an import of the module store but not of a name in it, an interface with a visibility list leaves every unlisted module free, and an exposed package above the internal lets any module reach the internal as an attribute
+  crossing: project-source -> reading
+  refuted: matched tach patterns as prefixes instead of whole, in fullMatch -> "tach reads tach.toml as tach 0.34 does: the nearest file at or above the root, regex from and expose matched whole, a visibility list constraining only its modules, an exposed package above the internal" went red in src/adapters/tach.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- tach draws the module boundary: Where tach governs, the chokepoint grades checker-choked with tach (tach.toml) as the enforcer and the interface as the fact, a reference in the module's own code is inside, and every import tach refused that reaches the protected thing is a bypass carrying tach's error; without a tach.toml the grading is Coherence's own.
+  over: every Python chokepoint whose protected thing lies in a module a tach.toml declares, a clean tree, a tree with an outside import planted, and the same tree without tach.toml
+  via: a chokepoint tach governs grades checker-choked by tach with the interface as the fact, the module's own use inside; a planted outside import grades broken with tach's interface error as the bypass; without tach.toml the grading is Coherence's own
+  because: PostHog declares 101 tach modules and 42 interfaces and runs tach check --dependencies --interfaces in CI, so tach, not Coherence's reading of Pyright's references, is what refuses an import of a product's internals; tach lets a module use its own internals, and re-deriving the boundary from references called every such use a bypass of the facade
+  crossing: instrument -> reading
+  refuted: classified a reference in the tach module's own code by Coherence's rule alone, ignoring the boundary, in checkChokepoint -> "a chokepoint tach governs grades checker-choked by tach with the interface as the fact, the module's own use inside; a planted outside import grades broken with tach's interface error as the bypass; without tach.toml the grading is Coherence's own" went red in src/adapters/tach.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- tach's refusal is the refutation: The refutation of a chokepoint tach governs stages an import of the protected thing in another tach module of a throwaway copy of the tree, runs tach over it, and records refused by the checker only when tach refuses that import; the copy is removed and nothing is written into the project.
+  over: every chokepoint tach governs, its staged outside import, and the project tree and temporary folder after the refutation
+  via: tach's refusal of an outside import staged in a throwaway copy is the refutation, and the copy is gone with nothing written into the project
+  because: a module's own code is free to use its internals, so a synthetic site staged beside the protected thing proves nothing where tach governs; only tach refusing an outside import shows the rung's enforcer would fire, and tach reads files from disk, so the import is staged in a copy whose other entries link to the project's, which tach does not walk
+  crossing: instrument -> record
+  refuted: read tach's refusal back from the line after the staged import, in witnessTach -> "tach's refusal of an outside import staged in a throwaway copy is the refutation, and the copy is gone with nothing written into the project" went red in src/adapters/tach.test.ts with the refutation missing; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- tach absent is a reason: A tach.toml that would govern a chokepoint with no tach installed, or with a tach that does not answer, earns no tach rung, and the grade's reason says where tach was looked for.
+  over: a governed chokepoint with tach missing, with COHERENCE_TACH naming a binary that does not exist
+  via: without tach installed the tach rung is not available and the grade says why
+  because: tach is the adopter's dependency, not Coherence's; a rung granted without the checker on the machine would credit a refusal nobody can make, and a silent fallback would hide why the grade dropped
+  crossing: instrument -> reading
+  refuted: fell back silently when tach is not installed, dropping the note, in tachVerdict -> "without tach installed the tach rung is not available and the grade says why" went red in src/adapters/tach.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- tach at an edit spawns only for a tach module's file: At an edit, tach runs only over the Python files the edit wrote that lie in a tach module, in a throwaway copy, and an edit that wrote none spawns no tach.
+  over: an edit to a file in no tach module, an edit to a file inside one, a clean and a leaking edit, and a repeat edit outside after the refusal was witnessed
+  via: an edit spawns tach only when a file it wrote is a Python file inside a tach module, and checks only those files
+  because: the tool hooks hold a 3 s latency budget, and tach over the whole of PostHog takes about two seconds where over one edited file in a throwaway copy it takes about 190 ms; a count of spawns is the same under any load, so a hook that starts running tach for a file tach cannot judge alarms the day it does
+  crossing: instrument -> reading
+  refuted: ran tach over the whole tree at an edit too, in tachRun -> "an edit spawns tach only when a file it wrote is a Python file inside a tach module, and checks only those files" went red in src/adapters/tach.test.ts on its own assertion (tach spawned for an edit outside every tach module); restored byte for byte, green batched and alone (2026-10-07)
+  kinds: budget
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is a count of child processes per edit
+  checklist: execution-budget declared as tach at an edit spawns only for a tach module's file
+  checklist: memory-budget dismissed: the bound is on spawned processes, not on allocation
+  checklist: circuit-breaker-policy dismissed: no dependency failures are observed
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window

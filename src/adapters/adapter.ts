@@ -109,6 +109,29 @@ export interface Visibility {
    * reference-choked.
    */
   rung?: Rung;
+  /**
+   * A module boundary a checker the project runs draws around the protected
+   * thing (tach): the module's own code is free to use it, and the imports
+   * the checker refused are bypasses. Present only with the checker-choked
+   * rung it earns.
+   */
+  boundary?: CheckerBoundary;
+}
+
+/** A checker's module boundary, as plain data so it crosses the warm server's socket. */
+export interface CheckerBoundary {
+  /** The checker, as the rung's enforcer names it. */
+  checker: string;
+  /** The checker's name for the module. */
+  module: string;
+  /** The module's code, project-relative: a folder ending "/" or a file. */
+  owns: string[];
+  /** Modules nested inside it that the checker treats as others, in the same form. */
+  except: string[];
+  /** The imports the checker refused that reach the protected thing, project-relative. */
+  violations: { file: string; line: number; symbol: string | undefined; message: string }[];
+  /** What the checker looked at for the violations: the whole tree, or the files an edit wrote. */
+  scope: string;
 }
 
 /** One rung of a ladder: the grade, who enforces it, and the fact that earns it. */

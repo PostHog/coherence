@@ -305,6 +305,17 @@ per runner, as [docs/config.md](docs/config.md#more-than-one-language) shows).
 It works inside Claude Code and Codex.
 Coherence verifies itself: every screenshot here is its own Scope reading.
 
+The language adapters ask tsserver and Pyright for references. Where a Python
+project runs a checker that refuses a bypass, the chokepoint is graded on that
+checker: Pyright's reportPrivateUsage, an import-linter rule, or
+[tach](https://github.com/gauge-sh/tach). When the nearest `tach.toml` declares
+an interface that exposes the chokepoint and not the protected thing, tach is
+the enforcer: a module's own code may use its internals, an import tach refuses
+is the bypass, and tach's refusal of an import staged in a throwaway copy is
+the refutation. tach runs whole at `run` (about two seconds on PostHog) and, at
+an edit, only over the edited Python files inside a tach module. See
+[docs/spec.md](docs/spec.md#the-bullet).
+
 ## Working on Coherence itself
 
 From this checkout, the same commands run as `node src/cli.ts <command>`:
@@ -362,8 +373,10 @@ npm run test:setup
 npm test
 ```
 
-`test:setup` creates `.venv` and installs the pinned pytest version from
-`requirements-test.txt`; it does not change the system Python. Run it again
+`test:setup` creates `.venv` and installs the pinned pytest version and tach
+(`~=0.34`, as PostHog pins it) from `requirements-test.txt`; it does not change
+the system Python. A missing tach fails the tach tests with setup instructions.
+`COHERENCE_TACH` names the tach binary to use, and nothing else is looked for. Run it again
 when that file changes. The environment is ignored by git. Tests themselves
 never install dependencies or need a network connection.
 

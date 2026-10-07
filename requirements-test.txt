@@ -1,2 +1,3 @@
-# Python test runner for npm test; install with npm run test:setup.
+# Python test runner and the tach import-boundary checker for npm test; install with npm run test:setup.
 pytest==9.1.1
+tach~=0.34

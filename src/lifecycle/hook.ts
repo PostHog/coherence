@@ -626,7 +626,7 @@ export async function editContext(root: string, input: HookInput, options: HookO
     const here = e.bypasses.filter((b) => files.includes(b.file));
     const elsewhere = e.bypasses.length - here.length;
     lines.push(`✕ ${e.component}/${e.name} — chokepoint ${d.chokepoint?.input.chokepoint ?? ""} protects ${d.chokepoint?.input.protects ?? ""}: ${e.grade ?? "broken"}`);
-    for (const b of here) lines.push(`    bypass ${b.file}:${b.line} in ${b.symbol} (this edit)`);
+    for (const b of here) lines.push(`    bypass ${b.file}:${b.line} in ${b.symbol} (this edit${b.checker === undefined ? "" : `; ${b.checker}`})`);
     if (elsewhere > 0) lines.push(`    ${elsewhere} bypass${elsewhere === 1 ? "" : "es"} elsewhere: ${e.bypasses.filter((b) => !files.includes(b.file)).map((b) => `${b.file}:${b.line} in ${b.symbol}`).join(", ")}`);
     if (e.bypasses.length === 0) lines.push(`    ${e.reason}`);
   }

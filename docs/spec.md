@@ -218,6 +218,32 @@ run store, and the refutation counts only once a later run finds that same
 totality oracle passing again. Refutation is required per enforcement, so a bullet carrying both
 forms needs both.
 
+A chokepoint's grade names who refuses a bypass. In a Python project, a
+checker the project runs earns `checker-choked`: Pyright's reportPrivateUsage
+as an error over an underscore-prefixed name, an import-linter rule naming the
+protected module, or tach. tach governs when the nearest `tach.toml` at or
+above the project root declares a module holding both the protected thing and
+the chokepoint, and an `[[interfaces]]` table from that module, carrying no
+`visibility` list, whose `expose` patterns cover the chokepoint and cover
+neither the protected thing nor a package above it. tach matches `from` and
+`expose` as whole regular expressions; an interface with a `visibility` list
+constrains only the modules it lists, `utility` never widens an interface,
+and a module carrying the deprecated `strict` alone is not read as governed.
+The enforcer is `tach (tach.toml)` and the interface is the fact. Where tach
+governs, the module's own code is free to use its internals, so a reference
+there is inside; every import tach refused that reaches the protected thing
+is a bypass, with tach's error beside it; a re-export stays a bypass by its
+form. The refutation stages an outside import in another module of a
+throwaway copy of the tree, runs tach over it and reads its refusal back,
+recorded as `refused by the checker`, and the copy is removed. tach runs
+whole at `run` and whenever a chokepoint is checked; at an edit it runs only
+over the Python files the edit wrote that lie in a tach module, in a throwaway
+copy, and an edit outside every tach module spawns nothing. Without tach
+installed the rung is not available and the grade says why; without a
+`tach.toml` nothing changes. Pyright's references still run for what tach
+cannot see: an import under `TYPE_CHECKING`, a `# tach-ignore` line, a file in
+no module, a name reached as an attribute of a package another file imported.
+
 ## Lifecycle states
 
 The check derives each bullet's state from what it carries:
