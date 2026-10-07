@@ -332,14 +332,14 @@ test("a kept parse is never served for a file whose content changed, at the same
       parses += 1;
       return text.length;
     };
-    keptParses(root, "kept-test", "t-1", listed, "spec", parse);
-    keptParses(root, "kept-test", "t-1", listed, "spec", parse);
+    keptParses(root, "kept-test", "t-1", ["spec/grammar.ts"], listed, "spec", parse);
+    keptParses(root, "kept-test", "t-1", ["spec/grammar.ts"], listed, "spec", parse);
     assert.equal(parses, 1, "the same code and content: parsed once");
     const saved = process.env[CODE_SALT_ENV];
     try {
       process.env[CODE_SALT_ENV] = "another release";
       forgetCodeIdentity();
-      keptParses(root, "kept-test", "t-1", listed, "spec", parse);
+      keptParses(root, "kept-test", "t-1", ["spec/grammar.ts"], listed, "spec", parse);
       assert.equal(parses, 2, "other code: parsed again");
     } finally {
       if (saved === undefined) delete process.env[CODE_SALT_ENV];
@@ -373,6 +373,8 @@ test("the run index answers which chokepoint's latest run saw a file, as the run
     assert.equal(fromIndex("src/a/y.ts"), true);
     // A run file replaced from outside (a checkout writes a new file): the folder changes, and the index is rebuilt from the files as they are.
     const s2 = join(root, ".coherence", "runs", "s2.jsonl");
+    // A checkout comes later than the run it replaces: past the folder clock's tick, which on Linux can hold one time for several milliseconds.
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
     rmSync(s2);
     writeFileSync(s2, JSON.stringify(runOf("2026-02-03T00:00:00.000Z", "s2", ["src/a/w.ts"])) + "\n");
     for (const file of ["src/a/x.ts", "src/a/y.ts", "src/a/w.ts"]) assert.equal(fromIndex(file), fromHistory(file), `${file}: after the replacement`);

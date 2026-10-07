@@ -175,7 +175,7 @@ export function chokepointIndex(rootGiven: string, written: readonly string[] = 
   const listed =
     listedContent(root, [`:(glob)**/*${SPEC_SUFFIX}`], "spec")?.filter((f) => !underIgnored(f.rel, skip)) ??
     readContent(root, findSpecs(root, config.ignore).map((path) => relative(root, path).split(sep).join("/")), "spec");
-  const parsed = keptParses(root, "chokepoint-index", CHOKEPOINT_PARSE_SHAPE, listed, "spec", (text, rel) =>
+  const parsed = keptParses(root, "chokepoint-index", CHOKEPOINT_PARSE_SHAPE, ["spec/grammar.ts"], listed, "spec", (text, rel) =>
     parseSpec(text, rel).invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint")).map((i) => ({ name: i.name, enforcements: i.enforcements })),
   );
   const seeing = written.length === 0 ? new Map<string, Set<string>>() : latestSeeing(root, written, parseRunLine);

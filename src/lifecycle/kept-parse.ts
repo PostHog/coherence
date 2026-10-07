@@ -108,9 +108,13 @@ export function keptParsePath(root: string, store: string): string {
   return join(cacheDir(root), `${store}.json`);
 }
 
-/** The version a store is written under: its parse's shape and the code that made it. */
-export function storeVersion(root: string, shape: string): string {
-  return `${shape}@${codeIdentity(cacheDir(root))}`;
+/**
+ * The version a store is written under: its parse's shape and the identity
+ * of the code that made it, the modules `entries` (paths under src) import
+ * and this one, so an edit to a parser discards what it parsed.
+ */
+export function storeVersion(root: string, shape: string, entries: readonly string[]): string {
+  return `${shape}@${codeIdentity(cacheDir(root), ["lifecycle/kept-parse.ts", ...entries])}`;
 }
 
 function loadKept<T>(path: string, version: string): Kept<T> {
@@ -185,11 +189,12 @@ export function writeKept(path: string, value: unknown, sweep = false): void {
  * The parse of each listed file, reused from the store while its content id
  * is the one the parse was made from, and made now from the file's text
  * otherwise (the text the listing read, or read now). The store keeps
- * exactly the files listed. `shape` names the parse's shape.
+ * exactly the files listed. `shape` names the parse's shape and `code` the
+ * modules (paths under src) whose import closure makes it.
  */
-export function keptParses<T>(root: string, store: string, shape: string, listed: readonly Listed[], what: ReadKind, parse: (text: string, rel: string) => T): Map<string, T> {
+export function keptParses<T>(root: string, store: string, shape: string, code: readonly string[], listed: readonly Listed[], what: ReadKind, parse: (text: string, rel: string) => T): Map<string, T> {
   const path = keptParsePath(root, store);
-  const version = storeVersion(root, shape);
+  const version = storeVersion(root, shape, code);
   const kept = loadKept<T>(path, version);
   const out = new Map<string, T>();
   const next: Kept<T> = { version, files: {} };

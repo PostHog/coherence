@@ -78,7 +78,7 @@ function readJson<T>(path: string): T | undefined {
 async function stateVersion(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }): Promise<string> {
   const facts = await vocabularyFacts(root);
   const lexicons = createHash("sha256").update(JSON.stringify([layers.coherence, layers.project ?? null, facts])).digest("hex").slice(0, 16);
-  return `${storeVersion(root, SHAPE)}:${lexicons}`;
+  return `${storeVersion(root, SHAPE, ["lifecycle/lexicon-coverage.ts", "lifecycle/vocabulary-state.ts"])}:${lexicons}`;
 }
 
 function bump(record: Record<string, number>, key: string, by: number): void {

@@ -270,7 +270,7 @@ export function deliveryPractices(root: string): ModelPractice[] {
   const present = listed.filter((f) => !underIgnored(f.rel, skip));
   const specs = new Set(present.filter((f) => f.rel.endsWith(SPEC_SUFFIX)).map((f) => f.rel));
   const paired = present.filter((f) => f.rel.endsWith(PRACTICE_SUFFIX) && specs.has(join(folderOf(f.rel), `${basename(f.rel).slice(0, -PRACTICE_SUFFIX.length)}${SPEC_SUFFIX}`).split(sep).join("/")));
-  const parsed = keptParses(root, "delivery-practices", DELIVERY_PARSE_SHAPE, paired, "practice", (text, rel) => parsePractices(text, rel).practices);
+  const parsed = keptParses(root, "delivery-practices", DELIVERY_PARSE_SHAPE, ["spec/practice.ts"], paired, "practice", (text, rel) => parsePractices(text, rel).practices);
   const out: ModelPractice[] = [];
   for (const { rel } of paired) {
     const folder = folderOf(rel);

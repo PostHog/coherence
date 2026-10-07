@@ -33,6 +33,8 @@ import { cacheDir, storeVersion, withLock, writeKept } from "../lifecycle/kept-p
 
 /** The shape of the index; one of another shape, or one other code made, is rebuilt. */
 const INDEX_SHAPE = "run-index-1";
+/** The code the index is made by: this module and the run records' parser. */
+const INDEX_CODE = ["enforcement/run-index.ts", "enforcement/record.ts"];
 
 const RUN_FILES = join(".coherence", "runs");
 
@@ -47,6 +49,28 @@ interface Latest {
 interface Seen {
   ino: number;
   offset: number;
+  /** A hash of the bytes just before the offset: a file rewritten in place, at the same inode, no longer ends the same. */
+  tail: string;
+}
+
+/** How many bytes before the offset a reconcile compares. */
+const TAIL_BYTES = 256;
+
+/** The hash of the bytes of a run file just before `offset`. */
+function tailOf(root: string, name: string, offset: number): string {
+  const from = Math.max(0, offset - TAIL_BYTES);
+  try {
+    const fd = openSync(join(root, RUN_FILES, name), "r");
+    try {
+      const buffer = Buffer.alloc(offset - from);
+      readSync(fd, buffer, 0, buffer.length, from);
+      return hashed(buffer.toString("latin1"));
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return "";
+  }
 }
 
 function hashed(text: string): string {
@@ -147,7 +171,7 @@ function readFrom(root: string, name: string, from: number, size: number, parse:
  */
 export function reconcileRunIndex(root: string, parse: (line: string) => unknown): void {
   locked(root, () => {
-    const version = storeVersion(root, INDEX_SHAPE);
+    const version = storeVersion(root, INDEX_SHAPE, INDEX_CODE);
     const folder = readJson<{ version: string; identity: string | undefined }>(join(indexDir(root), "folder.json"));
     const held = readJson<string[]>(join(indexDir(root), "names.json")) ?? [];
     let names: string[];
@@ -169,7 +193,7 @@ export function reconcileRunIndex(root: string, parse: (line: string) => unknown
     const gone = held.some((name) => !sizes.has(name));
     const replaced = [...sizes].some(([name, s]) => {
       const was = seen.get(name);
-      return was !== undefined && (was.ino !== s.ino || was.offset > s.size);
+      return was !== undefined && (was.ino !== s.ino || was.offset > s.size || was.tail !== tailOf(root, name, was.offset));
     });
     if (folder?.version !== version || gone || replaced) {
       rmSync(indexDir(root), { recursive: true, force: true });
@@ -179,7 +203,7 @@ export function reconcileRunIndex(root: string, parse: (line: string) => unknown
     for (const [name, s] of sizes) {
       const from = seen.get(name)?.offset ?? 0;
       const to = readFrom(root, name, from, s.size, parse);
-      if (to !== from || seen.get(name) === undefined) writeKept(shard(root, "seen", name), { ino: s.ino, offset: to } satisfies Seen);
+      if (to !== from || seen.get(name) === undefined) writeKept(shard(root, "seen", name), { ino: s.ino, offset: to, tail: tailOf(root, name, to) } satisfies Seen);
     }
     writeKept(join(indexDir(root), "names.json"), [...sizes.keys()]);
     writeKept(join(indexDir(root), "folder.json"), { version, identity: folderIdentity(root) });
@@ -196,7 +220,7 @@ export function latestSeeing(root: string, files: readonly string[], parse: (lin
   const identity = folderIdentity(root);
   if (identity === undefined) return out;
   const folder = readJson<{ version: string; identity: string | undefined }>(join(indexDir(root), "folder.json"));
-  if (folder?.identity !== identity || folder.version !== storeVersion(root, INDEX_SHAPE)) reconcileRunIndex(root, parse);
+  if (folder?.identity !== identity || folder.version !== storeVersion(root, INDEX_SHAPE, INDEX_CODE)) reconcileRunIndex(root, parse);
   for (const file of files) out.set(file, new Set(Object.keys(readJson<Record<string, true>>(shard(root, "file", file)) ?? {})));
   return out;
 }
