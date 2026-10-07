@@ -30,7 +30,11 @@
  *                     (defined inside the chokepoint function's body)
  *   checker-choked    a checker the project runs: the name is underscore-
  *                     prefixed and Pyright's reportPrivateUsage is an error,
- *                     or an import-linter rule names the protected module
+ *                     an import-linter rule names the protected module, or
+ *                     the nearest tach.toml at or above the root declares an
+ *                     interface for the tach module holding both the thing
+ *                     and the chokepoint that exposes the chokepoint and not
+ *                     the thing (tach.ts), and tach is installed
  *   reference-choked  Coherence's check at the edit and in CI: no bypass among
  *                     resolved references; the top rung when neither holds
  *   convention        the underscore prefix or __all__ exclusion alone, which
@@ -47,6 +51,18 @@
  * chokepoint's own module past its body; for a function-local, which no
  * import can reach, it opens the synthetic import instead and reads the
  * interpreter's refusal back from the published diagnostics.
+ *
+ * Where tach governs, tach is the enforcer: the module's own code is free to
+ * use its internals, so a site there is inside, and every import tach
+ * refused that reaches the thing is a bypass. tach runs once per forget: over
+ * the whole tree at a run or a check (about two seconds on PostHog), and at
+ * an edit only over the Python files the edit wrote that lie in a tach
+ * module, in a throwaway copy (about 190 ms), spawning nothing when none
+ * does. The refutation stages an outside import in another module of a
+ * throwaway copy and reads tach's refusal back (about 200 ms, kept until
+ * tach.toml changes), recorded as refused by the checker. Pyright's
+ * references still run for what tach cannot see: an import under
+ * TYPE_CHECKING, a # tach-ignore line, a file in no module, a re-export.
  */
 
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -62,6 +78,7 @@ import {
   rangeContains,
   statementStartLine,
   type AdapterBounds,
+  type CheckerBoundary,
   type Definition,
   type Ladder,
   type LanguageAdapter,
@@ -78,6 +95,7 @@ import {
 } from "./adapter.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
 import { horizonFolders, isVirtualEnvironment, keepHorizonFiles, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, nestedFolder, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
+import { TACH_CONFIG, dottedFor, excluded, findTachConfig, locateTach, moduleLocations, moduleOf, reaches, readTachConfig, runTach, tachGovernance, tachOverCopy, witnessTach, type TachConfig, type TachModule, type TachRun, type TachWitness } from "./tach.ts";
 
 /** The small JSON-RPC surface the adapter needs, exposed so a test can control server ordering. */
 export interface PythonLanguageClient {
@@ -102,7 +120,7 @@ export const PYTHON_LADDER: Ladder = {
   because: "Python enforces no visibility: an underscore prefix and a module's __all__ list are conventions the interpreter does not enforce, so a module attribute can be imported from anywhere and only a name that never becomes a module attribute is refused",
   rungs: [
     { grade: "closure-choked", enforcer: "the interpreter", fact: "the protected thing is never a module attribute: defined inside the chokepoint function's body, so nothing outside can import or name it" },
-    { grade: "checker-choked", enforcer: "a checker the project runs", fact: "the name is underscore-prefixed and the project's Pyright configuration makes reportPrivateUsage an error, or an import-linter rule names the protected module" },
+    { grade: "checker-choked", enforcer: "a checker the project runs", fact: "the name is underscore-prefixed and the project's Pyright configuration makes reportPrivateUsage an error, an import-linter rule names the protected module, or a tach interface exposes the chokepoint and not the protected thing" },
     { grade: "reference-choked", enforcer: COHERENCE_ENFORCER, fact: "no bypass among resolved references; the top rung when neither the interpreter nor a checker refuses one" },
     { grade: "convention", enforcer: "nobody", fact: "an underscore prefix or __all__ exclusion alone" },
   ],
@@ -537,6 +555,14 @@ export class PythonAdapter implements LanguageAdapter {
   private readonly diagnostics = new Map<string, { message: string; severity?: number }[]>();
   /** When the workspace was last reported to Pyright as possibly changed. */
   private lastForget = Date.now();
+  /** The files the last forget named: an edit's, which scope tach to them; none for a run. */
+  private named: readonly string[] = [];
+  /** The nearest tach.toml as read once per forget, or why it could not be read. */
+  private tachRead: { file?: string; config?: TachConfig; error?: string } | undefined;
+  /** tach's run once per forget: over the whole tree, over the files an edit wrote, or not at all, with what it looked at. */
+  private tachChecked: { run: TachRun | undefined; scope: string } | undefined;
+  /** tach's refusal of a staged outside import, by tach.toml digest and protected path; kept across forgets until tach.toml changes. */
+  private readonly tachWitnesses = new Map<string, TachWitness>();
 
   /** The folders a bounded workspace leaves out; undefined for the whole workspace every check needs. */
   private readonly bounds: AdapterBounds | undefined;
@@ -745,6 +771,9 @@ export class PythonAdapter implements LanguageAdapter {
     this.walked = undefined;
     this.listing = undefined;
     this.diagnostics.clear();
+    this.named = [...files];
+    this.tachRead = undefined;
+    this.tachChecked = undefined;
     const since = this.lastForget - 1000;
     this.lastForget = Date.now();
     if (this.client === undefined) return;
@@ -1014,7 +1043,148 @@ export class PythonAdapter implements LanguageAdapter {
     return members;
   }
 
+  /**
+   * The language's and the project's own checkers' rung, then tach's: where
+   * tach.toml's interface restricts the protected thing and exposes the
+   * chokepoint, tach is the checker that refuses a bypass, and the module's
+   * own code is free to use its internals. The interpreter's closure rung
+   * stays stronger. Absent tach.toml nothing changes; a tach.toml that
+   * governs with no tach installed is said beside the rung that stands.
+   */
   async visibility(definition: Definition, chokepoint?: Definition): Promise<Visibility> {
+    const own = await this.ownVisibility(definition, chokepoint);
+    if (own.rung?.grade === "closure-choked" || chokepoint === undefined) return own;
+    const tach = await this.tachVerdict(definition, chokepoint);
+    if (tach === undefined) return own;
+    if (!("rung" in tach)) return { ...own, evidence: `${own.evidence}; ${tach.note}`, ...(own.rung === undefined ? {} : { rung: { ...own.rung, fact: `${own.rung.fact}; ${tach.note}` } }) };
+    return { enforced: false, visible: true, evidence: `${own.evidence}; ${tach.boundary.scope}`, rung: tach.rung, boundary: tach.boundary };
+  }
+
+  private tachConfig(): { file?: string; config?: TachConfig; error?: string } {
+    if (this.tachRead === undefined) {
+      const file = findTachConfig(this.root);
+      if (file === undefined) this.tachRead = {};
+      else {
+        try {
+          this.tachRead = { file, config: readTachConfig(file) };
+        } catch (error) {
+          this.tachRead = { file, error: error instanceof Error ? error.message : String(error) };
+        }
+      }
+    }
+    return this.tachRead;
+  }
+
+  /** The dotted path an import names a definition by: its module, and for a symbol the module-level name it sits under. */
+  private async importPath(config: TachConfig, definition: Definition): Promise<string | undefined> {
+    const dotted = dottedFor(config, join(this.root, definition.file));
+    if (dotted === undefined || definition.kind === "module") return dotted;
+    const entry = await this.entryAt(definition);
+    return entry === undefined ? undefined : `${dotted}.${entry.path[0]}`;
+  }
+
+  /** A tach root path (a folder ending "/" or a file) as the project names it. */
+  private fromTachRoot(config: TachConfig, path: string): string {
+    const rel = relative(this.root, join(config.root, path)).split(sep).join("/");
+    return path.endsWith("/") ? `${rel}/` : rel;
+  }
+
+  /**
+   * tach once per forget. A run (a forget naming no file) checks the whole
+   * tree; an edit (a forget naming the files it wrote) checks only those of
+   * them that are Python files inside a tach module, in a throwaway copy,
+   * and spawns nothing when none is.
+   */
+  private tachRun(bin: string, config: TachConfig): { run: TachRun | undefined; scope: string } {
+    if (this.tachChecked !== undefined) return this.tachChecked;
+    if (this.named.length === 0) {
+      const run = runTach(bin, config.root);
+      this.tachChecked = { run, scope: `tach checked the whole tree (${run.ms} ms)` };
+      return this.tachChecked;
+    }
+    const files = new Map<string, string>();
+    for (const file of this.named) {
+      const path = join(this.root, file);
+      const rel = relative(config.root, path).split(sep).join("/");
+      if (!file.endsWith(".py") || rel.startsWith("..") || excluded(config, rel) || !existsSync(path)) continue;
+      const dotted = dottedFor(config, path);
+      if (dotted === undefined || moduleOf(config, dotted) === undefined) continue;
+      files.set(rel, readFileSync(path, "utf8"));
+    }
+    if (files.size === 0) {
+      this.tachChecked = { run: undefined, scope: "no file this edit wrote lies in a tach module, so tach was not run at this edit" };
+      return this.tachChecked;
+    }
+    const { run } = tachOverCopy(bin, config, files);
+    this.tachChecked = { run, scope: `tach checked the ${files.size} file${files.size === 1 ? "" : "s"} this edit wrote, in a throwaway copy (${run.ms} ms)` };
+    return this.tachChecked;
+  }
+
+  /** tach's rung for a chokepoint, or the note on why it is not available; undefined when no tach.toml stands at or above the root. */
+  private async tachVerdict(definition: Definition, chokepoint: Definition): Promise<{ rung: Rung; boundary: CheckerBoundary; config: TachConfig; module: TachModule; protectedPath: string; bin: string } | { note: string } | undefined> {
+    const read = this.tachConfig();
+    if (read.file === undefined) return undefined;
+    const where = relative(this.root, read.file).split(sep).join("/") || TACH_CONFIG;
+    if (read.config === undefined) return { note: `${where} could not be read (${read.error}), so tach's rung is not available` };
+    const config = read.config;
+    const protectedPath = await this.importPath(config, definition);
+    const chokepointPath = await this.importPath(config, chokepoint);
+    if (protectedPath === undefined || chokepointPath === undefined) return { note: `${protectedPath === undefined ? definition.file : chokepoint.file} lies under none of ${where}'s source_roots, so tach does not govern it` };
+    const governance = tachGovernance(config, protectedPath, chokepointPath);
+    if (!governance.governed) return { note: `${where}: ${governance.reason}` };
+    const bin = locateTach(this.root, config.root);
+    if (bin.path === undefined) return { note: `${where} restricts ${protectedPath} through an interface of tach module ${governance.module.path}, but tach is not installed (looked in ${bin.looked.join(", ")}), so tach's rung is not available; install it (pip install tach) to grade on it` };
+    const checked = this.tachRun(bin.path, config);
+    if (checked.run !== undefined && !checked.run.ok) return { note: `${where} restricts ${protectedPath} through an interface of tach module ${governance.module.path}, but ${checked.run.reason}, so tach's rung is not available` };
+    const refused = (checked.run?.ok === true ? checked.run.violations : []).filter((v) => reaches(v, protectedPath, governance.module.path));
+    const own = keepProjectFiles(this.root, refused.map((v) => this.fromTachRoot(config, v.file)), this.listingNow());
+    const violations: CheckerBoundary["violations"] = [];
+    for (const v of refused) {
+      const file = this.fromTachRoot(config, v.file);
+      if (!own.has(file)) continue;
+      violations.push({ file, line: v.line, symbol: await this.enclosingSymbol(file, { line: v.line - 1, character: 0 }), message: `tach refuses it: the path '${v.dependency}' is not part of the public interface for '${v.definitionModule}'` });
+    }
+    const nested = config.modules.filter((m) => m.path.startsWith(`${governance.module.path}.`));
+    const enforcer = `tach (${where})`;
+    const gaps = governance.gaps.length === 0 ? "" : `; what tach does not see, Coherence's own references still check: ${governance.gaps.join("; ")}`;
+    return {
+      rung: { grade: "checker-choked", enforcer, fact: `${governance.fact.replace(TACH_CONFIG, where)}${gaps}` },
+      boundary: {
+        checker: enforcer,
+        module: governance.module.path,
+        owns: moduleLocations(config, governance.module).map((p) => this.fromTachRoot(config, p)),
+        except: nested.flatMap((m) => moduleLocations(config, m)).map((p) => this.fromTachRoot(config, p)),
+        violations,
+        scope: checked.scope,
+      },
+      config,
+      module: governance.module,
+      protectedPath,
+      bin: bin.path,
+    };
+  }
+
+  /**
+   * tach's refusal of a staged outside import is the refutation for its rung,
+   * witnessed in a throwaway copy and kept until tach.toml changes. At an
+   * edit that wrote no file in a tach module nothing is spawned, so a refusal
+   * not yet witnessed is said to be missing rather than staged.
+   */
+  private refusedByTach(tach: { config: TachConfig; module: TachModule; protectedPath: string; bin: string }, protectedThing: Definition): Refutation {
+    const key = `${tach.config.digest} ${tach.protectedPath}`;
+    const kept = this.tachWitnesses.get(key);
+    if (kept?.refused !== undefined) return { seen: true, staged: [], refused: `tach: ${kept.refused}`, account: `${kept.account} (witnessed earlier; ${TACH_CONFIG} unchanged since)` };
+    if (this.named.length > 0 && this.tachChecked?.run === undefined) {
+      return { seen: true, staged: [], account: "tach's refusal of an outside import is not witnessed yet, and no file this edit wrote lies in a tach module, so nothing was spawned to witness it; the next run witnesses it" };
+    }
+    const dot = tach.protectedPath.lastIndexOf(".");
+    const importLine = protectedThing.kind === "module" ? `import ${tach.protectedPath}` : `from ${tach.protectedPath.slice(0, dot)} import ${tach.protectedPath.slice(dot + 1)}`;
+    const witness = witnessTach(tach.bin, tach.config, tach.module, tach.protectedPath, importLine);
+    if (witness.refused !== undefined) this.tachWitnesses.set(key, witness);
+    return { seen: true, staged: [], ...(witness.refused === undefined ? {} : { refused: `tach: ${witness.refused}` }), account: witness.account };
+  }
+
+  private async ownVisibility(definition: Definition, chokepoint?: Definition): Promise<Visibility> {
     const facts = this.facts();
     const checkerNote = facts.pyrightConfig !== undefined
       ? `reportPrivateUsage is ${facts.privateUsageIsError ? "an error" : "not an error"} in ${facts.pyrightConfig}`
@@ -1105,6 +1275,9 @@ export class PythonAdapter implements LanguageAdapter {
    */
   async refute(protectedThing: Definition, outsideOf: Definition | undefined, exempt?: string): Promise<Refutation> {
     const client = await this.indexed();
+    // Where tach governs, its refusal of a staged outside import is the refutation; the module's own code is free to use the thing.
+    const tach = outsideOf === undefined ? undefined : await this.tachVerdict(protectedThing, outsideOf);
+    if (tach !== undefined && "rung" in tach) return this.refusedByTach(tach, protectedThing);
     let importName: string;
     let access: string;
     if (protectedThing.kind === "module") {

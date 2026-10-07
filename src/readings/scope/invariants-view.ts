@@ -48,7 +48,7 @@ function renderVerdict(state: ShellState, entry: LatestEntry | undefined): Marku
   const grade =
     entry.grade === undefined
       ? null
-      : html`<span class="grade" data-grade="${entry.grade}">${entry.grade}</span>${rung !== undefined ? html` <span class="enforced-by quiet">enforced by ${rung.enforcedBy}</span>` : null}`;
+      : html`<span class="grade" data-grade="${entry.grade}">${entry.grade}</span>${entry.enforcer !== undefined ? html` <span class="enforced-by quiet">enforced by ${entry.enforcer}</span>` : rung !== undefined ? html` <span class="enforced-by quiet">enforced by ${rung.enforcedBy}</span>` : null}`;
   const word = entry.verdict === "pass" ? `verified ${entry.at.slice(0, 10)}` : entry.verdict === "fail" ? `structural defect ${entry.at.slice(0, 10)}` : `not run ${entry.at.slice(0, 10)}`;
   return html`<p class="verdict" data-verdict="${entry.verdict}"><span class="verdict-word">${word}</span> ${grade}${keptMark}</p>
     <p class="reason quiet">${entry.reason}</p>`;
@@ -90,6 +90,7 @@ export function renderEnforcement(state: ShellState, invariant: SpecInvariant, e
 export function renderRefutation(invariant: SpecInvariant, runs: readonly RunRecord[]): Markup {
   const automatic = latestOf(invariant, runs).find((l) => l.form === "chokepoint" && l.refutation === "automatic");
   const refused = latestOf(invariant, runs).find((l) => l.form === "chokepoint" && l.refutation === "refused by the language");
+  const checked = latestOf(invariant, runs).find((l) => l.form === "chokepoint" && l.refutation === "refused by the checker");
   const parts: Markup[] = [];
   for (const refutation of invariant.refutations) {
     parts.push(html`<li class="refutation" data-refutation="witnessed"><span class="refutation-word">witnessed ${refutation.date}</span> <span class="broke">${refutation.broke}</span> <span class="arrow">→</span> <span class="saw">${refutation.saw}</span></li>`);
@@ -99,6 +100,9 @@ export function renderRefutation(invariant: SpecInvariant, runs: readonly RunRec
   }
   if (refused !== undefined) {
     parts.push(html`<li class="refutation" data-refutation="refused"><span class="refutation-word">refused by the language, run ${refused.at.slice(0, 10)}</span> <span class="quiet">the compiler or interpreter refused a synthetic reference from outside the chokepoint; the refusal is the proof</span> </li>`);
+  }
+  if (checked !== undefined) {
+    parts.push(html`<li class="refutation" data-refutation="refused"><span class="refutation-word">refused by the checker, run ${checked.at.slice(0, 10)}</span> <span class="quiet">${checked.enforcer ?? "the checker"} refused a synthetic import from another module, staged in a throwaway copy; the refusal is the proof</span> </li>`);
   }
   if (parts.length === 0) {
     parts.push(html`<li class="refutation" data-refutation="missing"><span class="refutation-word">missing</span> <span class="quiet">no witnessed firing is written on the bullet and no run has refuted it automatically</span></li>`);
@@ -140,7 +144,7 @@ function renderDefect(invariant: SpecInvariant, runs: readonly RunRecord[]): Mar
     <h4>Structural defect</h4>
     ${failing.map((d) => html`<p class="reason">${d.form === "chokepoint" ? "chokepoint" : "totality oracle"} failed ${stamp(d.at)}: ${d.reason}</p>`)}
     ${sites.length > 0
-      ? html`<h5>Bypass sites</h5><ul class="bypasses" data-field="bypasses">${sites.map((b) => html`<li><code>${b.file}:${b.line}</code> <span class="label">in</span> <code>${b.symbol}</code></li>`)}</ul>`
+      ? html`<h5>Bypass sites</h5><ul class="bypasses" data-field="bypasses">${sites.map((b) => html`<li><code>${b.file}:${b.line}</code> <span class="label">in</span> <code>${b.symbol}</code>${b.checker === undefined ? null : html` <span class="quiet">${b.checker}</span>`}</li>`)}</ul>`
       : null}
     <h5>The two options</h5>
     <ol class="options" data-field="options">
