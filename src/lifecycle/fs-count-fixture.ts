@@ -7,8 +7,10 @@
  * meter's door still shows in a test.
  *
  * A call that lists (readdir, recursive or not; glob; an opened directory's
- * reads) is weighed by the entries it returned, not counted once: a walk
- * of the whole project is one call and thousands of entries.
+ * reads) is weighed by the entries it returned, and a call that reads a
+ * file's bytes (readFile in each form, readSync) by the bytes it returned,
+ * not counted once: a walk of the whole project is one call and thousands of
+ * entries, and a read of a growing file is one call and ever more bytes.
  *
  * Named exports of a built-in are live bindings: the functions are replaced
  * on the module objects and syncBuiltinESMExports carries the replacement to
@@ -121,22 +123,43 @@ function replace(target: Record<string, unknown>, name: string, make: (original:
 
 let installed = false;
 
+/** The paths file descriptors were opened on, so a read by descriptor is weighed under its file. */
+const opened = new Map<number, string>();
+
+function bytesOf(data: unknown): number {
+  return typeof data === "string" ? Buffer.byteLength(data) : Buffer.isBuffer(data) ? data.length : 1;
+}
+
 /** Replace the counted functions once for this process; they count only while a count is open. */
 function installCounting(): void {
   if (installed) return;
   installed = true;
   for (const name of ONCE_SYNC) replace(fs, name, (original) => function (this: unknown, ...args: unknown[]) {
-    tally(name, args[0], 1);
-    return original.apply(this, args);
+    const result = original.apply(this, args);
+    // A read is weighed by the bytes it returned, under the path it read: a read by descriptor under the path the descriptor was opened on.
+    if (name === "readFileSync") tally(name, args[0], bytesOf(result));
+    else if (name === "readSync") tally(name, opened.get(args[0] as number) ?? args[0], typeof result === "number" ? result : 0);
+    else tally(name, args[0], 1);
+    if (name === "openSync" && typeof result === "number" && typeof args[0] === "string") opened.set(result, args[0]);
+    return result;
   });
   for (const name of ONCE_ASYNC) {
     replace(fs, name, (original) => function (this: unknown, ...args: unknown[]) {
-      tally(`callback.${name}`, args[0], 1);
+      const last = args.length - 1;
+      const cb = args[last];
+      if (name === "readFile" && typeof cb === "function") {
+        args[last] = (error: unknown, data: unknown) => {
+          tally(`callback.${name}`, args[0], error ? 1 : bytesOf(data));
+          (cb as Fn)(error, data);
+        };
+      } else tally(`callback.${name}`, args[0], 1);
       return original.apply(this, args);
     });
     replace(promises, name, (original) => function (this: unknown, ...args: unknown[]) {
+      const result = original.apply(this, args);
+      if (name === "readFile" && result instanceof Promise) return result.then((data) => (tally(`promises.${name}`, args[0], bytesOf(data)), data));
       tally(`promises.${name}`, args[0], 1);
-      return original.apply(this, args);
+      return result;
     });
   }
   for (const name of LISTING_SYNC) replace(fs, name, (original) => function (this: unknown, ...args: unknown[]) {

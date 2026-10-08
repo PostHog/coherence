@@ -86,9 +86,12 @@ function latestCursor(loaded: Loaded): Cursor | null {
  */
 export function openFeed(root: string, session: string): boolean {
   if (readCursor(root, session) !== null) return false;
+  // The files' identities are taken before the read: the cursor is the latest record of all, so no file that stands can hold a later one.
+  const keys = journalFileKeys(root);
   const latest = latestCursor(loadJournal(root));
   if (latest === null) return false;
   writeCursor(root, session, latest);
+  writeSeen(root, session, keys);
   return true;
 }
 

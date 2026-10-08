@@ -38,6 +38,9 @@ import type { LanguageAdapter } from "../adapters/adapter.ts";
 
 const SESSION = "sized";
 
+/** The project-sized spawns an edit's PostToolUse may make (each named where the edit test states its budget). */
+const EDIT_PROJECT_SIZED = 6;
+
 /** An instrument that answers nothing: a check an edit makes is said not run, and no language server is started for a fixture. */
 const NO_INSTRUMENT = {
   language: "typescript",
@@ -95,7 +98,7 @@ function weighed(m: Measured): Map<string, number> {
     const k = family(key);
     out.set(k, (out.get(k) ?? 0) + weight);
   };
-  for (const kind of ["coverage reading", "spec model", "server request", "phrase comparison"] as const) add(`meter ${kind}`, m.work.counts[kind]);
+  for (const kind of ["coverage reading", "spec model", "server request", "phrase comparison", "project-sized spawn"] as const) add(`meter ${kind}`, m.work.counts[kind]);
   for (const r of m.work.reads) add(`meter read ${r}`, 1);
   for (const s of m.work.spawns) add(`meter spawn ${s}`, 1);
   for (const [line, bytes] of Object.entries(m.work.outputs)) add(`spawn output ${line}`, bytes);
@@ -106,14 +109,24 @@ function weighed(m: Measured): Map<string, number> {
 /** What an event may pay for one by one: families of files it must name, each at most tenfold when they grow tenfold. */
 const PRACTICES = /proj\/src\/cN\/CN\.(practice|spec)\.md|ls-files .*\*\.practice\.md/;
 const SPECS = /proj\/src\/cN\/(CN\.spec\.md|\.git|pyvenv\.cfg)$|ls-files .*\*\.spec\.md/;
-const RUNS = /proj\/\.coherence\/runs(\/hN\.jsonl)?$/;
-const JOURNAL = /proj\/\.coherence\/journal(\/hN\.jsonl)?$/;
+// The history families grow only in their file lists, a stat or a listed entry per file, and in the index or memo that keeps one line per
+// file; the bytes of the history itself are never in a budget: the index and the memo exist so that no hook reads them.
+const RUNS = /^fs (statSync|lstatSync|existsSync|readdirSync|realpathSync) .*proj\/\.coherence\/runs(\/hN\.jsonl)?$|^fs readFileSync .*proj\/\.coherence\/cache\/run-index\.json$/;
+// The vocabulary an edit judges against: the lexicons, the session's baseline, the kept state's meta and the buckets it reads, one of 64
+// each. These grow with the vocabulary and the project's terms, never with the corpus's lines read or its history.
+const VOCABULARY = /^fs (readFileSync|promises\.readFile) .*(proj\/lexicon\.json|docs\/lexicon\.json|\.coherence\/lexicon\/sessions\/[^/]+\.json|\.coherence\/cache\/vocabulary\/(meta\.json|declared\.json|files\/\d+\.json|terms\/\d+\.json))$/;
+const JOURNAL = /^fs (statSync|lstatSync|existsSync|readdirSync|realpathSync) .*proj\/\.coherence\/journal(\/hN\.jsonl)?$|^fs readFileSync .*proj\/\.coherence\/feed\/[^/]+\.seen$/;
 
 /** Every way the large call's work exceeds the small's beyond its budget; none when it holds. */
-function overBudget(small: Measured, large: Measured, allowed: readonly RegExp[]): string[] {
+function overBudget(small: Measured, large: Measured, allowed: readonly RegExp[], projectSized = 0): string[] {
   const s = weighed(small);
   const l = weighed(large);
   const problems: string[] = [];
+  // A spawn whose cost is the project's (git listing, searching or comparing the tree) is budgeted by count, at both sizes:
+  // its output may be small and its work the whole tree.
+  for (const [at, m] of [["1×", small], ["10×", large]] as const) {
+    if (m.work.counts["project-sized spawn"] > projectSized) problems.push(`project-sized spawns at ${at}: ${m.work.counts["project-sized spawn"]}, over the ${projectSized} the event may make (${m.work.spawns.filter((line) => /git\s(?:.*\s)?(ls-files|grep|status|diff|ls-tree|log|rev-list|check-ignore)\b/.test(line)).join("; ")})`);
+  }
   for (const key of new Set([...s.keys(), ...l.keys()])) {
     const a = s.get(key) ?? 0;
     const b = l.get(key) ?? 0;
@@ -168,16 +181,17 @@ test("a tool use that writes nothing pays only for its practice files and the jo
     }
     return works;
   });
-  const budgets: Record<string, RegExp[]> = {
+  // Each event's families, and the project-sized spawns it may make: a command lists the practice files once.
+  const budgets: Record<string, [RegExp[], number]> = {
     // A command is read against every practice: each practice file, once, and the spec it pairs with.
-    "PreToolUse Read": [],
-    "PreToolUse ls": [PRACTICES],
+    "PreToolUse Read": [[], 0],
+    "PreToolUse ls": [[PRACTICES], 1],
     // The peer feed lists the journal's files and reads only those that changed since its last look.
-    "PostToolUse Read": [JOURNAL],
-    "PostToolUse ls": [JOURNAL],
+    "PostToolUse Read": [[JOURNAL], 0],
+    "PostToolUse ls": [[JOURNAL], 0],
   };
   for (const name of Object.keys(small)) {
-    assert.deepEqual(overBudget(small[name]!, large[name]!, budgets[name]!), [], `${name} pays only for its budget over 30 components and their history`);
+    assert.deepEqual(overBudget(small[name]!, large[name]!, budgets[name]![0], budgets[name]![1]), [], `${name} pays only for its budget over 30 components and their history`);
     assert.equal(small[name]!.work.counts["coverage reading"], 0, `${name} takes no coverage reading`);
     assert.equal(small[name]!.work.counts["spec model"], 0, `${name} loads no spec model`);
     assert.deepEqual(projectReads(small[name]!).filter((p) => !/\.practice\.md$/.test(p) && !["coherence.config.json", "lexicon.json", "package.json"].includes(p)), [], `${name} reads no project file but its config and practices`);
@@ -217,8 +231,12 @@ test("an edit pays for the files it names, the specs and the history's file list
       const s = small[where]![at];
       const l = large[where]![at];
       // Before an edit, its practices; after it, every spec (read for its chokepoint lines), the run and journal file lists, and the run the check appends.
-      const budget = at === "pre" ? [PRACTICES] : [SPECS, RUNS, JOURNAL];
-      assert.deepEqual(overBudget(s, l, budget), [], `${where}, ${at}: pays only for its budget beside ten times the components, files and history`);
+      const budget = at === "pre" ? [PRACTICES] : [SPECS, RUNS, JOURNAL, VOCABULARY];
+      // Before an edit, the practice listing; after it, six: the project's own files asked of the written one twice (the trace and the check),
+      // the specs' listing twice (the check and the reading's components), and the tree key's two listings.
+      // A touched invariant's run also asks whether the tree is dirty, for the record it appends: one more.
+      const sized = at === "pre" ? 1 : EDIT_PROJECT_SIZED + (where === "edit naming a protected thing" ? 1 : 0);
+      assert.deepEqual(overBudget(s, l, budget, sized), [], `${where}, ${at}: pays only for its budget beside ten times the components, files and history`);
       assert.equal(s.work.counts["spec model"], 0, `${where}, ${at}: no whole spec model`);
       assert.equal(s.work.counts["server request"], l.work.counts["server request"], `${where}, ${at}: the same requests of the instrument`);
       assert.deepEqual([...new Set(projectReads(s))].filter((p) => p !== rel && !/\.(spec|practice)\.md$/.test(p) && !["coherence.config.json", "lexicon.json", "package.json"].includes(p)), [], `${where}, ${at}: no other project file is read`);
@@ -246,7 +264,9 @@ test("an event outside every project does the same work at 1× and 10×, and rea
   for (const [name, work] of Object.entries(small)) {
     // The command a cd took away still runs in the project's session: it is read against the project's own practices, as any command is.
     const budget = name === "command a cd took out of the project" ? [PRACTICES] : [];
-    assert.deepEqual(overBudget(work, (large as Record<string, Measured>)[name]!, budget), [], `${name}: outside the project, its size changes nothing`);
+    // The cd's command lists where the projects are and the project's practices; an event outside lists where the projects are, at most.
+    const sized = name === "command a cd took out of the project" ? 2 : 1;
+    assert.deepEqual(overBudget(work, (large as Record<string, Measured>)[name]!, budget, sized), [], `${name}: outside the project, its size changes nothing`);
     assert.deepEqual(work.work.reads.filter((r) => !/\.practice\.md$/.test(r)), [], `${name} reads no project file`);
     assert.equal(work.work.counts["coverage reading"] + work.work.counts["spec model"] + work.work.counts["server request"], 0, `${name} takes no reading`);
   }
@@ -257,7 +277,8 @@ test("a prompt over an unchanged tree reads no corpus, and pays only for the jou
     await workOf(project, "UserPromptSubmit", { prompt: "first" });
     return workOf(project, "UserPromptSubmit", { prompt: "second" });
   });
-  assert.deepEqual(overBudget(small, large, [JOURNAL]), [], "the second prompt pays only for the journal's file list over 30 components as over 3");
+  // The tree key: git's changed files and its untracked ones, two listings.
+  assert.deepEqual(overBudget(small, large, [JOURNAL], 2), [], "the second prompt pays only for the journal's file list over 30 components as over 3");
   assert.equal(small.work.counts["coverage reading"], 0, "no coverage reading over a tree that has not moved");
   assert.deepEqual(small.work.reads, [], "no project file read");
 });
