@@ -8,8 +8,11 @@
  *                      corpus (readCorpus), the spec model's spec, practice
  *                      and handler files, practice delivery's practice files,
  *                      the file an edit names (readProjectText)
- *   spawn              a child process, git or any other (every module but
- *                      this one takes child_process from here)
+ *   spawn              a child process or a worker thread, git or any other,
+ *                      counted at node's child_process module itself,
+ *                      whatever route reached it (below)
+ *   project-sized spawn  a spawn whose cost grows with the project whatever
+ *                      it prints: git listing, searching or comparing the tree
  *   spawn output       the bytes a child wrote to its standard output, for
  *                      the synchronous forms and a promised execFile (a
  *                      streamed spawn, the language servers' and the warm
@@ -31,14 +34,14 @@
  * comparison against undefined, so the meter costs nothing a hook can feel.
  */
 
-import * as childProcess from "node:child_process";
+import { createRequire, syncBuiltinESMExports } from "node:module";
 import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 
 export type { ChildProcess } from "node:child_process";
 
-export const WORK_KINDS = ["file read", "spawn", "spawn output", "coverage reading", "spec model", "server request", "phrase comparison"] as const;
+export const WORK_KINDS = ["file read", "spawn", "project-sized spawn", "spawn output", "coverage reading", "spec model", "server request", "phrase comparison"] as const;
 
 export type WorkKind = (typeof WORK_KINDS)[number];
 
@@ -132,13 +135,48 @@ function commandLine(args: readonly unknown[]): string {
   return [String(args[0]), ...argv].join(" ");
 }
 
+/**
+ * Whether a command line's cost is the project's, not its own: git listing,
+ * searching or comparing the tree (ls-files, grep, status, diff, log over
+ * paths) does work that grows with the project whatever it prints, so a size
+ * test budgets such spawns by count as well as by output.
+ */
+export function projectSized(line: string): boolean {
+  return /(^|[\\/])git(\.exe)?\s(?:.*\s)?(ls-files|grep|status|diff|ls-tree|log|rev-list|check-ignore)\b/.test(line);
+}
+
 function countSpawn(args: readonly unknown[]): void {
   if (current === undefined) return;
   current.counts.spawn += 1;
-  current.spawns.push(commandLine(args));
+  const line = commandLine(args);
+  current.spawns.push(line);
+  if (projectSized(line)) current.counts["project-sized spawn"] += 1;
 }
 
 type Callable = (...args: unknown[]) => unknown;
+
+/**
+ * The environment variables that change what a git pathspec means: with
+ * GIT_LITERAL_PATHSPECS set, `:(glob)**\/*.spec.md` matches no file, and a
+ * listing of the specs comes back empty without an error. Coherence's git
+ * calls never inherit them; every one passes here.
+ */
+export const PATHSPEC_ENV = ["GIT_LITERAL_PATHSPECS", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] as const;
+
+/** A git call's arguments with an environment that holds none of PATHSPEC_ENV; any other call's as they are. */
+function controlled(args: unknown[]): unknown[] {
+  const file = String(args[0] ?? "");
+  if (!/(^|[\\/])git(\.exe)?$/.test(file)) return args;
+  const at = Array.isArray(args[1]) ? 2 : 1;
+  const given = args[at];
+  const options = typeof given === "object" && given !== null ? (given as { env?: NodeJS.ProcessEnv }) : {};
+  const env = { ...(options.env ?? process.env) };
+  for (const name of PATHSPEC_ENV) delete env[name];
+  const next = [...args];
+  if (typeof given === "function" || given === undefined) next.splice(at, 0, { env });
+  else next[at] = { ...options, env };
+  return next;
+}
 
 /** The bytes a child wrote to its standard output, counted: a listing that grows with the project is work the hook pays to read. */
 function countOutput(args: readonly unknown[], stdout: unknown): void {
@@ -149,43 +187,102 @@ function countOutput(args: readonly unknown[], stdout: unknown): void {
   current.outputs[line] = (current.outputs[line] ?? 0) + bytes;
 }
 
-/** child_process.spawnSync, counted, with its output. */
-export const spawnSync = ((...args: unknown[]) => {
-  countSpawn(args);
-  const result = (childProcess.spawnSync as Callable)(...args) as { stdout?: unknown };
-  countOutput(args, result?.stdout);
-  return result;
-}) as typeof childProcess.spawnSync;
+/* ------------------------------------------------------------ spawns, at runtime */
 
-/** child_process.execFileSync, counted, with its output. */
-export const execFileSync = ((...args: unknown[]) => {
-  countSpawn(args);
-  const out = (childProcess.execFileSync as Callable)(...args);
-  countOutput(args, out);
-  return out;
-}) as typeof childProcess.execFileSync;
+/**
+ * Every spawn this process makes is counted at the one object every route to
+ * a spawn reaches: node's child_process module itself. Its spawning functions
+ * are replaced, once, at load, with counted ones, and syncBuiltinESMExports
+ * carries the replacement to every module that imported them by name, so a
+ * spawn through a static import, a dynamic import of a computed name,
+ * process.getBuiltinModule, createRequire, code vm runs, or a third-party
+ * module (execa spawns through child_process too) is counted alike. A worker
+ * thread is counted as a spawn. A call one counted function makes of another
+ * (exec runs execFile) counts once.
+ */
+const cjs = createRequire(import.meta.url);
+const childModule = cjs("node:child_process") as Record<string, unknown> & { __metered?: true };
+const workerModule = cjs("node:worker_threads") as Record<string, unknown>;
 
-/** child_process.spawn, counted. */
-export const spawn = ((...args: unknown[]) => {
-  countSpawn(args);
-  return (childProcess.spawn as Callable)(...args);
-}) as typeof childProcess.spawn;
+let depth = 0;
 
-const promisedExecFile = promisify(childProcess.execFile) as unknown as Callable;
-
-/** child_process.execFile, counted; promisify of it resolves to { stdout, stderr } as the original's does. */
-export const execFile = Object.defineProperty(
-  (...args: unknown[]) => {
-    countSpawn(args);
-    return (childProcess.execFile as Callable)(...args);
-  },
-  promisify.custom,
-  {
-    value: async (...args: unknown[]) => {
-      countSpawn(args);
-      const result = (await promisedExecFile(...args)) as { stdout?: unknown };
-      countOutput(args, result?.stdout);
+function counted(name: string, sync: boolean): void {
+  const original = childModule[name] as (Callable & { [key: symbol]: unknown }) | undefined;
+  if (typeof original !== "function") return;
+  const wrapped = function (this: unknown, ...given: unknown[]): unknown {
+    const outer = depth === 0;
+    // exec's line is its command; the others' is the file and its arguments.
+    const args = name === "exec" || name === "execSync" ? [String(given[0] ?? "")] : given;
+    const call = name === "exec" || name === "execSync" ? given : controlled(given);
+    if (outer) countSpawn(args);
+    depth += 1;
+    try {
+      if (!sync && outer) {
+        const last = call.length - 1;
+        const cb = call[last];
+        if (typeof cb === "function") call[last] = (error: unknown, stdout: unknown, stderr: unknown) => {
+          countOutput(args, stdout);
+          (cb as Callable)(error, stdout, stderr);
+        };
+      }
+      const result = original.apply(this, call);
+      if (sync && outer) countOutput(args, name === "spawnSync" ? (result as { stdout?: unknown } | undefined)?.stdout : result);
       return result;
-    },
-  },
-) as unknown as typeof childProcess.execFile;
+    } finally {
+      depth -= 1;
+    }
+  };
+  // promisify(execFile) and promisify(exec) resolve to { stdout, stderr }: their own forms, counted the same way.
+  const custom = original[promisify.custom] as Callable | undefined;
+  if (custom !== undefined) {
+    Object.defineProperty(wrapped, promisify.custom, {
+      value: async (...given: unknown[]) => {
+        const args = name === "exec" ? [String(given[0] ?? "")] : given;
+        const call = name === "exec" ? given : controlled(given);
+        const outer = depth === 0;
+        if (outer) countSpawn(args);
+        depth += 1;
+        try {
+          const result = (await custom(...call)) as { stdout?: unknown };
+          if (outer) countOutput(args, result?.stdout);
+          return result;
+        } finally {
+          depth -= 1;
+        }
+      },
+    });
+  }
+  childModule[name] = wrapped;
+}
+
+if (childModule.__metered !== true) {
+  childModule.__metered = true;
+  for (const name of ["spawn", "execFile", "exec", "fork"]) counted(name, false);
+  for (const name of ["spawnSync", "execFileSync", "execSync"]) counted(name, true);
+  const Worker = workerModule["Worker"] as (new (...args: unknown[]) => object) | undefined;
+  if (Worker !== undefined) {
+    workerModule["Worker"] = class MeteredWorker extends Worker {
+      constructor(...args: unknown[]) {
+        countSpawn(["worker", [typeof args[0] === "string" ? args[0].slice(0, 80) : String(args[0])]]);
+        super(...args);
+      }
+    };
+  }
+  syncBuiltinESMExports();
+}
+
+/** child_process.spawnSync, counted where every spawn is (above). */
+export const spawnSync = ((...args: unknown[]) => (childModule["spawnSync"] as Callable)(...args)) as typeof import("node:child_process").spawnSync;
+
+/** child_process.execFileSync, counted where every spawn is. */
+export const execFileSync = ((...args: unknown[]) => (childModule["execFileSync"] as Callable)(...args)) as typeof import("node:child_process").execFileSync;
+
+/** child_process.spawn, counted where every spawn is. */
+export const spawn = ((...args: unknown[]) => (childModule["spawn"] as Callable)(...args)) as typeof import("node:child_process").spawn;
+
+/** child_process.execFile, counted where every spawn is; promisify of it resolves to { stdout, stderr } as the original's does. */
+export const execFile = Object.defineProperty(
+  (...args: unknown[]) => (childModule["execFile"] as Callable)(...args),
+  promisify.custom,
+  { value: (...args: unknown[]) => ((childModule["execFile"] as Record<symbol, Callable>)[promisify.custom] as Callable)(...args) },
+) as unknown as typeof import("node:child_process").execFile;

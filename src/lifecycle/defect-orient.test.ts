@@ -25,6 +25,9 @@ after(() => {
 const here = dirname(fileURLToPath(import.meta.url));
 const SPEC = "# Widget\n\nWidgets turn.\n\n## invariants\n- knob turns: The knob turns.\n  over: every knob\n  via: the knob turns\n  because: a stuck knob is a broken widget\n  kinds: none\n";
 
+/** When the guard-failure fixture is read: a day after its run, so the floor's quiet line stays out of it. */
+const ORIENT_AT = Date.parse("2026-10-03T00:00:00.000Z");
+
 function project(): string {
   const root = made(mkdtempSync(join(tmpdir(), "coherence-defect-orient-")));
   mkdirSync(join(root, "widget"), { recursive: true });
@@ -55,11 +58,11 @@ test("orient names each guard failure under the spec block", () => {
   const j = journal(root);
   const who = ["--session", "s1", "--agent", "alpha"];
   const first = j("defect", "the knob stuck", "--evidence", "turned it", "--class", "path-identity", ...who);
-  assert.equal(specBlock(root), "", "a defect with no guard yet is no guard failure");
+  assert.equal(specBlock(root, ORIENT_AT), "", "a defect with no guard yet is no guard failure");
   const close = j("resolved", first, "--because", "oiled, every knob checked", "--guard", "widget/knob turns", ...who);
-  assert.equal(specBlock(root), "", "the guarded defect itself is none");
+  assert.equal(specBlock(root, ORIENT_AT), "", "the guarded defect itself is none");
   const repeat = j("defect", "another knob stuck", "--evidence", "turned it", "--class", "path-identity", ...who);
-  const block = specBlock(root);
+  const block = specBlock(root, ORIENT_AT);
   assert.match(block, /^Guard failures \(1\): a defect arrived in a class a guard already covered, so the guard was weaker than claimed/m);
   assert.match(block, new RegExp(`✕ ${repeat} in class path-identity, guarded by widget/knob turns since ${close}`));
 });
@@ -75,4 +78,27 @@ test("a hook call's kept time carries the Coherence version that answered it", (
   // A time kept before versions were written still reads, as unknown.
   appendFileSync(join(root, HOOK_TIMES_DIR, "s1.jsonl"), JSON.stringify({ at: "2026-10-01T10:00:00.000Z", event: "Stop", ms: 900 }) + "\n");
   assert.equal(hookTimes(root, "s1")[1]!.version, undefined);
+});
+
+test("orient names an invariant floor no run has graded in fourteen days", () => {
+  const root = project();
+  const runs = join(root, ".coherence", "runs");
+  mkdirSync(runs, { recursive: true });
+  const entry = { component: "widget", name: "knob turns", form: "totality oracle", verdict: "pass", refutation: "witnessed", bypasses: [], testReferences: 0, files: [], reason: "green" };
+  const run = (at: string, ungraded: boolean): void =>
+    appendFileSync(join(runs, "w.jsonl"), JSON.stringify({ at, session: "w", agent: "w", commit: null, dirty: false, invariants: [ungraded ? { ...entry, ungraded: true } : { ...entry, state: "invariant" }] }) + "\n");
+  appendFileSync(join(runs, "w.jsonl"), JSON.stringify({ kind: "refutation", at: "2026-08-31T00:00:00.000Z", session: "w", agent: "w", component: "widget", name: "knob turns", form: "totality oracle", broke: "a break", verdict: "fail", reason: "red", commit: null, dirty: false }) + "\n");
+  const day = 86_400_000;
+  const graded = Date.parse("2026-09-01T00:00:00.000Z");
+  const FLOOR = /^Invariant floor:/m;
+  assert.doesNotMatch(specBlock(root, graded), FLOOR, "no run, no floor to name");
+  run("2026-09-01T00:00:00.000Z", true);
+  assert.match(specBlock(root, graded + day), /^Invariant floor: no run has graded its entries; an edit's check records its entries ungraded, so the floor stands where that run left it\. Run: run$/m, "only edit checks: the floor was never moved");
+  run("2026-09-01T00:00:01.000Z", false);
+  assert.doesNotMatch(specBlock(root, graded + 14 * day), FLOOR, "a full run fourteen days ago still holds the floor");
+  // Edit checks since the full run, the latest of all the runs, move nothing.
+  run("2026-09-20T00:00:00.000Z", true);
+  assert.match(specBlock(root, graded + 20 * day), /^Invariant floor: the last run that graded its entries was 19 days ago \(2026-09-01T00:00:01\.000Z\); an edit's check records its entries ungraded/m);
+  run("2026-09-21T00:00:00.000Z", false);
+  assert.doesNotMatch(specBlock(root, graded + 21 * day), FLOOR, "a full run moves it again");
 });

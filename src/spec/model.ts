@@ -95,8 +95,12 @@ export interface SpecModel {
   components: Component[];
   problems: Problem[];
   counts: Counts;
-  /** When runs exist: the time of the latest, and how many run lines were unreadable. */
-  runs: { latest: string; count: number; damaged: number } | undefined;
+  /**
+   * When runs exist: the time of the latest, how many run lines were
+   * unreadable, and the time of the latest run that graded its entries (an
+   * edit's check records them ungraded), undefined when none did.
+   */
+  runs: { latest: string; count: number; damaged: number; graded: string | undefined } | undefined;
   /** The floor on defects: closes with neither a guard nor a decision, and guard failures; advisory, never a problem. */
   defects?: DefectFloor;
 }
@@ -155,7 +159,7 @@ export interface ChokepointEntry {
   component: string;
   name: string;
   enforcements: Invariant["enforcements"];
-  latest: { form: "chokepoint"; files: string[] }[];
+  latest: { form: "chokepoint"; files: string[]; language?: string }[];
 }
 
 /**
@@ -177,6 +181,9 @@ export function chokepointIndex(rootGiven: string, written: readonly string[] = 
   // The specs findSpecs would find, from a listing of the specs alone.
   const bounds = walkBounds(root, config.ignore);
   const specs = projectFilesEnding(root, SPEC_SUFFIX).filter((rel) => exclusionOf(rel, bounds) === undefined).map((rel) => join(root, rel));
+  // No spec from the light listing is a claim to check, never an answer: a listing that matched nothing it should have
+  // (a pathspec read another way) would leave every edit unchecked. The walk the spec model reads decides.
+  if (specs.length === 0 && findSpecs(root, config.ignore).length > 0) throw new Error("the listing of the specs found none where the project holds some");
   for (const specPath of specs) {
     const folder = folderOf(root, specPath);
     // A folder holds one spec, as the model reads it: a second is a problem there, and nothing here.
@@ -186,8 +193,9 @@ export function chokepointIndex(rootGiven: string, written: readonly string[] = 
     for (const invariant of parseSpec(readProjectText(specPath, "spec"), rel).invariants) {
       if (!invariant.enforcements.some((e) => e.form === "chokepoint")) continue;
       const key = entryKey(folder, invariant.name, "chokepoint");
-      const files = written.filter((file) => seeing?.get(file)?.has(key) === true);
-      entries.push({ component: folder, name: invariant.name, enforcements: invariant.enforcements, latest: files.length === 0 ? [] : [{ form: "chokepoint", files }] });
+      // The latest run's whole file list and its language, as the model carries them: the run of a touched invariant asks that language first.
+      const last = seeing?.latest.get(key);
+      entries.push({ component: folder, name: invariant.name, enforcements: invariant.enforcements, latest: last === undefined ? [] : [{ form: "chokepoint", files: last.files, ...(last.language === undefined ? {} : { language: last.language }) }] });
     }
   }
   return entries;
@@ -216,7 +224,14 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   const runs =
     loadedRuns.records.length === 0
       ? undefined
-      : { latest: loadedRuns.records[loadedRuns.records.length - 1]!.at, count: loadedRuns.records.length, damaged: loadedRuns.damaged.length };
+      : {
+          latest: loadedRuns.records[loadedRuns.records.length - 1]!.at,
+          count: loadedRuns.records.length,
+          damaged: loadedRuns.damaged.length,
+          graded: loadedRuns.records
+            .filter((record) => record.invariants.some((entry) => entry.ungraded !== true))
+            .reduce<string | undefined>((at, record) => (at === undefined || record.at > at ? record.at : at), undefined),
+        };
 
   const byFolder = new Map<string, { folder: string; specPath: string; parsed: ReturnType<typeof parseSpec> }>();
   for (const specPath of findSpecs(root, config.ignore)) {

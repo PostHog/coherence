@@ -18,7 +18,6 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
 import { runHook, type HookEvent, type HookInput } from "./hook.ts";
 import { closeWork, countWork, lastHookWork, openWork, type Work } from "./work-meter.ts";
 import { sizedProject, type SizedProject } from "./size-fixture.ts";
@@ -38,6 +37,9 @@ import { TypeScriptAdapter } from "../adapters/typescript.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 
 const SESSION = "sized";
+
+/** The project-sized spawns an edit's PostToolUse may make (each named where the edit test states its budget). */
+const EDIT_PROJECT_SIZED = 6;
 
 /** An instrument that answers nothing: a check an edit makes is said not run, and no language server is started for a fixture. */
 const NO_INSTRUMENT = {
@@ -96,7 +98,7 @@ function weighed(m: Measured): Map<string, number> {
     const k = family(key);
     out.set(k, (out.get(k) ?? 0) + weight);
   };
-  for (const kind of ["coverage reading", "spec model", "server request", "phrase comparison"] as const) add(`meter ${kind}`, m.work.counts[kind]);
+  for (const kind of ["coverage reading", "spec model", "server request", "phrase comparison", "project-sized spawn"] as const) add(`meter ${kind}`, m.work.counts[kind]);
   for (const r of m.work.reads) add(`meter read ${r}`, 1);
   for (const s of m.work.spawns) add(`meter spawn ${s}`, 1);
   for (const [line, bytes] of Object.entries(m.work.outputs)) add(`spawn output ${line}`, bytes);
@@ -107,14 +109,24 @@ function weighed(m: Measured): Map<string, number> {
 /** What an event may pay for one by one: families of files it must name, each at most tenfold when they grow tenfold. */
 const PRACTICES = /proj\/src\/cN\/CN\.(practice|spec)\.md|ls-files .*\*\.practice\.md/;
 const SPECS = /proj\/src\/cN\/(CN\.spec\.md|\.git|pyvenv\.cfg)$|ls-files .*\*\.spec\.md/;
-const RUNS = /proj\/\.coherence\/runs(\/hN\.jsonl)?$/;
-const JOURNAL = /proj\/\.coherence\/journal(\/hN\.jsonl)?$/;
+// The history families grow only in their file lists, a stat or a listed entry per file, and in the index or memo that keeps one line per
+// file; the bytes of the history itself are never in a budget: the index and the memo exist so that no hook reads them.
+const RUNS = /^fs (statSync|lstatSync|existsSync|readdirSync|realpathSync) .*proj\/\.coherence\/runs(\/hN\.jsonl)?$|^fs readFileSync .*proj\/\.coherence\/cache\/run-index\.json$/;
+// The vocabulary an edit judges against: the lexicons, the session's baseline, the kept state's meta and the buckets it reads, one of 64
+// each. These grow with the vocabulary and the project's terms, never with the corpus's lines read or its history.
+const VOCABULARY = /^fs (readFileSync|promises\.readFile) .*(proj\/lexicon\.json|docs\/lexicon\.json|\.coherence\/lexicon\/sessions\/[^/]+\.json|\.coherence\/cache\/vocabulary\/(meta\.json|declared\.json|files\/\d+\.json|terms\/\d+\.json))$/;
+const JOURNAL = /^fs (statSync|lstatSync|existsSync|readdirSync|realpathSync) .*proj\/\.coherence\/journal(\/hN\.jsonl)?$|^fs readFileSync .*proj\/\.coherence\/feed\/[^/]+\.seen$/;
 
 /** Every way the large call's work exceeds the small's beyond its budget; none when it holds. */
-function overBudget(small: Measured, large: Measured, allowed: readonly RegExp[]): string[] {
+function overBudget(small: Measured, large: Measured, allowed: readonly RegExp[], projectSized = 0): string[] {
   const s = weighed(small);
   const l = weighed(large);
   const problems: string[] = [];
+  // A spawn whose cost is the project's (git listing, searching or comparing the tree) is budgeted by count, at both sizes:
+  // its output may be small and its work the whole tree.
+  for (const [at, m] of [["1×", small], ["10×", large]] as const) {
+    if (m.work.counts["project-sized spawn"] > projectSized) problems.push(`project-sized spawns at ${at}: ${m.work.counts["project-sized spawn"]}, over the ${projectSized} the event may make (${m.work.spawns.filter((line) => /git\s(?:.*\s)?(ls-files|grep|status|diff|ls-tree|log|rev-list|check-ignore)\b/.test(line)).join("; ")})`);
+  }
   for (const key of new Set([...s.keys(), ...l.keys()])) {
     const a = s.get(key) ?? 0;
     const b = l.get(key) ?? 0;
@@ -169,16 +181,17 @@ test("a tool use that writes nothing pays only for its practice files and the jo
     }
     return works;
   });
-  const budgets: Record<string, RegExp[]> = {
+  // Each event's families, and the project-sized spawns it may make: a command lists the practice files once.
+  const budgets: Record<string, [RegExp[], number]> = {
     // A command is read against every practice: each practice file, once, and the spec it pairs with.
-    "PreToolUse Read": [],
-    "PreToolUse ls": [PRACTICES],
+    "PreToolUse Read": [[], 0],
+    "PreToolUse ls": [[PRACTICES], 1],
     // The peer feed lists the journal's files and reads only those that changed since its last look.
-    "PostToolUse Read": [JOURNAL],
-    "PostToolUse ls": [JOURNAL],
+    "PostToolUse Read": [[JOURNAL], 0],
+    "PostToolUse ls": [[JOURNAL], 0],
   };
   for (const name of Object.keys(small)) {
-    assert.deepEqual(overBudget(small[name]!, large[name]!, budgets[name]!), [], `${name} pays only for its budget over 30 components and their history`);
+    assert.deepEqual(overBudget(small[name]!, large[name]!, budgets[name]![0], budgets[name]![1]), [], `${name} pays only for its budget over 30 components and their history`);
     assert.equal(small[name]!.work.counts["coverage reading"], 0, `${name} takes no coverage reading`);
     assert.equal(small[name]!.work.counts["spec model"], 0, `${name} loads no spec model`);
     assert.deepEqual(projectReads(small[name]!).filter((p) => !/\.practice\.md$/.test(p) && !["coherence.config.json", "lexicon.json", "package.json"].includes(p)), [], `${name} reads no project file but its config and practices`);
@@ -218,8 +231,12 @@ test("an edit pays for the files it names, the specs and the history's file list
       const s = small[where]![at];
       const l = large[where]![at];
       // Before an edit, its practices; after it, every spec (read for its chokepoint lines), the run and journal file lists, and the run the check appends.
-      const budget = at === "pre" ? [PRACTICES] : [SPECS, RUNS, JOURNAL];
-      assert.deepEqual(overBudget(s, l, budget), [], `${where}, ${at}: pays only for its budget beside ten times the components, files and history`);
+      const budget = at === "pre" ? [PRACTICES] : [SPECS, RUNS, JOURNAL, VOCABULARY];
+      // Before an edit, the practice listing; after it, six: the project's own files asked of the written one twice (the trace and the check),
+      // the specs' listing twice (the check and the reading's components), and the tree key's two listings.
+      // A touched invariant's run also asks whether the tree is dirty, for the record it appends: one more.
+      const sized = at === "pre" ? 1 : EDIT_PROJECT_SIZED + (where === "edit naming a protected thing" ? 1 : 0);
+      assert.deepEqual(overBudget(s, l, budget, sized), [], `${where}, ${at}: pays only for its budget beside ten times the components, files and history`);
       assert.equal(s.work.counts["spec model"], 0, `${where}, ${at}: no whole spec model`);
       assert.equal(s.work.counts["server request"], l.work.counts["server request"], `${where}, ${at}: the same requests of the instrument`);
       assert.deepEqual([...new Set(projectReads(s))].filter((p) => p !== rel && !/\.(spec|practice)\.md$/.test(p) && !["coherence.config.json", "lexicon.json", "package.json"].includes(p)), [], `${where}, ${at}: no other project file is read`);
@@ -247,7 +264,9 @@ test("an event outside every project does the same work at 1× and 10×, and rea
   for (const [name, work] of Object.entries(small)) {
     // The command a cd took away still runs in the project's session: it is read against the project's own practices, as any command is.
     const budget = name === "command a cd took out of the project" ? [PRACTICES] : [];
-    assert.deepEqual(overBudget(work, (large as Record<string, Measured>)[name]!, budget), [], `${name}: outside the project, its size changes nothing`);
+    // The cd's command lists where the projects are and the project's practices; an event outside lists where the projects are, at most.
+    const sized = name === "command a cd took out of the project" ? 2 : 1;
+    assert.deepEqual(overBudget(work, (large as Record<string, Measured>)[name]!, budget, sized), [], `${name}: outside the project, its size changes nothing`);
     assert.deepEqual(work.work.reads.filter((r) => !/\.practice\.md$/.test(r)), [], `${name} reads no project file`);
     assert.equal(work.work.counts["coverage reading"] + work.work.counts["spec model"] + work.work.counts["server request"], 0, `${name} takes no reading`);
   }
@@ -258,7 +277,8 @@ test("a prompt over an unchanged tree reads no corpus, and pays only for the jou
     await workOf(project, "UserPromptSubmit", { prompt: "first" });
     return workOf(project, "UserPromptSubmit", { prompt: "second" });
   });
-  assert.deepEqual(overBudget(small, large, [JOURNAL]), [], "the second prompt pays only for the journal's file list over 30 components as over 3");
+  // The tree key: git's changed files and its untracked ones, two listings.
+  assert.deepEqual(overBudget(small, large, [JOURNAL], 2), [], "the second prompt pays only for the journal's file list over 30 components as over 3");
   assert.equal(small.work.counts["coverage reading"], 0, "no coverage reading over a tree that has not moved");
   assert.deepEqual(small.work.reads, [], "no project file read");
 });
@@ -314,116 +334,30 @@ test("the coverage scan compares a line only with the phrases its own words star
   assert.equal(worded - base, 200 * 3, "a word on every line that starts names adds what those names cost on each line, nothing more");
 });
 
-/* ------------------------------------------------------------ the spawn scan */
+/* ------------------------------------------------------------ spawns, at runtime */
 
-/** The meter: the one module that takes child_process. */
-const SPAWN_ALLOWED = new Set(["lifecycle/work-meter.ts"]);
-/** Test support that takes child_process to build fixtures, each by name. */
-const FIXTURES_THAT_SPAWN = new Set(["adapters/git-count-fixture.ts", "lifecycle/size-fixture.ts", "readings/scope/undeclared-fixture.ts", "readings/scope/gaps-fixture.ts", "enforcement/server-fixture.ts"]);
-/** Test support that loads a module by a computed name, each by name: the file system counter, which takes fs as CommonJS to replace its functions. */
-const LOADERS_ALLOWED = new Set(["lifecycle/fs-count-fixture.ts"]);
-
-const CHILD = /^(node:)?child_process$/;
-
-/** A string literal's text, or undefined for anything computed. */
-function literal(node: ts.Expression | undefined): string | undefined {
-  if (node === undefined) return undefined;
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
-  if (ts.isAsExpression(node) || ts.isParenthesizedExpression(node)) return literal(node.expression);
-  return undefined;
-}
-
-/**
- * What the scan refuses in one file, read by the compiler, so a comment or a
- * string is never code and code is never hidden in one: child_process named
- * as a module outside the meter, tests and named fixtures; and, everywhere
- * outside the meter and test support listed by name, every way to load a module or
- * run code by a computed name.
- */
-function spawnOffences(rel: string, source: string): string[] {
-  const out: string[] = [];
-  const test = /\.(?:test|e2e)\.[cm]?[jt]s$/.test(rel);
-  const mayNameChild = test || SPAWN_ALLOWED.has(rel) || FIXTURES_THAT_SPAWN.has(rel);
-  const mayLoad = SPAWN_ALLOWED.has(rel) || LOADERS_ALLOWED.has(rel);
-  const kind = /\.[cm]?js$/.test(rel) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
-  const file = ts.createSourceFile(rel, source, ts.ScriptTarget.Latest, true, kind);
-  const say = (node: ts.Node, what: string): void => void out.push(`${rel}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}: ${what}`);
-  const child = (node: ts.Node, name: string | undefined): void => {
-    if (name !== undefined && CHILD.test(name) && !mayNameChild) say(node, "names child_process");
-  };
-  const visit = (node: ts.Node): void => {
-    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier !== undefined) child(node, literal(node.moduleSpecifier as ts.Expression));
-    if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
-      child(node, literal(node.moduleReference.expression));
-      if (!mayLoad) say(node, "import = require(");
-    }
-    if (ts.isCallExpression(node)) {
-      const callee = node.expression;
-      if (callee.kind === ts.SyntaxKind.ImportKeyword) {
-        const name = literal(node.arguments[0]);
-        if (name === undefined && !mayLoad) say(node, "import( of a computed name");
-        child(node, name);
-      }
-      if (ts.isIdentifier(callee) && ["require", "eval", "Function"].includes(callee.text)) {
-        child(node, literal(node.arguments[0]));
-        if (!mayLoad) say(node, `${callee.text}(`);
-      }
-    }
-    if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "Function" && !mayLoad) say(node, "new Function(");
-    if (ts.isNewExpression(node) && !mayLoad) {
-      const name = ts.isIdentifier(node.expression) ? node.expression.text : ts.isPropertyAccessExpression(node.expression) ? node.expression.name.text : "";
-      const options = node.arguments?.[1];
-      if (name === "Worker" && options !== undefined && (!ts.isObjectLiteralExpression(options) || options.properties.some((p) => p.name !== undefined && ts.isIdentifier(p.name) && p.name.text === "eval"))) say(node, "new Worker( of code");
-    }
-    if (ts.isIdentifier(node) && ["getBuiltinModule", "createRequire"].includes(node.text) && !mayLoad) say(node, node.text);
-    if (ts.isPropertyAccessExpression(node) && ["binding", "_linkedBinding"].includes(node.name.text) && ts.isIdentifier(node.expression) && node.expression.text === "process" && !mayLoad) say(node, "process.binding");
-    if (ts.isPropertyAccessExpression(node) && node.name.text === "require" && !mayLoad) say(node, ".require");
-    // A member reached by a computed name on what holds a loader: process["getBuilt" + "inModule"], globalThis[name].
-    if (ts.isElementAccessExpression(node) && ts.isIdentifier(node.expression) && ["process", "globalThis", "global", "module"].includes(node.expression.text) && literal(node.argumentExpression) === undefined && !mayLoad) say(node, `${node.expression.text}[ a computed name ]`);
-    ts.forEachChild(node, visit);
-  };
-  visit(file);
-  return out;
-}
-
-test("no source module spawns a child process except through the work meter", () => {
-  const src = join(fileURLToPath(new URL(".", import.meta.url)), "..");
-  const offenders: string[] = [];
-  const walk = (dir: string): void => {
-    for (const name of readdirSync(dir)) {
-      const path = join(dir, name);
-      if (statSync(path).isDirectory()) walk(path);
-      else if (/\.[cm]?[jt]s$/.test(name) && !name.endsWith(".d.ts")) offenders.push(...spawnOffences(relative(src, path).split("\\").join("/"), readFileSync(path, "utf8")));
-    }
-  };
-  walk(src);
-  assert.deepEqual(offenders, [], "a module that takes child_process itself, or loads a module or runs code by a computed name, spawns where no hook's count can see it");
-  // Every way around the import list the scan knows, each refused in an ordinary module, in every extension the scan reads.
-  const evasions = [
-    'import { spawnSync } from "node:child_process";',
-    "import cp from 'child_process';",
-    'export { spawnSync } from "node:child_process";',
-    'const { spawnSync } = process.getBuiltinModule("node:child_process");',
-    'const load = createRequire(import.meta.url); load("node:" + "child" + "_process");',
-    'const cp = require("child" + "_process");',
-    '/* x */ require("child_process");',
-    'require?.("child_process");',
-    "const name = 'child' + '_process'; await import(`node:${name}`);",
-    "await import(name);",
-    'process.binding("spawn_sync");',
-    'process["getBuilt" + "inModule"]("child_process");',
-    'eval("req" + "uire")("child" + "_process");',
-    'new Function("return req" + "uire")()("child" + "_process");',
-    'Function("return process")().getBuiltinModule;',
-    'new Worker("require(\'child_process\')", { eval: true });',
-    "module.require('child_process');",
+test("every spawn is counted at runtime, whatever route reached child_process", async () => {
+  const { createRequire } = await import("node:module");
+  const vm = await import("node:vm");
+  const { Worker } = await import("node:worker_threads");
+  const name = ["node:child", "process"].join("_");
+  const routes: [string, () => unknown][] = [
+    ["a static import", () => spawnSync("true")],
+    ["process.getBuiltinModule", () => (process as unknown as { getBuiltinModule: (n: string) => { spawnSync: (c: string) => unknown } }).getBuiltinModule(name).spawnSync("true")],
+    ["createRequire", () => (createRequire(import.meta.url)(name) as { execFileSync: (c: string) => unknown }).execFileSync("true")],
+    ["code vm runs", () => vm.runInThisContext(`process.getBuiltinModule("${name}").execSync("true")`)],
+    ["a dynamic import of a computed name", async () => ((await import(name)) as { spawnSync: (c: string) => unknown }).spawnSync("true")],
+    ["exec, which runs execFile, counted once", () => new Promise((done) => (createRequire(import.meta.url)(name) as { exec: (c: string, cb: () => void) => void }).exec("true", () => done(undefined)))],
+    ["a worker thread", () => new Promise((done) => new Worker("1", { eval: true }).once("exit", done))],
   ];
-  for (const text of evasions) {
-    for (const rel of ["lifecycle/ordinary.ts", "lifecycle/ordinary.js", "lifecycle/ordinary.mjs", "lifecycle/ordinary.cjs"]) assert.notDeepEqual(spawnOffences(rel, text), [], `refused in ${rel}: ${text}`);
-    if (!/^(import|export)/.test(text)) assert.notDeepEqual(spawnOffences("lifecycle/ordinary.test.ts", text), [], `refused in a test too: ${text}`);
-  }
-  for (const text of ['const { x } = await import("./x.ts");', '// require("child_process") is prose here', 'const s = "require(\'child_process\')";', 'const lib = await import("node-llama-cpp" as string);']) {
-    assert.deepEqual(spawnOffences("lifecycle/ordinary.ts", text), [], `not refused: ${text}`);
+  for (const [route, spawnIt] of routes) {
+    const scope = openWork();
+    try {
+      await spawnIt();
+    } finally {
+      closeWork(scope);
+    }
+    assert.equal(scope.work.counts.spawn, 1, `${route}: one spawn counted`);
   }
 });
 
@@ -443,6 +377,76 @@ function gitRepo(files: Record<string, string>): string {
 }
 
 const SPEC = (name: string) => `# A\n\nA component.\n\n## invariants\n- sealed: ${name} leaves only through seal.\n  protects: ${name}\n  chokepoint: seal\n  because: a fixture\n  kinds: none\n`;
+
+test("in a project of two languages, an edit's check asks the language the last run graded the invariant in, with that run's whole file list", async () => {
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- sealed store: SECRET leaves only through seal.\n  protects: SECRET\n  chokepoint: seal\n  because: a fixture\n  kinds: none\n";
+  const root = gitRepo({
+    "coherence.config.json": JSON.stringify({ language: ["typescript", "python"] }),
+    "Fixture.spec.md": spec,
+    "backend/store.py": "SECRET = 1\n\ndef seal():\n    return SECRET + 1\n",
+    "src/use.ts": "export const fine = 1;\n",
+  });
+  try {
+    // The last full run graded it through Python, over the Python files that hold the protected thing and its chokepoint.
+    appendRun(root, { at: "2026-06-01T00:00:00.000Z", session: "earlier", agent: "t", binding: "none", commit: null, dirty: false, instrument: { language: "python", server: "warm" }, latency: 1, invariants: [{ component: ".", name: "sealed store", form: "chokepoint", verdict: "pass", grade: "reference-choked", refutation: "automatic", bypasses: [], testReferences: 0, files: ["backend/store.py", "backend/use.py"], latency: 1, reason: "t", language: "python" }] } as unknown as RunRecord);
+    const [entry] = chokepointIndex(root, ["src/use.ts"]);
+    assert.deepEqual(entry?.latest, [{ form: "chokepoint", files: ["backend/store.py", "backend/use.py"], language: "python" }], "the light path carries the last run's language and its whole file list");
+    // A TypeScript edit that spells the Python symbol's name: the check is put to Python, as main puts it.
+    writeFileSync(join(root, "src/use.ts"), "export const SECRET = 2;\n");
+    const python = { ...NO_INSTRUMENT, language: "python" } as LanguageAdapter;
+    await runHook("PostToolUse", { cwd: root, session_id: "m", tool_name: "Edit", tool_input: { file_path: join(root, "src/use.ts") } }, root, { adapter: python });
+    const last = readFileSync(join(root, ".coherence", "runs", "m.jsonl"), "utf8").trim().split("\n").at(-1)!;
+    assert.deepEqual((JSON.parse(last) as RunRecord).invariants.map((e) => e.language), ["python"], "the edit's check asked Python first, and recorded it so");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an edit is checked with GIT_LITERAL_PATHSPECS set as without it", async () => {
+  const root = gitRepo({ "coherence.config.json": JSON.stringify({ name: "l" }), "src/a/A.spec.md": SPEC("SECRET_0"), "src/a/m.ts": "export const x = 1;\n" });
+  const saved = Object.fromEntries(["GIT_LITERAL_PATHSPECS"].map((k) => [k, process.env[k]]));
+  try {
+    process.env["GIT_LITERAL_PATHSPECS"] = "1";
+    const listed = (() => {
+      try {
+        return chokepointIndex(root).map((i) => i.name);
+      } catch (error) {
+        return [`threw: ${error instanceof Error ? error.message : String(error)}`];
+      }
+    })();
+    assert.deepEqual(listed, ["sealed"], "the specs are listed by the light way whatever the environment says pathspecs mean");
+    writeFileSync(join(root, "src/a/m.ts"), "export const leak = SECRET_0;\n");
+    const answered = await runHook("PostToolUse", { cwd: root, session_id: "l", tool_name: "Edit", tool_input: { file_path: join(root, "src/a/m.ts") } }, root, { adapter: NO_INSTRUMENT });
+    assert.match(answered.stdout, /could not check 1 chokepoint invariant at this edit/, "the edit naming the protected name is put to the check, as main puts it");
+    assert.doesNotMatch(answered.stdout, /without its index/, "and by the light way: the listing itself was not misread");
+  } finally {
+    for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a spec listing that comes back empty where the project holds specs falls back to the whole model and says so", async () => {
+  const root = gitRepo({ "coherence.config.json": JSON.stringify({ name: "e" }), "src/a/A.spec.md": SPEC("SECRET_0"), "src/a/m.ts": "export const x = 1;\n" });
+  // A git that answers every glob pathspec with nothing, as any way of misreading one would: the listing is empty and nothing throws.
+  const real = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+  const shim = mkdtempSync(join(tmpdir(), "coherence-empty-git-"));
+  writeFileSync(join(shim, "git"), `#!/bin/sh\ncase "$*" in *":(glob)"*) exit 0 ;; esac\nexec '${real}' "$@"\n`);
+  spawnSync("chmod", ["+x", join(shim, "git")]);
+  const path = process.env["PATH"];
+  try {
+    process.env["PATH"] = `${shim}:${path ?? ""}`;
+    assert.throws(() => chokepointIndex(root), /found none where the project holds some/, "an empty listing is a failure, not an answer");
+    writeFileSync(join(root, "src/a/m.ts"), "export const leak = SECRET_0;\n");
+    const answered = await runHook("PostToolUse", { cwd: root, session_id: "e", tool_name: "Edit", tool_input: { file_path: join(root, "src/a/m.ts") } }, root, { adapter: NO_INSTRUMENT });
+    assert.match(answered.stdout, /without its index: the listing of the specs found none/, "the fallback is said");
+    assert.match(answered.stdout, /could not check 1 chokepoint invariant at this edit/, "and the edit is still put to the check");
+  } finally {
+    process.env["PATH"] = path;
+    rmSync(shim, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("an edit is checked against a spec changed at the same size with its modification time set back", async () => {
   const root = gitRepo({ "coherence.config.json": JSON.stringify({ name: "k" }), "src/a/A.spec.md": SPEC("SECRET_0"), "src/a/m.ts": "export const x = 1;\n" });
@@ -506,7 +510,7 @@ test("the run index answers as the run history does after appends, a replaced fi
   try {
     const key = entryKey("src/a", "sealed", "chokepoint");
     const fromHistory = (file: string) => latestByEnforcement(loadRuns(root).records).get(key)?.files.includes(file) === true;
-    const fromIndex = (file: string) => latestSeeing(root, [file], parseLine).get(file)?.has(key) === true;
+    const fromIndex = (file: string) => latestSeeing(root, [file], parseLine).byFile.get(file)?.has(key) === true;
     const agree = (when: string) => {
       for (const file of ["src/a/x.ts", "src/a/y.ts", "src/a/z.ts", "src/a/w.ts", "src/b/y.ts"]) assert.equal(fromIndex(file), fromHistory(file), `${when}: ${file}`);
     };
@@ -592,6 +596,55 @@ test("the peer feed shows every record a peer appended, through a cleared cache 
 });
 
 /* ------------------------------------------------------------ the kept vocabulary */
+
+test("an edit over torn or missing vocabulary buckets reads in full, says so, names nothing false and writes nothing derived from them", async () => {
+  for (const damage of ["torn term buckets", "a missing file bucket", "a term bucket in another shape"] as const) {
+    const project = sizedProject(1);
+    try {
+      const start = await runHook("SessionStart", { session_id: SESSION, cwd: project.root }, project.root, {});
+      start.commit?.();
+      const state = join(cacheDir(project.root), "vocabulary");
+      // Every bucket the state could hold is listed and damaged, so whichever ones this edit reads are damaged.
+      const ids = Array.from({ length: 64 }, (_, n) => String(n).padStart(2, "0"));
+      const meta = JSON.parse(readFileSync(join(state, "meta.json"), "utf8")) as Record<string, unknown>;
+      writeFileSync(join(state, "meta.json"), JSON.stringify({ ...meta, buckets: { files: ids, terms: ids } }));
+      if (damage === "torn term buckets") for (const id of ids) writeFileSync(join(state, "terms", `${id}.json`), "{");
+      if (damage === "a term bucket in another shape") for (const id of ids) writeFileSync(join(state, "terms", `${id}.json`), JSON.stringify({ pool: { x: { named: "three" } }, words: {} }));
+      if (damage === "a missing file bucket") for (const name of readdirSync(join(state, "files"))) rmSync(join(state, "files", name));
+      // An ordinary edit: a line that names a term once, which no whole reading would call recurring; the edit reads that term's bucket.
+      const file = join(project.root, "docs/note-0.md");
+      writeFileSync(file, readFileSync(file, "utf8") + "The `zorbix` turns again.\n");
+      const m = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
+      assert.match(m.said, /Lexicon: read in full at this edit: (a kept bucket|its kept)/, `${damage}: the fallback is said`);
+      assert.ok(m.work.reads.filter((r) => r.startsWith("corpus ")).length > 1, `${damage}: the corpus was read in full`);
+      assert.doesNotMatch(m.said, /recur without a definition|sense at risk/, `${damage}: an ordinary edit is named nothing, as a whole reading names it nothing`);
+      // The full reading kept the state again, whole: no bucket is left torn, none holds totals derived from the damaged parts.
+      for (const kind of ["terms", "files"]) for (const name of readdirSync(join(state, kind))) assert.doesNotThrow(() => JSON.parse(readFileSync(join(state, kind, name), "utf8")), `${damage}: ${kind}/${name} is whole again`);
+      const next = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
+      assert.doesNotMatch(next.said, /read in full/, `${damage}: the next edit reads the state the full reading kept`);
+    } finally {
+      rmSync(project.top, { recursive: true, force: true });
+    }
+  }
+});
+
+test("a write no hook saw is caught at the next edit, which reads in full as main does", async () => {
+  const project = sizedProject(1);
+  try {
+    const start = await runHook("SessionStart", { session_id: SESSION, cwd: project.root }, project.root, {});
+    start.commit?.();
+    // A generator, a checkout or a shell command the shell reader does not parse: the file changes and no hook hears of it.
+    const unseen = join(project.root, "docs/note-1.md");
+    writeFileSync(unseen, readFileSync(unseen, "utf8") + "The `rebate` is new.\nEach `rebate` is paid.\n");
+    const file = join(project.root, "docs/note-0.md");
+    writeFileSync(file, readFileSync(file, "utf8") + "A `rebate` is clawed back.\n");
+    const m = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
+    assert.match(m.said, /Lexicon: read in full at this edit: the tree moved since its vocabulary was kept, beyond what this edit wrote \(docs\/note-1\.md\)/, "the unseen write is said");
+    assert.match(m.said, /"rebate" recur without a definition/, "and the term it made recur with this edit is named, as main names it");
+  } finally {
+    rmSync(project.top, { recursive: true, force: true });
+  }
+});
 
 test("an edit whose kept vocabulary was left half-written reads in full and says so", async () => {
   const project = sizedProject(1);

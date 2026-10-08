@@ -30,7 +30,7 @@ import { join } from "node:path";
 import { cacheDir, storeVersion, withLock, writeKept } from "../lifecycle/kept-parse.ts";
 
 /** The shape of the index; one of another shape, or one other code made, is rebuilt. */
-const INDEX_SHAPE = "run-index-2";
+const INDEX_SHAPE = "run-index-3";
 /** The code the index is made by: this module and the run records' parser. */
 const INDEX_CODE = ["enforcement/run-index.ts", "enforcement/record.ts"];
 
@@ -42,6 +42,8 @@ interface Latest {
   file: string;
   offset: number;
   files: string[];
+  /** The language whose instrument graded it, when the run recorded one: where its next check is asked first. */
+  language?: string;
 }
 
 interface Held {
@@ -98,13 +100,13 @@ type Parse = (line: string) => unknown;
 
 /** Fold one line's chokepoint entries into the latest of each enforcement. */
 function fold(latest: Record<string, Latest>, file: string, offset: number, line: string, parse: Parse): void {
-  const record = parse(line) as { at?: string; kind?: string; invariants?: { component: string; name: string; form: string; files?: string[] }[] } | string;
+  const record = parse(line) as { at?: string; kind?: string; invariants?: { component: string; name: string; form: string; files?: string[]; language?: string }[] } | string;
   if (typeof record === "string" || record.kind !== undefined || !Array.isArray(record.invariants) || typeof record.at !== "string") return;
   for (const entry of record.invariants) {
     if (entry.form !== "chokepoint") continue;
     // entryKey's spelling (record.ts), which a lookup is made by.
     const key = `${entry.component}\0${entry.name}\0${entry.form}`;
-    const next: Latest = { at: record.at, file, offset, files: [...new Set(entry.files ?? [])].sort() };
+    const next: Latest = { at: record.at, file, offset, files: [...new Set(entry.files ?? [])].sort(), ...(typeof entry.language === "string" ? { language: entry.language } : {}) };
     if (later(next, latest[key])) latest[key] = next;
   }
 }
@@ -204,7 +206,13 @@ export class RunIndexUnavailable extends Error {}
  * index cannot be read and rebuilt and written: its caller then reads the
  * whole run store instead and says why.
  */
-export function latestSeeing(root: string, files: readonly string[], parse: Parse): Map<string, Set<string>> {
+/** What a lookup answers: per written file, the enforcements whose latest run saw it; and each enforcement's latest files and language. */
+export interface Seeing {
+  byFile: Map<string, Set<string>>;
+  latest: Map<string, { files: string[]; language?: string }>;
+}
+
+export function latestSeeing(root: string, files: readonly string[], parse: Parse): Seeing {
   const now = runFiles(root);
   let index = readIndex(root);
   const version = storeVersion(root, INDEX_SHAPE, INDEX_CODE);
@@ -225,5 +233,5 @@ export function latestSeeing(root: string, files: readonly string[], parse: Pars
   const latest = index!.latest;
   const byFile = new Map<string, Set<string>>();
   for (const file of files) byFile.set(file, new Set(Object.entries(latest).filter(([, l]) => l.files.includes(file)).map(([key]) => key)));
-  return byFile;
+  return { byFile, latest: new Map(Object.entries(latest).map(([key, l]) => [key, { files: l.files, ...(l.language === undefined ? {} : { language: l.language }) }])) };
 }

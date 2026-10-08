@@ -23,8 +23,8 @@
  *       src/big/Big.spec.md        one component of 6 × scale notes
  *       src/big/part-<k>.md
  *       docs/note-<k>.md           4 × scale notes in the root component
- *       .coherence/runs/h<k>.jsonl     2 × scale run files of 3 runs each
- *       .coherence/journal/h<k>.jsonl  2 × scale journal files of 5 records each
+ *       .coherence/runs/h<k>.jsonl     2 × scale run files of 3 × scale runs each
+ *       .coherence/journal/h<k>.jsonl  2 × scale journal files of 5 × scale records each
  */
 
 import { spawnSync } from "node:child_process";
@@ -120,8 +120,9 @@ export function sizedProject(scale: number): SizedProject {
   }
   for (let k = 0; k < 2 * scale; k++) {
     const day = `2026-01-${String((k % 28) + 1).padStart(2, "0")}`;
-    files[`proj/.coherence/runs/h${k}.jsonl`] = [0, 1, 2].map((r) => run(`${day}T0${r}:00:00.000Z`, (k + r) % (3 * scale)) + "\n").join("");
-    files[`proj/.coherence/journal/h${k}.jsonl`] = [0, 1, 2, 3, 4].map((r) => decision(`${day}T1${r}:00:00.000Z`, k * 5 + r) + "\n").join("");
+    // History grows in each file as well as in the number of files: 3 × scale runs and 5 × scale records each.
+    files[`proj/.coherence/runs/h${k}.jsonl`] = Array.from({ length: 3 * scale }, (_, r) => run(`${day}T${String(r % 24).padStart(2, "0")}:${String(r).padStart(2, "0")}:00.000Z`, (k + r) % (3 * scale)) + "\n").join("");
+    files[`proj/.coherence/journal/h${k}.jsonl`] = Array.from({ length: 5 * scale }, (_, r) => decision(`${day}T${String(r % 24).padStart(2, "0")}:${String(r).padStart(2, "0")}:30.000Z`, k * 100 + r) + "\n").join("");
   }
   for (const [path, text] of Object.entries(files)) {
     mkdirSync(dirname(join(top, path)), { recursive: true });

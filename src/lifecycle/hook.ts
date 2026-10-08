@@ -455,7 +455,19 @@ function specModelOrNull(root: string): SpecModel | { error: string } {
 }
 
 /** Requirements still short of invariant, and grammar problems, for orient. */
-export function specBlock(root: string): string {
+/** How long the invariant floor may go without a run that grades before orient names it. */
+export const FLOOR_QUIET_DAYS = 14;
+
+/** The orient line for a floor no full run has moved in FLOOR_QUIET_DAYS, or undefined while one has (or no run exists). */
+export function floorQuiet(runs: SpecModel["runs"], now: number): string | undefined {
+  if (runs === undefined) return undefined;
+  const since = runs.graded === undefined ? undefined : Date.parse(runs.graded);
+  if (since !== undefined && Number.isFinite(since) && now - since <= FLOOR_QUIET_DAYS * 86_400_000) return undefined;
+  const age = since === undefined || !Number.isFinite(since) ? "no run has graded its entries" : `the last run that graded its entries was ${Math.floor((now - since) / 86_400_000)} days ago (${runs.graded})`;
+  return `Invariant floor: ${age}; an edit's check records its entries ungraded, so the floor stands where that run left it. Run: run`;
+}
+
+export function specBlock(root: string, now: number = Date.now()): string {
   const model = specModelOrNull(root);
   if ("error" in model) return `Spec: not readable (${model.error})\n\n`;
   if (model.components.length === 0) return "";
@@ -467,6 +479,10 @@ export function specBlock(root: string): string {
     for (const { c, i } of open.slice(0, OPEN_REQUIREMENT_LINES)) lines.push(`○ ${c.folder}/${i.name} — lacks: ${i.lacks.join(", ")}`);
     if (open.length > OPEN_REQUIREMENT_LINES) lines.push(`  and ${open.length - OPEN_REQUIREMENT_LINES} more; run: spec --check`);
   }
+  // The invariant floor moves only with a run that grades: an edit's check records its entries ungraded, so a project
+  // that only edits keeps a floor as old as its last full run, and says so.
+  const quiet = floorQuiet(model.runs, now);
+  if (quiet !== undefined) lines.push(quiet);
   // A defect in a class already guarded: the protection was weaker than claimed (journal/defects.ts).
   const failures = model.defects?.guardFailures ?? [];
   if (failures.length > 0) {
