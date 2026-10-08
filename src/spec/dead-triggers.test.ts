@@ -14,8 +14,10 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
-import { loadSpecModel } from "./model.ts";
 import { adopt, adoptText } from "../lifecycle/adopt.ts";
+import { closeWork, openWork } from "../lifecycle/work-meter.ts";
+import { deadTriggers } from "./practices.ts";
+import { loadSpecModel, projectPractices } from "./model.ts";
 
 const madeFolders: string[] = [];
 after(() => {
@@ -90,4 +92,58 @@ test("adopt names the folder's practice triggers that name no file of the projec
   assert.equal(adopted.deadTriggers.length, 1);
   assert.match(adoptText(adopted, "coherence"), /1 practice trigger in posthog name no file of the project it now is[^\n]*\n  practice auth rule: its trigger edit posthog\/auth\.py .*: write edit auth\.py/);
   assert.deepEqual(adopt(top, "ee/api").deadTriggers, [], "a folder whose triggers already name its files hears nothing more");
+});
+
+test("the dead-trigger check lists only what its triggers name, so a project ten times larger costs it nothing more", () => {
+  // The spec model loads several times in one hook, and each load runs the check: a listing of the whole project per load cost PostHog's first leaf entry half a second.
+  const files = (others: number): Record<string, string> => ({
+    "coherence.config.json": JSON.stringify({ name: "p" }),
+    "src/widget/Widget.spec.md": spec("Widget"),
+    "src/widget/knob.ts": "export const knob = 1;\n",
+    "src/widget/Widget.practice.md": practice("oil the knob", "edit src/widget/knob.ts adding knob | edit src/widget/*.ts adding dial"),
+    ...Object.fromEntries(Array.from({ length: others }, (_, k) => [`docs/notes/note-${k}.md`, `A note numbered ${k}.\n`])),
+  });
+  const output = (root: string): number => {
+    const practices = projectPractices(root);
+    const scope = openWork();
+    try {
+      assert.deepEqual(deadTriggers(root, practices), []);
+    } finally {
+      closeWork(scope);
+    }
+    return Object.values(scope.work.outputs).reduce((sum, bytes) => sum + bytes, 0);
+  };
+  const small = output(repository(files(20)));
+  const large = output(repository(files(2000)));
+  assert.ok(small > 0, "the check asks git");
+  assert.equal(large, small, `the check's listings are the same size beside 20 and 2000 unrelated files: ${small} and ${large} bytes`);
+});
+
+test("a dead trigger in a leaf is looked for outside it as narrowly, so the repository's size costs the check nothing", () => {
+  // While a trigger is dead, every model load looks for it outside the leaf: a listing of the whole repository each time is the cost the check exists to avoid.
+  const files = (others: number): Record<string, string> => ({
+    "coherence.config.json": JSON.stringify({ projects: ["app"] }),
+    "app/App.spec.md": spec("App"),
+    "app/x.ts": "export const x = 1;\n",
+    "app/App.practice.md": practice("touch the other", "edit other/real.ts adding a | edit other/*.ts adding b"),
+    "other/real.ts": "export const real = 1;\n",
+    ...Object.fromEntries(Array.from({ length: others }, (_, k) => [`docs/notes/note-${k}.md`, `A note numbered ${k}.\n`])),
+  });
+  const measured = (top: string): { bytes: number; outside: string[] } => {
+    const root = join(top, "app");
+    const practices = projectPractices(root);
+    const scope = openWork();
+    let found: ReturnType<typeof deadTriggers>;
+    try {
+      found = deadTriggers(root, practices);
+    } finally {
+      closeWork(scope);
+    }
+    return { bytes: Object.values(scope.work.outputs).reduce((sum, bytes) => sum + bytes, 0), outside: found.map((d) => `${d.glob}: ${(d.outside ?? []).join(", ")}`) };
+  };
+  const small = measured(repository(files(20)));
+  const large = measured(repository(files(2000)));
+  assert.deepEqual(small.outside, ["other/real.ts: other/real.ts", "other/*.ts: other/real.ts"], "both triggers are named, with the file outside the leaf they name");
+  assert.deepEqual(large.outside, small.outside);
+  assert.equal(large.bytes, small.bytes, `the check's listings are the same size beside 20 and 2000 unrelated files: ${small.bytes} and ${large.bytes} bytes`);
 });
