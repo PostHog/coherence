@@ -18,7 +18,8 @@ import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { spawnSync } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PRACTICE_SUFFIX, RECORD_ID, parsePractices, type Practice } from "./practice.ts";
+import { PRACTICE_SUFFIX, RECORD_ID, globMatches, parsePractices, type Practice } from "./practice.ts";
+import { nestedFolder, projectFiles, repositoryTop } from "../adapters/project-files.ts";
 import type { Problem } from "./grammar.ts";
 import { loadJournal } from "../journal/store.ts";
 import { loadWork } from "../journal/work.ts";
@@ -173,6 +174,9 @@ export function practiceProblems(checks: PracticeChecks): Problem[] {
     }
   }
 
+  // A trigger that names no file of this project can never fire, and would never say so.
+  for (const dead of deadTriggers(root, practices)) problems.push({ file: dead.practice.file, line: dead.line, message: deadTriggerText(dead) });
+
   // The floor: what any enactment carried out may leave the practice only with a decision that amends it.
   for (const p of practices) {
     for (const gap of floorGaps(p, records)) {
@@ -242,4 +246,61 @@ export function journalRecords(root: string): JournalRecord[] {
   } catch {
     return [];
   }
+}
+
+/** An edit trigger of a project's own practice that matches no file of its project, so the practice can never fire on it. */
+export interface DeadTrigger {
+  practice: ModelPractice;
+  glob: string;
+  line: number;
+  /** The same path relative to this project's folder, when it was written relative to the repository top and matches there. */
+  suggestion?: string;
+  /** Files of the repository outside this project that the glob does match: a practice here never sees them. */
+  outside?: string[];
+}
+
+/**
+ * Every edit trigger of the project's own practices (a kernel practice's are
+ * Coherence's) that matches no project file. A when: line's paths are
+ * relative to the project's folder, so a trigger written relative to the
+ * repository top, as a whole-repository adoption wrote them, names nothing
+ * once the project is a folder below the top: it is reported with the path
+ * that folder makes of it, or with the files outside the project it names.
+ * The project's files are listed once, and only when an edit trigger exists.
+ */
+export function deadTriggers(root: string, practices: readonly ModelPractice[]): DeadTrigger[] {
+  const seen = new Set<string>();
+  const edits = practices
+    .filter((p) => !p.id.startsWith(KERNEL_PREFIX))
+    .flatMap((p) => p.triggers.flatMap((t) => (t.kind === "edit" ? [{ p, glob: t.glob }] : [])))
+    .filter(({ p, glob }) => !seen.has(`${p.id}\n${glob}`) && seen.add(`${p.id}\n${glob}`) !== undefined);
+  if (edits.length === 0) return [];
+  const files = projectFiles(root);
+  const nested = nestedFolder(root);
+  let repository: string[] | undefined;
+  const out: DeadTrigger[] = [];
+  for (const { p, glob } of edits) {
+    if (files.some((f) => globMatches(glob, f))) continue;
+    const dead: DeadTrigger = { practice: p, glob, line: p.lines.when ?? p.line };
+    if (nested !== undefined && glob.startsWith(`${nested}/`)) {
+      const rest = glob.slice(nested.length + 1);
+      if (files.some((f) => globMatches(rest, f))) dead.suggestion = rest;
+    }
+    if (dead.suggestion === undefined && nested !== undefined) {
+      const top = repositoryTop(root);
+      repository ??= top === undefined ? [] : projectFiles(top);
+      const hits = repository.filter((f) => globMatches(glob, f) && f !== nested && !f.startsWith(`${nested}/`));
+      if (hits.length > 0) dead.outside = hits.slice(0, 3);
+    }
+    out.push(dead);
+  }
+  return out;
+}
+
+/** The problem a dead trigger is, with what to write instead when that is known. */
+export function deadTriggerText(dead: DeadTrigger): string {
+  const head = `practice ${dead.practice.name}: its trigger edit ${dead.glob} matches no file in this project, so the practice never fires on it; paths in a when: line are relative to the project's folder`;
+  if (dead.suggestion !== undefined) return `${head}: write edit ${dead.suggestion}`;
+  if (dead.outside !== undefined) return `${head}, and it names ${dead.outside.join(", ")}, outside this project, which a practice here never sees: keep that trigger in a practice of the project that holds those files`;
+  return `${head}; correct the path, or remove the trigger`;
 }
