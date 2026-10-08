@@ -13,7 +13,7 @@ import { access, readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadLexicon, rejectedNames, type Lexicon } from "./lexicon.ts";
-import { effectiveConfig, leafOf, registryOf, under, type Registry } from "../adapters/project-config.ts";
+import { DEFAULT_PROJECT_LEXICON, configuredName, effectiveConfig, leafOf, projectName, registryOf, under, type Registry } from "../adapters/project-config.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -21,7 +21,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 export const COHERENCE_LEXICON = resolve(here, "..", "..", "docs", "lexicon.json");
 
 export const CONFIG_FILE = "coherence.config.json";
-export const DEFAULT_PROJECT_LEXICON = "lexicon.json";
+export { DEFAULT_PROJECT_LEXICON };
 
 export const HOSTS = ["claude", "codex"] as const;
 export type Host = (typeof HOSTS)[number];
@@ -165,7 +165,7 @@ export async function vocabularyFacts(root: string): Promise<VocabularyFacts> {
   const found = effectiveConfig(root);
   if (found === undefined) return facts;
   const record = found.record;
-  if (typeof record["name"] === "string" && record["name"].trim() !== "") facts.name = record["name"].trim();
+  facts.name = configuredName(root);
   const named = record["wellKnown"];
   if (Array.isArray(named)) facts.wellKnown = named.filter((n): n is string => typeof n === "string" && n.trim() !== "").map((n) => n.trim());
   return facts;
@@ -344,5 +344,7 @@ export async function loadProjectLexicons(root: string): Promise<ProjectLexicons
   coherence.project ??= "coherence";
   const path = await projectLexiconPath(root);
   const project = path === undefined || path === COHERENCE_LEXICON ? undefined : await loadLexicon(path);
+  // The project's name is the config's (projectName); a name the file stored is read only where the config gives none.
+  if (project !== undefined) project.project = projectName(root, project.project);
   return { root, coherence, project };
 }

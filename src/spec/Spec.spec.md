@@ -84,6 +84,20 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: returned a module handler's first candidate path in handlerFile without checking the file exists -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
+- an ignore entry that names nothing is a problem: An entry of the project's own config's ignore list that names no file or folder at its path from the root and, as a bare name, no folder of that name on any project file's way down, is a problem at the config, so it fails spec --check; the walk the model already takes answers, and the check lists nothing more.
+  over: a file and a folder named by path, a folder named by its name below the root, and a folder on disk git ignores, against a typo, a path that moved, a file path that does not exist, and a file named by its bare name below the root
+  via: an ignore entry that names no file or folder is a spec problem; a folder by name or path, a file by path, and a folder git ignores are not
+  because: the list accepted any string and an entry that matched nothing left nothing out in silence, so an adopter's "CHANGELOG.md" did nothing and nothing said so (praetorium.gg); a typo in a bound is the same silence. A folder git ignores holds no project file but is no typo, so the disk answers first
+  crossing: project-source -> reading
+  refuted: made ignoreProblems in model.ts skip every entry as though it named something, so a typo, a moved path and a bare file name below the root were accepted in silence -> "an ignore entry that names no file or folder is a spec problem; a folder by name or path, a file by path, and a folder git ignores are not" went red in src/adapters/ignore-files.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-08)
+  kinds: none
+- a stored project name that disagrees with the config is a problem: A project lexicon whose project field names the project otherwise than the config's name, ignoring case, is a problem at the lexicon's project line, so it fails spec --check; a lexicon that stores none, or one that agrees, is not.
+  over: a lexicon storing a name that differs from the config's, one storing it in another case, one storing none, and one under a config that names no project
+  via: a stored project name that disagrees with the config's name is a spec problem at the lexicon; one that agrees, none stored, or no configured name is not
+  because: lexicon apply wrote the folder's name as the lexicon's project and every reader of the lexicon took it over the config's, so an adopter whose folder differed from his config's name had the wrong name accepted and added his own to wellKnown to get by (praetorium.gg); the field still reads where the config names nothing, so an existing lexicon is never renamed, and a copy that disagrees is said rather than quietly outvoted
+  crossing: project-source -> reading
+  refuted: made storedNameProblems in model.ts accept every stored project as agreeing, so a lexicon's copy that disagreed with the config's name passed spec --check -> "a stored project name that disagrees with the config's name is a spec problem at the lexicon; one that agrees, none stored, or no configured name is not" went red in src/lifecycle/project-name.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-08)
+  kinds: none
 - a module handler may carry route segments: An entrance's handler naming a module file resolves as a module file when its path carries a framework's route segments ([slug], [...slug], [[...slug]], (group), (.)intercepted, @slot), and a spec in such a folder is a component; such a file that does not exist is still a problem.
   over: every route segment form in a module handler's path, a spec in a (group) folder, and a missing file under such segments, against a symbol in a file and a path without an extension, which stay no module
   via: the model: a module handler's path may carry route segments, [slug], [...slug], [[...slug]], (group), (.)intercepted and @slot, and it must still exist

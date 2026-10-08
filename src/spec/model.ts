@@ -14,7 +14,7 @@
  * declared, unverified.
  */
 
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { countWork, readProjectText } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
@@ -22,8 +22,8 @@ import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, parseLine as parseRunLine, witnessedRefutations, type Latest, type LoadedRuns, type RunRecord } from "../enforcement/record.ts";
 import { latestSeeing } from "../enforcement/run-index.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
-import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
-import { effectiveConfig } from "../adapters/project-config.ts";
+import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles, type Walked } from "../adapters/project-files.ts";
+import { configuredName, effectiveConfig, lexiconFileOf, readConfigFile } from "../adapters/project-config.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
 import { invariantFloorGaps, invariantFloorProblems, rawFloorGaps } from "./floor.ts";
 import { declaredClasses, defectFloor, defectStates, type DefectFloor, type GuardStanding } from "../journal/defects.ts";
@@ -119,6 +119,62 @@ function readConfig(root: string): Config {
   if (Array.isArray(record["ignore"])) config.ignore = record["ignore"].filter((v): v is string => typeof v === "string");
   if (typeof record["entryDir"] === "string") config.entryDir = record["entryDir"];
   return config;
+}
+
+/**
+ * The project's own ignore entries that name nothing: no file or folder at
+ * that path from the root and, for a bare name, no folder of that name on
+ * any project file's way down. Such an entry leaves nothing out, so a typo
+ * or a path that moved would bound nothing and say nothing. A registry's
+ * entries are its own to check; only the project's file is read. The walk
+ * the model already took answers, so the check lists nothing new.
+ */
+function ignoreProblems(root: string, walked: Walked): Problem[] {
+  const path = join(root, CONFIG_FILE);
+  const own = readConfigFile(path)?.["ignore"];
+  if (!Array.isArray(own)) return [];
+  let folderNames: Set<string> | undefined;
+  const problems: Problem[] = [];
+  for (const entry of own) {
+    if (typeof entry !== "string") continue;
+    const key = entry.split(sep).join("/").replace(/^(\.\/)+/, "").replace(/\/+$/, "");
+    if (key === "" || existsSync(join(root, key))) continue;
+    if (!key.includes("/")) {
+      folderNames ??= new Set([...walked.files, ...walked.excluded.map((e) => e.file)].flatMap((rel) => rel.split("/").slice(0, -1)));
+      if (folderNames.has(key)) continue;
+    }
+    const line = readFileSync(path, "utf8").split("\n").findIndex((text) => text.includes(JSON.stringify(entry))) + 1;
+    problems.push({
+      file: CONFIG_FILE,
+      line: Math.max(line, 1),
+      message: `ignore entry "${entry}" names no file or folder in the project, so it leaves nothing out; a folder is named by its name or its path from the root, a file by its path from the root`,
+    });
+  }
+  return problems;
+}
+
+/**
+ * A project lexicon whose stored project field disagrees with the name the
+ * config gives: the config's name is the one every reader takes
+ * (projectName), so the stored one is a second copy that has drifted. A
+ * lexicon that will not parse is the lexicon check's to refuse.
+ */
+function storedNameProblems(root: string): Problem[] {
+  const name = configuredName(root);
+  if (name === undefined) return [];
+  let path: string;
+  let stored: unknown;
+  try {
+    path = lexiconFileOf(root);
+    if (!existsSync(path)) return [];
+    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+    stored = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>)["project"] : undefined;
+  } catch {
+    return [];
+  }
+  if (typeof stored !== "string" || stored.trim().toLowerCase() === name.toLowerCase()) return [];
+  const line = readFileSync(path, "utf8").split("\n").findIndex((text) => text.includes('"project"')) + 1;
+  return [{ file: relative(root, path).split(sep).join("/"), line: Math.max(line, 1), message: `the lexicon stores project "${stored}" and the config names the project "${name}"; the config's name is the one read, so drop the lexicon's project field or make it agree` }];
 }
 
 /** Every spec file under the root, sorted by path. */
@@ -234,8 +290,11 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
             .reduce<string | undefined>((at, record) => (at === undefined || record.at > at ? record.at : at), undefined),
         };
 
+  // One walk of the project serves the specs, the practice files and the ignore list's check.
+  const walked = walkedProjectFiles(walkBounds(root, config.ignore));
+  problems.push(...ignoreProblems(root, walked), ...storedNameProblems(root));
   const byFolder = new Map<string, { folder: string; specPath: string; parsed: ReturnType<typeof parseSpec> }>();
-  for (const specPath of findSpecs(root, config.ignore)) {
+  for (const specPath of walked.files.filter((rel) => rel.endsWith(SPEC_SUFFIX)).map((rel) => join(root, rel)).sort()) {
     const folder = folderOf(root, specPath);
     const rel = relative(root, specPath).split(sep).join("/");
     const existing = byFolder.get(folder);
@@ -250,7 +309,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
 
   // A practice file stands beside its folder's spec, with the spec's stem (d-861e8319).
   const practiceFiles = new Map<string, { file: string; parsed: ReturnType<typeof parsePractices> }>();
-  for (const rel of walkedFiles(root, ".", config.ignore).filter((f) => f.endsWith(PRACTICE_SUFFIX)).sort()) {
+  for (const rel of walked.files.filter((f) => f.endsWith(PRACTICE_SUFFIX)).sort()) {
     const folder = folderOf(root, join(root, rel));
     const spec = byFolder.get(folder);
     if (spec === undefined) {

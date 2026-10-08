@@ -395,7 +395,8 @@ export function boundedWorkspaceConfig(root: string, folder: string, bounds: Ada
   };
   walk("");
   const defaults = ["**/node_modules", "**/__pycache__", "**/.*"];
-  const bound = [...skip].map((b) => (b.includes("/") ? from(b) : `**/${b}`));
+  // A bare name is a folder anywhere, except a file at the root: a file is named by its path alone (underIgnored).
+  const bound = [...skip].map((b) => (b.includes("/") || (existsSync(join(root, b)) && statSync(join(root, b)).isFile()) ? from(b) : `**/${b}`));
   config["exclude"] = [...(Array.isArray(config["exclude"]) ? (config["exclude"] as unknown[]) : defaults), ...bound, ...nested.map(from), ...venvs.map(from)];
   config["extraPaths"] = [...(Array.isArray(config["extraPaths"]) ? (config["extraPaths"] as unknown[]) : []), from(".")];
   return config;

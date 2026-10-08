@@ -612,7 +612,8 @@
         "class self-clearing": "A check the very record or edit it guards can clear on its own.",
         "class exposure": "Private state written where it is published or committed.",
         "class uninterpolated": "Template text reaches a reader literally instead of the value it stands for.",
-        "class load-flake": "A test that fails under machine load whatever the change under test."
+        "class load-flake": "A test that fails under machine load whatever the change under test.",
+        "class duplicated-fact": "One fact kept in two places written apart, so one copy drifts from the other and a reader takes the stale one."
       }
     },
     {
