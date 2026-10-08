@@ -254,7 +254,10 @@ where none is found, the session start says so in one line. Each session
 start names the Coherence that runs, says when another copy the project
 reaches is at another version, and names hooks an earlier release wrote
 (which looked at `../coherence` first) with the command that reinstalls
-them; `coherence hooks --check` names them too.
+them; `coherence hooks --check` names them too. If you keep a `../coherence`
+clone beside the project, run `npx --no -- coherence hooks install --host
+claude` (or `--host codex`) after upgrading: hooks an earlier release wrote
+still run that clone, which cannot tell you so.
 To add the project's own words to an event, write
 `.coherence/hooks/<Event>.append.md` (it follows what the hook says) or
 `.coherence/hooks/<Event>.override.md` (it replaces it; an empty one silences
