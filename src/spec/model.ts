@@ -97,8 +97,8 @@ export interface SpecModel {
   counts: Counts;
   /**
    * When runs exist: the time of the latest, how many run lines were
-   * unreadable, and the time of the latest run that graded its entries (an
-   * edit's check records them ungraded), undefined when none did.
+   * unreadable, and the time of the latest full run (every bullet, both
+   * forms, graded) dated no later than now, undefined when none is.
    */
   runs: { latest: string; count: number; damaged: number; graded: string | undefined } | undefined;
   /** The floor on defects: closes with neither a guard nor a decision, and guard failures; advisory, never a problem. */
@@ -228,8 +228,9 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
           latest: loadedRuns.records[loadedRuns.records.length - 1]!.at,
           count: loadedRuns.records.length,
           damaged: loadedRuns.damaged.length,
+          // Only a full run moves the floor for every bullet; a run dated in the future (a skewed clock, a hand-written line) says nothing of now.
           graded: loadedRuns.records
-            .filter((record) => record.invariants.some((entry) => entry.ungraded !== true))
+            .filter((record) => record.full === true && record.invariants.some((entry) => entry.ungraded !== true) && Date.parse(record.at) <= Date.now())
             .reduce<string | undefined>((at, record) => (at === undefined || record.at > at ? record.at : at), undefined),
         };
 

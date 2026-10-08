@@ -334,6 +334,7 @@ test("a run appends one record, never rewrites; spec --check reads the run; the 
   rmSync(join(root, ".coherence", "runs"), { recursive: true, force: true });
   const first = await performRun(root, { session: "s1", agent: "enforcement", adapter, now: () => new Date("2026-09-17T10:00:00Z") });
   assert.equal(first.record.invariants.length, 5, "four chokepoint enforcements and one totality oracle");
+  assert.equal(first.record.full, true, "a run with no --invariant and no --form is a full run");
   const byName = new Map(first.record.invariants.map((e) => [`${e.name}/${e.form}`, e]));
   const digestEntry = byName.get("digest-only egress/chokepoint")!;
   assert.equal(digestEntry.verdict, "fail");
@@ -363,6 +364,7 @@ test("a run appends one record, never rewrites; spec --check reads the run; the 
   assert.equal(lines().length, 1);
   const second = await performRun(root, { session: "s1", agent: "enforcement", adapter, form: "chokepoint", invariants: ["hidden set"], now: () => new Date("2026-09-17T11:00:00Z") });
   assert.equal(second.record.invariants.length, 1);
+  assert.equal(second.record.full, undefined, "a run scoped by --invariant or --form is no full run");
   assert.equal(lines().length, 2, "append only");
   assert.deepEqual(JSON.parse(lines()[0]!) as RunRecord, first.record, "the first line is untouched");
 

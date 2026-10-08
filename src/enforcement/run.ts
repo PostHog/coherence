@@ -489,6 +489,8 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     latency: Date.now() - started,
     load,
     ...(batched.size === 0 ? {} : { batch: { ms: totalBatch } }),
+    // A full run: every bullet, both forms, from the project's own model, and graded.
+    ...(chosen.size === 0 && options.form === undefined && options.model === undefined && options.grade !== false ? { full: true as const } : {}),
     invariants: details.map((d) => d.entry),
   };
   if (options.grade === false) for (const entry of record.invariants) entry.ungraded = true;

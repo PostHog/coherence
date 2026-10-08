@@ -171,6 +171,13 @@ export interface RunRecord {
   load?: { average: number; cores: number };
   /** The one batched test invocation's milliseconds. */
   batch?: { ms: number };
+  /**
+   * True when the run checked the whole spec: no --invariant and no --form
+   * filter, from the project's own spec model; what moves the invariant
+   * floor for every bullet at once. Absent on a scoped run, an edit's check,
+   * a per-test confirmation, and a run recorded before this was written.
+   */
+  full?: true;
   invariants: RunEntry[];
 }
 

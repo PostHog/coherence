@@ -466,8 +466,8 @@ export function floorQuiet(runs: SpecModel["runs"], now: number): string | undef
   if (runs === undefined) return undefined;
   const since = runs.graded === undefined ? undefined : Date.parse(runs.graded);
   if (since !== undefined && Number.isFinite(since) && now - since <= FLOOR_QUIET_DAYS * 86_400_000) return undefined;
-  const age = since === undefined || !Number.isFinite(since) ? "no run has graded its entries" : `the last run that graded its entries was ${Math.floor((now - since) / 86_400_000)} days ago (${runs.graded})`;
-  return `Invariant floor: ${age}; an edit's check records its entries ungraded, so the floor stands where that run left it. Run: run`;
+  const age = since === undefined || !Number.isFinite(since) ? "no full run has graded every bullet" : `the last full run that graded every bullet was ${Math.floor((now - since) / 86_400_000)} days ago (${runs.graded})`;
+  return `Invariant floor: ${age}; a scoped run moves only its own bullets and an edit's check records its entries ungraded, so the rest of the floor stands where that run left it. Run: run`;
 }
 
 export function specBlock(root: string, now: number = Date.now()): string {
