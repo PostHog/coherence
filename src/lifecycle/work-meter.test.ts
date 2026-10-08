@@ -444,6 +444,30 @@ function gitRepo(files: Record<string, string>): string {
 
 const SPEC = (name: string) => `# A\n\nA component.\n\n## invariants\n- sealed: ${name} leaves only through seal.\n  protects: ${name}\n  chokepoint: seal\n  because: a fixture\n  kinds: none\n`;
 
+test("in a project of two languages, an edit's check asks the language the last run graded the invariant in, with that run's whole file list", async () => {
+  const spec = "# Fixture\n\nA store.\n\n## invariants\n- sealed store: SECRET leaves only through seal.\n  protects: SECRET\n  chokepoint: seal\n  because: a fixture\n  kinds: none\n";
+  const root = gitRepo({
+    "coherence.config.json": JSON.stringify({ language: ["typescript", "python"] }),
+    "Fixture.spec.md": spec,
+    "backend/store.py": "SECRET = 1\n\ndef seal():\n    return SECRET + 1\n",
+    "src/use.ts": "export const fine = 1;\n",
+  });
+  try {
+    // The last full run graded it through Python, over the Python files that hold the protected thing and its chokepoint.
+    appendRun(root, { at: "2026-06-01T00:00:00.000Z", session: "earlier", agent: "t", binding: "none", commit: null, dirty: false, instrument: { language: "python", server: "warm" }, latency: 1, invariants: [{ component: ".", name: "sealed store", form: "chokepoint", verdict: "pass", grade: "reference-choked", refutation: "automatic", bypasses: [], testReferences: 0, files: ["backend/store.py", "backend/use.py"], latency: 1, reason: "t", language: "python" }] } as unknown as RunRecord);
+    const [entry] = chokepointIndex(root, ["src/use.ts"]);
+    assert.deepEqual(entry?.latest, [{ form: "chokepoint", files: ["backend/store.py", "backend/use.py"], language: "python" }], "the light path carries the last run's language and its whole file list");
+    // A TypeScript edit that spells the Python symbol's name: the check is put to Python, as main puts it.
+    writeFileSync(join(root, "src/use.ts"), "export const SECRET = 2;\n");
+    const python = { ...NO_INSTRUMENT, language: "python" } as LanguageAdapter;
+    await runHook("PostToolUse", { cwd: root, session_id: "m", tool_name: "Edit", tool_input: { file_path: join(root, "src/use.ts") } }, root, { adapter: python });
+    const last = readFileSync(join(root, ".coherence", "runs", "m.jsonl"), "utf8").trim().split("\n").at(-1)!;
+    assert.deepEqual((JSON.parse(last) as RunRecord).invariants.map((e) => e.language), ["python"], "the edit's check asked Python first, and recorded it so");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("an edit is checked with GIT_LITERAL_PATHSPECS set as without it", async () => {
   const root = gitRepo({ "coherence.config.json": JSON.stringify({ name: "l" }), "src/a/A.spec.md": SPEC("SECRET_0"), "src/a/m.ts": "export const x = 1;\n" });
   const saved = Object.fromEntries(["GIT_LITERAL_PATHSPECS"].map((k) => [k, process.env[k]]));
@@ -552,7 +576,7 @@ test("the run index answers as the run history does after appends, a replaced fi
   try {
     const key = entryKey("src/a", "sealed", "chokepoint");
     const fromHistory = (file: string) => latestByEnforcement(loadRuns(root).records).get(key)?.files.includes(file) === true;
-    const fromIndex = (file: string) => latestSeeing(root, [file], parseLine).get(file)?.has(key) === true;
+    const fromIndex = (file: string) => latestSeeing(root, [file], parseLine).byFile.get(file)?.has(key) === true;
     const agree = (when: string) => {
       for (const file of ["src/a/x.ts", "src/a/y.ts", "src/a/z.ts", "src/a/w.ts", "src/b/y.ts"]) assert.equal(fromIndex(file), fromHistory(file), `${when}: ${file}`);
     };

@@ -155,7 +155,7 @@ export interface ChokepointEntry {
   component: string;
   name: string;
   enforcements: Invariant["enforcements"];
-  latest: { form: "chokepoint"; files: string[] }[];
+  latest: { form: "chokepoint"; files: string[]; language?: string }[];
 }
 
 /**
@@ -189,8 +189,9 @@ export function chokepointIndex(rootGiven: string, written: readonly string[] = 
     for (const invariant of parseSpec(readProjectText(specPath, "spec"), rel).invariants) {
       if (!invariant.enforcements.some((e) => e.form === "chokepoint")) continue;
       const key = entryKey(folder, invariant.name, "chokepoint");
-      const files = written.filter((file) => seeing?.get(file)?.has(key) === true);
-      entries.push({ component: folder, name: invariant.name, enforcements: invariant.enforcements, latest: files.length === 0 ? [] : [{ form: "chokepoint", files }] });
+      // The latest run's whole file list and its language, as the model carries them: the run of a touched invariant asks that language first.
+      const last = seeing?.latest.get(key);
+      entries.push({ component: folder, name: invariant.name, enforcements: invariant.enforcements, latest: last === undefined ? [] : [{ form: "chokepoint", files: last.files, ...(last.language === undefined ? {} : { language: last.language }) }] });
     }
   }
   return entries;
