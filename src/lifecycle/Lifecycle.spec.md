@@ -986,3 +986,9 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: Claude Code runs one status line command, and a user who already has one would otherwise have to choose between it and Coherence's
   refuted: skipped running the command after -- -> "the status line command prints the user's own status line first, from the same session input, then Coherence's" went red in statusline.test.ts; restored, green (2026-10-08)
   kinds: none
+- the status line links Scope while it is served: While the project's warm server is alive and answers HTTP, Coherence's status line ends with a terminal hyperlink labelled scope that opens the live Scope page; the address, which carries the project's token, is the link's hidden target and never printed bare, and a server that is gone or serves no page yet shows no link.
+  over: a pointer whose process is alive and serves HTTP, one whose process has ended, one with no HTTP port, and the line with links off
+  via: the status line links the live Scope page while its warm server answers, never as a bare address and never for a server that is gone
+  because: opening Scope meant running coherence scope, and an agent that ran it put the tokened address into its own context and the transcript; the status line is read by the user alone and not kept in the transcript, and a link to a server that is gone would open nothing
+  refuted: dropped the check that the server's process is alive -> "the status line links the live Scope page while its warm server answers, never as a bare address and never for a server that is gone" went red in statusline.test.ts on the ended process; restored, green (2026-10-08)
+  kinds: none

@@ -8,6 +8,7 @@ import { after, test } from "node:test";
 import { JOURNAL_DIR } from "../journal/store.ts";
 import { DEFAULT_LATENCY_BUDGET, HOOK_TIMES_DIR } from "./hook-latency.ts";
 import { PRACTICES_DIR } from "./practice-delivery.ts";
+import { serverPaths } from "../enforcement/server.ts";
 import { readStatus, STATUS_DEFAULT_BUDGET, STATUS_SOURCES, statusText } from "./statusline.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -32,7 +33,7 @@ const jsonl = (...records: object[]): string => records.map((r) => JSON.stringif
 const time = (event: string, ms: number) => ({ at: "2026-10-08T10:00:00.000Z", event, ms });
 
 test("the status line reads where the hooks keep the session's records, by the hooks' own names and budget", () => {
-  assert.deepEqual(STATUS_SOURCES, { hookTimes: HOOK_TIMES_DIR, firings: PRACTICES_DIR, journal: JOURNAL_DIR });
+  assert.deepEqual(STATUS_SOURCES, { hookTimes: HOOK_TIMES_DIR, firings: PRACTICES_DIR, journal: JOURNAL_DIR, server: serverPaths("/p").pointer.slice("/p/".length) });
   assert.equal(STATUS_DEFAULT_BUDGET, DEFAULT_LATENCY_BUDGET);
 });
 
@@ -82,4 +83,22 @@ test("the status line command prints the user's own status line first, from the 
   const run = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", resolve(here, "../statusline.ts"), "--", "cat >/dev/null; echo theirs"], { input, encoding: "utf8", env: { ...process.env, NO_COLOR: "1" } });
   assert.equal(run.status, 0, run.stderr);
   assert.match(run.stdout, /^theirs\ncoherence \S+ · hooks 0\.3 s avg\n$/);
+});
+
+test("the status line links the live Scope page while its warm server answers, never as a bare address and never for a server that is gone", () => {
+  const token = "ab".repeat(32);
+  const ended = spawnSync(process.execPath, ["-e", "0"]).pid!;
+  const top = repository({
+    "coherence.config.json": JSON.stringify({ name: "p" }),
+    [`.coherence/hook-times/${SESSION}.jsonl`]: jsonl(time("PreToolUse", 300)),
+    ".coherence/run/server.json": JSON.stringify({ pid: process.pid, token, http: { port: 4321 } }),
+  });
+  const reading = readStatus({ session_id: SESSION, cwd: top })!;
+  assert.equal(reading.scope, `http://127.0.0.1:4321/?token=${token}`);
+  assert.ok(statusText(reading, false, true).endsWith(`\u001b]8;;http://127.0.0.1:4321/?token=${token}\u001b\\scope ↗\u001b]8;;\u001b\\`), "a terminal hyperlink whose label alone shows");
+  assert.ok(!statusText(reading, false, false).includes(token), "without links, no address at all: it carries the token");
+  writeFileSync(join(top, ".coherence/run/server.json"), JSON.stringify({ pid: ended, token, http: { port: 4321 } }));
+  assert.equal(readStatus({ session_id: SESSION, cwd: top })!.scope, undefined, "a server that is gone answers nothing");
+  writeFileSync(join(top, ".coherence/run/server.json"), JSON.stringify({ pid: process.pid, token }));
+  assert.equal(readStatus({ session_id: SESSION, cwd: top })!.scope, undefined, "a server that serves no HTTP yet has no page");
 });
