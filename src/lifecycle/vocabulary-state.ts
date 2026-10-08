@@ -28,7 +28,7 @@
 
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { cacheDir, storeVersion, withLock, writeKept } from "./kept-parse.ts";
 import { lexiconReading, singularForms, type Contribution, type Coverage } from "./lexicon-coverage.ts";
 import type { Lexicon } from "./lexicon.ts";
@@ -161,7 +161,7 @@ export async function keepVocabulary(root: string, layers: { coherence: Lexicon;
       for (const [id, b] of files) writeKept(join(aside, "files", `${id}.json`), b, false, true);
       for (const [id, b] of terms) writeKept(join(aside, "terms", `${id}.json`), b, false, true);
       writeKept(join(aside, "declared.json"), [...declared].sort(), false, true);
-      writeKept(join(aside, "meta.json"), { version }, false, true);
+      writeKept(join(aside, "meta.json"), { version, buckets: { files: [...files.keys()].sort(), terms: [...terms.keys()].sort() } } satisfies Meta, false, true);
       rmSync(stateDir(root), { recursive: true, force: true });
       renameSync(aside, stateDir(root));
     } catch {
@@ -190,16 +190,78 @@ export interface EditChange {
   reason: string;
 }
 
-function termBuckets(root: string, ids: Iterable<string>): Map<string, TermBucket> {
+/** A part of the kept state that cannot be trusted: the edit reads in full instead, says so, and writes nothing back. */
+class BucketUnusable extends Error {}
+
+interface Meta {
+  version: string;
+  writing?: boolean;
+  /** The buckets the state holds, by kind: one listed and missing or torn is a broken state, never an empty bucket. */
+  buckets: { files: string[]; terms: string[] };
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+const isCounts = (value: unknown): boolean => isRecord(value) && Object.values(value).every((n) => typeof n === "number");
+
+function validTermBucket(value: unknown): value is TermBucket {
+  if (!isRecord(value) || !isRecord(value["pool"]) || !isRecord(value["words"])) return false;
+  const poolOk = Object.values(value["pool"]).every((t) => isRecord(t) && typeof t["named"] === "number" && typeof t["declared"] === "number" && isCounts(t["sites"]) && isCounts(t["code"]) && isCounts(t["declaredIn"]));
+  const wordsOk = Object.values(value["words"]).every((t) => isRecord(t) && typeof t["words"] === "number" && isCounts(t["byComponent"]));
+  return poolOk && wordsOk;
+}
+
+function validFileBucket(value: unknown): value is FileBucket {
+  return isRecord(value) && Object.values(value).every((c) => isRecord(c) && typeof c["component"] === "string" && isRecord(c["pool"]) && isCounts(c["words"]) && Array.isArray(c["uses"]));
+}
+
+/** One bucket: validated when it is there; one the state lists and is not there, or is torn, throws; one never written is empty. */
+function readBucket<T>(path: string, listed: boolean, valid: (value: unknown) => value is T, empty: () => T): T {
+  let text: string;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    if (listed) throw new BucketUnusable(`a kept bucket the state lists is missing (${basename(path)})`);
+    return empty();
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new BucketUnusable(`a kept bucket is torn (${basename(path)})`);
+  }
+  if (!valid(value)) throw new BucketUnusable(`a kept bucket is not in the shape it is kept in (${basename(path)})`);
+  return value;
+}
+
+function termBuckets(root: string, ids: Iterable<string>, meta: Meta): Map<string, TermBucket> {
   const out = new Map<string, TermBucket>();
-  for (const id of new Set(ids)) out.set(id, readJson<TermBucket>(join(stateDir(root), "terms", `${id}.json`)) ?? { pool: {}, words: {} });
+  for (const id of new Set(ids)) out.set(id, readBucket(join(stateDir(root), "terms", `${id}.json`), meta.buckets.terms.includes(id), validTermBucket, () => ({ pool: {}, words: {} })));
   return out;
 }
 
-function fileBuckets(root: string, files: readonly string[]): Map<string, FileBucket> {
+function fileBuckets(root: string, files: readonly string[], meta: Meta): Map<string, FileBucket> {
   const out = new Map<string, FileBucket>();
-  for (const id of new Set(files.map(bucketOf))) out.set(id, readJson<FileBucket>(join(stateDir(root), "files", `${id}.json`)) ?? {});
+  for (const id of new Set(files.map(bucketOf))) out.set(id, readBucket(join(stateDir(root), "files", `${id}.json`), meta.buckets.files.includes(id), validFileBucket, () => ({})));
   return out;
+}
+
+/** The kept state's meta, validated; undefined when there is none. */
+function readMeta(root: string): Meta | undefined {
+  let text: string;
+  try {
+    text = readFileSync(join(stateDir(root), "meta.json"), "utf8");
+  } catch {
+    return undefined;
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new BucketUnusable("its kept state's meta is torn");
+  }
+  const buckets = isRecord(value) ? value["buckets"] : undefined;
+  if (!isRecord(value) || typeof value["version"] !== "string" || !isRecord(buckets) || !Array.isArray(buckets["files"]) || !Array.isArray(buckets["terms"])) throw new BucketUnusable("its kept state's meta is not in the shape it is kept in");
+  return value as unknown as Meta;
 }
 
 /** Whether the group counted under `canonical` is a candidate by these totals: the reading's rule, by name or by word. */
@@ -226,15 +288,27 @@ function candidacy(canonical: string, terms: Map<string, TermBucket>): { candida
  * holds as candidates, never named again.
  */
 export async function editVocabulary(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }, written: readonly string[], candidates: ReadonlySet<string>): Promise<EditVocabulary | { unavailable: string | undefined }> {
-  const meta = readJson<{ version: string; writing?: boolean }>(join(stateDir(root), "meta.json"));
+  try {
+    return await judgeEdit(root, layers, written, candidates);
+  } catch (error) {
+    // Any part of the state that cannot be trusted: the edit reads in full and says why, and nothing derived from the part is written back.
+    if (error instanceof BucketUnusable) return { unavailable: error.message };
+    throw error;
+  }
+}
+
+async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }, written: readonly string[], candidates: ReadonlySet<string>): Promise<EditVocabulary | { unavailable: string | undefined }> {
+  const meta = readMeta(root);
   // None kept yet, or kept by other code or lexicons: the full reading is the ordinary way, and keeps the state again.
   if (meta === undefined || meta.version !== (await stateVersion(root, layers))) return { unavailable: undefined };
   if (meta.writing === true) return { unavailable: "its kept vocabulary was left half-written by an edit that stopped while writing it" };
-  const declared = new Set(readJson<string[]>(join(stateDir(root), "declared.json")) ?? []);
+  const declaredRaw = readJson<unknown>(join(stateDir(root), "declared.json"));
+  if (!Array.isArray(declaredRaw) || !declaredRaw.every((d) => typeof d === "string")) throw new BucketUnusable("its kept declared names are missing or torn");
+  const declared = new Set(declaredRaw as string[]);
   const reading = await lexiconReading(root, layers, undefined, { files: written, declared, rulings: false, contributions: true });
   const fresh = new Map([...reading.contributions].filter(([file]) => written.includes(file)));
   if (fresh.size === 0) return { changes: [], keep: () => {} };
-  const files = fileBuckets(root, [...fresh.keys()]);
+  const files = fileBuckets(root, [...fresh.keys()], meta);
   const old = new Map([...fresh.keys()].map((file) => [file, files.get(bucketOf(file))?.[file]]));
   // The terms whose totals this edit can move, their singulars and plurals: what its candidacy is judged on.
   const moved = new Set<string>();
@@ -249,7 +323,7 @@ export async function editVocabulary(root: string, layers: { coherence: Lexicon;
     for (const s of singularForms(words.at(-1)!)) related.add([...words.slice(0, -1), s].join(" "));
     for (const p of pluralsOf(term)) related.add(p);
   }
-  const before = termBuckets(root, [...related].map(bucketOf));
+  const before = termBuckets(root, [...related].map(bucketOf), meta);
   const after = new Map([...before].map(([id, b]) => [id, JSON.parse(JSON.stringify(b)) as TermBucket]));
   for (const [file, c] of fresh) {
     const was = old.get(file);
@@ -299,14 +373,17 @@ export async function editVocabulary(root: string, layers: { coherence: Lexicon;
   // It is marked as being written first, so a stop half way leaves a state the next edit refuses and reads past in full;
   // one the edit cannot take in at all (no lock, no write) is dropped, so the next edit reads in full and keeps it again.
   const meta_ = join(stateDir(root), "meta.json");
-  const version = meta.version;
   const keep = (): void => {
     let kept: boolean | undefined;
     try {
       kept = withLock(join(cacheDir(root), "vocabulary.lock"), () => {
-        writeKept(meta_, { version, writing: true }, false, true);
-        takeIn();
-        writeKept(meta_, { version }, false, true);
+        // Read again under the lock: a part another edit tore since is refused here too, and the state is dropped below.
+        const now = readMeta(root);
+        if (now === undefined || now.version !== meta.version || now.writing === true) return false;
+        writeKept(meta_, { ...now, writing: true }, false, true);
+        const ids = takeIn(now);
+        const buckets = { files: [...new Set([...now.buckets.files, ...ids.files])].sort(), terms: [...new Set([...now.buckets.terms, ...ids.terms])].sort() };
+        writeKept(meta_, { version: now.version, buckets } satisfies Meta, false, true);
         return true;
       });
     } catch {
@@ -314,12 +391,12 @@ export async function editVocabulary(root: string, layers: { coherence: Lexicon;
     }
     if (kept !== true) rmSync(meta_, { force: true });
   };
-  const takeIn = (): void => {
-    const locked = fileBuckets(root, [...fresh.keys()]);
+  const takeIn = (now: Meta): { files: string[]; terms: string[] } => {
+    const locked = fileBuckets(root, [...fresh.keys()], now);
     const lockedOld = new Map([...fresh.keys()].map((file) => [file, locked.get(bucketOf(file))?.[file]]));
     const touched = new Set<string>();
     for (const c of [...fresh.values(), ...lockedOld.values()]) if (c !== undefined) for (const t of [...Object.keys(c.pool), ...Object.keys(c.words)]) touched.add(t);
-    const buckets = termBuckets(root, [...touched].map(bucketOf));
+    const buckets = termBuckets(root, [...touched].map(bucketOf), now);
     for (const [file, c] of fresh) {
       const was = lockedOld.get(file);
       if (was !== undefined) apply(buckets, was, -1);
@@ -341,6 +418,7 @@ export async function editVocabulary(root: string, layers: { coherence: Lexicon;
       }
     }
     if (changed) writeKept(join(stateDir(root), "declared.json"), [...declared].sort(), false, true);
+    return { files: [...locked.keys()], terms: [...buckets.keys()] };
   };
   return { changes, keep };
 }

@@ -639,6 +639,37 @@ test("the peer feed shows every record a peer appended, through a cleared cache 
 
 /* ------------------------------------------------------------ the kept vocabulary */
 
+test("an edit over torn or missing vocabulary buckets reads in full, says so, names nothing false and writes nothing derived from them", async () => {
+  for (const damage of ["torn term buckets", "a missing file bucket", "a term bucket in another shape"] as const) {
+    const project = sizedProject(1);
+    try {
+      const start = await runHook("SessionStart", { session_id: SESSION, cwd: project.root }, project.root, {});
+      start.commit?.();
+      const state = join(cacheDir(project.root), "vocabulary");
+      // Every bucket the state could hold is listed and damaged, so whichever ones this edit reads are damaged.
+      const ids = Array.from({ length: 64 }, (_, n) => String(n).padStart(2, "0"));
+      const meta = JSON.parse(readFileSync(join(state, "meta.json"), "utf8")) as Record<string, unknown>;
+      writeFileSync(join(state, "meta.json"), JSON.stringify({ ...meta, buckets: { files: ids, terms: ids } }));
+      if (damage === "torn term buckets") for (const id of ids) writeFileSync(join(state, "terms", `${id}.json`), "{");
+      if (damage === "a term bucket in another shape") for (const id of ids) writeFileSync(join(state, "terms", `${id}.json`), JSON.stringify({ pool: { x: { named: "three" } }, words: {} }));
+      if (damage === "a missing file bucket") for (const name of readdirSync(join(state, "files"))) rmSync(join(state, "files", name));
+      // An ordinary edit: a line that names a term once, which no whole reading would call recurring; the edit reads that term's bucket.
+      const file = join(project.root, "docs/note-0.md");
+      writeFileSync(file, readFileSync(file, "utf8") + "The `zorbix` turns again.\n");
+      const m = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
+      assert.match(m.said, /Lexicon: read in full at this edit: (a kept bucket|its kept)/, `${damage}: the fallback is said`);
+      assert.ok(m.work.reads.filter((r) => r.startsWith("corpus ")).length > 1, `${damage}: the corpus was read in full`);
+      assert.doesNotMatch(m.said, /recur without a definition|sense at risk/, `${damage}: an ordinary edit is named nothing, as a whole reading names it nothing`);
+      // The full reading kept the state again, whole: no bucket is left torn, none holds totals derived from the damaged parts.
+      for (const kind of ["terms", "files"]) for (const name of readdirSync(join(state, kind))) assert.doesNotThrow(() => JSON.parse(readFileSync(join(state, kind, name), "utf8")), `${damage}: ${kind}/${name} is whole again`);
+      const next = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
+      assert.doesNotMatch(next.said, /read in full/, `${damage}: the next edit reads the state the full reading kept`);
+    } finally {
+      rmSync(project.top, { recursive: true, force: true });
+    }
+  }
+});
+
 test("an edit whose kept vocabulary was left half-written reads in full and says so", async () => {
   const project = sizedProject(1);
   try {
