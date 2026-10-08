@@ -15,6 +15,7 @@ import { acceptedNames } from "./lexicon.ts";
 import { applyProposal, propose } from "./lexicon-maintain.ts";
 import { loadProjectLexicons } from "./project.ts";
 import { loadSpecModel } from "../spec/model.ts";
+import { formatReport, hasProblems } from "../spec/report.ts";
 import { projectNameOf } from "../readings/scope/build.ts";
 
 const who = { session: "project-name-test", agent: "test" };
@@ -60,18 +61,20 @@ test("the project's name is the config's: lexicon apply stores no copy, readers 
   assert.equal((await loadProjectLexicons(bare)).project!.project, basename(bare));
 });
 
-test("a stored project name that disagrees with the config's name is a spec problem at the lexicon; one that agrees, none stored, or no configured name is not", () => {
+test("a stored project name that disagrees with the config's name is a note at the lexicon, never a spec problem; one that agrees, none stored, or no configured name says nothing", () => {
   const stale = project({ name: "praetorium", language: "typescript" }, { version: 1, project: "praetorium-gg", concepts: [] });
-  const found = nameProblems(stale);
-  assert.equal(found.length, 1, JSON.stringify(found));
-  assert.equal(found[0]!.file, "lexicon.json");
-  assert.equal(found[0]!.line, 3);
-  assert.match(found[0]!.message, /"praetorium-gg".*"praetorium"/);
+  const model = loadSpecModel(stale, { runs: false });
+  assert.deepEqual(nameProblems(stale), [], "never a problem: an earlier release wrote the field, and the config's name is the one read");
+  assert.equal(model.storedName?.file, "lexicon.json");
+  assert.equal(model.storedName?.line, 3);
+  assert.match(model.storedName?.message ?? "", /"praetorium-gg".*"praetorium"/);
+  assert.match(formatReport(model), /^NOTE {2}lexicon\.json:3 {2}the lexicon stores project "praetorium-gg"/m, "spec --check says so, as a note");
+  assert.equal(hasProblems(model), false, "and passes");
 
-  // A stored name that agrees, in any case, is no problem.
-  assert.deepEqual(nameProblems(project({ name: "praetorium" }, { version: 1, project: "Praetorium", concepts: [] })), []);
+  // A stored name that agrees, in any case, says nothing.
+  assert.equal(loadSpecModel(project({ name: "praetorium" }, { version: 1, project: "Praetorium", concepts: [] }), { runs: false }).storedName, undefined);
 
   // None stored, and a stored name under a config that names no project.
-  assert.deepEqual(nameProblems(project({ name: "praetorium" }, { version: 1, concepts: [] })), []);
-  assert.deepEqual(nameProblems(project({ language: "typescript" }, { version: 1, project: "acme", concepts: [] })), []);
+  assert.equal(loadSpecModel(project({ name: "praetorium" }, { version: 1, concepts: [] }), { runs: false }).storedName, undefined);
+  assert.equal(loadSpecModel(project({ language: "typescript" }, { version: 1, project: "acme", concepts: [] }), { runs: false }).storedName, undefined);
 });

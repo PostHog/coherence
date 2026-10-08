@@ -91,6 +91,8 @@ export function formatReport(model: SpecModel): string {
   for (const problem of model.problems) lines.push(`PROBLEM  ${problem.file}:${problem.line}  ${problem.message}`);
   lines.push(formatCounts(model));
   lines.push(...crossingAloneLines(model.crossingAlone));
+  // Advisory: a stored lexicon project that disagrees with the config's name, which is the one read.
+  if (model.storedName !== undefined) lines.push(`NOTE  ${model.storedName.file}:${model.storedName.line}  ${model.storedName.message}`);
   // Advisory, after the counts: a close with neither a guard nor a decision, and each guard failure (defects.ts).
   lines.push(...defectFloorLines(model.defects));
   return lines.join("\n") + "\n";
