@@ -229,6 +229,8 @@ export interface SpecInvariant {
   enforcements: SpecEnforcement[];
   because: string | undefined;
   crossing: SpecCrossing | undefined;
+  /** The entrances it names as covered (an entrances: line), as written; absent when it names none, and it covers no entrance by its crossing alone. */
+  entrances?: { names: string[] | "none"; line: number } | undefined;
   refutations: SpecRefutation[];
   kinds: string[] | "none" | undefined;
   checklist: SpecChecklistLine[];

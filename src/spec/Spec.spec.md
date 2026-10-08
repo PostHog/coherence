@@ -112,6 +112,20 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: made the grammar accept control: none with an empty reason, dropping the problem -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
+- an invariant names the entrances it covers: An invariant's entrances: line names entrances some spec declares, each resolving in its own spec, then in the one spec that declares it, or as <name> in <folder>, and each whose declared trust its crossing enters from or enters; an unknown, ambiguous or mismatched name, none beside a name, a name twice, the line on a chokepoint form and the line on a bullet with no crossing are problems, entrances: none says it checks no entrance, and a placeholder counts as absent.
+  over: the adopter's signature check naming its notification route, a route no spec declares, a route one other spec declares, a name two other specs declare bare and qualified by folder, a crossing from another trust, and the grammar's none, none beside a name, a doubled name, a chokepoint form, no crossing and a placeholder
+  via: the model: an invariant's entrances: line names declared entrances whose trust its crossing checks; an unknown, ambiguous or mismatched name, none beside a name, a name twice, a chokepoint's line and one with no crossing are problems
+  because: a test-backed control is credited only to the entrances an invariant names (Scope's a test-backed control is the entrance's own), so a name that resolves to nothing, or to an entrance whose trust the crossing never checks, would read as coverage while crediting nothing; a chokepoint's entrances are traced, and a line with no crossing checks no trust
+  crossing: project-source -> reading
+  refuted: dropped the problem for a name that resolves to no declared entrance, in coveredEntranceProblems -> the totality oracle went red; restored, green (2026-10-08)
+  kinds: none
+- a control lost to the crossing alone is named: spec --check prints, after the counts and never as a problem, each verified invariant enforced by a totality oracle alone that covered entrances carrying outside trust in by its crossing alone (owned where they are declared or handled, its crossing checking their trust) with the entrances that lost it, and the line that names them; naming any entrance on it, or entrances: none, ends it, and an unverified invariant gave no control to lose.
+  over: the adopter's shape with the signature check unnamed, named and none, verified and unverified, and the server's invariant naming no entrance
+  via: spec --check names each entrance a verified invariant covered by its crossing alone, never as a problem, until the invariant names the entrances it checks or says none
+  because: adopters' invariants that relied on the crossing alone lose that credit, and a loss no command names is a silent change in what the map calls controlled; it is advisory, since the credit was the over-claim and naming what a test checks is the adopter's to decide
+  crossing: project-source -> reading
+  refuted: made creditedByCrossingAlone ignore the entrances: line, so naming no longer ended the advisory -> the totality oracle went red; restored, green (2026-10-08)
+  kinds: none
 - a practice is paired with its spec: A practice file stands only in a folder whose spec shares its stem; one beside no spec, under another stem, or second in its folder is a problem.
   over: every practice file under the root: beside no spec, under another stem, and paired
   via: a practice file stands only beside its folder's spec, with the spec's stem

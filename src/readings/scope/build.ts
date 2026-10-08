@@ -53,6 +53,8 @@ export const BROWSER_SOURCES = [
   "model.ts",
   "derive.ts",
   "entrance-coverage.ts",
+  // The one source outside this folder: which entrances an invariant covers, shared with the spec model.
+  "../../spec/covers.ts",
   "structure-flow.ts",
   "lexicon-view.ts",
   "components-view.ts",
@@ -332,10 +334,10 @@ async function browserSource(name: string): Promise<string> {
   return stripTypeScriptTypes(await readFile(resolve(here, name), "utf8"), { mode: "strip" });
 }
 
-/** Drop a stripped source's relative imports. */
+/** Drop a stripped source's imports of the other browser sources: this folder's, and the spec's covers.ts. Any other import stays, and the page check refuses it. */
 function toBrowserModule(stripped: string, name: string): string {
   // A relative import may span several lines; `[^;]` crosses them.
-  return stripped.replace(/^import\s[^;]*from\s+["']\.\/[^"']*["'];[^\S\n]*$/gm, "").concat(`\n// end of ${name}\n`);
+  return stripped.replace(/^import\s[^;]*from\s+["'](?:\.\/[^"']*|\.\.\/\.\.\/spec\/covers\.ts)["'];[^\S\n]*$/gm, "").concat(`\n// end of ${name}\n`);
 }
 
 /** The names a stripped module declares at its top level. */

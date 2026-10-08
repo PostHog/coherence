@@ -6,10 +6,12 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { Io } from "../journal/cli.ts";
+import { ADOPTER_ENTRANCES, APPLE, adopterFiles } from "../spec/covers-fixture.ts";
 import { parseSpec } from "../spec/grammar.ts";
 import { gapProject } from "../readings/scope/gaps-fixture.ts";
 import { lastReading, readAndRecord, readGapBaseline, STRUCTURE_DIR, structureState } from "../readings/scope/gaps.ts";
@@ -51,6 +53,7 @@ test("scaffold control proposes each gap's closure: a guard: line where its hand
     assert.match(bullet, /^- <name>: <what every peek request must satisfy before its work runs>\n/);
     assert.match(bullet, /\n {2}crossing: public -> <trust level>\n/, "the crossing prefilled from its trust");
     assert.match(bullet, /\n {2}over: [^\n]+\n {2}via: /, "in the totality oracle form, which counts as the entrance's own once verified");
+    assert.match(bullet, /\n {2}crossing: [^\n]+\n {2}entrances: peek\n/, "naming the entrance it covers, the only one it counts on");
     assert.deepEqual(parseSpec(`# A\n\nAn a.\n\n## invariants\n${bullet}`, "A.spec.md").problems, [], "it parses as a bullet");
     assert.deepEqual(peek.map((c) => c.kind), ["invariant", "none"]);
     assert.deepEqual(byName(called, "ping").closures.map((c) => c.kind), ["none", "invariant"], "a health check, reaching no component beyond its own: control: none first");
@@ -73,6 +76,42 @@ test("scaffold control proposes each gap's closure: a guard: line where its hand
     assert.match(all, /the other 1 keep a route of their own once those guard: lines are written/);
   } finally {
     remove();
+  }
+});
+
+test("scaffold control proposes the entrances: line first for an entrance a verified invariant covered by its crossing alone, writes it beneath the crossing or adds to the line, and the named entrance's route is controlled again", () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-name-closure-"));
+  try {
+    for (const [path, text] of Object.entries(adopterFiles({ named: false }))) {
+      mkdirSync(join(root, path, ".."), { recursive: true });
+      writeFileSync(join(root, path), text);
+    }
+    const reading: Parameters<typeof structureState>[1] = { kind: "read", language: "typescript", declarations: 5, symbols: [{ from: "src/routes", to: "src/server", symbol: "listRosters", file: "src/server/rosters.ts", sites: 1 }], entrances: ADOPTER_ENTRANCES.map((e) => ({ ...e })), unowned: { files: 0, lines: 0 } };
+    const verified = (): ShellState => {
+      const state = structureState(root, reading);
+      for (const c of state.spec.components) for (const i of c.invariants) i.state = "invariant";
+      return state;
+    };
+    const apple = proposalsOf(verified(), root).find((p) => p.entrance.name === APPLE)!;
+    const first = apple.closures[0]!;
+    assert.deepEqual(first.kind === "name" ? [first.line, first.invariant, first.specPath] : first, [`entrances: ${APPLE}`, "signed apple notifications", "src/routes/Routes.spec.md"], "the line that names it on the invariant that covered it");
+    assert.deepEqual(apple.closures.map((c) => c.kind), ["name", "invariant", "none"]);
+    assert.match(renderProposal(apple, "coherence"), new RegExp(`\\n {2}proposed: entrances: route api/apple-notifications {3}under signed apple notifications in src/routes/Routes\\.spec\\.md:\\d+\\n {4}signed apple notifications \\(src/routes, verified\\) covered this entrance by its crossing alone, which no longer counts`));
+    assert.match(renderAll(proposalsOf(verified(), root), "coherence"), /covered by signed apple notifications \(src\/routes, verified\) by its crossing alone, which no longer counts; name the ones its test checks under it in src\/routes\/Routes\.spec\.md:\d+:\n {4}entrances: route api\/apple-notifications, route api\/auth\.\$, route robots\[\.\]txt, server fn listRosters\n/);
+    const spec = (): string => readFileSync(join(root, "src/routes/Routes.spec.md"), "utf8");
+    assert.match(writeClosure(root, apple, first), /^src\/routes\/Routes\.spec\.md:\d+ {2}entrances: route api\/apple-notifications$/);
+    assert.match(spec(), /\n {2}crossing: visitor -> account store\n {2}entrances: route api\/apple-notifications\n {2}kinds: none\n/, "beneath its crossing");
+    assert.deepEqual(parseSpec(spec(), "Routes.spec.md").problems, []);
+    const after = flowOf(verified());
+    assert.deepEqual(after.routes.find((r) => r.names.includes(APPLE))!.traced.map((c) => c.name), ["signed apple notifications"], "named, its test controls the notification route again");
+    // The server's own invariant covered the server function by its crossing alone; naming it adds to the line, never twice.
+    const server = proposeClosures(root, verified(), after, "typescript").find((p) => p.entrance.name === "server fn listRosters")!;
+    const named = server.closures.find((c) => c.kind === "name" && c.invariant === "session-scoped rosters")!;
+    assert.deepEqual(named.kind === "name" ? named.line : named, "entrances: server fn listRosters", "declared in one spec only, the plain name resolves from the server's");
+    writeClosure(root, server, named);
+    assert.throws(() => writeClosure(root, server, named), /already names server fn listRosters/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
