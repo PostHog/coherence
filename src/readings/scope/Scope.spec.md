@@ -44,6 +44,12 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   crossing: record -> reading
   refuted: made windowState return the whole state, so the first load carried every run and journal record -> the totality oracle went red; restored, green (2026-09-23). Before the reading was live: made buildScopePage embed every run and journal record -> red naming 451606 then 1096410 bytes; restored, green (2026-09-22)
   kinds: none
+- an older run carries only what it holds: In the first load, a run older than the latest window that is kept because it holds some enforcement's latest verdict carries only the entries it holds, and the verdicts of its other entries as counts, so the Runs view shows its whole run's totals and says how many later runs superseded, and the page's size does not grow with how many entries old full runs had.
+  over: a full run of five entries of which later runs re-check four, three later runs, and a window of two
+  via: an older run kept for the verdicts it holds carries only those, and its totals stay true on the Runs view
+  because: the page over Coherence stood 2.5 KB under its 3 MB budget, and each merge that added specs or records crossed it: eight old full runs of 85 to 251 entries, each kept whole for a few latest verdicts, were 450 KB of it. Carrying only the held entries took the page from 3,143,164 to 2,697,075 bytes with every latest verdict unchanged
+  refuted: kept every older holder run whole -> "an older run kept for the verdicts it holds carries only those, and its totals stay true on the Runs view" went red in check.test.ts; restored byte for byte (cmp), green (2026-10-08)
+  kinds: none
 - self-contained snapshot: A snapshot is the shell byte for byte with one inline state, and neither loads anything from outside: no external src, href, url() or @import, and the script fetches only its own origin's paths.
   over: every src, href, url(), @import and fetch in the snapshot and in the shell
   via: a snapshot is the shell with one inline state and loads nothing from outside: no external src, href, url() or @import

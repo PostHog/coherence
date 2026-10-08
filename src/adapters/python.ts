@@ -1,7 +1,8 @@
 /**
  * The Python adapter: the language server protocol over stdio to Pyright
- * (`pyright-langserver`), found in the adopter's node_modules first, then
- * Coherence's own (it is an optional dependency), then on PATH.
+ * (`pyright-langserver`), resolved from the adopter's project first, then
+ * from Coherence's own module (it is an optional dependency), then on PATH;
+ * never by a path built by hand (installed.ts).
  *
  * Pyright enumerates the whole workspace at start and says so in a log
  * message ("Found N source files"); every question waits for it, since an
@@ -93,6 +94,7 @@ import {
   type StagedSite,
   type Visibility,
 } from "./adapter.ts";
+import { locateServer as locateInstalled, type ServerLocation } from "./installed.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
 import { horizonFolders, isVirtualEnvironment, keepHorizonFiles, keepProjectFiles, nestedCheckouts, neverWalkedName, projectListing, nestedFolder, repositoryTop, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
 import { TACH_CONFIG, dottedFor, excluded, findTachConfig, locateTach, moduleLocations, moduleOf, reaches, readTachConfig, runTach, tachGovernance, tachOverCopy, witnessTach, type TachConfig, type TachModule, type TachRun, type TachWitness } from "./tach.ts";
@@ -109,8 +111,6 @@ export interface PythonLanguageClient {
 
 export type PythonClientFactory = (command: string, args: string[], cwd: string, env?: Record<string, string>) => PythonLanguageClient;
 
-const here = dirname(fileURLToPath(import.meta.url));
-const COHERENCE_ROOT = resolve(here, "..", "..");
 const SERVER_BIN = "pyright-langserver";
 const ENUMERATION_TIMEOUT_MS = 10 * 60 * 1000;
 const COHERENCE_ENFORCER = "Coherence's check at the edit and in CI";
@@ -127,15 +127,9 @@ export const PYTHON_LADDER: Ladder = {
   whenVacuous: "convention",
 };
 
-/** Where the language server binary is, or undefined with the places looked. */
-export function locateServer(root: string): { path: string; looked: string[] } | undefined {
-  const looked = [join(root, "node_modules", ".bin", SERVER_BIN), join(COHERENCE_ROOT, "node_modules", ".bin", SERVER_BIN)];
-  for (const candidate of looked) if (existsSync(candidate)) return { path: candidate, looked };
-  for (const dir of (process.env["PATH"] ?? "").split(":")) {
-    const candidate = join(dir, SERVER_BIN);
-    if (dir !== "" && existsSync(candidate)) return { path: candidate, looked: [...looked, candidate] };
-  }
-  return undefined;
+/** Where the language server binary is, with every place looked. */
+export function locateServer(root: string): ServerLocation {
+  return locateInstalled("pyright", SERVER_BIN, root);
 }
 
 interface DocumentSymbol {
@@ -613,14 +607,14 @@ export class PythonAdapter implements LanguageAdapter {
 
   private async start(): Promise<{ ok: true } | { ok: false; reason: string }> {
     const server = locateServer(this.root);
-    if (server === undefined) {
-      return { ok: false, reason: `${SERVER_BIN} not found; looked in the project's node_modules, Coherence's, and PATH. Install it: npm install --save-dev pyright (or pip install pyright)` };
+    if (!server.found) {
+      return { ok: false, reason: `${SERVER_BIN} not found; looked at ${server.looked.join("; ")}. Install it: npm install --save-dev pyright (or pip install pyright)` };
     }
     const workspace = this.workspaceFolder();
     // Pyright is a Node program: a bounded reading of a large project raises its heap past Node's default of about 4 GB.
     const heap = this.bounds?.heapMB;
     const env = heap === undefined ? undefined : { NODE_OPTIONS: `${process.env["NODE_OPTIONS"] ?? ""} --max-old-space-size=${Math.round(heap)}`.trim() };
-    const client = this.clientFactory(server.path, ["--stdio"], this.root, env);
+    const client = this.clientFactory(server.command, [...server.args, "--stdio"], this.root, env);
     this.client = client;
     const started = Date.now();
     let found: (count: number) => void = () => {};

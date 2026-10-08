@@ -133,6 +133,21 @@ export function projectFiles(root: string): string[] {
 }
 
 /**
+ * The project files under one folder of the project, by the same rule as
+ * projectFiles, from a git listing of that folder alone: a caller asking
+ * about one corner of a large project pays for that corner. The empty
+ * folder is the whole project.
+ */
+export function projectFilesUnder(root: string, folder: string): string[] {
+  const key = folderKey(folder);
+  if (key === "") return projectFiles(root);
+  const base = resolve(root);
+  if (!inRepository(base)) return projectFiles(base).filter((rel) => rel.startsWith(`${key}/`));
+  const memo = new Map<string, boolean>();
+  return [...new Set(gitList(base, [key]))].filter((rel) => !insideNested(base, rel, memo) && isFileOnDisk(base, rel)).sort();
+}
+
+/**
  * The project files whose names end with `suffix` (a spec's `.spec.md`), by
  * the same rule as projectFiles, from a git listing of those files alone: a
  * caller that needs the specs pays for the specs, never for every file.

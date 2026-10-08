@@ -50,3 +50,33 @@ jobs:
         env:
           COHERENCE_UPGRADE_FROM: ${{ matrix.from != 'newest' && matrix.from || '' }}
         run: npm run test:upgrade
+
+  # An adopter on pnpm and TypeScript 7: pnpm keeps Coherence's own dependencies
+  # beside its package in the store, not inside it, and TypeScript 7 ships no
+  # tsserver, so a language server located by a path built by hand names
+  # nothing and every TypeScript reading fails. It installs this commit with
+  # pnpm, pinned, and grades a chokepoint through the TypeScript instrument.
+  pnpm:
+    name: pnpm adopter on TypeScript 7
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.18"
+
+      # npm run build, before the pack, needs the dev dependencies.
+      - name: Install
+        run: npm ci
+
+      - name: pnpm
+        run: npm install --global pnpm@10.33.0
+
+      - name: A pnpm project on TypeScript 7
+        env:
+          COHERENCE_TELEMETRY: "0"
+        run: npm run test:pnpm

@@ -157,6 +157,18 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   because: the PostHog adoption moved from one whole-repository project to registry leaves and its practices kept triggers written from the repository top, so edit posthog/auth.py inside the posthog leaf named posthog/posthog/auth.py and never fired, and nothing said so (df-b277ba29); a trigger that cannot fire is a silent skip, and the project's own file list is the one reading that decides it
   refuted: made deadTriggers pass every trigger as matching a file -> "a practice's edit trigger that names no file of its project is a spec problem saying what to write instead" went red in dead-triggers.test.ts with its two siblings; restored byte for byte, green (2026-10-08)
   kinds: none
+- the dead-trigger check pays for its triggers: The check that an edit trigger names a file of its project asks git only for the literal paths its triggers name, in one listing, and for a pattern only the folder before its first wildcard; its listings are the same size however many other files the project holds.
+  over: one project beside 20 and beside 2000 unrelated files, a literal trigger and a pattern trigger
+  via: the dead-trigger check lists only what its triggers name, so a project ten times larger costs it nothing more
+  because: the spec model loads several times in one hook, and each load runs the check; listing the whole project at each load added half a second to PostHog's first leaf entry (4.2 s against 3.6 s, interleaved, one power state), past the 3 s latency budget it was already over
+  refuted: put back the whole-project listing the check first shipped with -> "the dead-trigger check lists only what its triggers name, so a project ten times larger costs it nothing more" went red in dead-triggers.test.ts; restored, green (2026-10-08)
+  kinds: none
+- a dead trigger is looked for outside its leaf as narrowly: When a leaf's trigger names no file of the leaf, the check looks for what it names elsewhere in the repository as it looked inside: a literal path in one pathspec listing, a pattern only under the folder before its first wildcard; never a listing of the whole repository.
+  over: a leaf whose literal and pattern triggers name a file in another folder, beside 20 and beside 2000 unrelated files
+  via: a dead trigger in a leaf is looked for outside it as narrowly, so the repository's size costs the check nothing
+  because: while a trigger stays dead, every one of a hook's model loads looks for it outside the leaf, and a listing of PostHog's whole repository at each would cost far more than the half second the narrow check saved (df-4be1892a)
+  refuted: put back the whole-repository listing for the outside lookup -> "a dead trigger in a leaf is looked for outside it as narrowly, so the repository's size costs the check nothing" went red in dead-triggers.test.ts on the listing size; restored, green (2026-10-08)
+  kinds: none
 - kernel practices reach adopters: In an adopter, the practices whose reach is kernel are delivered beside the project's own with their ids led by coherence:, and an internal practice never leaves Coherence's tree.
   over: Coherence's practice files as an adopter reads them: kernel and internal
   via: in an adopter, the kernel practices are delivered beside the project's own, their ids led by coherence:, and an internal practice is not

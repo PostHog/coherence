@@ -345,6 +345,12 @@ export interface RunsData {
    * Absent when nothing was left out.
    */
   omitted?: number;
+  /**
+   * For an older run the window keeps only for the latest entries it holds,
+   * the verdicts of its other entries, which later runs superseded, as
+   * counts, by run id: the run's totals stay true without embedding them.
+   */
+  superseded?: Record<string, { pass: number; fail: number; notRun: number }>;
 }
 
 /* The journal, as src/journal records it. */
