@@ -26,15 +26,16 @@ work itself.
 ## Quick setup: paste this into your agent
 
 ```text
-Install @posthog/coherence as a dev dependency and run `npx --no coherence hooks install --host claude` (or `--host codex`).
-Then run `npx --no coherence query practice "adopt Coherence"`, work through it, record it with `enact`, and tell me what each step found.
+Install @posthog/coherence@^1.5 as a dev dependency (with pnpm, if minimumReleaseAge holds it back, add it to minimumReleaseAgeExclude) and run `npx --no -- coherence hooks install --host claude` (or `--host codex`).
+Then run `npx --no -- coherence query practice "adopt Coherence"`, work through it, record it with `enact`, and tell me what each step found.
 ```
 
 It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux. The package
 is [`@posthog/coherence`](https://www.npmjs.com/package/@posthog/coherence)
-on npm, published from this repository with provenance. A checkout kept
-beside the project as ../coherence (or named by COHERENCE_HOME) also works,
-and the hooks prefer it.
+on npm, published from this repository with provenance; the dev dependency
+is the one way to set Coherence up, and every session start names the
+Coherence that runs, its version and where it is. A clone kept beside the
+project is no longer a way to run it: the hooks never do.
 
 ## See the system: the Structure view
 
@@ -236,11 +237,16 @@ It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux.
 ```text
 Set up Coherence in this project, and report what each step found.
 
-1. Install. Run `npm install -D @posthog/coherence` (or `pnpm add -D
-   @posthog/coherence`). Do not `npm link` a checkout into the project. The
-   command is `npx --no coherence` (call it `coherence` below); `--no` keeps
-   npx from fetching an unrelated package if the install is missing.
-   Teammates get it from the lockfile.
+1. Install. Run `npm install -D @posthog/coherence@^1.5` (or `pnpm add -D
+   @posthog/coherence@^1.5`); an older release lacks what the steps below
+   use. If pnpm's minimumReleaseAge refuses it or resolves an older one, add
+   `@posthog/coherence` to `minimumReleaseAgeExclude` in pnpm-workspace.yaml
+   (bun: `minimumReleaseAgeExcludes`; Yarn: `npmPreapprovedPackages`). Install
+   the package itself, never a checkout. The command is
+   `npx --no -- coherence` (call it `coherence` below); `--no` keeps npx from
+   fetching an unrelated package if the install is missing, and `--` keeps it
+   from taking Coherence's flags, such as `--version`, as its own. Confirm
+   with `coherence --version`. Teammates get it from the lockfile.
 
 2. Hooks. Run `coherence hooks install --host claude` (or `--host codex`).
    From the next session on, every session starts with Coherence's
@@ -264,9 +270,18 @@ their commands run, its pitfalls cite what went wrong in earlier adoptions,
 and the enactment is a durable record of how the project was adopted
 (`coherence query practice` lists every practice).
 
-The installed hooks look for Coherence at `$COHERENCE_HOME`, then
-`../coherence` (also beside the main checkout of a git worktree), then the
-installed package; where none is found, the session start says so in one line.
+The installed hooks run the project's installed package; where it is not
+installed, the session start says so in one line and tells the agent how to
+install it. Each session start names the Coherence that runs and its
+version. Hooks an earlier release wrote also looked at a `../coherence`
+clone beside the project, before the installed package, and keep running
+that clone until they are reinstalled: if one sits beside your project, run
+`npx --no -- coherence hooks install --host claude` (or `--host codex`)
+after upgrading, since the clone cannot tell you so. Once the installed
+package runs, the session start and `coherence hooks --check` name hooks of
+that earlier form with the same command. To run a project against a
+Coherence checkout you are developing, see
+[Working on Coherence itself](#working-on-coherence-itself).
 To add the project's own words to an event, write
 `.coherence/hooks/<Event>.append.md` (it follows what the hook says) or
 `.coherence/hooks/<Event>.override.md` (it replaces it; an empty one silences
@@ -313,9 +328,9 @@ outside the component (`from: outside the component`), and its owners from
 Paste this into your agent to adopt one folder:
 
 ```text
-Adopt Coherence for <folder> only. Install @posthog/coherence as a dev dependency and run `npx --no coherence hooks install --host claude --local` from <folder>.
-Run `npx --no coherence adopt <folder>` from the repository root if this repository keeps a registry of adopted folders.
-Then run `npx --no coherence query practice "adopt Coherence"` from <folder>, work through it, record it with `enact`, and tell me what each step found.
+Adopt Coherence for <folder> only. Install @posthog/coherence@^1.5 as a dev dependency (with pnpm, if minimumReleaseAge holds it back, add it to minimumReleaseAgeExclude) and run `npx --no -- coherence hooks install --host claude --local` from <folder>.
+Run `npx --no -- coherence adopt <folder>` from the repository root if this repository keeps a registry of adopted folders.
+Then run `npx --no -- coherence query practice "adopt Coherence"` from <folder>, work through it, record it with `enact`, and tell me what each step found.
 ```
 
 Every key is in [docs/config.md](docs/config.md).
@@ -399,6 +414,21 @@ the settings; a session start or a stop with something queued starts a
 detached flush that sends them in one request to PostHog's batch endpoint
 and drops them, sent or not. No hook waits for it.
 
+### Update check
+
+Apart from telemetry, and sending nothing about you, a session start asks
+the npm registry for the newest published version
+(`https://registry.npmjs.org/@posthog/coherence/latest`) at most once a day,
+from a detached process no hook waits for. The answer is kept in
+`$XDG_CONFIG_HOME/coherence/latest.json` (or `~/.config/coherence/`); a
+failed request is dropped and the last answer stands. When the newest is
+later than the version running, the session start says so with the update
+command for the project's package manager (by its lockfile) and the
+release-age setting that may hold the newest back. `coherence --version`
+shows the version running, where it is, the newest published, and when the
+registry last answered. `COHERENCE_NO_UPDATE_CHECK=1` turns the check off,
+and so do `CI` and `DO_NOT_TRACK=1`.
+
 ## Working on Coherence itself
 
 From this checkout, the same commands run as `node src/cli.ts <command>`:
@@ -438,6 +468,27 @@ write template. This checkout carries hooks for both Claude Code and Codex;
 carries here (orient at the starts, the peer feed at prompt and tool boundaries,
 a practice before a tool use that fires it, regulate at the stops), and `hooks --check` is the CI form. Stop reports the check
 over changed files; SubagentStop refuses the stop (exit 2, reason on stderr) while findings remain.
+
+### Running a project against your checkout
+
+To try a change to Coherence in another project before it is published, keep
+the project's hooks as they are and point them at your checkout:
+
+```sh
+export COHERENCE_HOME=~/Dev/coherence   # in the shell that starts claude or codex
+```
+
+The hooks the project commits run the checkout `$COHERENCE_HOME` names
+instead of the installed package, and each session start says so (`the
+checkout COHERENCE_HOME names`) and names the installed package when its
+version differs. Unset it to go back. A project that commits no Coherence
+hooks can instead keep a personal hook naming the checkout's cli:
+`node ~/Dev/coherence/src/cli.ts hooks install --host claude --local
+--command "node ~/Dev/coherence/src/cli.ts"` writes it to
+`.claude/settings.local.json`, which is never committed (`hooks --check`
+takes the same `--local --command`). Do not do both: a personal hook beside
+the shared one answers every event twice. In Coherence's own repository and
+its git worktrees, the hooks always run that tree's own source.
 
 ## Lexicon workflow
 
