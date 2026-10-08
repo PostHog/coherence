@@ -32,11 +32,10 @@ Then run `npx --no -- coherence query practice "adopt Coherence"`, work through 
 
 It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux. The package
 is [`@posthog/coherence`](https://www.npmjs.com/package/@posthog/coherence)
-on npm, published from this repository with provenance. A checkout named by
-COHERENCE_HOME runs instead of the installed package; one kept beside the
-project as ../coherence runs only while the project declares no package.
-Every session start names the Coherence that runs, its version and where it
-is.
+on npm, published from this repository with provenance; the dev dependency
+is the one way to set Coherence up, and every session start names the
+Coherence that runs, its version and where it is. A clone kept beside the
+project is no longer a way to run it: the hooks never do.
 
 ## See the system: the Structure view
 
@@ -218,8 +217,8 @@ Set up Coherence in this project, and report what each step found.
    @posthog/coherence@^1.5`); an older release lacks what the steps below
    use. If pnpm's minimumReleaseAge refuses it or resolves an older one, add
    `@posthog/coherence` to `minimumReleaseAgeExclude` in pnpm-workspace.yaml
-   (bun: `minimumReleaseAgeExcludes`; Yarn: `npmPreapprovedPackages`). Do not
-   `npm link` a checkout into the project. The command is
+   (bun: `minimumReleaseAgeExcludes`; Yarn: `npmPreapprovedPackages`). Install
+   the package itself, never a checkout. The command is
    `npx --no -- coherence` (call it `coherence` below); `--no` keeps npx from
    fetching an unrelated package if the install is missing, and `--` keeps it
    from taking Coherence's flags, such as `--version`, as its own. Confirm
@@ -247,17 +246,18 @@ their commands run, its pitfalls cite what went wrong in earlier adoptions,
 and the enactment is a durable record of how the project was adopted
 (`coherence query practice` lists every practice).
 
-The installed hooks look for Coherence at `$COHERENCE_HOME`, then the
-installed package, and only when the project's package.json declares no
-Coherence, `../coherence` (also beside the main checkout of a git worktree);
-where none is found, the session start says so in one line. Each session
-start names the Coherence that runs, says when another copy the project
-reaches is at another version, and names hooks an earlier release wrote
-(which looked at `../coherence` first) with the command that reinstalls
-them; `coherence hooks --check` names them too. If you keep a `../coherence`
-clone beside the project, run `npx --no -- coherence hooks install --host
-claude` (or `--host codex`) after upgrading: hooks an earlier release wrote
-still run that clone, which cannot tell you so.
+The installed hooks run the project's installed package; where it is not
+installed, the session start says so in one line and tells the agent how to
+install it. Each session start names the Coherence that runs and its
+version. Hooks an earlier release wrote also looked at a `../coherence`
+clone beside the project, before the installed package, and keep running
+that clone until they are reinstalled: if one sits beside your project, run
+`npx --no -- coherence hooks install --host claude` (or `--host codex`)
+after upgrading, since the clone cannot tell you so. Once the installed
+package runs, the session start and `coherence hooks --check` name hooks of
+that earlier form with the same command. To run a project against a
+Coherence checkout you are developing, see
+[Working on Coherence itself](#working-on-coherence-itself).
 To add the project's own words to an event, write
 `.coherence/hooks/<Event>.append.md` (it follows what the hook says) or
 `.coherence/hooks/<Event>.override.md` (it replaces it; an empty one silences
@@ -444,6 +444,27 @@ write template. This checkout carries hooks for both Claude Code and Codex;
 carries here (orient at the starts, the peer feed at prompt and tool boundaries,
 a practice before a tool use that fires it, regulate at the stops), and `hooks --check` is the CI form. Stop reports the check
 over changed files; SubagentStop refuses the stop (exit 2, reason on stderr) while findings remain.
+
+### Running a project against your checkout
+
+To try a change to Coherence in another project before it is published, keep
+the project's hooks as they are and point them at your checkout:
+
+```sh
+export COHERENCE_HOME=~/Dev/coherence   # in the shell that starts claude or codex
+```
+
+The hooks the project commits run the checkout `$COHERENCE_HOME` names
+instead of the installed package, and each session start says so (`the
+checkout COHERENCE_HOME names`) and names the installed package when its
+version differs. Unset it to go back. A project that commits no Coherence
+hooks can instead keep a personal hook naming the checkout's cli:
+`node ~/Dev/coherence/src/cli.ts hooks install --host claude --local
+--command "node ~/Dev/coherence/src/cli.ts"` writes it to
+`.claude/settings.local.json`, which is never committed (`hooks --check`
+takes the same `--local --command`). Do not do both: a personal hook beside
+the shared one answers every event twice. In Coherence's own repository and
+its git worktrees, the hooks always run that tree's own source.
 
 ## Lexicon workflow
 

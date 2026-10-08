@@ -460,16 +460,16 @@ test("a hook without Coherence installed tells the user once and the agent how t
           assert.deepEqual(out.hookSpecificOutput, { hookEventName: "SessionStart", additionalContext: MISSING_CONTEXT }, `${host}: the agent is told how to supply Coherence`);
           assert.match(MISSING_CONTEXT, /npm install -D @posthog\/coherence/, "the agent is given the install command");
           assert.match(MISSING_CONTEXT, /ask before installing/, "and told the dependency change is the user's call");
+          assert.doesNotMatch(MISSING_CONTEXT, /clone|\.\.\/coherence|COHERENCE_HOME|checkout/, "the installed package is the one way offered");
         } else assert.equal(run.stdout, "", `${host} ${event}: nothing after the session start`);
       }
     }
 
     // Found, but node is not on the PATH the hook runs with: the same one line, naming node.
-    await symlink(CHECKOUT, join(parent, "coherence"));
     const noNode = (process.env["PATH"] ?? "").split(":").filter((dir) => dir !== "" && !existsSync(join(dir, "node"))).join(":");
-    const bare = await runInstalled(project, "claude", "SessionStart", {}, { PATH: noNode });
+    const bare = await runInstalled(project, "claude", "SessionStart", {}, { PATH: noNode, COHERENCE_HOME: CHECKOUT });
     assert.deepEqual([bare.status, bare.stderr, bare.stdout], [0, "", JSON.stringify({ systemMessage: NO_NODE }) + "\n"]);
-    const quiet = await runInstalled(project, "claude", "Stop", { stop_hook_active: false }, { PATH: noNode });
+    const quiet = await runInstalled(project, "claude", "Stop", { stop_hook_active: false }, { PATH: noNode, COHERENCE_HOME: CHECKOUT });
     assert.deepEqual([quiet.status, quiet.stderr, quiet.stdout], [0, "", ""], "without node, only the session start speaks");
 
     // Uninstall still knows the located command as ours and removes all of it.
@@ -507,15 +507,20 @@ test("a located Coherence answers, and refuses, as a direct command does", async
     git(project, "add", ".");
     git(project, "commit", "-q", "-m", "seed");
     for (const host of ["claude", "codex"] as const) await install({ root: project, host, command: LOCATED_PREFIX });
-    await symlink(CHECKOUT, join(parent, "coherence"));
-    assert.equal(realpathSync(locate(project, hostEnv("codex", project))!), realpathSync(CLI), "the sibling is found");
+    // A developer's checkout of Coherence, kept beside the project and named by COHERENCE_HOME in the host's environment.
+    const home = join(parent, "coherence");
+    await symlink(CHECKOUT, home);
+    assert.equal(locate(project, hostEnv("codex", project)), undefined, "a checkout beside the project is never run of itself");
+    const env = { COHERENCE_HOME: home };
+    assert.equal(realpathSync(locate(project, hostEnv("codex", project, env))!), realpathSync(CLI), "the checkout COHERENCE_HOME names is found");
 
     for (const host of ["claude", "codex"] as const) {
-      const start = await runInstalled(project, host, "SessionStart", { session_id: `s-${host}` });
+      const start = await runInstalled(project, host, "SessionStart", { session_id: `s-${host}` }, env);
       assert.equal(start.status, 0, start.stderr);
       const context = (JSON.parse(start.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext;
       assert.match(context, /Coherence vocabulary/, `${host}: the start injection arrives through the located command`);
-      assert.match(context, /\n  node \.\.\/coherence\/src\/cli\.ts journal\n/, `${host}: the session is told the checkout beside it, not a node_modules path`);
+      assert.match(context, /\n  node \.\.\/coherence\/src\/cli\.ts journal\n/, `${host}: the session is told the checkout it runs, not a node_modules path`);
+      assert.match(context, /runs this session: the checkout COHERENCE_HOME names/, `${host}: and that COHERENCE_HOME chose it`);
     }
 
     // A rejected name in a changed file: the subagent stop is refused exactly as a direct command refuses it.
@@ -523,24 +528,22 @@ test("a located Coherence answers, and refuses, as a direct command does", async
     const direct = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hook", "SubagentStop"], { cwd: project, env: hostEnv("codex", project), input: JSON.stringify({ cwd: project, stop_hook_active: false }), encoding: "utf8" });
     assert.equal(direct.status, REFUSE_EXIT, direct.stderr);
     for (const host of ["claude", "codex"] as const) {
-      const refused = await runInstalled(project, host, "SubagentStop", { stop_hook_active: false });
+      const refused = await runInstalled(project, host, "SubagentStop", { stop_hook_active: false }, env);
       assert.deepEqual([refused.status, refused.stdout, refused.stderr], [direct.status, direct.stdout, direct.stderr], `${host}: the located command refuses as the direct one does`);
     }
 
-    // COHERENCE_HOME finds a checkout kept anywhere; it is read before the sibling.
-    await rm(join(parent, "coherence"));
-    assert.equal(locate(project, hostEnv("codex", project)), undefined);
-    const home = await runInstalled(project, "codex", "SessionStart", {}, { COHERENCE_HOME: CHECKOUT });
-    assert.equal(home.status, 0, home.stderr);
-    assert.match(home.stdout, /"hookSpecificOutput"/);
+    // COHERENCE_HOME finds a checkout kept anywhere.
+    const far = await runInstalled(project, "codex", "SessionStart", {}, { COHERENCE_HOME: CHECKOUT });
+    assert.equal(far.status, 0, far.stderr);
+    assert.match(far.stdout, /"hookSpecificOutput"/);
 
-    // A git worktree of the project finds the Coherence beside its main checkout.
-    await symlink(CHECKOUT, join(parent, "coherence"));
+    // A git worktree of the project runs the checkout COHERENCE_HOME names, and never the one beside its main checkout.
     git(project, "add", ".");
     git(project, "commit", "-q", "-m", "hooks");
     const worktree = join(project, ".claude", "worktrees", "w");
     git(project, "worktree", "add", "-q", worktree);
-    assert.equal(realpathSync(locate(worktree, hostEnv("codex", worktree))!), realpathSync(CLI), "the main checkout's sibling is found from a worktree");
+    assert.equal(locate(worktree, hostEnv("codex", worktree)), undefined, "the main checkout's sibling is never run");
+    assert.equal(realpathSync(locate(worktree, hostEnv("codex", worktree, env))!), realpathSync(CLI), "COHERENCE_HOME reaches a worktree too");
   } finally {
     await rm(parent, { recursive: true, force: true });
   }
@@ -556,7 +559,7 @@ test("a session is told the checkout it ran from: beside it by a relative path, 
 const EARLIER_LOCATE =
   'root="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$root" != / ] && [ ! -f "$root/.claude/settings.json" ] && [ ! -f "$root/.codex/hooks.json" ]; do root=$(dirname "$root"); done; main=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null); coherence=; for c in "${COHERENCE_HOME:+$COHERENCE_HOME/src/cli.ts}" "$root/../coherence/src/cli.ts" "${main:+${main%/*}/../coherence/src/cli.ts}" "$root/node_modules/@posthog/coherence/dist/cli.js" "$root/node_modules/.bin/coherence"; do if [ -n "$c" ] && [ -f "$c" ]; then coherence=$c; break; fi; done; coherence() { exec node "$coherence" "$@"; }; coherence';
 
-test("a stale checkout beside the project never wins over the installed package; only COHERENCE_HOME names a checkout over it", async () => {
+test("a checkout beside the project never runs, installed package or not; only COHERENCE_HOME names a checkout", async () => {
   const parent = await mkdtemp(join(tmpdir(), "coherence-order-"));
   const project = join(parent, "project");
   const home = join(parent, "elsewhere");
@@ -578,9 +581,9 @@ test("a stale checkout beside the project never wins over the installed package;
     await rm(join(project, "node_modules"), { recursive: true });
     assert.equal(locate(project, hostEnv("codex", project)), undefined, "a declared but missing package is missing, never replaced by a checkout");
 
-    // Nothing declared, nothing installed: the checkout beside the project is the one way left.
+    // Nothing declared, nothing installed: Coherence is missing; the clone beside the project is still never run.
     await writeFile(join(project, "package.json"), JSON.stringify({ devDependencies: {} }));
-    assert.equal(resolve(locate(project, hostEnv("codex", project)) ?? ""), stale);
+    assert.equal(locate(project, hostEnv("codex", project)), undefined, "nothing installed: missing, whatever sits beside the project");
 
     // COHERENCE_HOME is the explicit way to run a checkout, and wins over an installed package.
     await mkdir(dirname(installed), { recursive: true });
@@ -615,5 +618,72 @@ test("hooks an earlier Coherence wrote, which look beside the project first, are
     assert.deepEqual(earlierSearchLines(project), [], "a reinstall clears it");
   } finally {
     await rm(project, { recursive: true, force: true });
+  }
+});
+
+/** Run this checkout's command line in `cwd`, as a person does. */
+function cli(cwd: string, ...args: string[]): ReturnType<typeof spawnSync> {
+  // No warm instrument outlives the test: a session start would start one.
+  const env: NodeJS.ProcessEnv = { ...process.env, COHERENCE_NO_WARM_UP: "1" };
+  delete env["COHERENCE_HOME"];
+  delete env["CLAUDE_PROJECT_DIR"];
+  return spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, ...args], { cwd, env, encoding: "utf8" });
+}
+
+test("Coherence's own repository runs its own source, in its main checkout and in each of its worktrees", async () => {
+  const parent = await mkdtemp(join(tmpdir(), "coherence-own-"));
+  const main = join(parent, "coherence");
+  try {
+    await mkdir(join(main, "src"), { recursive: true });
+    await writeFile(join(main, "package.json"), JSON.stringify({ name: PACKAGE_NAME, version: "9.9.9" }));
+    // A stand-in for the repository's cli that says which file ran.
+    await writeFile(join(main, "src", "cli.ts"), "console.log(process.argv[1]);\n");
+    const installed = cli(main, "hooks", "install", "--host", "claude");
+    assert.equal(installed.status, 0, String(installed.stderr));
+    git(main, "init", "-q");
+    git(main, "add", ".");
+    git(main, "commit", "-q", "-m", "seed");
+    const worktree = join(parent, "coherence-practice");
+    git(main, "worktree", "add", "-q", worktree);
+    for (const tree of [main, worktree]) {
+      const settings = JSON.parse(await readFile(join(tree, ".claude", "settings.json"), "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
+      const command = settings.hooks["SessionStart"]!.at(-1)!.hooks[0]!.command;
+      assert.doesNotMatch(command, /node_modules|COHERENCE_HOME/, "its own source, never a package or another checkout");
+      const ran = spawnSync("sh", ["-c", command], { cwd: tree, env: hostEnv("claude", tree), input: "{}", encoding: "utf8" });
+      assert.equal(ran.status, 0, ran.stderr);
+      assert.equal(realpathSync(ran.stdout.trim()), realpathSync(join(tree, "src", "cli.ts")), `${tree}: the tree's own cli runs`);
+    }
+  } finally {
+    await rm(parent, { recursive: true, force: true });
+  }
+});
+
+test("a developer points an adopter at a local checkout through COHERENCE_HOME, or through install --local --command where no shared hook of ours is installed", async () => {
+  const parent = await mkdtemp(join(tmpdir(), "coherence-dev-"));
+  const project = join(parent, "adopter");
+  try {
+    await mkdir(project);
+    await writeFile(join(project, "package.json"), JSON.stringify({ devDependencies: { [PACKAGE_NAME]: "^1.5.0" } }));
+    const started = (run: { status: number | null; stdout: string; stderr: string }): string => {
+      assert.equal(run.status, 0, run.stderr);
+      return (JSON.parse(run.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext;
+    };
+
+    // The shared hooks the project commits, with COHERENCE_HOME set in the environment the host starts with.
+    assert.equal(cli(project, "hooks", "install", "--host", "claude").status, 0);
+    assert.match(started(await runInstalled(project, "claude", "SessionStart", { session_id: "s1" }, { COHERENCE_HOME: CHECKOUT, COHERENCE_NO_WARM_UP: "1" })), /runs this session: the checkout COHERENCE_HOME names/);
+    assert.equal(cli(project, "hooks", "uninstall", "--host", "claude").status, 0);
+
+    // No shared hook of ours: a personal install names the checkout's cli itself, and the check agrees with it.
+    const prefix = `node ${CLI}`;
+    assert.equal(cli(project, "hooks", "install", "--host", "claude", "--local", "--command", prefix).status, 0);
+    const local = JSON.parse(await readFile(join(project, ".claude", "settings.local.json"), "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
+    const command = local.hooks["SessionStart"]!.at(-1)!.hooks[0]!.command;
+    assert.equal(command, `${prefix} hook SessionStart`);
+    const ran = spawnSync("sh", ["-c", command], { cwd: project, env: hostEnv("claude", project, { COHERENCE_NO_WARM_UP: "1" }), input: JSON.stringify({ cwd: project, session_id: "s2" }), encoding: "utf8" });
+    assert.match(started(ran), /runs this session: a checkout at /);
+    assert.equal(cli(project, "hooks", "--check", "--host", "claude", "--local", "--command", prefix).status, 0);
+  } finally {
+    await rm(parent, { recursive: true, force: true });
   }
 });

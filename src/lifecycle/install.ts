@@ -20,16 +20,18 @@
  * nothing when nothing changed, so a round trip gives back the adopter's file.
  *
  * An adopter's hook finds Coherence rather than naming one path to it:
- * Coherence is the package in the project's node_modules, or a checkout run
- * from outside the project (never `npm link`ed in: that installed a second
- * dependency tree and broke a pnpm build). The command walks up to the
- * project root and looks, in order, at $COHERENCE_HOME, the installed
- * package's own cli, the project's node_modules/.bin/coherence, and only
- * when the project's package.json declares no Coherence, a `coherence`
- * folder beside the project and one beside the main checkout when the
- * project is a git worktree. A hook an earlier Coherence wrote, which looked
- * beside the project first, is named by the check and at every session
- * start with the command that reinstalls it. The committed command names no one's absolute
+ * Coherence is the package the project installed as a dev dependency (never
+ * a checkout `npm link`ed in: that installed a second dependency tree and
+ * broke a pnpm build). The command walks up to the project root and runs
+ * exactly one of two things: the checkout $COHERENCE_HOME names, which a
+ * developer of Coherence sets in the agent host's environment, or else the
+ * installed package's own cli (the project's node_modules/.bin/coherence
+ * when the package's cli is not where npm puts it). A hook an earlier
+ * Coherence wrote also looked in a `coherence` folder beside the project,
+ * before the installed package; it is named by the check and at every
+ * session start with the command that reinstalls it. Coherence's own
+ * repository runs its own source instead, in its main checkout and in each
+ * of its worktrees. The committed command names no one's absolute
  * path, so it is the same on every teammate's machine and the check agrees
  * across them. When nothing is found, or node is not on the PATH, the hook
  * prints one line as a systemMessage (both hosts show it to the user), exits
@@ -123,29 +125,24 @@ const LOCAL_ROOT_WALK =
   'root="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$root" != / ] && [ ! -f "$root/.claude/settings.json" ] && [ ! -f "$root/.claude/settings.local.json" ] && [ ! -f "$root/.codex/hooks.json" ]; do root=$(dirname "$root"); done';
 
 /**
- * Shell that sets `$coherence` to the cli to run, or to nothing:
- * $COHERENCE_HOME, which names a checkout on purpose; then the installed
- * package's own cli and the project's own bin; and only when the project's
- * package.json declares no Coherence, the sibling folder and the sibling of
- * a worktree's main checkout. A checkout beside the project never wins over
- * the package the project installed: an adopter's stale clone at
- * ../coherence once answered every session while the installed release was
- * current. The package's cli comes before the bin because a package manager
- * may write the bin as a shell shim that node cannot run. Nothing here names
- * a path on one machine. Settings at a repository's top for a project nested
- * below it (`sub`, the project's folder from the top) look in that project's
- * own node_modules first, where the project installed Coherence.
+ * Shell that sets `$coherence` to the cli to run, or to nothing: the
+ * checkout $COHERENCE_HOME names, else the installed package's own cli, else
+ * the project's own bin. No folder that merely sits beside the project is
+ * ever run: an adopter's stale clone at ../coherence once answered every
+ * session while the installed release was current. The package's cli comes
+ * before the bin because a package manager may write the bin as a shell shim
+ * that node cannot run. Nothing here names a path on one machine. Settings
+ * at a repository's top for a project nested below it (`sub`, the project's
+ * folder from the top) look in that project's own node_modules first, where
+ * the project installed Coherence.
  */
 export function locateShell(sub = "", local = false): string {
   const quoted = sub.replace(/["$`\\]/g, "\\$&");
   const own = sub === "" ? "" : `"$root/${quoted}/node_modules/${PACKAGE_NAME}/dist/cli.js" "$root/${quoted}/node_modules/.bin/coherence" `;
-  const declared = sub === "" ? "" : ` "$root/${quoted}/package.json"`;
   return [
     local ? LOCAL_ROOT_WALK : ROOT_WALK,
-    'main=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)',
     "coherence=",
     `for c in "\${${HOME_VAR}:+\$${HOME_VAR}/src/cli.ts}" ${own}"$root/node_modules/${PACKAGE_NAME}/dist/cli.js" "$root/node_modules/.bin/coherence"; do if [ -n "$c" ] && [ -f "$c" ]; then coherence=$c; break; fi; done`,
-    `if [ -z "$coherence" ] && ! grep -qs '"${PACKAGE_NAME}"' "$root/package.json"${declared}; then for c in "$root/../${SIBLING}/src/cli.ts" "\${main:+\${main%/*}/../${SIBLING}/src/cli.ts}"; do if [ -n "$c" ] && [ -f "$c" ]; then coherence=$c; break; fi; done; fi`,
   ].join("; ");
 }
 
@@ -160,7 +157,7 @@ export const NOT_INSTALLED = "Coherence is configured for this project but not i
  * project's dependencies is the user's decision. The agent makes the call.
  * No apostrophes: it sits in single quotes.
  */
-export const MISSING_CONTEXT = `Coherence is configured for this project (its hooks are in the agent host settings) but is not installed where the hooks look, so they do nothing this session: no vocabulary, specs, journal or checks. Ways to supply it: add ${PACKAGE_NAME} as a dev dependency with the package manager this project uses (npm install -D ${PACKAGE_NAME}, pnpm add -D ${PACKAGE_NAME}, or yarn add -D ${PACKAGE_NAME}), which changes package.json and the lockfile; clone github.com/PostHog/coherence beside the project as ../${SIBLING} and run npm ci in the clone (used only while package.json declares no ${PACKAGE_NAME}); or set ${HOME_VAR} to a checkout. If package.json already lists ${PACKAGE_NAME}, the project install (npm ci, pnpm install) has not run here: run it. Changing the project dependencies is for the user to decide: unless the user asked for Coherence in this session, tell them it is missing and ask before installing it. Once it is installed, npx --no -- coherence spec --check confirms it, and the hooks answer from their next event.`;
+export const MISSING_CONTEXT = `Coherence is configured for this project (its hooks are in the agent host settings) but is not installed, so they do nothing this session: no vocabulary, specs, journal or checks. If package.json already lists ${PACKAGE_NAME}, the project install has not run here: run it with the package manager this project uses (npm ci, pnpm install, yarn install). Otherwise add it as a dev dependency (npm install -D ${PACKAGE_NAME}, pnpm add -D ${PACKAGE_NAME}, or yarn add -D ${PACKAGE_NAME}), which changes package.json and the lockfile. Changing the project dependencies is for the user to decide: unless the user asked for Coherence in this session, tell them it is missing and ask before installing it. Once it is installed, npx --no -- coherence spec --check confirms it, and the hooks answer from their next event.`;
 
 /** The one line the user is shown at session start when Coherence is there but node is not. */
 export const NO_NODE = "Coherence was found but node is not on the PATH its hooks run with, so they do nothing this session. Install Node 22.18 or newer.";

@@ -47,7 +47,7 @@ import { formatReport, hasFindings, recordVetter, runCheck } from "./lifecycle/c
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
 import { cliName, CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
-import { check, formatCheck, formatStatus, formatUninstall, HOME_VAR, HOSTS, install, isHost, locatedPrefix, locate, settingsFile, settingsRoots, SIBLING, status, uninstall, type SettingsRoot } from "./lifecycle/install.ts";
+import { check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, locatedPrefix, locate, settingsFile, settingsRoots, status, uninstall, type SettingsRoot } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectLexicons, PACKAGE_NAME, projectRoot } from "./lifecycle/project.ts";
 import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
 import { SCOPE_USAGE, scopeCommand } from "./readings/scope/cli.ts";
@@ -147,8 +147,8 @@ function locateNote(root: string, sub = ""): string {
   if (real === THIS_CLI) return `the hooks reach this checkout (${dirname(dirname(THIS_CLI))})\n`;
   if (real !== undefined) return `note: the hooks will run the Coherence at ${real}, not this checkout (${THIS_CLI})\n`;
   return (
-    `note: the hooks cannot find Coherence from here; they look at $${HOME_VAR}, then the project's installed ${PACKAGE_NAME}, then, only while package.json declares no ${PACKAGE_NAME}, ../${SIBLING} beside the project (or beside its main checkout).\n` +
-    `  Run npm install -D ${PACKAGE_NAME} in the project, clone Coherence beside it as ../${SIBLING}, or set ${HOME_VAR}=${dirname(dirname(THIS_CLI))} where your agent host starts. Until then each session start tells the agent it is missing, and the other events do nothing.\n`
+    `note: the hooks cannot find Coherence from here; they run the project's installed ${PACKAGE_NAME}.\n` +
+    `  Run npm install -D ${PACKAGE_NAME} (or pnpm add -D, yarn add -D) in the project, or its install if package.json already lists it. Until then each session start tells the agent it is missing, and the other events do nothing.\n`
   );
 }
 

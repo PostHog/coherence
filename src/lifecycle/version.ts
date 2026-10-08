@@ -2,10 +2,8 @@
  * Which Coherence runs, and whether a newer one is published.
  *
  * A session is told the Coherence answering it: its version and where it
- * is, the project's installed package or a checkout (the one
- * $COHERENCE_HOME names, or one beside the project reached because nothing
- * is installed), and, when another copy the project could reach differs in
- * version, that one too. An adopter whose hooks ran an old clone at
+ * is, the project's installed package or the checkout $COHERENCE_HOME names,
+ * and, when the other of the two differs in version, that one too. An adopter whose hooks ran an old clone at
  * ../coherence while the installed package was current saw every session
  * open with problems the installed release did not have, and nothing said
  * which Coherence spoke.
@@ -121,13 +119,12 @@ export function runningCopy(root: string, cli: string = OWN_CLI, env: Env = proc
   return { kind: "checkout", version, folder };
 }
 
-/** The other copies of Coherence the project could reach: the installed package, the checkout $COHERENCE_HOME names, and ../coherence beside the project. */
+/** The other copies of Coherence the project could reach: the installed package and the checkout $COHERENCE_HOME names. */
 export function otherCopies(root: string, running: RunningCopy, env: Env = process.env): OtherCopy[] {
   const home = env[HOME_VAR];
   const candidates: { kind: OtherCopy["kind"]; folder: string }[] = [
     { kind: "installed", folder: installedFolder(root) },
     ...(home !== undefined && home !== "" ? [{ kind: "home" as const, folder: home }] : []),
-    { kind: "checkout", folder: join(root, "..", SIBLING) },
   ];
   const seen = new Set([real(running.folder)]);
   const out: OtherCopy[] = [];
@@ -146,7 +143,7 @@ function shown(root: string, folder: string): string {
   return rel !== "" && rel.split(sep).filter((part) => part === "..").length <= 2 ? rel : folder;
 }
 
-function described(root: string, copy: { kind: CopyKind; folder: string }, installedThere: boolean): string {
+function described(root: string, copy: { kind: CopyKind; folder: string }): string {
   switch (copy.kind) {
     case "own":
       return "this repository's own source";
@@ -155,18 +152,17 @@ function described(root: string, copy: { kind: CopyKind; folder: string }, insta
     case "home":
       return `the checkout ${HOME_VAR} names (${copy.folder})`;
     case "checkout":
-      return `a checkout at ${shown(root, copy.folder)}${installedThere ? "" : ", reached because the project has no installed package"}`;
+      return `a checkout at ${shown(root, copy.folder)}, named by the hook command itself`;
   }
 }
 
 /** The session start's lines on the Coherence running: one line naming it, and one more for each reachable copy at another version. */
 export function copyLines(root: string, running: RunningCopy, others: readonly OtherCopy[]): string[] {
-  const installedThere = others.some((o) => o.kind === "installed") || running.kind === "installed";
-  const lines = [`Coherence ${running.version} runs this session: ${described(root, running, installedThere)}.`];
+  const lines = [`Coherence ${running.version} runs this session: ${described(root, running)}.`];
   for (const other of others) {
     if (other.version === running.version) continue;
     const reach = other.kind === "installed" ? `npx --no -- coherence` : `node ${shown(root, join(other.folder, "src", "cli.ts"))}`;
-    lines.push(`Another Coherence differs: ${described(root, other, true)} is ${other.version}, so ${reach} answers as ${other.version}, not as this session's ${running.version}; keep one, or update the other.`);
+    lines.push(`Another Coherence differs: ${described(root, other)} is ${other.version}, so ${reach} answers as ${other.version}, not as this session's ${running.version}; keep one, or update the other.`);
   }
   return lines;
 }

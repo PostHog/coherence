@@ -78,30 +78,31 @@ test("the session start names the Coherence that runs and where it is, and warns
   const project = join(parent, "project");
   mkdirSync(project);
   const installed = coherenceAt(join(project, "node_modules", PACKAGE_NAME), "1.5.2", join("dist", "cli.js"));
-  const sibling = coherenceAt(join(parent, "coherence"), "0.0.0", join("src", "cli.ts"));
+  const checkout = join(parent, "coherence");
+  const sibling = coherenceAt(checkout, "0.0.0", join("src", "cli.ts"));
   const env = userEnv({ COHERENCE_NO_UPDATE_CHECK: "1" });
 
-  // The adopter's case: the installed release runs, and the stale clone beside the project is named as the other copy.
+  // The adopter's case: the installed release runs, and a stale clone beside the project, which no hook runs, is not a copy it reaches.
+  assert.equal(versionBlock(project, false, env, installed), `Coherence 1.5.2 runs this session: the installed package (node_modules/${PACKAGE_NAME}).\n`);
+
+  // A developer's checkout named by COHERENCE_HOME, while the installed package answers a direct npx: the checkout is named as the other copy.
   assert.equal(
-    versionBlock(project, false, env, installed),
+    versionBlock(project, false, { ...env, COHERENCE_HOME: checkout }, installed),
     `Coherence 1.5.2 runs this session: the installed package (node_modules/${PACKAGE_NAME}).\n` +
-      "Another Coherence differs: a checkout at ../coherence is 0.0.0, so node ../coherence/src/cli.ts answers as 0.0.0, not as this session's 1.5.2; keep one, or update the other.\n",
+      `Another Coherence differs: the checkout COHERENCE_HOME names (${checkout}) is 0.0.0, so node ../coherence/src/cli.ts answers as 0.0.0, not as this session's 1.5.2; keep one, or update the other.\n`,
   );
 
   // A checkout run through COHERENCE_HOME says so, and names the installed package it is not.
   assert.equal(
-    versionBlock(project, false, { ...env, COHERENCE_HOME: join(parent, "coherence") }, sibling),
-    `Coherence 0.0.0 runs this session: the checkout COHERENCE_HOME names (${join(parent, "coherence")}).\n` +
+    versionBlock(project, false, { ...env, COHERENCE_HOME: checkout }, sibling),
+    `Coherence 0.0.0 runs this session: the checkout COHERENCE_HOME names (${checkout}).\n` +
       `Another Coherence differs: the installed package (node_modules/${PACKAGE_NAME}) is 1.5.2, so npx --no -- coherence answers as 1.5.2, not as this session's 0.0.0; keep one, or update the other.\n`,
   );
 
-  // A checkout beside a project with nothing installed: it says it was reached because nothing is.
+  // A checkout a hook command names itself (hooks install --command), at the installed package's version: one Coherence, nothing to warn of.
   rmSync(join(project, "node_modules"), { recursive: true });
-  assert.equal(versionBlock(project, false, env, sibling), "Coherence 0.0.0 runs this session: a checkout at ../coherence, reached because the project has no installed package.\n");
-
-  // Copies at the same version are one Coherence: nothing to warn of.
   coherenceAt(join(project, "node_modules", PACKAGE_NAME), "0.0.0", join("dist", "cli.js"));
-  assert.equal(versionBlock(project, false, env, sibling), "Coherence 0.0.0 runs this session: a checkout at ../coherence.\n");
+  assert.equal(versionBlock(project, false, env, sibling), "Coherence 0.0.0 runs this session: a checkout at ../coherence, named by the hook command itself.\n");
 
   // Through the hook: the session start carries the line, beside the session block.
   const root = temp("coherence-start-");
