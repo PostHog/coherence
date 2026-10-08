@@ -13,6 +13,7 @@ import type {
   JournalKind,
   JournalRecord,
   LatestEntry,
+  RunEntry,
   RunRecord,
   ShellState,
   RecordedSite,
@@ -511,29 +512,38 @@ export const JOURNAL_WINDOW = 150;
 export const CITED_WINDOW = 60;
 
 /**
- * The run records a page embeds: the latest `keep`, and every run that holds
- * the latest entry of some enforcement, in their original order. Every
- * derivation over runs (the latest verdict, what the latest run kept from an
- * earlier one, reliance from its reference sites) reads the last entry per
- * enforcement, so it is the same over the window as over every record; only
- * the count of the rest is carried, and superseded entries carry no sites.
+ * The run records a page embeds: the latest `keep` whole, and every older run
+ * that holds the latest entry of some enforcement, in their original order.
+ * Every derivation over runs (the latest verdict, what the latest run kept
+ * from an earlier one, reliance from its reference sites) reads the last
+ * entry per enforcement, so it is the same over the window as over every
+ * record. An older run kept only for what it holds carries just those
+ * entries, and the verdicts of the rest as counts (`superseded`, by run id),
+ * so a full run of hundreds of entries that still holds two latest verdicts
+ * costs the page two entries, not hundreds. Superseded entries in the latest
+ * `keep` carry no sites: a full run's sites are most of its bytes.
  */
-export function windowRuns(records: readonly RunRecord[], keep: number = RUN_WINDOW): { records: RunRecord[]; omitted: number } {
+export function windowRuns(records: readonly RunRecord[], keep: number = RUN_WINDOW): { records: RunRecord[]; omitted: number; superseded: Record<string, VerdictCounts> } {
   const holders = new Map<string, number>();
   records.forEach((record, index) => {
     for (const entry of record.invariants) holders.set(entryKey(entry.component, entry.name, entry.form), index);
   });
   const kept = new Set(holders.values());
-  for (let index = Math.max(0, records.length - keep); index < records.length; index++) kept.add(index);
-  // Reference sites are read only from the latest entry per enforcement (reliance, the flow's run symbols),
-  // so a superseded entry keeps its verdict and reason but not its sites: a full run's sites are most of its bytes.
+  const recent = Math.max(0, records.length - keep);
+  for (let index = recent; index < records.length; index++) kept.add(index);
+  const superseded: Record<string, VerdictCounts> = {};
   const window = records.flatMap((record, index) => {
     if (!kept.has(index)) return [];
-    const invariants = record.invariants.map((entry) =>
-      entry.sites === undefined || holders.get(entryKey(entry.component, entry.name, entry.form)) === index ? entry : (({ sites: _sites, ...rest }) => rest)(entry));
+    const holds = (entry: RunEntry): boolean => holders.get(entryKey(entry.component, entry.name, entry.form)) === index;
+    if (index < recent) {
+      const held = record.invariants.filter(holds);
+      if (held.length < record.invariants.length) superseded[runId(record)] = verdictCounts({ ...record, invariants: record.invariants.filter((entry) => !holds(entry)) });
+      return [held.length === record.invariants.length ? record : { ...record, invariants: held }];
+    }
+    const invariants = record.invariants.map((entry) => (entry.sites === undefined || holds(entry) ? entry : (({ sites: _sites, ...rest }) => rest)(entry)));
     return [invariants.every((entry, i) => entry === record.invariants[i]) ? record : { ...record, invariants }];
   });
-  return { records: window, omitted: records.length - window.length };
+  return { records: window, omitted: records.length - window.length, superseded };
 }
 
 /**

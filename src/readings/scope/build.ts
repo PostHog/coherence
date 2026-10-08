@@ -312,7 +312,7 @@ export function windowState(state: ShellState): ShellState {
   const journal = windowJournal(state.journal.records, undefined, state.journal.work.kind === "present" ? state.journal.work.orders : [], undefined, cited);
   return {
     ...state,
-    runs: { ...state.runs, records: runs.records, ...(runs.omitted === 0 ? {} : { omitted: runs.omitted }) },
+    runs: { ...state.runs, records: runs.records, ...(runs.omitted === 0 ? {} : { omitted: runs.omitted }), ...(Object.keys(runs.superseded).length === 0 ? {} : { superseded: runs.superseded }) },
     journal: { ...state.journal, records: journal.records, ...(journal.omitted === 0 ? {} : { omitted: journal.omitted }) },
   };
 }
