@@ -68,15 +68,38 @@ function local(project: SizedProject, text: string): string {
 }
 
 /** One hook call's work, the meter's and the file system's. */
+/** The run files' sizes now, by path: where a line appended after this begins. */
+function runSizes(project: SizedProject): Map<string, number> {
+  const dir = join(project.root, ".coherence", "runs");
+  const sizes = new Map<string, number>();
+  try {
+    for (const name of readdirSync(dir)) sizes.set(join(dir, name), statSync(join(dir, name)).size);
+  } catch {
+    // No run files yet.
+  }
+  return sizes;
+}
+
 async function workOf(project: SizedProject, event: HookEvent, input: HookInput, fallback: string = project.root): Promise<Measured> {
+  const before = runSizes(project);
   // No instrument: a check the edit would make is answered as not run, never by a warm server started for a fixture.
   const { value, fs } = await countingFs(() => runHook(event, { session_id: SESSION, cwd: project.root, ...input }, fallback, { adapter: NO_INSTRUMENT, door: async (_root, fn) => fn(undefined, undefined, "no instrument in this test") }));
   const work = lastHookWork();
   assert.ok(work !== undefined, "runHook closed a scope");
-  const paths = Object.fromEntries(Object.entries(fs.paths).map(([k, v]) => [local(project, k), v]));
+  // The run index's fold reads back the line the call appended, and only it: a read that begins at or past a run file's size before
+  // the call reads nothing older than the call. Those bytes are set aside by position; every other read of run bytes stays in the count.
+  const raw = { ...fs.paths };
+  for (const read of fs.positioned) {
+    const start = before.get(read.path) ?? 0;
+    const key = `readSync ${read.path}`;
+    if (read.position < start || raw[key] === undefined) continue;
+    raw[key] -= read.bytes;
+    if (raw[key] <= 0) delete raw[key];
+  }
+  const paths = Object.fromEntries(Object.entries(raw).map(([k, v]) => [local(project, k), v]));
   return {
     work: { counts: work.counts, reads: work.reads.map((r) => local(project, r)), spawns: work.spawns.map((s) => local(project, s)), outputs: Object.fromEntries(Object.entries(work.outputs).map(([k, v]) => [local(project, k), v])) },
-    fs: { calls: fs.calls, paths },
+    fs: { calls: fs.calls, paths, positioned: fs.positioned },
     said: value.stdout === "" ? "" : ((JSON.parse(value.stdout) as { hookSpecificOutput?: { additionalContext?: string } }).hookSpecificOutput?.additionalContext ?? ""),
   };
 }
@@ -110,10 +133,10 @@ function weighed(m: Measured): Map<string, number> {
 const PRACTICES = /proj\/src\/cN\/CN\.(practice|spec)\.md|ls-files .*\*\.practice\.md/;
 const SPECS = /proj\/src\/cN\/(CN\.spec\.md|\.git|pyvenv\.cfg)$|ls-files .*\*\.spec\.md/;
 // The history families grow only in their file lists, a stat or a listed entry per file, and in the index or memo that keeps one line per
-// file; the bytes of the history itself are never in a budget: the index and the memo exist so that no hook reads them. One read of run
-// bytes is allowed: the index's fold reads back the line the edit's check just appended to the session's own file, its bytes the line's
-// (a byte more or less as its latency's digits fall); a read of any history file, by any function, is in no family.
-const RUNS = /^fs (statSync|lstatSync|existsSync|readdirSync|realpathSync) .*proj\/\.coherence\/runs(\/hN\.jsonl)?$|^fs readSync .*proj\/\.coherence\/runs\/sized\.jsonl$|^fs readFileSync .*proj\/\.coherence\/cache\/run-index\.json$/;
+// file; the bytes of the history itself are never in a budget: the index and the memo exist so that no hook reads them. The index's fold
+// reads back the line the edit's check just appended to the session's own file; workOf sets those bytes aside by the read's position,
+// so a read of any run file's older bytes, the session's own included, by any function, is in no family.
+const RUNS = /^fs (statSync|lstatSync|existsSync|readdirSync|realpathSync) .*proj\/\.coherence\/runs(\/hN\.jsonl)?$|^fs readFileSync .*proj\/\.coherence\/cache\/run-index\.json$/;
 // The vocabulary an edit judges against: the lexicons, the session's baseline, the kept state's meta and the buckets it reads, one of 64
 // each. These grow with the vocabulary and the project's terms, never with the corpus's lines read or its history.
 const VOCABULARY = /^fs (readFileSync|promises\.readFile) .*(proj\/lexicon\.json|docs\/lexicon\.json|\.coherence\/lexicon\/sessions\/[^/]+\.json|\.coherence\/cache\/vocabulary\/(meta\.json|declared\.json|files\/\d+\.json|terms\/\d+\.json))$/;

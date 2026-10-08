@@ -39,6 +39,8 @@ export interface FsCount {
   calls: Record<string, number>;
   /** The weight of each call by the path it named, as "<function> <path>". */
   paths: Record<string, number>;
+  /** Each readSync with a position, by the path its descriptor was opened on: where it began and the bytes it returned. */
+  positioned: { path: string; position: number; bytes: number }[];
 }
 
 let open: FsCount | undefined;
@@ -180,7 +182,14 @@ function installCounting(): void {
     const result = original.apply(this, args);
     // A read is weighed by the bytes it returned, under the path it read: a read by descriptor under the path the descriptor was opened on.
     if (name === "readFileSync") tally(name, args[0], bytesOf(result));
-    else if (name === "readSync" || name === "readvSync") tally(name, pathOfFd(args[0]), typeof result === "number" ? result : 0);
+    else if (name === "readSync" || name === "readvSync") {
+      const bytes = typeof result === "number" ? result : 0;
+      tally(name, pathOfFd(args[0]), bytes);
+      // readSync(fd, buffer, offset, length, position), or readSync(fd, buffer, { position }).
+      const position = name === "readSync" ? (typeof args[4] === "number" ? args[4] : (args[2] as { position?: unknown } | undefined)?.position) : args[2];
+      const path = pathOfFd(args[0]);
+      if (open !== undefined && typeof position === "number" && typeof path === "string") open.positioned.push({ path, position, bytes });
+    }
     else tally(name, args[0], 1);
     if (name === "openSync" && typeof result === "number" && typeof args[0] === "string") opened.set(result, args[0]);
     return result;
@@ -252,7 +261,7 @@ function installCounting(): void {
 export async function countingFs<T>(body: () => Promise<T>): Promise<{ value: T; fs: FsCount }> {
   installCounting();
   const outer = open;
-  const count: FsCount = { calls: {}, paths: {} };
+  const count: FsCount = { calls: {}, paths: {}, positioned: [] };
   open = count;
   try {
     return { value: await body(), fs: count };
