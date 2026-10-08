@@ -18,7 +18,6 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
 import { runHook, type HookEvent, type HookInput } from "./hook.ts";
 import { closeWork, countWork, lastHookWork, openWork, type Work } from "./work-meter.ts";
 import { sizedProject, type SizedProject } from "./size-fixture.ts";
@@ -314,116 +313,30 @@ test("the coverage scan compares a line only with the phrases its own words star
   assert.equal(worded - base, 200 * 3, "a word on every line that starts names adds what those names cost on each line, nothing more");
 });
 
-/* ------------------------------------------------------------ the spawn scan */
+/* ------------------------------------------------------------ spawns, at runtime */
 
-/** The meter: the one module that takes child_process. */
-const SPAWN_ALLOWED = new Set(["lifecycle/work-meter.ts"]);
-/** Test support that takes child_process to build fixtures, each by name. */
-const FIXTURES_THAT_SPAWN = new Set(["adapters/git-count-fixture.ts", "lifecycle/size-fixture.ts", "readings/scope/undeclared-fixture.ts", "readings/scope/gaps-fixture.ts", "enforcement/server-fixture.ts"]);
-/** Test support that loads a module by a computed name, each by name: the file system counter, which takes fs as CommonJS to replace its functions. */
-const LOADERS_ALLOWED = new Set(["lifecycle/fs-count-fixture.ts"]);
-
-const CHILD = /^(node:)?child_process$/;
-
-/** A string literal's text, or undefined for anything computed. */
-function literal(node: ts.Expression | undefined): string | undefined {
-  if (node === undefined) return undefined;
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
-  if (ts.isAsExpression(node) || ts.isParenthesizedExpression(node)) return literal(node.expression);
-  return undefined;
-}
-
-/**
- * What the scan refuses in one file, read by the compiler, so a comment or a
- * string is never code and code is never hidden in one: child_process named
- * as a module outside the meter, tests and named fixtures; and, everywhere
- * outside the meter and test support listed by name, every way to load a module or
- * run code by a computed name.
- */
-function spawnOffences(rel: string, source: string): string[] {
-  const out: string[] = [];
-  const test = /\.(?:test|e2e)\.[cm]?[jt]s$/.test(rel);
-  const mayNameChild = test || SPAWN_ALLOWED.has(rel) || FIXTURES_THAT_SPAWN.has(rel);
-  const mayLoad = SPAWN_ALLOWED.has(rel) || LOADERS_ALLOWED.has(rel);
-  const kind = /\.[cm]?js$/.test(rel) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
-  const file = ts.createSourceFile(rel, source, ts.ScriptTarget.Latest, true, kind);
-  const say = (node: ts.Node, what: string): void => void out.push(`${rel}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}: ${what}`);
-  const child = (node: ts.Node, name: string | undefined): void => {
-    if (name !== undefined && CHILD.test(name) && !mayNameChild) say(node, "names child_process");
-  };
-  const visit = (node: ts.Node): void => {
-    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier !== undefined) child(node, literal(node.moduleSpecifier as ts.Expression));
-    if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
-      child(node, literal(node.moduleReference.expression));
-      if (!mayLoad) say(node, "import = require(");
-    }
-    if (ts.isCallExpression(node)) {
-      const callee = node.expression;
-      if (callee.kind === ts.SyntaxKind.ImportKeyword) {
-        const name = literal(node.arguments[0]);
-        if (name === undefined && !mayLoad) say(node, "import( of a computed name");
-        child(node, name);
-      }
-      if (ts.isIdentifier(callee) && ["require", "eval", "Function"].includes(callee.text)) {
-        child(node, literal(node.arguments[0]));
-        if (!mayLoad) say(node, `${callee.text}(`);
-      }
-    }
-    if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "Function" && !mayLoad) say(node, "new Function(");
-    if (ts.isNewExpression(node) && !mayLoad) {
-      const name = ts.isIdentifier(node.expression) ? node.expression.text : ts.isPropertyAccessExpression(node.expression) ? node.expression.name.text : "";
-      const options = node.arguments?.[1];
-      if (name === "Worker" && options !== undefined && (!ts.isObjectLiteralExpression(options) || options.properties.some((p) => p.name !== undefined && ts.isIdentifier(p.name) && p.name.text === "eval"))) say(node, "new Worker( of code");
-    }
-    if (ts.isIdentifier(node) && ["getBuiltinModule", "createRequire"].includes(node.text) && !mayLoad) say(node, node.text);
-    if (ts.isPropertyAccessExpression(node) && ["binding", "_linkedBinding"].includes(node.name.text) && ts.isIdentifier(node.expression) && node.expression.text === "process" && !mayLoad) say(node, "process.binding");
-    if (ts.isPropertyAccessExpression(node) && node.name.text === "require" && !mayLoad) say(node, ".require");
-    // A member reached by a computed name on what holds a loader: process["getBuilt" + "inModule"], globalThis[name].
-    if (ts.isElementAccessExpression(node) && ts.isIdentifier(node.expression) && ["process", "globalThis", "global", "module"].includes(node.expression.text) && literal(node.argumentExpression) === undefined && !mayLoad) say(node, `${node.expression.text}[ a computed name ]`);
-    ts.forEachChild(node, visit);
-  };
-  visit(file);
-  return out;
-}
-
-test("no source module spawns a child process except through the work meter", () => {
-  const src = join(fileURLToPath(new URL(".", import.meta.url)), "..");
-  const offenders: string[] = [];
-  const walk = (dir: string): void => {
-    for (const name of readdirSync(dir)) {
-      const path = join(dir, name);
-      if (statSync(path).isDirectory()) walk(path);
-      else if (/\.[cm]?[jt]s$/.test(name) && !name.endsWith(".d.ts")) offenders.push(...spawnOffences(relative(src, path).split("\\").join("/"), readFileSync(path, "utf8")));
-    }
-  };
-  walk(src);
-  assert.deepEqual(offenders, [], "a module that takes child_process itself, or loads a module or runs code by a computed name, spawns where no hook's count can see it");
-  // Every way around the import list the scan knows, each refused in an ordinary module, in every extension the scan reads.
-  const evasions = [
-    'import { spawnSync } from "node:child_process";',
-    "import cp from 'child_process';",
-    'export { spawnSync } from "node:child_process";',
-    'const { spawnSync } = process.getBuiltinModule("node:child_process");',
-    'const load = createRequire(import.meta.url); load("node:" + "child" + "_process");',
-    'const cp = require("child" + "_process");',
-    '/* x */ require("child_process");',
-    'require?.("child_process");',
-    "const name = 'child' + '_process'; await import(`node:${name}`);",
-    "await import(name);",
-    'process.binding("spawn_sync");',
-    'process["getBuilt" + "inModule"]("child_process");',
-    'eval("req" + "uire")("child" + "_process");',
-    'new Function("return req" + "uire")()("child" + "_process");',
-    'Function("return process")().getBuiltinModule;',
-    'new Worker("require(\'child_process\')", { eval: true });',
-    "module.require('child_process');",
+test("every spawn is counted at runtime, whatever route reached child_process", async () => {
+  const { createRequire } = await import("node:module");
+  const vm = await import("node:vm");
+  const { Worker } = await import("node:worker_threads");
+  const name = ["node:child", "process"].join("_");
+  const routes: [string, () => unknown][] = [
+    ["a static import", () => spawnSync("true")],
+    ["process.getBuiltinModule", () => (process as unknown as { getBuiltinModule: (n: string) => { spawnSync: (c: string) => unknown } }).getBuiltinModule(name).spawnSync("true")],
+    ["createRequire", () => (createRequire(import.meta.url)(name) as { execFileSync: (c: string) => unknown }).execFileSync("true")],
+    ["code vm runs", () => vm.runInThisContext(`process.getBuiltinModule("${name}").execSync("true")`)],
+    ["a dynamic import of a computed name", async () => ((await import(name)) as { spawnSync: (c: string) => unknown }).spawnSync("true")],
+    ["exec, which runs execFile, counted once", () => new Promise((done) => (createRequire(import.meta.url)(name) as { exec: (c: string, cb: () => void) => void }).exec("true", () => done(undefined)))],
+    ["a worker thread", () => new Promise((done) => new Worker("1", { eval: true }).once("exit", done))],
   ];
-  for (const text of evasions) {
-    for (const rel of ["lifecycle/ordinary.ts", "lifecycle/ordinary.js", "lifecycle/ordinary.mjs", "lifecycle/ordinary.cjs"]) assert.notDeepEqual(spawnOffences(rel, text), [], `refused in ${rel}: ${text}`);
-    if (!/^(import|export)/.test(text)) assert.notDeepEqual(spawnOffences("lifecycle/ordinary.test.ts", text), [], `refused in a test too: ${text}`);
-  }
-  for (const text of ['const { x } = await import("./x.ts");', '// require("child_process") is prose here', 'const s = "require(\'child_process\')";', 'const lib = await import("node-llama-cpp" as string);']) {
-    assert.deepEqual(spawnOffences("lifecycle/ordinary.ts", text), [], `not refused: ${text}`);
+  for (const [route, spawnIt] of routes) {
+    const scope = openWork();
+    try {
+      await spawnIt();
+    } finally {
+      closeWork(scope);
+    }
+    assert.equal(scope.work.counts.spawn, 1, `${route}: one spawn counted`);
   }
 });
 
