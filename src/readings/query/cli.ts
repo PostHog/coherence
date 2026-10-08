@@ -20,6 +20,7 @@ import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { buildScopePage, projectNameOf } from "../scope/build.ts";
 import { budgetFlags, readComponentInterfaces } from "../scope/component-interfaces.ts";
 import { readAndRecord } from "../scope/gaps.ts";
+import { keptLine } from "../scope/kept-answers.ts";
 import { observedCommand } from "../../observation/observed.ts";
 import { answer, answerLexicon, QUERY_USAGE } from "./query.ts";
 import { practiceAnswer } from "../../lifecycle/practice-delivery.ts";
@@ -133,6 +134,9 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
     // The real reading is kept for the hooks (gaps.ts); an injected one is a test's, and never kept.
     ...(question === "structure" ? { componentInterfaces: deps.interfaces !== undefined ? await deps.interfaces(root, undefined, { budget }) : await readAndRecord(root, () => readComponentInterfaces(root, undefined, { budget })) } : {}),
   });
+  // What the reading reused of the language server's kept answers, and what it asked anew: never reused silently.
+  const kept = state.componentInterfaces.kind === "read" ? keptLine(state.componentInterfaces.kept) : undefined;
+  if (kept !== undefined) io.err(kept);
   const result = answer(state, question, args, { session: parsed.session });
   if (result.code === 0) io.out(result.text);
   else io.err(result.text);

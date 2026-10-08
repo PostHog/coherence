@@ -562,8 +562,27 @@ export type InterfaceReading =
       candidates?: EntranceCandidate[];
       /** Present when the reading was scoped to some entrances' routes rather than read whole: never recorded as the tree's reading. */
       scoped?: ScopedReading;
+      /** What the reading did with the language server's kept answers (kept-answers.ts): absent from a reading taken before they were kept. */
+      kept?: KeptReport;
     }
   | { kind: "unread"; because: string };
+
+/**
+ * What a reading did with the kept answers: how many it reused without
+ * asking the server, how many it asked anew, how many files had changed
+ * since they were kept and how many answers those changes dropped, and,
+ * when nothing kept was used at all, why.
+ */
+export interface KeptReport {
+  reused: number;
+  asked: number;
+  changed: number;
+  dropped: number;
+  /** Why nothing kept from an earlier reading was used, when nothing was: every question was asked. */
+  whole?: string;
+  /** In a reading of several languages that reused some: each language that used nothing kept, with why. */
+  unused?: string[];
+}
 
 /**
  * What a scoped reading read: the entrances it started from (the named ones
