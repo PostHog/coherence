@@ -88,7 +88,7 @@ import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, t
 import { COHERENCE_LEXICON, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, real as realSpelling, within, type HookProject } from "./project.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
-import { editVocabulary, keptReading } from "./vocabulary-state.ts";
+import { editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
@@ -211,15 +211,18 @@ function treeKeyPath(root: string, session: string): string {
 }
 
 /**
- * What the coverage reading's text depends on, cheaply: every changed or
- * untracked project file git lists, with its size and modification time. Two
- * git listings and a stat each, never a read; a commit that changes no text
- * leaves the key alone, as it leaves the reading.
+ * What the coverage reading's text depends on, cheaply: the commit HEAD
+ * names, and every changed or untracked project file git lists, with its
+ * size and modification time. A rev-parse, two git listings and a stat each,
+ * never a read. HEAD is in it because a checkout, a pull or a branch switch
+ * onto a clean tree changes files the listings never name.
  */
 async function treeKey(root: string): Promise<string | undefined> {
+  const head = headCommit(root);
+  if (head === undefined) return undefined;
   const changed = await changedFiles(root);
   if (changed.failure !== undefined) return undefined;
-  return changed.files
+  return `HEAD ${head}\n` + changed.files
     .sort()
     .map((file) => {
       try {

@@ -205,10 +205,29 @@ interface Meta {
   tree: Record<string, string>;
 }
 
+/** The key the tree's HEAD is kept under: no path git lists can be spelled so. */
+export const HEAD_KEY = "\u0000HEAD";
+
 /**
- * The tree's key: every file git lists as changed against HEAD or untracked,
- * outside .coherence, with its size, modification and change time; two git
- * listings and a stat each, never a read. Undefined when git cannot answer.
+ * The commit HEAD names, through the git door: one rev-parse. "unborn" for a
+ * repository with no commit yet; undefined when git cannot answer.
+ */
+export function headCommit(root: string): string | undefined {
+  const head = spawnSync("git", ["rev-parse", "--verify", "-q", "HEAD"], { cwd: root, encoding: "utf8" });
+  if (head.status === 0) return head.stdout.trim();
+  // --verify -q exits 1 and prints nothing when HEAD names no commit; anything else is git failing.
+  return head.status === 1 && head.stdout.trim() === "" && head.stderr.trim() === "" ? "unborn" : undefined;
+}
+
+/**
+ * The tree's key: the commit HEAD names, and every file git lists as changed
+ * against HEAD or untracked, outside .coherence, with its size, modification
+ * and change time; a rev-parse, two git listings and a stat each, never a
+ * read. Undefined when git cannot answer. HEAD is in it because a checkout,
+ * a pull or a branch switch onto a clean tree changes files the two listings
+ * never name: they list what differs from HEAD, and HEAD moved with them.
+ * The index's own stat is left out: git rewrites it whenever it refreshes,
+ * which changes no file's text.
  * A write no hook saw (a code generator, a checkout, a shell command the
  * shell reader did not parse) moves it, and the next edit reads in full.
  * Coherence's own records under .coherence are left out: the commands that
@@ -216,13 +235,15 @@ interface Meta {
  * reads them.
  */
 export function treeKeys(root: string): Record<string, string> | undefined {
+  const head = headCommit(root);
+  if (head === undefined) return undefined;
   const files = new Set<string>();
   for (const args of [["diff", "--name-only", "--relative", "-z", "HEAD"], ["ls-files", "--others", "--exclude-standard", "-z"]]) {
     const listed = spawnSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
     if (listed.status !== 0) return undefined;
     for (const f of listed.stdout.split("\0")) if (f !== "" && !f.startsWith(".coherence/")) files.add(f);
   }
-  const out: Record<string, string> = {};
+  const out: Record<string, string> = { [HEAD_KEY]: head };
   for (const f of [...files].sort()) {
     try {
       const st = statSync(join(root, f));
@@ -346,7 +367,7 @@ async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Le
   const tree = treeKeys(root);
   if (tree === undefined) return { unavailable: "git could not list the tree's changes, so writes no hook saw cannot be ruled out" };
   const unseen = movedBeyond(meta.tree, tree, written);
-  if (unseen.length > 0) return { unavailable: `the tree moved since its vocabulary was kept, beyond what this edit wrote (${unseen.slice(0, 3).join(", ")}${unseen.length > 3 ? `, and ${unseen.length - 3} more` : ""})` };
+  if (unseen.length > 0) return { unavailable: `the tree moved since its vocabulary was kept, beyond what this edit wrote (${unseen.slice(0, 3).map((f) => (f === HEAD_KEY ? "HEAD names another commit" : f)).join(", ")}${unseen.length > 3 ? `, and ${unseen.length - 3} more` : ""})` };
   const declaredRaw = readJson<unknown>(join(stateDir(root), "declared.json"));
   if (!Array.isArray(declaredRaw) || !declaredRaw.every((d) => typeof d === "string")) throw new BucketUnusable("its kept declared names are missing or torn");
   const declared = new Set(declaredRaw as string[]);

@@ -648,6 +648,72 @@ test("a write no hook saw is caught at the next edit, which reads in full as mai
   }
 });
 
+/** The fixture's own git, as a shell would run it: no hook hears of it. */
+function fixtureGit(project: SizedProject, ...args: string[]): void {
+  const done = spawnSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "commit.gpgsign=false", ...args], { cwd: project.top, encoding: "utf8" });
+  assert.equal(done.status, 0, `git ${args.join(" ")}: ${done.stderr}`);
+}
+
+/** Three ways HEAD moves onto a clean tree, each set up before the session starts and made after it. */
+const HEAD_MOVES: [string, (project: SizedProject) => void, (project: SizedProject) => void][] = [
+  [
+    "a checkout of a branch that changes one file and adds another",
+    (project) => {
+      fixtureGit(project, "checkout", "-q", "-b", "other");
+      writeFileSync(join(project.root, "docs/note-1.md"), "The `rebate` is new.\nEach `rebate` is paid.\n");
+      writeFileSync(join(project.root, "docs/added.md"), "A `rebate` is clawed back.\n");
+      fixtureGit(project, "add", "-A");
+      fixtureGit(project, "commit", "-q", "-m", "other");
+      fixtureGit(project, "checkout", "-q", "-");
+    },
+    (project) => fixtureGit(project, "checkout", "-q", "other"),
+  ],
+  [
+    "a pull, as a commit made in a shell",
+    () => {},
+    (project) => {
+      writeFileSync(join(project.root, "docs/note-1.md"), "The `rebate` is new.\nEach `rebate` is paid.\n");
+      fixtureGit(project, "commit", "-q", "-am", "pulled");
+    },
+  ],
+  [
+    "a switch to a branch whose tree is the same and whose HEAD is not",
+    (project) => {
+      fixtureGit(project, "branch", "twin");
+      fixtureGit(project, "checkout", "-q", "twin");
+      fixtureGit(project, "commit", "-q", "--allow-empty", "-m", "twin");
+      fixtureGit(project, "checkout", "-q", "-");
+    },
+    (project) => fixtureGit(project, "checkout", "-q", "twin"),
+  ],
+];
+
+test("a checkout, a pull or a branch switch onto a clean tree moves the tree: the next edit and the next prompt read in full", async () => {
+  for (const [name, before, move] of HEAD_MOVES) {
+    for (const next of ["edit", "prompt"] as const) {
+      const project = sizedProject(1);
+      try {
+        before(project);
+        const start = await runHook("SessionStart", { session_id: SESSION, cwd: project.root }, project.root, {});
+        start.commit?.();
+        await workOf(project, "UserPromptSubmit", { prompt: "first" });
+        move(project);
+        if (next === "edit") {
+          const file = join(project.root, "docs/note-0.md");
+          writeFileSync(file, readFileSync(file, "utf8") + "A line.\n");
+          const m = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
+          assert.match(m.said, /Lexicon: read in full at this edit: the tree moved since its vocabulary was kept, beyond what this edit wrote \(HEAD names another commit/, `${name}: the next edit reads in full and says why`);
+        } else {
+          const m = await workOf(project, "UserPromptSubmit", { prompt: "second" });
+          assert.equal(m.work.counts["coverage reading"], 1, `${name}: the next prompt takes the reading`);
+        }
+      } finally {
+        rmSync(project.top, { recursive: true, force: true });
+      }
+    }
+  }
+});
+
 test("an edit whose kept vocabulary was left half-written reads in full and says so", async () => {
   const project = sizedProject(1);
   try {
