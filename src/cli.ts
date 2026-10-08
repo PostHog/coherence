@@ -31,6 +31,8 @@
  * to refuse a stop, with the reason on stderr.
  */
 
+// First, before any other module loads: every spawn this process makes is counted from here on (lifecycle/work-meter.ts).
+import "./lifecycle/work-meter.ts";
 import { realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

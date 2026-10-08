@@ -221,7 +221,19 @@ function countOutput(args: readonly unknown[], stdout: unknown): void {
  * process.getBuiltinModule, createRequire, code vm runs, or a third-party
  * module (execa spawns through child_process too) is counted alike. A worker
  * thread is counted as a spawn. A call one counted function makes of another
- * (exec runs execFile) counts once.
+ * (exec runs execFile) counts once. A counted function carries every
+ * property its original does, and its promisified form returns the
+ * original's own promise, `.child` included, so nothing that calls it can
+ * tell it from node's.
+ *
+ * The patch is installed at the CLI's first import, before any other module
+ * loads (cli.ts), so no Coherence module and no library it loads can take
+ * the spawning functions before they are counted. What stays uncounted, and
+ * no test here can catch: a CommonJS module that captured spawnSync (or any
+ * of them) by destructuring before this module ran, which only code loaded
+ * ahead of the CLI can be; process.binding('spawn_sync') and node's other
+ * internal bindings, which spawn below the module; and a native addon that
+ * starts a process itself.
  */
 const cjs = createRequire(import.meta.url);
 const childModule = cjs("node:child_process") as Record<string, unknown> & { __metered?: true };
@@ -256,25 +268,39 @@ function counted(name: string, sync: boolean): void {
       depth -= 1;
     }
   };
-  // promisify(execFile) and promisify(exec) resolve to { stdout, stderr }: their own forms, counted the same way.
+  // Every property the original carries is carried over (its name and length, and anything node or a library hung on it), so the
+  // counted function reads as the original wherever it is inspected.
+  for (const key of Reflect.ownKeys(original)) {
+    if (key === "prototype" || key === promisify.custom) continue;
+    const descriptor = Object.getOwnPropertyDescriptor(original, key);
+    if (descriptor !== undefined && (Object.getOwnPropertyDescriptor(wrapped, key)?.configurable ?? true)) Object.defineProperty(wrapped, key, descriptor);
+  }
+  // promisify(execFile) and promisify(exec) call the original's own promisified form, which resolves to { stdout, stderr } and carries
+  // the child on the promise as .child; the counted form returns that very promise, so its shape is node's, .child included, and the
+  // output is counted on a branch of it that never changes how it settles.
   const custom = original[promisify.custom] as Callable | undefined;
   if (custom !== undefined) {
-    Object.defineProperty(wrapped, promisify.custom, {
-      value: async (...given: unknown[]) => {
-        const args = name === "exec" ? [String(given[0] ?? "")] : given;
-        const call = name === "exec" ? given : controlled(given);
-        const outer = depth === 0;
-        if (outer) countSpawn(args, name === "exec" || shellOption(given));
-        depth += 1;
-        try {
-          const result = (await custom(...call)) as { stdout?: unknown };
-          if (outer) countOutput(args, result?.stdout);
-          return result;
-        } finally {
-          depth -= 1;
-        }
-      },
-    });
+    const promised = function (this: unknown, ...given: unknown[]): unknown {
+      const args = name === "exec" ? [String(given[0] ?? "")] : given;
+      const call = name === "exec" ? given : controlled(given);
+      const outer = depth === 0;
+      if (outer) countSpawn(args, name === "exec" || shellOption(given));
+      depth += 1;
+      let result: unknown;
+      try {
+        result = custom.apply(this, call);
+      } finally {
+        depth -= 1;
+      }
+      if (outer && result instanceof Promise) result.then((value: { stdout?: unknown } | undefined) => countOutput(args, value?.stdout), () => {});
+      return result;
+    };
+    for (const key of Reflect.ownKeys(custom)) {
+      if (key === "prototype") continue;
+      const descriptor = Object.getOwnPropertyDescriptor(custom, key);
+      if (descriptor !== undefined && (Object.getOwnPropertyDescriptor(promised, key)?.configurable ?? true)) Object.defineProperty(promised, key, descriptor);
+    }
+    Object.defineProperty(wrapped, promisify.custom, { value: promised, configurable: true, enumerable: false, writable: true });
   }
   childModule[name] = wrapped;
 }

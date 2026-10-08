@@ -404,6 +404,43 @@ test("every way of reading a file's bytes is weighed by them, and a spawn throug
 
 /* ------------------------------------------------------------ spawns, at runtime */
 
+/** What a promisified exec and execFile hand back, and what the spawning functions carry, as JSON: a function body given `require`. */
+const SHAPE_PROBE = `
+const cp = require("node:child_process");
+const { promisify } = require("node:util");
+const own = (f) => Reflect.ownKeys(f).filter((k) => k !== "prototype").map(String).sort();
+return (async () => {
+  const shapes = {};
+  for (const [name, call] of [["exec", () => promisify(cp.exec)("echo shape")], ["execFile", () => promisify(cp.execFile)("echo", ["shape"])]]) {
+    const p = call();
+    const child = p.child;
+    const value = await p;
+    shapes[name] = {
+      promise: p instanceof Promise,
+      child: child === undefined ? "undefined" : child.constructor.name,
+      childPid: typeof child?.pid,
+      keys: Object.keys(p).sort(),
+      value: Object.keys(value).sort(),
+      stdout: value.stdout,
+    };
+  }
+  for (const name of ["spawn", "spawnSync", "execFile", "execFileSync", "exec", "execSync", "fork"]) shapes["props " + name] = { keys: own(cp[name]), name: cp[name].name, length: cp[name].length, custom: typeof cp[name][promisify.custom] };
+  return JSON.stringify(shapes);
+})();
+`;
+
+test("the patched spawning functions keep node's shape: a promisified exec or execFile carries its child, and every property stays", async () => {
+  // Unpatched node: a child process that never loads the meter.
+  const plain = spawnSync(process.execPath, ["-e", `Promise.resolve((function (require) {${SHAPE_PROBE}})(require)).then((text) => process.stdout.write(text))`], { encoding: "utf8" });
+  assert.equal(plain.status, 0, plain.stderr);
+  // Patched: this process, where the meter replaced the functions at load.
+  const { createRequire } = await import("node:module");
+  const here = createRequire(import.meta.url);
+  assert.equal((here("node:child_process") as { __metered?: true }).__metered, true, "the meter is installed in this process");
+  const shapes = (await (new Function("require", SHAPE_PROBE) as (r: NodeJS.Require) => Promise<string>)(here)) as string;
+  assert.deepEqual(JSON.parse(shapes), JSON.parse(plain.stdout), "the same shapes as unpatched node");
+});
+
 test("every spawn is counted at runtime, whatever route reached child_process", async () => {
   const { createRequire } = await import("node:module");
   const vm = await import("node:vm");
