@@ -27,6 +27,7 @@
  *     via: <the test>
  *     because: <why it exists, what it protects against>
  *     crossing: <trust level> -> <trust level>
+ *     entrances: <entrance, entrance> | none   optional; the entrances whose work it checks, by name, never by crossing alone
  *     refuted: <what was broken> -> <what was seen> (YYYY-MM-DD)   the human account of a refutation record
  *     kinds: <a, b> | none
  *     checklist: <shape> declared as <invariant> | <shape> dismissed: <reason>
@@ -66,7 +67,7 @@ export const INVARIANTS_SECTION = "invariants";
 const SECTIONS_SENTENCE = "a spec holds ## trust levels (entry spec only), ## entrances and ## invariants";
 
 /** The keys an invariant bullet may carry, in the order the scaffold prints them. */
-export const KEYS = ["protects", "chokepoint", "from", "over", "via", "because", "crossing", "refuted", "kinds", "checklist"] as const;
+export const KEYS = ["protects", "chokepoint", "from", "over", "via", "because", "crossing", "entrances", "refuted", "kinds", "checklist"] as const;
 export type Key = (typeof KEYS)[number];
 const MANY: ReadonlySet<Key> = new Set<Key>(["refuted", "checklist"]);
 
@@ -184,6 +185,19 @@ export interface Crossing {
   line: number;
 }
 
+/**
+ * The entrances an invariant covers, by name: the work it checks enters
+ * there. Its crossing says which trust it checks; this line says where, so a
+ * test-backed check is credited to the entrances it names and to no other
+ * entrance its crossing merely matches. "none" says it checks no entrance. A
+ * name resolves in the invariant's own spec first, then in the one spec that
+ * declares it; `<name> in <folder>` picks among several (see covers.ts).
+ */
+export interface CoveredEntrances {
+  names: string[] | "none";
+  line: number;
+}
+
 export type ChecklistLine =
   | { shape: string; outcome: "declared"; as: string; line: number }
   | { shape: string; outcome: "dismissed"; reason: string; line: number };
@@ -195,6 +209,8 @@ export interface Invariant {
   enforcements: Enforcement[];
   because: string | undefined;
   crossing: Crossing | undefined;
+  /** The entrances it names as covered (an entrances: line); absent when it names none, and then it covers no entrance by its crossing alone. */
+  entrances?: CoveredEntrances | undefined;
   refutations: Refutation[];
   /** Undefined when no kinds line was written; "none" when the line says no shape applies. */
   kinds: string[] | "none" | undefined;
@@ -612,6 +628,23 @@ function buildInvariant(bullet: RawBullet, problem: (line: number, message: stri
     else crossing = { from, to, line };
   }
 
+  // The entrances it covers, named; the model checks each names a declared entrance. A test-backed check is credited
+  // only where it is named, so a chokepoint (traced, never named) and an invariant with no crossing (checking no
+  // trust) name none.
+  let covered: CoveredEntrances | undefined;
+  const entrancesField = single.get("entrances");
+  const entrancesText = filled("entrances");
+  if (entrancesField !== undefined && entrancesText !== undefined) {
+    const names = entrancesText.split(",").map((name) => name.trim()).filter((name) => name !== "");
+    const doubled = names.find((name, index) => names.indexOf(name) !== index);
+    if (names.length === 1 && names[0] === "none") covered = { names: "none", line: entrancesField.line };
+    else if (names.includes("none")) problem(entrancesField.line, `entrances on ${bullet.name}: none cannot be combined with an entrance`);
+    else if (doubled !== undefined) problem(entrancesField.line, `entrances on ${bullet.name} names ${doubled} twice`);
+    else if (single.has("protects") || single.has("chokepoint")) problem(entrancesField.line, `entrances on ${bullet.name}: a chokepoint's entrances are traced, never named; declare guard: <chokepoint> on an entrance whose handler is registered through it`);
+    else if (!single.has("crossing")) problem(entrancesField.line, `entrances on ${bullet.name} names the entrances its crossing checks; add crossing: <trust level> -> <trust level>`);
+    else covered = { names, line: entrancesField.line };
+  }
+
   const refutations: Refutation[] = [];
   for (const field of many.get("refuted") ?? []) {
     if (isPlaceholder(field.value)) {
@@ -680,6 +713,7 @@ function buildInvariant(bullet: RawBullet, problem: (line: number, message: stri
     enforcements,
     because,
     crossing,
+    ...(covered === undefined ? {} : { entrances: covered }),
     refutations,
     kinds,
     checklist,

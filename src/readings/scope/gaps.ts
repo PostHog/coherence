@@ -67,7 +67,7 @@ export const STRUCTURE_DIR = join(".coherence", "structure");
 const RECORD_VERSION = 1;
 
 /** The three ways a gap closes, in the words orient, regulate and the scaffold share. */
-export const CLOSE_WAYS = "declare guard: <chokepoint> where a verified chokepoint wraps it, add an invariant whose crossing enters from its trust, or record control: none — <reason>";
+export const CLOSE_WAYS = "declare guard: <chokepoint> where a verified chokepoint wraps it, name it on the entrances: line of an invariant whose crossing enters from its trust, or record control: none — <reason>";
 
 /** An entrance with outside or unknown trust whose route has no traced control, and which declares no control: none. */
 export interface Gap {
@@ -80,6 +80,8 @@ export interface Gap {
   file: string | undefined;
   trust: string[];
   route: { id: string; first: string; entrances: number; stops: string[] };
+  /** Verified invariants that covered it by their crossing alone before entrances: (PR #4), by name: a control it lost, until one names it. */
+  unnamed?: string[];
 }
 
 export interface GapState {
@@ -114,6 +116,7 @@ export function gapsOf(state: Pick<ShellState, "spec">, model: FlowModel): GapSt
         file: declared?.file,
         trust: entrance.trust,
         route: { id: route.id, first: route.names[0] ?? entrance.name, entrances: route.entrances.length, stops: route.stops },
+        ...(entrance.unnamed.length === 0 ? {} : { unnamed: entrance.unnamed.map((u) => u.name) }),
       });
     }
   }
@@ -520,7 +523,22 @@ export function orientGapText(state: GapState, baseline: GapBaseline | undefined
   const where = `${short(busiest.gap.name)}${others > 0 ? ` and ${others} more` : ""} (${busiest.gap.route.stops.join(" -> ")})`;
   const scope = baseline === undefined ? "" : ", beyond the adoption baseline";
   const count = open.length === 1 ? "1 entrance carries" : `${open.length} entrances carry`;
-  return `Spec gaps${label}: ${count} outside or unknown trust in with no traced control on ${open.length === 1 ? "its" : "their"} route${scope}; busiest: ${where}. To close one, ${CLOSE_WAYS}; ${cli} scaffold control ${quoted(short(busiest.gap.name))} proposes it.${still === "" ? "" : ` Also, ${still}.`}`;
+  return `Spec gaps${label}: ${count} outside or unknown trust in with no traced control on ${open.length === 1 ? "its" : "their"} route${scope}; busiest: ${where}.${lostText(open, cli)} To close one, ${CLOSE_WAYS}; ${cli} scaffold control ${quoted(short(busiest.gap.name))} proposes it.${still === "" ? "" : ` Also, ${still}.`}`;
+}
+
+/**
+ * The migration clause (covers.ts): how many of the gaps lost the control an
+ * invariant gave them by its crossing alone, which invariant covered the most,
+ * and how to restore it. Bounded like the rest: one invariant named, cut.
+ */
+function lostText(open: readonly Gap[], cli: string): string {
+  const lost = open.filter((g) => (g.unnamed ?? []).length > 0);
+  if (lost.length === 0) return "";
+  const tally = new Map<string, Gap[]>();
+  for (const g of lost) for (const name of g.unnamed!) tally.set(name, [...(tally.get(name) ?? []), g]);
+  const [invariant, gaps] = [...tally.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))[0]!;
+  const which = lost.length === 1 ? "1 of them lost the control" : `${lost.length} of them lost the control`;
+  return ` ${which} an invariant gave by its crossing alone, which no longer counts (most: ${short(invariant)}, on ${gaps.length}); name each one its test checks on its entrances: line (${cli} scaffold control ${quoted(short(gaps[0]!.name))} proposes it).`;
 }
 
 function utc(at: string): string {

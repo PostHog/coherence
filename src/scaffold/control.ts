@@ -2,9 +2,14 @@
  * Scaffold control: the closure for an entrance with no traced control
  * (d-a1095ef2), proposed from the Structure reading, in the spec's own terms.
  *
- * Three closures, ranked for each entrance:
+ * Four closures, ranked for each entrance:
  *
- *   guard      a verified chokepoint its handler passes, or whose symbol its
+ *   name       a verified invariant enforced by a totality oracle alone
+ *              covered it by its crossing alone before entrances: (PR #4),
+ *              and covers it no longer: the entrances: line that names it on
+ *              that invariant, proposed first, since its test may already
+ *              check this entrance's work; the caller confirms it does.
+ *   guard     a verified chokepoint its handler passes, or whose symbol its
  *              handler's declaration calls, while some route-mates do not:
  *              the exact guard: line. Entrances that declare different
  *              guard: lines never share a route, so the ones it names take
@@ -14,7 +19,7 @@
  *              one, which is named first: verify it): an invariant bullet in
  *              the scaffold invariant shape, owned by the component that
  *              declares the entrance, its crossing entering from the trust
- *              the entrance carries in.
+ *              the entrance carries in and its entrances: line naming it.
  *   none       it plausibly needs none: its handler reaches no component
  *              beyond its own, or its name says static or public content, a
  *              health check. The control: none line, with a reason the
@@ -23,7 +28,8 @@
  * Writing follows scaffold invariant: printed by default, applied only with
  * --write, and only where safe: a guard: line or a control: none line goes
  * under the entrance's bullet (never beside one it already has), an
- * invariant bullet is appended as a requirement with its placeholders.
+ * entrances: line goes under the invariant's bullet (or gains the name),
+ * an invariant bullet is appended as a requirement with its placeholders.
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -32,6 +38,7 @@ import { declarationsOf } from "../economy/source.ts";
 import type { Language } from "../adapters/index.ts";
 import { languageOfFile } from "../enforcement/config.ts";
 import { NO_CONTROL, NO_CONTROL_FORM } from "../spec/grammar.ts";
+import { resolveCovered } from "../spec/covers.ts";
 import { declaresAtTop } from "../spec/model.ts";
 import { loadSeed } from "../spec/seed.ts";
 import { CLOSE_WAYS } from "../readings/scope/gaps.ts";
@@ -73,7 +80,24 @@ export interface NoneClosure {
   line: string;
 }
 
-export type Closure = GuardClosure | InvariantClosure | NoneClosure;
+/**
+ * An invariant that covered the entrance by its crossing alone before
+ * entrances: (PR #4): the line that names the entrance on it, so its
+ * verified test counts again where it checks this entrance's work.
+ */
+export interface NameClosure {
+  kind: "name";
+  component: string;
+  invariant: string;
+  sentence: string;
+  specPath: string;
+  /** The invariant's bullet line, where the entrances: line goes beneath. */
+  bulletLine: number;
+  entrance: string;
+  line: string;
+}
+
+export type Closure = NameClosure | GuardClosure | InvariantClosure | NoneClosure;
 
 export interface Proposal {
   entrance: FlowEntrance;
@@ -82,6 +106,12 @@ export interface Proposal {
   route: FlowRoute;
   /** Ranked: the first is the proposed closure, the rest the alternatives. */
   closures: Closure[];
+}
+
+/** An entrance's name as an entrances: line in `owner`'s spec writes it: plain where that resolves to it, else qualified by the folder declaring it. */
+function coveredName(name: string, declaredIn: string, owner: string, state: ShellState): string {
+  const resolved = resolveCovered(name, owner, state.spec.components);
+  return "entrance" in resolved && resolved.entrance.component === declaredIn ? name : `${name} in ${declaredIn}`;
 }
 
 function namedSymbol(value: string): string | undefined {
@@ -183,6 +213,13 @@ export function proposeClosures(root: string, state: ShellState, model: FlowMode
       const declared = spec?.entrances.find((e) => e.name === entrance.name);
       if (spec === undefined || declared === undefined) continue;
       const closures: Closure[] = [];
+      // (0) Named: a verified invariant that covered it by its crossing alone before entrances: names it, and its test counts again.
+      for (const lost of entrance.unnamed) {
+        const owner = state.spec.components.find((c) => c.folder === lost.component);
+        const invariant = owner?.invariants.find((i) => i.name === lost.name);
+        if (owner === undefined || invariant === undefined) continue;
+        closures.push({ kind: "name", component: owner.folder, invariant: invariant.name, sentence: invariant.sentence, specPath: owner.specPath, bulletLine: invariant.line, entrance: entrance.name, line: `entrances: ${coveredName(entrance.name, component, owner.folder, state)}` });
+      }
       // (a) Traced: a verified chokepoint this entrance passes that its route-mates do not all pass (the route's partial list).
       for (const partial of route.partial) {
         // Only a wrapper: its guard: line is confirmed where the handler is registered; one inside the reach is not spelled there.
@@ -200,7 +237,7 @@ export function proposeClosures(root: string, state: ShellState, model: FlowMode
         const rivals = [...new Set(model.entrances.flatMap((m) => (calls.get(m.id) ?? []).filter((c) => c.verified === call.verified).map((c) => c.symbol)))].sort();
         closures.push({ kind: "guard", symbol: call.symbol, component: call.verified.invariant.component, invariant: call.verified.invariant.name, sentence: call.verified.invariant.sentence, how: "called", rivals: rivals.length > 1 ? rivals : [], line: `guard: ${call.symbol}` });
       }
-      // (b) An invariant whose crossing enters from its trust, owned where the entrance is declared, so it counts as the entrance's own.
+      // (b) An invariant whose crossing enters from its trust and whose entrances: line names it, so it counts as the entrance's own.
       const unverified = (entrance.guards ?? [])
         .map((g) => ({ g, invariant: allInvariants(state.spec.components).find((i) => i.component === g.component && i.name === g.name) }))
         .filter(({ invariant }) => invariant !== undefined && invariantVerdict(invariant, state.runs.records).state !== "verified")
@@ -212,6 +249,8 @@ export function proposeClosures(root: string, state: ShellState, model: FlowMode
         kinds: undefined,
         form: "totality oracle",
         crossing: { from, to: "<trust level>" },
+        // It covers the entrances it names, and only those: owned by the declaring spec, the plain name resolves there.
+        entrances: [entrance.name],
       });
       const invariantClosure: InvariantClosure = { kind: "invariant", component, specPath: spec.specPath, bullet, unverified, inside };
       // (c) Plausibly none: reaching no component beyond its own, or named for static or public content, a health check.
@@ -256,7 +295,10 @@ export function renderProposal(p: Proposal, cli: string): string {
   const lines = [`${p.entrance.name}  (${p.specPath}:${p.declared.line}, trust ${p.entrance.trust.length === 0 ? "unknown" : p.entrance.trust.join(", ")})`, `  no traced control on its route: ${routeWords(p.route)}`];
   const say = (c: Closure, proposed: boolean): void => {
     const lead = proposed ? "  proposed:" : "  or:";
-    if (c.kind === "guard") {
+    if (c.kind === "name") {
+      lines.push(`${lead} ${c.line}   under ${c.invariant} in ${c.specPath}:${c.bulletLine}${proposed ? "" : " (--as name)"}`);
+      if (proposed) lines.push(`    ${c.invariant} (${c.component === "." ? "the root" : c.component}, verified) covered this entrance by its crossing alone, which no longer counts; name it there if its test checks this entrance's work. ${c.sentence}`);
+    } else if (c.kind === "guard") {
       lines.push(`${lead} ${c.line}`);
       if (!proposed) return;
       lines.push(`    ${guardWords(c)}`);
@@ -292,11 +334,19 @@ export function renderAll(proposals: readonly Proposal[], cli: string): string {
     const guards = new Map<string, Proposal[]>();
     const invariants: Proposal[] = [];
     const nones: Proposal[] = [];
+    const naming = new Map<string, Proposal[]>();
     for (const p of group) {
       const c = p.closures[0]!;
-      if (c.kind === "guard") guards.set(`${c.invariant}\u0000${c.symbol}`, [...(guards.get(`${c.invariant}\u0000${c.symbol}`) ?? []), p]);
+      if (c.kind === "name") naming.set(`${c.component}\u0000${c.invariant}`, [...(naming.get(`${c.component}\u0000${c.invariant}`) ?? []), p]);
+      else if (c.kind === "guard") guards.set(`${c.invariant}\u0000${c.symbol}`, [...(guards.get(`${c.invariant}\u0000${c.symbol}`) ?? []), p]);
       else if (c.kind === "none") nones.push(p);
       else invariants.push(p);
+    }
+    for (const members of naming.values()) {
+      const c = members[0]!.closures[0] as NameClosure;
+      const listed = members.map((p) => (p.closures[0] as NameClosure).line.replace(/^entrances: /, ""));
+      lines.push(`  ${members.length} of ${route.entrances.length}: covered by ${c.invariant} (${c.component}, verified) by its crossing alone, which no longer counts; name the ones its test checks under it in ${c.specPath}:${c.bulletLine}:`);
+      lines.push(`    entrances: ${listed.join(", ")}`);
     }
     for (const members of guards.values()) {
       const c = members[0]!.closures[0] as GuardClosure;
@@ -307,7 +357,7 @@ export function renderAll(proposals: readonly Proposal[], cli: string): string {
     if (guards.size > 0 && invariants.length + nones.length > 0) lines.push(`  the other ${invariants.length + nones.length} keep a route of their own once those guard: lines are written; close them by an invariant, control: none, or a trust: level of their own:`);
     if (invariants.length > 0) {
       const c = invariants[0]!.closures[0] as InvariantClosure;
-      lines.push(`  ${invariants.length}: an invariant in ${[...new Set(invariants.map((p) => p.specPath))].join(", ")} whose crossing enters from ${route.trust[0] ?? "their trust"}; one bullet covers every entrance its spec declares:`);
+      lines.push(`  ${invariants.length}: an invariant in ${[...new Set(invariants.map((p) => p.specPath))].join(", ")} whose crossing enters from ${route.trust[0] ?? "their trust"}; one bullet covers the entrances its entrances: line names, and no other:`);
       for (const l of c.bullet.trimEnd().split("\n")) lines.push(`    ${l.replace(/<what every .* request must satisfy before its work runs>/, "<what every request on this route must satisfy before its work runs>")}`);
       lines.push(`    ${invariants.slice(0, 6).map((p) => p.entrance.name).join(", ")}${invariants.length > 6 ? ` and ${invariants.length - 6} more` : ""}`);
       const choices = invariants.flatMap((p) => p.closures.filter((c): c is GuardClosure => c.kind === "guard"));
@@ -352,8 +402,42 @@ export function insertEntranceLine(root: string, specPath: string, entrance: Spe
   return `${specPath}:${end + 1}  ${line}`;
 }
 
-/** Apply one closure for one entrance: the guard: line, the control: none line with its reason, or the invariant bullet. */
+/**
+ * Name one entrance on an invariant's entrances: line: added to the line
+ * when the bullet has one, else a new line beneath its crossing:. Refused
+ * when the line already names it or says none, which is a human's ruling.
+ */
+export function nameCoveredEntrance(root: string, specPath: string, bulletLine: number, invariant: string, name: string): string {
+  const path = join(root, specPath);
+  const lines = readFileSync(path, "utf8").split("\n");
+  const at = bulletLine - 1;
+  if (!(lines[at] ?? "").startsWith(`- ${invariant}:`)) throw new ScaffoldError(`${specPath}:${bulletLine} is not the bullet of invariant ${invariant}; the spec changed since it was read`);
+  let end = at + 1;
+  let crossing: number | undefined;
+  let indent = "  ";
+  while (end < lines.length && /^\s+\S/.test(lines[end]!)) {
+    indent = /^(\s+)/.exec(lines[end]!)![1]!;
+    const entrances = /^(\s+entrances:\s*)(.*)$/.exec(lines[end]!);
+    if (entrances !== null) {
+      const names = entrances[2]!.split(",").map((n) => n.trim()).filter((n) => n !== "");
+      if (names.length === 1 && names[0] === "none") throw new ScaffoldError(`${invariant} says entrances: none; it checks no entrance, so naming ${name} there is a ruling to change by hand`);
+      if (names.includes(name)) throw new ScaffoldError(`${invariant} already names ${name}`);
+      lines[end] = `${entrances[1]}${[...names, name].join(", ")}`;
+      writeFileSync(path, lines.join("\n"), "utf8");
+      return `${specPath}:${end + 1}  ${lines[end]!.trim()}`;
+    }
+    if (/^\s+crossing:/.test(lines[end]!)) crossing = end;
+    end += 1;
+  }
+  const where = crossing === undefined ? end : crossing + 1;
+  lines.splice(where, 0, `${indent}entrances: ${name}`);
+  writeFileSync(path, lines.join("\n"), "utf8");
+  return `${specPath}:${where + 1}  entrances: ${name}`;
+}
+
+/** Apply one closure for one entrance: the entrances: line on an invariant, the guard: line, the control: none line with its reason, or the invariant bullet. */
 export function writeClosure(root: string, p: Proposal, c: Closure, reason?: string): string {
+  if (c.kind === "name") return nameCoveredEntrance(root, c.specPath, c.bulletLine, c.invariant, c.line.replace(/^entrances: /, ""));
   if (c.kind === "guard") return insertEntranceLine(root, p.specPath, p.declared, c.line);
   if (c.kind === "none") {
     const text = reason?.trim() ?? "";

@@ -71,6 +71,7 @@
 
 import { allInvariants, componentOfFile, flowChokepointId, flowLevelId, invariantVerdict, latestOf, openEscalations, plural, subjectOf, type InvariantVerdict, type RelianceSite } from "./derive.ts";
 import { coverageOf, type EntranceCoverage } from "./entrance-coverage.ts";
+import { creditedByCrossingAlone, crossingChecksTrust, namesEntrance } from "../../spec/covers.ts";
 import { slug } from "./html.ts";
 import { languagesReadLine, type LanguagesRead } from "./languages-read.ts";
 import type { EntranceGuard, InterfacePartial, InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, ShellState, SpecComponent, SpecInvariant } from "./model.ts";
@@ -264,9 +265,9 @@ export interface FlowRoute {
  *   inside     a verified chokepoint whose invariant a component on the route
  *              owns, whose protected thing the handler's reach reaches: it
  *              stands inside that component, on no line of the map
- *   totality   a verified invariant enforced only by a totality oracle, owned
- *              by the component that declares or handles the entrance:
- *              test-backed, not structural
+ *   totality   a verified invariant enforced only by a totality oracle whose
+ *              entrances: line names the entrance: test-backed, not
+ *              structural, and never credited by its crossing alone
  *
  * Every kind but the wrapper counts only when its invariant's crossing
  * checks what the route's trust sends: it enters from a level the route
@@ -349,6 +350,14 @@ export interface FlowEntrance {
   guardUnconfirmed: string | undefined;
   /** Why it needs no control, when its spec says so (control: none — <reason>). */
   noControl: string | undefined;
+  /** The invariants whose entrances: line names it, in declaration order: the only ones a test-backed control is credited from (covers.ts). */
+  coveredBy: { component: string; name: string }[];
+  /**
+   * Verified invariants that covered it by their crossing alone before
+   * entrances: (PR #4) and cover it no longer, until they name it: said
+   * where the agent reads its gap, never dropped in silence.
+   */
+  unnamed: { component: string; name: string }[];
 }
 
 export interface FlowNode {
@@ -703,7 +712,14 @@ export function flowOf(state: ShellState): FlowModel {
         : [...new Set(invariants.filter((invariant) => invariant.crossing !== undefined && represent(invariant.component) === start && invariant.enforcements.some((e) => e.form === "chokepoint" && flowNamed(e.chokepoint)?.symbol === handlerName)).map((invariant) => invariant.crossing!.from))]
           .sort((a, b) => (levelOrder.get(a) ?? 99) - (levelOrder.get(b) ?? 99) || a.localeCompare(b));
       const passes = [...new Set([component.folder, ...(holder === undefined ? [] : [holder]), ...(resolution?.reach ?? []).flatMap((r) => [r.from, r.to])])].sort();
-      return { id: flowEntranceId(component.folder, entrance.name), name: entrance.name, meaning: entrance.meaning, declaredBy, owners: [...new Set([component.folder, ...(holder === undefined ? [] : [holder])])], handler: entrance.handler, start, resolved: start !== undefined, reachable, reason, trust, trustSource, reach: resolution?.reach, passes, module, guard: entrance.guard, guards: resolution?.guards, guardUnconfirmed: resolution?.guardUnconfirmed, noControl: entrance.noControl };
+      const owners = [...new Set([component.folder, ...(holder === undefined ? [] : [holder])])];
+      // Which invariants name it as covered; and which covered it by their crossing alone, the rule before (PR #4), and no longer do.
+      const named = { component: component.folder, name: entrance.name };
+      const coveredBy = invariants.filter((invariant) => namesEntrance(invariant, named, components)).map((invariant) => ({ component: invariant.component, name: invariant.name }));
+      // Said only where the loss can leave a gap: work carried in from outside the system's control, needing a control.
+      const fromOutside = state.spec.trustLevels.some((level) => level.outside === true && trust.includes(level.name));
+      const unnamed = entrance.noControl !== undefined || !fromOutside ? [] : invariants.filter((invariant) => creditedByCrossingAlone(invariant, owners, trust) && verdictOf(invariant.component, invariant.name).state === "verified").map((invariant) => ({ component: invariant.component, name: invariant.name }));
+      return { id: flowEntranceId(component.folder, entrance.name), name: entrance.name, meaning: entrance.meaning, declaredBy, owners, handler: entrance.handler, start, resolved: start !== undefined, reachable, reason, trust, trustSource, reach: resolution?.reach, passes, module, guard: entrance.guard, guards: resolution?.guards, guardUnconfirmed: resolution?.guardUnconfirmed, noControl: entrance.noControl, coveredBy, unnamed };
     }),
   );
 
@@ -797,8 +813,9 @@ export function flowOf(state: ShellState): FlowModel {
       const first = entrance.declaredBy === entrance.start ? [entrance.start] : [entrance.declaredBy, entrance.start];
       const followed: FlowRoute["followed"] = entrance.reach === undefined ? "weight" : "reach";
       const { trust, trustSource } = entrance;
-      // What the entrance declares of its control: a guard: line, or control: none. Entrances that declare differently never share a line.
-      const declares = entrance.noControl !== undefined ? "none" : entrance.guard === undefined ? "" : `guard ${entrance.guard}`;
+      // What the entrance declares of its control: a guard: line, control: none, or the invariants that name it as covered.
+      // Entrances that declare differently never share a line, so a control named for some counts for those it names.
+      const declares = [entrance.noControl !== undefined ? "none" : entrance.guard === undefined ? "" : `guard ${entrance.guard}`, ...entrance.coveredBy.map((c) => `covered ${c.component}\u0001${c.name}`)].join("\u0000");
       if (core.has(entrance.start)) drafts.push({ stops: [entrance.declaredBy], rail: entrance.start, entrance: entrance.id, trust, trustSource, followed, declares });
       else drafts.push({ ...(entrance.reach === undefined ? onward(first) : alongReach(first, entrance.reach)), entrance: entrance.id, trust, trustSource, followed, declares });
     }
@@ -840,7 +857,7 @@ export function flowOf(state: ShellState): FlowModel {
       traced: [],
       partial: [],
       noTracedControl: false,
-      noControl: draft.declares === "none",
+      noControl: draft.declares.split("\u0000")[0] === "none",
     });
     declaresOf.set(routes[routes.length - 1]!.id, draft.declares);
   }
@@ -967,10 +984,8 @@ export function flowOf(state: ShellState): FlowModel {
   // level the route carries in, or enters one, turning an outside caller into it. A chokepoint guarding some other
   // boundary (a data-write log, a migration registry, an egress filter for another reader) is no check on this caller,
   // however far the handler's reach runs (c-9941b95e). A wrapper is exempt: its handler is registered through it.
-  const crossesTrust = (component: string, name: string, trust: readonly string[]): boolean => {
-    const crossing = invariants.find((invariant) => invariant.component === component && invariant.name === name)?.crossing;
-    return crossing !== undefined && (trust.includes(crossing.from) || trust.includes(crossing.to));
-  };
+  const crossesTrust = (component: string, name: string, trust: readonly string[]): boolean =>
+    crossingChecksTrust(invariants.find((invariant) => invariant.component === component && invariant.name === name)?.crossing, trust);
   for (const route of routes) {
     const railStub = route.rail === undefined ? undefined : edges.find((edge) => edge.from === route.stops[route.stops.length - 1] && edge.to === route.rail);
     route.controls = [...new Set([...route.entry, ...route.edges.flatMap((id) => edges.find((edge) => edge.id === id)!.identifiers), ...(railStub?.identifiers ?? [])])];
@@ -998,12 +1013,13 @@ export function flowOf(state: ShellState): FlowModel {
         if (guard.how === "wrapper" || guard.how === "declared") found.push({ kind: "wrapper", component: guard.component, name: guard.name, identifier: undefined, declared: guard.how === "declared" });
         else if (on.has(guard.component) && crossesTrust(guard.component, guard.name, route.trust)) found.push({ kind: "inside", component: guard.component, name: guard.name, identifier: undefined, declared: false });
       }
-      // A test-backed control is the entrance's own: owned where the entrance is declared or handled, never merely somewhere
-      // its work passes, so an unrelated test further along cannot stand in for a check on this entrance (owner, d-127ab8e4).
-      // Compared unfolded: a child component folded into a stop at this zoom does not own its parent's entrances.
-      const own = new Set(entrance?.owners ?? []);
+      // A test-backed control is the entrance's own: an invariant whose entrances: line names it, never one whose crossing
+      // merely matches its trust. Owning the component that declares or handles it was not enough (d-127ab8e4 narrowed it
+      // to the owner; covers.ts to the named): a signature check in a routes folder is no check on its crawler file, and
+      // a server function sharing a folder shares no test.
+      const covering = new Set((entrance?.coveredBy ?? []).map((c) => `${c.component}\u0000${c.name}`));
       for (const invariant of invariants) {
-        if (!crossesTrust(invariant.component, invariant.name, route.trust) || !own.has(invariant.component)) continue;
+        if (!covering.has(`${invariant.component}\u0000${invariant.name}`) || !crossesTrust(invariant.component, invariant.name, route.trust)) continue;
         // An invariant with a chokepoint is traced by its chokepoint; only one enforced by a totality oracle alone is test-backed here.
         if (invariant.enforcements.some((e) => e.form === "chokepoint") || !invariant.enforcements.some((e) => e.form === "totality oracle")) continue;
         if (verified(invariant.component, invariant.name)) found.push({ kind: "totality", component: invariant.component, name: invariant.name, identifier: undefined, declared: false });

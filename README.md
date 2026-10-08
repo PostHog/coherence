@@ -71,7 +71,10 @@ When a chokepoint breaks, the component wears a red mark listing every
 bypass site, and the map opens on the worst one. An entrance whose untrusted
 input reaches the system with no verified chokepoint or totality oracle
 traced on its route is flagged `no traced control` (see `scope http` above):
-not a demonstrated bypass, but a place to look. Selecting a trust level lights every
+not a demonstrated bypass, but a place to look. A chokepoint counts where the
+reading sees the handler pass it; a totality oracle counts only on the
+entrances its invariant names (`entrances:`), never on every entrance whose
+trust its crossing matches. Selecting a trust level lights every
 crossing that carries it, so you can see where sensitive data goes.
 
 ## How it helps
@@ -113,7 +116,9 @@ and the detector went red.
   invariant over a whole set, for the cases where a chokepoint isn't
   practical.
 - **Crossings** mark the invariants that stand on a security boundary, naming
-  the trust levels on either side.
+  the trust levels on either side. A crossing says which trust an invariant
+  checks, not where it enters: a totality oracle counts as a control only on
+  the entrances its `entrances:` line names.
 
 ![The Invariants view: each invariant with its sentence, the reason it matters, its enforcement, and its latest verdict.](docs/images/scope-invariants.jpg)
 

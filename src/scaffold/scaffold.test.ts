@@ -85,7 +85,7 @@ test("scaffold invariant prints every slot and only the applicable checklist sha
   assert.deepEqual(shapes, expected);
   assert.ok(expected.length > 0 && expected.length < seed.shapes.length);
   for (const key of KEYS) {
-    if (key === "over" || key === "via") {
+    if (key === "over" || key === "via" || key === "entrances") {
       assert.doesNotMatch(bullet, new RegExp(`^  ${key}:`, "m"), `the chokepoint form has no ${key}`);
     } else {
       assert.match(bullet, new RegExp(`^  ${key}:`, "m"), `slot ${key} is present`);
@@ -101,6 +101,9 @@ test("scaffold invariant prints every slot and only the applicable checklist sha
   assert.match(totality.bullet, /^- given: S\.$/m);
   assert.match(totality.bullet, /^  over: </m);
   assert.match(totality.bullet, /^  via: </m);
+  assert.doesNotMatch(totality.bullet, /^  entrances:/m, "with no crossing declared, no entrances slot: a boundary that checks no trust covers no entrance");
+  const crossed = renderInvariant(seed, { sentence: "S.", name: "given", kinds: "none", form: "totality oracle", crossing: { from: "a", to: "b" } });
+  assert.match(crossed.bullet, /^  crossing: a -> b\n  entrances: <the entrances whose work its test checks, comma separated, or none>$/m, "on a declared crossing, a totality oracle names the entrances it covers, or none");
   assert.doesNotMatch(totality.bullet, /^  protects:/m);
   assert.match(totality.bullet, /^  kinds: none$/m);
   assert.doesNotMatch(totality.bullet, /checklist:/);
