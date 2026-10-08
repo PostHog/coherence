@@ -1,0 +1,18 @@
+{
+  "SessionStart": 2500,
+  "UserPromptSubmit": 2500,
+  "read (PreToolUse)": 2000,
+  "read (PostToolUse)": 2000,
+  "edit alpha (Python) (PreToolUse)": 12000,
+  "edit alpha (Python) (PostToolUse)": 12000,
+  "edit beta (TypeScript) (PreToolUse)": 12000,
+  "edit beta (TypeScript) (PostToolUse)": 12000,
+  "edit gamma (store) (PreToolUse)": 12000,
+  "edit gamma (store) (PostToolUse)": 12000,
+  "edit outside every product (PreToolUse)": 2000,
+  "edit outside every product (PostToolUse)": 2000,
+  "cd into alpha (PreToolUse)": 2000,
+  "cd into alpha (PostToolUse)": 2000,
+  "UserPromptSubmit after the change": 15000,
+  "Stop": 15000
+}

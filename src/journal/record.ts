@@ -122,8 +122,31 @@ export interface Head extends Stamp<Kind> {
   binding?: string;
 }
 
+/**
+ * A defect's class, where it came in, and what caught it. Each is optional:
+ * a record written before these fields existed, or by a caller who did not
+ * know, carries none, and every reader says unknown rather than guess.
+ */
+export interface DefectOrigin {
+  /** A short kebab-case name for the shape of the failure, declared once in a lexicon as the property "class <name>" of defect. */
+  class?: string;
+  /** A commit, "PR #<n>", "pre-existing" or "unknown". */
+  introduced?: string;
+  caught?: Caught;
+}
+
+export const CAUGHT = ["review", "ci", "probe", "adopter", "self", "test"] as const;
+export type Caught = (typeof CAUGHT)[number];
+
 export interface Decision extends Head, Citing, HumanWords {
   kind: "decision";
+  /**
+   * Present on a decision the classify verb wrote: the defect it classifies
+   * and the fields it gives, each overriding what the defect and earlier
+   * classifications said. The journal is append-only, so a defect recorded
+   * without these fields is classified by a later record, never edited.
+   */
+  classifies?: DefectOrigin & { of: string };
   chose: string;
   /**
    * What was rejected. An empty list means the caller never said; the string
@@ -148,12 +171,20 @@ export interface Conjecture extends Head, Citing {
   discriminatedBy: string;
 }
 
-export interface Resolution extends Head {
+export interface Resolution extends Head, DefectOrigin {
   kind: "resolution";
+  /** The conjecture this resolves, or the defect it closes. */
   of: string;
   because: string;
-  /** Which candidate won, when the caller named one. */
+  /** Which candidate won, when the caller named one; a conjecture's only. */
   as?: string;
+  /**
+   * A defect's close only: the invariant, as <component folder>/<name>, that
+   * guards the defect's whole class. It counts once its refutation is witnessed.
+   */
+  guard?: string;
+  /** A defect's close only: the decision that says why fixing the instance suffices. */
+  decision?: string;
 }
 
 export interface Dismissal extends Head {
@@ -162,7 +193,7 @@ export interface Dismissal extends Head {
   because: string;
 }
 
-export interface Defect extends Head, Citing {
+export interface Defect extends Head, Citing, DefectOrigin {
   kind: "defect";
   what: string;
   evidence: string;

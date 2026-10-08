@@ -19,13 +19,14 @@ import { countWork, readProjectText } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
-import { entryKey, latestByEnforcement, latestFor, loadRuns, parseLine as parseRunLine, witnessedRefutations, type Latest } from "../enforcement/record.ts";
+import { entryKey, latestByEnforcement, latestFor, loadRuns, parseLine as parseRunLine, witnessedRefutations, type Latest, type LoadedRuns, type RunRecord } from "../enforcement/record.ts";
 import { latestSeeing } from "../enforcement/run-index.ts";
-import { keptParses, listedContent, readContent } from "../lifecycle/kept-parse.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
-import { underIgnored, walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
+import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
 import { effectiveConfig } from "../adapters/project-config.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
+import { invariantFloorGaps, invariantFloorProblems, rawFloorGaps } from "./floor.ts";
+import { declaredClasses, defectFloor, defectStates, type DefectFloor, type GuardStanding } from "../journal/defects.ts";
 import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPractice, practiceProblems, stemOf, type ModelPractice } from "./practices.ts";
 
 export const SPEC_SUFFIX = ".spec.md";
@@ -96,6 +97,8 @@ export interface SpecModel {
   counts: Counts;
   /** When runs exist: the time of the latest, and how many run lines were unreadable. */
   runs: { latest: string; count: number; damaged: number } | undefined;
+  /** The floor on defects: closes with neither a guard nor a decision, and guard failures; advisory, never a problem. */
+  defects?: DefectFloor;
 }
 
 interface Config {
@@ -155,50 +158,47 @@ export interface ChokepointEntry {
   latest: { form: "chokepoint"; files: string[] }[];
 }
 
-/** The shape of a kept spec parse for the chokepoint index; a store of another shape, or one other code made, is read again. */
-const CHOKEPOINT_PARSE_SHAPE = "chokepoints-1";
-
 /**
  * Every chokepoint invariant in the project, the light way an edit can
- * afford: the specs the spec model would read, named by content and each
- * parsed once and kept while its content stands (kept-parse.ts), with no
- * state derived and no practice, handler or journal read; and, for each of
- * `written`, whether an invariant's latest run saw it, from the run index
- * (run-index.ts), never from the run history. An edit to no spec reads no
- * spec; one that touches an invariant runs the check, which loads the model.
+ * afford: each spec the spec model would read, read and parsed (specs are
+ * small; nothing of them is kept between calls), with no state derived and
+ * no practice, handler or journal read; and, for each of `written`, whether
+ * an invariant's latest run saw it, from the run index (run-index.ts). Throws
+ * when a spec or the index cannot be read; the caller falls back to the
+ * whole model and says so. An edit that touches an invariant runs the check
+ * over these entries alone.
  */
 export function chokepointIndex(rootGiven: string, written: readonly string[] = []): ChokepointEntry[] {
   const root = resolve(rootGiven);
   const config = readConfig(root);
-  const skip = new Set(config.ignore);
-  // git names each spec by its content; outside git every spec is read and hashed.
-  const listed =
-    listedContent(root, [`:(glob)**/*${SPEC_SUFFIX}`], "spec")?.filter((f) => !underIgnored(f.rel, skip)) ??
-    readContent(root, findSpecs(root, config.ignore).map((path) => relative(root, path).split(sep).join("/")), "spec");
-  const parsed = keptParses(root, "chokepoint-index", CHOKEPOINT_PARSE_SHAPE, ["spec/grammar.ts"], listed, "spec", (text, rel) =>
-    parseSpec(text, rel).invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint")).map((i) => ({ name: i.name, enforcements: i.enforcements })),
-  );
-  const seeing = written.length === 0 ? new Map<string, Set<string>>() : latestSeeing(root, written, parseRunLine);
-  const out: ChokepointEntry[] = [];
+  const seeing = written.length === 0 ? undefined : latestSeeing(root, written, parseRunLine);
+  const entries: ChokepointEntry[] = [];
   const seen = new Set<string>();
-  for (const { rel } of listed) {
-    const folder = folderOf(root, join(root, rel));
+  // The specs findSpecs would find, from a listing of the specs alone.
+  const bounds = walkBounds(root, config.ignore);
+  const specs = projectFilesEnding(root, SPEC_SUFFIX).filter((rel) => exclusionOf(rel, bounds) === undefined).map((rel) => join(root, rel));
+  for (const specPath of specs) {
+    const folder = folderOf(root, specPath);
     // A folder holds one spec, as the model reads it: a second is a problem there, and nothing here.
     if (seen.has(folder)) continue;
     seen.add(folder);
-    for (const invariant of parsed.get(rel) ?? []) {
+    const rel = relative(root, specPath).split(sep).join("/");
+    for (const invariant of parseSpec(readProjectText(specPath, "spec"), rel).invariants) {
+      if (!invariant.enforcements.some((e) => e.form === "chokepoint")) continue;
       const key = entryKey(folder, invariant.name, "chokepoint");
-      const files = written.filter((file) => seeing.get(file)?.has(key) === true);
-      out.push({ component: folder, name: invariant.name, enforcements: invariant.enforcements, latest: files.length === 0 ? [] : [{ form: "chokepoint", files }] });
+      const files = written.filter((file) => seeing?.get(file)?.has(key) === true);
+      entries.push({ component: folder, name: invariant.name, enforcements: invariant.enforcements, latest: files.length === 0 ? [] : [{ form: "chokepoint", files }] });
     }
   }
-  return out;
+  return entries;
 }
 
 export interface LoadOptions {
   seed?: Seed | undefined;
   /** Read .coherence/runs and derive run-informed state (default true). */
   runs?: boolean | undefined;
+  /** A run not yet appended, read in as the latest: the run grades each entry's bullet with it before it writes. */
+  pending?: RunRecord | undefined;
 }
 
 export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): SpecModel {
@@ -208,7 +208,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   const seed = options.seed ?? loadSeed();
   const config = readConfig(root);
   const problems: Problem[] = [];
-  const loadedRuns = options.runs === false ? { records: [], refutations: [], damaged: [] } : loadRuns(root);
+  const loadedRuns: LoadedRuns = options.runs === false ? { records: [], refutations: [], damaged: [] } : loadRuns(root);
+  if (options.pending !== undefined) loadedRuns.records.push(options.pending);
   const latest = latestByEnforcement(loadedRuns.records);
   // A totality oracle's refutation is witnessed by the record, never by the bullet's own refuted: line.
   const witnessed = witnessedRefutations(loadedRuns.records, loadedRuns.refutations);
@@ -333,6 +334,9 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   components.sort((a, b) => a.folder.localeCompare(b.folder));
   problems.push(...entranceTrustProblems(components, trustLevels));
   problems.push(...entranceGuardProblems(root, components));
+  // The invariant floor (df-f3826eaa): a bullet the run store graded an invariant is not demoted without a decision; the journal is read only when one was.
+  const demoted = rawFloorGaps(components, loadedRuns.records, loadedRuns.refutations);
+  if (demoted.length > 0) problems.push(...invariantFloorProblems(components, invariantFloorGaps(demoted, practiceFiles.size === 0 ? journalRecords(root) : records)));
   problems.push(
     ...practiceProblems({
       root,
@@ -349,7 +353,20 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   problems.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
 
   const counts = countModel(components, problems);
-  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs };
+  // The journal is read for defects even where no practice file asked for it; a project with no spec reads none.
+  const journal = practiceFiles.size === 0 && components.length > 0 ? journalRecords(root) : records;
+  const defects = defectFloor(defectStates(journal), guardStanding(components), declaredClasses(root));
+  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs, defects };
+}
+
+/** How a defect's guard stands in this model: the invariant <folder>/<name> is declared and its refutation witnessed, declared only, or missing. */
+export function guardStanding(components: readonly Component[]): (guard: string) => GuardStanding {
+  return (guard) => {
+    const slash = guard.lastIndexOf("/");
+    const invariant = components.find((c) => c.folder === guard.slice(0, slash))?.invariants.find((i) => i.name === guard.slice(slash + 1));
+    if (slash === -1 || invariant === undefined) return "missing";
+    return invariant.enforcements.length > 0 && !invariant.lacks.includes("refutation") ? "witnessed" : "unwitnessed";
+  };
 }
 
 /** The component whose folder holds a project-relative file: the deepest component folder above it. */

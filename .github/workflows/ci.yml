@@ -18,6 +18,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# CI never sends telemetry, whatever a user config on the runner says.
+env:
+  COHERENCE_TELEMETRY: "0"
+  DO_NOT_TRACK: "1"
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -35,6 +40,14 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      # The records are folded in the diff (.gitattributes); the job summary says what they hold.
+      - name: Records summary
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/records-summary.mjs "$BASE" "$HEAD" >> "$GITHUB_STEP_SUMMARY"
 
       # The language servers the adapters ask: neither is a dependency of the package, so an adopter brings its own.
       - name: Language servers
@@ -56,3 +69,28 @@ jobs:
       # Every chokepoint graded in-process (no warm server); a broken one fails the run.
       - name: Chokepoints
         run: node --disable-warning=ExperimentalWarning src/cli.ts run --form chokepoint --no-server --session "ci-${{ github.run_id }}" --agent ci
+
+  # One session's hooks over a synthetic monorepo of about 5,000 files under a
+  # registry of three products, warm-up on: each event's wall time against
+  # bench/scale/budgets.json, set a few times above what these runners
+  # measure, so an order-of-magnitude regression fails and noise does not.
+  # The timings go to the job summary.
+  bench:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.18"
+
+      # The optional dependencies bring the TypeScript language server and Pyright the edits ask.
+      - name: Install
+        run: npm ci
+
+      - name: Scale benchmark
+        run: node --disable-warning=ExperimentalWarning bench/scale/run.ts

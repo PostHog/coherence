@@ -26,6 +26,7 @@ import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/mode
 import { checkChokepoint, type ChokepointResult } from "./check.ts";
 import { languageOfFile, readEnforcementConfig, setupClaims, type EnforcementConfig } from "./config.ts";
 import { appendRun, entryKey, loadRuns, machineLoad, type Form, type RunEntry, type RunRecord } from "./record.ts";
+import { enforcesOf } from "../spec/floor.ts";
 import { connectAdapter, type RemoteAdapter } from "./server.ts";
 import { escapeRegExp, runTotalityBatch, runTotalityOracle, type TotalityResult } from "./totality.ts";
 import { readLatency, type LatencyReading } from "./latency.ts";
@@ -40,6 +41,12 @@ export interface RunOptions {
   invariants?: readonly string[] | undefined;
   /** Files (project-relative) whose text changed since the instrument last read them; the warm server re-reads them first. */
   refresh?: readonly string[] | undefined;
+  /**
+   * False for an edit's check: the run's entries are recorded ungraded, with
+   * no state derived, since deriving one reads the whole spec model and run
+   * store; the invariant floor counts only graded entries. A full run grades.
+   */
+  grade?: boolean | undefined;
   /** An adapter to use instead of the warm server (tests, and `--no-server`); in a multi-language project, for its own language. */
   adapter?: LanguageAdapter | undefined;
   /** Adapters by language to use instead of the warm servers (tests, and `--no-server` in a multi-language project). */
@@ -287,7 +294,8 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   const details: EntryDetail[] = [];
   const needsAdapter = wantChokepoints && selected.some(({ invariant }) => chokepointEnforcements(invariant).length > 0);
   // A totality oracle's refutation is the record `refute` wrote, never the bullet's own refuted: line.
-  const recorded = new Set(loadRuns(root).refutations.map((r) => entryKey(r.component, r.name, r.form)));
+  // Read only when a totality oracle is checked: an edit's chokepoint check never reads the run history.
+  const recorded = wantTotality ? new Set(loadRuns(root).refutations.map((r) => entryKey(r.component, r.name, r.form))) : new Set<string>();
   let listed: string[] | undefined;
   const files = (): string[] => (listed ??= projectFiles(root));
   const plans: ChokepointPlan[] = wantChokepoints
@@ -483,6 +491,8 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     ...(batched.size === 0 ? {} : { batch: { ms: totalBatch } }),
     invariants: details.map((d) => d.entry),
   };
+  if (options.grade === false) for (const entry of record.invariants) entry.ungraded = true;
+  else gradeRecord(root, record);
   const file = appendRun(root, record);
   const outcome: RunOutcome = { record, file, details, instrumentReason, instrumentDied: needsAdapter && instrumentReason !== undefined };
   if (batched.size > 0) {
@@ -521,6 +531,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     } else {
       // The one function that performs a pass is the only one that appends: confirmEach builds the second record, performRun writes it.
       const each = await confirmEach(root, config, options, batchedDetails, instrument, recorded, now);
+      gradeRecord(root, each.record);
       outcome.each = { ...each, file: appendRun(root, each.record) };
     }
   }
@@ -723,6 +734,24 @@ export async function withWarmAdapters<T>(
  */
 export async function warmInstrument(root: string): Promise<void> {
   await withWarmAdapter(root, async () => {});
+}
+
+/**
+ * Each entry's bullet state as this record leaves it, with what its form
+ * enforces through, set on the entries before the record is appended: the
+ * model is loaded with the record read in as the latest run, so the state is
+ * the one loadSpecModel derives and no other. The invariant floor
+ * (src/spec/floor.ts) reads it.
+ */
+export function gradeRecord(root: string, record: RunRecord): void {
+  const after = loadSpecModel(root, { pending: record });
+  const byKey = new Map(after.components.flatMap((c) => c.invariants.map((i) => [`${c.folder}\u0000${i.name}`, i] as const)));
+  for (const entry of record.invariants) {
+    const invariant = byKey.get(`${entry.component}\u0000${entry.name}`);
+    if (invariant === undefined) continue;
+    entry.state = invariant.state;
+    entry.enforces = enforcesOf(invariant, entry.form);
+  }
 }
 
 function entryOf(component: string, name: string, form: Form, rest: Omit<RunEntry, "component" | "name" | "form" | "grade"> & { grade: RunEntry["grade"] | undefined }): RunEntry {

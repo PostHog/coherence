@@ -14,9 +14,11 @@ absent. A single-value flag given twice is refused.
 - `decide "<chose>" [--over "<rejected>"]... --because "<why>" [--human "<what the human said>"] [--cite <id>]...`
 - `retract <id> --because "<what refuted it>"`: points at a record; nothing is edited.
 - `conjecture "<observation>" [--could-be "<candidate>"]... --discriminated-by "<test>" [--cite <id>]...`: "the instrument is wrong" is always a candidate.
-- `resolved <id> --because "<what the test showed>" [--as "<candidate>"]`
+- `resolved <id> --because "<what the test showed>" [--as "<candidate>"]`: resolves a conjecture.
+- `resolved <defect-id> --because "<what fixed it>" [--guard <component folder>/<invariant>] [--decision <id>]`: closes a defect (see Defects below).
 - `dismiss <id> --because "<why nobody will chase it>"`
-- `defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--cite <id>]...`
+- `defect "<what failed>" --evidence "<reproducer or report>" [--file <path>]... [--class <name>] [--introduced <commit|PR #n|pre-existing|unknown>] [--caught <review|ci|probe|adopter|self|test>] [--cite <id>]...`
+- `classify <defect-id> [--class <name>] [--introduced <...>] [--caught <...>] --because "<the evidence>"`: a decision citing the defect that gives the fields it lacked.
 - `experiment create "<expectation>" [--context <file>]... --action "<step>"... --success "<criterion>"... [--cite <id>]...`: prints step ids.
 - `experiment close <id> --result <stepId>=<pass|fail|unknown>...`: every step needs a result; the outcome is derived.
 - `unable "<what you could not do>" --because "<the wall>" [--cite <id>]...`
@@ -38,6 +40,38 @@ agent attributes to a human in a `human` field, apart from the agent's own
 `because`, and every reader labels them as the agent's attribution. It records
 that the agent says a human said them; it does not prove a human wrote them.
 Proof of authorship is out of scope.
+
+## Defects
+
+A defect should buy a guard for its whole class. It carries three optional
+fields, which the practice close a defect asks for:
+
+- `class`: a short kebab-case name for the shape of the failure (path-identity,
+  silent-skip, cost). Each class is declared once, as the property
+  `class <name>` of the defect concept in Coherence's lexicon or the project's
+  own; the verb refuses a class declared nowhere.
+- `introduced`: a commit, `PR #<n>`, `pre-existing` or `unknown`. A commit or
+  pull request makes the defect fix-induced.
+- `caught`: review, ci, probe, adopter, self or test.
+
+A defect recorded without them stays valid. The journal is append-only, so
+`classify` gives them later as a decision citing the defect; every reader
+folds the defect's own fields, then each classification not retracted, then
+its close, the later field winning. A field nobody gave reads as unknown.
+
+`resolved <defect-id>` closes a defect. The close names a guard, an invariant
+whose enforcement covers the class and whose refutation is witnessed, or a
+decision saying why fixing the instance suffices. `spec --check` names a close
+with neither, and a defect recorded in a class a close had already guarded
+is a guard failure: the guard was weaker than claimed. Both are advisory,
+and orient lists each guard failure. A retracted close no longer closes, so a
+defect can be closed again with its guard.
+
+`query convergence [--days <n>] [--json]` reads whether discoveries repay over
+a window (14 days by default): defects arriving by origin and catch, escapes
+per release, the share closed with a guard, repeats per class, bullets at each
+day and release tag, the files most often changed, and hook latency p50 and
+p95 per event and Coherence version.
 
 ## Work orders
 
@@ -103,7 +137,9 @@ One JSONL file per session at `.coherence/journal/<session>.jsonl`, append
 only. Every record carries `id`, `kind`, `at` (ISO), `session`, `agent`,
 `commit` (short sha or null), `dirty`, its binding, and its kind's fields;
 `cites` (a list of ids) when it cites any, and `human` when the agent recorded
-a human's words. The
+a human's words. A defect may carry `class`, `introduced` and `caught`; a
+defect's resolution `guard` and `decision`; a classifying decision
+`classifies`. The
 id is the kind's prefix plus eight hex digits hashed from session, time, and
 text; work records share the minter. The branch is never stored; a read asks
 git.

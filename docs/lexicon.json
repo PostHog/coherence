@@ -589,6 +589,30 @@
       "provenance": {
         "owner_words": "Defect can be a report from a user about a UI bug, or any other behavioral deviation which may be fuzzier than what an invariant can record. we cannot make the entire car out of structural steel.",
         "defined_by": "owner, 2026-09-17"
+      },
+      "properties": {
+        "class": "A defect's class: a short kebab-case name for the shape of the failure, shared by every defect of that shape, so one guard can cover them all. A class is declared once, as the property class <name> of defect, in Coherence's lexicon or the project's own; the defect verb refuses one declared nowhere.",
+        "introduced": "Where a defect came in: a commit, a pull request (PR #n), pre-existing (there before the work that found it), or unknown. A commit or pull request makes it fix-induced. A defect that never says is unknown, never guessed.",
+        "caught": "What caught a defect: review, ci, probe, adopter, self (the session that made it) or test.",
+        "fix-induced": "A defect whose introduced names a commit or a pull request: the work that was meant to fix or build something brought it in.",
+        "guard": "The invariant a defect's close names, as <component folder>/<name>, to protect the defect's whole class; it counts once its refutation is witnessed. A close names a guard or a decision saying why fixing the instance suffices; spec --check names a close with neither.",
+        "guard failure": "A defect recorded in a class a close had already guarded, after that close: the protection was weaker than claimed. spec --check and orient name it; the convergence reading counts it as a repeat of its class, which should fall to zero.",
+        "escape": "A defect whose introduced points into a release's range and that was recorded after the release's tag: it shipped.",
+        "convergence": "The reading of whether discoveries repay, over a window: defects arriving by origin and catch, escapes per release, the share closed with a guard, repeats per class, bullets over time, hotspot churn, and hook latency per Coherence version (query convergence).",
+        "class path-identity": "One file or folder spelled two ways (through a symbolic link, against another base, from the repository top instead of the project root) compares as two.",
+        "class silent-skip": "A reading or walk leaves part of its population out and says nothing about it.",
+        "class audience": "A reader is told the wrong thing for that reader, or not told what it needs: a message naming the wrong subject, guidance missing from what ships or from a practice.",
+        "class cost": "Work out of proportion to the answer: a hook or reading that reads far more than it needs, past the latency budget.",
+        "class ownership": "One party's thing treated as another's: Coherence's lexicon, practice or decision demanded of or read as an adopter's, or the reverse.",
+        "class structure-drift": "What a spec, the lexicon or a document says has drifted from what the code or the files do, and no check sees it.",
+        "class bypassed-door": "A reference reaches a protected thing outside its chokepoint.",
+        "class parse-gap": "A reader of source, shell or spec text misses a shape its language allows.",
+        "class root-resolution": "The tool settled on the wrong project root, so it read, wrote or answered for the wrong tree.",
+        "class overmatch": "A pattern or check matches more than it means, so an unrelated thing satisfies or triggers it.",
+        "class self-clearing": "A check the very record or edit it guards can clear on its own.",
+        "class exposure": "Private state written where it is published or committed.",
+        "class uninterpolated": "Template text reaches a reader literally instead of the value it stands for.",
+        "class load-flake": "A test that fails under machine load whatever the change under test."
       }
     },
     {

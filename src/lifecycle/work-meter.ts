@@ -10,6 +10,10 @@
  *                      the file an edit names (readProjectText)
  *   spawn              a child process, git or any other (every module but
  *                      this one takes child_process from here)
+ *   spawn output       the bytes a child wrote to its standard output, for
+ *                      the synchronous forms and a promised execFile (a
+ *                      streamed spawn, the language servers' and the warm
+ *                      server's, is not counted)
  *   coverage reading   one vocabulary coverage reading (lexiconCoverage)
  *   spec model         one spec model load (loadSpecModel)
  *   server request     one request to a language server or to the warm
@@ -34,7 +38,7 @@ import { promisify } from "node:util";
 
 export type { ChildProcess } from "node:child_process";
 
-export const WORK_KINDS = ["file read", "spawn", "coverage reading", "spec model", "server request", "phrase comparison"] as const;
+export const WORK_KINDS = ["file read", "spawn", "spawn output", "coverage reading", "spec model", "server request", "phrase comparison"] as const;
 
 export type WorkKind = (typeof WORK_KINDS)[number];
 
@@ -45,10 +49,12 @@ export interface Work {
   reads: string[];
   /** Each spawn, as its command line, in order. */
   spawns: string[];
+  /** The bytes each command line's spawns wrote to standard output, summed by command line. */
+  outputs: Record<string, number>;
 }
 
 function emptyWork(): Work {
-  return { counts: Object.fromEntries(WORK_KINDS.map((k) => [k, 0])) as Record<WorkKind, number>, reads: [], spawns: [] };
+  return { counts: Object.fromEntries(WORK_KINDS.map((k) => [k, 0])) as Record<WorkKind, number>, reads: [], spawns: [], outputs: {} };
 }
 
 let current: Work | undefined;
@@ -78,6 +84,7 @@ export function closeWork(scope: WorkScope): Work {
     for (const kind of WORK_KINDS) scope.outer.counts[kind] += scope.work.counts[kind];
     scope.outer.reads.push(...scope.work.reads);
     scope.outer.spawns.push(...scope.work.spawns);
+    for (const [line, bytes] of Object.entries(scope.work.outputs)) scope.outer.outputs[line] = (scope.outer.outputs[line] ?? 0) + bytes;
   }
   lastHook = scope.work;
   return scope.work;
@@ -120,25 +127,42 @@ export function readProjectTextAsync(path: string, what: ReadKind): Promise<stri
   return readFile(path, "utf8");
 }
 
+function commandLine(args: readonly unknown[]): string {
+  const argv = Array.isArray(args[1]) ? (args[1] as unknown[]).map(String) : [];
+  return [String(args[0]), ...argv].join(" ");
+}
+
 function countSpawn(args: readonly unknown[]): void {
   if (current === undefined) return;
   current.counts.spawn += 1;
-  const argv = Array.isArray(args[1]) ? (args[1] as unknown[]).map(String) : [];
-  current.spawns.push([String(args[0]), ...argv].join(" "));
+  current.spawns.push(commandLine(args));
 }
 
 type Callable = (...args: unknown[]) => unknown;
 
-/** child_process.spawnSync, counted. */
+/** The bytes a child wrote to its standard output, counted: a listing that grows with the project is work the hook pays to read. */
+function countOutput(args: readonly unknown[], stdout: unknown): void {
+  if (current === undefined || stdout === undefined || stdout === null) return;
+  const bytes = typeof stdout === "string" ? Buffer.byteLength(stdout) : Buffer.isBuffer(stdout) ? stdout.length : 0;
+  current.counts["spawn output"] += bytes;
+  const line = commandLine(args);
+  current.outputs[line] = (current.outputs[line] ?? 0) + bytes;
+}
+
+/** child_process.spawnSync, counted, with its output. */
 export const spawnSync = ((...args: unknown[]) => {
   countSpawn(args);
-  return (childProcess.spawnSync as Callable)(...args);
+  const result = (childProcess.spawnSync as Callable)(...args) as { stdout?: unknown };
+  countOutput(args, result?.stdout);
+  return result;
 }) as typeof childProcess.spawnSync;
 
-/** child_process.execFileSync, counted. */
+/** child_process.execFileSync, counted, with its output. */
 export const execFileSync = ((...args: unknown[]) => {
   countSpawn(args);
-  return (childProcess.execFileSync as Callable)(...args);
+  const out = (childProcess.execFileSync as Callable)(...args);
+  countOutput(args, out);
+  return out;
 }) as typeof childProcess.execFileSync;
 
 /** child_process.spawn, counted. */
@@ -157,9 +181,11 @@ export const execFile = Object.defineProperty(
   },
   promisify.custom,
   {
-    value: (...args: unknown[]) => {
+    value: async (...args: unknown[]) => {
       countSpawn(args);
-      return promisedExecFile(...args);
+      const result = (await promisedExecFile(...args)) as { stdout?: unknown };
+      countOutput(args, result?.stdout);
+      return result;
     },
   },
 ) as unknown as typeof childProcess.execFile;

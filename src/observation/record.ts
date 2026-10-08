@@ -18,6 +18,7 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Attribution, TestVerdict } from "./capture.ts";
+import type { LanguagesRead } from "../readings/scope/languages-read.ts";
 
 export const OBSERVATIONS_DIR = join(".coherence", "observations");
 
@@ -107,6 +108,8 @@ export interface ObservationRecord {
     entrancesExercised: number;
   };
   latency: { pass: number; map: number };
+  /** Which of the project's languages the observation read (the primary alone), and each other one with why; absent from a record written before. */
+  languages?: LanguagesRead;
 }
 
 const SESSION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;

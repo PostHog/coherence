@@ -15,19 +15,21 @@
  * the code was restored, and the detector went green again.
  *
  * A chokepoint entry's reference sites are most of a run's bytes and rarely
- * change, so an entry whose sites are exactly its enforcement's previous
- * recorded sites is written with `sitesRef` (their content's hash and the
- * run that holds them in full) in their place. loadRuns resolves each back
+ * change, so an entry whose sites are exactly the ones its enforcement's last
+ * entry in the same run file wrote is written with `sitesRef` (their
+ * content's hash and the run in that file that holds them in full) in their
+ * place; a reference never leaves its file, so each file resolves alone, and
+ * each file's first entry for an enforcement is in full. loadRuns resolves each back
  * into `sites`, where a full write puts them; one it cannot resolve is said
  * in `sitesUnresolved` and among the damaged lines, never read as no sites.
  * Nothing already written is converted.
  */
 
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { availableParallelism, loadavg } from "node:os";
-import { join } from "node:path";
-import { reconcileRunIndex } from "./run-index.ts";
+import { basename, join } from "node:path";
+import { noteRunAppend, runFileIdentity } from "./run-index.ts";
 
 export const RUNS_DIR = join(".coherence", "runs");
 
@@ -157,6 +159,16 @@ export interface RunEntry {
    * totality oracle's test. Absent in a single-language project, where the record's instrument says it.
    */
   language?: string;
+  /**
+   * The bullet's lifecycle state as this run left it, with this entry's verdict and refutation read in. The
+   * invariant floor (src/spec/floor.ts) reads it: a bullet graded an invariant is not demoted silently. Absent
+   * on a record from before it was kept.
+   */
+  state?: "requirement" | "invariant" | "structural defect";
+  /** What this form of the bullet enforces through: its via: test titles, or its chokepoints. The floor recognizes a rename by it. */
+  enforces?: string[];
+  /** Set on an edit's check, which derives no state (run.ts, grade: false): the invariant floor does not count the entry. */
+  ungraded?: true;
 }
 
 export interface RunRecord {
@@ -226,7 +238,7 @@ export function machineLoad(): { average: number; cores: number } {
 
 const SESSION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
-/** A run entry's sites, written once: their content's hash and the run whose line holds them in full. */
+/** A run entry's sites, written once per run file: their content's hash and the run, in the same file, whose line holds them in full. */
 export interface SitesRef {
   hash: string;
   at: string;
@@ -243,42 +255,64 @@ function replacing(entry: RunEntry, key: "sites" | "sitesRef", next: Partial<Rec
 }
 
 /**
- * The record as it is written: each chokepoint entry whose sites are exactly
- * the ones its enforcement's latest recorded entry has carries a reference in
- * their place (the sites are most of a run's bytes, and they rarely change);
- * sites that changed, or an enforcement never recorded before, are written in
- * full. Reads the run store, which the append is about to grow.
+ * The record as it is written to `file`: each chokepoint entry whose sites
+ * are exactly the ones its enforcement's last entry in that same file wrote
+ * in full carries a reference in their place (the sites are most of a run's
+ * bytes, and they rarely change); sites that changed, and an enforcement's
+ * first entry in the file, are written in full. A reference never leaves its
+ * file: every run file, alone, resolves, whatever other files are committed,
+ * and a reader that does not know references loses only later entries'
+ * sites, never a file's first.
  */
-export function compactRecord(root: string, record: RunRecord): RunRecord {
+export function compactRecord(file: string, record: RunRecord): RunRecord {
   if (!record.invariants.some((e) => e.sites !== undefined)) return record;
-  const latest = new Map<string, { entry: RunEntry; at: string }>();
-  for (const run of loadRuns(root).records)
+  const latest = new Map<string, { hash: string; at: string }>();
+  let text = "";
+  try {
+    text = readFileSync(file, "utf8");
+  } catch {
+    // A new file: every entry's sites are its first, written in full.
+  }
+  for (const line of text.split("\n")) {
+    if (line.trim() === "") continue;
+    const run = parseLine(line);
+    if (typeof run === "string" || "kind" in run) continue;
     for (const entry of run.invariants) {
       const key = entryKey(entry.component, entry.name, entry.form);
-      if (entry.sites === undefined) latest.delete(key);
-      else latest.set(key, { entry, at: heldAt.get(entry) ?? run.at });
+      if (entry.sites !== undefined) latest.set(key, { hash: sitesHash(entry.sites), at: run.at });
+      else if (entry.sitesRef === undefined) latest.delete(key);
     }
+  }
   const invariants = record.invariants.map((entry) => {
     if (entry.sites === undefined) return entry;
     const before = latest.get(entryKey(entry.component, entry.name, entry.form));
     const hash = sitesHash(entry.sites);
-    if (before === undefined || sitesHash(before.entry.sites!) !== hash) return entry;
+    if (before === undefined || before.hash !== hash) return entry;
     return replacing(entry, "sites", { sitesRef: { hash, at: before.at } satisfies SitesRef });
   });
   return { ...record, invariants };
 }
 
-/** For an entry loadRuns resolved from a reference: the run that holds its sites in full, so the next reference names that run too. */
-const heldAt = new WeakMap<RunEntry, string>();
+/**
+ * Append one line to a run file, then fold it into the run index the edit
+ * hook reads (run-index.ts). The fold is best effort and never throws: the
+ * line is recorded once it is appended, and an index the fold could not
+ * bring up to date no longer matches the store, so its next reader rebuilds it.
+ */
+function appendLine(root: string, file: string, line: string): void {
+  const name = basename(file);
+  const before = runFileIdentity(root, name);
+  const offset = existsSync(file) ? statSync(file).size : 0;
+  appendFileSync(file, line, "utf8");
+  noteRunAppend(root, name, before, offset, parseLine);
+}
 
-/** Append one run as one line; the file and folder are created on first write. Sites its enforcement already recorded are written as a reference. */
+/** Append one run as one line; the file and folder are created on first write. Sites its enforcement already wrote in full in this file are written as a reference. */
 export function appendRun(root: string, record: RunRecord): string {
   if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
   mkdirSync(runsDir(root), { recursive: true });
   const file = join(runsDir(root), `${record.session}.jsonl`);
-  appendFileSync(file, `${JSON.stringify(compactRecord(root, record))}\n`, "utf8");
-  // The index an edit reads is brought up to date by the append itself, reading only the bytes since its last look.
-  reconcileRunIndex(root, parseLine);
+  appendLine(root, file, `${JSON.stringify(compactRecord(file, record))}\n`);
   return file;
 }
 
@@ -287,9 +321,7 @@ export function appendRefutation(root: string, record: RefutationRecord): string
   if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
   mkdirSync(runsDir(root), { recursive: true });
   const file = join(runsDir(root), `${record.session}.jsonl`);
-  appendFileSync(file, `${JSON.stringify(record)}\n`, "utf8");
-  // The index an edit reads is brought up to date by the append itself, reading only the bytes since its last look.
-  reconcileRunIndex(root, parseLine);
+  appendLine(root, file, `${JSON.stringify(record)}\n`);
   return file;
 }
 
@@ -325,18 +357,19 @@ export function loadRuns(root: string): LoadedRuns {
 }
 
 /**
- * Every sites reference resolved in place into the sites it names, from the
- * entry of the same enforcement in the run it names, else from any entry of
- * that enforcement whose sites hash to it. One no record holds is said: the
- * entry carries why in `sitesUnresolved`, and the line is reported damaged.
+ * Every sites reference resolved in place into the sites it names, from an
+ * entry of the same enforcement in the same run file, the run it names first,
+ * whose sites hash to it. One its file does not hold is said: the entry
+ * carries why in `sitesUnresolved`, and the line is reported damaged.
  */
 function resolveSites(loaded: LoadedRuns, where: ReadonlyMap<RunRecord, { file: string; line: number }>): void {
   if (!loaded.records.some((run) => run.invariants.some((e) => e.sitesRef !== undefined))) return;
+  // Only an entry in the same run file can hold the sites a reference names: a file resolves alone.
   const full = new Map<string, { at: string; entry: RunEntry }[]>();
   for (const run of loaded.records)
     for (const entry of run.invariants) {
       if (entry.sites === undefined) continue;
-      const key = entryKey(entry.component, entry.name, entry.form);
+      const key = `${where.get(run)?.file ?? ""}\0${entryKey(entry.component, entry.name, entry.form)}`;
       const list = full.get(key) ?? [];
       list.push({ at: run.at, entry });
       full.set(key, list);
@@ -353,17 +386,15 @@ function resolveSites(loaded: LoadedRuns, where: ReadonlyMap<RunRecord, { file: 
     run.invariants = run.invariants.map((entry) => {
       const ref = entry.sitesRef;
       if (ref === undefined) return entry;
-      const candidates = full.get(entryKey(entry.component, entry.name, entry.form)) ?? [];
+      const candidates = full.get(`${where.get(run)?.file ?? ""}\0${entryKey(entry.component, entry.name, entry.form)}`) ?? [];
       const held = candidates.find((c) => c.at === ref.at && hashOf(c.entry) === ref.hash) ?? candidates.find((c) => hashOf(c.entry) === ref.hash);
       if (held === undefined) {
-        const reason = `the sites this entry refers to (${ref.hash.slice(0, 15)}, first recorded by the run of ${ref.at}) are in no record`;
+        const reason = `the sites this entry refers to (${ref.hash.slice(0, 15)}, written in full by the run of ${ref.at}) are in no record of its run file`;
         const at = where.get(run);
         loaded.damaged.push({ file: at?.file ?? RUNS_DIR, line: at?.line ?? 0, reason: `${entry.component}/${entry.name}: ${reason}` });
         return replacing(entry, "sitesRef", { sitesUnresolved: reason });
       }
-      const resolved = replacing(entry, "sitesRef", { sites: held.entry.sites });
-      heldAt.set(resolved, held.at);
-      return resolved;
+      return replacing(entry, "sitesRef", { sites: held.entry.sites });
     });
   }
 }

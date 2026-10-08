@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
 import { CODE_SALT_ENV, QUICK_REQUEST_MS, REQUEST_MS, codeFingerprint, connectAdapter, openLineClient, serve, serverPaths, type HttpAppFactory, type Serving } from "./server.ts";
 import { performRun } from "./run.ts";
+import { stopWarmServers } from "./server-fixture.ts";
 
 let root: string;
 let started: Promise<Serving> | undefined;
@@ -178,17 +179,10 @@ async function stopAll(dir: string): Promise<void> {
     await connected.adapter.stopServer();
     await connected.adapter.close();
   } catch {
-    // Nothing listening.
+    // Nothing listening, or a server running other code than this client, which refuses to stop it.
   }
-  const pids = servePids(dir);
-  await until(() => pids.every((pid) => !running(pid)), 5_000);
-  for (const pid of servePids(dir)) {
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {
-      // Already gone.
-    }
-  }
+  // What is left gets SIGTERM, its clean shutdown, before a kill, and a killed server's socket is removed.
+  await stopWarmServers(dir);
 }
 
 /** One client in its own process: connects (spawning when nothing listens) and prints the pid that answered. */
@@ -290,6 +284,8 @@ test("a server whose root is deleted exits", async () => {
   rmSync(dir, { recursive: true, force: true });
   const gone = await until(() => exited, 5_000);
   if (!gone) await serving.stop();
+  // A server that lost its root leaves the socket to a next owner; one too long for the root lives in the temp folder.
+  rmSync(serving.paths.socket, { force: true });
   assert.ok(gone, "the server shut down once its root was removed");
 });
 

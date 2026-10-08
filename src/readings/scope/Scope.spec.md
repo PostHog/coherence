@@ -561,3 +561,38 @@ The reading: one surface projecting the model for a human, in seven views: Struc
   crossing: record -> reading
   refuted: made renderGoverned skip the from: line a run applied -> "Scope and the agent query show which references governed: the from: line with its exempt count on the enforcement, each exempt site as exempt, and the component's owners" went red in from.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- every reading names the languages it did not read: In a project of several languages, every reading's result carries which languages it read and each one it did not with why, every renderer prints that line, and no reading takes the config's primary language except through primaryOnly, which hands the statement of what it left unread back with it.
+  over: every source file under src/readings, src/economy, src/scaffold and src/observation, and the mass, scaffold entrances, observation and Structure query renderers given a language not read
+  via: no reading takes the primary language alone without naming the languages it left unread, and every renderer prints them
+  because: a checking tool that skips a language quietly prints a clean result it never read (df-f47a5c05); one check per reading would miss the next reading, so the source guard refuses any reading that takes the primary language another way, and the renderers share one line
+  crossing: project-source -> reading
+  refuted: made formatMass drop the languages line it prints for a result naming a language not read -> "no reading takes the primary language alone without naming the languages it left unread, and every renderer prints them" went red in languages-read.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- the Structure reading reads every language: In a multi-language project the Structure reading reads each component's code through the adapter of each language its files use, resolves each entrance through its handler's language, and merges declarations, component interfaces, reach and traced chokepoints side by side over the components the languages share, drawing no reference across languages.
+  over: a component spanning backend/*.py and frontend/*.ts beside a shared component written in both, with an entrance and a chokepoint in each language
+  via: the Structure reading of a two-language project reads each language's component code through its own adapter and merges them, drawing no reference across languages
+  because: a PostHog product's frontend interfaces, entrances and reach stayed unread while its backend was read (df-56343a7c); no language server reports a reference from Python into TypeScript, so an edge across them would be invented, not read
+  crossing: instrument -> reading
+  refuted: made mergeLanguages keep the first language's component interfaces alone -> "the Structure reading of a two-language project reads each language's component code through its own adapter and merges them, drawing no reference across languages" went red in multi-language.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- a language's server starts only when read: A multi-language Structure reading starts a language's adapter only when that language has component code or an entrance handled in its files.
+  over: a two-language config whose tree holds component code and entrances in one language alone
+  via: a multi-language Structure reading starts no adapter for a language with no component code and no handler
+  because: a language server holds hundreds of megabytes and takes seconds to load the project; one started for a language with nothing to read costs that for nothing
+  crossing: instrument -> reading
+  refuted: dropped the check that skips a language with no component code and no handler, so every declared language's adapter started -> "a multi-language Structure reading starts no adapter for a language with no component code and no handler" went red in multi-language.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- entrance detection reads every language: The detected entrances of a multi-language project are each language's rules over its own files and manifests, measured against the declared entrances together, and scaffold entrances proposes a bullet for each one undeclared.
+  over: a Python route decorator and a TypeScript route method in one component, declared and undeclared
+  via: entrance detection in a two-language project finds each language's entrances by its own rules
+  because: the coverage the declared entrances are measured against was the primary language's alone, so a frontend's routes counted as neither declared nor undeclared and orient said nothing of them (df-f47a5c05)
+  crossing: project-source -> reading
+  refuted: made detectedEntrances run the primary language's rules alone in a multi-language project -> "entrance detection in a two-language project finds each language's entrances by its own rules" went red in multi-language.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none
+- one language reads as before: A single-language project's readings read that one language, print no languages line, and leave a handler in another language's file unresolved, as before.
+  over: the two-language fixture configured with python alone, read by the Structure reading, the Structure query, mass, entrance detection and scaffold control
+  via: a single-language project reads as it always did: one language read, no languages line printed
+  because: every adopter today declares one language; the multi-language readings must leave their output exactly as it was
+  crossing: project-source -> reading
+  refuted: made languagesReadLine print its line for a project of one language read whole -> "a single-language project reads as it always did: one language read, no languages line printed" went red in multi-language.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
+  kinds: none

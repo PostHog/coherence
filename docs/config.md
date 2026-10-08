@@ -137,6 +137,7 @@ yet. For now, every leaf keeps its own `lexicon.json`.
 | `references` | `"project"` | Where a chokepoint check searches for references: `"project"` (the project alone), `"repository"` (the whole repository), or a list of folders relative to the repository top (`["posthog/api", "ee"]`), searched beside the project. A verdict over less than the whole repository names every folder it searched. Each folder adds to the language server's work: on PostHog, `products/notebooks` with `["posthog", "ee"]` took 15.5 s and 1.1 GB for one check, against 4.8 s and 380 MB for the project alone. |
 | `chokepointFrom` | `anywhere` | Which references a chokepoint governs when its bullet has no `from:` line: `anywhere`, `outside the component`, or `outside <folder>`. A bullet's own `from:` overrides it, and every run entry records which governed and who said it. Any other value is refused. See [spec.md](spec.md#which-references-a-chokepoint-governs). |
 | `interfaceBudget` | `{ "seconds": 600, "memoryMB": 12288 }` | The most time and memory the Structure reading's interface pass may take; when it runs out, the reading says it is partial. |
+| `telemetry` | none | `false` refuses fleet telemetry for this project, whatever each user chose with `coherence telemetry on`; a registry's `false` refuses for every leaf. Telemetry is off unless a user opts in; see the README's [Telemetry](../README.md#telemetry) section for what is sent. |
 
 ## Tests: how a totality oracle is run
 
@@ -198,20 +199,35 @@ server alone. The primary language's server keeps the plain file names under
 its name (`server-typescript.json`). Only the primary server answers the live
 Scope reading over HTTP.
 
-**What the hooks keep between calls.** `.coherence/cache/` is transient:
-the `.coherence/.gitignore` install writes leaves it out with everything
-else but the journal, runs, work orders and hook voice. Deleting it costs
-time, never a result. It holds what lets a tool hook pay for what changed
-rather than for the project. That covers the spec and practice parses, each
-keyed by its file's content (git's blob id, or a hash of the text for a file
-git reports changed). It also holds the latest chokepoint verdict's files,
-indexed from the run store by byte offset; the journal's tail log, which
-the peer feed reads instead of the whole journal; and the vocabulary a full
-reading leaves, which an edit compares its own files against. Every store is
-keyed by the identity of the Coherence code that made it, so an upgrade
-never serves an old parse. Each store is written aside and renamed into
-place, so two hooks at once never tear one, and an aside a crash left
-behind is removed by a later write.
+**What the hooks keep between calls.** `.coherence/cache/` is transient.
+The `.coherence/.gitignore` that install writes leaves it out, along with
+everything else except the journal, runs, work orders and hook voice.
+Deleting it costs time, never a result. It holds two things that let a tool
+hook pay for what changed rather than for the whole project:
+
+- the run index: the latest chokepoint verdict's files, checked against one
+  stat per run file on every read and rebuilt when it does not match;
+- the vocabulary a full reading leaves, which an edit compares its own files
+  against.
+
+Both are optimizations of a check, so each fails toward the slow, correct
+path and says so. A run index that cannot be read, rebuilt or written
+(for example, a read-only or root-owned folder, or a lock held past the
+wait) makes the edit's check read the whole spec model and run store, and
+the edit says it ran without its index and why. A kept vocabulary that is
+half-written or unreadable makes the edit take a full coverage reading,
+and the edit says so.
+
+Every store is keyed by the identity of the Coherence code that made it, so
+an upgrade discards it. Every store is written aside and renamed into
+place, so two hooks at once never tear one, and an aside that a crash left
+behind is removed by a later write. Nothing parsed from a spec or practice
+file is kept between calls: those files are small and are read as they are.
+
+The peer feed keeps, beside its cursor in `.coherence/feed/`, each journal
+file's identity (inode, size, modification and change time) as its last
+look found them, and reads only the files that changed. Without that memo,
+it reads every file.
 
 **Which setup runs a test.** Each test setup takes the keys of the table
 above (`test`, `testJson`, `testMatch`, `testFilterForm`, `testDir` /
@@ -235,10 +251,19 @@ totality oracle). The run's `instrument.language` is the language whose server
 answered, or the languages joined with `+` when several did, each listed
 under `instrument.languages`.
 
-**What reads one language.** The economy prediction reads each given file in
-its own language. The Structure reading (Scope, `query structure`) reads the
-primary language alone and says which languages it left unread (df-56343a7c).
-Mass, the entrance detection, observation and `scaffold control` read the
-primary language alone too (df-f47a5c05).
+**What each reading reads.** Every reading says, in its output and in its
+JSON (`languages`: `declared`, `read`, and each language `unread` with why),
+which of the project's languages it read; with one language the line is not
+printed and nothing changes. The economy prediction reads each given file in
+its own language. The Structure reading (Scope, `query structure`) reads each
+component's code with the adapter of each language its files use, starting a
+language's server only when that language has component code or a handled
+entrance, and merges the languages side by side over the components
+they share: no language server reports a reference from Python into
+TypeScript, so none is drawn. A language whose server does not answer is
+named as not read, with why. Mass, the entrance detection (`scaffold
+entrances`) and `scaffold control` read every language. Observation maps the
+first test setup's pass through the primary language alone and says so on its
+record and in the line the run prints.
 
 The spec grammar is in [spec.md](spec.md).

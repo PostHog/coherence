@@ -80,7 +80,8 @@ import { adapterFor, type Language } from "../../adapters/index.ts";
 import { resolveDotted } from "../../adapters/python.ts";
 import { resolveSpecifier } from "../../adapters/typescript.ts";
 import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy/source.ts";
-import { readEnforcementConfig } from "../../enforcement/config.ts";
+import { languageOfFile, readEnforcementConfig } from "../../enforcement/config.ts";
+import { languagesRead } from "./languages-read.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
 import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, ReachReference, ScopedReading } from "./model.ts";
@@ -225,8 +226,7 @@ export const HEAP_HEADROOM_MB = 2048;
  * when the shared instrument reads the same (TypeScript's server reads its
  * tsconfig's project either way, and no bounds means the whole workspace).
  */
-export function interfaceAdapter(root: string): { adapter: LanguageAdapter; bounds: string } | undefined {
-  const language = readEnforcementConfig(root).language;
+export function interfaceAdapter(root: string, language: Language): { adapter: LanguageAdapter; bounds: string } | undefined {
   const ignore = configIgnore(root);
   if (language !== "python" || ignore.length === 0) return undefined;
   return { adapter: boundedAdapter(language, root, ignore, configuredBudget(root).memoryMB), bounds: ignore.join("\n") };
@@ -522,10 +522,23 @@ export function entranceWrappers(model: Pick<SpecModel, "components">): string[]
  * measure the declared entrances against the same set (c-3760638e). A plain
  * scan: it asks the language server nothing and costs a read of the tree.
  */
-export function detectedEntrances(root: string, model: Pick<SpecModel, "components">, language: Language, testFolders: readonly string[], ignore: readonly string[] = configIgnore(root)): EntranceCandidate[] {
+export function detectedEntrances(root: string, model: Pick<SpecModel, "components">, languages: Language | readonly Language[], testFolders: readonly string[], ignore: readonly string[] = configIgnore(root)): EntranceCandidate[] {
   const skip = boundsOf(root, ignore);
   const files = projectFiles(root).filter((file) => withinBounds(file, skip));
-  return detectEntranceCandidates(root, { language, files, wrappers: entranceWrappers(model), testFolders });
+  const wrappers = entranceWrappers(model);
+  const each = typeof languages === "string" ? [languages] : languages;
+  // Every declared language's rules, each over its own files and manifests: a backend's views and a frontend's routes alike.
+  if (each.length === 1) return detectEntranceCandidates(root, { language: each[0]!, files, wrappers, testFolders });
+  const seen = new Set<string>();
+  return each
+    .flatMap((language) => detectEntranceCandidates(root, { language, files, wrappers, testFolders }))
+    .filter((c) => {
+      const key = `${c.file}\u0000${c.line}\u0000${c.symbol}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.symbol.localeCompare(b.symbol));
 }
 
 /** The budget a reading spends: each part the options give over the config's, over the default. */
@@ -534,12 +547,28 @@ function budgetOf(root: string, given: Partial<InterfaceBudget> = {}): Interface
 }
 
 /**
- * The adapter readComponentInterfaces starts for itself when given none, for
- * a caller that reads more than once through one server (a scoped reading,
- * then the whole one when it cannot settle): the caller closes it.
+ * The adapters readComponentInterfaces starts for itself when given none, for
+ * a caller that reads more than once through the same servers (a scoped
+ * reading, then the whole one when it cannot settle): each language's is
+ * started the first time a reading asks for it, never before, and the caller
+ * closes them all.
  */
-export function readingAdapter(root: string, budget: Partial<InterfaceBudget> = {}): LanguageAdapter {
-  return boundedAdapter(readEnforcementConfig(root).language, root, configIgnore(root), budgetOf(root, budget).memoryMB);
+export function readingAdapters(root: string, budget: Partial<InterfaceBudget> = {}): { of: ReadingAdapters; close: () => Promise<void> } {
+  const started = new Map<Language, LanguageAdapter>();
+  return {
+    of: (language) => {
+      let adapter = started.get(language);
+      if (adapter === undefined) {
+        adapter = boundedAdapter(language, root, configIgnore(root), budgetOf(root, budget).memoryMB);
+        started.set(language, adapter);
+      }
+      return adapter;
+    },
+    close: async () => {
+      for (const adapter of started.values()) await adapter.close();
+      started.clear();
+    },
+  };
 }
 
 /**
@@ -578,16 +607,120 @@ export function scopeStarts(model: Pick<SpecModel, "components">, named: readonl
  * could reference it, so what a route depends on and the reading did not read
  * can be settled (scopedUnsettled) before the reading stands for a whole one.
  */
-export async function readComponentInterfaces(root: string, given?: LanguageAdapter, options: ReadOptions = {}): Promise<InterfaceReading> {
+export async function readComponentInterfaces(root: string, given?: LanguageAdapter | ReadingAdapters, options: ReadOptions = {}): Promise<InterfaceReading> {
   const config = readEnforcementConfig(root);
   const model = loadSpecModel(root, { runs: false });
   const budget = budgetOf(root, options.budget);
   const started = Date.now();
+  const ignore = configIgnore(root);
+  const languages = config.languages;
+  const adapterOf = (language: Language): LanguageAdapter | undefined => (typeof given === "function" ? given(language) : language === languages[0] ? given : undefined);
+  const candidates = (): EntranceCandidate[] => detectedEntrances(root, model, languages, config.testFolders, ignore);
+  if (languages.length === 1) {
+    // One language: the reading it always was, with the one language read.
+    const reading = await readLanguage(root, languages[0]!, adapterOf(languages[0]!), options, { model, budget, started, owns: () => true });
+    return reading.kind === "read" ? { ...reading, languages: languagesRead(languages), candidates: candidates() } : reading;
+  }
+  // Several languages: each one's component code is read through its own adapter, started only when the language has
+  // component code or an entrance handled in its files. Each language's references are its own (no language server reports a
+  // reference across languages), so the readings merge side by side over the components they share.
+  const owner = (entrance: { file?: string | undefined }): Language => (entrance.file === undefined ? undefined : languageOfFile(entrance.file, languages)) ?? languages[0]!;
+  const skip = boundsOf(root, ignore);
+  const held = new Set<Language>();
+  for (const file of projectFiles(root)) {
+    const language = languageOfFile(file, languages);
+    if (language === undefined || held.has(language) || !withinBounds(file, skip) || !isSourceFile(file, language) || isTest(file, config.testFolders)) continue;
+    if (componentOf(model, file) !== undefined) held.add(language);
+  }
+  for (const component of model.components) for (const entrance of component.entrances) if (entrance.handler !== undefined) held.add(owner(entrance));
+  const parts: { language: Language; reading: InterfaceReading }[] = [];
+  for (const language of languages) {
+    if (!held.has(language)) continue;
+    const reading = await readLanguage(root, language, adapterOf(language), options, { model, budget, started, owns: (_component, entrance) => owner(entrance) === language });
+    parts.push({ language, reading });
+  }
+  return mergeLanguages(languages, parts, model, candidates());
+}
+
+/** An adapter for each language a multi-language reading asks, started by the caller (who closes it); undefined lets the reading start its own. */
+export type ReadingAdapters = (language: Language) => LanguageAdapter | undefined;
+
+/** What one language's reading shares with the reading of the whole project. */
+interface LanguagePart {
+  model: SpecModel;
+  budget: InterfaceBudget;
+  /** When the whole reading started: every language spends from the one time budget. */
+  started: number;
+  /** Whether this language resolves the entrance: its handler is in one of this language's files. */
+  owns: (component: string, entrance: { file?: string | undefined }) => boolean;
+}
+
+/** Why a language's reading left an entrance to another; never kept past the merge. */
+const OTHER_LANGUAGE = "\u0000handled in another language";
+
+/**
+ * One reading of every language a multi-language project declares: a
+ * language no component code is written in was read and held nothing; one
+ * whose instrument did not answer is named, with why, as not read.
+ * Declarations, interfaces, unowned and outside code, and bounds add up; each
+ * entrance takes the resolution of the language its handler is written in.
+ * No edge is drawn across languages: each language's references are its own.
+ */
+function mergeLanguages(languages: readonly Language[], parts: readonly { language: Language; reading: InterfaceReading }[], model: SpecModel, candidates: EntranceCandidate[]): InterfaceReading {
+  const read = parts.flatMap((p) => (p.reading.kind === "read" ? [{ language: p.language, reading: p.reading }] : []));
+  const unread = new Map(parts.flatMap((p) => (p.reading.kind === "unread" ? [[p.language, p.reading.because] as const] : [])));
+  if (read.length === 0 && unread.size > 0) return { kind: "unread", because: [...unread.values()].join("; ") };
+  const symbols = read.flatMap((r) => r.reading.symbols).sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to) || a.symbol.localeCompare(b.symbol) || a.file.localeCompare(b.file));
+  const entrances: EntranceResolution[] = [];
+  for (const component of model.components) {
+    for (const entrance of component.entrances) {
+      const each = read.map((r) => r.reading.entrances.find((e) => e.component === component.folder && e.name === entrance.name)).filter((e): e is EntranceResolution => e !== undefined && e.reason !== OTHER_LANGUAGE);
+      entrances.push(each[0] ?? { component: component.folder, name: entrance.name, reason: unread.size > 0 ? `not read: its language's instrument did not answer (${[...unread.values()].join("; ")})` : "no language's reading resolved it" });
+    }
+  }
+  const outsideInto = new Map<string, number>();
+  for (const r of read) for (const i of r.reading.outside?.into ?? []) outsideInto.set(i.component, (outsideInto.get(i.component) ?? 0) + i.sites);
+  const partials = read.flatMap((r) => (r.reading.partial === undefined ? [] : [r.reading.partial]));
+  const scopes = read.flatMap((r) => (r.reading.scoped === undefined ? [] : [r.reading.scoped]));
+  const maybe = new Map(scopes.flatMap((sc) => sc.maybe.map((m) => [`${m.from}\u0000${m.to}`, m] as const)));
+  const sum = (of: (r: Extract<InterfaceReading, { kind: "read" }>) => number): number => read.reduce((n, r) => n + of(r.reading), 0);
+  return {
+    kind: "read",
+    language: languages[0]!,
+    languages: languagesRead(languages, unread),
+    declarations: sum((r) => r.declarations),
+    symbols,
+    entrances,
+    unowned: { files: sum((r) => r.unowned.files), lines: sum((r) => r.unowned.lines) },
+    bounds: { components: model.components.length, files: sum((r) => r.bounds?.files ?? 0), candidates: sum((r) => r.bounds?.candidates ?? 0), asked: sum((r) => r.bounds?.asked ?? 0) },
+    outside: {
+      sites: sum((r) => r.outside?.sites ?? 0),
+      files: sum((r) => r.outside?.files ?? 0),
+      into: [...outsideInto].map(([component, sites]) => ({ component, sites })).sort((a, b) => a.component.localeCompare(b.component)),
+    },
+    candidates,
+    ...(partials.length === 0 ? {} : { partial: { ...partials[0]!, seconds: Math.max(...partials.map((p) => p.seconds)), unread: [...new Set(partials.flatMap((p) => p.unread))].sort() } }),
+    ...(scopes.length === 0
+      ? {}
+      : {
+          scoped: {
+            entrances: scopes[0]!.entrances,
+            components: [...new Set(scopes.flatMap((sc) => sc.components))].sort(),
+            maybe: [...maybe.values()].sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to)),
+          },
+        }),
+  };
+}
+
+/** One language's reading (see readComponentInterfaces): its component code, through its adapter (started here when not given). */
+async function readLanguage(root: string, language: Language, given: LanguageAdapter | undefined, options: ReadOptions, part: LanguagePart): Promise<InterfaceReading> {
+  const config = readEnforcementConfig(root);
+  const { model, budget, started } = part;
   const deadline = started + budget.seconds * 1000;
   // Started here, the server reads only the config's bounds: nothing past them is ever counted, and a monorepo's
   // server that scans every file spelling a name would spend its memory on code the reading never draws.
   const ignore = configIgnore(root);
-  const adapter = given ?? boundedAdapter(config.language, root, ignore, budget.memoryMB);
+  const adapter = given ?? boundedAdapter(language, root, ignore, budget.memoryMB);
   const starting = options.scope === undefined ? undefined : scopeStarts(model, options.scope.entrances);
   const inScope = (component: string, name: string): boolean => starting === undefined || starting.some((e) => e.component === component && e.name === name);
   let stop: { limit: "time" | "memory"; observed?: number } | undefined;
@@ -628,13 +761,10 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
     const ready = await within(() => adapter.ready());
     // One sample once the server is up, so a reading shorter than the sampling interval is still measured.
     if (ready !== STOPPED) memory = await measure();
-    if (ready === STOPPED) return { kind: "unread", because: `the ${config.language} instrument did not start within the interface reading's time budget (${budget.seconds} s)` };
-    if (!ready.ok) return { kind: "unread", because: `the ${config.language} instrument did not answer: ${ready.reason}` };
+    if (ready === STOPPED) return { kind: "unread", because: `the ${language} instrument did not start within the interface reading's time budget (${budget.seconds} s)` };
+    if (!ready.ok) return { kind: "unread", because: `the ${language} instrument did not answer: ${ready.reason}` };
     const testFolders = config.testFolders;
     const skip = boundsOf(root, ignore);
-    const language = config.language;
-    // One language per reading: a multi-language project's other languages are named as unread, never silently left out.
-    const unreadLanguages = config.languages.length > 1 ? { unreadLanguages: config.languages.filter((l) => l !== language) } : {};
     // The component code: every bounded non-test file of the language whose nearest spec folder is a component.
     const code = new Map<string, string>();
     const unowned = { files: 0, lines: 0 };
@@ -799,6 +929,11 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
     const starts: { at: number; start: string; definition?: Definition }[] = [];
     for (const component of model.components) {
       for (const entrance of component.entrances) {
+        if (!part.owns(component.folder, entrance)) {
+          // Another language's handler: that language's reading resolves it.
+          entrances.push({ component: component.folder, name: entrance.name, reason: OTHER_LANGUAGE });
+          continue;
+        }
         if (!inScope(component.folder, entrance.name)) {
           entrances.push({ component: component.folder, name: entrance.name, reason: "scoped out: the reading followed only other entrances' routes" });
           continue;
@@ -908,7 +1043,6 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
     // Scoped, the candidates are those of the components it read whole, the reach having asked some of them first.
     const candidateCount = starting === undefined ? interfacePass.length : declared.filter((d) => scopeComponents.has(d.component) && candidate(d)).length;
     const bounds = { components: model.components.length, files: code.size, candidates: candidateCount, asked: asked.size };
-    const candidates = detectedEntrances(root, model, language, testFolders, ignore);
     const scoped = starting === undefined ? undefined : { scoped: scopedFacts(model, starting, scopeComponents, declared, asked, index) };
     if (stop !== undefined) {
       // Whose declarations were not all read: a component with a declaration the reading meant to ask and never
@@ -919,14 +1053,12 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
       return {
         kind: "read",
         language,
-        ...unreadLanguages,
         declarations,
         symbols,
         entrances,
         unowned,
         bounds,
         outside,
-        candidates,
         partial: {
           limit: stop.limit,
           budget: stop.limit === "time" ? `${budget.seconds} s` : `${budget.memoryMB} MB`,
@@ -937,9 +1069,9 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
         ...scoped,
       };
     }
-    return { kind: "read", language, ...unreadLanguages, declarations, symbols, entrances, unowned, bounds, outside, candidates, ...scoped };
+    return { kind: "read", language, declarations, symbols, entrances, unowned, bounds, outside, ...scoped };
   } catch (error) {
-    return { kind: "unread", because: `the ${config.language} instrument failed: ${error instanceof Error ? error.message : String(error)}` };
+    return { kind: "unread", because: `the ${language} instrument failed: ${error instanceof Error ? error.message : String(error)}` };
   } finally {
     clearInterval(sampler);
     if (given === undefined) await adapter.close();

@@ -41,6 +41,7 @@ import { buildShell, rootOptions, scopeState, windowState, type BuildOptions, ty
 import { interfaceAdapter, interfaceBounds, readComponentInterfaces } from "./component-interfaces.ts";
 import { readAndRecord } from "./gaps.ts";
 import type { LanguageAdapter } from "../../adapters/adapter.ts";
+import { isLanguage } from "../../adapters/index.ts";
 import { JOURNAL_WINDOW, RUN_WINDOW } from "./derive.ts";
 import type { InterfaceReading, JournalRecord, RunRecord, ShellState, WorkOrder } from "./model.ts";
 import { runKeyOf } from "./updates.ts";
@@ -284,7 +285,8 @@ class LiveReading implements HttpApp {
       await this.readingServer.adapter.close();
       this.readingServer = undefined;
     }
-    this.readingServer ??= interfaceAdapter(this.root);
+    const language = this.context.adapter.language;
+    this.readingServer ??= isLanguage(language) ? interfaceAdapter(this.root, language) : undefined;
     return this.readingServer?.adapter ?? this.context.adapter;
   }
 

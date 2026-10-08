@@ -1,38 +1,36 @@
 /**
- * The latest chokepoint verdict's files, indexed so an edit never reads the
+ * The latest chokepoint verdict's files, indexed so an edit never parses the
  * run history. The run store is append-only: one JSONL file per session
- * under .coherence/runs. The index keeps, per run file, the byte offset it
- * has read to, and, per chokepoint enforcement, the files its latest run saw,
- * sharded two ways under .coherence/cache/run-index:
+ * under .coherence/runs. The index is one small file,
+ * .coherence/cache/run-index.json: for each run file, the identity it was
+ * read at (device, inode, size, modification and change time) and the byte
+ * offset read to; for each chokepoint enforcement, its latest run's files.
  *
- *   key/<hash>.json    one enforcement's latest: when, from which line, its files
- *   file/<hash>.json   the enforcements whose latest run saw one file
- *   seen/<hash>.json   one run file's inode and the offset read to
- *   folder.json        the runs folder's identity when the index last held it whole
- *   names.json         the run files it held then, read only to reconcile
+ * It is an optimization of a check, so it fails toward the slow, correct
+ * path and says so, never toward silence:
  *
- * An edit reads folder.json, stats the runs folder, and reads one file/
- * shard per file it wrote: never a run file, never the whole index. Every
- * append through appendRun or appendRefutation brings the index up to date
- * at once, reading only the bytes appended since. When the runs folder is not
- * the one folder.json names (a file arrived from git, or was replaced or
- * removed), the next reader reconciles: each run file is stat'd and only its
- * new bytes are read, or, when a file was replaced, truncated or removed,
- * the index is rebuilt from every file. An append made in place by
- * something other than those two (an older release, a hand edit) changes
- * no folder and is read at the next append or reconcile.
+ * - every read verifies it: each run file is stat'd, and an index that does
+ *   not name exactly the run files there are, at the identities they have, is
+ *   rebuilt from every run file before it answers;
+ * - it is written whole, aside, and renamed into place, so a crash leaves the
+ *   old index or the new one, never half of one, and a stale one is caught
+ *   by the verification;
+ * - an append folds its own line in only when the index held the file just
+ *   before it; a fold that cannot be made (a lock not had, a cache that cannot
+ *   be written) leaves the index stale, which the next read catches;
+ * - when the index cannot be rebuilt and written, a lookup throws
+ *   RunIndexUnavailable, and its caller reads the whole store and says why.
  *
- * Latest means what latestByEnforcement means: the last record in the
- * order loadRuns sorts them, by time, then by file and line.
+ * Latest means what latestByEnforcement means: the last record in the order
+ * loadRuns sorts them, by time, then by file and line.
  */
 
-import { createHash } from "node:crypto";
-import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync } from "node:fs";
+import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { cacheDir, storeVersion, withLock, writeKept } from "../lifecycle/kept-parse.ts";
 
 /** The shape of the index; one of another shape, or one other code made, is rebuilt. */
-const INDEX_SHAPE = "run-index-1";
+const INDEX_SHAPE = "run-index-2";
 /** The code the index is made by: this module and the run records' parser. */
 const INDEX_CODE = ["enforcement/run-index.ts", "enforcement/record.ts"];
 
@@ -46,65 +44,46 @@ interface Latest {
   files: string[];
 }
 
-interface Seen {
-  ino: number;
+interface Held {
+  /** The file's identity when the index last read it. */
+  identity: string;
+  /** The offset read to: the end of its last whole line. */
   offset: number;
-  /** A hash of the bytes just before the offset: a file rewritten in place, at the same inode, no longer ends the same. */
-  tail: string;
 }
 
-/** How many bytes before the offset a reconcile compares. */
-const TAIL_BYTES = 256;
+interface Index {
+  version: string;
+  files: Record<string, Held>;
+  latest: Record<string, Latest>;
+}
 
-/** The hash of the bytes of a run file just before `offset`. */
-function tailOf(root: string, name: string, offset: number): string {
-  const from = Math.max(0, offset - TAIL_BYTES);
+function indexPath(root: string): string {
+  return join(cacheDir(root), "run-index.json");
+}
+
+function identityOf(root: string, name: string): { identity: string; size: number } | undefined {
   try {
-    const fd = openSync(join(root, RUN_FILES, name), "r");
-    try {
-      const buffer = Buffer.alloc(offset - from);
-      readSync(fd, buffer, 0, buffer.length, from);
-      return hashed(buffer.toString("latin1"));
-    } finally {
-      closeSync(fd);
-    }
-  } catch {
-    return "";
-  }
-}
-
-function hashed(text: string): string {
-  return createHash("sha1").update(text).digest("hex").slice(0, 20);
-}
-
-function indexDir(root: string): string {
-  return join(cacheDir(root), "run-index");
-}
-
-function shard(root: string, kind: "key" | "file" | "seen", name: string): string {
-  return join(indexDir(root), kind, `${hashed(name)}.json`);
-}
-
-function readJson<T>(path: string): T | undefined {
-  try {
-    return JSON.parse(readFileSync(path, "utf8")) as T;
+    const s = statSync(join(root, RUN_FILES, name));
+    return { identity: `${s.dev}:${s.ino}:${s.size}:${s.mtimeMs}:${s.ctimeMs}`, size: s.size };
   } catch {
     return undefined;
   }
 }
 
-function folderIdentity(root: string): string | undefined {
+/** Each run file's name and identity now. */
+function runFiles(root: string): Map<string, { identity: string; size: number }> {
+  const out = new Map<string, { identity: string; size: number }>();
+  let names: string[];
   try {
-    const s = statSync(join(root, RUN_FILES));
-    return `${s.dev}:${s.ino}:${s.mtimeMs}:${s.ctimeMs}`;
+    names = readdirSync(join(root, RUN_FILES)).filter((n) => n.endsWith(".jsonl")).sort();
   } catch {
-    return undefined;
+    return out;
   }
-}
-
-/** Run `fn` holding the index's lock, which sits beside the index: a rebuild removes the index's folder while holding it. */
-function locked<T>(root: string, fn: () => T): T | undefined {
-  return withLock(join(cacheDir(root), "run-index.lock"), fn);
+  for (const name of names) {
+    const id = identityOf(root, name);
+    if (id !== undefined) out.set(name, id);
+  }
+  return out;
 }
 
 /** Whether `a` comes after `b` in loadRuns' order. */
@@ -115,8 +94,10 @@ function later(a: Latest, b: Latest | undefined): boolean {
   return a.offset > b.offset;
 }
 
-/** Fold one line's chokepoint entries into the index: a later latest replaces the earlier, and the file shards follow. */
-function fold(root: string, file: string, offset: number, line: string, parse: (line: string) => unknown): void {
+type Parse = (line: string) => unknown;
+
+/** Fold one line's chokepoint entries into the latest of each enforcement. */
+function fold(latest: Record<string, Latest>, file: string, offset: number, line: string, parse: Parse): void {
   const record = parse(line) as { at?: string; kind?: string; invariants?: { component: string; name: string; form: string; files?: string[] }[] } | string;
   if (typeof record === "string" || record.kind !== undefined || !Array.isArray(record.invariants) || typeof record.at !== "string") return;
   for (const entry of record.invariants) {
@@ -124,109 +105,125 @@ function fold(root: string, file: string, offset: number, line: string, parse: (
     // entryKey's spelling (record.ts), which a lookup is made by.
     const key = `${entry.component}\0${entry.name}\0${entry.form}`;
     const next: Latest = { at: record.at, file, offset, files: [...new Set(entry.files ?? [])].sort() };
-    const keyPath = shard(root, "key", key);
-    const was = readJson<Latest>(keyPath);
-    if (!later(next, was)) continue;
-    writeKept(keyPath, next);
-    const before = new Set(was?.files ?? []);
-    const after = new Set(next.files);
-    for (const seen of new Set([...before, ...after])) {
-      if (before.has(seen) && after.has(seen)) continue;
-      const filePath = shard(root, "file", seen);
-      const keys = readJson<Record<string, true>>(filePath) ?? {};
-      if (after.has(seen)) keys[key] = true;
-      else delete keys[key];
-      writeKept(filePath, keys);
-    }
+    if (later(next, latest[key])) latest[key] = next;
   }
 }
 
-/** Read one run file from `from` to its end, folding each whole line; the offset read to. */
-function readFrom(root: string, name: string, from: number, size: number, parse: (line: string) => unknown): number {
+/** Fold every whole line of one run file from `from` to `size`; the offset read to. */
+function readFrom(root: string, latest: Record<string, Latest>, name: string, from: number, size: number, parse: Parse): number {
   if (size <= from) return from;
   const fd = openSync(join(root, RUN_FILES, name), "r");
-  let text: string;
+  let buffer: Buffer;
   try {
-    const buffer = Buffer.alloc(size - from);
+    buffer = Buffer.alloc(size - from);
     readSync(fd, buffer, 0, buffer.length, from);
-    text = buffer.toString("utf8");
   } finally {
     closeSync(fd);
   }
-  let offset = from;
   // Only whole lines: a line still being written is read at the next look.
-  const end = text.lastIndexOf("\n");
+  const end = buffer.lastIndexOf(0x0a);
   if (end < 0) return from;
-  for (const line of text.slice(0, end + 1).split("\n")) {
-    if (line.trim() !== "") fold(root, name, offset, line, parse);
+  let offset = from;
+  for (const line of buffer.subarray(0, end + 1).toString("utf8").split("\n")) {
+    if (line.trim() !== "") fold(latest, name, offset, line, parse);
     offset += Buffer.byteLength(line, "utf8") + 1;
   }
-  return from + Buffer.byteLength(text.slice(0, end + 1), "utf8");
+  return from + end + 1;
+}
+
+/** The index made from every run file as they are now. */
+function build(root: string, version: string, parse: Parse): Index {
+  const index: Index = { version, files: {}, latest: {} };
+  for (const [name, id] of runFiles(root)) index.files[name] = { identity: id.identity, offset: readFrom(root, index.latest, name, 0, id.size, parse) };
+  return index;
+}
+
+function readIndex(root: string): Index | undefined {
+  try {
+    const index = JSON.parse(readFileSync(indexPath(root), "utf8")) as Index;
+    return typeof index.files === "object" && typeof index.latest === "object" ? index : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Whether the index names exactly the run files there are, at the identities they have. */
+function holds(index: Index | undefined, version: string, files: ReadonlyMap<string, { identity: string }>): index is Index {
+  if (index === undefined || index.version !== version) return false;
+  if (Object.keys(index.files).length !== files.size) return false;
+  for (const [name, id] of files) if (index.files[name]?.identity !== id.identity) return false;
+  return true;
+}
+
+/** Write the index whole, aside, and rename it into place; throws when it cannot. */
+function writeIndex(root: string, index: Index): void {
+  mkdirSync(cacheDir(root), { recursive: true });
+  writeKept(indexPath(root), index, true, true);
+}
+
+function lockPath(root: string): string {
+  return join(cacheDir(root), "run-index.lock");
 }
 
 /**
- * Bring the index up to date with every run file: only new bytes are read,
- * unless a file was replaced, truncated or removed, or the index is of
- * another shape, when it is rebuilt from every file. Holds the lock.
+ * After an append of `length` bytes at `offset` to run file `name`: fold
+ * that line in when the index held the file, at the identity it had, just
+ * before the append. Best effort and never throws: an index it cannot bring
+ * up to date is left stale, and the next read rebuilds it.
  */
-export function reconcileRunIndex(root: string, parse: (line: string) => unknown): void {
-  locked(root, () => {
-    const version = storeVersion(root, INDEX_SHAPE, INDEX_CODE);
-    const folder = readJson<{ version: string; identity: string | undefined }>(join(indexDir(root), "folder.json"));
-    const held = readJson<string[]>(join(indexDir(root), "names.json")) ?? [];
-    let names: string[];
-    try {
-      names = readdirSync(join(root, RUN_FILES)).filter((n) => n.endsWith(".jsonl")).sort();
-    } catch {
-      names = [];
-    }
-    const sizes = new Map<string, { ino: number; size: number }>();
-    for (const name of names) {
-      try {
-        const s = statSync(join(root, RUN_FILES, name));
-        sizes.set(name, { ino: s.ino, size: s.size });
-      } catch {
-        // Gone since the listing.
-      }
-    }
-    const seen = new Map(names.map((name) => [name, readJson<Seen>(shard(root, "seen", name))]));
-    const gone = held.some((name) => !sizes.has(name));
-    const replaced = [...sizes].some(([name, s]) => {
-      const was = seen.get(name);
-      return was !== undefined && (was.ino !== s.ino || was.offset > s.size || was.tail !== tailOf(root, name, was.offset));
+export function noteRunAppend(root: string, name: string, before: string | undefined, offset: number, parse: Parse): void {
+  try {
+    withLock(lockPath(root), () => {
+      const index = readIndex(root);
+      const version = storeVersion(root, INDEX_SHAPE, INDEX_CODE);
+      const held = index?.files[name];
+      const heldBefore = before === undefined ? held === undefined : held?.identity === before && held.offset === offset;
+      if (index === undefined || index.version !== version || !heldBefore) return;
+      const now = identityOf(root, name);
+      if (now === undefined) return;
+      index.files[name] = { identity: now.identity, offset: readFrom(root, index.latest, name, offset, now.size, parse) };
+      writeIndex(root, index);
     });
-    if (folder?.version !== version || gone || replaced) {
-      rmSync(indexDir(root), { recursive: true, force: true });
-      mkdirSync(indexDir(root), { recursive: true });
-      seen.clear();
-    }
-    for (const [name, s] of sizes) {
-      const from = seen.get(name)?.offset ?? 0;
-      const to = readFrom(root, name, from, s.size, parse);
-      if (to !== from || seen.get(name) === undefined) writeKept(shard(root, "seen", name), { ino: s.ino, offset: to, tail: tailOf(root, name, to) } satisfies Seen);
-    }
-    writeKept(join(indexDir(root), "names.json"), [...sizes.keys()]);
-    writeKept(join(indexDir(root), "folder.json"), { version, identity: folderIdentity(root) });
-  });
+  } catch {
+    // The index stays as it was; its file no longer matches it, so the next read rebuilds it.
+  }
 }
+
+/** A run file's identity, for an appender to hand noteRunAppend. */
+export function runFileIdentity(root: string, name: string): string | undefined {
+  return identityOf(root, name)?.identity;
+}
+
+/** Why the run index could not answer: the caller falls back to the whole run store and says so. */
+export class RunIndexUnavailable extends Error {}
 
 /**
  * The chokepoint enforcements whose latest run saw each of `files`, by
- * entryKey: a stat of the runs folder, one small read to know the index
- * holds it, and one shard read per file; a reconcile first when it does not.
+ * entryKey: one stat per run file and one small read, a rebuild first when
+ * the index does not hold the store. Throws RunIndexUnavailable when the
+ * index cannot be read and rebuilt and written: its caller then reads the
+ * whole run store instead and says why.
  */
-export function latestSeeing(root: string, files: readonly string[], parse: (line: string) => unknown): Map<string, Set<string>> {
-  const out = new Map<string, Set<string>>();
-  const identity = folderIdentity(root);
-  if (identity === undefined) return out;
-  const folder = readJson<{ version: string; identity: string | undefined }>(join(indexDir(root), "folder.json"));
-  if (folder?.identity !== identity || folder.version !== storeVersion(root, INDEX_SHAPE, INDEX_CODE)) reconcileRunIndex(root, parse);
-  for (const file of files) out.set(file, new Set(Object.keys(readJson<Record<string, true>>(shard(root, "file", file)) ?? {})));
-  return out;
+export function latestSeeing(root: string, files: readonly string[], parse: Parse): Map<string, Set<string>> {
+  const now = runFiles(root);
+  let index = readIndex(root);
+  const version = storeVersion(root, INDEX_SHAPE, INDEX_CODE);
+  if (!holds(index, version, now)) {
+    const rebuilt = build(root, version, parse);
+    try {
+      const written = withLock(lockPath(root), () => {
+        writeIndex(root, rebuilt);
+        return true;
+      });
+      if (written !== true) throw new RunIndexUnavailable("the run index's lock was held by another process past the wait");
+    } catch (error) {
+      if (error instanceof RunIndexUnavailable) throw error;
+      throw new RunIndexUnavailable(`the run index could not be written (${error instanceof Error ? error.message : String(error)})`);
+    }
+    index = rebuilt;
+  }
+  const latest = index!.latest;
+  const byFile = new Map<string, Set<string>>();
+  for (const file of files) byFile.set(file, new Set(Object.entries(latest).filter(([, l]) => l.files.includes(file)).map(([key]) => key)));
+  return byFile;
 }
-
-/** Forget the index: a test that rewrites the run files under it. */
-export function dropRunIndex(root: string): void {
-  rmSync(indexDir(root), { recursive: true, force: true });
-}
-

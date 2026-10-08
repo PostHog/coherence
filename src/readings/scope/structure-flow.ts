@@ -72,6 +72,7 @@
 import { allInvariants, componentOfFile, flowChokepointId, flowLevelId, invariantVerdict, latestOf, openEscalations, plural, subjectOf, type InvariantVerdict, type RelianceSite } from "./derive.ts";
 import { coverageOf, type EntranceCoverage } from "./entrance-coverage.ts";
 import { slug } from "./html.ts";
+import { languagesReadLine, type LanguagesRead } from "./languages-read.ts";
 import type { EntranceGuard, InterfacePartial, InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, ShellState, SpecComponent, SpecInvariant } from "./model.ts";
 
 type ReadInterfaces = Extract<InterfaceReading, { kind: "read" }>;
@@ -452,20 +453,22 @@ export function flowBoundaryId(folder: string): string {
   return `structure--boundary-${flowSlug(folder)}`;
 }
 
-/** A multi-language project's languages the reading left unread, as a clause; empty for one language. */
-export function unreadLanguagesText(model: Pick<FlowModel, "language" | "unreadLanguages">): string {
-  const unread = model.unreadLanguages ?? [];
-  return unread.length === 0 ? "" : ` (${unread.join(" and ")} files not read: the Structure reading reads the primary language, ${model.language}, alone)`;
+/** A multi-language project's languages as the reading read them, as a clause: each one read and each one not, with why; empty for one language. */
+export function unreadLanguagesText(model: Pick<FlowModel, "languages">): string {
+  const line = languagesReadLine(model.languages);
+  return line === undefined ? "" : ` (${line})`;
 }
 
 export interface FlowModel {
   evidence: FlowEvidence;
   /** The language the adapter read, when it read. */
   language: string | undefined;
-  /** A multi-language project: the languages the reading left unread (it reads the primary one alone). */
-  unreadLanguages?: string[] | undefined;
+  /** Which of the project's languages the reading read, and each one it did not with why; absent when the adapter did not read. */
+  languages?: LanguagesRead | undefined;
   /** Why the adapter's reading is absent, when it is. */
   unread: string | undefined;
+  /** Drawn from run sites only: each latest chokepoint entry whose sites a reference named and its run file did not hold, as "component/name: why". Never drawn as no references. */
+  sitesUnknown: string[];
   /** Visible components in folder order (their column order). */
   nodes: FlowNode[];
   /** Every component interface between visible components, in folder order of caller then callee. */
@@ -517,12 +520,21 @@ function flowIs(symbol: Omit<InterfaceSymbol, "from" | "to">, named: { symbol?: 
   return named.symbol === undefined ? inFile && symbol.file !== "" : symbol.symbol === named.symbol && inFile;
 }
 
+/** The latest chokepoint entries whose sites a reference named and no record of its file held: said, never read as no references. */
+function flowSitesUnknown(state: ShellState): string[] {
+  return allInvariants(state.spec.components).flatMap((invariant) => {
+    const entry = latestOf(invariant, state.runs.records).find((candidate) => candidate.form === "chokepoint");
+    return entry?.sitesUnresolved === undefined ? [] : [`${invariant.component}/${invariant.name}: ${entry.sitesUnresolved}`];
+  });
+}
+
 /** The symbols the latest runs recorded as referenced across components: the fallback when the adapter was not asked. */
 function flowRunSymbols(state: ShellState): InterfaceSymbol[] {
   const components = state.spec.components;
   const tally = new Map<string, InterfaceSymbol>();
   for (const invariant of allInvariants(components)) {
     const entry = latestOf(invariant, state.runs.records).find((candidate) => candidate.form === "chokepoint");
+    // An entry whose sites are unknown is named in the model's sitesUnknown, never drawn as an entry with none.
     if (entry?.sites === undefined) continue;
     for (const enforcement of invariant.enforcements) {
       if (enforcement.form !== "chokepoint") continue;
@@ -1072,8 +1084,9 @@ export function flowOf(state: ShellState): FlowModel {
   return {
     evidence: reading.kind === "read" ? "language adapter" : "run sites only",
     language: reading.kind === "read" ? reading.language : undefined,
-    ...(reading.kind === "read" && reading.unreadLanguages !== undefined ? { unreadLanguages: reading.unreadLanguages } : {}),
+    ...(reading.kind === "read" && reading.languages !== undefined ? { languages: reading.languages } : {}),
     unread: reading.kind === "read" ? undefined : reading.because,
+    sitesUnknown: reading.kind === "read" ? [] : flowSitesUnknown(state),
     nodes,
     edges,
     entrances,

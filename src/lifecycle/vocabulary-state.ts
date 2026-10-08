@@ -156,14 +156,16 @@ export async function keepVocabulary(root: string, layers: { coherence: Lexicon;
     const aside = `${stateDir(root)}.${process.pid}.tmp`;
     // An aside a process died before renaming is removed by the next whole write.
     for (const name of readdirSync(cacheDir(root))) if (/^vocabulary\.\d+\.tmp$/.test(name)) rmSync(join(cacheDir(root), name), { recursive: true, force: true });
-    for (const [id, b] of files) writeKept(join(aside, "files", `${id}.json`), b);
-    for (const [id, b] of terms) writeKept(join(aside, "terms", `${id}.json`), b);
-    writeKept(join(aside, "declared.json"), [...declared].sort());
-    writeKept(join(aside, "meta.json"), { version });
-    rmSync(stateDir(root), { recursive: true, force: true });
     try {
+      // Every part is written before the whole is swapped in, and a part that cannot be written keeps the aside from ever being used.
+      for (const [id, b] of files) writeKept(join(aside, "files", `${id}.json`), b, false, true);
+      for (const [id, b] of terms) writeKept(join(aside, "terms", `${id}.json`), b, false, true);
+      writeKept(join(aside, "declared.json"), [...declared].sort(), false, true);
+      writeKept(join(aside, "meta.json"), { version }, false, true);
+      rmSync(stateDir(root), { recursive: true, force: true });
       renameSync(aside, stateDir(root));
     } catch {
+      // No state kept: the next edit finds none and takes the full reading, which tries again.
       rmSync(aside, { recursive: true, force: true });
     }
   });
@@ -223,9 +225,11 @@ function candidacy(canonical: string, terms: Map<string, TermBucket>): { candida
  * full reading instead. `candidates` names the terms the baseline already
  * holds as candidates, never named again.
  */
-export async function editVocabulary(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }, written: readonly string[], candidates: ReadonlySet<string>): Promise<EditVocabulary | undefined> {
-  const meta = readJson<{ version: string }>(join(stateDir(root), "meta.json"));
-  if (meta === undefined || meta.version !== (await stateVersion(root, layers))) return undefined;
+export async function editVocabulary(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }, written: readonly string[], candidates: ReadonlySet<string>): Promise<EditVocabulary | { unavailable: string | undefined }> {
+  const meta = readJson<{ version: string; writing?: boolean }>(join(stateDir(root), "meta.json"));
+  // None kept yet, or kept by other code or lexicons: the full reading is the ordinary way, and keeps the state again.
+  if (meta === undefined || meta.version !== (await stateVersion(root, layers))) return { unavailable: undefined };
+  if (meta.writing === true) return { unavailable: "its kept vocabulary was left half-written by an edit that stopped while writing it" };
   const declared = new Set(readJson<string[]>(join(stateDir(root), "declared.json")) ?? []);
   const reading = await lexiconReading(root, layers, undefined, { files: written, declared, rulings: false, contributions: true });
   const fresh = new Map([...reading.contributions].filter(([file]) => written.includes(file)));
@@ -292,7 +296,25 @@ export async function editVocabulary(root: string, layers: { coherence: Lexicon;
     }
   }
   // The kept state takes the edit in, against the contributions as they are now under the lock, so two edits at once both count.
-  const keep = (): void => void withLock(join(cacheDir(root), "vocabulary.lock"), () => {
+  // It is marked as being written first, so a stop half way leaves a state the next edit refuses and reads past in full;
+  // one the edit cannot take in at all (no lock, no write) is dropped, so the next edit reads in full and keeps it again.
+  const meta_ = join(stateDir(root), "meta.json");
+  const version = meta.version;
+  const keep = (): void => {
+    let kept: boolean | undefined;
+    try {
+      kept = withLock(join(cacheDir(root), "vocabulary.lock"), () => {
+        writeKept(meta_, { version, writing: true }, false, true);
+        takeIn();
+        writeKept(meta_, { version }, false, true);
+        return true;
+      });
+    } catch {
+      kept = undefined;
+    }
+    if (kept !== true) rmSync(meta_, { force: true });
+  };
+  const takeIn = (): void => {
     const locked = fileBuckets(root, [...fresh.keys()]);
     const lockedOld = new Map([...fresh.keys()].map((file) => [file, locked.get(bucketOf(file))?.[file]]));
     const touched = new Set<string>();
@@ -304,8 +326,8 @@ export async function editVocabulary(root: string, layers: { coherence: Lexicon;
       apply(buckets, c, 1);
       locked.get(bucketOf(file))![file] = c;
     }
-    for (const [id, b] of locked) writeKept(join(stateDir(root), "files", `${id}.json`), b);
-    for (const [id, b] of buckets) writeKept(join(stateDir(root), "terms", `${id}.json`), b);
+    for (const [id, b] of locked) writeKept(join(stateDir(root), "files", `${id}.json`), b, false, true);
+    for (const [id, b] of buckets) writeKept(join(stateDir(root), "terms", `${id}.json`), b, false, true);
     // The declared names change only when the edit declared or undeclared one.
     const present = has(buckets);
     let changed = false;
@@ -318,14 +340,18 @@ export async function editVocabulary(root: string, layers: { coherence: Lexicon;
         changed = true;
       }
     }
-    if (changed) writeKept(join(stateDir(root), "declared.json"), [...declared].sort());
-  });
+    if (changed) writeKept(join(stateDir(root), "declared.json"), [...declared].sort(), false, true);
+  };
   return { changes, keep };
 }
 
 /** A full reading that also keeps the state an edit reads. */
 export async function keptReading(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }): Promise<Coverage> {
   const { coverage, contributions } = await lexiconReading(root, layers, undefined, { contributions: true });
-  await keepVocabulary(root, layers, contributions);
+  try {
+    await keepVocabulary(root, layers, contributions);
+  } catch {
+    // A state that cannot be kept costs the next edit a full reading of its own, never this reading.
+  }
   return coverage;
 }

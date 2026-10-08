@@ -1,12 +1,12 @@
 /**
- * A run entry's reference sites are written once: an entry whose sites are
- * its enforcement's previous recorded sites carries a reference, and every
- * reader, through loadRuns, sees the sites as if they had been written in
- * full.
+ * A run entry's reference sites are written once per run file: an entry
+ * whose sites are its enforcement's last sites in the same file carries a
+ * reference, every reader, through loadRuns, sees the sites as if they had
+ * been written in full, and each run file resolves alone.
  */
 
 import assert from "node:assert/strict";
-import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -15,10 +15,10 @@ import { appendRun, entryKey, latestByEnforcement, loadRuns, sitesHash, type Rec
 
 const site = (file: string, line: number): RecordedSite => ({ file, line, symbol: "seal", class: "inside", of: "protected", test: false });
 
-function run(at: string, sites: RecordedSite[] | undefined): RunRecord {
+function run(at: string, sites: RecordedSite[] | undefined, session = "sites"): RunRecord {
   return {
     at,
-    session: "sites",
+    session,
     agent: "t",
     binding: "none",
     commit: null,
@@ -29,11 +29,17 @@ function run(at: string, sites: RecordedSite[] | undefined): RunRecord {
   } as RunRecord;
 }
 
-function written(root: string): Record<string, unknown>[] {
-  return readFileSync(join(root, ".coherence", "runs", "sites.jsonl"), "utf8").trim().split("\n").map((l) => (JSON.parse(l) as { invariants: Record<string, unknown>[] }).invariants[0]!);
+function written(root: string, session = "sites"): Record<string, unknown>[] {
+  return readFileSync(join(root, ".coherence", "runs", `${session}.jsonl`), "utf8").trim().split("\n").map((l) => (JSON.parse(l) as { invariants: Record<string, unknown>[] }).invariants[0]!);
 }
 
-test("a run whose sites did not change stores a reference that resolves to the same sites; changed sites are stored in full; a reference no record holds is reported, never an empty list", () => {
+/** Every run file's raw lines, by name. */
+function rawLines(root: string): Record<string, string> {
+  const dir = join(root, ".coherence", "runs");
+  return Object.fromEntries(readdirSync(dir).sort().map((name) => [name, readFileSync(join(dir, name), "utf8")]));
+}
+
+test("a run whose sites did not change stores a reference within its own run file that resolves to the same sites; changed sites are stored in full; a reference no record holds is reported, never an empty list", () => {
   const root = mkdtempSync(join(tmpdir(), "coherence-sites-"));
   try {
     const first = [site("src/a/x.ts", 3), site("src/a/y.ts", 9)];
@@ -45,7 +51,7 @@ test("a run whose sites did not change stores a reference that resolves to the s
     const lines = written(root);
     assert.deepEqual(lines[0]!["sites"], first, "the first run writes its sites in full");
     assert.equal(lines[1]!["sites"], undefined, "the unchanged run writes none");
-    assert.deepEqual(lines[1]!["sitesRef"], { hash: sitesHash(first), at: "2026-05-01T00:00:00.000Z" }, "but a reference to the run that holds them");
+    assert.deepEqual(lines[1]!["sitesRef"], { hash: sitesHash(first), at: "2026-05-01T00:00:00.000Z" }, "but a reference to the run in its file that holds them");
     assert.deepEqual(lines[2]!["sites"], changed, "changed sites are written in full");
     assert.deepEqual(lines[3]!["sitesRef"], { hash: sitesHash(changed), at: "2026-05-03T00:00:00.000Z" });
     const loaded = loadRuns(root);
@@ -54,33 +60,49 @@ test("a run whose sites did not change stores a reference that resolves to the s
     assert.ok(loaded.records.every((r) => r.invariants[0]!.sitesRef === undefined), "and never a reference");
     assert.deepEqual(Object.keys(loaded.records[1]!.invariants[0]!), Object.keys(loaded.records[0]!.invariants[0]!), "the sites stand where a full write puts them");
     assert.deepEqual(latestByEnforcement(loaded.records).get(entryKey("src/a", "sealed", "chokepoint"))?.sites, changed);
-    // A fifth run unchanged from a resolved one refers to the run that holds them in full, never to a reference.
-    appendRun(root, run("2026-05-05T00:00:00.000Z", changed));
-    assert.deepEqual(written(root)[4]!["sitesRef"], { hash: sitesHash(changed), at: "2026-05-03T00:00:00.000Z" });
-    // A reference whose run is gone: said, in the damaged lines and on the entry, never read as no sites.
-    const lost = { ...run("2026-05-06T00:00:00.000Z", undefined), session: "lost" };
+    // Another session's file, with the very same sites: its first entry is in full, so it never depends on this file.
+    appendRun(root, run("2026-05-05T00:00:00.000Z", changed, "other"));
+    appendRun(root, run("2026-05-06T00:00:00.000Z", changed, "other"));
+    assert.deepEqual(written(root, "other")[0]!["sites"], changed, "a file's first entry for an enforcement is in full");
+    assert.deepEqual(written(root, "other")[1]!["sitesRef"], { hash: sitesHash(changed), at: "2026-05-05T00:00:00.000Z" }, "and a reference stays in its file");
+    // Each run file resolves alone: take away any one, and every entry of the others still has its sites.
+    for (const gone of ["sites.jsonl", "other.jsonl"]) {
+      const alone = mkdtempSync(join(tmpdir(), "coherence-sites-alone-"));
+      try {
+        cpSync(join(root, ".coherence"), join(alone, ".coherence"), { recursive: true });
+        rmSync(join(alone, ".coherence", "runs", gone));
+        const rest = loadRuns(alone);
+        assert.deepEqual(rest.damaged, [], `without ${gone}, nothing is unresolved`);
+        assert.ok(rest.records.every((r) => r.invariants[0]!.sites !== undefined), `without ${gone}, every entry has its sites`);
+      } finally {
+        rmSync(alone, { recursive: true, force: true });
+      }
+    }
+    // A reference its file cannot resolve (a line edited by hand, a file truncated): said, in the damaged lines and on the entry, never read as no sites.
+    const lost = run("2026-05-07T00:00:00.000Z", undefined, "lost");
     (lost.invariants[0] as unknown as Record<string, unknown>)["sitesRef"] = { hash: sitesHash([site("src/a/z.ts", 1)]), at: "2026-01-01T00:00:00.000Z" };
     appendFileSync(join(root, ".coherence", "runs", "lost.jsonl"), JSON.stringify(lost) + "\n");
     const again = loadRuns(root);
     const unresolved = again.records.find((r) => r.session === "lost")!.invariants[0]!;
     assert.equal(unresolved.sites, undefined, "no sites are invented");
-    assert.match(unresolved.sitesUnresolved ?? "", /are in no record/, "the entry says its sites are unknown");
+    assert.match(unresolved.sitesUnresolved ?? "", /are in no record of its run file/, "the entry says its sites are unknown");
     assert.ok(again.damaged.some((d) => d.file.endsWith("lost.jsonl") && /src\/a\/sealed: the sites this entry refers to/.test(d.reason)), "and the line is reported");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("over this repository's run store, a run written with its unchanged sites by reference reads exactly as one written in full, in fewer bytes", () => {
+test("over this repository's run store, a run written with its unchanged sites by reference reads exactly as one written in full, in fewer bytes, and no line already written changes", () => {
   const repo = join(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
   const store = join(repo, ".coherence", "runs");
   if (!existsSync(store)) return;
   const real = loadRuns(repo);
-  assert.ok(real.records.every((r) => r.invariants.every((e) => e.sitesRef === undefined && e.sitesUnresolved === undefined)), "nothing old is converted: every recorded entry reads as written");
-  // The latest run that carries sites, run again now: every one of its entries is its enforcement's latest.
+  assert.deepEqual(real.damaged.filter((d) => /refers to/.test(d.reason)), [], "every reference already in the store resolves");
+  // The latest run that carries sites, run twice more in one new session file: the second time its sites are its first's.
   const last = [...real.records].reverse().find((r) => r.invariants.some((e) => e.sites !== undefined));
   if (last === undefined) return;
-  const again: RunRecord = { ...JSON.parse(JSON.stringify(last)), at: new Date(Date.parse(real.records.at(-1)!.at) + 1000).toISOString(), session: "sites-reference-test" };
+  const at = Date.parse(real.records.at(-1)!.at);
+  const again = (n: number): RunRecord => ({ ...JSON.parse(JSON.stringify(last)), at: new Date(at + 1000 * n).toISOString(), session: "sites-reference-test" });
   const roots = ["full", "reference"].map((name) => {
     const root = mkdtempSync(join(tmpdir(), `coherence-sites-${name}-`));
     mkdirSync(join(root, ".coherence"), { recursive: true });
@@ -89,8 +111,12 @@ test("over this repository's run store, a run written with its unchanged sites b
   });
   const [full, reference] = roots as [string, string];
   try {
-    writeFileSync(join(full, ".coherence", "runs", "sites-reference-test.jsonl"), JSON.stringify(again) + "\n");
-    appendRun(reference, again);
+    const before = rawLines(reference);
+    writeFileSync(join(full, ".coherence", "runs", "sites-reference-test.jsonl"), JSON.stringify(again(1)) + "\n" + JSON.stringify(again(2)) + "\n");
+    appendRun(reference, again(1));
+    appendRun(reference, again(2));
+    const after = rawLines(reference);
+    for (const [name, text] of Object.entries(before)) assert.equal(after[name], text, `${name}: no line already written is changed`);
     const views = (root: string): string => {
       const loaded = loadRuns(root);
       return JSON.stringify({ loaded, latest: [...latestByEnforcement(loaded.records)] });

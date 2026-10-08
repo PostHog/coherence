@@ -14,7 +14,10 @@ const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
 let root: string;
 
-before(async () => {
+// Node 22 runs the after hook without waiting for an async before when a name filter selects none of this file's tests, so the after waits for it.
+let setup: Promise<void> | undefined;
+
+before(() => (setup = (async () => {
   root = await mkdtemp(join(tmpdir(), "coherence-install-"));
   await mkdir(join(root, ".claude"));
   await writeFile(
@@ -31,9 +34,10 @@ before(async () => {
       2,
     ),
   );
-});
+})()));
 
 after(async () => {
+  await setup?.catch(() => undefined);
   if (root !== undefined) await rm(root, { recursive: true, force: true });
 });
 
