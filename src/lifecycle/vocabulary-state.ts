@@ -27,7 +27,8 @@
  */
 
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { readdirSync, readFileSync, renameSync, rmSync, statSync } from "node:fs";
+import { spawnSync } from "./work-meter.ts";
 import { basename, join } from "node:path";
 import { cacheDir, storeVersion, withLock, writeKept } from "./kept-parse.ts";
 import { lexiconReading, singularForms, type Contribution, type Coverage } from "./lexicon-coverage.ts";
@@ -138,7 +139,9 @@ function pluralsOf(term: string): string[] {
  * Keep the state a full reading's contributions make: written whole, aside,
  * and swapped into place under the lock.
  */
-export async function keepVocabulary(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }, contributions: ReadonlyMap<string, Contribution>): Promise<void> {
+export async function keepVocabulary(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }, contributions: ReadonlyMap<string, Contribution>, tree: Record<string, string> | undefined): Promise<void> {
+  // A tree git cannot describe keeps no state: every edit then reads in full.
+  if (tree === undefined) return;
   const version = await stateVersion(root, layers);
   const files = new Map<string, FileBucket>();
   const terms = new Map<string, TermBucket>();
@@ -161,7 +164,7 @@ export async function keepVocabulary(root: string, layers: { coherence: Lexicon;
       for (const [id, b] of files) writeKept(join(aside, "files", `${id}.json`), b, false, true);
       for (const [id, b] of terms) writeKept(join(aside, "terms", `${id}.json`), b, false, true);
       writeKept(join(aside, "declared.json"), [...declared].sort(), false, true);
-      writeKept(join(aside, "meta.json"), { version, buckets: { files: [...files.keys()].sort(), terms: [...terms.keys()].sort() } } satisfies Meta, false, true);
+      writeKept(join(aside, "meta.json"), { version, buckets: { files: [...files.keys()].sort(), terms: [...terms.keys()].sort() }, tree } satisfies Meta, false, true);
       rmSync(stateDir(root), { recursive: true, force: true });
       renameSync(aside, stateDir(root));
     } catch {
@@ -198,6 +201,43 @@ interface Meta {
   writing?: boolean;
   /** The buckets the state holds, by kind: one listed and missing or torn is a broken state, never an empty bucket. */
   buckets: { files: string[]; terms: string[] };
+  /** The tree as the state last took it in: each file git lists as changed or untracked, with its size, modification and change time. */
+  tree: Record<string, string>;
+}
+
+/**
+ * The tree's key: every file git lists as changed against HEAD or untracked,
+ * outside .coherence, with its size, modification and change time; two git
+ * listings and a stat each, never a read. Undefined when git cannot answer.
+ * A write no hook saw (a code generator, a checkout, a shell command the
+ * shell reader did not parse) moves it, and the next edit reads in full.
+ * Coherence's own records under .coherence are left out: the commands that
+ * write them run at every turn, and a full reading at the next prompt or stop
+ * reads them.
+ */
+export function treeKeys(root: string): Record<string, string> | undefined {
+  const files = new Set<string>();
+  for (const args of [["diff", "--name-only", "--relative", "-z", "HEAD"], ["ls-files", "--others", "--exclude-standard", "-z"]]) {
+    const listed = spawnSync("git", args, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    if (listed.status !== 0) return undefined;
+    for (const f of listed.stdout.split("\0")) if (f !== "" && !f.startsWith(".coherence/")) files.add(f);
+  }
+  const out: Record<string, string> = {};
+  for (const f of [...files].sort()) {
+    try {
+      const st = statSync(join(root, f));
+      out[f] = `${st.size}:${st.mtimeMs}:${st.ctimeMs}`;
+    } catch {
+      out[f] = "gone";
+    }
+  }
+  return out;
+}
+
+/** The files whose key differs between two trees, other than `except`. */
+function movedBeyond(then: Record<string, string>, now: Record<string, string>, except: readonly string[]): string[] {
+  const skip = new Set(except);
+  return [...new Set([...Object.keys(then), ...Object.keys(now)])].filter((f) => !skip.has(f) && then[f] !== now[f]).sort();
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -260,7 +300,7 @@ function readMeta(root: string): Meta | undefined {
     throw new BucketUnusable("its kept state's meta is torn");
   }
   const buckets = isRecord(value) ? value["buckets"] : undefined;
-  if (!isRecord(value) || typeof value["version"] !== "string" || !isRecord(buckets) || !Array.isArray(buckets["files"]) || !Array.isArray(buckets["terms"])) throw new BucketUnusable("its kept state's meta is not in the shape it is kept in");
+  if (!isRecord(value) || typeof value["version"] !== "string" || !isRecord(buckets) || !Array.isArray(buckets["files"]) || !Array.isArray(buckets["terms"]) || !isRecord(value["tree"])) throw new BucketUnusable("its kept state's meta is not in the shape it is kept in");
   return value as unknown as Meta;
 }
 
@@ -302,6 +342,11 @@ async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Le
   // None kept yet, or kept by other code or lexicons: the full reading is the ordinary way, and keeps the state again.
   if (meta === undefined || meta.version !== (await stateVersion(root, layers))) return { unavailable: undefined };
   if (meta.writing === true) return { unavailable: "its kept vocabulary was left half-written by an edit that stopped while writing it" };
+  // A write no hook saw since the state was kept (a generator, a checkout, an unparsed shell command): the totals would be stale.
+  const tree = treeKeys(root);
+  if (tree === undefined) return { unavailable: "git could not list the tree's changes, so writes no hook saw cannot be ruled out" };
+  const unseen = movedBeyond(meta.tree, tree, written);
+  if (unseen.length > 0) return { unavailable: `the tree moved since its vocabulary was kept, beyond what this edit wrote (${unseen.slice(0, 3).join(", ")}${unseen.length > 3 ? `, and ${unseen.length - 3} more` : ""})` };
   const declaredRaw = readJson<unknown>(join(stateDir(root), "declared.json"));
   if (!Array.isArray(declaredRaw) || !declaredRaw.every((d) => typeof d === "string")) throw new BucketUnusable("its kept declared names are missing or torn");
   const declared = new Set(declaredRaw as string[]);
@@ -383,7 +428,7 @@ async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Le
         writeKept(meta_, { ...now, writing: true }, false, true);
         const ids = takeIn(now);
         const buckets = { files: [...new Set([...now.buckets.files, ...ids.files])].sort(), terms: [...new Set([...now.buckets.terms, ...ids.terms])].sort() };
-        writeKept(meta_, { version: now.version, buckets } satisfies Meta, false, true);
+        writeKept(meta_, { version: now.version, buckets, tree } satisfies Meta, false, true);
         return true;
       });
     } catch {
@@ -425,9 +470,11 @@ async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Le
 
 /** A full reading that also keeps the state an edit reads. */
 export async function keptReading(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }): Promise<Coverage> {
+  // The tree is keyed before the corpus is read: a write during the reading moves it, and the next edit reads in full.
+  const tree = treeKeys(root);
   const { coverage, contributions } = await lexiconReading(root, layers, undefined, { contributions: true });
   try {
-    await keepVocabulary(root, layers, contributions);
+    await keepVocabulary(root, layers, contributions, tree);
   } catch {
     // A state that cannot be kept costs the next edit a full reading of its own, never this reading.
   }

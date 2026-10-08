@@ -670,6 +670,24 @@ test("an edit over torn or missing vocabulary buckets reads in full, says so, na
   }
 });
 
+test("a write no hook saw is caught at the next edit, which reads in full as main does", async () => {
+  const project = sizedProject(1);
+  try {
+    const start = await runHook("SessionStart", { session_id: SESSION, cwd: project.root }, project.root, {});
+    start.commit?.();
+    // A generator, a checkout or a shell command the shell reader does not parse: the file changes and no hook hears of it.
+    const unseen = join(project.root, "docs/note-1.md");
+    writeFileSync(unseen, readFileSync(unseen, "utf8") + "The `rebate` is new.\nEach `rebate` is paid.\n");
+    const file = join(project.root, "docs/note-0.md");
+    writeFileSync(file, readFileSync(file, "utf8") + "A `rebate` is clawed back.\n");
+    const m = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
+    assert.match(m.said, /Lexicon: read in full at this edit: the tree moved since its vocabulary was kept, beyond what this edit wrote \(docs\/note-1\.md\)/, "the unseen write is said");
+    assert.match(m.said, /"rebate" recur without a definition/, "and the term it made recur with this edit is named, as main names it");
+  } finally {
+    rmSync(project.top, { recursive: true, force: true });
+  }
+});
+
 test("an edit whose kept vocabulary was left half-written reads in full and says so", async () => {
   const project = sizedProject(1);
   try {
