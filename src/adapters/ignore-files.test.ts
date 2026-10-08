@@ -102,3 +102,22 @@ test("an ignore entry that names no file or folder is a spec problem; a folder b
   assert.deepEqual(found.map((p) => p.message.match(/"([^"]+)"/)?.[1]), ["CHANGELOG.md", "CHANGELGO.md", "src/old", "pkg/missing.ts"]);
   assert.ok(found.every((p) => p.file === "coherence.config.json" && p.line === 1), JSON.stringify(found));
 });
+
+test("an ignore entry git ignores is no spec problem though nothing it names is there: dist and build absent in a single-package repo, and dist only in a monorepo package; a typo beside them still is", () => {
+  const ignoreProblems = (base: string) => loadSpecModel(base, { runs: false }).problems.filter((p) => p.message.startsWith("ignore entry"));
+
+  // A single package whose build output is gitignored and absent, as in a fresh checkout or CI.
+  const single = project({ language: "typescript", ignore: ["dist", "build", "dsit"] });
+  write(single, ".gitignore", "dist/\nbuild\n");
+  write(single, "src/main.ts", "export const m = 1;\n");
+  assert.deepEqual(ignoreProblems(single).map((p) => p.message.match(/"([^"]+)"/)?.[1]), ["dsit"], "only the typo names nothing git ignores");
+
+  // A monorepo whose package ignores its own dist: absent in one package, present (and so unlisted) in another.
+  const mono = project({ language: "typescript", ignore: ["dist", "packages/api/build", "buidl"] });
+  write(mono, "packages/web/.gitignore", "dist/\n");
+  write(mono, "packages/web/src/index.ts", "export const w = 1;\n");
+  write(mono, "packages/api/.gitignore", "dist/\nbuild/\n");
+  write(mono, "packages/api/src/index.ts", "export const a = 1;\n");
+  write(mono, "packages/api/dist/index.js", "1;\n");
+  assert.deepEqual(ignoreProblems(mono).map((p) => p.message.match(/"([^"]+)"/)?.[1]), ["buidl"], "a nested-only dist and an absent gitignored path are no typo");
+});
