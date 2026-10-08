@@ -3,7 +3,7 @@
 The command that makes the complete shape the cheapest thing to produce: a component with its intent, an invariant with every slot and its checklist.
 
 ## invariants
-- every slot printed: A scaffolded invariant prints every slot as a placeholder and one checklist line per applicable shape, and nothing for a shape that does not apply.
+- every slot printed: A scaffolded invariant prints every slot its form takes as a placeholder (the entrances a totality oracle on a declared crossing covers among them, which a chokepoint form never names) and one checklist line per applicable shape, and nothing for a shape that does not apply.
   protects: PLACEHOLDERS
   chokepoint: renderInvariant
   over: every key of the grammar and every shape of the checklist seed
@@ -43,12 +43,19 @@ The command that makes the complete shape the cheapest thing to produce: a compo
   crossing: project-source -> reading
   refuted: inverted the preview branch so a preview request only printed the bullet and wrote no page -> the focused scaffold preview detector failed because no preview path was printed; restored, green (2026-09-18)
   kinds: none
-- a gap's closure is proposed: For each entrance with no traced control the scaffold proposes a ranked closure in the spec's terms: the exact guard: line where its handler calls or passes a verified chokepoint its route-mates do not, else an invariant bullet in the scaffold shape whose crossing enters from its trust, and control: none first where it plausibly needs none.
+- a gap's closure is proposed: For each entrance with no traced control the scaffold proposes a ranked closure in the spec's terms: the exact guard: line where its handler calls or passes a verified chokepoint its route-mates do not, else an invariant bullet in the scaffold shape whose crossing enters from its trust and whose entrances: line names it, and control: none first where it plausibly needs none.
   over: a handler calling a verified chokepoint, one the reading traced passing it while a route-mate does not, one whose reach meets no control, and a health check reaching no component beyond its own
   via: scaffold control proposes each gap's closure: a guard: line where its handler calls or passes a verified chokepoint its route-mates do not, else an invariant whose crossing enters from its trust, and control: none first where it plausibly needs none
   because: both outside adoptions left their gaps open (d-a1095ef2); the closure must be the cheapest thing to write, printed from what the reading already knows, not recalled from the grammar
   crossing: record -> reading
   refuted: stopped reading which verified chokepoint symbol a handler's declaration calls, so no guard: line was proposed for it -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- a lost control is named back: For an entrance with no traced control that a verified invariant covered by its crossing alone, scaffold control proposes first the entrances: line naming it on that invariant, the name plain where it resolves from the invariant's spec and qualified by folder where not; --all groups those entrances under the invariant on one line; --write puts the line beneath the invariant's crossing, or adds the name to the line it has, never twice; and the named entrance's route is controlled again.
+  over: praetorium.gg's shape with the signature check unnamed: the notification route's proposal, its words, the grouped --all line, the write, the route after it, and the server function named on the server's own invariant, twice
+  via: scaffold control proposes the entrances: line first for an entrance a verified invariant covered by its crossing alone, writes it beneath the crossing or adds to the line, and the named entrance's route is controlled again
+  because: the migration off the crossing-alone credit must cost one line per invariant, printed from what the reading knows; an adopter left to find which invariant used to cover which route would baseline the new gaps instead of naming what the tests check
+  crossing: record -> reading
+  refuted: dropped the entrances: closure from proposeClosures, so a lost control was proposed back as a new invariant -> the totality oracle went red; restored, green (2026-10-08)
   kinds: none
 - a closure is written only where safe: The scaffold writes a guard: line under the entrance's bullet, never a second one nor one beside control: none; control: none only with a real reason, never a placeholder; and an invariant bullet as a requirement with its placeholders; what it writes still parses.
   over: a guard: written, written again, a control: none without a reason, with a placeholder reason, with a reason, beside a guard, and an invariant appended

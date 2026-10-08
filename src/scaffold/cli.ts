@@ -3,7 +3,7 @@
  *
  *   node src/cli.ts scaffold component <folder> "<intent>"
  *   node src/cli.ts scaffold invariant <componentFolder> "<sentence>" [--name "<name>"] --kinds a,b [--chokepoint|--totality-oracle] [--crossing "a -> b"] [--preview] [--write]
- *   node src/cli.ts scaffold control "<entrance>" | --all [--component <folder>] [--whole] [--as guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write]
+ *   node src/cli.ts scaffold control "<entrance>" | --all [--component <folder>] [--whole] [--as name|guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write]
  *   node src/cli.ts scaffold control --baseline --session <id> --agent <name>
  *   node src/cli.ts scaffold entrances [<folder or file>]
  *   node src/cli.ts scaffold import tach [<module>...] | --all [--write]
@@ -59,7 +59,7 @@ import { appendInvariant, appendPractice, componentDir, parseCrossing, practiceF
 export const SCAFFOLD_USAGE = [
   '  scaffold component <folder> "<intent>"',
   '  scaffold invariant <componentFolder> "<sentence>" [--name "<name>"] --kinds <a,b|none> [--chokepoint|--totality-oracle] [--crossing "<level> -> <level>"] [--preview] [--write]',
-  `  scaffold control "<entrance>" | --all [--component <folder>] [--whole] [--as guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write] ${BUDGET_FLAGS}   the closure for an entrance with no traced control: a guard: line, an invariant, or control: none; with no recorded reading of the tree, an entrance or a component reads only the components its routes enter, unrecorded (--whole reads and records every one)`,
+  `  scaffold control "<entrance>" | --all [--component <folder>] [--whole] [--as name|guard|invariant|none] [--guard <symbol>] [--reason "<why>"] [--write] ${BUDGET_FLAGS}   the closure for an entrance with no traced control: an entrances: line naming it on an invariant, a guard: line, an invariant, or control: none; with no recorded reading of the tree, an entrance or a component reads only the components its routes enter, unrecorded (--whole reads and records every one)`,
   "  scaffold control --baseline --session <id> --agent <name>   record the entrances with no traced control at adoption, so orient names only new ones",
   '  scaffold practice <componentFolder> "<name>" "<sentence>" [--when "<trigger>"] [--write]   a practice bullet with every slot to fill; --write appends it to the practice file beside the spec',
   "  scaffold entrances [<folder or file>]   the ## entrances bullets for the detected entrances no spec declares, by the component that owns each; printed, never written",
@@ -227,13 +227,14 @@ function scopedLine(scope: ScopedReading | undefined): string | undefined {
   return `scoped reading, not recorded: only the interfaces of ${scope.components.join(", ")}, which the routes of ${scope.entrances.map((e) => e.name).join(", ")} enter, were read; every other component was never asked (--whole reads and records every one)`;
 }
 
-const CLOSURE_KINDS = ["guard", "invariant", "none"] as const;
+const CLOSURE_KINDS = ["name", "guard", "invariant", "none"] as const;
 
 /** The closure --as names, or the proposed one; a guard with rivals needs --guard to choose. */
 function chosen(p: Proposal, as: string | undefined, guard: string | undefined): Closure {
   const kind = as ?? p.closures[0]!.kind;
   if (!(CLOSURE_KINDS as readonly string[]).includes(kind)) usage(`--as takes ${CLOSURE_KINDS.join(", ")}`);
   const candidates = p.closures.filter((c) => c.kind === kind);
+  if (kind === "name" && candidates.length === 0) throw new ScaffoldError(`no verified invariant covered ${p.entrance.name} by its crossing alone, so there is no entrances: line to write; close it with --as guard, --as invariant or --as none`);
   if (kind === "guard") {
     if (candidates.length === 0) throw new ScaffoldError(`no verified chokepoint is traced on ${p.entrance.name}'s handler or called by it, so there is no guard: line to write; close it with --as invariant or --as none`);
     const pick = guard === undefined ? candidates[0]! : candidates.find((c) => c.kind === "guard" && c.symbol === guard);

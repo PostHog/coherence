@@ -26,6 +26,8 @@ import { answer, answerStructure } from "../query/query.ts";
 import { buildScopePage } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
+import { gapsOf, orientGapText, structureState } from "./gaps.ts";
+import { ADOPTER_ENTRANCES, APPLE, adopterFiles } from "../../spec/covers-fixture.ts";
 import { allInvariants, flowChokepointId, flowLevelId, invariantVerdict, relianceId, resolveHash, structureId } from "./derive.ts";
 import type { EntranceGuard, InterfaceReading, InterfaceSymbol, ReachReference, RecordedSite, RunEntry, ShellState, SpecComponent, SpecEntrance, SpecInvariant } from "./model.ts";
 import { renderView } from "./shell.ts";
@@ -1789,7 +1791,7 @@ test("motion runs caller to callee while selected: every drawn line runs from ca
 /* ------------------------------------------------ traced controls (d-127ab8e4) */
 
 /** The untraced fixture's reader route carrying outside in, with the reading's guards on its entrance and an invariant enforced by a totality oracle alone in the reader. */
-function tracedState(options: { guards?: EntranceGuard[]; totality?: { from: string; to?: string; chokepoint?: boolean; state?: SpecInvariant["state"]; in?: string }; states?: Record<string, SpecInvariant["state"]>; crossings?: Record<string, [string, string] | null>; guard?: string; unconfirmed?: string } = {}): ShellState {
+function tracedState(options: { guards?: EntranceGuard[]; totality?: { from: string; to?: string; chokepoint?: boolean; state?: SpecInvariant["state"]; in?: string; entrances?: string[] | null }; states?: Record<string, SpecInvariant["state"]>; crossings?: Record<string, [string, string] | null>; guard?: string; unconfirmed?: string } = {}): ShellState {
   const state = untracedState();
   state.spec.trustLevels = state.spec.trustLevels.map((level) => ({ ...level, outside: level.name === "outside" }));
   for (const component of state.spec.components) for (const invariant of component.invariants) invariant.state = options.states?.[invariant.name] ?? invariant.state;
@@ -1808,19 +1810,71 @@ function tracedState(options: { guards?: EntranceGuard[]; totality?: { from: str
     const owner = options.totality.in ?? "src/reader";
     const reader = state.spec.components.find((c) => c.folder === owner)!;
     const enforcements: SpecInvariant["enforcements"] = [{ form: "totality oracle", over: "every look", via: "looks stay scoped", line: 9 }, ...(options.totality.chokepoint === true ? [{ form: "chokepoint" as const, chokepoint: "peekAt", protects: "peek", line: 10 }] : [])];
-    reader.invariants.push({ ...state.spec.components.find((c) => c.folder === "src/core")!.invariants[0]!, component: owner, name: "looks stay scoped", sentence: "looks stay scoped.", enforcements, crossing: { from: options.totality.from, to: options.totality.to ?? "inside", line: 11 }, state: options.totality.state ?? "invariant" });
+    reader.invariants.push({ ...state.spec.components.find((c) => c.folder === "src/core")!.invariants[0]!, component: owner, name: "looks stay scoped", sentence: "looks stay scoped.", enforcements, crossing: { from: options.totality.from, to: options.totality.to ?? "inside", line: 11 }, ...(options.totality.entrances === null ? {} : { entrances: { names: options.totality.entrances ?? ["look"], line: 12 } }), state: options.totality.state ?? "invariant" });
   }
   return state;
 }
 
-test("a test-backed control is the entrance's own: a verified totality oracle further along the route, in a component that neither declares nor handles the entrance, never stands in for a check on it", () => {
+test("a test-backed control counts on the entrances its invariant names and on no other: neither owning the component that declares or handles an entrance nor standing further along its route covers it", () => {
   const look = (state: ShellState): FlowRoute => flowOf(state).routes.find((r) => r.names.includes("look"))!;
   const own = look(tracedState({ totality: { from: "outside" } }));
   assert.ok(own.stops.includes("src/store"), "the route passes the store");
-  assert.deepEqual(own.traced.map((c) => `${c.kind} ${c.component}`), ["totality src/reader"], "handled in the reader, the reader's totality oracle counts");
-  const further = look(tracedState({ totality: { from: "outside", in: "src/store" } }));
-  assert.deepEqual(further.traced, [], "the same totality oracle in the store, which the route passes but which neither declares nor handles the entrance, does not count");
-  assert.equal(further.noTracedControl, true, "so the route reads no traced control");
+  assert.deepEqual(own.traced.map((c) => `${c.kind} ${c.component}`), ["totality src/reader"], "named by the reader's totality oracle, look counts it");
+  assert.deepEqual(look(tracedState({ totality: { from: "outside", in: "src/store" } })).traced.map((c) => `${c.kind} ${c.component}`), ["totality src/store"], "named, it counts wherever it is owned: the line is the evidence");
+  const unnamed = tracedState({ totality: { from: "outside", entrances: null } });
+  assert.deepEqual([look(unnamed).traced, look(unnamed).noTracedControl], [[], true], "owned by the reader, which handles look, and naming no entrance: it covers none");
+  assert.deepEqual(flowOf(unnamed).entrances.find((e) => e.name === "look")!.unnamed, [{ component: "src/reader", name: "looks stay scoped" }], "and look says which invariant covered it by its crossing alone");
+  const further = look(tracedState({ totality: { from: "outside", in: "src/store", entrances: null } }));
+  assert.deepEqual([further.traced, further.noTracedControl], [[], true], "further along the route and naming none, it never did and does not now");
+  const other = look(tracedState({ totality: { from: "outside", entrances: ["run"] } }));
+  assert.deepEqual([other.traced, other.noTracedControl], [[], true], "naming another entrance covers that one, not look");
+});
+
+/** The adopter's shape (covers-fixture.ts) as the state Structure derives from: its files read, a reading resolving each entrance, its two test-backed invariants verified. */
+function adopterState(files: Record<string, string>): ShellState {
+  const root = mkdtempSync(join(tmpdir(), "coherence-covers-"));
+  try {
+    for (const [path, text] of Object.entries(files)) {
+      mkdirSync(join(root, path, ".."), { recursive: true });
+      writeFileSync(join(root, path), text);
+    }
+    const read: InterfaceReading = { kind: "read", language: "typescript", declarations: 5, symbols: [sym("src/routes", "src/server", "listRosters", "src/server/rosters.ts")], entrances: ADOPTER_ENTRANCES.map((e) => ({ ...e })), unowned: { files: 0, lines: 0 } };
+    const state = structureState(root, read);
+    for (const component of state.spec.components) for (const invariant of component.invariants) invariant.state = "invariant";
+    return state;
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test("an invariant covers the entrances it names: the adopter's apple signature check controls its notification route alone, and the auth, crawler and preview routes beside it and a server function sharing src/server stay uncontrolled", () => {
+  const model = flowOf(adopterState(adopterFiles()));
+  const routeOf = (name: string): FlowRoute => model.routes.find((r) => r.names.includes(name))!;
+  const apple = routeOf(APPLE);
+  assert.deepEqual([apple.traced.map((c) => `${c.kind} ${c.name}`), apple.noTracedControl], [["totality signed apple notifications"], false], "named, its test controls the notification route");
+  assert.deepEqual(apple.names, [APPLE], "a route of its own: entrances an invariant names never share a line with ones it does not, so its control counts for those it names");
+  for (const name of ["route api/auth.$", "route robots[.]txt", "route api/previews/battles.$token", "server fn listRosters"]) {
+    const route = routeOf(name);
+    assert.deepEqual([route.traced, route.partial, route.noTracedControl], [[], [], true], `${name}: the same crossing, visitor -> account store, covers nothing it does not name`);
+  }
+  assert.deepEqual(model.entrances.find((e) => e.name === "server fn listRosters")!.owners, ["src/routes", "src/server"], "the server function is declared among the routes and handled in src/server, which owns a test-backed invariant of its own, and still gets nothing");
+  assert.deepEqual(model.entrances.flatMap((e) => e.unnamed), [{ component: "src/server", name: "session-scoped rosters" }], "only the server's own invariant, which names no entrance, says it covered one by its crossing alone");
+});
+
+test("an invariant that covered entrances by its crossing alone covers none, and each entrance that lost it says so: its gap and orient's line name the invariant and the entrances: line", () => {
+  const state = adopterState(adopterFiles({ named: false }));
+  const model = flowOf(state);
+  assert.ok(model.routes.every((r) => r.traced.length === 0 && r.noTracedControl), "unnamed, the signature check controls no route, its own included");
+  const lost = (name: string): string[] => model.entrances.find((e) => e.name === name)!.unnamed.map((u) => u.name);
+  assert.deepEqual(lost(APPLE), ["signed apple notifications"]);
+  assert.deepEqual(lost("route robots[.]txt"), ["signed apple notifications"], "the crawler file lost a control it never had in fact: the over-claim, now said");
+  assert.deepEqual(lost("server fn listRosters"), ["signed apple notifications", "session-scoped rosters"]);
+  assert.deepEqual(lost("route api/previews/battles.$token"), [], "the previews' own spec owns neither, so it was never credited");
+  const gaps = gapsOf(state, model);
+  assert.deepEqual(gaps.gaps.find((g) => g.name === APPLE)!.unnamed, ["signed apple notifications"]);
+  const line = orientGapText(gaps, undefined, "coherence");
+  assert.match(line, /4 of them lost the control an invariant gave by its crossing alone, which no longer counts \(most: signed apple notifications, on 4\); name each one its test checks on its entrances: line \(coherence scaffold control "route api\/apple-notifications" proposes it\)\./);
+  assert.ok(line.length < 900, "still one bounded line");
 });
 
 test("a route's controls are traced four ways, verified only: an identifier on its lines, a chokepoint its handler is registered through, a chokepoint inside a component on it whose protected thing its reach reaches, and a totality oracle on it, each but the wrapper only when its crossing enters from the route's trust or enters it", () => {

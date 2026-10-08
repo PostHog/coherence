@@ -17,6 +17,7 @@ import { loadJournal, sessionFile } from "../journal/store.ts";
 import { workBinding } from "../journal/work.ts";
 import { digest, lexiconCoverage } from "./lexicon-coverage.ts";
 import { aliasNames, parseLexicon, rejectedNames } from "./lexicon.ts";
+import { projectName } from "../adapters/project-config.ts";
 import { normalizeTerm, runCheck } from "./check.ts";
 import {
   isCoherenceItself,
@@ -184,6 +185,7 @@ async function dropFindings(
   const changed = parseLexicon(after, target);
   const ownLayer = resolve(target) === resolve(coherence.path);
   if (ownLayer) changed.project ??= "coherence";
+  else changed.project = projectName(root, changed.project);
   const coherenceItself = await isCoherenceItself(root);
   const before = await runCheck({ root, coherence, project, coherenceItself });
   const afterReport = await runCheck({
@@ -243,10 +245,9 @@ export async function propose(root: string, change: Change): Promise<Proposal> {
   }
   const target = await lexiconTarget(root);
   const raw = body(target);
+  // A new lexicon stores no project: the project's name is the config's (projectName), never a copy here to drift.
   const value = (
-    raw
-      ? JSON.parse(raw)
-      : { version: 1, project: root.split("/").at(-1), concepts: [] }
+    raw ? JSON.parse(raw) : { version: 1, concepts: [] }
   ) as Record<string, unknown>;
   if (!Array.isArray(value["concepts"]))
     throw new Error("lexicon concepts must be a list");
