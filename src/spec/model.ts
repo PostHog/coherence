@@ -95,8 +95,12 @@ export interface SpecModel {
   components: Component[];
   problems: Problem[];
   counts: Counts;
-  /** When runs exist: the time of the latest, and how many run lines were unreadable. */
-  runs: { latest: string; count: number; damaged: number } | undefined;
+  /**
+   * When runs exist: the time of the latest, how many run lines were
+   * unreadable, and the time of the latest run that graded its entries (an
+   * edit's check records them ungraded), undefined when none did.
+   */
+  runs: { latest: string; count: number; damaged: number; graded: string | undefined } | undefined;
   /** The floor on defects: closes with neither a guard nor a decision, and guard failures; advisory, never a problem. */
   defects?: DefectFloor;
 }
@@ -220,7 +224,14 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   const runs =
     loadedRuns.records.length === 0
       ? undefined
-      : { latest: loadedRuns.records[loadedRuns.records.length - 1]!.at, count: loadedRuns.records.length, damaged: loadedRuns.damaged.length };
+      : {
+          latest: loadedRuns.records[loadedRuns.records.length - 1]!.at,
+          count: loadedRuns.records.length,
+          damaged: loadedRuns.damaged.length,
+          graded: loadedRuns.records
+            .filter((record) => record.invariants.some((entry) => entry.ungraded !== true))
+            .reduce<string | undefined>((at, record) => (at === undefined || record.at > at ? record.at : at), undefined),
+        };
 
   const byFolder = new Map<string, { folder: string; specPath: string; parsed: ReturnType<typeof parseSpec> }>();
   for (const specPath of findSpecs(root, config.ignore)) {

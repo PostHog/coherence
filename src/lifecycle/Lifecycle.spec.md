@@ -868,6 +868,13 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: harness -> record
   refuted: dropped the installed version from recordHookTime, so a kept time carried none -> "a hook call's kept time carries the Coherence version that answered it" went red in defect-orient.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- orient names a floor no full run moved: When the run store holds runs and none that graded its entries in the last fourteen days (an edit's check records its entries ungraded, so the edits alone never move the invariant floor), orient names how long ago the last run that graded was, or that none ever did, and the run that moves it; a run that grades within fourteen days says nothing.
+  over: no run, edit checks alone, a full run fourteen days ago, edit checks since a full run twenty days ago, and a full run after them
+  via: orient names an invariant floor no run has graded in fourteen days
+  because: an edit's check runs one invariant from a model of that invariant alone, which derives no state, so it records its entries ungraded and the floor never counts them; a project whose agents only edit would keep a floor as old as its last full run with no one told, and the session that starts is the one that can run it
+  crossing: record -> reading
+  refuted: counted an edit check's ungraded run as the run that graded -> "orient names an invariant floor no run has graded in fourteen days" went red in defect-orient.test.ts on its own assertion (only edit checks: the floor was never moved); restored byte for byte, green batched and alone (2026-10-08)
+  kinds: none
 - telemetry is sent only on opt-in: Fleet telemetry queues and sends nothing until the user runs telemetry on, which keeps the choice and a random installation id under the user's config directory, never in the project; DO_NOT_TRACK, COHERENCE_TELEMETRY=0, a build with no PostHog key, and a project's or its registry's "telemetry": false each refuse whatever the user chose, and off forgets the id and drops the queue.
   over: a user who never opted in, one who did, each environment override, a build with no key, a project that refuses, and an opt-out with events queued
   via: nothing is queued or sent unless the user opted in, and a project's refusal or the environment always wins
