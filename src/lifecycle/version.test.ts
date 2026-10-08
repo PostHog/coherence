@@ -26,6 +26,11 @@ const CHECKOUT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const CLI = join(CHECKOUT, "src", "cli.ts");
 const VERSION = (JSON.parse(readFileSync(join(CHECKOUT, "package.json"), "utf8")) as { version: string }).version;
 
+/** `text` as a regular expression that matches it literally. */
+function escaped(text: string): string {
+  return text.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+}
+
 const made: string[] = [];
 after(() => {
   for (const dir of made) rmSync(dir, { recursive: true, force: true });
@@ -102,7 +107,7 @@ test("the session start names the Coherence that runs and where it is, and warns
   const root = temp("coherence-start-");
   const result = await runHook("SessionStart", { session_id: "s1", cwd: root }, root);
   const context = (JSON.parse(result.stdout) as { hookSpecificOutput: { additionalContext: string } }).hookSpecificOutput.additionalContext;
-  assert.match(context, new RegExp(`\\n\\nCoherence ${VERSION.replace(/\./g, "\\.")} runs this session: a checkout at [^\\n]+\\.\\n\\nSession: s1\\n`));
+  assert.match(context, new RegExp(`\\n\\nCoherence ${escaped(VERSION)} runs this session: a checkout at [^\\n]+\\.\\n\\nSession: s1\\n`));
 });
 
 test("a newer release in the kept answer is named at the session start with the update command for the project's package manager and its release-age setting", () => {
@@ -185,7 +190,7 @@ test("--version, -v, version, --help, -h and help answer at the top level", () =
   for (const flag of ["--version", "-v", "version"]) {
     const run = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, flag], { cwd: CHECKOUT, env, encoding: "utf8" });
     assert.equal(run.status, 0, `${flag}: ${run.stderr}`);
-    assert.match(run.stdout, new RegExp(`^coherence ${VERSION.replace(/\./g, "\\.")}: this repository's own source\\.\\n`), flag);
+    assert.match(run.stdout, new RegExp(`^coherence ${escaped(VERSION)}: this repository's own source\\.\\n`), flag);
   }
   for (const flag of ["--help", "-h", "help"]) {
     const run = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, flag], { cwd: CHECKOUT, env, encoding: "utf8" });
