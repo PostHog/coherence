@@ -185,6 +185,15 @@ reference its file cannot resolve is marked on the entry as
 wherever sites are read: Scope's reliance, enforcement card and flow map,
 and `query`. It is never read as an empty list.
 
+Writing a run never reads its session's run file to find what it last
+wrote in full. The run index keeps one small sites shard per run file, under
+`.coherence/cache/run-sites/`, with each enforcement's last full sites hash
+and the file's identity and size when the shard was written. An append asks
+the shard. When the shard is missing, or was kept for the file as it no
+longer is, the append writes its sites in full, which costs one larger line
+and never a reference that does not resolve, and the shard starts again from
+that line.
+
 A reader older than this release knows no references. It sees no `sites`
 on those later entries and reports their sites as unavailable, which is the
 rule for an entry without sites. It still sees every file's first entry in

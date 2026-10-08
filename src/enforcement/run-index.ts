@@ -191,6 +191,92 @@ export function noteRunAppend(root: string, name: string, before: string | undef
   }
 }
 
+/* ---------------------------------------------------------- sites shards */
+
+/**
+ * A run file's sites shard: for each enforcement, the hash of the sites its
+ * last entry in that file wrote in full and that run's time, which is what a
+ * sites reference names. It is kept per run file, in
+ * .coherence/cache/run-sites/<file>.json, with the file's identity and size
+ * when it was written, so an append asks it instead of reading its session's
+ * whole run file. It answers only for the file exactly as it is (the same
+ * identity, every byte of it); otherwise it cannot say, and the appender
+ * writes its sites in full. Every hash it names was written in full in its
+ * file, which is append-only, so a shard that missed a line knows less,
+ * never something false: one started at any line holds from there.
+ */
+const SITES_SHAPE = "run-sites-1";
+const SITES_CODE = ["enforcement/run-index.ts", "enforcement/record.ts"];
+
+export interface HeldSites {
+  hash: string;
+  at: string;
+}
+
+interface SitesShard {
+  version: string;
+  identity: string;
+  size: number;
+  latest: Record<string, HeldSites>;
+}
+
+function shardPath(root: string, name: string): string {
+  return join(cacheDir(root), "run-sites", `${name}.json`);
+}
+
+function readShard(root: string, name: string, version: string): SitesShard | undefined {
+  try {
+    const shard = JSON.parse(readFileSync(shardPath(root, name), "utf8")) as SitesShard;
+    if (shard.version !== version || typeof shard.identity !== "string" || typeof shard.size !== "number") return undefined;
+    if (typeof shard.latest !== "object" || shard.latest === null || Array.isArray(shard.latest)) return undefined;
+    for (const held of Object.values(shard.latest)) if (typeof held?.hash !== "string" || typeof held.at !== "string") return undefined;
+    return shard;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The sites each enforcement last wrote in full in run file `name`, by
+ * entryKey, as its shard holds them: an empty map for a file not yet
+ * written, undefined when the shard cannot say (none, torn, of other code,
+ * or kept for the file as it no longer is). One stat and one small read.
+ */
+export function heldSites(root: string, name: string): Map<string, HeldSites> | undefined {
+  const now = identityOf(root, name);
+  if (now === undefined) return new Map();
+  const shard = readShard(root, name, storeVersion(root, SITES_SHAPE, SITES_CODE));
+  if (shard === undefined || shard.identity !== now.identity || shard.size !== now.size) return undefined;
+  return new Map(Object.entries(shard.latest));
+}
+
+/**
+ * After an append to run file `name`, whose identity was `before` (undefined
+ * for a new file): the shard carried forward with `updates` (an
+ * enforcement's sites written in full, or null where its entry carried
+ * neither sites nor a reference) when it held the file just before, or
+ * started from `updates` alone when it did not. Best effort and never
+ * throws: a shard not written cannot say, and the next append writes its
+ * sites in full.
+ */
+export function noteSitesAppend(root: string, name: string, before: string | undefined, updates: ReadonlyMap<string, HeldSites | null>): void {
+  try {
+    const version = storeVersion(root, SITES_SHAPE, SITES_CODE);
+    const old = before === undefined ? undefined : readShard(root, name, version);
+    const latest: Record<string, HeldSites> = old !== undefined && old.identity === before ? { ...old.latest } : {};
+    for (const [key, held] of updates) {
+      if (held === null) delete latest[key];
+      else latest[key] = held;
+    }
+    const now = identityOf(root, name);
+    if (now === undefined) return;
+    mkdirSync(join(cacheDir(root), "run-sites"), { recursive: true });
+    writeKept(shardPath(root, name), { version, identity: now.identity, size: now.size, latest } satisfies SitesShard, false, true);
+  } catch {
+    // No shard, or the old one: either cannot say for the file as it is now, so the next append writes in full.
+  }
+}
+
 /** A run file's identity, for an appender to hand noteRunAppend. */
 export function runFileIdentity(root: string, name: string): string | undefined {
   return identityOf(root, name)?.identity;

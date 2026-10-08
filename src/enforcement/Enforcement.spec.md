@@ -290,3 +290,15 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   refuted: put resolved sites after every other key instead of where a full write puts them -> "over this repository's run store, a run written with its unchanged sites by reference reads exactly as one written in full, in fewer bytes, and no line already written changes" went red in run-sites.test.ts on its own assertion (the views differed byte for byte); restored byte for byte, green batched and alone (2026-10-08)
   kinds: revision
   checklist: revision-preservation declared as a run's sites read the same by reference
+- an append asks the sites shard, never its run file: Writing a run asks what its session's run file last wrote in full of its sites shard in the run index, kept per run file with the file's identity and size, and never reads the run file itself; beside a session file ten times as long, every read, stat and listing the append makes weighs the same, each read by its bytes, and the file is read back for the appended line alone, by the index's fold; a shard that cannot say (none, or kept for the file as it no longer is) writes the sites in full and starts again from that line, and every reference written resolves.
+  over: a session file of 30 runs and one of 300, each carrying forty sites that change at every run, with the edit hook's index current, then the shard taken away, and the file appended to by another writer
+  via: an append asks its run file's sites shard, never the file: beside ten times the session's runs it reads the same bytes, and a shard that cannot say writes the sites in full
+  because: writing a reference read and parsed the session's whole run file at every append, so a run grew slower with every run the session had made before it; the shard is a few hundred bytes whatever the file's length, and it is kept for one exact state of the file, so a file it no longer matches costs one larger line, never a reference that does not resolve
+  refuted: read the session's whole run file at every append again, as compactRecord did before the shard -> "an append asks its run file's sites shard, never the file: beside ten times the session's runs it reads the same bytes, and a shard that cannot say writes the sites in full" went red in run-sites.test.ts on its own assertion (the session's run file is read for the appended line alone); restored byte for byte, green batched and alone (2026-10-08)
+  kinds: budget
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is on one append's work
+  checklist: execution-budget declared as an append asks the sites shard, never its run file
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: no quota over time; the bound is on one append's work, whatever the rate
+  checklist: memory-budget dismissed: the shard is a few hundred bytes per run file; the bound stated is on reads, not allocation
+  checklist: circuit-breaker-policy dismissed: no dependency is called; a shard that cannot say is the fallback, a full write

@@ -29,7 +29,7 @@ import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { availableParallelism, loadavg } from "node:os";
 import { basename, join } from "node:path";
-import { noteRunAppend, runFileIdentity } from "./run-index.ts";
+import { heldSites, noteRunAppend, noteSitesAppend, runFileIdentity, type HeldSites } from "./run-index.ts";
 
 export const RUNS_DIR = join(".coherence", "runs");
 
@@ -255,34 +255,25 @@ function replacing(entry: RunEntry, key: "sites" | "sitesRef", next: Partial<Rec
 }
 
 /**
- * The record as it is written to `file`: each chokepoint entry whose sites
- * are exactly the ones its enforcement's last entry in that same file wrote
- * in full carries a reference in their place (the sites are most of a run's
- * bytes, and they rarely change); sites that changed, and an enforcement's
- * first entry in the file, are written in full. A reference never leaves its
- * file: every run file, alone, resolves, whatever other files are committed,
- * and a reader that does not know references loses only later entries'
- * sites, never a file's first.
+ * The record as it is written to run file `name`: each chokepoint entry
+ * whose sites are exactly the ones its enforcement's last entry in that same
+ * file wrote in full carries a reference in their place (the sites are most
+ * of a run's bytes, and they rarely change); sites that changed, and an
+ * enforcement's first entry in the file, are written in full. A reference
+ * never leaves its file: every run file, alone, resolves, whatever other
+ * files are committed, and a reader that does not know references loses only
+ * later entries' sites, never a file's first.
+ *
+ * What the file last wrote in full is asked of its sites shard in the run
+ * index (run-index.ts), one stat and one small read, never of the file
+ * itself, which grows with its session. When the shard cannot say (none, or
+ * kept for the file as it no longer is), every entry is written in full:
+ * larger, never wrong, and the shard starts again from that line.
  */
-export function compactRecord(file: string, record: RunRecord): RunRecord {
+export function compactRecord(root: string, name: string, record: RunRecord): RunRecord {
   if (!record.invariants.some((e) => e.sites !== undefined)) return record;
-  const latest = new Map<string, { hash: string; at: string }>();
-  let text = "";
-  try {
-    text = readFileSync(file, "utf8");
-  } catch {
-    // A new file: every entry's sites are its first, written in full.
-  }
-  for (const line of text.split("\n")) {
-    if (line.trim() === "") continue;
-    const run = parseLine(line);
-    if (typeof run === "string" || "kind" in run) continue;
-    for (const entry of run.invariants) {
-      const key = entryKey(entry.component, entry.name, entry.form);
-      if (entry.sites !== undefined) latest.set(key, { hash: sitesHash(entry.sites), at: run.at });
-      else if (entry.sitesRef === undefined) latest.delete(key);
-    }
-  }
+  const latest = heldSites(root, name);
+  if (latest === undefined) return record;
   const invariants = record.invariants.map((entry) => {
     if (entry.sites === undefined) return entry;
     const before = latest.get(entryKey(entry.component, entry.name, entry.form));
@@ -293,26 +284,42 @@ export function compactRecord(file: string, record: RunRecord): RunRecord {
   return { ...record, invariants };
 }
 
+/** What a written run tells its file's sites shard: each enforcement's sites written in full, or null where its entry carried neither sites nor a reference. */
+function sitesUpdates(record: RunRecord): Map<string, HeldSites | null> {
+  const updates = new Map<string, HeldSites | null>();
+  for (const entry of record.invariants) {
+    const key = entryKey(entry.component, entry.name, entry.form);
+    if (entry.sites !== undefined) updates.set(key, { hash: sitesHash(entry.sites), at: record.at });
+    else if (entry.sitesRef === undefined) updates.set(key, null);
+  }
+  return updates;
+}
+
 /**
  * Append one line to a run file, then fold it into the run index the edit
- * hook reads (run-index.ts). The fold is best effort and never throws: the
- * line is recorded once it is appended, and an index the fold could not
- * bring up to date no longer matches the store, so its next reader rebuilds it.
+ * hook reads and into the file's sites shard (run-index.ts). Each fold is
+ * best effort and never throws: the line is recorded once it is appended,
+ * and an index or shard the fold could not bring up to date no longer
+ * matches the file, so its next reader rebuilds the index, and the next
+ * append writes its sites in full.
  */
-function appendLine(root: string, file: string, line: string): void {
+function appendLine(root: string, file: string, line: string, updates: ReadonlyMap<string, HeldSites | null>): void {
   const name = basename(file);
   const before = runFileIdentity(root, name);
   const offset = existsSync(file) ? statSync(file).size : 0;
   appendFileSync(file, line, "utf8");
   noteRunAppend(root, name, before, offset, parseLine);
+  noteSitesAppend(root, name, before, updates);
 }
 
 /** Append one run as one line; the file and folder are created on first write. Sites its enforcement already wrote in full in this file are written as a reference. */
 export function appendRun(root: string, record: RunRecord): string {
   if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
   mkdirSync(runsDir(root), { recursive: true });
-  const file = join(runsDir(root), `${record.session}.jsonl`);
-  appendLine(root, file, `${JSON.stringify(compactRecord(file, record))}\n`);
+  const name = `${record.session}.jsonl`;
+  const file = join(runsDir(root), name);
+  const written = compactRecord(root, name, record);
+  appendLine(root, file, `${JSON.stringify(written)}\n`, sitesUpdates(written));
   return file;
 }
 
@@ -321,7 +328,7 @@ export function appendRefutation(root: string, record: RefutationRecord): string
   if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
   mkdirSync(runsDir(root), { recursive: true });
   const file = join(runsDir(root), `${record.session}.jsonl`);
-  appendLine(root, file, `${JSON.stringify(record)}\n`);
+  appendLine(root, file, `${JSON.stringify(record)}\n`, new Map());
   return file;
 }
 
