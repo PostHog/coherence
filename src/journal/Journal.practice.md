@@ -1,5 +1,5 @@
 - close a defect: A defect is closed only when its whole class is guarded, or a decision says why fixing the instance suffices, and the guard has been seen to fire.
-  when: command defect | command classify | command resolved
+  when: command coherence defect | command cli.* defect | command classify | command resolved df-*
   step: classify it: record the defect with --class, --introduced and --caught, or classify one already recorded (classify <defect-id>); a class declared nowhere is declared once first, as the property class <name> of defect (lexicon propose define defect)
     leaves: the defect's or the classification's id
   step: sweep the codebase for siblings of the same shape (the same comparison, call or pattern wherever else it is written) and fix each one, then record the sweep: what was searched and every sibling it found, or that it found none

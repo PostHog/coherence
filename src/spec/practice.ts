@@ -5,6 +5,7 @@
  *
  *   - <name>: <sentence>
  *     when: command <words> | edit <glob> [adding <text>] | explicit
+ *       (a command word with * or ? is a glob over one word: command resolved df-*)
  *     step: <what to do>
  *       leaves: <the evidence the step leaves>       optional, indented under its step
  *     pitfall: <a way this practice has failed> (<record id or commit>)
@@ -306,19 +307,41 @@ export interface ToolUse {
   added: string;
 }
 
-/** Whether the words appear in the command as whole words, in order and adjacent. */
+/**
+ * One word of a command trigger as a test of one word of the command: a
+ * literal word is equal or not; a word with * or ? is a glob over that one
+ * word, * any run of non-blank characters and ? one, so df-* matches df-1a2b
+ * and never resolved df-1 as one quoted argument.
+ */
+function wordTest(word: string): (candidate: string) => boolean {
+  if (!/[*?]/.test(word)) return (candidate) => candidate === word;
+  const pattern = new RegExp(`^${[...word].map((ch) => (ch === "*" ? "\\S*" : ch === "?" ? "\\S" : ch.replace(/[.+^${}()|[\]\\]/g, "\\$&"))).join("")}$`);
+  return (candidate) => pattern.test(candidate);
+}
+
+/** Whether the words appear in the command as whole words, in order and adjacent; a glob word matches one word of the text. */
 export function commandMatches(words: string, command: string): boolean {
-  const escaped = words.trim().split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+");
+  const word = "[^\\s;&|()'\"]";
+  const escaped = words
+    .trim()
+    .split(/\s+/)
+    .map((w) => [...w].map((ch) => (ch === "*" ? `${word}*` : ch === "?" ? word : ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))).join(""))
+    .join("\\s+");
   return new RegExp(`(?:^|[\\s;&|(/'"])${escaped}(?=$|[\\s;&|)'"])`).test(command);
 }
 
-/** Whether the trigger's words are adjacent words of one simple command; the first may be a program named by its path (./bin/turn-knob). */
+/**
+ * Whether the trigger's words are adjacent words of one simple command, each
+ * equal to its word or matching it as a one-word glob (resolved df-* is
+ * resolved followed at once by an argument starting df-); the first may be a
+ * program named by its path (./bin/turn-knob).
+ */
 export function commandWordsMatch(words: string, command: readonly string[]): boolean {
-  const wanted = words.trim().split(/\s+/);
+  const wanted = words.trim().split(/\s+/).map(wordTest);
   for (let i = 0; i + wanted.length <= command.length; i += 1) {
     const first = command[i]!;
-    if (first !== wanted[0] && first.slice(first.lastIndexOf("/") + 1) !== wanted[0]) continue;
-    if (wanted.every((w, k) => k === 0 || command[i + k] === w)) return true;
+    if (!wanted[0]!(first) && !wanted[0]!(first.slice(first.lastIndexOf("/") + 1))) continue;
+    if (wanted.every((test, k) => k === 0 || test(command[i + k]!))) return true;
   }
   return false;
 }
