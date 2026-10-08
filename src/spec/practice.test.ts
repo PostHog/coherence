@@ -78,7 +78,7 @@ const WHO = ["--session", "s1", "--agent", "main"];
 
 /** A project with one component, its practice file, and the decision its pitfall cites. */
 function widget(extra = ""): { root: string; cite: string; run: ReturnType<typeof journal> } {
-  const root = project({ "src/widget/Widget.spec.md": SPEC });
+  const root = project({ "src/widget/Widget.spec.md": SPEC, "src/widget/knob.ts": "export const knob = 1;\n" });
   const run = journal(root);
   const decided = run("decide", "keep knobs oiled", "--because", "one seized", ...WHO);
   assert.equal(decided.code, 0, decided.err.join("\n"));

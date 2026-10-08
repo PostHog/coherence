@@ -16,6 +16,8 @@ import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from 
 import { join, relative, resolve, sep } from "node:path";
 import { CONFIG_FILE, readConfigFile, repositoryTop, under } from "../adapters/project-config.ts";
 import { readTach } from "../scaffold/boundaries.ts";
+import { projectPractices } from "../spec/model.ts";
+import { deadTriggers, deadTriggerText } from "../spec/practices.ts";
 
 export class AdoptError extends Error {}
 
@@ -28,6 +30,8 @@ export interface Adopted {
   created: boolean;
   /** The tach module whose path is this folder, when tach.toml at the top declares one. */
   tachModule: string | undefined;
+  /** The folder's own practice triggers that match no file in it, as spec --check will name them: a whole-repository adoption's paths, still relative to the repository top. */
+  deadTriggers: string[];
 }
 
 function realOr(path: string): string {
@@ -70,7 +74,16 @@ export function adopt(cwd: string, given: string): Adopted {
   const indent = text === undefined ? 2 : indentationOf(text);
   const newline = text === undefined || text === "" || text.endsWith("\n");
   writeFileSync(path, JSON.stringify(next, null, indent) + (newline ? "\n" : ""));
-  return { path, folder, created: text === undefined, tachModule: tachModuleFor(top, folder) };
+  return { path, folder, created: text === undefined, tachModule: tachModuleFor(top, folder), deadTriggers: deadTriggersIn(target) };
+}
+
+/** The dead triggers of the folder's own practices, or none when its practices cannot be read (spec --check says why). */
+function deadTriggersIn(folder: string): string[] {
+  try {
+    return deadTriggers(folder, projectPractices(folder)).map(deadTriggerText);
+  } catch {
+    return [];
+  }
 }
 
 /** The tach module whose folder is `folder`, read from tach.toml at the top; undefined when there is none or it will not read. */
@@ -91,6 +104,7 @@ export function adoptText(adopted: Adopted, cli: string): string {
     `${adopted.folder} is a project: its records live in ${adopted.folder}/.coherence, and it inherits the registry's keys unless a ${CONFIG_FILE} of its own there overrides them.`,
     `Next: work through the adoption practice from inside ${adopted.folder}: ${cli} query practice "adopt Coherence"`,
   ];
+  if (adopted.deadTriggers.length > 0) lines.push(`${adopted.deadTriggers.length} practice trigger${adopted.deadTriggers.length === 1 ? "" : "s"} in ${adopted.folder} name no file of the project it now is (a when: line's paths are relative to the project's folder):`, ...adopted.deadTriggers.map((t) => `  ${t}`));
   if (adopted.tachModule !== undefined) lines.push(`tach.toml declares ${adopted.folder} as the module ${adopted.tachModule}; draft its spec with: ${cli} scaffold import tach ${adopted.tachModule}`);
   lines.push(`Install the hooks once, at the repository top, if they are not yet: ${cli} hooks install --host claude (or --local for yourself alone).`);
   return lines.join("\n") + "\n";
