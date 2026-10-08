@@ -12,7 +12,7 @@
  * method, and a refusal would train a session to work around it.
  */
 
-import { spawnSync } from "node:child_process";
+import { readProjectText, spawnSync } from "./work-meter.ts";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { loadSpecModel, projectPractices, type SpecModel } from "../spec/model.ts";
@@ -268,7 +268,7 @@ export function deliveryPractices(root: string): ModelPractice[] {
     const stem = basename(rel).slice(0, -PRACTICE_SUFFIX.length);
     const folder = dirname(rel) === "." ? "." : dirname(rel);
     if (!existsSync(path) || !existsSync(join(root, folder, `${stem}.spec.md`))) continue;
-    for (const practice of parsePractices(readFileSync(path, "utf8"), rel).practices) {
+    for (const practice of parsePractices(readProjectText(path, "practice"), rel).practices) {
       out.push({ ...practice, id: `${folder}/${practice.name}`, component: folder, file: rel, state: "candidate", enactments: 0 });
     }
   }

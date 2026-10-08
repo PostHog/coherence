@@ -18,7 +18,7 @@
  * pre-existing, and a hook time with no version is version unknown.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "../lifecycle/work-meter.ts";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseSpec } from "../spec/grammar.ts";

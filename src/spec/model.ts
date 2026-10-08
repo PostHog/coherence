@@ -14,13 +14,15 @@
  * declared, unverified.
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
+import { countWork, readProjectText } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
-import { entryKey, latestByEnforcement, latestFor, loadRuns, witnessedRefutations, type Latest, type LoadedRuns, type RunRecord } from "../enforcement/record.ts";
+import { entryKey, latestByEnforcement, latestFor, loadRuns, parseLine as parseRunLine, witnessedRefutations, type Latest, type LoadedRuns, type RunRecord } from "../enforcement/record.ts";
+import { latestSeeing } from "../enforcement/run-index.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
-import { walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
+import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
 import { effectiveConfig } from "../adapters/project-config.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
 import { invariantFloorGaps, invariantFloorProblems, rawFloorGaps } from "./floor.ts";
@@ -93,8 +95,12 @@ export interface SpecModel {
   components: Component[];
   problems: Problem[];
   counts: Counts;
-  /** When runs exist: the time of the latest, and how many run lines were unreadable. */
-  runs: { latest: string; count: number; damaged: number } | undefined;
+  /**
+   * When runs exist: the time of the latest, how many run lines were
+   * unreadable, and the time of the latest full run (every bullet, both
+   * forms, graded) dated no later than now, undefined when none is.
+   */
+  runs: { latest: string; count: number; damaged: number; graded: string | undefined } | undefined;
   /** The floor on defects: closes with neither a guard nor a decision, and guard failures; advisory, never a problem. */
   defects?: DefectFloor;
 }
@@ -148,6 +154,53 @@ function parentOf(folder: string, folders: ReadonlySet<string>): string | undefi
   }
 }
 
+/** One chokepoint invariant as the check at an edit reads it: its component, its enforcements, and the files its latest run saw. */
+export interface ChokepointEntry {
+  component: string;
+  name: string;
+  enforcements: Invariant["enforcements"];
+  latest: { form: "chokepoint"; files: string[]; language?: string }[];
+}
+
+/**
+ * Every chokepoint invariant in the project, the light way an edit can
+ * afford: each spec the spec model would read, read and parsed (specs are
+ * small; nothing of them is kept between calls), with no state derived and
+ * no practice, handler or journal read; and, for each of `written`, whether
+ * an invariant's latest run saw it, from the run index (run-index.ts). Throws
+ * when a spec or the index cannot be read; the caller falls back to the
+ * whole model and says so. An edit that touches an invariant runs the check
+ * over these entries alone.
+ */
+export function chokepointIndex(rootGiven: string, written: readonly string[] = []): ChokepointEntry[] {
+  const root = resolve(rootGiven);
+  const config = readConfig(root);
+  const seeing = written.length === 0 ? undefined : latestSeeing(root, written, parseRunLine);
+  const entries: ChokepointEntry[] = [];
+  const seen = new Set<string>();
+  // The specs findSpecs would find, from a listing of the specs alone.
+  const bounds = walkBounds(root, config.ignore);
+  const specs = projectFilesEnding(root, SPEC_SUFFIX).filter((rel) => exclusionOf(rel, bounds) === undefined).map((rel) => join(root, rel));
+  // No spec from the light listing is a claim to check, never an answer: a listing that matched nothing it should have
+  // (a pathspec read another way) would leave every edit unchecked. The walk the spec model reads decides.
+  if (specs.length === 0 && findSpecs(root, config.ignore).length > 0) throw new Error("the listing of the specs found none where the project holds some");
+  for (const specPath of specs) {
+    const folder = folderOf(root, specPath);
+    // A folder holds one spec, as the model reads it: a second is a problem there, and nothing here.
+    if (seen.has(folder)) continue;
+    seen.add(folder);
+    const rel = relative(root, specPath).split(sep).join("/");
+    for (const invariant of parseSpec(readProjectText(specPath, "spec"), rel).invariants) {
+      if (!invariant.enforcements.some((e) => e.form === "chokepoint")) continue;
+      const key = entryKey(folder, invariant.name, "chokepoint");
+      // The latest run's whole file list and its language, as the model carries them: the run of a touched invariant asks that language first.
+      const last = seeing?.latest.get(key);
+      entries.push({ component: folder, name: invariant.name, enforcements: invariant.enforcements, latest: last === undefined ? [] : [{ form: "chokepoint", files: last.files, ...(last.language === undefined ? {} : { language: last.language }) }] });
+    }
+  }
+  return entries;
+}
+
 export interface LoadOptions {
   seed?: Seed | undefined;
   /** Read .coherence/runs and derive run-informed state (default true). */
@@ -157,6 +210,7 @@ export interface LoadOptions {
 }
 
 export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): SpecModel {
+  countWork("spec model");
   const root = resolve(rootGiven);
   if (!existsSync(root) || !statSync(root).isDirectory()) throw new Error(`${root}: not a folder`);
   const seed = options.seed ?? loadSeed();
@@ -170,7 +224,15 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   const runs =
     loadedRuns.records.length === 0
       ? undefined
-      : { latest: loadedRuns.records[loadedRuns.records.length - 1]!.at, count: loadedRuns.records.length, damaged: loadedRuns.damaged.length };
+      : {
+          latest: loadedRuns.records[loadedRuns.records.length - 1]!.at,
+          count: loadedRuns.records.length,
+          damaged: loadedRuns.damaged.length,
+          // Only a full run moves the floor for every bullet; a run dated in the future (a skewed clock, a hand-written line) says nothing of now.
+          graded: loadedRuns.records
+            .filter((record) => record.full === true && record.invariants.some((entry) => entry.ungraded !== true) && Date.parse(record.at) <= Date.now())
+            .reduce<string | undefined>((at, record) => (at === undefined || record.at > at ? record.at : at), undefined),
+        };
 
   const byFolder = new Map<string, { folder: string; specPath: string; parsed: ReturnType<typeof parseSpec> }>();
   for (const specPath of findSpecs(root, config.ignore)) {
@@ -181,7 +243,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       problems.push({ file: rel, line: 1, message: `a folder holds one spec; ${existing.specPath} is already this component's` });
       continue;
     }
-    const parsed = parseSpec(readFileSync(specPath, "utf8"), rel, { seed });
+    const parsed = parseSpec(readProjectText(specPath, "spec"), rel, { seed });
     problems.push(...parsed.problems);
     byFolder.set(folder, { folder, specPath: rel, parsed });
   }
@@ -203,7 +265,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
       problems.push({ file: rel, line: 1, message: `a folder holds one practice file; ${practiceFiles.get(folder)!.file} is already this component's` });
       continue;
     }
-    const parsed = parsePractices(readFileSync(join(root, rel), "utf8"), rel);
+    const parsed = parsePractices(readProjectText(join(root, rel), "practice"), rel);
     problems.push(...parsed.problems);
     practiceFiles.set(folder, { file: rel, parsed });
   }
@@ -397,7 +459,7 @@ function entranceGuardProblems(root: string, components: readonly Component[]): 
         if (!SOURCE.test(value)) return false;
         return [owner.folder === "." ? value : `${owner.folder}/${value}`, value].some((path) => {
           const at = resolve(root, path);
-          return existsSync(at) && statSync(at).isFile() && declaresAtTop(readFileSync(at, "utf8"), name);
+          return existsSync(at) && statSync(at).isFile() && declaresAtTop(readProjectText(at, "source"), name);
         });
       });
       if (!named) {
@@ -496,7 +558,7 @@ function handlerFile(root: string, folder: string, handler: string, ignore: read
   for (const candidate of candidates) {
     const path = resolve(root, candidate);
     if (!existsSync(path) || !statSync(path).isFile()) continue;
-    if (declaresAtTop(readFileSync(path, "utf8"), name)) return candidate;
+    if (declaresAtTop(readProjectText(path, "source"), name)) return candidate;
   }
   return {
     reason:

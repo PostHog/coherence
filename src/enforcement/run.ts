@@ -41,6 +41,12 @@ export interface RunOptions {
   invariants?: readonly string[] | undefined;
   /** Files (project-relative) whose text changed since the instrument last read them; the warm server re-reads them first. */
   refresh?: readonly string[] | undefined;
+  /**
+   * False for an edit's check: the run's entries are recorded ungraded, with
+   * no state derived, since deriving one reads the whole spec model and run
+   * store; the invariant floor counts only graded entries. A full run grades.
+   */
+  grade?: boolean | undefined;
   /** An adapter to use instead of the warm server (tests, and `--no-server`); in a multi-language project, for its own language. */
   adapter?: LanguageAdapter | undefined;
   /** Adapters by language to use instead of the warm servers (tests, and `--no-server` in a multi-language project). */
@@ -108,7 +114,7 @@ export interface RunOutcome {
   latency?: LatencyReading;
 }
 
-function chokepointEnforcements(invariant: ModelInvariant): { protects: string; chokepoint: string; from: ChokepointFrom | undefined }[] {
+function chokepointEnforcements(invariant: Pick<ModelInvariant, "enforcements">): { protects: string; chokepoint: string; from: ChokepointFrom | undefined }[] {
   return invariant.enforcements.flatMap((e) => (e.form === "chokepoint" ? [{ protects: e.protects, chokepoint: e.chokepoint, from: e.from }] : []));
 }
 
@@ -117,7 +123,7 @@ function totalityEnforcements(invariant: ModelInvariant): { over: string; via: s
 }
 
 /** Whether a chokepoint invariant may involve a file: its latest run touched it, or the file's text carries one of its names. */
-export function mayTouch(invariant: ModelInvariant, file: string, text: string | undefined): boolean {
+export function mayTouch(invariant: Pick<ModelInvariant, "enforcements"> & { latest: readonly { form: string; files: readonly string[] }[] }, file: string, text: string | undefined): boolean {
   const latest = invariant.latest.find((l) => l.form === "chokepoint");
   if (latest !== undefined && latest.files.includes(file)) return true;
   if (text === undefined) return false;
@@ -288,7 +294,8 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   const details: EntryDetail[] = [];
   const needsAdapter = wantChokepoints && selected.some(({ invariant }) => chokepointEnforcements(invariant).length > 0);
   // A totality oracle's refutation is the record `refute` wrote, never the bullet's own refuted: line.
-  const recorded = new Set(loadRuns(root).refutations.map((r) => entryKey(r.component, r.name, r.form)));
+  // Read only when a totality oracle is checked: an edit's chokepoint check never reads the run history.
+  const recorded = wantTotality ? new Set(loadRuns(root).refutations.map((r) => entryKey(r.component, r.name, r.form))) : new Set<string>();
   let listed: string[] | undefined;
   const files = (): string[] => (listed ??= projectFiles(root));
   const plans: ChokepointPlan[] = wantChokepoints
@@ -482,9 +489,12 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     latency: Date.now() - started,
     load,
     ...(batched.size === 0 ? {} : { batch: { ms: totalBatch } }),
+    // A full run: every bullet, both forms, from the project's own model, and graded.
+    ...(chosen.size === 0 && options.form === undefined && options.model === undefined && options.grade !== false ? { full: true as const } : {}),
     invariants: details.map((d) => d.entry),
   };
-  gradeRecord(root, record);
+  if (options.grade === false) for (const entry of record.invariants) entry.ungraded = true;
+  else gradeRecord(root, record);
   const file = appendRun(root, record);
   const outcome: RunOutcome = { record, file, details, instrumentReason, instrumentDied: needsAdapter && instrumentReason !== undefined };
   if (batched.size > 0) {

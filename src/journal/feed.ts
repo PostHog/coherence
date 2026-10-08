@@ -14,6 +14,11 @@
  * once the print succeeded, so a feed that failed to reach the agent is
  * shown again next time.
  *
+ * A look reads only the session files whose identity (inode, size,
+ * modification and change time) moved since the session's last look, kept in
+ * .coherence/feed/<session>.seen beside the cursor; a file that stands holds
+ * no record that look did not see. Without the memo every file is read.
+ *
  * A session that meets the feed for the first time has no cursor. The cursor
  * is set to the latest record then and nothing is printed: the feed is the
  * delta since the last look, and what came before is the journal, one
@@ -32,12 +37,12 @@
  * once the block that names them was handed to the host.
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { SESSION_TOKEN } from "./work.ts";
 import { cursorAfter, formatCursor, parseCursor, recordsAfter, subjectLine, type Cursor } from "./read.ts";
 import type { JournalRecord } from "./record.ts";
-import { loadJournal, type Loaded } from "./store.ts";
+import { journalFileKeys, loadJournal, loadJournalFiles, type Loaded } from "./store.ts";
 
 export const FEED_DIR = join(".coherence", "feed");
 
@@ -81,9 +86,12 @@ function latestCursor(loaded: Loaded): Cursor | null {
  */
 export function openFeed(root: string, session: string): boolean {
   if (readCursor(root, session) !== null) return false;
+  // The files' identities are taken before the read: the cursor is the latest record of all, so no file that stands can hold a later one.
+  const keys = journalFileKeys(root);
   const latest = latestCursor(loadJournal(root));
   if (latest === null) return false;
   writeCursor(root, session, latest);
+  writeSeen(root, session, keys);
   return true;
 }
 
@@ -103,16 +111,24 @@ export interface Feed {
 export function peerFeed(root: string, session: string, ownAgent?: string, shown: ReadonlySet<string> = new Set()): Feed {
   const none: Feed = { text: "", commit: () => {} };
   if (cursorFile(root, session) === undefined) return none;
-  const loaded = loadJournal(root);
   const since = readCursor(root, session);
   if (since === null) {
     openFeed(root, session);
     return none;
   }
+  // Only the session files that changed since this session's last look are read: a file whose identity (inode, size,
+  // modification and change time) stands holds no record the last look did not see. Without a memo, every file is read.
+  const keys = journalFileKeys(root);
+  const seen = readSeen(root, session);
+  const changed = seen === undefined ? undefined : [...keys].filter(([name, key]) => seen[name] !== key).map(([name]) => name);
+  const loaded = loadJournalFiles(root, changed);
   const all = recordsAfter(loaded, since, {});
   const peer = (record: JournalRecord): boolean => record.session !== session || (ownAgent !== undefined && record.agent !== ownAgent);
   const fresh = all.filter((record) => peer(record) && FEED_KINDS.has(record.kind) && !shown.has(record.id));
   const next = cursorAfter(all, since);
+  const keep = (): void => writeSeen(root, session, keys);
+  // Nothing a peer recorded to show in what was read: the files are spent at once. Otherwise they are spent with the cursor, once the text was delivered.
+  if (!all.some((record) => peer(record) && FEED_KINDS.has(record.kind))) keep();
   if (fresh.length === 0 || next === null) return { text: "", commit: next === null ? () => {} : () => writeCursor(root, session, next) };
   const first = fresh.slice(0, FEED_CAP);
   const lines = [
@@ -120,7 +136,32 @@ export function peerFeed(root: string, session: string, ownAgent?: string, shown
     ...first.map(subjectLine),
   ];
   if (fresh.length > first.length) lines.push(`and ${fresh.length - first.length} more; run: journal --since ${formatCursor(since)}`);
-  return { text: lines.join("\n") + "\n", commit: () => writeCursor(root, session, next) };
+  return { text: lines.join("\n") + "\n", commit: () => { writeCursor(root, session, next); keep(); } };
+}
+
+function seenFile(root: string, session: string): string {
+  return join(root, FEED_DIR, `${session}.seen`);
+}
+
+/** The journal files' identities as this session's last look found them; undefined when there is no memo, or it is torn. */
+function readSeen(root: string, session: string): Record<string, string> | undefined {
+  try {
+    const value = JSON.parse(readFileSync(seenFile(root, session), "utf8")) as unknown;
+    return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, string>) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeSeen(root: string, session: string, keys: ReadonlyMap<string, string>): void {
+  try {
+    mkdirSync(join(root, FEED_DIR), { recursive: true });
+    const aside = `${seenFile(root, session)}.${process.pid}.tmp`;
+    writeFileSync(aside, JSON.stringify(Object.fromEntries(keys)));
+    renameSync(aside, seenFile(root, session));
+  } catch {
+    // Without the memo the next look reads every file again: slower, never a record lost.
+  }
 }
 
 /* -------------------------------------------------------------- returns */

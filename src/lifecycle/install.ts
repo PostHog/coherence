@@ -41,7 +41,7 @@
  * install wrote and no agent host keeps a hook of ours.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "./work-meter.ts";
 import { mkdir, readFile, rm, rmdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";

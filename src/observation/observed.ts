@@ -6,7 +6,7 @@
  * fact it gives, never read as current.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "../lifecycle/work-meter.ts";
 import { resolve } from "node:path";
 import type { Io } from "../journal/cli.ts";
 import { gitState } from "../journal/store.ts";

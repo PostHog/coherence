@@ -131,7 +131,8 @@ test("a session at the repository top gets orient once, at its first tool use in
     assert.ok(!existsSync(join(billing, ".coherence")) && !existsSync(join(top, ".coherence")), "and nothing is written anywhere");
     const first = await hook("PostToolUse", { tool_name: "Edit", tool_input: { file_path: join(billing, "src/mask.ts") } });
     assert.match(first, ORIENT, "the first tool use inside the project carries orient");
-    assert.match(first, /card numbers masked/);
+    // The nested project's own: its practice. Its invariant is no longer listed open here, since the edit's own check ran before orient read the spec.
+    assert.match(first, /list before charging/);
     const second = await hook("PreToolUse", { tool_name: "Edit", tool_input: { file_path: join(billing, "src/store.ts"), new_string: "x" } });
     assert.doesNotMatch(second, ORIENT, "and only the first");
     assert.doesNotMatch(await hook("PreToolUse", { tool_name: "Bash", tool_input: { command: "ls" } }), ORIENT, "nor a command at the top once the session has entered");

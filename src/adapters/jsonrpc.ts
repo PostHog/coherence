@@ -9,7 +9,7 @@
  * and are otherwise ignored.
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { countWork, spawn, type ChildProcess } from "../lifecycle/work-meter.ts";
 
 interface Pending {
   resolve: (value: unknown) => void;
@@ -68,6 +68,7 @@ export class JsonRpcClient {
   }
 
   request<T>(method: string, params: unknown, timeoutMs = 60_000): Promise<T> {
+    countWork("server request");
     if (this.exited !== undefined) return Promise.reject(this.exited);
     const id = this.nextId++;
     return new Promise<T>((resolve, reject) => {

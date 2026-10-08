@@ -60,6 +60,8 @@ export function enforcesOf(invariant: Pick<ModelInvariant, "enforcements">, form
 /** Whether an entry graded its bullet an invariant: its recorded state, or for an entry from before that was recorded, a pass with a witnessed refutation. */
 function gradedInvariant(entry: RunEntry, at: string, firstRefuted: ReadonlyMap<string, string>): boolean {
   if (entry.state !== undefined) return entry.state === "invariant";
+  // An edit's check derived no state: it grades nothing, either way.
+  if (entry.ungraded === true) return false;
   if (entry.verdict !== "pass") return false;
   if (entry.form === "chokepoint") return CHOKEPOINT_WITNESSED.has(entry.refutation);
   const refuted = firstRefuted.get(entryKey(entry.component, entry.name, entry.form));
