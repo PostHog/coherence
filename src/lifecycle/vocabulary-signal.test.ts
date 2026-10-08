@@ -170,10 +170,10 @@ test("a Coherence name an adopter's code declares is the project's own sense: it
       "export class Config {}\nexport function run(): void {}\nexport type Spec = string;\nexport interface Scope { book: string }\nexport interface Structure { depth: number }\n",
     );
     writeFileSync(join(root, "books/settings.py"), "class Config:\n    pass\n");
-    writeFileSync(join(root, "books/notes.md"), "Each config is loaded once.\nThe run starts at dawn.\nA spec names its ledger.\nThe scope is one book.\nThe structure is a tree.\n");
+    writeFileSync(join(root, "books/notes.md"), "Each config is loaded once.\nThe run starts at dawn.\nA spec names its book.\nThe scope is one book.\nThe structure is a tree.\n");
     writeFileSync(
       join(root, "books/Books.spec.md"),
-      "# books\n\n## invariants\n- ledger balance: Each run of the ledger balances within one scope, under one config and spec.\n  because: the structure of a ledger is its run\n\n## structure\n",
+      "# books\n\n## invariants\n- books balance: Each run of the books balances within one scope, under one config and spec.\n  because: the structure of a book is its run\n\n## structure\n",
     );
     const report = await lexiconCoverage(root);
     const risk = (term: string): string | undefined =>
