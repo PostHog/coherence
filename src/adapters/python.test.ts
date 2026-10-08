@@ -126,7 +126,7 @@ A store with one door out.
 let root: string;
 let adapter: PythonAdapter;
 const hint = { component: ".", testFolders: readEnforcementConfig("/nowhere").testFolders };
-const serverPresent = locateServer(process.cwd()) !== undefined;
+const serverPresent = locateServer(process.cwd()).found;
 
 const TEST_PYTHON = fileURLToPath(new URL("../../.venv/bin/python", import.meta.url));
 

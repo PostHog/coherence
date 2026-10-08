@@ -14,16 +14,17 @@
  * declared, unverified.
  */
 
-import { existsSync, statSync } from "node:fs";
-import { countWork, readProjectText } from "../lifecycle/work-meter.ts";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { countWork, readProjectText, spawnSync } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
+import { creditedByCrossingAlone, crossingChecksTrust, resolveCovered } from "./covers.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, parseLine as parseRunLine, witnessedRefutations, type Latest, type LoadedRuns, type RunRecord } from "../enforcement/record.ts";
 import { latestSeeing } from "../enforcement/run-index.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
-import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles } from "../adapters/project-files.ts";
-import { effectiveConfig } from "../adapters/project-config.ts";
+import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles, type Walked } from "../adapters/project-files.ts";
+import { configuredName, effectiveConfig, lexiconFileOf, readConfigFile } from "../adapters/project-config.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
 import { invariantFloorGaps, invariantFloorProblems, rawFloorGaps } from "./floor.ts";
 import { declaredClasses, defectFloor, defectStates, type DefectFloor, type GuardStanding } from "../journal/defects.ts";
@@ -103,6 +104,8 @@ export interface SpecModel {
   runs: { latest: string; count: number; damaged: number; graded: string | undefined } | undefined;
   /** The floor on defects: closes with neither a guard nor a decision, and guard failures; advisory, never a problem. */
   defects?: DefectFloor;
+  /** The entrances an invariant covered by its crossing alone and no longer does, until it names them (covers.ts); advisory, never a problem. Absent when none. */
+  crossingAlone?: CrossingAloneCredit[];
 }
 
 interface Config {
@@ -119,6 +122,86 @@ function readConfig(root: string): Config {
   if (Array.isArray(record["ignore"])) config.ignore = record["ignore"].filter((v): v is string => typeof v === "string");
   if (typeof record["entryDir"] === "string") config.entryDir = record["entryDir"];
   return config;
+}
+
+/**
+ * The project's own ignore entries that name nothing: no file or folder at
+ * that path from the root, for a bare name no folder of that name on any
+ * project file's way down, and nothing git ignores by it. Such an entry
+ * leaves nothing out, so a typo or a path that moved would bound nothing and
+ * say nothing. An entry git ignores (dist, build: output absent from a fresh
+ * checkout, or present only in a package) bounds that output whenever it
+ * exists, so it is no typo. A registry's entries are its own to check; only
+ * the project's file is read. The walk the model already took answers, and
+ * git is asked once, only when some entry names nothing there.
+ */
+function ignoreProblems(root: string, walked: Walked): Problem[] {
+  const path = join(root, CONFIG_FILE);
+  const own = readConfigFile(path)?.["ignore"];
+  if (!Array.isArray(own)) return [];
+  let folders: Set<string> | undefined;
+  const folderSet = (): Set<string> =>
+    (folders ??= new Set([...walked.files, ...walked.excluded.map((e) => e.file)].flatMap((rel) => rel.split("/").slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join("/")))));
+  const missing: { entry: string; key: string }[] = [];
+  for (const entry of own) {
+    if (typeof entry !== "string") continue;
+    const key = entry.split(sep).join("/").replace(/^(\.\/)+/, "").replace(/\/+$/, "");
+    if (key === "" || existsSync(join(root, key))) continue;
+    if (!key.includes("/") && [...folderSet()].some((folder) => folder === key || folder.endsWith("/" + key))) continue;
+    missing.push({ entry, key });
+  }
+  if (missing.length === 0) return [];
+  const ignored = gitIgnoredEntries(root, missing.map((m) => m.key), folderSet());
+  const text = readFileSync(path, "utf8").split("\n");
+  return missing
+    .filter((m) => !ignored.has(m.key))
+    .map(({ entry }) => ({
+      file: CONFIG_FILE,
+      line: Math.max(text.findIndex((line) => line.includes(JSON.stringify(entry))) + 1, 1),
+      message: `ignore entry "${entry}" names no file or folder in the project and nothing git ignores, so it leaves nothing out: a typo, or a path that moved? A folder is named by its name or its path from the root, a file by its path from the root`,
+    }));
+}
+
+/**
+ * The entries git ignores, asked in one git check-ignore: a path entry as a
+ * file and as a folder at its path, a bare name as a folder at the root and
+ * under every folder the project holds (a package's own .gitignore). Outside
+ * a repository nothing is ignored.
+ */
+function gitIgnoredEntries(root: string, keys: readonly string[], folders: ReadonlySet<string>): Set<string> {
+  const asked = new Map<string, string>();
+  for (const key of keys) {
+    const at = key.includes("/") ? [key] : [key, ...[...folders].map((folder) => `${folder}/${key}`)];
+    for (const candidate of at) for (const spelled of [candidate, candidate + "/"]) asked.set(spelled, key);
+  }
+  const result = spawnSync("git", ["check-ignore", "--no-index", "--stdin"], { cwd: root, encoding: "utf8", input: [...asked.keys()].join("\n") + "\n" });
+  // 0: some ignored, 1: none; anything else (no repository) leaves every entry reported.
+  if (result.status !== 0) return new Set();
+  return new Set(String(result.stdout).split("\n").filter((line) => line !== "").map((line) => asked.get(line)).filter((key): key is string => key !== undefined));
+}
+
+/**
+ * A project lexicon whose stored project field disagrees with the name the
+ * config gives: the config's name is the one every reader takes
+ * (projectName), so the stored one is a second copy that has drifted. A
+ * lexicon that will not parse is the lexicon check's to refuse.
+ */
+function storedNameProblems(root: string): Problem[] {
+  const name = configuredName(root);
+  if (name === undefined) return [];
+  let path: string;
+  let stored: unknown;
+  try {
+    path = lexiconFileOf(root);
+    if (!existsSync(path)) return [];
+    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+    stored = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>)["project"] : undefined;
+  } catch {
+    return [];
+  }
+  if (typeof stored !== "string" || stored.trim().toLowerCase() === name.toLowerCase()) return [];
+  const line = readFileSync(path, "utf8").split("\n").findIndex((text) => text.includes('"project"')) + 1;
+  return [{ file: relative(root, path).split(sep).join("/"), line: Math.max(line, 1), message: `the lexicon stores project "${stored}" and the config names the project "${name}"; the config's name is the one read, so drop the lexicon's project field or make it agree` }];
 }
 
 /** Every spec file under the root, sorted by path. */
@@ -234,8 +317,11 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
             .reduce<string | undefined>((at, record) => (at === undefined || record.at > at ? record.at : at), undefined),
         };
 
+  // One walk of the project serves the specs, the practice files and the ignore list's check.
+  const walked = walkedProjectFiles(walkBounds(root, config.ignore));
+  problems.push(...ignoreProblems(root, walked), ...storedNameProblems(root));
   const byFolder = new Map<string, { folder: string; specPath: string; parsed: ReturnType<typeof parseSpec> }>();
-  for (const specPath of findSpecs(root, config.ignore)) {
+  for (const specPath of walked.files.filter((rel) => rel.endsWith(SPEC_SUFFIX)).map((rel) => join(root, rel)).sort()) {
     const folder = folderOf(root, specPath);
     const rel = relative(root, specPath).split(sep).join("/");
     const existing = byFolder.get(folder);
@@ -250,7 +336,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
 
   // A practice file stands beside its folder's spec, with the spec's stem (d-861e8319).
   const practiceFiles = new Map<string, { file: string; parsed: ReturnType<typeof parsePractices> }>();
-  for (const rel of walkedFiles(root, ".", config.ignore).filter((f) => f.endsWith(PRACTICE_SUFFIX)).sort()) {
+  for (const rel of walked.files.filter((f) => f.endsWith(PRACTICE_SUFFIX)).sort()) {
     const folder = folderOf(root, join(root, rel));
     const spec = byFolder.get(folder);
     if (spec === undefined) {
@@ -350,6 +436,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   components.sort((a, b) => a.folder.localeCompare(b.folder));
   problems.push(...entranceTrustProblems(components, trustLevels));
   problems.push(...entranceGuardProblems(root, components));
+  problems.push(...coveredEntranceProblems(components));
   // The invariant floor (df-f3826eaa): a bullet the run store graded an invariant is not demoted without a decision; the journal is read only when one was.
   const demoted = rawFloorGaps(components, loadedRuns.records, loadedRuns.refutations);
   if (demoted.length > 0) problems.push(...invariantFloorProblems(components, invariantFloorGaps(demoted, practiceFiles.size === 0 ? journalRecords(root) : records)));
@@ -372,7 +459,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   // The journal is read for defects even where no practice file asked for it; a project with no spec reads none.
   const journal = practiceFiles.size === 0 && components.length > 0 ? journalRecords(root) : records;
   const defects = defectFloor(defectStates(journal), guardStanding(components), declaredClasses(root));
-  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs, defects };
+  const crossingAlone = crossingAloneCredits(components, trustLevels);
+  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs, defects, ...(crossingAlone.length === 0 ? {} : { crossingAlone }) };
 }
 
 /** How a defect's guard stands in this model: the invariant <folder>/<name> is declared and its refutation witnessed, declared only, or missing. */
@@ -433,6 +521,83 @@ function entranceTrustProblems(components: readonly Component[], trustLevels: re
 }
 
 const HANDLER = /^([A-Za-z_$][\w$]*)(?:\s+in\s+(\S+))?$/;
+
+/** The trust an entrance carries in, as the model can tell without a reading: the level it declares, else the entering side of every crossing whose chokepoint is its handler, in the component holding it. */
+function entranceTrust(entrance: ModelEntrance, components: readonly Component[]): string[] {
+  if (entrance.trust !== undefined) return [entrance.trust];
+  const handler = entrance.handler === undefined ? undefined : HANDLER.exec(entrance.handler.trim())?.[1];
+  const holder = entrance.file === undefined ? undefined : componentHolding(components, entrance.file);
+  if (handler === undefined || holder === undefined) return [];
+  return [...new Set(holder.invariants.flatMap((invariant) => (invariant.crossing !== undefined && invariant.enforcements.some((e) => e.form === "chokepoint" && HANDLER.exec(e.chokepoint.trim())?.[1] === handler) ? [invariant.crossing.from] : [])))];
+}
+
+/**
+ * An invariant's entrances: line, checked: every name is an entrance some
+ * spec declares (covers.ts resolves it), and an entrance that declares its
+ * trust carries in a level the invariant's crossing checks, entering from it
+ * or entering it. A name that resolves to nothing, or to an entrance whose
+ * trust the crossing never checks, would credit nothing while reading as
+ * coverage, so each is a problem.
+ */
+function coveredEntranceProblems(components: readonly Component[]): Problem[] {
+  const problems: Problem[] = [];
+  for (const component of components) {
+    for (const invariant of component.invariants) {
+      const names = invariant.entrances?.names;
+      if (names === undefined || names === "none") continue;
+      const line = invariant.entrances!.line;
+      for (const name of names) {
+        const resolved = resolveCovered(name, component.folder, components);
+        if ("problem" in resolved) {
+          problems.push({ file: component.specPath, line, message: `entrances on ${invariant.name}: ${resolved.problem}` });
+          continue;
+        }
+        const entrance = components.find((c) => c.folder === resolved.entrance.component)?.entrances.find((e) => e.name === resolved.entrance.name);
+        if (entrance?.trust === undefined || crossingChecksTrust(invariant.crossing, [entrance.trust])) continue;
+        problems.push({ file: component.specPath, line, message: `entrances on ${invariant.name} names ${name}, which carries ${entrance.trust} in, but its crossing ${invariant.crossing!.from} -> ${invariant.crossing!.to} neither enters from ${entrance.trust} nor enters it, so it checks nothing that entrance sends` });
+      }
+    }
+  }
+  return problems;
+}
+
+/** An entrance an invariant covered by its crossing alone, before entrances: (PR #4), and no longer covers: advisory, never a problem. */
+export interface CrossingAloneCredit {
+  invariant: { component: string; name: string; specPath: string; line: number };
+  entrance: { component: string; name: string; specPath: string; line: number };
+}
+
+/**
+ * Every entrance that lost a test-backed control when crossings stopped
+ * covering entrances by themselves: a verified invariant enforced by a
+ * totality oracle alone, with no entrances: line, owned where the entrance is
+ * declared or its handler lies, whose crossing checks the entrance's trust,
+ * on an entrance carrying a level from outside the system's control in, where
+ * the loss can leave it with no traced control. An entrance that declares
+ * control: none needed none. Naming the entrances
+ * it checks (or none) on the invariant ends the advisory.
+ */
+export function crossingAloneCredits(components: readonly Component[], trustLevels: readonly TrustLevel[]): CrossingAloneCredit[] {
+  const outside = new Set(trustLevels.filter((level) => level.outside).map((level) => level.name));
+  const credits: CrossingAloneCredit[] = [];
+  for (const component of components) {
+    for (const entrance of component.entrances) {
+      if (entrance.noControl !== undefined) continue;
+      const holder = entrance.file === undefined ? undefined : componentHolding(components, entrance.file);
+      const owners = [...new Set([component.folder, ...(holder === undefined ? [] : [holder.folder])])];
+      const trust = entranceTrust(entrance, components);
+      // Only where the loss can open a gap: work carried in from outside the system's control (a level marked outside).
+      if (!trust.some((level) => outside.has(level))) continue;
+      for (const owner of components.filter((c) => owners.includes(c.folder))) {
+        for (const invariant of owner.invariants) {
+          if (invariant.state !== "invariant" || !creditedByCrossingAlone(invariant, owners, trust)) continue;
+          credits.push({ invariant: { component: owner.folder, name: invariant.name, specPath: owner.specPath, line: invariant.line }, entrance: { component: component.folder, name: entrance.name, specPath: component.specPath, line: entrance.line } });
+        }
+      }
+    }
+  }
+  return credits;
+}
 
 /**
  * An entrance's declared guard, checked (d-127ab8e4): it names a chokepoint

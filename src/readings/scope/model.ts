@@ -229,6 +229,8 @@ export interface SpecInvariant {
   enforcements: SpecEnforcement[];
   because: string | undefined;
   crossing: SpecCrossing | undefined;
+  /** The entrances it names as covered (an entrances: line), as written; absent when it names none, and it covers no entrance by its crossing alone. */
+  entrances?: { names: string[] | "none"; line: number } | undefined;
   refutations: SpecRefutation[];
   kinds: string[] | "none" | undefined;
   checklist: SpecChecklistLine[];
@@ -343,6 +345,12 @@ export interface RunsData {
    * Absent when nothing was left out.
    */
   omitted?: number;
+  /**
+   * For an older run the window keeps only for the latest entries it holds,
+   * the verdicts of its other entries, which later runs superseded, as
+   * counts, by run id: the run's totals stay true without embedding them.
+   */
+  superseded?: Record<string, { pass: number; fail: number; notRun: number }>;
 }
 
 /* The journal, as src/journal records it. */
@@ -554,8 +562,27 @@ export type InterfaceReading =
       candidates?: EntranceCandidate[];
       /** Present when the reading was scoped to some entrances' routes rather than read whole: never recorded as the tree's reading. */
       scoped?: ScopedReading;
+      /** What the reading did with the language server's kept answers (kept-answers.ts): absent from a reading taken before they were kept. */
+      kept?: KeptReport;
     }
   | { kind: "unread"; because: string };
+
+/**
+ * What a reading did with the kept answers: how many it reused without
+ * asking the server, how many it asked anew, how many files had changed
+ * since they were kept and how many answers those changes dropped, and,
+ * when nothing kept was used at all, why.
+ */
+export interface KeptReport {
+  reused: number;
+  asked: number;
+  changed: number;
+  dropped: number;
+  /** Why nothing kept from an earlier reading was used, when nothing was: every question was asked. */
+  whole?: string;
+  /** In a reading of several languages that reused some: each language that used nothing kept, with why. */
+  unused?: string[];
+}
 
 /**
  * What a scoped reading read: the entrances it started from (the named ones

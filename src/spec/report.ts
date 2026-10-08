@@ -90,9 +90,34 @@ export function formatReport(model: SpecModel): string {
   if (model.components.length === 0) lines.push(`no spec under ${model.root}`);
   for (const problem of model.problems) lines.push(`PROBLEM  ${problem.file}:${problem.line}  ${problem.message}`);
   lines.push(formatCounts(model));
+  lines.push(...crossingAloneLines(model.crossingAlone));
   // Advisory, after the counts: a close with neither a guard nor a decision, and each guard failure (defects.ts).
   lines.push(...defectFloorLines(model.defects));
   return lines.join("\n") + "\n";
+}
+
+/** How many entrance names one advisory line lists before it counts the rest. */
+const NAMED = 6;
+
+/**
+ * Advisory, after the counts: each invariant that covered entrances by its
+ * crossing alone and no longer does (covers.ts), the entrances that lost it,
+ * and the line that names them. Never a problem: the old credit was the
+ * over-claim, and naming is the adopter's to decide.
+ */
+export function crossingAloneLines(credits: SpecModel["crossingAlone"]): string[] {
+  if (credits === undefined || credits.length === 0) return [];
+  const byInvariant = new Map<string, NonNullable<SpecModel["crossingAlone"]>>();
+  for (const credit of credits) {
+    const key = `${credit.invariant.component}\u0000${credit.invariant.name}`;
+    byInvariant.set(key, [...(byInvariant.get(key) ?? []), credit]);
+  }
+  return [...byInvariant.values()].map((group) => {
+    const { invariant } = group[0]!;
+    const names = group.map((c) => c.entrance.name);
+    const listed = names.length <= NAMED ? names.join(", ") : `${names.slice(0, NAMED).join(", ")} and ${names.length - NAMED} more`;
+    return `COVERAGE  ${invariant.specPath}:${invariant.line}  ${invariant.name} no longer covers ${names.length === 1 ? "an entrance" : `${names.length} entrances`} by its crossing alone: ${listed} lost it as a control. Under it, name the ones its test checks (entrances: <name>, <name>), or write entrances: none; scaffold control ${JSON.stringify(names[0])} proposes the line.`;
+  });
 }
 
 export function hasProblems(model: SpecModel): boolean {

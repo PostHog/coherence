@@ -22,10 +22,11 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { configuredName, projectName } from "../../adapters/project-config.ts";
 import { stripTypeScriptTypes } from "node:module";
-import { basename, dirname, extname, relative, resolve, sep } from "node:path";
+import { dirname, extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { adapterFor } from "../../adapters/index.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
@@ -53,6 +54,8 @@ export const BROWSER_SOURCES = [
   "model.ts",
   "derive.ts",
   "entrance-coverage.ts",
+  // The one source outside this folder: which entrances an invariant covers, shared with the spec model.
+  "../../spec/covers.ts",
   "structure-flow.ts",
   "lexicon-view.ts",
   "components-view.ts",
@@ -111,11 +114,12 @@ function capitalize(text: string): string {
   return text.length === 0 ? text : text[0]!.toUpperCase() + text.slice(1);
 }
 
-/** The domain layer's heading: as given, else from the file's project name, else the default. */
+/** The domain layer's heading: as given, else from the project's name (projectName: the config's, else the file's stored one), else the default. */
 function domainTitle(options: BuildOptions, lexicon: Lexicon | undefined): string {
   if (options.domainTitle !== undefined) return options.domainTitle;
-  if (lexicon?.project !== undefined) return `${capitalize(lexicon.project)} lexicon`;
-  return DEFAULTS.domainTitle;
+  if (lexicon === undefined) return DEFAULTS.domainTitle;
+  const named = configuredName(options.root ?? process.cwd()) ?? lexicon.project;
+  return named === undefined ? DEFAULTS.domainTitle : `${capitalize(named)} lexicon`;
 }
 
 /**
@@ -174,10 +178,6 @@ export function loadSpec(root: string, held?: SpecModel): SpecData {
     ladder: ladderFor(root),
   };
   return JSON.parse(JSON.stringify(data)) as SpecData;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -312,7 +312,7 @@ export function windowState(state: ShellState): ShellState {
   const journal = windowJournal(state.journal.records, undefined, state.journal.work.kind === "present" ? state.journal.work.orders : [], undefined, cited);
   return {
     ...state,
-    runs: { ...state.runs, records: runs.records, ...(runs.omitted === 0 ? {} : { omitted: runs.omitted }) },
+    runs: { ...state.runs, records: runs.records, ...(runs.omitted === 0 ? {} : { omitted: runs.omitted }), ...(Object.keys(runs.superseded).length === 0 ? {} : { superseded: runs.superseded }) },
     journal: { ...state.journal, records: journal.records, ...(journal.omitted === 0 ? {} : { omitted: journal.omitted }) },
   };
 }
@@ -332,10 +332,10 @@ async function browserSource(name: string): Promise<string> {
   return stripTypeScriptTypes(await readFile(resolve(here, name), "utf8"), { mode: "strip" });
 }
 
-/** Drop a stripped source's relative imports. */
+/** Drop a stripped source's imports of the other browser sources: this folder's, and the spec's covers.ts. Any other import stays, and the page check refuses it. */
 function toBrowserModule(stripped: string, name: string): string {
   // A relative import may span several lines; `[^;]` crosses them.
-  return stripped.replace(/^import\s[^;]*from\s+["']\.\/[^"']*["'];[^\S\n]*$/gm, "").concat(`\n// end of ${name}\n`);
+  return stripped.replace(/^import\s[^;]*from\s+["'](?:\.\/[^"']*|\.\.\/\.\.\/spec\/covers\.ts)["'];[^\S\n]*$/gm, "").concat(`\n// end of ${name}\n`);
 }
 
 /** The names a stripped module declares at its top level. */
@@ -485,18 +485,9 @@ export async function writeStructurePreview(root: string, preview: StructurePrev
   );
 }
 
-/** The project's name from its config, capitalized, else its folder name. */
+/** The project's name (projectName: its config's, else its folder's), capitalized. A config that will not parse is the spec model's to refuse, with its path. */
 export function projectNameOf(root: string): string {
-  const path = resolve(root, "coherence.config.json");
-  if (existsSync(path)) {
-    try {
-      const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-      if (isRecord(parsed) && typeof parsed["name"] === "string" && parsed["name"] !== "") return capitalize(parsed["name"]);
-    } catch {
-      // A config that will not parse is the spec model's to refuse, with its path.
-    }
-  }
-  return capitalize(basename(root));
+  return capitalize(projectName(root));
 }
 
 /** The options a reading of `root` builds with when nothing more is given: Coherence's lexicon, the project's own name. */

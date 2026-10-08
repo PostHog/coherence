@@ -61,8 +61,13 @@
  * partial, which budget stopped it, and whose declarations were not all
  * read; a partial map is never presented as complete.
  *
- * Nothing here is stored: the builder passes the reading into the page
- * state, and every list is sorted, so one tree reads the same every time.
+ * The reading itself is not stored here: the builder passes it into the
+ * page state, and every list is sorted, so one tree reads the same every
+ * time. What is kept is each answer the language server gave (kept-answers.ts),
+ * which depends on source text and never on a spec: a later reading reuses
+ * every answer no changed file could have changed, starts the server only
+ * for a question none answers, and works out every component interface,
+ * handler, reach, guard and chokepoint again from the specs as they stand.
  * The adapter is started in this process and never writes into the tree it
  * reads, so a read-only project can be read.
  *
@@ -72,7 +77,7 @@
 import { execFile } from "../../lifecycle/work-meter.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite } from "../../adapters/adapter.ts";
+import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite, type ResolveHint, type Resolved } from "../../adapters/adapter.ts";
 import { detectEntranceCandidates, type EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 import { configIgnore, exclusionOf, projectFiles, projectListing, projectSites, walkBounds, type Bounds } from "../../adapters/project-files.ts";
 import { configRecord } from "../../adapters/project-config.ts";
@@ -81,10 +86,11 @@ import { resolveDotted } from "../../adapters/python.ts";
 import { resolveSpecifier } from "../../adapters/typescript.ts";
 import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy/source.ts";
 import { languageOfFile, readEnforcementConfig } from "../../enforcement/config.ts";
+import { KeptAnswers } from "./kept-answers.ts";
 import { languagesRead } from "./languages-read.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
 import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
-import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, ReachReference, ScopedReading } from "./model.ts";
+import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, KeptReport, ReachReference, ScopedReading } from "./model.ts";
 
 /** Whether a declaration line declares a type only (an interface or a type alias): a route never follows one. */
 export function isTypeDeclaration(line: string, language: string): boolean {
@@ -498,6 +504,8 @@ export interface ReadOptions {
    * the reading carries `scoped` and is never the tree's reading. Absent: whole.
    */
   scope?: { entrances: readonly { component: string; name: string }[] };
+  /** Reuse and keep the language server's answers (kept-answers.ts); false asks the server every question and keeps nothing. Default true. */
+  keep?: boolean;
 }
 
 const STOPPED = Symbol("stopped");
@@ -684,6 +692,19 @@ function mergeLanguages(languages: readonly Language[], parts: readonly { langua
   const scopes = read.flatMap((r) => (r.reading.scoped === undefined ? [] : [r.reading.scoped]));
   const maybe = new Map(scopes.flatMap((sc) => sc.maybe.map((m) => [`${m.from}\u0000${m.to}`, m] as const)));
   const sum = (of: (r: Extract<InterfaceReading, { kind: "read" }>) => number): number => read.reduce((n, r) => n + of(r.reading), 0);
+  // What each language did with its kept answers, added up; a language that used none says why, before the rest.
+  const kepts = read.flatMap((r) => (r.reading.kept === undefined ? [] : [{ language: r.language, kept: r.reading.kept }]));
+  const whole = kepts.filter((k) => k.kept.whole !== undefined).map((k) => `${k.language}: ${k.kept.whole}`);
+  const kept: KeptReport | undefined =
+    kepts.length === 0
+      ? undefined
+      : {
+          reused: kepts.reduce((n, k) => n + k.kept.reused, 0),
+          asked: kepts.reduce((n, k) => n + k.kept.asked, 0),
+          changed: kepts.reduce((n, k) => n + k.kept.changed, 0),
+          dropped: kepts.reduce((n, k) => n + k.kept.dropped, 0),
+          ...(whole.length === 0 ? {} : whole.length === kepts.length ? { whole: whole.join("; ") } : { unused: whole }),
+        };
   return {
     kind: "read",
     language: languages[0]!,
@@ -699,6 +720,7 @@ function mergeLanguages(languages: readonly Language[], parts: readonly { langua
       into: [...outsideInto].map(([component, sites]) => ({ component, sites })).sort((a, b) => a.component.localeCompare(b.component)),
     },
     candidates,
+    ...(kept === undefined ? {} : { kept }),
     ...(partials.length === 0 ? {} : { partial: { ...partials[0]!, seconds: Math.max(...partials.map((p) => p.seconds)), unread: [...new Set(partials.flatMap((p) => p.unread))].sort() } }),
     ...(scopes.length === 0
       ? {}
@@ -757,12 +779,47 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
       clearTimeout(timer);
     }
   };
+  // The answers an earlier reading kept, less every one a file changed since could have changed: what is reused is never asked.
+  let keep: KeptAnswers | undefined;
+  /**
+   * The server, started the first time a question has no kept answer, never before: a reading every answer of which
+   * is kept never starts it. STOPPED when the time budget ran out first and something kept was already reused.
+   */
+  let up: Promise<true | typeof STOPPED> | undefined;
+  const live = (): Promise<true | typeof STOPPED> =>
+    (up ??= (async () => {
+      const ready = await within(() => adapter.ready());
+      // One sample once the server is up, so a reading shorter than the sampling interval is still measured.
+      if (ready !== STOPPED) memory = await measure();
+      if (ready === STOPPED) {
+        if ((keep?.report().reused ?? 0) > 0) return STOPPED;
+        throw new NotUp(`the ${language} instrument did not start within the interface reading's time budget (${budget.seconds} s)`);
+      }
+      if (!ready.ok) throw new NotUp(`the ${language} instrument did not answer: ${ready.reason}`);
+      return true as const;
+    })());
+  /** A name resolved: kept, or asked of the server and kept. */
+  const resolveOf = async (query: string, hint: ResolveHint, name: string): Promise<Resolved | typeof STOPPED> => {
+    const kept = keep?.resolved(query, hint);
+    if (kept !== undefined) return kept;
+    if ((await live()) === STOPPED) return STOPPED;
+    const answer = await within(() => adapter.resolve(query, hint));
+    if (answer !== STOPPED) keep?.keepResolved(query, hint, answer, name);
+    return answer;
+  };
+  /** A definition's reference sites: kept, or asked of the server and kept with the spellings that could change them. */
+  const referencesOf = async (definition: Definition, spelled: readonly string[], broad: boolean): Promise<ReferenceSite[] | typeof STOPPED> => {
+    const kept = keep?.referenced(definition);
+    if (kept !== undefined) return kept;
+    if ((await live()) === STOPPED) return STOPPED;
+    const answer = await within(() => adapter.references(definition));
+    if (answer !== STOPPED) keep?.keepReferenced(definition, answer, spelled, broad);
+    return answer;
+  };
+  const keptOf = (): { kept?: KeptReport } => (keep === undefined ? {} : { kept: keep.report() });
   try {
-    const ready = await within(() => adapter.ready());
-    // One sample once the server is up, so a reading shorter than the sampling interval is still measured.
-    if (ready !== STOPPED) memory = await measure();
-    if (ready === STOPPED) return { kind: "unread", because: `the ${language} instrument did not start within the interface reading's time budget (${budget.seconds} s)` };
-    if (!ready.ok) return { kind: "unread", because: `the ${language} instrument did not answer: ${ready.reason}` };
+    const listed = projectFiles(root);
+    if (options.keep !== false) keep = KeptAnswers.open(root, language, listed, ignore, config.testFolders);
     const testFolders = config.testFolders;
     const skip = boundsOf(root, ignore);
     // The component code: every bounded non-test file of the language whose nearest spec folder is a component.
@@ -771,7 +828,7 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
     const declared: Declared[] = [];
     const nodes = new Map<string, ReachNode>();
     let declarations = 0;
-    for (const file of projectFiles(root)) {
+    for (const file of listed) {
       if (!withinBounds(file, skip)) continue;
       const owner = componentCodeOf(model, file, language, skip, testFolders);
       const source = isSourceFile(file, language) && !isTest(file, testFolders);
@@ -840,14 +897,14 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
     /** Ask one declaration for its references and account for every site; false once a budget stops the reading. */
     const ask = async (d: Declared): Promise<boolean> => {
       asked.add(d.id);
-      const resolved = await within(() => adapter.resolve(`${d.name} in ${d.file}`, { component: d.component, testFolders }));
+      const resolved = await resolveOf(`${d.name} in ${d.file}`, { component: d.component, testFolders }, d.name);
       if (resolved === STOPPED) return false;
       if (!resolved.ok || resolved.definition.file !== d.file) {
         answered.add(d.id);
         return true;
       }
       const definition: Definition = resolved.definition;
-      const reported = await within(() => adapter.references(definition));
+      const reported = await referencesOf(definition, spellings(index, d.name), d.isDefault || index.defaults.has(d.name));
       if (reported === STOPPED) return false;
       for (const site of projectSites(root, reported, listing) as ReferenceSite[]) {
         if (isTest(site.file, testFolders)) continue;
@@ -915,7 +972,8 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
       const own = readFileSync(join(root, startFile), "utf8").split("\n");
       if (definition === undefined) return spelled.test(own.join("\n")) ? named : `the handler's top-level script does not reference ${symbol}`;
       if (spelled.test(own.slice(definition.range.start.line, definition.range.end.line + 1).join("\n"))) return named;
-      const sites = await within(() => adapter.references(definition));
+      const handlerName = namedValue(definition.name)?.symbol ?? definition.name;
+      const sites = await referencesOf(definition, spellings(index, handlerName), index.defaults.has(handlerName) || declared.some((d) => d.id === start && d.isDefault));
       if (sites === STOPPED) return STOPPED;
       for (const site of projectSites(root, sites, listing) as ReferenceSite[]) {
         if (isTest(site.file, testFolders) || !existsSync(join(root, site.file))) continue;
@@ -958,7 +1016,7 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
         }
         const name = entrance.handler.split(/\s+in\s+/)[0]!;
         const handler = entrance.file === undefined ? entrance.handler : `${name} in ${entrance.file}`;
-        const resolved = await within(() => adapter.resolve(handler, { component: component.folder, testFolders }));
+        const resolved = await resolveOf(handler, { component: component.folder, testFolders }, name);
         if (resolved === STOPPED) {
           reading = false;
           entrances.push({ component: component.folder, name: entrance.name, reason: stoppedBefore(stop, budget, "this handler was resolved") });
@@ -1067,16 +1125,22 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
           unread: [...unread].sort(),
         },
         ...scoped,
+        ...keptOf(),
       };
     }
-    return { kind: "read", language, declarations, symbols, entrances, unowned, bounds, outside, ...scoped };
+    return { kind: "read", language, declarations, symbols, entrances, unowned, bounds, outside, ...scoped, ...keptOf() };
   } catch (error) {
+    if (error instanceof NotUp) return { kind: "unread", because: error.message };
     return { kind: "unread", because: `the ${language} instrument failed: ${error instanceof Error ? error.message : String(error)}` };
   } finally {
     clearInterval(sampler);
+    keep?.save();
     if (given === undefined) await adapter.close();
   }
 }
+
+/** The server would not start, or did not answer: the reading is unread, as it was before any answer was kept. */
+class NotUp extends Error {}
 
 /**
  * What a scoped reading says of itself: its starts, the components it read

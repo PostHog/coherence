@@ -67,8 +67,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { closeWork, execFile, openWork, readProjectText, spawn } from "./work-meter.ts";
 import { promisify } from "node:util";
 import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
@@ -76,6 +75,8 @@ import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { TOOL_HOOKS, hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
+import { tsserverNotice } from "../adapters/installed.ts";
+import { readEnforcementConfig } from "../enforcement/config.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
@@ -95,6 +96,7 @@ import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../
 import { baselinePath, coverageChanges, deliverCandidates, heldCandidates, holdCandidates, introducedCandidates, pendingCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
 import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
 import { shellCommandOf, shellWrittenPaths } from "./shell-writes.ts";
+import { earlierSearchLines, OWN_CLI, versionBlock } from "./version.ts";
 
 const run = promisify(execFile);
 
@@ -375,24 +377,6 @@ export function workStopText(root: string, input: HookInput): string {
 }
 
 /**
- * This checkout's cli: the one the hook is running from, wherever the adopter
- * keeps it, by the path it was invoked through when that is this file (a
- * sibling reached through a link reads as ../coherence, not as the link's
- * target).
- */
-const OWN_CLI = ((): string => {
-  // Compiled, this module is .js and so is the cli beside it.
-  const own = fileURLToPath(new URL(`../cli${extname(fileURLToPath(import.meta.url))}`, import.meta.url));
-  const invoked = process.argv[1];
-  try {
-    if (invoked !== undefined && realpathSync(invoked) === realpathSync(own)) return resolve(invoked);
-  } catch {
-    // An invocation path that cannot be resolved is not used.
-  }
-  return own;
-})();
-
-/**
  * How a session at this root invokes the tool: its own source tree, or the
  * checkout this hook ran from, as a path from the root (`node
  * ../coherence/src/cli.ts`) or, when that climbs further than a sibling of a
@@ -468,6 +452,24 @@ export function floorQuiet(runs: SpecModel["runs"], now: number): string | undef
   if (since !== undefined && Number.isFinite(since) && now - since <= FLOOR_QUIET_DAYS * 86_400_000) return undefined;
   const age = since === undefined || !Number.isFinite(since) ? "no full run has graded every bullet" : `the last full run that graded every bullet was ${Math.floor((now - since) / 86_400_000)} days ago (${runs.graded})`;
   return `Invariant floor: ${age}; a scoped run moves only its own bullets and an edit's check records its entries ungraded, so the rest of the floor stands where that run left it. Run: run`;
+}
+
+/**
+ * The one line orient carries when the project's TypeScript ships no
+ * tsserver (TypeScript 7 and later) and Coherence reads with its own: said
+ * once, at the start, where the agent reads, so a reading made by another
+ * compiler than the project's is never a surprise.
+ */
+export function tsserverBlock(root: string): string {
+  let languages: readonly string[];
+  try {
+    languages = readEnforcementConfig(root).languages;
+  } catch {
+    return "";
+  }
+  if (!languages.includes("typescript")) return "";
+  const notice = tsserverNotice(root);
+  return notice === "" ? "" : `${notice}\n\n`;
 }
 
 export function specBlock(root: string, now: number = Date.now()): string {
@@ -778,10 +780,23 @@ export async function startContext(root: string, input: HookInput = {}, report?:
   return (await startReading(root, input, report)).text;
 }
 
+/**
+ * Which Coherence answers this session, any copy the project could reach at
+ * another version, a newer published release, and hooks an earlier
+ * Coherence wrote that still look beside the project first: a few short
+ * lines above the session block. Reads a handful of small files, never the
+ * network.
+ */
+export async function copyBlock(root: string, env: NodeJS.ProcessEnv = process.env): Promise<string> {
+  const settings = installedRoot(root, env) ?? root;
+  const earlier = earlierSearchLines(settings);
+  return versionBlock(root, await isCoherenceItself(root), env) + (earlier.length === 0 ? "" : earlier.join("\n") + "\n");
+}
+
 /** The start injection with the level the vocabulary was delivered at, so a reading of the hook can say what orient carries. */
 export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
   const { coherence, project } = await loadProjectLexicons(root);
-  const head = escalationBlock(root) + specBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + workBlock(root, input);
+  const head = escalationBlock(root) + specBlock(root) + tsserverBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + workBlock(root, input);
   const reading=report ?? await lexiconCoverage(root);
   const commands=await cliName(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
@@ -789,7 +804,7 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   const coverage=signal ? `\n${signal}\n` : "";
   // The practices ride beside the commands that record them, after the vocabulary.
   const practices = practiceOrientText(root, commands);
-  const tail = coverage + (practices === "" ? "" : `\n${practices.trimEnd()}\n`) + `\n${await sessionBlock(root, input)}`;
+  const tail = coverage + (practices === "" ? "" : `\n${practices.trimEnd()}\n`) + `\n${await copyBlock(root)}\n${await sessionBlock(root, input)}`;
   const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root));
   return { text: head + text + tail, detail, coverage: reading };
 }
@@ -898,6 +913,12 @@ export interface HookOptions {
    * unless the user opted in; absent (a test), nothing is started.
    */
   telemetry?: ((root: string, event: string, input: HookInput) => void) | undefined;
+  /**
+   * Start the detached check of the newest published version at a session
+   * start, once the answer is made, never waited on. The command line passes
+   * startUpdateCheck, which asks at most once a day; absent (a test), nothing is started.
+   */
+  updateCheck?: ((root: string, event: string) => void) | undefined;
 }
 
 /**
@@ -1163,6 +1184,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     if (session !== undefined) recordHookTime(root, session, { at: new Date().toISOString(), event, ms });
     // Last, once the answer is made: a detached flush started earlier would compete with the hook's own work.
     if (event === "SessionStart" || event === "Stop") options.telemetry?.(root, event, input);
+    if (event === "SessionStart") options.updateCheck?.(root, event);
     if (!TOOL_HOOKS.has(event) || result.exit !== 0) return result;
     const line = overBudgetLine(event, ms, latencyBudget(root));
     if (line === "") return result;
