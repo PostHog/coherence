@@ -22,6 +22,8 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "./work-meter.ts";
+import { installedPackage, projectFrom } from "../adapters/installed.ts";
+import { searchesCheckoutFirst } from "./hook-command.ts";
 import { HOME_VAR, HOSTS, LOCAL_SETTINGS_FILE, PACKAGE_NAME, SETTINGS_FILE, SIBLING, type Host } from "./project.ts";
 import { coherenceVersion, readJson, telemetryDir, truthy, writeJson, type Env } from "./telemetry.ts";
 
@@ -103,9 +105,9 @@ export interface OtherCopy {
   folder: string;
 }
 
-/** The installed package's folder for a project root. */
-export function installedFolder(root: string): string {
-  return join(root, "node_modules", PACKAGE_NAME);
+/** The installed package's folder for a project root, as Node's resolver finds it (pnpm's layout included); undefined when none is installed. */
+export function installedFolder(root: string): string | undefined {
+  return installedPackage(PACKAGE_NAME, projectFrom(root))?.dir;
 }
 
 /** Which Coherence `cli` is, for a project at `root`. */
@@ -122,8 +124,9 @@ export function runningCopy(root: string, cli: string = OWN_CLI, env: Env = proc
 /** The other copies of Coherence the project could reach: the installed package and the checkout $COHERENCE_HOME names. */
 export function otherCopies(root: string, running: RunningCopy, env: Env = process.env): OtherCopy[] {
   const home = env[HOME_VAR];
+  const installed = installedFolder(root);
   const candidates: { kind: OtherCopy["kind"]; folder: string }[] = [
-    { kind: "installed", folder: installedFolder(root) },
+    ...(installed !== undefined ? [{ kind: "installed" as const, folder: installed }] : []),
     ...(home !== undefined && home !== "" ? [{ kind: "home" as const, folder: home }] : []),
   ];
   const seen = new Set([real(running.folder)]);
@@ -139,7 +142,8 @@ export function otherCopies(root: string, running: RunningCopy, env: Env = proce
 }
 
 function shown(root: string, folder: string): string {
-  const rel = relative(root, folder);
+  // Both as the file system names them: the resolver answers with real paths, a root may come through a link (/var and /private/var).
+  const rel = relative(real(root), real(folder));
   return rel !== "" && rel.split(sep).filter((part) => part === "..").length <= 2 ? rel : folder;
 }
 
@@ -173,18 +177,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 // ---------------------------------------------------------------- hooks an earlier Coherence wrote
 
-/**
- * Whether a command of ours is the located command an earlier Coherence
- * wrote, which looked at a checkout beside the project before the installed
- * package, so a stale clone there answered instead of the installed release.
- */
-export function searchesCheckoutFirst(command: string): boolean {
-  const sibling = command.indexOf(`/../${SIBLING}/src/cli.ts`);
-  const installed = command.indexOf(`node_modules/${PACKAGE_NAME}/dist/cli.js`);
-  return sibling !== -1 && installed !== -1 && sibling < installed;
-}
-
 /** The plain reason a hook of that earlier form must be reinstalled. No apostrophes and no path: it is shown as written. */
+export { searchesCheckoutFirst };
+
 export const EARLIER_SEARCH = `written by an earlier Coherence, they look for a checkout beside the project (../${SIBLING}) before the installed package, so a stale clone there answers instead of the installed release`;
 
 /** The hosts whose settings at `dir` hold a hook of ours in that earlier form, with the file and whether it is the personal one. */

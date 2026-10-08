@@ -1,7 +1,8 @@
 /**
  * The TypeScript adapter: the language server protocol over stdio to
- * typescript-language-server, found in the adopter's node_modules first,
- * then Coherence's own (it is an optional dependency), then on PATH.
+ * typescript-language-server, resolved from the adopter's project first,
+ * then from Coherence's own module (it is an optional dependency), then on
+ * PATH; never by a path built by hand (installed.ts).
  *
  * Symbols resolve through workspace/symbol (a bare name) or the hinted
  * file's textDocument/documentSymbol (`name in file.ts`); a module is its
@@ -46,11 +47,10 @@ import {
   type StagedSite,
   type Visibility,
 } from "./adapter.ts";
+import { locateServer as locateInstalled, locateTsserver, type ServerLocation } from "./installed.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
 import { horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const COHERENCE_ROOT = resolve(here, "..", "..");
 const SERVER_BIN = "typescript-language-server";
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
 
@@ -63,24 +63,9 @@ export const TYPESCRIPT_LADDER: Ladder = {
   ],
 };
 
-/** Where the language server binary is, or undefined with the places looked. */
-export function locateServer(root: string): { path: string; looked: string[] } | undefined {
-  const looked = [join(root, "node_modules", ".bin", SERVER_BIN), join(COHERENCE_ROOT, "node_modules", ".bin", SERVER_BIN)];
-  for (const candidate of looked) if (existsSync(candidate)) return { path: candidate, looked };
-  for (const dir of (process.env["PATH"] ?? "").split(":")) {
-    const candidate = join(dir, SERVER_BIN);
-    if (dir !== "" && existsSync(candidate)) return { path: candidate, looked: [...looked, candidate] };
-  }
-  return undefined;
-}
-
-/** The tsserver the server should drive: the adopter's typescript, else Coherence's optional one. */
-function locateTsserver(root: string): string | undefined {
-  for (const base of [root, COHERENCE_ROOT]) {
-    const candidate = join(base, "node_modules", "typescript", "lib", "tsserver.js");
-    if (existsSync(candidate)) return candidate;
-  }
-  return undefined;
+/** Where the language server binary is, with every place looked. */
+export function locateServer(root: string): ServerLocation {
+  return locateInstalled(SERVER_BIN, SERVER_BIN, root);
 }
 
 interface DocumentSymbol {
@@ -257,11 +242,11 @@ export class TypeScriptAdapter implements LanguageAdapter {
 
   private async start(): Promise<{ ok: true } | { ok: false; reason: string }> {
     const server = locateServer(this.root);
-    if (server === undefined) {
-      return { ok: false, reason: `${SERVER_BIN} not found; looked in the project's node_modules, Coherence's, and PATH. Install it: npm install --save-dev typescript-language-server typescript` };
+    if (!server.found) {
+      return { ok: false, reason: `${SERVER_BIN} not found; looked at ${server.looked.join("; ")}. Install it: npm install --save-dev typescript-language-server typescript` };
     }
-    const tsserver = locateTsserver(this.root);
-    const client = JsonRpcClient.spawn(server.path, ["--stdio"], this.root);
+    const tsserver = locateTsserver(this.root)?.path;
+    const client = JsonRpcClient.spawn(server.command, [...server.args, "--stdio"], this.root);
     this.client = client;
     client.onNotification = (method, params) => {
       if (method !== "textDocument/publishDiagnostics") return;

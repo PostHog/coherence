@@ -12,7 +12,7 @@
 
 import { spawnSync } from "./lifecycle/work-meter.ts";
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { stripTypeScriptTypes } from "node:module";
+import { createRequire, stripTypeScriptTypes } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BROWSER_SOURCES, strippedName } from "./readings/scope/build.ts";
@@ -36,7 +36,8 @@ function copy(from: string, to: string): void {
 }
 
 rmSync(dist, { recursive: true, force: true });
-const tsc = spawnSync(join(root, "node_modules", ".bin", "tsc"), ["-p", join(root, "tsconfig.build.json")], { stdio: "inherit" });
+// The compiler as the package resolver finds it from this checkout, never a path into node_modules built by hand (installed.ts).
+const tsc = spawnSync(process.execPath, [createRequire(import.meta.url).resolve("typescript/bin/tsc"), "-p", join(root, "tsconfig.build.json")], { stdio: "inherit" });
 if (tsc.status !== 0) process.exit(tsc.status ?? 1);
 
 for (const file of files(src)) {

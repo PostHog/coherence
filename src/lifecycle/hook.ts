@@ -75,6 +75,8 @@ import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { TOOL_HOOKS, hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
+import { tsserverNotice } from "../adapters/installed.ts";
+import { readEnforcementConfig } from "../enforcement/config.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
@@ -452,6 +454,24 @@ export function floorQuiet(runs: SpecModel["runs"], now: number): string | undef
   return `Invariant floor: ${age}; a scoped run moves only its own bullets and an edit's check records its entries ungraded, so the rest of the floor stands where that run left it. Run: run`;
 }
 
+/**
+ * The one line orient carries when the project's TypeScript ships no
+ * tsserver (TypeScript 7 and later) and Coherence reads with its own: said
+ * once, at the start, where the agent reads, so a reading made by another
+ * compiler than the project's is never a surprise.
+ */
+export function tsserverBlock(root: string): string {
+  let languages: readonly string[];
+  try {
+    languages = readEnforcementConfig(root).languages;
+  } catch {
+    return "";
+  }
+  if (!languages.includes("typescript")) return "";
+  const notice = tsserverNotice(root);
+  return notice === "" ? "" : `${notice}\n\n`;
+}
+
 export function specBlock(root: string, now: number = Date.now()): string {
   const model = specModelOrNull(root);
   if ("error" in model) return `Spec: not readable (${model.error})\n\n`;
@@ -776,7 +796,7 @@ export async function copyBlock(root: string, env: NodeJS.ProcessEnv = process.e
 /** The start injection with the level the vocabulary was delivered at, so a reading of the hook can say what orient carries. */
 export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
   const { coherence, project } = await loadProjectLexicons(root);
-  const head = escalationBlock(root) + specBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + workBlock(root, input);
+  const head = escalationBlock(root) + specBlock(root) + tsserverBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + workBlock(root, input);
   const reading=report ?? await lexiconCoverage(root);
   const commands=await cliName(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.

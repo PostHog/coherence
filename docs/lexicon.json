@@ -613,6 +613,7 @@
         "class exposure": "Private state written where it is published or committed.",
         "class uninterpolated": "Template text reaches a reader literally instead of the value it stands for.",
         "class load-flake": "A test that fails under machine load whatever the change under test.",
+        "class hand-built-path": "A file of an installed package located by a path spelled by hand (a node_modules folder joined to a root) instead of asked of the package resolver, so a package manager that lays its packages out otherwise (pnpm's store, a package's exports) leaves it naming nothing.",
         "class version-skew": "The Coherence that runs is not the one the adopter installed or meant: another copy shadows it, or a package manager resolved an older release than the project needs, and nothing says which version answers.",
         "class missing-entry-point": "A way of reaching the tool that users expect is absent or answers wrongly: a conventional flag or verb (--version, --help) that is not recognized or is taken by the program in front of it."
       }
@@ -1477,7 +1478,7 @@
     },
     {
       "name": "status line",
-      "definition": "The row Claude Code draws under the prompt from a command it runs after events; Coherence's line there names the session's hook time against the latency budget and the practices it owes, for the user, at no cost to the agent's context.",
+      "definition": "The row Claude Code draws under the prompt from a command it runs; Coherence's line there is for the user, not the agent.",
       "status": "settled",
       "related": [
         "hook",
