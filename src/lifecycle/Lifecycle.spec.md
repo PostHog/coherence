@@ -913,3 +913,15 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: rate-budget dismissed: at most one flush per session start or stop, and one collection summarizes at most 20 sessions
   checklist: memory-budget dismissed: the queue holds one line per event and is drained at each flush
   checklist: circuit-breaker-policy dismissed: a send that fails is dropped after one attempt with a 5 s timeout, in the detached flush
+- git calls ignore how the environment reads pathspecs: Every git call Coherence makes runs without GIT_LITERAL_PATHSPECS, GIT_GLOB_PATHSPECS, GIT_NOGLOB_PATHSPECS and GIT_ICASE_PATHSPECS, at the one door every spawn passes, so an edit is checked the same, by the light way, with any of them set.
+  over: an edit naming a protected thing with GIT_LITERAL_PATHSPECS and GIT_ICASE_PATHSPECS set in the hook's environment
+  via: an edit is checked with GIT_LITERAL_PATHSPECS set as without it
+  because: with GIT_LITERAL_PATHSPECS set, the light listing of the specs (a glob pathspec) matched nothing, nothing threw, and the edit's check went silent where main checked; the variables are a user's to set for their own git, never a reason for a checker to read its own listing another way
+  refuted: passed git calls the environment as given, GIT_LITERAL_PATHSPECS and all -> "an edit is checked with GIT_LITERAL_PATHSPECS set as without it" went red in work-meter.test.ts on its own assertion (the light listing of the specs came back empty); a first red, from git refusing a second variable the test also set, was recorded as not counting (d-962eb2f7) and the break staged again; restored byte for byte, green batched and alone (2026-10-08)
+  kinds: none
+- an empty spec listing is a failure, not an answer: When the light listing of the specs comes back empty while the walk the spec model reads finds specs, the edit's check falls back to the whole model, says so, and still checks.
+  over: a git that answers every glob pathspec with nothing, over a project that holds a spec, and an edit naming its protected thing
+  via: a spec listing that comes back empty where the project holds specs falls back to the whole model and says so
+  because: an index that comes back empty where the project has specs fails silently, the one way a checker must never fail; the walk is paid only when the light listing found nothing, so a project with specs pays it never, and one without pays what main paid at every edit
+  refuted: took an empty spec listing as the answer -> "a spec listing that comes back empty where the project holds specs falls back to the whole model and says so" went red in work-meter.test.ts on its own assertion (the empty listing was no failure); restored byte for byte, green batched and alone (2026-10-08)
+  kinds: none

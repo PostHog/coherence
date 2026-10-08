@@ -140,6 +140,29 @@ function countSpawn(args: readonly unknown[]): void {
 
 type Callable = (...args: unknown[]) => unknown;
 
+/**
+ * The environment variables that change what a git pathspec means: with
+ * GIT_LITERAL_PATHSPECS set, `:(glob)**\/*.spec.md` matches no file, and a
+ * listing of the specs comes back empty without an error. Coherence's git
+ * calls never inherit them; every one passes here.
+ */
+export const PATHSPEC_ENV = ["GIT_LITERAL_PATHSPECS", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] as const;
+
+/** A git call's arguments with an environment that holds none of PATHSPEC_ENV; any other call's as they are. */
+function controlled(args: unknown[]): unknown[] {
+  const file = String(args[0] ?? "");
+  if (!/(^|[\\/])git(\.exe)?$/.test(file)) return args;
+  const at = Array.isArray(args[1]) ? 2 : 1;
+  const given = args[at];
+  const options = typeof given === "object" && given !== null ? (given as { env?: NodeJS.ProcessEnv }) : {};
+  const env = { ...(options.env ?? process.env) };
+  for (const name of PATHSPEC_ENV) delete env[name];
+  const next = [...args];
+  if (typeof given === "function" || given === undefined) next.splice(at, 0, { env });
+  else next[at] = { ...options, env };
+  return next;
+}
+
 /** The bytes a child wrote to its standard output, counted: a listing that grows with the project is work the hook pays to read. */
 function countOutput(args: readonly unknown[], stdout: unknown): void {
   if (current === undefined || stdout === undefined || stdout === null) return;
@@ -152,7 +175,7 @@ function countOutput(args: readonly unknown[], stdout: unknown): void {
 /** child_process.spawnSync, counted, with its output. */
 export const spawnSync = ((...args: unknown[]) => {
   countSpawn(args);
-  const result = (childProcess.spawnSync as Callable)(...args) as { stdout?: unknown };
+  const result = (childProcess.spawnSync as Callable)(...controlled(args)) as { stdout?: unknown };
   countOutput(args, result?.stdout);
   return result;
 }) as typeof childProcess.spawnSync;
@@ -160,7 +183,7 @@ export const spawnSync = ((...args: unknown[]) => {
 /** child_process.execFileSync, counted, with its output. */
 export const execFileSync = ((...args: unknown[]) => {
   countSpawn(args);
-  const out = (childProcess.execFileSync as Callable)(...args);
+  const out = (childProcess.execFileSync as Callable)(...controlled(args));
   countOutput(args, out);
   return out;
 }) as typeof childProcess.execFileSync;
@@ -168,7 +191,7 @@ export const execFileSync = ((...args: unknown[]) => {
 /** child_process.spawn, counted. */
 export const spawn = ((...args: unknown[]) => {
   countSpawn(args);
-  return (childProcess.spawn as Callable)(...args);
+  return (childProcess.spawn as Callable)(...controlled(args));
 }) as typeof childProcess.spawn;
 
 const promisedExecFile = promisify(childProcess.execFile) as unknown as Callable;
@@ -177,13 +200,13 @@ const promisedExecFile = promisify(childProcess.execFile) as unknown as Callable
 export const execFile = Object.defineProperty(
   (...args: unknown[]) => {
     countSpawn(args);
-    return (childProcess.execFile as Callable)(...args);
+    return (childProcess.execFile as Callable)(...controlled(args));
   },
   promisify.custom,
   {
     value: async (...args: unknown[]) => {
       countSpawn(args);
-      const result = (await promisedExecFile(...args)) as { stdout?: unknown };
+      const result = (await promisedExecFile(...controlled(args))) as { stdout?: unknown };
       countOutput(args, result?.stdout);
       return result;
     },

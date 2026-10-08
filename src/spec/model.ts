@@ -177,6 +177,9 @@ export function chokepointIndex(rootGiven: string, written: readonly string[] = 
   // The specs findSpecs would find, from a listing of the specs alone.
   const bounds = walkBounds(root, config.ignore);
   const specs = projectFilesEnding(root, SPEC_SUFFIX).filter((rel) => exclusionOf(rel, bounds) === undefined).map((rel) => join(root, rel));
+  // No spec from the light listing is a claim to check, never an answer: a listing that matched nothing it should have
+  // (a pathspec read another way) would leave every edit unchecked. The walk the spec model reads decides.
+  if (specs.length === 0 && findSpecs(root, config.ignore).length > 0) throw new Error("the listing of the specs found none where the project holds some");
   for (const specPath of specs) {
     const folder = folderOf(root, specPath);
     // A folder holds one spec, as the model reads it: a second is a problem there, and nothing here.

@@ -444,6 +444,52 @@ function gitRepo(files: Record<string, string>): string {
 
 const SPEC = (name: string) => `# A\n\nA component.\n\n## invariants\n- sealed: ${name} leaves only through seal.\n  protects: ${name}\n  chokepoint: seal\n  because: a fixture\n  kinds: none\n`;
 
+test("an edit is checked with GIT_LITERAL_PATHSPECS set as without it", async () => {
+  const root = gitRepo({ "coherence.config.json": JSON.stringify({ name: "l" }), "src/a/A.spec.md": SPEC("SECRET_0"), "src/a/m.ts": "export const x = 1;\n" });
+  const saved = Object.fromEntries(["GIT_LITERAL_PATHSPECS"].map((k) => [k, process.env[k]]));
+  try {
+    process.env["GIT_LITERAL_PATHSPECS"] = "1";
+    const listed = (() => {
+      try {
+        return chokepointIndex(root).map((i) => i.name);
+      } catch (error) {
+        return [`threw: ${error instanceof Error ? error.message : String(error)}`];
+      }
+    })();
+    assert.deepEqual(listed, ["sealed"], "the specs are listed by the light way whatever the environment says pathspecs mean");
+    writeFileSync(join(root, "src/a/m.ts"), "export const leak = SECRET_0;\n");
+    const answered = await runHook("PostToolUse", { cwd: root, session_id: "l", tool_name: "Edit", tool_input: { file_path: join(root, "src/a/m.ts") } }, root, { adapter: NO_INSTRUMENT });
+    assert.match(answered.stdout, /could not check 1 chokepoint invariant at this edit/, "the edit naming the protected name is put to the check, as main puts it");
+    assert.doesNotMatch(answered.stdout, /without its index/, "and by the light way: the listing itself was not misread");
+  } finally {
+    for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a spec listing that comes back empty where the project holds specs falls back to the whole model and says so", async () => {
+  const root = gitRepo({ "coherence.config.json": JSON.stringify({ name: "e" }), "src/a/A.spec.md": SPEC("SECRET_0"), "src/a/m.ts": "export const x = 1;\n" });
+  // A git that answers every glob pathspec with nothing, as any way of misreading one would: the listing is empty and nothing throws.
+  const real = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+  const shim = mkdtempSync(join(tmpdir(), "coherence-empty-git-"));
+  writeFileSync(join(shim, "git"), `#!/bin/sh\ncase "$*" in *":(glob)"*) exit 0 ;; esac\nexec '${real}' "$@"\n`);
+  spawnSync("chmod", ["+x", join(shim, "git")]);
+  const path = process.env["PATH"];
+  try {
+    process.env["PATH"] = `${shim}:${path ?? ""}`;
+    assert.throws(() => chokepointIndex(root), /found none where the project holds some/, "an empty listing is a failure, not an answer");
+    writeFileSync(join(root, "src/a/m.ts"), "export const leak = SECRET_0;\n");
+    const answered = await runHook("PostToolUse", { cwd: root, session_id: "e", tool_name: "Edit", tool_input: { file_path: join(root, "src/a/m.ts") } }, root, { adapter: NO_INSTRUMENT });
+    assert.match(answered.stdout, /without its index: the listing of the specs found none/, "the fallback is said");
+    assert.match(answered.stdout, /could not check 1 chokepoint invariant at this edit/, "and the edit is still put to the check");
+  } finally {
+    process.env["PATH"] = path;
+    rmSync(shim, { recursive: true, force: true });
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("an edit is checked against a spec changed at the same size with its modification time set back", async () => {
   const root = gitRepo({ "coherence.config.json": JSON.stringify({ name: "k" }), "src/a/A.spec.md": SPEC("SECRET_0"), "src/a/m.ts": "export const x = 1;\n" });
   try {
