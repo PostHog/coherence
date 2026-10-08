@@ -861,6 +861,13 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   crossing: record -> reading
   refuted: made orient name guard failures only when there are two or more -> "orient names each guard failure under the spec block" went red in defect-orient.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- orient names Coherence's own TypeScript: When the project reads TypeScript and its own TypeScript is 7 or later, which ships no tsserver, orient says once that Coherence is using its own TypeScript, with both versions; a project on a TypeScript with a tsserver, or one that reads no TypeScript, is told nothing.
+  over: a project on typescript 7.0.2 declaring typescript, the same project declaring python, and a project on its own typescript 5.8.2
+  via: orient says once that Coherence reads with its own TypeScript when the project's is 7 or later
+  because: every reading a TypeScript 7 project gets is made by another compiler than the one it builds with, and an agent that is not told will take a difference between them for its own mistake (df-aa4a8606)
+  crossing: project-source -> reading
+  refuted: left the TypeScript line out of orient's head -> "orient says once that Coherence reads with its own TypeScript when the project's is 7 or later" went red in installed.test.ts; restored byte for byte, green (2026-10-08)
+  kinds: none
 - a hook time carries its version: every hook call's kept time carries the Coherence version that answered it, read once from the installed package; a time kept before versions were written still reads, with no version.
   over: a kept time written now and one written before versions existed
   via: a hook call's kept time carries the Coherence version that answered it

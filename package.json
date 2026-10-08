@@ -29,6 +29,7 @@
     "test:setup": "\"${COHERENCE_PYTHON:-python3}\" -m venv .venv && .venv/bin/python -m pip install --requirement requirements-test.txt",
     "test:python": "node --disable-warning=ExperimentalWarning --test src/adapters/python.test.ts",
     "test:upgrade": "node --disable-warning=ExperimentalWarning --test --test-timeout=1800000 src/lifecycle/upgrade.e2e.ts",
+    "test:pnpm": "node --disable-warning=ExperimentalWarning --test --test-timeout=1200000 src/adapters/pnpm.e2e.ts",
     "build": "node --disable-warning=ExperimentalWarning src/build.ts",
     "prepare": "npm run build"
   },

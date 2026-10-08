@@ -612,7 +612,8 @@
         "class self-clearing": "A check the very record or edit it guards can clear on its own.",
         "class exposure": "Private state written where it is published or committed.",
         "class uninterpolated": "Template text reaches a reader literally instead of the value it stands for.",
-        "class load-flake": "A test that fails under machine load whatever the change under test."
+        "class load-flake": "A test that fails under machine load whatever the change under test.",
+        "class hand-built-path": "A file of an installed package located by a path spelled by hand (a node_modules folder joined to a root) instead of asked of the package resolver, so a package manager that lays its packages out otherwise (pnpm's store, a package's exports) leaves it naming nothing."
       }
     },
     {
