@@ -19,7 +19,7 @@ import { spawnSync } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PRACTICE_SUFFIX, RECORD_ID, globMatches, parsePractices, type Practice } from "./practice.ts";
-import { keepProjectFiles, nestedFolder, projectFiles, projectFilesUnder, repositoryTop } from "../adapters/project-files.ts";
+import { keepProjectFiles, nestedFolder, projectFilesUnder, repositoryTop } from "../adapters/project-files.ts";
 import type { Problem } from "./grammar.ts";
 import { loadJournal } from "../journal/store.ts";
 import { loadWork } from "../journal/work.ts";
@@ -279,7 +279,7 @@ export function deadTriggers(root: string, practices: readonly ModelPractice[]):
   const literal = (glob: string): boolean => !/[*?]/.test(glob);
   const under = new Map<string, string[]>();
   const filesFor = (glob: string): string[] => {
-    const folder = glob.split("/").slice(0, -1).filter((_, i, all) => !all.slice(0, i + 1).some((part) => /[*?]/.test(part))).join("/");
+    const folder = literalFolder(glob);
     let files = under.get(folder);
     if (files === undefined) under.set(folder, (files = projectFilesUnder(root, folder)));
     return files;
@@ -291,7 +291,6 @@ export function deadTriggers(root: string, practices: readonly ModelPractice[]):
     return asked.has(glob) ? kept.has(glob) : keepProjectFiles(root, [glob]).size === 1;
   };
   const nested = nestedFolder(root);
-  let repository: string[] | undefined;
   const out: DeadTrigger[] = [];
   for (const { p, glob } of edits) {
     if (matches(glob)) continue;
@@ -301,14 +300,22 @@ export function deadTriggers(root: string, practices: readonly ModelPractice[]):
       if (matches(rest)) dead.suggestion = rest;
     }
     if (dead.suggestion === undefined && nested !== undefined) {
+      // The repository asked as narrowly as the project: never its whole listing, at every one of a hook's model loads.
       const top = repositoryTop(root);
-      repository ??= top === undefined ? [] : projectFiles(top);
-      const hits = repository.filter((f) => globMatches(glob, f) && f !== nested && !f.startsWith(`${nested}/`));
+      const candidates = top === undefined ? [] : literal(glob) ? [...keepProjectFiles(top, [glob])] : projectFilesUnder(top, literalFolder(glob));
+      const hits = candidates.filter((f) => globMatches(glob, f) && f !== nested && !f.startsWith(`${nested}/`));
       if (hits.length > 0) dead.outside = hits.slice(0, 3);
     }
     out.push(dead);
   }
   return out;
+}
+
+/** The folders of a trigger's path before its first wildcard: all a listing must cover to answer it. */
+function literalFolder(glob: string): string {
+  const folders = glob.split("/").slice(0, -1);
+  const wild = folders.findIndex((part) => /[*?]/.test(part));
+  return (wild === -1 ? folders : folders.slice(0, wild)).join("/");
 }
 
 export function deadTriggerText(dead: DeadTrigger): string {
