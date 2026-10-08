@@ -171,6 +171,36 @@ those, and none dated after now. Nothing is
 rewritten. `refute` appends its refutation records to the same files, marked
 with `kind: "refutation"`.
 
+A chokepoint entry also carries its reference `sites`, which are most of a
+run's bytes and rarely change. Each run file writes an enforcement's sites
+in full at its first entry for that enforcement, and again whenever they
+change. A later entry whose sites are the same as that enforcement's last
+entry in the same file carries `sitesRef` instead: the hash of their
+content, and the time of the run in that file that holds them in full.
+
+A reference never points outside its own file, so any one run file
+resolves on its own, whether or not other sessions' files were committed.
+Every reader goes through `loadRuns`, which turns each reference back into
+the `sites` it names, in the same key position a full write uses. A
+reference its file cannot resolve is marked on the entry as
+`sitesUnresolved`, listed among the damaged lines, and shown as unknown
+wherever sites are read: Scope's reliance, enforcement card and flow map,
+and `query`. It is never read as an empty list.
+
+Writing a run never reads its session's run file to find what it last
+wrote in full. The run index keeps one small sites shard per run file, under
+`.coherence/cache/run-sites/`, with each enforcement's last full sites hash
+and the file's identity and size when the shard was written. An append asks
+the shard. When the shard is missing, or was kept for the file as it no
+longer is, the append writes its sites in full, which costs one larger line
+and never a reference that does not resolve, and the shard starts again from
+that line.
+
+A reader older than this release knows no references. It sees no `sites`
+on those later entries and reports their sites as unavailable, which is the
+rule for an entry without sites. It still sees every file's first entry in
+full.
+
 A run exits non-zero when an enforcement failed and also when the instrument
 was needed and could not answer: the totality pass runs the whole suite
 before the first question, so the run holds the warm server's idle timer open

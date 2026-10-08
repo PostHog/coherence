@@ -64,7 +64,7 @@ function renderGoverned(enforcement: Extract<SpecEnforcement, { form: "chokepoin
   if (ran?.exempt !== undefined) {
     const exempt = entry!.sites?.filter((s) => s.of === "protected" && s.class === "exempt").length;
     const by = ran.by === "bullet" ? "its from: line" : ran.by === "config" ? "the config default" : "the default";
-    return html`<p class="governs" data-field="from" data-exempt="${ran.exempt}"><span class="label">from</span> ${ran.value} <span class="quiet">(${by}): governs only references from outside <code>${ran.exempt}</code>; ${exempt === undefined ? "exempt references unrecorded" : `${plural(exempt, "reference", "references")} from inside it exempt, reported and never a bypass`}</span></p>`;
+    return html`<p class="governs" data-field="from" data-exempt="${ran.exempt}"><span class="label">from</span> ${ran.value} <span class="quiet">(${by}): governs only references from outside <code>${ran.exempt}</code>; ${entry!.sitesUnresolved !== undefined ? `exempt references unknown: ${entry!.sitesUnresolved}` : exempt === undefined ? "exempt references unrecorded" : `${plural(exempt, "reference", "references")} from inside it exempt, reported and never a bypass`}</span></p>`;
   }
   const declared = enforcement.from;
   if (declared === undefined || declared === "anywhere") return null;

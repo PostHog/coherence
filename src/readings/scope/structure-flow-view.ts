@@ -2132,6 +2132,7 @@ function renderFlowSummary(state: ShellState, model: FlowModel, previews: readon
   const stubs = model.edges.filter((edge) => edge.stub).length;
   return html`<div class="flow-summary">
     ${flowHead("Nothing selected", html`The whole system`, undefined, `${plural(model.nodes.length, "component", "components")} and ${plural(model.edges.length, "component interface", "component interfaces")}. Select anything to trace it; the rest dims.`)}
+    ${model.sitesUnknown.length === 0 ? null : html`<p class="flow-note" data-field="sites-unknown">Run sites unknown for ${model.sitesUnknown.length === 1 ? "one chokepoint" : `${model.sitesUnknown.length} chokepoints`}, so their interfaces are not drawn: ${model.sitesUnknown.join("; ")}</p>`}
     ${model.edges.length === 0 ? html`<p class="empty" data-field="no-interfaces">No component interface is known: ${model.evidence === "run sites only" ? "no latest run records a reference from one component into another's chokepoint or protected thing, and the language adapter was not asked." : "no component's code references another's."}</p>` : null}
     <h4>Where work enters</h4>
     ${model.routesFrom === "root interfaces" ? html`<p class="flow-note" data-field="derived-routes">No spec declares an entrance. Each route is ${termLink(state, "derived")} from one of the root component's component interfaces by ${termLink(state, "reference weight")}, not flow, and named for the first component it reaches.</p>` : null}

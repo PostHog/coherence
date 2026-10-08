@@ -467,6 +467,8 @@ export interface FlowModel {
   languages?: LanguagesRead | undefined;
   /** Why the adapter's reading is absent, when it is. */
   unread: string | undefined;
+  /** Drawn from run sites only: each latest chokepoint entry whose sites a reference named and its run file did not hold, as "component/name: why". Never drawn as no references. */
+  sitesUnknown: string[];
   /** Visible components in folder order (their column order). */
   nodes: FlowNode[];
   /** Every component interface between visible components, in folder order of caller then callee. */
@@ -518,12 +520,21 @@ function flowIs(symbol: Omit<InterfaceSymbol, "from" | "to">, named: { symbol?: 
   return named.symbol === undefined ? inFile && symbol.file !== "" : symbol.symbol === named.symbol && inFile;
 }
 
+/** The latest chokepoint entries whose sites a reference named and no record of its file held: said, never read as no references. */
+function flowSitesUnknown(state: ShellState): string[] {
+  return allInvariants(state.spec.components).flatMap((invariant) => {
+    const entry = latestOf(invariant, state.runs.records).find((candidate) => candidate.form === "chokepoint");
+    return entry?.sitesUnresolved === undefined ? [] : [`${invariant.component}/${invariant.name}: ${entry.sitesUnresolved}`];
+  });
+}
+
 /** The symbols the latest runs recorded as referenced across components: the fallback when the adapter was not asked. */
 function flowRunSymbols(state: ShellState): InterfaceSymbol[] {
   const components = state.spec.components;
   const tally = new Map<string, InterfaceSymbol>();
   for (const invariant of allInvariants(components)) {
     const entry = latestOf(invariant, state.runs.records).find((candidate) => candidate.form === "chokepoint");
+    // An entry whose sites are unknown is named in the model's sitesUnknown, never drawn as an entry with none.
     if (entry?.sites === undefined) continue;
     for (const enforcement of invariant.enforcements) {
       if (enforcement.form !== "chokepoint") continue;
@@ -1075,6 +1086,7 @@ export function flowOf(state: ShellState): FlowModel {
     language: reading.kind === "read" ? reading.language : undefined,
     ...(reading.kind === "read" && reading.languages !== undefined ? { languages: reading.languages } : {}),
     unread: reading.kind === "read" ? undefined : reading.because,
+    sitesUnknown: reading.kind === "read" ? [] : flowSitesUnknown(state),
     nodes,
     edges,
     entrances,
