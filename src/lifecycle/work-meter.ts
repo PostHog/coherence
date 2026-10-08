@@ -12,7 +12,10 @@
  *                      counted at node's child_process module itself,
  *                      whatever route reached it (below)
  *   project-sized spawn  a spawn whose cost grows with the project whatever
- *                      it prints: git listing, searching or comparing the tree
+ *                      it prints: git listing, searching or comparing the
+ *                      tree; any spawn through a shell, whose command line
+ *                      cannot be read for what it runs; and a recursive tool
+ *                      (grep -r, find, rg, ls -R, fd, du, tree)
  *   spawn output       the bytes a child wrote to its standard output, for
  *                      the synchronous forms and a promised execFile (a
  *                      streamed spawn, the language servers' and the warm
@@ -135,22 +138,42 @@ function commandLine(args: readonly unknown[]): string {
   return [String(args[0]), ...argv].join(" ");
 }
 
+/** Shells: a command line run through one can run anything, so its cost is never read off its first word. */
+const SHELLS = /^(sh|bash|zsh|dash|ksh|mksh|fish|csh|tcsh|busybox|cmd|powershell|pwsh)(\.exe)?$/i;
+/** Tools that walk a tree whatever they print. */
+const WALKERS = /^(find|rg|fd|fdfind|du|tree|ag|ack)(\.exe)?$/i;
+
 /**
- * Whether a command line's cost is the project's, not its own: git listing,
+ * Whether a command line's cost is the project's, not its own, so a size
+ * test budgets such spawns by count as well as by output: git listing,
  * searching or comparing the tree (ls-files, grep, status, diff, log over
- * paths) does work that grows with the project whatever it prints, so a size
- * test budgets such spawns by count as well as by output.
+ * paths); any spawn through a shell (`sh -c`, `bash -c`, exec with a string,
+ * an option `shell`), whose line cannot be read for what it runs; and a
+ * recursive tool (grep -r, find, rg, ls -R, and the like).
  */
-export function projectSized(line: string): boolean {
-  return /(^|[\\/])git(\.exe)?\s(?:.*\s)?(ls-files|grep|status|diff|ls-tree|log|rev-list|check-ignore)\b/.test(line);
+export function projectSized(line: string, viaShell = false): boolean {
+  if (viaShell) return true;
+  if (/(^|[\\/])git(\.exe)?\s(?:.*\s)?(ls-files|grep|status|diff|ls-tree|log|rev-list|check-ignore)\b/.test(line)) return true;
+  const [first = "", ...rest] = line.trim().split(/\s+/);
+  const tool = first.split(/[\\/]/).pop() ?? "";
+  if (SHELLS.test(tool) || WALKERS.test(tool)) return true;
+  if (/^[ef]?grep$/i.test(tool)) return rest.some((a) => a === "--recursive" || a === "--dereference-recursive" || /^-[a-zA-Z]*[rR]/.test(a));
+  if (/^ls$/i.test(tool)) return rest.some((a) => a === "--recursive" || /^-[a-zA-Z]*R/.test(a));
+  return false;
 }
 
-function countSpawn(args: readonly unknown[]): void {
+/** Whether a spawn's options ask for a shell: `{ shell: true }` or a shell's path. */
+function shellOption(given: readonly unknown[]): boolean {
+  const options = given.find((a, i) => i > 0 && a !== null && typeof a === "object" && !Array.isArray(a)) as { shell?: unknown } | undefined;
+  return options !== undefined && options.shell !== undefined && options.shell !== false;
+}
+
+function countSpawn(args: readonly unknown[], viaShell = false): void {
   if (current === undefined) return;
   current.counts.spawn += 1;
   const line = commandLine(args);
   current.spawns.push(line);
-  if (projectSized(line)) current.counts["project-sized spawn"] += 1;
+  if (projectSized(line, viaShell)) current.counts["project-sized spawn"] += 1;
 }
 
 type Callable = (...args: unknown[]) => unknown;
@@ -214,7 +237,8 @@ function counted(name: string, sync: boolean): void {
     // exec's line is its command; the others' is the file and its arguments.
     const args = name === "exec" || name === "execSync" ? [String(given[0] ?? "")] : given;
     const call = name === "exec" || name === "execSync" ? given : controlled(given);
-    if (outer) countSpawn(args);
+    // exec and execSync always run their string through a shell.
+    if (outer) countSpawn(args, name === "exec" || name === "execSync" || shellOption(given));
     depth += 1;
     try {
       if (!sync && outer) {
@@ -240,7 +264,7 @@ function counted(name: string, sync: boolean): void {
         const args = name === "exec" ? [String(given[0] ?? "")] : given;
         const call = name === "exec" ? given : controlled(given);
         const outer = depth === 0;
-        if (outer) countSpawn(args);
+        if (outer) countSpawn(args, name === "exec" || shellOption(given));
         depth += 1;
         try {
           const result = (await custom(...call)) as { stdout?: unknown };

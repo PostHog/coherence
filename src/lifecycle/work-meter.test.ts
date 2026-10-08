@@ -19,7 +19,7 @@ import { join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { runHook, type HookEvent, type HookInput } from "./hook.ts";
-import { closeWork, countWork, lastHookWork, openWork, type Work } from "./work-meter.ts";
+import { closeWork, countWork, lastHookWork, openWork, projectSized as projectSizedLine, type Work } from "./work-meter.ts";
 import { sizedProject, type SizedProject } from "./size-fixture.ts";
 import { countingFs, type FsCount } from "./fs-count-fixture.ts";
 import { countingGit } from "../adapters/git-count-fixture.ts";
@@ -127,7 +127,7 @@ function overBudget(small: Measured, large: Measured, allowed: readonly RegExp[]
   // A spawn whose cost is the project's (git listing, searching or comparing the tree) is budgeted by count, at both sizes:
   // its output may be small and its work the whole tree.
   for (const [at, m] of [["1×", small], ["10×", large]] as const) {
-    if (m.work.counts["project-sized spawn"] > projectSized) problems.push(`project-sized spawns at ${at}: ${m.work.counts["project-sized spawn"]}, over the ${projectSized} the event may make (${m.work.spawns.filter((line) => /git\s(?:.*\s)?(ls-files|grep|status|diff|ls-tree|log|rev-list|check-ignore)\b/.test(line)).join("; ")})`);
+    if (m.work.counts["project-sized spawn"] > projectSized) problems.push(`project-sized spawns at ${at}: ${m.work.counts["project-sized spawn"]}, over the ${projectSized} the event may make (${m.work.spawns.filter((line) => projectSizedLine(line)).join("; ")})`);
   }
   for (const key of new Set([...s.keys(), ...l.keys()])) {
     const a = s.get(key) ?? 0;
@@ -334,6 +334,49 @@ test("the coverage scan compares a line only with the phrases its own words star
   // "lantern" starts two names, one of them two words long: a single and a multi-word comparison each, plus the multi-word name's test for its plural.
   const worded = await phraseComparisons(200, 10, " with a lantern");
   assert.equal(worded - base, 200 * 3, "a word on every line that starts names adds what those names cost on each line, nothing more");
+});
+
+test("every way of reading a file's bytes is weighed by them, and a spawn through a shell or a recursive tool is project-sized", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-read-forms-"));
+  try {
+    const file = join(dir, "f.txt");
+    writeFileSync(file, "x".repeat(5000));
+    const fsMod = await import("node:fs");
+    const fsp = await import("node:fs/promises");
+    const forms: [string, () => Promise<unknown>][] = [
+      ["readFileSync", async () => fsMod.readFileSync(file)],
+      ["readSync", async () => { const fd = fsMod.openSync(file, "r"); try { fsMod.readSync(fd, Buffer.alloc(5000), 0, 5000, 0); } finally { fsMod.closeSync(fd); } }],
+      ["readvSync", async () => { const fd = fsMod.openSync(file, "r"); try { fsMod.readvSync(fd, [Buffer.alloc(5000)], 0); } finally { fsMod.closeSync(fd); } }],
+      ["callback read", () => new Promise((done) => fsMod.open(file, "r", (_e, fd) => fsMod.read(fd, Buffer.alloc(5000), 0, 5000, 0, () => fsMod.close(fd, () => done(undefined)))))],
+      ["callback readv", () => new Promise((done) => fsMod.open(file, "r", (_e, fd) => fsMod.readv(fd, [Buffer.alloc(5000)], 0, () => fsMod.close(fd, () => done(undefined)))))],
+      ["callback readFile", () => new Promise((done) => fsMod.readFile(file, () => done(undefined)))],
+      ["promises readFile", () => fsp.readFile(file)],
+      ["a FileHandle's readFile", async () => { const h = await fsp.open(file); try { await h.readFile(); } finally { await h.close(); } }],
+      ["a FileHandle's read", async () => { const h = await fsp.open(file); try { await h.read(Buffer.alloc(5000), 0, 5000, 0); } finally { await h.close(); } }],
+      ["a FileHandle's readv", async () => { const h = await fsp.open(file); try { await h.readv([Buffer.alloc(5000)], 0); } finally { await h.close(); } }],
+      ["a read stream", () => new Promise((done) => fsMod.createReadStream(file).on("data", () => {}).on("close", () => done(undefined)))],
+      ["a FileHandle's read stream", async () => { const h = await fsp.open(file); await new Promise((done) => h.createReadStream().on("data", () => {}).on("close", () => done(undefined))); }],
+    ];
+    for (const [name, read] of forms) {
+      const { fs } = await countingFs(read);
+      const bytes = Object.entries(fs.paths).filter(([key]) => key.endsWith("/f.txt")).reduce((n, [, w]) => n + w, 0);
+      assert.ok(bytes >= 5000, `${name}: weighed by its 5000 bytes, not once (${JSON.stringify(fs.paths)})`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  for (const line of ["git grep -q x", "git ls-files -z", "sh -c git grep -q x", "/bin/bash -c ls", "grep -rq x .", "grep -R x .", "grep --recursive x .", "find . -name x", "rg x", "ls -R", "ls -laR ."]) assert.ok(projectSizedLine(line), `${line}: project-sized`);
+  for (const line of ["git rev-parse HEAD", "grep x f.txt", "ls -la", "node -v", "true"]) assert.ok(!projectSizedLine(line), `${line}: its own cost`);
+  assert.ok(projectSizedLine("node -v", true), "any spawn through a shell is project-sized");
+  const scope = openWork();
+  try {
+    const cp = await import("node:child_process");
+    cp.execSync("true");
+    cp.spawnSync("true", [], { shell: true });
+  } finally {
+    closeWork(scope);
+  }
+  assert.equal(scope.work.counts["project-sized spawn"], 2, "exec with a string and a spawn with shell: true are project-sized");
 });
 
 /* ------------------------------------------------------------ spawns, at runtime */
