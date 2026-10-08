@@ -160,6 +160,11 @@ It reads only the session's own records, about 0.1 s a render. Add it to
 { "statusLine": { "type": "command", "command": "npx --no -- coherence-statusline" } }
 ```
 
+While Coherence's warm server is serving Scope (after `coherence scope`), the
+line ends with a `scope ↗` link to the live page, in terminals that draw
+hyperlinks (iTerm2, Kitty, WezTerm). The address carries the project's token,
+so it is only ever the link's target, never printed.
+
 If you already have a status line, keep it by passing its command after
 `--`: `npx --no -- coherence-statusline -- ~/.claude/statusline.sh` prints
 yours first, then Coherence's.
