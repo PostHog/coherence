@@ -345,7 +345,11 @@ component's methods, one bullet each, in the same grammar, with no headings:
 ```
 
 `when:` names what fires the practice: a command's words, an edited path's
-glob with the text the edit adds, or `explicit`. A shell command that writes a file
+glob with the text the edit adds, or `explicit`. A command's words are
+adjacent whole words of one simple command, never text inside a quoted
+argument or a heredoc's body; a word with `*` or `?` is a glob over one word,
+so `command resolved df-*` fires when `resolved` is followed at once by an
+argument starting `df-`, and not when a conjecture is resolved. A shell command that writes a file
 (a redirect, a heredoc, `tee`, `sed -i`, `cp`) counts as an edit of that file, and
 its own text as the text added. Steps are numbered in the
 order written; `leaves:` under a step names the evidence it leaves. Every

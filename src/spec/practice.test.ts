@@ -17,7 +17,7 @@ import { appendRecord, loadJournal } from "../journal/store.ts";
 import type { Enactment } from "../journal/record.ts";
 import { runHook } from "../lifecycle/hook.ts";
 import { installedEntry } from "../lifecycle/install.ts";
-import { practiceAnswer, practiceOrientText } from "../lifecycle/practice-delivery.ts";
+import { practiceAnswer, practiceOrientText, toolUseOf } from "../lifecycle/practice-delivery.ts";
 import { scaffoldCommand } from "../scaffold/cli.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 
@@ -120,6 +120,30 @@ test("triggers: a command fires on its words, an edit on its glob and the text i
   assert.equal(firedBy(p, use({ writes: ["src/widget/a/b.ts"], added: "const knob = 1" })), "edit src/widget/a/b.ts adding knob");
   assert.equal(firedBy(p, use({ writes: ["src/widget/a/b.ts"], added: "const dial = 1" })), undefined, "the edit adds no knob");
   assert.equal(firedBy(p, use({ command: "ls" })), undefined);
+});
+
+test("a command trigger's words match whole words of one simple command in place, a glob word one word, and never quoted text or a heredoc's body", () => {
+  const practice = (when: string) => parsePractices(practiceText("d-0000abcd").replace("command turn-knob | edit src/widget/**/*.ts adding knob", when), "W.practice.md").practices[0]!;
+  const fires = (p: ReturnType<typeof practice>, command: string) => firedBy(p, toolUseOf({ tool_input: { command } }, []));
+  const pattern = practice("command turn-knob k-*");
+  assert.equal(fires(pattern, "turn-knob k-1a2b --hard"), "command turn-knob k-*", "the argument after the command matches the glob");
+  assert.equal(fires(pattern, "./bin/turn-knob k-1"), "command turn-knob k-*", "the program may be named by its path");
+  assert.equal(fires(pattern, "turn-knob c-1a2b --hard"), undefined, "another argument is no match");
+  assert.equal(fires(pattern, "turn-knob --hard k-1"), undefined, "the pattern is the next word, not any later one");
+  assert.equal(fires(pattern, "turn-knob"), undefined, "a pattern word needs a word to match");
+  assert.equal(fires(pattern, `turn-knob "k-1 and more"`), undefined, "a glob never matches blanks inside one quoted argument");
+  assert.equal(fires(pattern, `oil --note "turn-knob k-1"`), undefined, "the words inside a quoted argument are no command");
+  assert.equal(fires(pattern, "cat > notes.md <<'EOF'\nturn-knob k-1\nEOF"), undefined, "a heredoc's body is text, not a command");
+  assert.equal(fires(pattern, "ls && turn-knob k-9"), "command turn-knob k-*", "any simple command of the line may fire it");
+  assert.equal(fires(practice("command turn-knob k-?"), "turn-knob k-12"), undefined, "? is one character");
+  assert.ok(commandMatches("turn-knob k-*", "turn-knob k-1") && !commandMatches("turn-knob k-*", "turn-knob c-1"), "the text fallback reads a glob word as one word");
+  // A trigger without a pattern behaves as before: whole words anywhere in one simple command.
+  const plain = practice("command lexicon apply");
+  assert.equal(fires(plain, "node src/cli.ts lexicon apply lp-1 --because x"), "command lexicon apply");
+  assert.equal(fires(plain, "node src/cli.ts lexicon applyall"), undefined);
+  assert.equal(fires(plain, `node src/cli.ts decide "x" --because "lexicon apply"`), undefined);
+  assert.equal(fires(practice("command turn-knob"), "turn-knob c-1"), "command turn-knob", "a bare command fires whatever follows");
+  assert.notEqual(pattern.version, practice("command turn-knob").version, "the pattern is part of the version");
 });
 
 test("a practice file stands only beside its folder's spec, with the spec's stem", () => {

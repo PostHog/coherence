@@ -18,6 +18,8 @@ import type { Decision, Defect, Resolution } from "./record.ts";
 import { loadJournal } from "./store.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { specCommand } from "../spec/cli.ts";
+import { firedBy, parsePractices } from "../spec/practice.ts";
+import { toolUseOf } from "../lifecycle/practice-delivery.ts";
 
 // Every fixture folder this file makes is removed when the file is done; the leak guard fails a file that leaves one.
 const madeFolders: string[] = [];
@@ -251,4 +253,20 @@ test("query convergence counts arrivals by origin and catch, escapes per release
   assert.match(text, /defects arriving: 5; fix-induced 2, pre-existing 1, unknown 2/);
   assert.match(text, /release v0\.2\.0 .*2 escaped/);
   assert.match(text, /hook latency PreToolUse unknown: p50 0\.10 s, p95 0\.30 s over 2 calls/);
+});
+
+test("close a defect fires on resolving a defect and never a conjecture, nor on a quoted argument or a heredoc's body", () => {
+  const text = readFileSync(join(import.meta.dirname, "Journal.practice.md"), "utf8");
+  const practice = parsePractices(text, "src/journal/Journal.practice.md").practices.find((p) => p.name === "close a defect")!;
+  const fires = (command: string) => firedBy(practice, toolUseOf({ tool_input: { command } }, []));
+  assert.equal(fires(`node src/cli.ts resolved df-1a2b3c4d --because "x" --guard src/journal/a`), "command resolved df-*", "resolving a defect fires it");
+  assert.equal(fires(`node src/cli.ts resolved c-ad47425a --because "the test showed it"`), undefined, "resolving a conjecture is no defect's close");
+  assert.equal(fires(`node src/cli.ts decide "y" --because "resolved df-1"`), undefined, "a quoted argument is no command");
+  assert.equal(fires(`node src/cli.ts resolved c-1 --because "resolved df-1"`), undefined, "a quoted because naming a defect does not make a conjecture's close one");
+  assert.equal(fires("cat > notes.md <<'EOF'\nnode src/cli.ts resolved df-1\nEOF"), undefined, "a heredoc's body is text");
+  assert.equal(fires(`node src/cli.ts defect "x" --evidence "y" --class overmatch`), "command cli.* defect", "recording a defect fires it: classifying is its first step");
+  assert.equal(fires(`npx coherence defect "x" --evidence "y"`), "command coherence defect", "the installed CLI records one too");
+  assert.equal(fires(`node node_modules/@posthog/coherence/dist/cli.js defect "x" --evidence "y"`), "command cli.* defect", "and the built one by its path");
+  for (const read of ["node src/cli.ts journal --kind defect", "coherence query defect", "coherence lexicon review defect"]) assert.equal(fires(read), undefined, `${read} reads defects and closes none`);
+  assert.equal(fires(`node src/cli.ts classify df-1a2b3c4d --class overmatch --because "z"`), "command classify", "classifying one fires it");
 });
