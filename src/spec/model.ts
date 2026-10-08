@@ -106,6 +106,8 @@ export interface SpecModel {
   defects?: DefectFloor;
   /** The entrances an invariant covered by its crossing alone and no longer does, until it names them (covers.ts); advisory, never a problem. Absent when none. */
   crossingAlone?: CrossingAloneCredit[];
+  /** A project lexicon's stored project field that disagrees with the config's name; advisory, never a problem: the config's name is the one read, and an earlier release wrote the stored one. Absent when they agree. */
+  storedName?: Problem;
 }
 
 interface Config {
@@ -183,8 +185,11 @@ function gitIgnoredEntries(root: string, keys: readonly string[], folders: Reado
 /**
  * A project lexicon whose stored project field disagrees with the name the
  * config gives: the config's name is the one every reader takes
- * (projectName), so the stored one is a second copy that has drifted. A
- * lexicon that will not parse is the lexicon check's to refuse.
+ * (projectName), so the stored one is a second copy that has drifted. It is
+ * advisory, never a problem: lexicon apply wrote that field until #67, so an
+ * adopter upgrading carries it without having done anything, and a copy no
+ * reader takes changes no answer (df-be527a7b). A lexicon that will not parse
+ * is the lexicon check's to refuse.
  */
 function storedNameProblems(root: string): Problem[] {
   const name = configuredName(root);
@@ -319,7 +324,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
 
   // One walk of the project serves the specs, the practice files and the ignore list's check.
   const walked = walkedProjectFiles(walkBounds(root, config.ignore));
-  problems.push(...ignoreProblems(root, walked), ...storedNameProblems(root));
+  problems.push(...ignoreProblems(root, walked));
+  const storedName = storedNameProblems(root)[0];
   const byFolder = new Map<string, { folder: string; specPath: string; parsed: ReturnType<typeof parseSpec> }>();
   for (const specPath of walked.files.filter((rel) => rel.endsWith(SPEC_SUFFIX)).map((rel) => join(root, rel)).sort()) {
     const folder = folderOf(root, specPath);
@@ -460,7 +466,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   const journal = practiceFiles.size === 0 && components.length > 0 ? journalRecords(root) : records;
   const defects = defectFloor(defectStates(journal), guardStanding(components), declaredClasses(root));
   const crossingAlone = crossingAloneCredits(components, trustLevels);
-  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs, defects, ...(crossingAlone.length === 0 ? {} : { crossingAlone }) };
+  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs, defects, ...(crossingAlone.length === 0 ? {} : { crossingAlone }), ...(storedName === undefined ? {} : { storedName }) };
 }
 
 /** How a defect's guard stands in this model: the invariant <folder>/<name> is declared and its refutation witnessed, declared only, or missing. */
