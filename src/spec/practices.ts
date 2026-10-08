@@ -19,7 +19,7 @@ import { spawnSync } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PRACTICE_SUFFIX, RECORD_ID, globMatches, parsePractices, type Practice } from "./practice.ts";
-import { nestedFolder, projectFiles, repositoryTop } from "../adapters/project-files.ts";
+import { keepProjectFiles, nestedFolder, projectFiles, projectFilesUnder, repositoryTop } from "../adapters/project-files.ts";
 import type { Problem } from "./grammar.ts";
 import { loadJournal } from "../journal/store.ts";
 import { loadWork } from "../journal/work.ts";
@@ -275,16 +275,30 @@ export function deadTriggers(root: string, practices: readonly ModelPractice[]):
     .flatMap((p) => p.triggers.flatMap((t) => (t.kind === "edit" ? [{ p, glob: t.glob }] : [])))
     .filter(({ p, glob }) => !seen.has(`${p.id}\n${glob}`) && seen.add(`${p.id}\n${glob}`) !== undefined);
   if (edits.length === 0) return [];
-  const files = projectFiles(root);
+  // The spec model loads several times in one hook: a literal path costs one git call for all of them, a pattern only the folder before its first wildcard.
+  const literal = (glob: string): boolean => !/[*?]/.test(glob);
+  const under = new Map<string, string[]>();
+  const filesFor = (glob: string): string[] => {
+    const folder = glob.split("/").slice(0, -1).filter((_, i, all) => !all.slice(0, i + 1).some((part) => /[*?]/.test(part))).join("/");
+    let files = under.get(folder);
+    if (files === undefined) under.set(folder, (files = projectFilesUnder(root, folder)));
+    return files;
+  };
+  const asked = new Set(edits.filter(({ glob }) => literal(glob)).map(({ glob }) => glob));
+  const kept = keepProjectFiles(root, [...asked]);
+  const matches = (glob: string): boolean => {
+    if (!literal(glob)) return filesFor(glob).some((f) => globMatches(glob, f));
+    return asked.has(glob) ? kept.has(glob) : keepProjectFiles(root, [glob]).size === 1;
+  };
   const nested = nestedFolder(root);
   let repository: string[] | undefined;
   const out: DeadTrigger[] = [];
   for (const { p, glob } of edits) {
-    if (files.some((f) => globMatches(glob, f))) continue;
+    if (matches(glob)) continue;
     const dead: DeadTrigger = { practice: p, glob, line: p.lines.when ?? p.line };
     if (nested !== undefined && glob.startsWith(`${nested}/`)) {
       const rest = glob.slice(nested.length + 1);
-      if (files.some((f) => globMatches(rest, f))) dead.suggestion = rest;
+      if (matches(rest)) dead.suggestion = rest;
     }
     if (dead.suggestion === undefined && nested !== undefined) {
       const top = repositoryTop(root);
@@ -297,7 +311,6 @@ export function deadTriggers(root: string, practices: readonly ModelPractice[]):
   return out;
 }
 
-/** The problem a dead trigger is, with what to write instead when that is known. */
 export function deadTriggerText(dead: DeadTrigger): string {
   const head = `practice ${dead.practice.name}: its trigger edit ${dead.glob} matches no file in this project, so the practice never fires on it; paths in a when: line are relative to the project's folder`;
   if (dead.suggestion !== undefined) return `${head}: write edit ${dead.suggestion}`;
