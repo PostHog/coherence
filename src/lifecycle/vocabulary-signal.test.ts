@@ -13,6 +13,7 @@ import { runHook } from "./hook.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { lexiconWorkCommand } from "./lexicon-cli.ts";
 import { FUNCTION_WORDS, STOPLIST } from "./stoplist.ts";
+import { reviewLexicon } from "./lexicon-maintain.ts";
 
 const COMPONENTS = ["books", "sales", "stock", "staff"];
 
@@ -127,7 +128,16 @@ test("well-known names, the project's own name and the lexicon's not: names are 
   }
 });
 
-test("sense review is asked only where meaning is at risk: more than one recorded sense, a rejected name beside the use, or a Coherence concept an adopter's code declares", async () => {
+/** One journal record in the adopter's own journal, as a decision written to Coherence. */
+function record(root: string, id: string, chose: string): void {
+  mkdirSync(join(root, ".coherence/journal"), { recursive: true });
+  appendFileSync(
+    join(root, ".coherence/journal/payroll.jsonl"),
+    JSON.stringify({ id, kind: "decision", at: "2026-10-08T00:00:00.000Z", session: "payroll", agent: "main", chose, over: ["a week"], because: "payroll closes daily" }) + "\n",
+  );
+}
+
+test("sense review is asked only where meaning is at risk: more than one recorded sense, a rejected name beside the use, or a Coherence concept an adopter's code declares written where Coherence's grammar speaks", async () => {
   const root = project();
   try {
     writeFileSync(join(root, "books/notes.md"), "The exposure is counted in USD.\nNothing else here.\n\n\nThe exposure is settled nightly.\n");
@@ -135,16 +145,64 @@ test("sense review is asked only where meaning is at risk: more than one recorde
     writeFileSync(join(root, "stock/notes.md"), "Each row states its unit basis.\n");
     writeFileSync(join(root, "staff/model.ts"), "export function scope(): string {\n  return 'staff';\n}\n");
     writeFileSync(join(root, "staff/notes.md"), "The scope of a shift is one day.\n");
+    record(root, "d-1", "narrow the scope to one shift");
     const report = await lexiconCoverage(root);
     const risk = (term: string, component: string): string | undefined =>
       report.terms.find((t) => t.term === term)?.contexts.find((c) => c.component === component)?.risk;
     assert.equal(risk("exposure", "books"), undefined, "an ordinary use of a defined word asks no review");
     assert.match(risk("exposure", "sales") ?? "", /hazard/, "a name rejected for the concept beside its use puts the sense at risk");
     assert.match(risk("unit basis", "stock") ?? "", /more than one recorded sense/, "a name with two recorded senses is at risk");
-    assert.match(risk("scope", "staff") ?? "", /declared in this project's code/, "a Coherence concept the adopter declares in code is at risk");
+    assert.equal(risk("scope", "staff"), undefined, "a Coherence concept the adopter's code declares is the project's sense in its code and its domain prose");
+    assert.match(risk("scope", ".") ?? "", /declared in this project's code \(staff\/model\.ts:1\).*text Coherence reads as its own \(\.coherence\/journal\/payroll\.jsonl:1\)/, "the same name in a record, text written to Coherence, is where the two senses meet");
     const at = attention(report).senses.map((s) => `${s.term}@${s.component}`).sort();
-    assert.deepEqual(at, ["exposure@sales", "scope@staff", "unit basis@stock"]);
+    assert.deepEqual(at, ["exposure@sales", "scope@.", "unit basis@stock"]);
     assert.equal(report.totals.unreviewedContexts, 3, "only at-risk contexts await review");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a Coherence name an adopter's code declares is the project's own sense: its code, its domain prose and its specs' sentences ask nothing, its specs' grammar does", async () => {
+  const root = project();
+  try {
+    writeFileSync(
+      join(root, "books/model.ts"),
+      "export class Config {}\nexport function run(): void {}\nexport type Spec = string;\nexport interface Scope { book: string }\nexport interface Structure { depth: number }\n",
+    );
+    writeFileSync(join(root, "books/settings.py"), "class Config:\n    pass\n");
+    writeFileSync(join(root, "books/notes.md"), "Each config is loaded once.\nThe run starts at dawn.\nA spec names its book.\nThe scope is one book.\nThe structure is a tree.\n");
+    writeFileSync(
+      join(root, "books/Books.spec.md"),
+      "# books\n\n## invariants\n- books balance: Each run of the books balances within one scope, under one config and spec.\n  because: the structure of a book is its run\n\n## structure\n",
+    );
+    const report = await lexiconCoverage(root);
+    const risk = (term: string): string | undefined =>
+      report.terms.find((t) => t.term === term)?.contexts.find((c) => c.component === "books")?.risk;
+    for (const name of ["config", "run", "spec", "scope"]) {
+      assert.ok(report.terms.find((t) => t.term === name)?.contexts.some((c) => c.component === "books"), `${name} is observed in books`);
+      assert.equal(risk(name), undefined, `${name}, declared in the adopter's code, written in its code, prose and spec sentences, is the project's sense`);
+    }
+    assert.match(risk("structure") ?? "", /Books\.spec\.md:7/, "a declared name in a spec's grammar (its ## structure heading) is where Coherence's sense speaks too");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a ruling on a Coherence name an adopter's code declares holds for its component: a new use of the same name does not reopen it, and settling it still needs a person", async () => {
+  const root = project();
+  try {
+    writeFileSync(join(root, "staff/model.ts"), "export function scope(): string {\n  return 'staff';\n}\n");
+    record(root, "d-1", "narrow the scope to one shift");
+    const context = async () => (await lexiconCoverage(root)).terms.find((t) => t.term === "scope")!.contexts.find((c) => c.component === ".")!;
+    const first = await context();
+    assert.ok(first.risk !== undefined, "the record puts the declared name's sense at risk");
+    const who = { session: "ruling-test", agent: "test" };
+    await assert.rejects(reviewLexicon(root, "scope", ".", first.fingerprint, "not-domain", who, "the payroll scope", ["Coherence's scope"]), /human/);
+    await reviewLexicon(root, "scope", ".", first.fingerprint, "not-domain", who, "the payroll scope is a shift's span", ["Coherence's scope"], "owner: a shift's span");
+    record(root, "d-2", "widen the scope to a fortnight");
+    const later = await context();
+    assert.equal(later.fingerprint, first.fingerprint, "the evidence is the term and component, not the uses");
+    assert.equal(later.disposition, "not-domain", "a new use of the same name keeps the ruling");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -188,7 +246,7 @@ test("no hook injection carries a total: orient names the ranked terms or says n
   }
 });
 
-test("the per-tool line is silent on an ordinary edit and names only the candidate an edit introduces", async () => {
+test("an edit is silent on the terms it makes recur: regulate names the session's together at the stop, once, with the declare-or-alias command", async () => {
   const root = project();
   try {
     writeFileSync(join(root, "books/notes.md"), "The exposure is counted in USD.\n");
@@ -200,13 +258,53 @@ test("the per-tool line is silent on an ordinary edit and names only the candida
     appendFileSync(join(root, "books/notes.md"), "The exposure is settled nightly.\nRows are appended at the end of the day.\n");
     const ordinary = await runHook("PostToolUse", tool, root);
     assert.doesNotMatch(injected(ordinary.stdout), /Lexicon/, "an ordinary edit says nothing about vocabulary");
-    // An edit that makes a new name recur: named, once.
+    ordinary.commit?.();
+    // Two edits that each make a new name recur: neither says a word of it.
     appendFileSync(join(root, "books/notes.md"), "The `rebate` is new.\nEach `rebate` is paid.\nA `rebate` is clawed back.\n");
-    const introduced = await runHook("PostToolUse", tool, root);
-    assert.match(injected(introduced.stdout), /this edit made "rebate" recur without a definition/);
-    introduced.commit?.();
-    const again = await runHook("PostToolUse", tool, root);
-    assert.doesNotMatch(injected(again.stdout), /Lexicon/, "a candidate already named is not named again");
+    const first = await runHook("PostToolUse", tool, root);
+    assert.doesNotMatch(injected(first.stdout), /Lexicon/, "the edit that made rebate recur is silent");
+    first.commit?.();
+    appendFileSync(join(root, "books/notes.md"), "The `levy` is new.\nEach `levy` is paid.\nA `levy` is waived.\n");
+    const second = await runHook("PostToolUse", tool, root);
+    assert.doesNotMatch(injected(second.stdout), /Lexicon/, "the edit that made levy recur is silent");
+    second.commit?.();
+    // The stop names both in one line, with what settles them.
+    const stop = await runHook("Stop", input, root);
+    const said = injected(stop.stdout);
+    const line = said.split("\n").filter((l) => /recurring without a definition/.test(l));
+    assert.equal(line.length, 1, `one line names them: ${said}`);
+    assert.match(line[0]!, /"rebate"/);
+    assert.match(line[0]!, /"levy"/);
+    assert.match(line[0]!, /lexicon propose declare <term> --definition "<text>" --because "<why>"\) or map it as an alias of an existing concept/);
+    stop.commit?.();
+    // The next prompt carries what the stop said, and names neither term again on its own.
+    const prompt = await runHook("UserPromptSubmit", { ...input, prompt: "next" }, root);
+    assert.match(injected(prompt.stdout), /At your last stop[\s\S]*this session left/, "the stop's line reaches the agent at the prompt");
+    assert.doesNotMatch(injected(prompt.stdout), /no stop has named/, "what the stop named is not named again");
+  } finally {
+    await stopWarmServers(root);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a term an edit held reaches the next prompt when no stop named it, once", async () => {
+  const root = project();
+  try {
+    writeFileSync(join(root, "books/notes.md"), "The exposure is counted in USD.\n");
+    const input = { session_id: "held-test", cwd: root };
+    const start = await runHook("SessionStart", input, root);
+    start.commit?.();
+    const tool = { ...input, tool_name: "Write", tool_input: { file_path: join(root, "books/notes.md") } };
+    appendFileSync(join(root, "books/notes.md"), "The `rebate` is new.\nEach `rebate` is paid.\nA `rebate` is clawed back.\n");
+    const edit = await runHook("PostToolUse", tool, root);
+    assert.doesNotMatch(injected(edit.stdout), /Lexicon/, "the edit is silent");
+    edit.commit?.();
+    // The session never stopped cleanly: the host was interrupted, and the next thing it runs is a prompt.
+    const prompt = await runHook("UserPromptSubmit", { ...input, prompt: "after an interrupt" }, root);
+    assert.match(injected(prompt.stdout), /no stop has named "rebate", which this session made recur without a definition; declare each .* or map it as an alias of an existing concept/);
+    prompt.commit?.();
+    const again = await runHook("UserPromptSubmit", { ...input, prompt: "and again" }, root);
+    assert.doesNotMatch(injected(again.stdout), /no stop has named/, "named once");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

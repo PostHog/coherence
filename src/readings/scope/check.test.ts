@@ -15,9 +15,9 @@ import { loadJournal } from "../../journal/store.ts";
 import { loadSpecModel } from "../../spec/model.ts";
 import { DEFAULTS, STATE_SLOT, buildScopePage, buildShell, scopeState, snapshotOf, writeScopePage, writeStructurePreview, type BuildOptions } from "./build.ts";
 import { makeFixture, type Fixture } from "./check-fixture.ts";
-import { CITED_WINDOW, windowJournal, allReliance, componentId, defectsOf, flowChokepointId, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, verifiedOf, workId } from "./derive.ts";
+import { CITED_WINDOW, windowJournal, windowRuns, allReliance, componentId, defectsOf, flowChokepointId, invariantId, journalId, latestOf, relianceId, resolveHash, runId, structureId, verifiedOf, workId } from "./derive.ts";
 import { escapeHtml } from "./html.ts";
-import type { Lexicon, LexiconCoverage, RecordedSite, ShellState, StructurePreview, WorkOrder } from "./model.ts";
+import type { Lexicon, LexiconCoverage, RecordedSite, RunRecord, ShellState, StructurePreview, WorkOrder } from "./model.ts";
 import { renderShell, renderView } from "./shell.ts";
 
 const options: BuildOptions = {
@@ -691,7 +691,9 @@ test("deep links resolve: every card id on every view resolves to that view", ()
 test("another project's tree builds as a second root: its lexicon is the domain layer and its run records show its structural defects", async () => {
   const other = makeFixture();
   try {
-    writeFileSync(join(other.root, "lexicon.json"), JSON.stringify({ version: 1, project: "widgetry", concepts: [{ name: "widget", definition: "A thing with a knob." }] }));
+    // The domain layer's heading is the project's name, which its config gives (projectName); the lexicon stores none.
+    writeFileSync(join(other.root, "coherence.config.json"), JSON.stringify({ name: "widgetry", entryDir: ".", language: "typescript" }));
+    writeFileSync(join(other.root, "lexicon.json"), JSON.stringify({ version: 1, concepts: [{ name: "widget", definition: "A thing with a knob." }] }));
     const { state } = await buildScopePage({ root: other.root, lexiconPath: DEFAULTS.lexiconPath, project: "Widgetry" });
     const domain = state.lexicon.layers.find((l) => l.id === "domain");
     assert.ok(domain?.kind === "present" && domain.title === "Widgetry lexicon", "the other project's lexicon.json is located from its root");
@@ -726,3 +728,27 @@ test("the page's run window keeps every latest entry whole and drops reference s
   });
 });
 
+
+test("an older run kept for the verdicts it holds carries only those, and its totals stay true on the Runs view", () => {
+  const entry = (name: string, verdict: "pass" | "fail" | "not run") =>
+    ({ component: "src/c", name, form: "totality-oracle", verdict, refutation: "missing", latency: 1, reason: "r" }) as unknown as RunRecord["invariants"][number];
+  const run = (i: number, entries: RunRecord["invariants"]): RunRecord =>
+    ({ at: new Date(Date.UTC(2026, 9, 1) + i * 1000).toISOString(), session: `s-${i}`, agent: "a", commit: null, dirty: false, instrument: { language: "typescript", server: "none" }, latency: 1, invariants: entries }) as unknown as RunRecord;
+  // A full run of five; later runs re-check four of them, so it still holds one latest verdict (e).
+  const full = run(0, [entry("a", "pass"), entry("b", "fail"), entry("c", "pass"), entry("d", "not run"), entry("e", "pass")]);
+  const later = [1, 2, 3].map((i) => run(i, [entry("a", "pass"), entry("b", "pass"), entry("c", "pass"), entry("d", "pass")]));
+  const records = [full, ...later];
+  const window = windowRuns(records, 2);
+  const kept = window.records.find((r) => r.session === "s-0");
+  assert.ok(kept !== undefined, "the run holding a latest verdict is kept");
+  assert.deepEqual(kept.invariants.map((e) => e.name), ["e"], "it carries only the entry it holds");
+  assert.deepEqual(window.superseded[runId(full)], { pass: 2, fail: 1, notRun: 1 }, "the rest are counted by verdict");
+  assert.equal(window.omitted, 1, "a run holding nothing and outside the latest is left out and counted");
+  const latest = (rs: readonly RunRecord[]) => Object.fromEntries(rs.flatMap((r) => r.invariants.map((e) => [e.name, `${e.verdict} ${r.session}`])));
+  assert.deepEqual(latest(window.records), latest(records), "every latest verdict is the one every record gives");
+  const state = { ...fixtureState, runs: { ...fixtureState.runs, records: window.records, superseded: window.superseded } };
+  const view = renderView(state, "runs").text;
+  const article = view.slice(view.indexOf(`id="${runId(full)}"`), view.indexOf("</article>", view.indexOf(`id="${runId(full)}"`)));
+  assert.match(article, /3 pass<\/span> <span class="count failing" data-count="fail">1 fail<\/span> <span class="count" data-count="not-run">1 not run<\/span> <span class="quiet">of 5 enforcements/, "the run's totals are its whole run's");
+  assert.match(article, /data-field="superseded">4 verdicts later runs superseded are counted here and not listed/, "and the view says why four are not listed");
+});

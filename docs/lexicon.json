@@ -443,7 +443,7 @@
     {
       "name": "crossing",
       "status": "settled",
-      "definition": "The first form of the security marker on an invariant: crossing A -> B names the trust levels on either side of the invariant's chokepoint. Lets \"every chokepoint where agent input reaches storage\" be a query. Where the chokepoint is an entrance's handler, its entering side must equal the trust level the entrance declares, and is the entrance's trust, labeled derived, when it declares none. Carries no topology and nothing renders from it but the spine.",
+      "definition": "The first form of the security marker on an invariant: crossing A -> B names the trust levels on either side of the invariant's chokepoint. Lets \"every chokepoint where agent input reaches storage\" be a query. Where the chokepoint is an entrance's handler, its entering side must equal the trust level the entrance declares, and is the entrance's trust, labeled derived, when it declares none. It says which trust an invariant checks, never where that trust enters: an invariant enforced by a totality oracle alone is a control only on the entrances its entrances: line names, never on every entrance whose trust its crossing matches. Carries no topology and nothing renders from it but the spine.",
       "related": [
         "invariant",
         "trust level",
@@ -612,7 +612,12 @@
         "class self-clearing": "A check the very record or edit it guards can clear on its own.",
         "class exposure": "Private state written where it is published or committed.",
         "class uninterpolated": "Template text reaches a reader literally instead of the value it stands for.",
-        "class load-flake": "A test that fails under machine load whatever the change under test."
+        "class load-flake": "A test that fails under machine load whatever the change under test.",
+        "class duplicated-fact": "One fact kept in two places written apart, so one copy drifts from the other and a reader takes the stale one.",
+        "class over-claim": "A reading credits more than its evidence shows: a control, a coverage or a verification counted where nothing checks it, so a gap reads closed.",
+        "class hand-built-path": "A file of an installed package located by a path spelled by hand (a node_modules folder joined to a root) instead of asked of the package resolver, so a package manager that lays its packages out otherwise (pnpm's store, a package's exports) leaves it naming nothing.",
+        "class version-skew": "The Coherence that runs is not the one the adopter installed or meant: another copy shadows it, or a package manager resolved an older release than the project needs, and nothing says which version answers.",
+        "class missing-entry-point": "A way of reaching the tool that users expect is absent or answers wrongly: a conventional flag or verb (--version, --help) that is not recognized or is taken by the program in front of it."
       }
     },
     {
@@ -1069,7 +1074,7 @@
     {
       "name": "scaffold",
       "status": "settled",
-      "definition": "The command that makes the complete shape the cheapest thing to ship. Two shapes: a component (folder plus spec with intent and empty invariants) and an invariant (bullet with slots for enforcement, because, crossing, refutation, and the decomposition checklist printed beside it as declare-or-dismiss lines). The agent fills slots instead of recalling rules. For a spec gap it proposes the closure in those same terms: a guard: line, an invariant bullet whose crossing enters from the entrance's trust, or control: none with a reason. Scope shows a visual preview of the proposed structure before it is written, so a human can see the new vertebra in place.",
+      "definition": "The command that makes the complete shape the cheapest thing to ship. Two shapes: a component (folder plus spec with intent and empty invariants) and an invariant (bullet with slots for enforcement, because, crossing, the entrances it covers, refutation, and the decomposition checklist printed beside it as declare-or-dismiss lines). The agent fills slots instead of recalling rules. For a spec gap it proposes the closure in those same terms: an entrances: line naming the entrance on a verified invariant that covered it by its crossing alone, a guard: line, an invariant bullet whose crossing enters from the entrance's trust and whose entrances: line names it, or control: none with a reason. Scope shows a visual preview of the proposed structure before it is written, so a human can see the new vertebra in place.",
       "rejected": [
         {
           "alternative": "four kinds (component, invariant, boundary, parity)",
@@ -1331,7 +1336,7 @@
     },
     {
       "name": "spec gap",
-      "definition": "An untrusted entrance with no traced control. Its trust is a level from outside the system's control, or unknown, no control is traced on its structural route, and it declares no control: none. It closes three ways: a guard: line, an invariant whose crossing enters from its trust, or control: none with a reason. Orient names the gaps beyond the adoption baseline and regulate the ones a session touched; neither is a demonstrated bypass.",
+      "definition": "An untrusted entrance with no traced control. Its trust is a level from outside the system's control, or unknown, no control is traced on its structural route, and it declares no control: none. It closes three ways: a guard: line, an invariant whose crossing enters from its trust and whose entrances: line names it, or control: none with a reason. Orient names the gaps beyond the adoption baseline, and how many lost a control an invariant gave by its crossing alone; regulate names the ones a session touched; neither is a demonstrated bypass.",
       "provenance": {
         "defined_by": "agent gaps (session a3238ebe9efd46ba5), 2026-09-25 (journal d-a1095ef2)",
         "owner_words": "let's do 1-3, and then test the results on a pre-Coherence commit from both of those projects to see if the behavior change is effective"
@@ -1475,7 +1480,7 @@
     },
     {
       "name": "status line",
-      "definition": "The row Claude Code draws under the prompt from a command it runs after events; Coherence's line there names the session's hook time against the latency budget and the practices it owes, for the user, at no cost to the agent's context.",
+      "definition": "The row Claude Code draws under the prompt from a command it runs; Coherence's line there is for the user, not the agent.",
       "status": "settled",
       "related": [
         "hook",

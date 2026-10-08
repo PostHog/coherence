@@ -30,7 +30,7 @@
 
 import { spawnSync } from "../lifecycle/work-meter.ts";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export const CONFIG_FILE = "coherence.config.json";
 
@@ -214,6 +214,36 @@ export function effectiveConfig(root: string): { record: Record<string, unknown>
 /** The effective config's object, or an empty one. */
 export function configRecord(root: string): Record<string, unknown> {
   return effectiveConfig(root)?.record ?? {};
+}
+
+/** The project lexicon's file name at the root when the config names no other. */
+export const DEFAULT_PROJECT_LEXICON = "lexicon.json";
+
+/** Where the project's lexicon is or would be: the file its own config's lexicon key names (never a registry's), else the default at the root. */
+export function lexiconFileOf(root: string): string {
+  const named = readConfigFile(join(resolve(root), CONFIG_FILE))?.["lexicon"];
+  return resolve(root, typeof named === "string" ? named : DEFAULT_PROJECT_LEXICON);
+}
+
+/** The name the project's own config gives it (`name`, never a registry's), trimmed; undefined when it gives none or the config will not parse. */
+export function configuredName(root: string): string | undefined {
+  try {
+    const named = readConfigFile(join(resolve(root), CONFIG_FILE))?.["name"];
+    return typeof named === "string" && named.trim() !== "" ? named.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The project's name, the one answer every reader takes: its config's name;
+ * else the name a lexicon stored before any config named one (`stored`,
+ * read from the lexicon's project field and never written now); else its
+ * folder's. A stored name that disagrees with the config's is a spec problem
+ * (model.ts), never a second answer.
+ */
+export function projectName(root: string, stored?: string): string {
+  return configuredName(root) ?? (stored !== undefined && stored.trim() !== "" ? stored.trim() : basename(resolve(root)));
 }
 
 /** One thing wrong with a registry: the file it is about, and what. */

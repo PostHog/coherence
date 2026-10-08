@@ -12,14 +12,15 @@
  * does, and never to the page state.
  */
 
-import { basename, resolve } from "node:path";
+import { resolve } from "node:path";
 import type { Io } from "../../journal/cli.ts";
 import { economyFor, queryEconomyCommand, type EconomyOf } from "../../economy/cli.ts";
 import { lexiconCoverage } from "../../lifecycle/lexicon-coverage.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
-import { buildScopePage } from "../scope/build.ts";
+import { buildScopePage, projectNameOf } from "../scope/build.ts";
 import { budgetFlags, readComponentInterfaces } from "../scope/component-interfaces.ts";
 import { readAndRecord } from "../scope/gaps.ts";
+import { keptLine } from "../scope/kept-answers.ts";
 import { observedCommand } from "../../observation/observed.ts";
 import { answer, answerLexicon, QUERY_USAGE } from "./query.ts";
 import { practiceAnswer } from "../../lifecycle/practice-delivery.ts";
@@ -127,12 +128,15 @@ export async function queryCommand(argv: string[], io: Io, deps: QueryDependenci
   const { state } = await buildScopePage({
     root,
     lexiconPath: COHERENCE_LEXICON,
-    project: basename(root),
+    project: projectNameOf(root),
     window: false,
     // Only the Structure question needs every component interface, read through the language adapter.
     // The real reading is kept for the hooks (gaps.ts); an injected one is a test's, and never kept.
     ...(question === "structure" ? { componentInterfaces: deps.interfaces !== undefined ? await deps.interfaces(root, undefined, { budget }) : await readAndRecord(root, () => readComponentInterfaces(root, undefined, { budget })) } : {}),
   });
+  // What the reading reused of the language server's kept answers, and what it asked anew: never reused silently.
+  const kept = state.componentInterfaces.kind === "read" ? keptLine(state.componentInterfaces.kept) : undefined;
+  if (kept !== undefined) io.err(kept);
   const result = answer(state, question, args, { session: parsed.session });
   if (result.code === 0) io.out(result.text);
   else io.err(result.text);

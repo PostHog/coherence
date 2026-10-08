@@ -409,7 +409,7 @@ async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Le
     const file = [...fresh.keys()].find((f) => fresh.get(f)!.pool[term] !== undefined || fresh.get(f)!.words[term] !== undefined) ?? [...fresh.keys()][0]!;
     changes.push({ term: canonical, component: file, evidence: "", state: "unresolved", reason: `recurs without a definition (${now.prose} prose lines, ${now.components} components)` });
   }
-  // A known name newly written where its sense is at risk: the reading of the written files says where, the kept totals what code elsewhere declares.
+  // A known name newly written where its sense is at risk, as the reading of the written files judges it; a Coherence name declared only in code the edit did not write is named by the next full reading.
   const terms = new Map(reading.coverage.terms.map((t) => [t.term, t]));
   for (const [file, c] of fresh) {
     const was = new Map<string, number>();
@@ -425,11 +425,7 @@ async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Le
       if (risked.has(term)) continue;
       const found = terms.get(term);
       const context = found?.contexts.find((x) => x.component === c.component);
-      let risk = context?.risk;
-      if (risk === undefined && found !== undefined && found.layer === "coherence" && layers.project !== undefined && found.state !== "unresolved" && found.state !== "rejected") {
-        const total = after.get(bucketOf(term))?.pool[term];
-        if ((total?.declaredIn[c.component] ?? 0) > 0) risk = `declared in this project's code (in ${c.component}) with its own sense, while the definition is Coherence's`;
-      }
+      const risk = context?.risk;
       if (risk === undefined) continue;
       risked.add(term);
       changes.push({ term, component: c.component, evidence: context?.fingerprint ?? "", state: found?.state ?? "declared", reason: `sense at risk: ${risk}` });

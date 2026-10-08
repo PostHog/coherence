@@ -84,6 +84,27 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: returned a module handler's first candidate path in handlerFile without checking the file exists -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
+- an ignore entry that names nothing is a problem: An entry of the project's own config's ignore list that names no file or folder at its path from the root and, as a bare name, no folder of that name on any project file's way down, and that names nothing git ignores, is a problem at the config, so it fails spec --check; the walk the model already takes answers, and git is asked once only when some entry names nothing there.
+  over: a file and a folder named by path, a folder named by its name below the root, and a folder on disk git ignores, against a typo, a path that moved, a file path that does not exist, and a file named by its bare name below the root
+  via: an ignore entry that names no file or folder is a spec problem; a folder by name or path, a file by path, and a folder git ignores are not
+  because: the list accepted any string and an entry that matched nothing left nothing out in silence, so an adopter's "CHANGELOG.md" did nothing and nothing said so (praetorium.gg); a typo in a bound is the same silence. A folder git ignores holds no project file but is no typo, so the disk answers first
+  crossing: project-source -> reading
+  refuted: made ignoreProblems in model.ts skip every entry as though it named something, so a typo, a moved path and a bare file name below the root were accepted in silence -> "an ignore entry that names no file or folder is a spec problem; a folder by name or path, a file by path, and a folder git ignores are not" went red in src/adapters/ignore-files.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-08)
+  kinds: none
+- an ignore entry git ignores is no problem: An ignore entry that names nothing on disk or in the project's listing is still no problem when git ignores what it names: a path entry as a file or a folder at its path, a bare name as a folder at the root or under any folder the project holds, asked of git in one git check-ignore over every such entry, and never when every entry names something.
+  over: dist and build gitignored and absent in a single-package repository, a monorepo's dist gitignored by its packages and present in one of them only, a gitignored absent path, and a typo beside each
+  via: an ignore entry git ignores is no spec problem though nothing it names is there: dist and build absent in a single-package repo, and dist only in a monorepo package; a typo beside them still is
+  because: "ignore": ["dist", "build"] is a common and correct config: the output is gitignored, so git's listing never holds it, and in a fresh checkout or CI it is not on disk, or sits only in a package; reported, it failed spec --check and refused subagent stops for a config that bounds the output whenever a walk outside git meets it (review of PR #67). The check stays a problem, not advisory: what remains after git is asked is an entry that leaves nothing out in any checkout, the silence the check exists to end, and an advisory line is read past as the CHANGELOG.md entry was
+  crossing: project-source -> reading
+  refuted: made ignoreProblems in model.ts treat no entry as gitignored, replacing git check-ignore's answer with an empty set, so dist and build absent from a fresh checkout and a dist only in a package were reported -> "an ignore entry git ignores is no spec problem though nothing it names is there: dist and build absent in a single-package repo, and dist only in a monorepo package; a typo beside them still is" went red in src/adapters/ignore-files.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-08)
+  kinds: none
+- a stored project name that disagrees with the config is a problem: A project lexicon whose project field names the project otherwise than the config's name, ignoring case, is a problem at the lexicon's project line, so it fails spec --check; a lexicon that stores none, or one that agrees, is not.
+  over: a lexicon storing a name that differs from the config's, one storing it in another case, one storing none, and one under a config that names no project
+  via: a stored project name that disagrees with the config's name is a spec problem at the lexicon; one that agrees, none stored, or no configured name is not
+  because: lexicon apply wrote the folder's name as the lexicon's project and every reader of the lexicon took it over the config's, so an adopter whose folder differed from his config's name had the wrong name accepted and added his own to wellKnown to get by (praetorium.gg); the field still reads where the config names nothing, so an existing lexicon is never renamed, and a copy that disagrees is said rather than quietly outvoted
+  crossing: project-source -> reading
+  refuted: made storedNameProblems in model.ts accept every stored project as agreeing, so a lexicon's copy that disagreed with the config's name passed spec --check -> "a stored project name that disagrees with the config's name is a spec problem at the lexicon; one that agrees, none stored, or no configured name is not" went red in src/lifecycle/project-name.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-08)
+  kinds: none
 - a module handler may carry route segments: An entrance's handler naming a module file resolves as a module file when its path carries a framework's route segments ([slug], [...slug], [[...slug]], (group), (.)intercepted, @slot), and a spec in such a folder is a component; such a file that does not exist is still a problem.
   over: every route segment form in a module handler's path, a spec in a (group) folder, and a missing file under such segments, against a symbol in a file and a path without an extension, which stay no module
   via: the model: a module handler's path may carry route segments, [slug], [...slug], [[...slug]], (group), (.)intercepted and @slot, and it must still exist
@@ -112,6 +133,20 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: made the grammar accept control: none with an empty reason, dropping the problem -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
+- an invariant names the entrances it covers: An invariant's entrances: line names entrances some spec declares, each resolving in its own spec, then in the one spec that declares it, or as <name> in <folder>, and each whose declared trust its crossing enters from or enters; an unknown, ambiguous or mismatched name, none beside a name, a name twice, the line on a chokepoint form and the line on a bullet with no crossing are problems, entrances: none says it checks no entrance, and a placeholder counts as absent.
+  over: the adopter's signature check naming its notification route, a route no spec declares, a route one other spec declares, a name two other specs declare bare and qualified by folder, a crossing from another trust, and the grammar's none, none beside a name, a doubled name, a chokepoint form, no crossing and a placeholder
+  via: the model: an invariant's entrances: line names declared entrances whose trust its crossing checks; an unknown, ambiguous or mismatched name, none beside a name, a name twice, a chokepoint's line and one with no crossing are problems
+  because: a test-backed control is credited only to the entrances an invariant names (Scope's a test-backed control is the entrance's own), so a name that resolves to nothing, or to an entrance whose trust the crossing never checks, would read as coverage while crediting nothing; a chokepoint's entrances are traced, and a line with no crossing checks no trust
+  crossing: project-source -> reading
+  refuted: dropped the problem for a name that resolves to no declared entrance, in coveredEntranceProblems -> the totality oracle went red; restored, green (2026-10-08)
+  kinds: none
+- a control lost to the crossing alone is named: spec --check prints, after the counts and never as a problem, each verified invariant enforced by a totality oracle alone that covered entrances carrying outside trust in by its crossing alone (owned where they are declared or handled, its crossing checking their trust) with the entrances that lost it, and the line that names them; naming any entrance on it, or entrances: none, ends it, and an unverified invariant gave no control to lose.
+  over: the adopter's shape with the signature check unnamed, named and none, verified and unverified, and the server's invariant naming no entrance
+  via: spec --check names each entrance a verified invariant covered by its crossing alone, never as a problem, until the invariant names the entrances it checks or says none
+  because: adopters' invariants that relied on the crossing alone lose that credit, and a loss no command names is a silent change in what the map calls controlled; it is advisory, since the credit was the over-claim and naming what a test checks is the adopter's to decide
+  crossing: project-source -> reading
+  refuted: made creditedByCrossingAlone ignore the entrances: line, so naming no longer ended the advisory -> the totality oracle went red; restored, green (2026-10-08)
+  kinds: none
 - a practice is paired with its spec: A practice file stands only in a folder whose spec shares its stem; one beside no spec, under another stem, or second in its folder is a problem.
   over: every practice file under the root: beside no spec, under another stem, and paired
   via: a practice file stands only beside its folder's spec, with the spec's stem
@@ -130,6 +165,12 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   via: every record a practice cites must exist, and every invariant it names must be declared
   because: a practice is learned, not wished: what makes it binding is the record of the failure it prevents, and a citation of nothing would make an invented step read as witnessed
   refuted: made practiceProblems accept a cited record id that no store holds -> "every record a practice cites must exist, and every invariant it names must be declared" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
+  kinds: none
+- a leaves line belongs to the step above it: A leaves: line in a practice belongs to the step written above it whatever its indentation: four spaces, two or a tab parse to the same steps and the same version.
+  over: one practice with leaves: under its second step at four spaces, two spaces and a tab
+  via: a leaves: line belongs to the step above it whatever its indentation: four spaces, two, or a tab parse alike
+  because: the docs show leaves: four spaces in, and a formatter such as oxfmt flattens it to two, which made an adopter think the practice broke; the parser reads key lines in order and never measures their indent, and this keeps it so
+  refuted: made a leaves: line indented fewer than four spaces a problem -> "a leaves: line belongs to the step above it whatever its indentation: four spaces, two, or a tab parse alike" went red in practice.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-08)
   kinds: none
 - a command trigger matches its words in place: A when: command trigger fires when its words are adjacent words of one simple command, in order; a word with * or ? is a glob over one word (* any run of non-blank characters, ? one), so command resolved df-* fires on resolved followed at once by an argument starting df- and on no other; a word without them must equal the command's word, as before; quoted text and a heredoc's body never fire a trigger, and the words, patterns included, are part of the practice's version.
   over: a pattern trigger on its next argument, on another argument, on a later argument, with no argument, on a quoted argument with blanks, inside a quoted argument, inside a heredoc and after a separator, a ? pattern, the text fallback, and a trigger without a pattern on its words, on a longer word, on a quoted argument and on any argument

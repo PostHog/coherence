@@ -75,7 +75,7 @@ const CONFIG = JSON.stringify({ language: "typescript", testDir: "__tests__" });
 
 let root: string;
 let adapter: TypeScriptAdapter;
-const serverPresent = locateServer(process.cwd()) !== undefined;
+const serverPresent = locateServer(process.cwd()).found;
 
 function write(path: string, text: string): void {
   mkdirSync(dirname(join(root, path)), { recursive: true });

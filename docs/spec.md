@@ -55,7 +55,10 @@ node src/cli.ts scaffold control --baseline --session <id> --agent <name>
 ```
 
 `scaffold control` proposes the closure for an entrance with no traced
-control: a `guard:` line, an invariant, or `control: none`. It proposes from
+control: an `entrances:` line naming it on a verified invariant that covered
+it by its crossing alone (see "Which entrances an invariant covers"), a
+`guard:` line, an invariant whose `entrances:` line names it, or
+`control: none`. It proposes from
 the recorded Structure reading while that reading still describes the tree.
 When no recorded reading does, and the request names entrances (`"<entrance>"`,
 or `--all --component <folder>` for every entrance that component declares),
@@ -209,6 +212,7 @@ is a problem, and so is a `from:` on a bullet with no chokepoint form.
 
 `because` says why the invariant exists and what it protects against.
 `crossing` is the security marker: two trust levels the entry spec declares.
+`entrances` names the entrances whose work the invariant checks; see below.
 `refuted` is the human account of a witnessed firing: what was broken, what
 was seen, the date. It is an account, not the evidence. A chokepoint form is
 refuted by the run itself; a totality oracle form is refuted by running
@@ -217,6 +221,51 @@ requires the totality oracle to fail and appends a refutation record to the
 run store, and the refutation counts only once a later run finds that same
 totality oracle passing again. Refutation is required per enforcement, so a bullet carrying both
 forms needs both.
+
+### Which entrances an invariant covers
+
+A crossing says which trust an invariant checks, never where that trust
+enters. An entrance carrying a level from outside the system's control needs
+a control traced on its route, or Structure marks it `no traced control`.
+A chokepoint is traced: it counts where the reading sees the handler pass it
+(a `guard:` line on the entrance declares one the reading cannot see). A
+totality oracle is a test, and nothing traces a test to a handler, so an
+invariant enforced by one alone names the entrances it covers:
+
+```markdown
+- signed apple notifications: An Apple account notification changes an account only when its payload verifies against Apple's signing key for this app.
+  over: the notification payloads appleNotificationResponse receives, signed by the expected key and by an unrelated one
+  via: rejects unsigned notifications and acknowledges email relay changes
+  because: a verified account-delete event deletes the player's account; an unsigned or foreign payload must change nothing
+  crossing: visitor -> account store
+  entrances: route api/apple-notifications
+```
+
+Once the invariant is verified, its test is a control on each entrance it
+names, and on no other. That holds even where its crossing matches another
+entrance's trust, or the invariant lives in the component that declares or
+handles that entrance. The sign-in route and the crawler file beside the
+notification route stay uncontrolled until something checks them. Entrances
+named by different invariants never share a route, so a control named for
+some of a route's entrances counts for those it names. `entrances: none` says
+the invariant checks no entrance.
+
+The names are comma separated. Each one resolves in the invariant's own spec,
+then in the one spec that declares it; when several do, write
+`<name> in <folder>`. A name no spec declares is a problem. So is a named
+entrance whose declared trust the crossing neither enters from nor enters,
+`none` beside a name, a name given twice, an `entrances:` line on a chokepoint
+form (its entrances are traced), and one on a bullet with no `crossing:`.
+
+Before this line existed, such an invariant counted on every entrance its
+component declared or handled whose trust its crossing matched, so one
+signature check stood for every public route in its folder. That credit is
+gone. For each entrance carrying outside trust in that a verified invariant
+covered this way, `spec --check` prints a `COVERAGE` line after the counts
+(advisory, never a problem), orient's spec gap line counts the gaps it
+opened, and `scaffold control "<entrance>"` proposes the `entrances:` line
+first and writes it with `--write`. Name the entrances the test really
+checks, or write `entrances: none`, and the advisory ends.
 
 A chokepoint's grade names who refuses a bypass. In a Python project, a
 checker the project runs earns `checker-choked`: Pyright's reportPrivateUsage
@@ -352,7 +401,11 @@ so `command resolved df-*` fires when `resolved` is followed at once by an
 argument starting `df-`, and not when a conjecture is resolved. A shell command that writes a file
 (a redirect, a heredoc, `tee`, `sed -i`, `cp`) counts as an edit of that file, and
 its own text as the text added. Steps are numbered in the
-order written; `leaves:` under a step names the evidence it leaves. Every
+order written; `leaves:` under a step names the evidence it leaves. A
+`leaves:` line belongs to the step above it whatever its indentation: the
+four spaces shown here, the two a formatter such as oxfmt writes back, or a
+tab all parse alike, since the parser reads key lines in order and never
+measures their indent. Every
 pitfall cites the record or commit that witnessed it, and a practice that
 cites nothing is a problem. `invariants:` names invariants of the sister spec,
 or `<folder>/<name>` elsewhere. A practice file never stands without its spec.

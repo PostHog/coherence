@@ -30,6 +30,7 @@ import { answerStructure } from "../query/query.ts";
 import { buildScopePage } from "./build.ts";
 import { proposeClosures, renderProposal, type Proposal } from "../../scaffold/control.ts";
 import { readComponentInterfaces } from "./component-interfaces.ts";
+import { keptLine } from "./kept-answers.ts";
 import { lastReading, recordReading, structureFingerprint, structureState } from "./gaps.ts";
 import type { InterfaceReading } from "./model.ts";
 import { checked, routedProject } from "./routed-fixture.ts";
@@ -64,11 +65,14 @@ class TextServer implements LanguageAdapter {
   /** Every question put to it, a resolve or a references, by the file it is about. */
   readonly questions: string[] = [];
   readonly stall = new Set<string>();
+  /** How many times a reading started it. */
+  started = 0;
   private readonly root: string;
   constructor(root: string) {
     this.root = root;
   }
   async ready(): Promise<{ ok: true }> {
+    this.started += 1;
     return { ok: true };
   }
   private lines(file: string): string[] {
@@ -172,8 +176,9 @@ test("a name no other component spells is never asked for its references", async
 /** Read a project exhaustively and through the prefilter on one server; both readings, and the server closed. */
 async function bothWays(adapter: LanguageAdapter, root: string): Promise<{ exhaustive: InterfaceReading; filtered: InterfaceReading }> {
   try {
-    const exhaustive = await readComponentInterfaces(root, adapter, { exhaustive: true });
-    const filtered = await readComponentInterfaces(root, adapter);
+    // Neither keeps answers: the filtered reading must ask the server itself for what the prefilter lets through.
+    const exhaustive = await readComponentInterfaces(root, adapter, { exhaustive: true, keep: false });
+    const filtered = await readComponentInterfaces(root, adapter, { keep: false });
     return { exhaustive, filtered };
   } finally {
     await adapter.close();
@@ -196,7 +201,7 @@ test("the prefilter never hides a cross-component reference", { timeout: 600_000
   // The bounded fixture through the text server.
   const bounded = project(BOUNDED);
   try {
-    sameMap(await readComponentInterfaces(bounded.root, new TextServer(bounded.root), { exhaustive: true }), await readComponentInterfaces(bounded.root, new TextServer(bounded.root)), "the bounded fixture");
+    sameMap(await readComponentInterfaces(bounded.root, new TextServer(bounded.root), { exhaustive: true, keep: false }), await readComponentInterfaces(bounded.root, new TextServer(bounded.root), { keep: false }), "the bounded fixture");
   } finally {
     bounded.remove();
   }
@@ -305,7 +310,8 @@ test("a scoped reading proposes for its entrances what the whole reading propose
   try {
     const whole = await readComponentInterfaces(root, new TextServer(root));
     const server = new TextServer(root);
-    const scoped = await readComponentInterfaces(root, server, { scope: { entrances: [{ component: "src/api", name: "look" }] } });
+    // Keeping nothing, so every question the scoped reading needs reaches the server and is counted.
+    const scoped = await readComponentInterfaces(root, server, { scope: { entrances: [{ component: "src/api", name: "look" }] }, keep: false });
     assert.equal(scoped.kind, "read");
     if (scoped.kind !== "read" || whole.kind !== "read") return;
     assert.deepEqual(scoped.scoped?.entrances.map((e) => e.name), ["look", "grab"], "grab is declared where look is, so it may share look's route, and is read too");
@@ -349,6 +355,89 @@ test("a scoped reading is never recorded as the tree's reading", async () => {
     assert.equal(lastReading(root), undefined, "and nothing is kept");
     const whole = await readComponentInterfaces(root, new TextServer(root));
     assert.equal(recordReading(root, whole, structureFingerprint(root)), true, "the whole reading of the same tree is kept");
+  } finally {
+    remove();
+  }
+});
+
+/** A reading less what it did with the kept answers: what two readings of one tree must agree on. */
+function mapOf(reading: InterfaceReading): unknown {
+  if (reading.kind !== "read") return reading;
+  const { kept: _kept, ...map } = reading;
+  return map;
+}
+
+test("a spec edit asks the language server only what no reading asked before, and rereads no source", async () => {
+  const { root, remove } = routedProject();
+  try {
+    const first = await readComponentInterfaces(root, new TextServer(root));
+    assert.equal(first.kind === "read" && first.kept?.whole, "no answers were kept for this tree yet", "the first reading says it had nothing kept to reuse");
+    // The specs' shape changes and no source does: an entrance on a declaration the reading asked about, a guard: on it, and a chokepoint.
+    const service = join(root, "src/service/Service.spec.md");
+    writeFileSync(service, readFileSync(service, "utf8").replace("## invariants", "## entrances\n- serve: a peer serves\n  handler: serve in src/service/serve.ts\n  trust: public\n  guard: check\n\n## invariants"));
+    const store = join(root, "src/store/Store.spec.md");
+    writeFileSync(store, `${readFileSync(store, "utf8")}- one put: Every row is put through serve.\n  protects: put\n  chokepoint: serve\n  because: serve is where a row is shaped\n  kinds: none\n`);
+    const server = new TextServer(root);
+    const kept = await readComponentInterfaces(root, server);
+    assert.deepEqual(server.questions, [], "nothing is asked: every answer the reading needs was kept");
+    assert.equal(server.started, 0, "the server is never started");
+    assert.ok(kept.kind === "read" && kept.kept !== undefined && kept.kept.reused > 0, "the kept answers were reused");
+    assert.deepEqual({ ...kept.kept, reused: 0 }, { reused: 0, asked: 0, changed: 0, dropped: 0 });
+    assert.match(keptLine(kept.kept) ?? "", /^kept language-server answers: \d+ reused, 0 asked anew; no source file changed since they were kept$/);
+    const fresh = await readComponentInterfaces(root, new TextServer(root), { keep: false });
+    assert.ok(fresh.kind === "read" && fresh.entrances.some((e) => e.name === "serve" && e.reach !== undefined), "the new entrance is resolved and reached");
+    assert.deepEqual(mapOf(kept), mapOf(fresh), "the reading a server asked everything gives: the new entrance, its reach and guard, the new chokepoint traced");
+    // A handler no reading asked about is the one thing asked, and only about its own file.
+    const api = join(root, "src/api/Api.spec.md");
+    writeFileSync(api, readFileSync(api, "utf8").replace("## invariants", "- audit: an admin audits\n  handler: audit in src/api/admin.ts\n  trust: public\n\n## invariants"));
+    const next = new TextServer(root);
+    const again = await readComponentInterfaces(root, next);
+    assert.ok(next.questions.length > 0 && next.questions.every((file) => file === "src/api/admin.ts"), `only the new handler is asked about: ${next.questions.join(", ")}`);
+    assert.deepEqual(mapOf(again), mapOf(await readComponentInterfaces(root, new TextServer(root), { keep: false })));
+  } finally {
+    remove();
+  }
+});
+
+test("a source edit asks again only what the changed file could have changed, and the reading is the one a fresh server gives", async () => {
+  const { root, remove } = routedProject();
+  try {
+    const all = new TextServer(root);
+    await readComponentInterfaces(root, all);
+    // serve now sums the day too: a new interface from src/service into src/report, spelled only in the changed file.
+    writeFileSync(join(root, "src/service/serve.ts"), 'import { put } from "../store/rows.ts";\nimport { summary } from "../report/report.ts";\nexport function serve(v: string): string {\n  summary();\n  return put(v);\n}\n');
+    const server = new TextServer(root);
+    const kept = await readComponentInterfaces(root, server);
+    const fresh = await readComponentInterfaces(root, new TextServer(root), { keep: false });
+    assert.ok(kept.kind === "read" && kept.symbols.some((s) => s.from === "src/service" && s.to === "src/report" && s.symbol === "summary"), "the new interface is read");
+    assert.deepEqual(mapOf(kept), mapOf(fresh), "the reading a server asked everything gives");
+    assert.ok(kept.kept !== undefined && kept.kept.changed === 1 && kept.kept.dropped > 0 && kept.kept.reused > 0, JSON.stringify(kept.kept));
+    assert.match(keptLine(kept.kept) ?? "", /1 file changed since they were kept, which dropped \d+ answers?$/);
+    const touched = new Set(["serve", "put", "summary"]);
+    assert.ok(server.asked.length > 0 && server.asked.every((name) => touched.has(name)), `only what serve.ts declares or spells is asked again: ${server.asked.join(", ")}`);
+    assert.ok(server.asked.length < all.asked.length, "fewer than the whole reading asked");
+  } finally {
+    remove();
+  }
+});
+
+test("kept answers are never used silently: when what the server's answers rest on changes, every question is asked again and the reading says why", async () => {
+  const { root, remove } = routedProject();
+  try {
+    await readComponentInterfaces(root, new TextServer(root));
+    const tsconfig = join(root, "tsconfig.json");
+    writeFileSync(tsconfig, readFileSync(tsconfig, "utf8").replace('"strict":true', '"strict":false'));
+    const server = new TextServer(root);
+    const reread = await readComponentInterfaces(root, server);
+    const everything = new TextServer(root);
+    await readComponentInterfaces(root, everything, { keep: false });
+    assert.ok(reread.kind === "read" && reread.kept?.reused === 0, "nothing kept is reused");
+    assert.equal(server.questions.length, everything.questions.length, "every question is asked again");
+    assert.match(keptLine(reread.kept) ?? "", /^kept language-server answers: none from an earlier reading used \(what the server's answers rest on changed \(tsconfig\.json\)\); every question was asked of the server \(\d+\)$/);
+    // An unreadable store is said too, and never trusted.
+    writeFileSync(join(root, ".coherence", "structure", "answers-typescript.json"), "{");
+    const broken = await readComponentInterfaces(root, new TextServer(root));
+    assert.equal(broken.kind === "read" && broken.kept?.whole, "the kept answers are unreadable");
   } finally {
     remove();
   }

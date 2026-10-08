@@ -67,8 +67,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { closeWork, execFile, openWork, readProjectText, spawn } from "./work-meter.ts";
 import { promisify } from "node:util";
 import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
@@ -76,6 +75,8 @@ import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { TOOL_HOOKS, hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
+import { tsserverNotice } from "../adapters/installed.ts";
+import { readEnforcementConfig } from "../enforcement/config.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
@@ -92,9 +93,10 @@ import { editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
-import { baselinePath, coverageChanges, heldCandidates, introducedCandidates, markCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
+import { baselinePath, coverageChanges, deliverCandidates, heldCandidates, holdCandidates, introducedCandidates, pendingCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
 import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
 import { shellCommandOf, shellWrittenPaths } from "./shell-writes.ts";
+import { earlierSearchLines, OWN_CLI, versionBlock } from "./version.ts";
 
 const run = promisify(execFile);
 
@@ -375,24 +377,6 @@ export function workStopText(root: string, input: HookInput): string {
 }
 
 /**
- * This checkout's cli: the one the hook is running from, wherever the adopter
- * keeps it, by the path it was invoked through when that is this file (a
- * sibling reached through a link reads as ../coherence, not as the link's
- * target).
- */
-const OWN_CLI = ((): string => {
-  // Compiled, this module is .js and so is the cli beside it.
-  const own = fileURLToPath(new URL(`../cli${extname(fileURLToPath(import.meta.url))}`, import.meta.url));
-  const invoked = process.argv[1];
-  try {
-    if (invoked !== undefined && realpathSync(invoked) === realpathSync(own)) return resolve(invoked);
-  } catch {
-    // An invocation path that cannot be resolved is not used.
-  }
-  return own;
-})();
-
-/**
  * How a session at this root invokes the tool: its own source tree, or the
  * checkout this hook ran from, as a path from the root (`node
  * ../coherence/src/cli.ts`) or, when that climbs further than a sibling of a
@@ -468,6 +452,24 @@ export function floorQuiet(runs: SpecModel["runs"], now: number): string | undef
   if (since !== undefined && Number.isFinite(since) && now - since <= FLOOR_QUIET_DAYS * 86_400_000) return undefined;
   const age = since === undefined || !Number.isFinite(since) ? "no full run has graded every bullet" : `the last full run that graded every bullet was ${Math.floor((now - since) / 86_400_000)} days ago (${runs.graded})`;
   return `Invariant floor: ${age}; a scoped run moves only its own bullets and an edit's check records its entries ungraded, so the rest of the floor stands where that run left it. Run: run`;
+}
+
+/**
+ * The one line orient carries when the project's TypeScript ships no
+ * tsserver (TypeScript 7 and later) and Coherence reads with its own: said
+ * once, at the start, where the agent reads, so a reading made by another
+ * compiler than the project's is never a surprise.
+ */
+export function tsserverBlock(root: string): string {
+  let languages: readonly string[];
+  try {
+    languages = readEnforcementConfig(root).languages;
+  } catch {
+    return "";
+  }
+  if (!languages.includes("typescript")) return "";
+  const notice = tsserverNotice(root);
+  return notice === "" ? "" : `${notice}\n\n`;
 }
 
 export function specBlock(root: string, now: number = Date.now()): string {
@@ -778,10 +780,23 @@ export async function startContext(root: string, input: HookInput = {}, report?:
   return (await startReading(root, input, report)).text;
 }
 
+/**
+ * Which Coherence answers this session, any copy the project could reach at
+ * another version, a newer published release, and hooks an earlier
+ * Coherence wrote that still look beside the project first: a few short
+ * lines above the session block. Reads a handful of small files, never the
+ * network.
+ */
+export async function copyBlock(root: string, env: NodeJS.ProcessEnv = process.env): Promise<string> {
+  const settings = installedRoot(root, env) ?? root;
+  const earlier = earlierSearchLines(settings);
+  return versionBlock(root, await isCoherenceItself(root), env) + (earlier.length === 0 ? "" : earlier.join("\n") + "\n");
+}
+
 /** The start injection with the level the vocabulary was delivered at, so a reading of the hook can say what orient carries. */
 export async function startReading(root: string, input: HookInput = {}, report?: Coverage, gaps?: GapReading): Promise<{ text: string; detail: InjectionLevel; coverage: Coverage }> {
   const { coherence, project } = await loadProjectLexicons(root);
-  const head = escalationBlock(root) + specBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + workBlock(root, input);
+  const head = escalationBlock(root) + specBlock(root) + tsserverBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + workBlock(root, input);
   const reading=report ?? await lexiconCoverage(root);
   const commands=await cliName(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
@@ -789,35 +804,47 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   const coverage=signal ? `\n${signal}\n` : "";
   // The practices ride beside the commands that record them, after the vocabulary.
   const practices = practiceOrientText(root, commands);
-  const tail = coverage + (practices === "" ? "" : `\n${practices.trimEnd()}\n`) + `\n${await sessionBlock(root, input)}`;
+  const tail = coverage + (practices === "" ? "" : `\n${practices.trimEnd()}\n`) + `\n${await copyBlock(root)}\n${await sessionBlock(root, input)}`;
   const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root));
   return { text: head + text + tail, detail, coverage: reading };
 }
 
+/** How a term that recurs without a definition is settled, as every vocabulary line says it. */
+function declareOrAlias(cli: string): string {
+  return `declare each (${cli} lexicon propose declare <term> --definition "<text>" --because "<why>") or map it as an alias of an existing concept`;
+}
+
 /**
- * The vocabulary line at an edit: only what this edit introduced, named. A
- * term that newly recurs without a definition, or a use whose sense is now at
- * risk; an ordinary edit that uses a known word says nothing.
+ * The vocabulary line at an edit or a prompt. An edit names only a use whose
+ * sense its own change put at risk: a term it makes recur without a
+ * definition is held for regulate, which names the session's together at the
+ * stop. A prompt names what no stop has: the terms edits held that a stop
+ * never named, and the ones a write no hook saw made recur.
  */
-async function vocabularyAtEdit(root: string, changes: ReturnType<typeof coverageChanges>): Promise<string> {
+async function vocabularyAtEdit(root: string, changes: ReturnType<typeof coverageChanges>, pending: readonly string[], atEdit: boolean): Promise<string> {
   const cli = await cliName(root);
-  const fresh = changes.filter((c) => c.state === "unresolved").slice(0, 5);
+  const fresh = [...new Set([...pending, ...changes.filter((c) => c.state === "unresolved").map((c) => c.term)])].slice(0, 5);
   const risky = changes.filter((c) => c.state !== "unresolved").slice(0, 3);
   const lines: string[] = [];
-  if (fresh.length) lines.push(`Lexicon: this edit made ${fresh.map((c) => `"${c.term}"`).join(", ")} recur without a definition; declare it (${cli} lexicon propose declare <term> --definition "<text>" --because "<why>") or map it as an alias of an existing concept.`);
-  if (risky.length) lines.push(`Lexicon: sense at risk at this edit: ${risky.map((c) => `${c.term} in ${c.component} (${c.reason.replace(/^sense at risk: /, "")})`).join("; ")}; check it against the definition: ${cli} lexicon review <term>.`);
+  if (fresh.length) lines.push(`Lexicon: no stop has named ${fresh.map((t) => `"${t}"`).join(", ")}, which this session made recur without a definition; ${declareOrAlias(cli)}.`);
+  if (risky.length) lines.push(`Lexicon: sense at risk ${atEdit ? "at this edit" : "since the last stop"}: ${risky.map((c) => `${c.term} in ${c.component} (${c.reason.replace(/^sense at risk: /, "")})`).join("; ")}; check it against the definition: ${cli} lexicon review <term>.`);
   return lines.join("\n") + "\n";
 }
 
-/** Regulate's vocabulary line: the undefined terms this session introduced and the risks no edit has shown yet, named; nothing otherwise. */
-async function vocabularyAtStop(root: string, reading: Coverage, prior: Record<string, string>): Promise<string> {
+/**
+ * Regulate's vocabulary line: the undefined terms this session introduced,
+ * the ones its edits held among them, and the risks no edit has shown yet,
+ * named; nothing otherwise. named is the terms the line carries, which the
+ * stop marks delivered once the line reached the host.
+ */
+async function vocabularyAtStop(root: string, reading: Coverage, prior: Record<string, string>): Promise<{ text: string; named: string[] }> {
   const cli = await cliName(root);
   const introduced = introducedCandidates(reading, prior).slice(0, 5);
   const risky = coverageChanges(reading, prior).filter((c) => c.state !== "unresolved").slice(0, 3);
   const lines: string[] = [];
-  if (introduced.length) lines.push(`Lexicon: this session left ${introduced.map((t) => `"${t}"`).join(", ")} recurring without a definition; declare or map each (${cli} lexicon propose declare <term> ...).`);
+  if (introduced.length) lines.push(`Lexicon: this session left ${introduced.map((t) => `"${t}"`).join(", ")} recurring without a definition; ${declareOrAlias(cli)}.`);
   if (risky.length) lines.push(`Lexicon: sense at risk: ${risky.map((c) => `${c.term} in ${c.component} (${c.reason.replace(/^sense at risk: /, "")})`).join("; ")}; ${cli} lexicon review <term>.`);
-  return lines.join("\n");
+  return { text: lines.join("\n"), named: introduced };
 }
 
 /** Whether the event comes from the main thread rather than a subagent. */
@@ -886,6 +913,12 @@ export interface HookOptions {
    * unless the user opted in; absent (a test), nothing is started.
    */
   telemetry?: ((root: string, event: string, input: HookInput) => void) | undefined;
+  /**
+   * Start the detached check of the newest published version at a session
+   * start, once the answer is made, never waited on. The command line passes
+   * startUpdateCheck, which asks at most once a day; absent (a test), nothing is started.
+   */
+  updateCheck?: ((root: string, event: string) => void) | undefined;
 }
 
 /**
@@ -1151,6 +1184,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     if (session !== undefined) recordHookTime(root, session, { at: new Date().toISOString(), event, ms });
     // Last, once the answer is made: a detached flush started earlier would compete with the hook's own work.
     if (event === "SessionStart" || event === "Stop") options.telemetry?.(root, event, input);
+    if (event === "SessionStart") options.updateCheck?.(root, event);
     if (!TOOL_HOOKS.has(event) || result.exit !== 0) return result;
     const line = overBudgetLine(event, ms, latencyBudget(root));
     if (line === "") return result;
@@ -1263,8 +1297,10 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const tree = event === "UserPromptSubmit" && session ? await treeKey(root) : undefined;
         const baseline = session !== undefined && existsSync(baselinePath(root, session));
         let reading: Coverage | undefined;
+        // What this event says: a sense at risk, and at a prompt the terms that came to recur without a definition since the last stop.
         let changes: { term: string; component: string; evidence: string; state: string; reason: string }[] = [];
-        let fresh: string[] = [];
+        // The terms edits held for the stop that no stop named: a session that never stopped cleanly is told them at its next prompt.
+        let pending: string[] = [];
         let keep = (): void => {};
         let vocabularyNote = "";
         if (baseline && event === "PostToolUse" && written.length > 0) {
@@ -1277,23 +1313,37 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
           } catch (error) {
             edited = { unavailable: `its kept vocabulary could not be read (${error instanceof Error ? error.message : String(error)})` };
           }
+          // A term an edit makes recur is held, unsaid, for regulate to name with the session's others at the stop; only a sense at risk is said here.
           if ("changes" in edited) {
-            changes = edited.changes;
-            fresh = changes.filter((c) => c.state === "unresolved").map((c) => c.term);
+            changes = edited.changes.filter((c) => c.state !== "unresolved");
+            holdCandidates(root, session!, edited.changes.filter((c) => c.state === "unresolved").map((c) => c.term));
             // Nothing to say: the kept state takes the edit in now; otherwise once the line reached the host.
             if (changes.length === 0) edited.keep();
             else keep = edited.keep;
           } else {
             if (edited.unavailable !== undefined) vocabularyNote = `Lexicon: read in full at this edit: ${edited.unavailable}.`;
             reading = await keptReading(root, layers);
-            changes = coverageChanges(reading, prior);
+            const found = coverageChanges(reading, prior);
+            changes = found.filter((c) => c.state !== "unresolved");
+            holdCandidates(root, session!, found.filter((c) => c.state === "unresolved").map((c) => c.term));
+            if (changes.length === 0) saveBaseline(root, session!, reading);
           }
-        } else if (baseline && event === "UserPromptSubmit" && (tree === undefined || tree !== lastTreeKey(root, session!))) {
-          reading = await keptReading(root, await loadProjectLexicons(root));
-          if (tree !== undefined) keepTreeKey(root, session!, tree);
-          changes = coverageChanges(reading, priorBaseline(root, session!));
+        } else if (baseline && event === "UserPromptSubmit") {
+          // A few names, read apart from the baseline: a prompt over an unchanged tree stays as cheap as it was.
+          const held = pendingCandidates(root, session!);
+          pending = held.terms;
+          if (held.unreadable !== undefined) vocabularyNote = `Lexicon: the terms this session's edits held for the stop could not be read (${held.unreadable}); ${await cliName(root)} lexicon coverage names what recurs without a definition.`;
+          if (tree === undefined || tree !== lastTreeKey(root, session!)) {
+            const prior = priorBaseline(root, session!);
+            reading = await keptReading(root, await loadProjectLexicons(root));
+            if (tree !== undefined) keepTreeKey(root, session!, tree);
+            changes = coverageChanges(reading, prior);
+            // A held term the session has since declared or stopped repeating is owed no more.
+            const owed = new Set(introducedCandidates(reading, prior));
+            pending = pending.filter((term) => owed.has(term));
+          }
         }
-        const vocabulary=changes.length ? await vocabularyAtEdit(root, changes) : "";
+        const vocabulary=changes.length || pending.length ? await vocabularyAtEdit(root, changes, pending, event === "PostToolUse") : "";
         // What the last stop said reached only the user; the prompt that follows it is where the agent reads it.
         const fromStop = event === "UserPromptSubmit" && session ? carried(root, session) : undefined;
         const lastStop = fromStop === undefined ? "" : `At your last stop (shown to the user, not to you), ${fromStop.replace(/^Regulate \(Stop\):\n/, "regulate said:\n")}`;
@@ -1301,8 +1351,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         if (context === "") return { stdout: "", stderr: "", exit: 0 };
         const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
         // An override took the feed's and the vocabulary line's place, so neither reached the host and neither advances.
-        const delivered = voice.override === undefined && (feed.text !== "" || changes.length > 0 || lastStop !== "");
-        const commit=()=> { if(feed.text) feed.commit(); if(changes.length && session) { if (reading) saveBaseline(root,session,reading); else { keep(); markCandidates(root, session, fresh); } } if(lastStop && session) dropCarry(root,session); };
+        const delivered = voice.override === undefined && (feed.text !== "" || changes.length > 0 || pending.length > 0 || lastStop !== "");
+        const commit=()=> { if(feed.text) feed.commit(); if(changes.length && session) { if (reading) saveBaseline(root,session,reading); else keep(); } if(pending.length && session) deliverCandidates(root,session,pending); if(lastStop && session) dropCarry(root,session); };
         return {stdout:stdout+"\n",stderr:"",exit:0,...(delivered ? {commit} : {})};
       }
       case "Stop":
@@ -1318,7 +1368,11 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const lexicon = lexiconStopText(report, walls);
         const workText = workStopText(root, input);
         const reading=session && existsSync(baselinePath(root,session)) ? await keptReading(root, await loadProjectLexicons(root)) : undefined;
-        const coverageText=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : "";
+        const coverage=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : { text: "", named: [] };
+        const coverageText=coverage.text;
+        // The terms edits held reach the session in this line: once it is out (and no override took its place), no prompt names them again.
+        const told = (): void => { if (session !== undefined && voice.override === undefined) deliverCandidates(root, session, coverage.named); };
+        const tell = coverage.named.length > 0 ? { commit: told } : {};
         const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the lexicon check ran over nothing`;
         const gapText = await gapStopText(root, input, changed.files);
         const undeclaredText = await undeclaredStopText(root, changed.files);
@@ -1345,7 +1399,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
           // The refusal is enforcement: no override reaches its reason, and an append only follows it.
           const { override: _unheard, ...heard } = voice;
           const reason = await voiced(root, input, `Regulate found what this session owes; settle it before stopping.\n${text}`, heard);
-          return { stdout: "", stderr: reason, exit: REFUSE_EXIT };
+          return { stdout: "", stderr: reason, exit: REFUSE_EXIT, ...(session !== undefined && coverage.named.length > 0 ? { commit: () => deliverCandidates(root, session, coverage.named) } : {}) };
         }
         // The stop goes through: what this subagent recorded waits for its coordinator's next boundary.
         const parent = typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
@@ -1354,20 +1408,21 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
           // The host shows a stop's systemMessage to the user alone: each line is said once, what the session owes blocks once so
           // the agent reads it, and the rest is carried into the next prompt, which the agent does read.
           const fresh = unsaid(root, session, parts);
-          if (fresh.parts.length === 0) return { stdout: "", stderr: "", exit: 0 };
+          // Nothing unsaid: the vocabulary line, if any, was said at an earlier stop, so what it names has reached the session.
+          if (fresh.parts.length === 0) return { stdout: "", stderr: "", exit: 0, ...tell };
           const freshText = fresh.parts.join("\n");
           const owes = fresh.lines.some((line) => /^Practice \S.* has no enactment since/.test(line));
           if (owes && input.stop_hook_active !== true) {
             const reason = await voiced(root, input, `Regulate (Stop): before stopping, record what this session owes.\n${freshText}`, voice);
-            if (reason !== "") return { stdout: JSON.stringify({ decision: "block", reason }) + "\n", stderr: "", exit: 0, commit: () => rememberSaid(root, session, fresh.lines, undefined) };
+            if (reason !== "") return { stdout: JSON.stringify({ decision: "block", reason }) + "\n", stderr: "", exit: 0, commit: () => { rememberSaid(root, session, fresh.lines, undefined); told(); } };
           }
           const message = await voiced(root, input, `Regulate (Stop):\n${freshText}`, voice);
           if (message === "") return { stdout: "", stderr: "", exit: 0 };
-          return { stdout: JSON.stringify({ systemMessage: message }) + "\n", stderr: "", exit: 0, commit: () => rememberSaid(root, session, fresh.lines, message) };
+          return { stdout: JSON.stringify({ systemMessage: message }) + "\n", stderr: "", exit: 0, commit: () => { rememberSaid(root, session, fresh.lines, message); told(); } };
         }
         const message = await voiced(root, input, parts.length === 0 ? "" : `Regulate (${event}):\n${text}`, voice);
         if (message === "") return { stdout: "", stderr: "", exit: 0 };
-        return { stdout: JSON.stringify({ systemMessage: message }) + "\n", stderr: "", exit: 0 };
+        return { stdout: JSON.stringify({ systemMessage: message }) + "\n", stderr: "", exit: 0, ...tell };
       }
     }
   }
