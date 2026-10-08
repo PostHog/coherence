@@ -131,6 +131,12 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   because: a practice is learned, not wished: what makes it binding is the record of the failure it prevents, and a citation of nothing would make an invented step read as witnessed
   refuted: made practiceProblems accept a cited record id that no store holds -> "every record a practice cites must exist, and every invariant it names must be declared" went red in practice.test.ts on its own assertion; restored byte for byte, green (2026-10-05)
   kinds: none
+- a leaves line belongs to the step above it: A leaves: line in a practice belongs to the step written above it whatever its indentation: four spaces, two or a tab parse to the same steps and the same version.
+  over: one practice with leaves: under its second step at four spaces, two spaces and a tab
+  via: a leaves: line belongs to the step above it whatever its indentation: four spaces, two, or a tab parse alike
+  because: the docs show leaves: four spaces in, and a formatter such as oxfmt flattens it to two, which made an adopter think the practice broke; the parser reads key lines in order and never measures their indent, and this keeps it so
+  refuted: made a leaves: line indented fewer than four spaces a problem -> "a leaves: line belongs to the step above it whatever its indentation: four spaces, two, or a tab parse alike" went red in practice.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-08)
+  kinds: none
 - a command trigger matches its words in place: A when: command trigger fires when its words are adjacent words of one simple command, in order; a word with * or ? is a glob over one word (* any run of non-blank characters, ? one), so command resolved df-* fires on resolved followed at once by an argument starting df- and on no other; a word without them must equal the command's word, as before; quoted text and a heredoc's body never fire a trigger, and the words, patterns included, are part of the practice's version.
   over: a pattern trigger on its next argument, on another argument, on a later argument, with no argument, on a quoted argument with blanks, inside a quoted argument, inside a heredoc and after a separator, a ? pattern, the text fallback, and a trigger without a pattern on its words, on a longer word, on a quoted argument and on any argument
   via: a command trigger's words match whole words of one simple command in place, a glob word one word, and never quoted text or a heredoc's body

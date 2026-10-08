@@ -181,6 +181,9 @@ the record that witnessed it.
   because: the step that slips is the one no command checks: that the red came from the break
 ```
 
+A `leaves:` line belongs to the step above it whatever its indentation; a
+formatter that flattens it to two spaces changes nothing.
+
 When a tool use is about to fire a practice's trigger, the hook delivers the
 practice whole, before the act. The session records what it did with
 `enact`: every step done, deviated, or skipped, with why. Once a practice has

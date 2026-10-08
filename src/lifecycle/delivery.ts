@@ -125,7 +125,7 @@ export async function deliveries(root: string): Promise<Delivery[]> {
   ];
   const feed = [
     "subjects of the decisions and escalations other sessions recorded since this session's cursor, twelve at most; never whole records",
-    "only what an edit introduced: a term that now recurs without a definition, or a use whose sense is at risk, named; silent otherwise",
+    "only a use whose sense an edit put at risk, named; a term an edit makes recur without a definition is held for the stop, and a prompt names one no stop named; silent otherwise",
   ];
   const edit = "error" in spec
     ? "revelation at the edit: none (the spec is not readable)"
@@ -134,7 +134,7 @@ export async function deliveries(root: string): Promise<Delivery[]> {
     ? `the lexicon check over the changed files (${changed.files.length} now)`
     : `the lexicon check over the changed files (not known now: ${changed.failure})`;
   const debt = "error" in spec ? specLine : `spec: ${plural(spec.problems, "problem")}, ${plural(spec.defects, "structural defect")}, ${plural(spec.open, "open requirement")}`;
-  const regulate = [changedLine, debt, "the reminder that an active work order is closed with work close", "the spec gaps this session touched, advisory", "the undeclared entrances in the files it changed, advisory", "practices that fired this session with no enactment since, advisory", "the read trace snapshotted for calibrate"];
+  const regulate = [changedLine, debt, "the reminder that an active work order is closed with work close", "the terms this session made recur without a definition, in one line with the declare-or-alias command", "the spec gaps this session touched, advisory", "the undeclared entrances in the files it changed, advisory", "practices that fired this session with no enactment since, advisory", "the read trace snapshotted for calibrate"];
 
   const carries: Record<HookEvent, string[]> = {
     SessionStart: orient,

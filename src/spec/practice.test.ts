@@ -101,6 +101,14 @@ test("a practice bullet parses into triggers, numbered steps with what each leav
   assert.equal(reworded.version, p!.version, "the because is not part of the version");
 });
 
+test("a leaves: line belongs to the step above it whatever its indentation: four spaces, two, or a tab parse alike", () => {
+  // Four spaces as the docs show it; two as a formatter such as oxfmt writes it back; a tab as an editor might.
+  const parsed = ["    leaves:", "  leaves:", "\tleaves:"].map((indent) => parsePractices(practiceText("d-0000abcd").replace("    leaves:", indent), "W.practice.md"));
+  for (const p of parsed) assert.deepEqual(p.problems, []);
+  for (const p of parsed) assert.deepEqual(p.practices[0]!.steps.map((s) => [s.n, s.text, s.leaves]), [[1, "wipe the knob", undefined], [2, "oil the knob", "an oil record"], [3, "turn it once", undefined]]);
+  assert.equal(new Set(parsed.map((p) => p.practices[0]!.version)).size, 1, "one practice, one version, however leaves: is indented");
+});
+
 test("a practice with no evidence, a pitfall without a citation, an unknown key, a heading, and leaves before any step are problems", () => {
   const text = ["# Widget practices", "- guess: A practice nobody learned.", "  when: explicit", "    leaves: nothing yet", "  step: hope", "  pitfall: it went wrong once", "  colour: blue", "  because: it seemed right"].join("\n");
   const messages = parsePractices(text, "W.practice.md").problems.map((p) => p.message);

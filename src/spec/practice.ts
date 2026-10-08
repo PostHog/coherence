@@ -7,7 +7,7 @@
  *     when: command <words> | edit <glob> [adding <text>] | explicit
  *       (a command word with * or ? is a glob over one word: command resolved df-*)
  *     step: <what to do>
- *       leaves: <the evidence the step leaves>       optional, indented under its step
+ *       leaves: <the evidence the step leaves>       optional; belongs to the step above it, at any indentation
  *     pitfall: <a way this practice has failed> (<record id or commit>)
  *     learned: <record id or commit>, ...
  *     invariants: <invariant name>, ...                optional; names in the sister spec
@@ -229,7 +229,7 @@ export function parsePractices(text: string, file: string): ParsedPractices {
       }
       case "leaves": {
         if (lastStep === undefined) {
-          problem(line, `leaves: on practice ${current.name} comes before any step; it is indented under the step whose evidence it names`);
+          problem(line, `leaves: on practice ${current.name} comes before any step; it follows the step whose evidence it names, at any indentation`);
           return;
         }
         if (lastStep.leaves !== undefined) {

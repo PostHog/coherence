@@ -421,17 +421,29 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: commit-ordered-effects declared as cursor advances after the print
   checklist: circuit-breaker-policy dismissed: the reading is local files; no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
-- the edit line names what the edit introduced: The per-tool vocabulary line fires only when an edit makes a new term recur without a definition or puts a sense at risk, and names it; an ordinary edit that uses a known word says nothing, and a term once named is not named again.
-  over: every PostToolUse after a session's baseline: an ordinary edit, an edit using a defined word, an edit that introduces a recurring undefined term, and the next edit after it was delivered
-  via: the per-tool line is silent on an ordinary edit and names only the candidate an edit introduces
-  because: the old line reported every new or changed context, so every edit that mentioned a known word added to it and the line was noise at every tool use; the moment to name a new term is the edit that made it recur, once
+- regulate names the terms the session made recur: The per-tool vocabulary line names only a use whose sense an edit put at risk; a term an edit makes recur without a definition is held, unsaid, and regulate names the session's held terms together at the stop, in one line with the declare-or-alias command; the stop marks them delivered once the line reached the host, so the next prompt carries the stop's line and names none of them again, and an ordinary edit that uses a known word says nothing.
+  over: every PostToolUse after a session's baseline: an ordinary edit, an edit using a defined word, two edits that each make a new undefined term recur, the stop after them, and the prompt after the stop
+  via: an edit is silent on the terms it makes recur: regulate names the session's together at the stop, once, with the declare-or-alias command
+  because: during adoption the per-edit line fired on almost every spec edit, one term at a time as each crossed the threshold (browser, account, page on PostHog's praetorium adoption), so the line was noise at the tool use and the terms were never settled together; the stop is where the session looks back over its work, and one line there names them all once
   crossing: project-source -> reading
-  refuted: named every recurring undefined term at every edit instead of only the one the edit introduced, as the old per-tool line did -> "the per-tool line is silent on an ordinary edit and names only the candidate an edit introduces" went red in vocabulary-signal.test.ts; restored, green (2026-09-23)
+  refuted: let the full-reading edit path keep the unresolved changes it found, so the edit said its terms again -> "an edit is silent on the terms it makes recur: regulate names the session's together at the stop, once, with the declare-or-alias command" went red in vocabulary-signal.test.ts on its own assertion (the edit that made rebate recur is silent); restored byte for byte, green; and made the stop's delivery mark nothing, so the next prompt named the terms again -> the same test went red (what the stop named is not named again); restored byte for byte, green batched and alone (2026-10-08)
   kinds: output
   checklist: destination-confinement dismissed: one destination, the host's additionalContext, and no redirect
   checklist: redaction dismissed: only terms and component names are printed, never a use's text
   checklist: commit-ordered-effects declared as cursor advances after the print
   checklist: circuit-breaker-policy dismissed: the reading is local files; no dependency is sampled
+  checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
+- a held term reaches the next prompt: A term an edit held for the stop that no stop named, because the session never stopped cleanly, is named at the session's next prompt with the declare-or-alias command, once; the held terms are kept apart from the baseline, so a prompt over an unchanged tree reads a few names, never the session's whole reading, and a held list that cannot be read is said.
+  over: an edit that makes a term recur, a prompt with no stop between, and the prompt after it
+  via: a term an edit held reaches the next prompt when no stop named it, once
+  because: a host interrupted mid-turn runs no stop hook, so a finding held for regulate alone would be lost to the session that made it; the next prompt is the next boundary the agent reads, as it is for what a stop carries
+  crossing: project-source -> reading
+  refuted: made the prompt read no held terms -> "a term an edit held reaches the next prompt when no stop named it, once" went red in vocabulary-signal.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-08)
+  kinds: output
+  checklist: destination-confinement dismissed: one destination, the host's additionalContext, and no redirect
+  checklist: redaction dismissed: only terms are printed, never a use's text
+  checklist: commit-ordered-effects declared as cursor advances after the print
+  checklist: circuit-breaker-policy dismissed: the held list is a local file; no dependency is sampled
   checklist: declared-target-coverage dismissed: one host reads the injection, not a registry of targets
 - coverage honors the config's bounds: The vocabulary corpus never enters a folder the config's ignore list names, by name or by path, through the same rule every other walk applies (underIgnored in project-files.ts); the journal's and work's records are read even when the config ignores .coherence.
   over: every file and folder the corpus walk meets, in a project whose config ignores a large folder by name, a nested folder by path, and .coherence
@@ -832,6 +844,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   via: an edit whose kept vocabulary was left half-written reads in full and says so
   because: the edit's vocabulary is judged against state kept between calls, written in parts; a stop between two writes would leave totals that no longer match the files' kept contributions, so the state is marked while it is written and refused while the mark stands
   refuted: used a kept vocabulary marked as half-written -> "an edit whose kept vocabulary was left half-written reads in full and says so" went red in work-meter.test.ts on its own assertion (the edit read against it and never said it read in full); restored byte for byte, green batched and alone (2026-10-08)
+  kinds: none
+- the kept vocabulary holds what the full reading holds: An edit read through the kept vocabulary holds the term it makes recur without a definition for the stop, unsaid, as an edit read in full does.
+  over: an edit through a kept vocabulary state that makes a backticked term recur in one note
+  via: an edit read through the kept vocabulary holds the term it makes recur for the stop, unsaid, as the full reading does
+  because: the kept state answers most edits, and a path that still said the term at the edit, or held nothing, would bring back the per-edit noise or lose the term the stop is meant to name
+  refuted: let the kept path keep the unresolved changes it found, so the edit said its term -> "an edit read through the kept vocabulary holds the term it makes recur for the stop, unsaid, as the full reading does" went red in work-meter.test.ts on its own assertion (the term is not said at the edit); restored byte for byte, green batched and alone (2026-10-08)
   kinds: none
 - nested work scopes add up: The work a scope opened inside another counts is the outer scope's too, so nesting never hides work from the scope a test reads.
   over: work counted before, inside and after an inner scope
