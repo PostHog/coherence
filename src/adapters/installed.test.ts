@@ -129,12 +129,15 @@ function sources(dir: string): string[] {
 const HAND_BUILT = [/\b(?:join|resolve)\([^()]*["'`]node_modules["'`]/, /["'`][^"'`\n]*node_modules[\\/][\w@.$]/];
 
 /**
- * The one file allowed to spell one, and why: the hook command it writes is
+ * The files allowed to spell one, and why: the hook command install writes is
  * shell the agent host runs before any Node is started, so no resolver can be
  * asked, and it looks for Coherence itself where every package manager links
- * a direct dependency (pnpm included).
+ * a direct dependency (pnpm included); hook-command reads that shell back.
  */
-const SHELL_ONLY = new Map([["lifecycle/install.ts", "the committed hook command is shell, run before any Node resolver exists"]]);
+const SHELL_ONLY = new Map([
+  ["lifecycle/install.ts", "the committed hook command is shell, run before any Node resolver exists"],
+  ["lifecycle/hook-command.ts", "it reads that shell back, to tell a hook an earlier Coherence wrote, and opens no path"],
+]);
 
 test("no source file builds a path into node_modules by hand: every package Coherence starts, drives or detects is found by the resolver", () => {
   const src = dirname(dirname(fileURLToPath(import.meta.url)));
