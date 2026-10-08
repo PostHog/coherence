@@ -691,7 +691,9 @@ test("deep links resolve: every card id on every view resolves to that view", ()
 test("another project's tree builds as a second root: its lexicon is the domain layer and its run records show its structural defects", async () => {
   const other = makeFixture();
   try {
-    writeFileSync(join(other.root, "lexicon.json"), JSON.stringify({ version: 1, project: "widgetry", concepts: [{ name: "widget", definition: "A thing with a knob." }] }));
+    // The domain layer's heading is the project's name, which its config gives (projectName); the lexicon stores none.
+    writeFileSync(join(other.root, "coherence.config.json"), JSON.stringify({ name: "widgetry", entryDir: ".", language: "typescript" }));
+    writeFileSync(join(other.root, "lexicon.json"), JSON.stringify({ version: 1, concepts: [{ name: "widget", definition: "A thing with a knob." }] }));
     const { state } = await buildScopePage({ root: other.root, lexiconPath: DEFAULTS.lexiconPath, project: "Widgetry" });
     const domain = state.lexicon.layers.find((l) => l.id === "domain");
     assert.ok(domain?.kind === "present" && domain.title === "Widgetry lexicon", "the other project's lexicon.json is located from its root");

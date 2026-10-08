@@ -613,6 +613,7 @@
         "class exposure": "Private state written where it is published or committed.",
         "class uninterpolated": "Template text reaches a reader literally instead of the value it stands for.",
         "class load-flake": "A test that fails under machine load whatever the change under test.",
+        "class duplicated-fact": "One fact kept in two places written apart, so one copy drifts from the other and a reader takes the stale one.",
         "class over-claim": "A reading credits more than its evidence shows: a control, a coverage or a verification counted where nothing checks it, so a gap reads closed.",
         "class hand-built-path": "A file of an installed package located by a path spelled by hand (a node_modules folder joined to a root) instead of asked of the package resolver, so a package manager that lays its packages out otherwise (pnpm's store, a package's exports) leaves it naming nothing.",
         "class version-skew": "The Coherence that runs is not the one the adopter installed or meant: another copy shadows it, or a package manager resolved an older release than the project needs, and nothing says which version answers.",
