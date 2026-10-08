@@ -74,18 +74,39 @@ The language adapter seam: how to ask a language's server for definitions, refer
   crossing: instrument -> record
   refuted: joined pytest names as a regex -> "pytest's JUnit report reads as the jest shape, and -k names join with or" went red in python.test.ts; restored, green (2026-09-17)
   kinds: none
-- server located or a reason: The language server binary is found in the adopter's node_modules first, then Coherence's, then on PATH, and its absence is a reason, never a crash.
+- server located or a reason: The language server binary is resolved by the package resolver from the adopter's project first, then from Coherence's own module, then found on PATH, and its absence is a reason naming each place looked, never a crash.
   protects: SERVER_BIN in typescript.ts
   chokepoint: src/adapters/typescript.ts
-  over: the adopter's node_modules, Coherence's, and every folder on PATH
+  over: the adopter's project, Coherence's own module, and every folder on PATH
   via: the language server binary is found (the adapter's precondition)
   because: the language server is an optional dependency; an adopter without it must get a reason naming where the tool looked and how to install it, and a run must record not run rather than crash, since not run is a verdict the status view can show. The chokepoint's refutation is the compiler's own refusal of a synthetic import of SERVER_BIN, which its module does not export (ruling rs-e93ecdd6); the totality oracle was refuted by making locateServer answer before it looked anywhere, which is the absence branch staged inside the function rather than by taking the binary off the machine
   crossing: instrument -> reading
-  refuted: made locateServer return undefined before it looked anywhere, so the adapter's precondition found no binary -> the totality oracle went red, then green once restored (2026-09-18)
+  refuted: made locateServer return undefined before it looked anywhere, so the adapter's precondition found no binary -> the totality oracle went red, then green once restored (2026-09-18); made the TypeScript adapter's locateServer answer not found, with nothing looked, before it asked the resolver -> "the language server binary is found (the adapter's precondition)" went red in enforcement.test.ts and economy.test.ts; restored byte for byte, green (2026-10-08)
   kinds: deploy
   checklist: graceful-drain dismissed: nothing is shut down by locating the binary
   checklist: readiness-evidence declared as server located or a reason
   checklist: declared-target-coverage dismissed: three places are looked in, in order; there is no registry of targets
+- packages found by the resolver: Every installed package Coherence starts, drives or detects (both language servers, the tsserver, a vitest coverage provider, its own compiler at build) is found by Node's package resolver through installed.ts, never by a path into node_modules built by hand; the hook command install.ts writes is the one exception, being shell the agent host runs before any Node exists.
+  over: every non-test TypeScript source under src, and the shapes a hand-built path takes: a join or resolve given node_modules, and a string spelling a path inside it
+  via: no source file builds a path into node_modules by hand: every package Coherence starts, drives or detects is found by the resolver
+  because: under pnpm Coherence's own dependencies sit beside its package in the store, not inside it, and TypeScript 7 ships no lib/tsserver.js, so <Coherence>/node_modules/typescript/lib/tsserver.js and <root>/node_modules/.bin/... named nothing, initialize failed, and run, the edit-time checks, scaffold control and the Scope map all failed for an adopter on 1.5.2 (df-aa4a8606); the sweep found the same shape in the vitest coverage provider's detection and the build's compiler, so the class is refused over the whole source, not the two adapters. A pnpm project on TypeScript 7 installed from this checkout is the network half (pnpm.e2e.ts, which CI runs where the registry is reachable)
+  crossing: project-source -> instrument
+  refuted: put a hand-built join(root, "node_modules", ".bin", SERVER_BIN) back in front of the Python adapter's locateServer -> "no source file builds a path into node_modules by hand: every package Coherence starts, drives or detects is found by the resolver" went red in installed.test.ts; restored byte for byte, green (2026-10-08)
+  kinds: none
+- a pnpm project on TypeScript 7 reads with Coherence's own: Under pnpm, where Coherence's dependencies sit beside its package rather than inside it, and with a project TypeScript of 7 or later, which ships no tsserver, the TypeScript adapter drives Coherence's own tsserver and both language servers resolve from Coherence's own module, the project's TypeScript named as passed over.
+  over: a fake pnpm store holding Coherence with typescript 5.9.3, typescript-language-server and pyright beside it, under a project whose typescript 7.0.2 exports no lib/tsserver.js
+  via: under pnpm with TypeScript 7, the tsserver and both language servers are Coherence's own, resolved beside its package, and the project's TypeScript is named as passed over
+  because: the adopter's run failed at initialize with "Could not find a valid TypeScript installation" while createRequire from Coherence's own module found its typescript 5.9.3 (df-aa4a8606); the project's own resolver cannot reach a tsserver past TypeScript 7's exports, and there is none to reach
+  crossing: project-source -> instrument
+  refuted: looked for Coherence's dependencies only in the node_modules inside its own package, as the hand-built path did -> "under pnpm with TypeScript 7, the tsserver and both language servers are Coherence's own, resolved beside its package, and the project's TypeScript is named as passed over" went red in installed.test.ts; restored byte for byte, green; took the project's typescript whatever its version and whether or not it held lib/tsserver.js -> the same test went red; restored byte for byte, green (2026-10-08)
+  kinds: none
+- the project's own install comes first: When the project has its own language server and a TypeScript below 7 holding lib/tsserver.js, those are what the adapters start and drive, and Coherence's own are not looked for; a TypeScript whose tsserver.js is missing is passed over for Coherence's.
+  over: a project with its own typescript 5.8.2 and typescript-language-server beside a pnpm store holding Coherence's, before and after its tsserver.js is removed
+  via: the project's own tsserver and language server come first when it has them; a TypeScript whose tsserver.js is missing is passed over
+  because: a project's checks must read with the compiler the project builds with whenever it has one Coherence can drive; Coherence's own is the fallback, never a preference
+  crossing: project-source -> instrument
+  refuted: asked Coherence's module before the project's in locateServer -> "the project's own tsserver and language server come first when it has them; a TypeScript whose tsserver.js is missing is passed over" went red in installed.test.ts; restored byte for byte, green (2026-10-08)
+  kinds: none
 - only the project's files: Only the project's own files are ever evidence: a file is the project's when git tracks it or lists it untracked and not ignored, and it lies inside no nested checkout; one function set decides it (projectFiles, keepProjectFiles, projectSites in project-files.ts), and every walk of the project and every reference an instrument reports passes through it.
   over: every walk of the project (the adapters' source scans, the spec walker, economy and mass, the vocabulary check's corpus, observation's path mapping, the changed-file listings) and every reference site accepted from an instrument (the adapters, the chokepoint check, the edit hook's re-check, the economy closure, the observed and Scope component interfaces)
   via: only the project's own files are ever evidence: a nested checkout and an ignored path are no bypass, no vocabulary, and no mass

@@ -22,6 +22,7 @@ export const STATUS_SOURCES = {
   hookTimes: join(".coherence", "hook-times"),
   firings: join(".coherence", "practices"),
   journal: join(".coherence", "journal"),
+  server: join(".coherence", "run", "server.json"),
 } as const;
 export const STATUS_DEFAULT_BUDGET = 3;
 const TOOL_HOOKS = new Set(["PreToolUse", "PostToolUse"]);
@@ -45,6 +46,8 @@ export interface StatusReading {
   owed: string[];
   /** Whether any folder read holds Coherence's records: a session outside every project shows nothing. */
   inProject: boolean;
+  /** The live Scope page's address, while a warm server answers it; it carries the token, so it goes only where the user alone reads it. */
+  scope?: string;
 }
 
 const fileName = (session: string): string => `${session.replace(/[^\w.-]/g, "_")}.jsonl`;
@@ -132,6 +135,30 @@ export function statusVersion(): string | null {
   return ownVersion;
 }
 
+/**
+ * The address of the live Scope page a warm server answers for one folder,
+ * from the pointer the server keeps (mode 0600): only while its process is
+ * alive and it serves HTTP. A status line cannot start a server, so a folder
+ * with none shows no link, and `coherence scope` starts one.
+ */
+export function scopeAddress(folder: string): string | undefined {
+  let pointer: { pid?: unknown; token?: unknown; http?: { port?: unknown } };
+  try {
+    pointer = JSON.parse(readFileSync(join(folder, STATUS_SOURCES.server), "utf8")) as typeof pointer;
+  } catch {
+    return undefined;
+  }
+  const port = pointer.http?.port;
+  if (typeof pointer.pid !== "number" || typeof pointer.token !== "string" || !/^[0-9a-f]{64}$/.test(pointer.token) || typeof port !== "number") return undefined;
+  try {
+    process.kill(pointer.pid, 0);
+  } catch {
+    // Gone, or (EPERM) another user's process under a reused pid: no server of this user's answers there.
+    return undefined;
+  }
+  return `http://127.0.0.1:${port}/?token=${pointer.token}`;
+}
+
 /** What the session's kept records say now. */
 export function readStatus(input: StatusInput): StatusReading | undefined {
   const session = typeof input.session_id === "string" && input.session_id !== "" ? input.session_id : undefined;
@@ -165,15 +192,24 @@ export function readStatus(input: StatusInput): StatusReading | undefined {
   }
   // As regulate reads it: owed when no enactment of the practice came at or after its first firing.
   const owed = [...fired].filter(([practice, at]) => !enacted.some((e) => e.practice === practice && e.at >= at)).map(([practice]) => practice);
-  return { version: statusVersion(), calls, totalMs, over, budget, owed, inProject };
+  const scope = folders.map(scopeAddress).find((address) => address !== undefined);
+  return { version: statusVersion(), calls, totalMs, over, budget, owed, inProject, ...(scope === undefined ? {} : { scope }) };
 }
 
 const DIM = "\u001b[2m";
 const YELLOW = "\u001b[33m";
 const RESET = "\u001b[0m";
 
-/** The one line, or "" for a session no project of Coherence's holds. Colour only where something wants the user's eye. */
-export function statusText(reading: StatusReading | undefined, colour = true): string {
+/** A terminal hyperlink (OSC 8): the label shows, the address does not; a terminal without them shows the label alone. */
+const link = (url: string, label: string): string => `\u001b]8;;${url}\u001b\\${label}\u001b]8;;\u001b\\`;
+
+/**
+ * The one line, or "" for a session no project of Coherence's holds. Colour
+ * only where something wants the user's eye; the Scope link only where a
+ * terminal can draw it, never as a bare address, since the address carries
+ * the token.
+ */
+export function statusText(reading: StatusReading | undefined, colour = true, links = colour): string {
   if (reading === undefined || !reading.inProject) return "";
   const paint = (text: string, code: string): string => (colour ? `${code}${text}${RESET}` : text);
   const parts = [paint(`coherence ${reading.version ?? "(version unknown)"}`, DIM)];
@@ -185,5 +221,6 @@ export function statusText(reading: StatusReading | undefined, colour = true): s
     const short = reading.owed.map((id) => id.split("/").at(-1) ?? id);
     parts.push(paint(`${reading.owed.length} practice${reading.owed.length === 1 ? "" : "s"} owed: ${short.join(", ")}`, YELLOW));
   }
+  if (links && reading.scope !== undefined) parts.push(link(reading.scope, "scope ↗"));
   return parts.join(paint(" · ", DIM));
 }

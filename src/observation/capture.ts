@@ -22,6 +22,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSyn
 import { tmpdir } from "node:os";
 import { extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { installedPackage, projectFrom } from "../adapters/installed.ts";
 import { keepProjectFiles, projectFiles } from "../adapters/project-files.ts";
 import type { EnforcementConfig } from "../enforcement/config.ts";
 import type { BatchObserver, CommandSpec, JsonReport } from "../enforcement/totality.ts";
@@ -230,8 +231,9 @@ export function executedFromIstanbul(coverage: Record<string, IstanbulFile>, rea
   return files;
 }
 
+/** The coverage provider the project has installed, as the package resolver finds it from the project (installed.ts). */
 function vitestProvider(root: string): string | undefined {
-  for (const name of ["coverage-v8", "coverage-istanbul"]) if (existsSync(join(root, "node_modules", "@vitest", name))) return `@vitest/${name}`;
+  for (const name of ["coverage-v8", "coverage-istanbul"]) if (installedPackage(`@vitest/${name}`, projectFrom(root)) !== undefined) return `@vitest/${name}`;
   return undefined;
 }
 

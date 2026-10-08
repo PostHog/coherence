@@ -106,6 +106,8 @@ export interface InvariantOptions {
   form: Form;
   /** A declared crossing supplied now; absent keeps the scaffold placeholder. */
   crossing?: { from: string; to: string } | undefined;
+  /** The entrances a totality oracle form covers, by name; absent, a declared crossing prints the placeholder and none prints no slot. A chokepoint form names none. */
+  entrances?: string[] | undefined;
 }
 
 export interface InvariantScaffold {
@@ -122,6 +124,7 @@ const PLACEHOLDERS: Record<Key, string> = {
   via: "<the test that fails when the invariant is broken>",
   because: "<why this exists; what it protects against>",
   crossing: "<trust level> -> <trust level>",
+  entrances: "<the entrances whose work its test checks, comma separated, or none>",
   refuted: "<what was broken> -> <what was seen> (<date>)",
   kinds: "<a, b: the kinds of thing protected, or none>",
   checklist: "",
@@ -149,6 +152,12 @@ export function renderInvariant(seed: Seed, options: InvariantOptions): Invarian
     if (key === "crossing") {
       const value = options.crossing === undefined ? PLACEHOLDERS.crossing : `${options.crossing.from} -> ${options.crossing.to}`;
       lines.push(`  crossing: ${value}`);
+      continue;
+    }
+    // A chokepoint's entrances are traced, never named; a totality oracle on a declared crossing covers only the entrances it names.
+    if (key === "entrances") {
+      if (options.form === "chokepoint" || (options.crossing === undefined && options.entrances === undefined)) continue;
+      lines.push(`  entrances: ${options.entrances === undefined || options.entrances.length === 0 ? PLACEHOLDERS.entrances : options.entrances.join(", ")}`);
       continue;
     }
     if (key === "kinds") {

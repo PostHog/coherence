@@ -19,6 +19,7 @@ import { countWork, readProjectText, spawnSync } from "../lifecycle/work-meter.t
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isModuleHandler, parseSpec, type Entrance, type Invariant, type Problem, type TrustLevel } from "./grammar.ts";
 import { applicableShapes, loadSeed, type Seed } from "./seed.ts";
+import { creditedByCrossingAlone, crossingChecksTrust, resolveCovered } from "./covers.ts";
 import { entryKey, latestByEnforcement, latestFor, loadRuns, parseLine as parseRunLine, witnessedRefutations, type Latest, type LoadedRuns, type RunRecord } from "../enforcement/record.ts";
 import { latestSeeing } from "../enforcement/run-index.ts";
 import { deriveState, type Lack, type State } from "./state.ts";
@@ -103,6 +104,8 @@ export interface SpecModel {
   runs: { latest: string; count: number; damaged: number; graded: string | undefined } | undefined;
   /** The floor on defects: closes with neither a guard nor a decision, and guard failures; advisory, never a problem. */
   defects?: DefectFloor;
+  /** The entrances an invariant covered by its crossing alone and no longer does, until it names them (covers.ts); advisory, never a problem. Absent when none. */
+  crossingAlone?: CrossingAloneCredit[];
 }
 
 interface Config {
@@ -433,6 +436,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   components.sort((a, b) => a.folder.localeCompare(b.folder));
   problems.push(...entranceTrustProblems(components, trustLevels));
   problems.push(...entranceGuardProblems(root, components));
+  problems.push(...coveredEntranceProblems(components));
   // The invariant floor (df-f3826eaa): a bullet the run store graded an invariant is not demoted without a decision; the journal is read only when one was.
   const demoted = rawFloorGaps(components, loadedRuns.records, loadedRuns.refutations);
   if (demoted.length > 0) problems.push(...invariantFloorProblems(components, invariantFloorGaps(demoted, practiceFiles.size === 0 ? journalRecords(root) : records)));
@@ -455,7 +459,8 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   // The journal is read for defects even where no practice file asked for it; a project with no spec reads none.
   const journal = practiceFiles.size === 0 && components.length > 0 ? journalRecords(root) : records;
   const defects = defectFloor(defectStates(journal), guardStanding(components), declaredClasses(root));
-  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs, defects };
+  const crossingAlone = crossingAloneCredits(components, trustLevels);
+  return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs, defects, ...(crossingAlone.length === 0 ? {} : { crossingAlone }) };
 }
 
 /** How a defect's guard stands in this model: the invariant <folder>/<name> is declared and its refutation witnessed, declared only, or missing. */
@@ -516,6 +521,83 @@ function entranceTrustProblems(components: readonly Component[], trustLevels: re
 }
 
 const HANDLER = /^([A-Za-z_$][\w$]*)(?:\s+in\s+(\S+))?$/;
+
+/** The trust an entrance carries in, as the model can tell without a reading: the level it declares, else the entering side of every crossing whose chokepoint is its handler, in the component holding it. */
+function entranceTrust(entrance: ModelEntrance, components: readonly Component[]): string[] {
+  if (entrance.trust !== undefined) return [entrance.trust];
+  const handler = entrance.handler === undefined ? undefined : HANDLER.exec(entrance.handler.trim())?.[1];
+  const holder = entrance.file === undefined ? undefined : componentHolding(components, entrance.file);
+  if (handler === undefined || holder === undefined) return [];
+  return [...new Set(holder.invariants.flatMap((invariant) => (invariant.crossing !== undefined && invariant.enforcements.some((e) => e.form === "chokepoint" && HANDLER.exec(e.chokepoint.trim())?.[1] === handler) ? [invariant.crossing.from] : [])))];
+}
+
+/**
+ * An invariant's entrances: line, checked: every name is an entrance some
+ * spec declares (covers.ts resolves it), and an entrance that declares its
+ * trust carries in a level the invariant's crossing checks, entering from it
+ * or entering it. A name that resolves to nothing, or to an entrance whose
+ * trust the crossing never checks, would credit nothing while reading as
+ * coverage, so each is a problem.
+ */
+function coveredEntranceProblems(components: readonly Component[]): Problem[] {
+  const problems: Problem[] = [];
+  for (const component of components) {
+    for (const invariant of component.invariants) {
+      const names = invariant.entrances?.names;
+      if (names === undefined || names === "none") continue;
+      const line = invariant.entrances!.line;
+      for (const name of names) {
+        const resolved = resolveCovered(name, component.folder, components);
+        if ("problem" in resolved) {
+          problems.push({ file: component.specPath, line, message: `entrances on ${invariant.name}: ${resolved.problem}` });
+          continue;
+        }
+        const entrance = components.find((c) => c.folder === resolved.entrance.component)?.entrances.find((e) => e.name === resolved.entrance.name);
+        if (entrance?.trust === undefined || crossingChecksTrust(invariant.crossing, [entrance.trust])) continue;
+        problems.push({ file: component.specPath, line, message: `entrances on ${invariant.name} names ${name}, which carries ${entrance.trust} in, but its crossing ${invariant.crossing!.from} -> ${invariant.crossing!.to} neither enters from ${entrance.trust} nor enters it, so it checks nothing that entrance sends` });
+      }
+    }
+  }
+  return problems;
+}
+
+/** An entrance an invariant covered by its crossing alone, before entrances: (PR #4), and no longer covers: advisory, never a problem. */
+export interface CrossingAloneCredit {
+  invariant: { component: string; name: string; specPath: string; line: number };
+  entrance: { component: string; name: string; specPath: string; line: number };
+}
+
+/**
+ * Every entrance that lost a test-backed control when crossings stopped
+ * covering entrances by themselves: a verified invariant enforced by a
+ * totality oracle alone, with no entrances: line, owned where the entrance is
+ * declared or its handler lies, whose crossing checks the entrance's trust,
+ * on an entrance carrying a level from outside the system's control in, where
+ * the loss can leave it with no traced control. An entrance that declares
+ * control: none needed none. Naming the entrances
+ * it checks (or none) on the invariant ends the advisory.
+ */
+export function crossingAloneCredits(components: readonly Component[], trustLevels: readonly TrustLevel[]): CrossingAloneCredit[] {
+  const outside = new Set(trustLevels.filter((level) => level.outside).map((level) => level.name));
+  const credits: CrossingAloneCredit[] = [];
+  for (const component of components) {
+    for (const entrance of component.entrances) {
+      if (entrance.noControl !== undefined) continue;
+      const holder = entrance.file === undefined ? undefined : componentHolding(components, entrance.file);
+      const owners = [...new Set([component.folder, ...(holder === undefined ? [] : [holder.folder])])];
+      const trust = entranceTrust(entrance, components);
+      // Only where the loss can open a gap: work carried in from outside the system's control (a level marked outside).
+      if (!trust.some((level) => outside.has(level))) continue;
+      for (const owner of components.filter((c) => owners.includes(c.folder))) {
+        for (const invariant of owner.invariants) {
+          if (invariant.state !== "invariant" || !creditedByCrossingAlone(invariant, owners, trust)) continue;
+          credits.push({ invariant: { component: owner.folder, name: invariant.name, specPath: owner.specPath, line: invariant.line }, entrance: { component: component.folder, name: entrance.name, specPath: component.specPath, line: entrance.line } });
+        }
+      }
+    }
+  }
+  return credits;
+}
 
 /**
  * An entrance's declared guard, checked (d-127ab8e4): it names a chokepoint
