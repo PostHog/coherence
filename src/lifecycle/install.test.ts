@@ -8,7 +8,7 @@ import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { cliName, HOOK_EVENTS, REFUSE_EXIT } from "./hook.ts";
 import { PACKAGE_NAME } from "./project.ts";
-import { driftOf, formatCheck, formatStatus, formatUninstall, IGNORE_TEXT, install, LOCATED_PREFIX, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
+import { driftOf, EARLIER_SEARCH, earlierSearchLines, formatCheck, formatStatus, formatUninstall, IGNORE_TEXT, install, LOCATED_PREFIX, searchesCheckoutFirst, locate, MISSING_CONTEXT, mergeHooks, NO_NODE, NOT_INSTALLED, status, stripHooks, uninstall } from "./install.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 
@@ -550,4 +550,70 @@ test("a session is told the checkout it ran from: beside it by a relative path, 
   assert.equal(await cliName("/work/project", "/work/coherence/src/cli.ts"), "node ../coherence/src/cli.ts");
   assert.equal(await cliName("/a/b/c/d/e/project", "/opt/tools/coherence/src/cli.ts"), "node /opt/tools/coherence/src/cli.ts");
   assert.equal(await cliName("/work/project", "/work/my tools/coherence/src/cli.ts"), 'node "../my tools/coherence/src/cli.ts"');
+});
+
+/** The located search an earlier Coherence wrote (through 1.5.2): a checkout beside the project before the installed package. */
+const EARLIER_LOCATE =
+  'root="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$root" != / ] && [ ! -f "$root/.claude/settings.json" ] && [ ! -f "$root/.codex/hooks.json" ]; do root=$(dirname "$root"); done; main=$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null); coherence=; for c in "${COHERENCE_HOME:+$COHERENCE_HOME/src/cli.ts}" "$root/../coherence/src/cli.ts" "${main:+${main%/*}/../coherence/src/cli.ts}" "$root/node_modules/@posthog/coherence/dist/cli.js" "$root/node_modules/.bin/coherence"; do if [ -n "$c" ] && [ -f "$c" ]; then coherence=$c; break; fi; done; coherence() { exec node "$coherence" "$@"; }; coherence';
+
+test("a stale checkout beside the project never wins over the installed package; only COHERENCE_HOME names a checkout over it", async () => {
+  const parent = await mkdtemp(join(tmpdir(), "coherence-order-"));
+  const project = join(parent, "project");
+  const home = join(parent, "elsewhere");
+  try {
+    await mkdir(project);
+    await install({ root: project, host: "codex", command: LOCATED_PREFIX });
+    // The adopter's stale clone at ../coherence, and the release the project installed.
+    const stale = join(parent, "coherence", "src", "cli.ts");
+    await mkdir(dirname(stale), { recursive: true });
+    await writeFile(stale, "");
+    await writeFile(join(parent, "coherence", "package.json"), JSON.stringify({ name: PACKAGE_NAME, version: "0.0.0" }));
+    const installed = join(project, "node_modules", PACKAGE_NAME, "dist", "cli.js");
+    await mkdir(dirname(installed), { recursive: true });
+    await writeFile(installed, "");
+    await writeFile(join(project, "package.json"), JSON.stringify({ devDependencies: { [PACKAGE_NAME]: "^1.5.0" } }));
+    assert.equal(locate(project, hostEnv("codex", project)), installed, "the installed package wins over the checkout beside the project");
+
+    // The project declares Coherence but its install has not run: the stale clone still does not answer.
+    await rm(join(project, "node_modules"), { recursive: true });
+    assert.equal(locate(project, hostEnv("codex", project)), undefined, "a declared but missing package is missing, never replaced by a checkout");
+
+    // Nothing declared, nothing installed: the checkout beside the project is the one way left.
+    await writeFile(join(project, "package.json"), JSON.stringify({ devDependencies: {} }));
+    assert.equal(resolve(locate(project, hostEnv("codex", project)) ?? ""), stale);
+
+    // COHERENCE_HOME is the explicit way to run a checkout, and wins over an installed package.
+    await mkdir(dirname(installed), { recursive: true });
+    await writeFile(installed, "");
+    await mkdir(join(home, "src"), { recursive: true });
+    await writeFile(join(home, "src", "cli.ts"), "");
+    assert.equal(locate(project, hostEnv("codex", project, { COHERENCE_HOME: home })), join(home, "src", "cli.ts"));
+  } finally {
+    await rm(parent, { recursive: true, force: true });
+  }
+});
+
+test("hooks an earlier Coherence wrote, which look beside the project first, are named by the check and at the session start with the reinstall", async () => {
+  const project = await mkdtemp(join(tmpdir(), "coherence-earlier-"));
+  try {
+    assert.equal(searchesCheckoutFirst(`${EARLIER_LOCATE} hook Stop`), true);
+    assert.equal(searchesCheckoutFirst(`${LOCATED_PREFIX} hook Stop`), false, "what install writes now looks at the installed package first");
+    assert.deepEqual(earlierSearchLines(project), [], "no settings, nothing to say");
+    await install({ root: project, host: "claude", command: LOCATED_PREFIX });
+    assert.deepEqual(earlierSearchLines(project), [], "current hooks, nothing to say");
+    const path = join(project, ".claude", "settings.json");
+    const settings = JSON.parse(await readFile(path, "utf8")) as { hooks: Record<string, { hooks: { command: string }[] }[]> };
+    for (const [event, entries] of Object.entries(settings.hooks)) entries.at(-1)!.hooks[0]!.command = `${EARLIER_LOCATE} hook ${event}`;
+    await writeFile(path, JSON.stringify(settings, null, 2) + "\n");
+    const lines = earlierSearchLines(project);
+    assert.equal(lines.length, 1, lines.join("\n"));
+    assert.match(lines[0]!, /^Coherence hooks in \.claude\/settings\.json: written by an earlier Coherence, they look for a checkout beside the project \(\.\.\/coherence\) before the installed package/);
+    assert.match(lines[0]!, /Reinstall them: npx --no -- coherence hooks install --host claude$/);
+    const checked = formatCheck({ host: "claude", path, present: true, drift: driftOf(settings, { command: LOCATED_PREFIX, host: "claude" }) });
+    assert.ok(checked.endsWith(`  these hooks were ${EARLIER_SEARCH}; reinstall them\nconverge with: hooks install --host claude\n`), checked);
+    await install({ root: project, host: "claude", command: LOCATED_PREFIX });
+    assert.deepEqual(earlierSearchLines(project), [], "a reinstall clears it");
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
 });

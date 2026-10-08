@@ -84,7 +84,7 @@ export const queuePath = (env: Env = process.env): string => join(telemetryDir(e
 const reportedPath = (env: Env): string => join(telemetryDir(env), "telemetry-reported.json");
 const factsPath = (env: Env): string => join(telemetryDir(env), "telemetry-facts.json");
 
-function readJson(path: string): unknown {
+export function readJson(path: string): unknown {
   try {
     return JSON.parse(readFileSync(path, "utf8"));
   } catch {
@@ -92,7 +92,7 @@ function readJson(path: string): unknown {
   }
 }
 
-function writeJson(path: string, value: unknown, env: Env): void {
+export function writeJson(path: string, value: unknown, env: Env): void {
   mkdirSync(telemetryDir(env), { recursive: true });
   writeFileSync(path, JSON.stringify(value, null, 2) + "\n");
 }
@@ -117,7 +117,7 @@ export interface TelemetryState {
   settings: TelemetrySettings;
 }
 
-const truthy = (value: string | undefined): boolean => value !== undefined && value !== "" && value !== "0" && value.toLowerCase() !== "false";
+export const truthy = (value: string | undefined): boolean => value !== undefined && value !== "" && value !== "0" && value.toLowerCase() !== "false";
 const refusing = (value: string | undefined): boolean => value !== undefined && ["0", "false", "off", "no"].includes(value.toLowerCase());
 
 /** Whether the project at `root` refuses telemetry: its config, or its registry's, says "telemetry": false; a config that will not parse refuses too. */

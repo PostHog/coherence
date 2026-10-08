@@ -328,6 +328,12 @@ function realpathOr(path: string): string {
 /** Coherence's own package name: a root whose package.json carries it is Coherence's own checkout. */
 export const PACKAGE_NAME = "@posthog/coherence";
 
+/** The variable that names a checkout of Coherence outside the default places. */
+export const HOME_VAR = "COHERENCE_HOME";
+
+/** The folder name the hooks look for beside the project. */
+export const SIBLING = "coherence";
+
 /** Whether the project at `root` is Coherence itself, whose CLI is its own source tree rather than an installed bin. */
 export async function isCoherenceItself(root: string): Promise<boolean> {
   try {
