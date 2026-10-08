@@ -1472,6 +1472,21 @@
         "defined_by": "owner, 2026-10-07 (session 8efd6465), naming the declared suite time limit when asked, since budget alone already names a checklist kind (d-b2c62260)",
         "redirected_by": "owner, 2026-10-07: \"I think the alarm we care about it aggregate hook time. if a hook costs more than n seconds, coherence will be bypassed ... I think a 3000ms tool hook budget would work fine, it's if we bloat the call cycle to something that makes dev feel unreasonably sluggish\" (d-f159ad7e)"
       }
+    },
+    {
+      "name": "status line",
+      "definition": "The row Claude Code draws under the prompt from a command it runs after events; Coherence's line there names the session's hook time against the latency budget and the practices it owes, for the user, at no cost to the agent's context.",
+      "status": "settled",
+      "related": [
+        "hook",
+        "latency budget",
+        "practice",
+        "agent host"
+      ],
+      "provenance": {
+        "owner_words": "ship the statusline script too",
+        "defined_by": "owner, 2026-10-08 (session 8efd6465), asking for the status line script after the mods pitch showed what Coherence passes to Claude Code's interface (d-04037868)"
+      }
     }
   ],
   "metaphors": {
