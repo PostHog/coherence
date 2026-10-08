@@ -165,7 +165,9 @@ refutation field takes one of four values: `automatic` (the check called
 every staged synthetic site a bypass), `refused by the language` (the
 compiler or the interpreter refused the synthetic outside reference),
 `witnessed` (a refutation record for a totality oracle, with a later passing
-run), and `missing`. Nothing is
+run), and `missing`. A run with no `--invariant` and no `--form` filter
+also carries `full: true`. Orient's note on the invariant floor counts only
+those, and none dated after now. Nothing is
 rewritten. `refute` appends its refutation records to the same files, marked
 with `kind: "refutation"`.
 

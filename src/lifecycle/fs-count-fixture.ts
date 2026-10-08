@@ -8,9 +8,13 @@
  *
  * A call that lists (readdir, recursive or not; glob; an opened directory's
  * reads) is weighed by the entries it returned, and a call that reads a
- * file's bytes (readFile in each form, readSync) by the bytes it returned,
- * not counted once: a walk of the whole project is one call and thousands of
- * entries, and a read of a growing file is one call and ever more bytes.
+ * file's bytes by the bytes it returned, not counted once: a walk of the
+ * whole project is one call and thousands of entries, and a read of a
+ * growing file is one call and ever more bytes. The reads weighed so are
+ * readFile in each form, read and readv by descriptor (sync and callback,
+ * under the path the descriptor was opened on), a FileHandle's readFile,
+ * read and readv (fs.promises.open), and a read stream, from a path or from a
+ * FileHandle, by the bytes it pushes.
  *
  * Named exports of a built-in are live bindings: the functions are replaced
  * on the module objects and syncBuiltinESMExports carries the replacement to
@@ -24,7 +28,7 @@ const fs = require("node:fs") as Record<string, unknown>;
 const promises = require("node:fs/promises") as Record<string, unknown>;
 
 /** The functions counted once per call: what reads a file's bytes or asks after a path. */
-const ONCE_SYNC = ["readFileSync", "statSync", "lstatSync", "existsSync", "openSync", "readSync", "accessSync", "realpathSync"] as const;
+const ONCE_SYNC = ["readFileSync", "statSync", "lstatSync", "existsSync", "openSync", "readSync", "readvSync", "accessSync", "realpathSync"] as const;
 const ONCE_ASYNC = ["readFile", "stat", "lstat", "open", "access", "realpath"] as const;
 /** The functions weighed by the entries they return. */
 const LISTING_SYNC = ["readdirSync", "globSync", "opendirSync"] as const;
@@ -35,6 +39,8 @@ export interface FsCount {
   calls: Record<string, number>;
   /** The weight of each call by the path it named, as "<function> <path>". */
   paths: Record<string, number>;
+  /** Each readSync with a position, by the path its descriptor was opened on: where it began and the bytes it returned. */
+  positioned: { path: string; position: number; bytes: number }[];
 }
 
 let open: FsCount | undefined;
@@ -130,6 +136,44 @@ function bytesOf(data: unknown): number {
   return typeof data === "string" ? Buffer.byteLength(data) : Buffer.isBuffer(data) ? data.length : 1;
 }
 
+/** The path a read by descriptor is weighed under: the one the descriptor was opened on. */
+function pathOfFd(fd: unknown): unknown {
+  return typeof fd === "number" ? (opened.get(fd) ?? fd) : fd;
+}
+
+/** A read stream, weighed by every chunk it pushes, without changing how it flows. */
+function countedStream(stream: unknown, label: string, path: unknown): unknown {
+  if (stream === null || typeof stream !== "object") return stream;
+  const target = stream as { push?: Fn };
+  const push = target.push;
+  tally(label, path, 1);
+  if (typeof push === "function") target.push = function (this: unknown, ...args: unknown[]) {
+    if (args[0] !== null && args[0] !== undefined) tally(label, path, bytesOf(args[0]));
+    return push.apply(this, args);
+  };
+  return stream;
+}
+
+/** A FileHandle whose reads are weighed by their bytes, under the path it was opened on. */
+function countedHandle(handle: unknown, path: unknown): unknown {
+  if (handle === null || typeof handle !== "object") return handle;
+  const h = handle as Record<string, unknown>;
+  const method = (name: string, make: (original: Fn) => Fn): void => {
+    const original = h[name];
+    if (typeof original === "function") h[name] = make(original as Fn);
+  };
+  method("readFile", (original) => function (this: unknown, ...args: unknown[]) {
+    return (original.apply(this, args) as Promise<unknown>).then((data) => (tally("handle.readFile", path, bytesOf(data)), data));
+  });
+  for (const name of ["read", "readv"]) method(name, (original) => function (this: unknown, ...args: unknown[]) {
+    return (original.apply(this, args) as Promise<{ bytesRead?: number }>).then((result) => (tally(`handle.${name}`, path, result?.bytesRead ?? 0), result));
+  });
+  method("createReadStream", (original) => function (this: unknown, ...args: unknown[]) {
+    return countedStream(original.apply(this, args), "handle.createReadStream", path);
+  });
+  return handle;
+}
+
 /** Replace the counted functions once for this process; they count only while a count is open. */
 function installCounting(): void {
   if (installed) return;
@@ -138,7 +182,14 @@ function installCounting(): void {
     const result = original.apply(this, args);
     // A read is weighed by the bytes it returned, under the path it read: a read by descriptor under the path the descriptor was opened on.
     if (name === "readFileSync") tally(name, args[0], bytesOf(result));
-    else if (name === "readSync") tally(name, opened.get(args[0] as number) ?? args[0], typeof result === "number" ? result : 0);
+    else if (name === "readSync" || name === "readvSync") {
+      const bytes = typeof result === "number" ? result : 0;
+      tally(name, pathOfFd(args[0]), bytes);
+      // readSync(fd, buffer, offset, length, position), or readSync(fd, buffer, { position }).
+      const position = name === "readSync" ? (typeof args[4] === "number" ? args[4] : (args[2] as { position?: unknown } | undefined)?.position) : args[2];
+      const path = pathOfFd(args[0]);
+      if (open !== undefined && typeof position === "number" && typeof path === "string") open.positioned.push({ path, position, bytes });
+    }
     else tally(name, args[0], 1);
     if (name === "openSync" && typeof result === "number" && typeof args[0] === "string") opened.set(result, args[0]);
     return result;
@@ -152,16 +203,42 @@ function installCounting(): void {
           tally(`callback.${name}`, args[0], error ? 1 : bytesOf(data));
           (cb as Fn)(error, data);
         };
-      } else tally(`callback.${name}`, args[0], 1);
+      } else {
+        tally(`callback.${name}`, args[0], 1);
+        // A descriptor opened by callback is weighed, when read, under its path.
+        if (name === "open" && typeof cb === "function" && typeof args[0] === "string") {
+          const path = args[0];
+          args[last] = (error: unknown, fd: unknown) => {
+            if (!error && typeof fd === "number") opened.set(fd, path);
+            (cb as Fn)(error, fd);
+          };
+        }
+      }
       return original.apply(this, args);
     });
     replace(promises, name, (original) => function (this: unknown, ...args: unknown[]) {
       const result = original.apply(this, args);
       if (name === "readFile" && result instanceof Promise) return result.then((data) => (tally(`promises.${name}`, args[0], bytesOf(data)), data));
       tally(`promises.${name}`, args[0], 1);
+      if (name === "open" && result instanceof Promise) return result.then((handle) => countedHandle(handle, args[0]));
       return result;
     });
   }
+  // Reads by descriptor with a callback: weighed by the bytes each read returned.
+  for (const name of ["read", "readv"]) {
+    replace(fs, name, (original) => function (this: unknown, ...args: unknown[]) {
+      const last = args.length - 1;
+      const cb = args[last];
+      if (typeof cb === "function") args[last] = (error: unknown, bytesRead: unknown, ...rest: unknown[]) => {
+        tally(`callback.${name}`, pathOfFd(args[0]), !error && typeof bytesRead === "number" ? bytesRead : 0);
+        (cb as Fn)(error, bytesRead, ...rest);
+      };
+      return original.apply(this, args);
+    });
+  }
+  replace(fs, "createReadStream", (original) => function (this: unknown, ...args: unknown[]) {
+    return countedStream(original.apply(this, args), "createReadStream", args[0]);
+  });
   for (const name of LISTING_SYNC) replace(fs, name, (original) => function (this: unknown, ...args: unknown[]) {
     return weighed(original.apply(this, args), name, args[0]);
   });
@@ -184,7 +261,7 @@ function installCounting(): void {
 export async function countingFs<T>(body: () => Promise<T>): Promise<{ value: T; fs: FsCount }> {
   installCounting();
   const outer = open;
-  const count: FsCount = { calls: {}, paths: {} };
+  const count: FsCount = { calls: {}, paths: {}, positioned: [] };
   open = count;
   try {
     return { value: await body(), fs: count };

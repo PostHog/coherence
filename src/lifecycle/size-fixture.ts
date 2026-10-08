@@ -124,6 +124,8 @@ export function sizedProject(scale: number): SizedProject {
     files[`proj/.coherence/runs/h${k}.jsonl`] = Array.from({ length: 3 * scale }, (_, r) => run(`${day}T${String(r % 24).padStart(2, "0")}:${String(r).padStart(2, "0")}:00.000Z`, (k + r) % (3 * scale)) + "\n").join("");
     files[`proj/.coherence/journal/h${k}.jsonl`] = Array.from({ length: 5 * scale }, (_, r) => decision(`${day}T${String(r % 24).padStart(2, "0")}:${String(r).padStart(2, "0")}:30.000Z`, k * 100 + r) + "\n").join("");
   }
+  // The session's own run file, the one an edit's check appends to, grows with the history too: a hook that read it whole would grow.
+  files["proj/.coherence/runs/sized.jsonl"] = Array.from({ length: 30 * scale }, (_, r) => run(`2026-02-01T${String(r % 24).padStart(2, "0")}:${String(r % 60).padStart(2, "0")}:${String(Math.floor(r / 60) % 60).padStart(2, "0")}.000Z`, r % (3 * scale)) + "\n").join("");
   for (const [path, text] of Object.entries(files)) {
     mkdirSync(dirname(join(top, path)), { recursive: true });
     writeFileSync(join(top, path), text);

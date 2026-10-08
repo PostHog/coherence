@@ -54,7 +54,7 @@ test("orient names each guard failure under the spec block", () => {
   const runs = join(root, ".coherence", "runs");
   mkdirSync(runs, { recursive: true });
   appendFileSync(join(runs, "w.jsonl"), JSON.stringify({ kind: "refutation", at: "2026-10-02T00:00:00.000Z", session: "w", agent: "w", component: "widget", name: "knob turns", form: "totality oracle", broke: "a break", verdict: "fail", reason: "red", commit: null, dirty: false }) + "\n");
-  appendFileSync(join(runs, "w.jsonl"), JSON.stringify({ at: "2026-10-02T00:00:01.000Z", session: "w", agent: "w", commit: null, dirty: false, invariants: [{ component: "widget", name: "knob turns", form: "totality oracle", verdict: "pass", refutation: "witnessed", bypasses: [], testReferences: 0, files: [], reason: "green" }] }) + "\n");
+  appendFileSync(join(runs, "w.jsonl"), JSON.stringify({ at: "2026-10-02T00:00:01.000Z", session: "w", agent: "w", commit: null, dirty: false, full: true, invariants: [{ component: "widget", name: "knob turns", form: "totality oracle", verdict: "pass", refutation: "witnessed", bypasses: [], testReferences: 0, files: [], reason: "green" }] }) + "\n");
   const j = journal(root);
   const who = ["--session", "s1", "--agent", "alpha"];
   const first = j("defect", "the knob stuck", "--evidence", "turned it", "--class", "path-identity", ...who);
@@ -80,25 +80,30 @@ test("a hook call's kept time carries the Coherence version that answered it", (
   assert.equal(hookTimes(root, "s1")[1]!.version, undefined);
 });
 
-test("orient names an invariant floor no run has graded in fourteen days", () => {
+test("orient names an invariant floor no full run has graded in fourteen days; a scoped run and a run dated in the future move nothing", () => {
   const root = project();
   const runs = join(root, ".coherence", "runs");
   mkdirSync(runs, { recursive: true });
   const entry = { component: "widget", name: "knob turns", form: "totality oracle", verdict: "pass", refutation: "witnessed", bypasses: [], testReferences: 0, files: [], reason: "green" };
-  const run = (at: string, ungraded: boolean): void =>
-    appendFileSync(join(runs, "w.jsonl"), JSON.stringify({ at, session: "w", agent: "w", commit: null, dirty: false, invariants: [ungraded ? { ...entry, ungraded: true } : { ...entry, state: "invariant" }] }) + "\n");
+  // An edit's check (ungraded), a scoped run (graded, not full), or a full run (graded, every bullet).
+  const run = (at: string, kind: "edit" | "scoped" | "full"): void =>
+    appendFileSync(join(runs, "w.jsonl"), JSON.stringify({ at, session: "w", agent: "w", commit: null, dirty: false, ...(kind === "full" ? { full: true } : {}), invariants: [kind === "edit" ? { ...entry, ungraded: true } : { ...entry, state: "invariant" }] }) + "\n");
   appendFileSync(join(runs, "w.jsonl"), JSON.stringify({ kind: "refutation", at: "2026-08-31T00:00:00.000Z", session: "w", agent: "w", component: "widget", name: "knob turns", form: "totality oracle", broke: "a break", verdict: "fail", reason: "red", commit: null, dirty: false }) + "\n");
   const day = 86_400_000;
   const graded = Date.parse("2026-09-01T00:00:00.000Z");
   const FLOOR = /^Invariant floor:/m;
   assert.doesNotMatch(specBlock(root, graded), FLOOR, "no run, no floor to name");
-  run("2026-09-01T00:00:00.000Z", true);
-  assert.match(specBlock(root, graded + day), /^Invariant floor: no run has graded its entries; an edit's check records its entries ungraded, so the floor stands where that run left it\. Run: run$/m, "only edit checks: the floor was never moved");
-  run("2026-09-01T00:00:01.000Z", false);
+  run("2026-09-01T00:00:00.000Z", "edit");
+  assert.match(specBlock(root, graded + day), /^Invariant floor: no full run has graded every bullet; a scoped run moves only its own bullets and an edit's check records its entries ungraded, so the rest of the floor stands where that run left it\. Run: run$/m, "only edit checks: the floor was never moved");
+  run("2026-09-01T00:00:00.500Z", "scoped");
+  assert.match(specBlock(root, graded + day), /^Invariant floor: no full run has graded every bullet/m, "a run scoped by --invariant or --form is no full run");
+  run("2026-09-01T00:00:01.000Z", "full");
   assert.doesNotMatch(specBlock(root, graded + 14 * day), FLOOR, "a full run fourteen days ago still holds the floor");
-  // Edit checks since the full run, the latest of all the runs, move nothing.
-  run("2026-09-20T00:00:00.000Z", true);
-  assert.match(specBlock(root, graded + 20 * day), /^Invariant floor: the last run that graded its entries was 19 days ago \(2026-09-01T00:00:01\.000Z\); an edit's check records its entries ungraded/m);
-  run("2026-09-21T00:00:00.000Z", false);
+  // Edit checks and scoped runs since the full run, the latest of all the runs, move nothing; nor does a full run dated in the future.
+  run("2026-09-20T00:00:00.000Z", "edit");
+  run("2026-09-20T00:00:01.000Z", "scoped");
+  run("2099-01-01T00:00:00.000Z", "full");
+  assert.match(specBlock(root, graded + 20 * day), /^Invariant floor: the last full run that graded every bullet was 19 days ago \(2026-09-01T00:00:01\.000Z\)/m, "neither a scoped run nor a future one moves it");
+  run("2026-09-21T00:00:00.000Z", "full");
   assert.doesNotMatch(specBlock(root, graded + 21 * day), FLOOR, "a full run moves it again");
 });

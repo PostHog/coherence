@@ -19,7 +19,7 @@ import { join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { runHook, type HookEvent, type HookInput } from "./hook.ts";
-import { closeWork, countWork, lastHookWork, openWork, type Work } from "./work-meter.ts";
+import { closeWork, countWork, lastHookWork, openWork, projectSized as projectSizedLine, type Work } from "./work-meter.ts";
 import { sizedProject, type SizedProject } from "./size-fixture.ts";
 import { countingFs, type FsCount } from "./fs-count-fixture.ts";
 import { countingGit } from "../adapters/git-count-fixture.ts";
@@ -68,15 +68,38 @@ function local(project: SizedProject, text: string): string {
 }
 
 /** One hook call's work, the meter's and the file system's. */
+/** The run files' sizes now, by path: where a line appended after this begins. */
+function runSizes(project: SizedProject): Map<string, number> {
+  const dir = join(project.root, ".coherence", "runs");
+  const sizes = new Map<string, number>();
+  try {
+    for (const name of readdirSync(dir)) sizes.set(join(dir, name), statSync(join(dir, name)).size);
+  } catch {
+    // No run files yet.
+  }
+  return sizes;
+}
+
 async function workOf(project: SizedProject, event: HookEvent, input: HookInput, fallback: string = project.root): Promise<Measured> {
+  const before = runSizes(project);
   // No instrument: a check the edit would make is answered as not run, never by a warm server started for a fixture.
   const { value, fs } = await countingFs(() => runHook(event, { session_id: SESSION, cwd: project.root, ...input }, fallback, { adapter: NO_INSTRUMENT, door: async (_root, fn) => fn(undefined, undefined, "no instrument in this test") }));
   const work = lastHookWork();
   assert.ok(work !== undefined, "runHook closed a scope");
-  const paths = Object.fromEntries(Object.entries(fs.paths).map(([k, v]) => [local(project, k), v]));
+  // The run index's fold reads back the line the call appended, and only it: a read that begins at or past a run file's size before
+  // the call reads nothing older than the call. Those bytes are set aside by position; every other read of run bytes stays in the count.
+  const raw = { ...fs.paths };
+  for (const read of fs.positioned) {
+    const start = before.get(read.path) ?? 0;
+    const key = `readSync ${read.path}`;
+    if (read.position < start || raw[key] === undefined) continue;
+    raw[key] -= read.bytes;
+    if (raw[key] <= 0) delete raw[key];
+  }
+  const paths = Object.fromEntries(Object.entries(raw).map(([k, v]) => [local(project, k), v]));
   return {
     work: { counts: work.counts, reads: work.reads.map((r) => local(project, r)), spawns: work.spawns.map((s) => local(project, s)), outputs: Object.fromEntries(Object.entries(work.outputs).map(([k, v]) => [local(project, k), v])) },
-    fs: { calls: fs.calls, paths },
+    fs: { calls: fs.calls, paths, positioned: fs.positioned },
     said: value.stdout === "" ? "" : ((JSON.parse(value.stdout) as { hookSpecificOutput?: { additionalContext?: string } }).hookSpecificOutput?.additionalContext ?? ""),
   };
 }
@@ -111,10 +134,10 @@ const PRACTICES = /proj\/src\/cN\/CN\.(practice|spec)\.md|ls-files .*\*\.practic
 const SPECS = /proj\/src\/cN\/(CN\.spec\.md|\.git|pyvenv\.cfg)$|ls-files .*\*\.spec\.md/;
 // The history families grow only in their file lists, a stat or a listed entry per file, and in the index or memo that keeps one line per
 // file, and in the run file's sites shard, whose size it spells; the bytes of the history itself are never in a budget: the index, the
-// shard and the memo exist so that no hook reads them. One read of run bytes is allowed: the index's fold reads back the line the edit's
-// check just appended to the session's own file, its bytes the line's (a byte more or less as its latency's digits fall); a read of any
-// history file, by any function, is in no family.
-const RUNS = /^fs (statSync|lstatSync|existsSync|readdirSync|realpathSync) .*proj\/\.coherence\/runs(\/hN\.jsonl)?$|^fs readSync .*proj\/\.coherence\/runs\/sized\.jsonl$|^fs readFileSync .*proj\/\.coherence\/cache\/(run-index\.json|run-sites\/[^/]+\.jsonl\.json)$/;
+// shard and the memo exist so that no hook reads them. The index's fold reads back the line the edit's check just appended to the
+// session's own file; workOf sets those bytes aside by the read's position, so a read of any run file's older bytes, the session's own
+// included, by any function, is in no family.
+const RUNS = /^fs (statSync|lstatSync|existsSync|readdirSync|realpathSync) .*proj\/\.coherence\/runs(\/hN\.jsonl)?$|^fs readFileSync .*proj\/\.coherence\/cache\/(run-index\.json|run-sites\/[^/]+\.jsonl\.json)$/;
 // The vocabulary an edit judges against: the lexicons, the session's baseline, the kept state's meta and the buckets it reads, one of 64
 // each. These grow with the vocabulary and the project's terms, never with the corpus's lines read or its history.
 const VOCABULARY = /^fs (readFileSync|promises\.readFile) .*(proj\/lexicon\.json|docs\/lexicon\.json|\.coherence\/lexicon\/sessions\/[^/]+\.json|\.coherence\/cache\/vocabulary\/(meta\.json|declared\.json|files\/\d+\.json|terms\/\d+\.json))$/;
@@ -128,7 +151,7 @@ function overBudget(small: Measured, large: Measured, allowed: readonly RegExp[]
   // A spawn whose cost is the project's (git listing, searching or comparing the tree) is budgeted by count, at both sizes:
   // its output may be small and its work the whole tree.
   for (const [at, m] of [["1×", small], ["10×", large]] as const) {
-    if (m.work.counts["project-sized spawn"] > projectSized) problems.push(`project-sized spawns at ${at}: ${m.work.counts["project-sized spawn"]}, over the ${projectSized} the event may make (${m.work.spawns.filter((line) => /git\s(?:.*\s)?(ls-files|grep|status|diff|ls-tree|log|rev-list|check-ignore)\b/.test(line)).join("; ")})`);
+    if (m.work.counts["project-sized spawn"] > projectSized) problems.push(`project-sized spawns at ${at}: ${m.work.counts["project-sized spawn"]}, over the ${projectSized} the event may make (${m.work.spawns.filter((line) => projectSizedLine(line)).join("; ")})`);
   }
   for (const key of new Set([...s.keys(), ...l.keys()])) {
     const a = s.get(key) ?? 0;
@@ -337,7 +360,87 @@ test("the coverage scan compares a line only with the phrases its own words star
   assert.equal(worded - base, 200 * 3, "a word on every line that starts names adds what those names cost on each line, nothing more");
 });
 
+test("every way of reading a file's bytes is weighed by them, and a spawn through a shell or a recursive tool is project-sized", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-read-forms-"));
+  try {
+    const file = join(dir, "f.txt");
+    writeFileSync(file, "x".repeat(5000));
+    const fsMod = await import("node:fs");
+    const fsp = await import("node:fs/promises");
+    const forms: [string, () => Promise<unknown>][] = [
+      ["readFileSync", async () => fsMod.readFileSync(file)],
+      ["readSync", async () => { const fd = fsMod.openSync(file, "r"); try { fsMod.readSync(fd, Buffer.alloc(5000), 0, 5000, 0); } finally { fsMod.closeSync(fd); } }],
+      ["readvSync", async () => { const fd = fsMod.openSync(file, "r"); try { fsMod.readvSync(fd, [Buffer.alloc(5000)], 0); } finally { fsMod.closeSync(fd); } }],
+      ["callback read", () => new Promise((done) => fsMod.open(file, "r", (_e, fd) => fsMod.read(fd, Buffer.alloc(5000), 0, 5000, 0, () => fsMod.close(fd, () => done(undefined)))))],
+      ["callback readv", () => new Promise((done) => fsMod.open(file, "r", (_e, fd) => fsMod.readv(fd, [Buffer.alloc(5000)], 0, () => fsMod.close(fd, () => done(undefined)))))],
+      ["callback readFile", () => new Promise((done) => fsMod.readFile(file, () => done(undefined)))],
+      ["promises readFile", () => fsp.readFile(file)],
+      ["a FileHandle's readFile", async () => { const h = await fsp.open(file); try { await h.readFile(); } finally { await h.close(); } }],
+      ["a FileHandle's read", async () => { const h = await fsp.open(file); try { await h.read(Buffer.alloc(5000), 0, 5000, 0); } finally { await h.close(); } }],
+      ["a FileHandle's readv", async () => { const h = await fsp.open(file); try { await h.readv([Buffer.alloc(5000)], 0); } finally { await h.close(); } }],
+      ["a read stream", () => new Promise((done) => fsMod.createReadStream(file).on("data", () => {}).on("close", () => done(undefined)))],
+      ["a FileHandle's read stream", async () => { const h = await fsp.open(file); await new Promise((done) => h.createReadStream().on("data", () => {}).on("close", () => done(undefined))); }],
+    ];
+    for (const [name, read] of forms) {
+      const { fs } = await countingFs(read);
+      const bytes = Object.entries(fs.paths).filter(([key]) => key.endsWith("/f.txt")).reduce((n, [, w]) => n + w, 0);
+      assert.ok(bytes >= 5000, `${name}: weighed by its 5000 bytes, not once (${JSON.stringify(fs.paths)})`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  for (const line of ["git grep -q x", "git ls-files -z", "sh -c git grep -q x", "/bin/bash -c ls", "grep -rq x .", "grep -R x .", "grep --recursive x .", "find . -name x", "rg x", "ls -R", "ls -laR ."]) assert.ok(projectSizedLine(line), `${line}: project-sized`);
+  for (const line of ["git rev-parse HEAD", "grep x f.txt", "ls -la", "node -v", "true"]) assert.ok(!projectSizedLine(line), `${line}: its own cost`);
+  assert.ok(projectSizedLine("node -v", true), "any spawn through a shell is project-sized");
+  const scope = openWork();
+  try {
+    const cp = await import("node:child_process");
+    cp.execSync("true");
+    cp.spawnSync("true", [], { shell: true });
+  } finally {
+    closeWork(scope);
+  }
+  assert.equal(scope.work.counts["project-sized spawn"], 2, "exec with a string and a spawn with shell: true are project-sized");
+});
+
 /* ------------------------------------------------------------ spawns, at runtime */
+
+/** What a promisified exec and execFile hand back, and what the spawning functions carry, as JSON: a function body given `require`. */
+const SHAPE_PROBE = `
+const cp = require("node:child_process");
+const { promisify } = require("node:util");
+const own = (f) => Reflect.ownKeys(f).filter((k) => k !== "prototype").map(String).sort();
+return (async () => {
+  const shapes = {};
+  for (const [name, call] of [["exec", () => promisify(cp.exec)("echo shape")], ["execFile", () => promisify(cp.execFile)("echo", ["shape"])]]) {
+    const p = call();
+    const child = p.child;
+    const value = await p;
+    shapes[name] = {
+      promise: p instanceof Promise,
+      child: child === undefined ? "undefined" : child.constructor.name,
+      childPid: typeof child?.pid,
+      keys: Object.keys(p).sort(),
+      value: Object.keys(value).sort(),
+      stdout: value.stdout,
+    };
+  }
+  for (const name of ["spawn", "spawnSync", "execFile", "execFileSync", "exec", "execSync", "fork"]) shapes["props " + name] = { keys: own(cp[name]), name: cp[name].name, length: cp[name].length, custom: typeof cp[name][promisify.custom] };
+  return JSON.stringify(shapes);
+})();
+`;
+
+test("the patched spawning functions keep node's shape: a promisified exec or execFile carries its child, and every property stays", async () => {
+  // Unpatched node: a child process that never loads the meter.
+  const plain = spawnSync(process.execPath, ["-e", `Promise.resolve((function (require) {${SHAPE_PROBE}})(require)).then((text) => process.stdout.write(text))`], { encoding: "utf8" });
+  assert.equal(plain.status, 0, plain.stderr);
+  // Patched: this process, where the meter replaced the functions at load.
+  const { createRequire } = await import("node:module");
+  const here = createRequire(import.meta.url);
+  assert.equal((here("node:child_process") as { __metered?: true }).__metered, true, "the meter is installed in this process");
+  const shapes = (await (new Function("require", SHAPE_PROBE) as (r: NodeJS.Require) => Promise<string>)(here)) as string;
+  assert.deepEqual(JSON.parse(shapes), JSON.parse(plain.stdout), "the same shapes as unpatched node");
+});
 
 test("every spawn is counted at runtime, whatever route reached child_process", async () => {
   const { createRequire } = await import("node:module");
@@ -646,6 +749,72 @@ test("a write no hook saw is caught at the next edit, which reads in full as mai
     assert.match(m.said, /"rebate" recur without a definition/, "and the term it made recur with this edit is named, as main names it");
   } finally {
     rmSync(project.top, { recursive: true, force: true });
+  }
+});
+
+/** The fixture's own git, as a shell would run it: no hook hears of it. */
+function fixtureGit(project: SizedProject, ...args: string[]): void {
+  const done = spawnSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "commit.gpgsign=false", ...args], { cwd: project.top, encoding: "utf8" });
+  assert.equal(done.status, 0, `git ${args.join(" ")}: ${done.stderr}`);
+}
+
+/** Three ways HEAD moves onto a clean tree, each set up before the session starts and made after it. */
+const HEAD_MOVES: [string, (project: SizedProject) => void, (project: SizedProject) => void][] = [
+  [
+    "a checkout of a branch that changes one file and adds another",
+    (project) => {
+      fixtureGit(project, "checkout", "-q", "-b", "other");
+      writeFileSync(join(project.root, "docs/note-1.md"), "The `rebate` is new.\nEach `rebate` is paid.\n");
+      writeFileSync(join(project.root, "docs/added.md"), "A `rebate` is clawed back.\n");
+      fixtureGit(project, "add", "-A");
+      fixtureGit(project, "commit", "-q", "-m", "other");
+      fixtureGit(project, "checkout", "-q", "-");
+    },
+    (project) => fixtureGit(project, "checkout", "-q", "other"),
+  ],
+  [
+    "a pull, as a commit made in a shell",
+    () => {},
+    (project) => {
+      writeFileSync(join(project.root, "docs/note-1.md"), "The `rebate` is new.\nEach `rebate` is paid.\n");
+      fixtureGit(project, "commit", "-q", "-am", "pulled");
+    },
+  ],
+  [
+    "a switch to a branch whose tree is the same and whose HEAD is not",
+    (project) => {
+      fixtureGit(project, "branch", "twin");
+      fixtureGit(project, "checkout", "-q", "twin");
+      fixtureGit(project, "commit", "-q", "--allow-empty", "-m", "twin");
+      fixtureGit(project, "checkout", "-q", "-");
+    },
+    (project) => fixtureGit(project, "checkout", "-q", "twin"),
+  ],
+];
+
+test("a checkout, a pull or a branch switch onto a clean tree moves the tree: the next edit and the next prompt read in full", async () => {
+  for (const [name, before, move] of HEAD_MOVES) {
+    for (const next of ["edit", "prompt"] as const) {
+      const project = sizedProject(1);
+      try {
+        before(project);
+        const start = await runHook("SessionStart", { session_id: SESSION, cwd: project.root }, project.root, {});
+        start.commit?.();
+        await workOf(project, "UserPromptSubmit", { prompt: "first" });
+        move(project);
+        if (next === "edit") {
+          const file = join(project.root, "docs/note-0.md");
+          writeFileSync(file, readFileSync(file, "utf8") + "A line.\n");
+          const m = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
+          assert.match(m.said, /Lexicon: read in full at this edit: the tree moved since its vocabulary was kept, beyond what this edit wrote \(HEAD names another commit/, `${name}: the next edit reads in full and says why`);
+        } else {
+          const m = await workOf(project, "UserPromptSubmit", { prompt: "second" });
+          assert.equal(m.work.counts["coverage reading"], 1, `${name}: the next prompt takes the reading`);
+        }
+      } finally {
+        rmSync(project.top, { recursive: true, force: true });
+      }
+    }
   }
 });
 
