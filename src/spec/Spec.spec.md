@@ -84,6 +84,27 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: project-source -> reading
   refuted: returned a module handler's first candidate path in handlerFile without checking the file exists -> the totality oracle went red; restored, green (2026-09-25)
   kinds: none
+- an ignore entry that names nothing is a problem: An entry of the project's own config's ignore list that names no file or folder at its path from the root and, as a bare name, no folder of that name on any project file's way down, and that names nothing git ignores, is a problem at the config, so it fails spec --check; the walk the model already takes answers, and git is asked once only when some entry names nothing there.
+  over: a file and a folder named by path, a folder named by its name below the root, and a folder on disk git ignores, against a typo, a path that moved, a file path that does not exist, and a file named by its bare name below the root
+  via: an ignore entry that names no file or folder is a spec problem; a folder by name or path, a file by path, and a folder git ignores are not
+  because: the list accepted any string and an entry that matched nothing left nothing out in silence, so an adopter's "CHANGELOG.md" did nothing and nothing said so (praetorium.gg); a typo in a bound is the same silence. A folder git ignores holds no project file but is no typo, so the disk answers first
+  crossing: project-source -> reading
+  refuted: made ignoreProblems in model.ts skip every entry as though it named something, so a typo, a moved path and a bare file name below the root were accepted in silence -> "an ignore entry that names no file or folder is a spec problem; a folder by name or path, a file by path, and a folder git ignores are not" went red in src/adapters/ignore-files.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-08)
+  kinds: none
+- an ignore entry git ignores is no problem: An ignore entry that names nothing on disk or in the project's listing is still no problem when git ignores what it names: a path entry as a file or a folder at its path, a bare name as a folder at the root or under any folder the project holds, asked of git in one git check-ignore over every such entry, and never when every entry names something.
+  over: dist and build gitignored and absent in a single-package repository, a monorepo's dist gitignored by its packages and present in one of them only, a gitignored absent path, and a typo beside each
+  via: an ignore entry git ignores is no spec problem though nothing it names is there: dist and build absent in a single-package repo, and dist only in a monorepo package; a typo beside them still is
+  because: "ignore": ["dist", "build"] is a common and correct config: the output is gitignored, so git's listing never holds it, and in a fresh checkout or CI it is not on disk, or sits only in a package; reported, it failed spec --check and refused subagent stops for a config that bounds the output whenever a walk outside git meets it (review of PR #67). The check stays a problem, not advisory: what remains after git is asked is an entry that leaves nothing out in any checkout, the silence the check exists to end, and an advisory line is read past as the CHANGELOG.md entry was
+  crossing: project-source -> reading
+  refuted: made ignoreProblems in model.ts treat no entry as gitignored, replacing git check-ignore's answer with an empty set, so dist and build absent from a fresh checkout and a dist only in a package were reported -> "an ignore entry git ignores is no spec problem though nothing it names is there: dist and build absent in a single-package repo, and dist only in a monorepo package; a typo beside them still is" went red in src/adapters/ignore-files.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-08)
+  kinds: none
+- a stored project name that disagrees with the config is a problem: A project lexicon whose project field names the project otherwise than the config's name, ignoring case, is a problem at the lexicon's project line, so it fails spec --check; a lexicon that stores none, or one that agrees, is not.
+  over: a lexicon storing a name that differs from the config's, one storing it in another case, one storing none, and one under a config that names no project
+  via: a stored project name that disagrees with the config's name is a spec problem at the lexicon; one that agrees, none stored, or no configured name is not
+  because: lexicon apply wrote the folder's name as the lexicon's project and every reader of the lexicon took it over the config's, so an adopter whose folder differed from his config's name had the wrong name accepted and added his own to wellKnown to get by (praetorium.gg); the field still reads where the config names nothing, so an existing lexicon is never renamed, and a copy that disagrees is said rather than quietly outvoted
+  crossing: project-source -> reading
+  refuted: made storedNameProblems in model.ts accept every stored project as agreeing, so a lexicon's copy that disagreed with the config's name passed spec --check -> "a stored project name that disagrees with the config's name is a spec problem at the lexicon; one that agrees, none stored, or no configured name is not" went red in src/lifecycle/project-name.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-08)
+  kinds: none
 - a module handler may carry route segments: An entrance's handler naming a module file resolves as a module file when its path carries a framework's route segments ([slug], [...slug], [[...slug]], (group), (.)intercepted, @slot), and a spec in such a folder is a component; such a file that does not exist is still a problem.
   over: every route segment form in a module handler's path, a spec in a (group) folder, and a missing file under such segments, against a symbol in a file and a path without an extension, which stay no module
   via: the model: a module handler's path may carry route segments, [slug], [...slug], [[...slug]], (group), (.)intercepted and @slot, and it must still exist
@@ -111,6 +132,20 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   because: an entrance that needs no control is a claim a human must be able to challenge (d-a1095ef2), and only a stated reason can be challenged; an empty one is a silent waiver, and one beside a guard contradicts itself, since a guard is a control
   crossing: project-source -> reading
   refuted: made the grammar accept control: none with an empty reason, dropping the problem -> the totality oracle went red; restored, green (2026-09-25)
+  kinds: none
+- an invariant names the entrances it covers: An invariant's entrances: line names entrances some spec declares, each resolving in its own spec, then in the one spec that declares it, or as <name> in <folder>, and each whose declared trust its crossing enters from or enters; an unknown, ambiguous or mismatched name, none beside a name, a name twice, the line on a chokepoint form and the line on a bullet with no crossing are problems, entrances: none says it checks no entrance, and a placeholder counts as absent.
+  over: the adopter's signature check naming its notification route, a route no spec declares, a route one other spec declares, a name two other specs declare bare and qualified by folder, a crossing from another trust, and the grammar's none, none beside a name, a doubled name, a chokepoint form, no crossing and a placeholder
+  via: the model: an invariant's entrances: line names declared entrances whose trust its crossing checks; an unknown, ambiguous or mismatched name, none beside a name, a name twice, a chokepoint's line and one with no crossing are problems
+  because: a test-backed control is credited only to the entrances an invariant names (Scope's a test-backed control is the entrance's own), so a name that resolves to nothing, or to an entrance whose trust the crossing never checks, would read as coverage while crediting nothing; a chokepoint's entrances are traced, and a line with no crossing checks no trust
+  crossing: project-source -> reading
+  refuted: dropped the problem for a name that resolves to no declared entrance, in coveredEntranceProblems -> the totality oracle went red; restored, green (2026-10-08)
+  kinds: none
+- a control lost to the crossing alone is named: spec --check prints, after the counts and never as a problem, each verified invariant enforced by a totality oracle alone that covered entrances carrying outside trust in by its crossing alone (owned where they are declared or handled, its crossing checking their trust) with the entrances that lost it, and the line that names them; naming any entrance on it, or entrances: none, ends it, and an unverified invariant gave no control to lose.
+  over: the adopter's shape with the signature check unnamed, named and none, verified and unverified, and the server's invariant naming no entrance
+  via: spec --check names each entrance a verified invariant covered by its crossing alone, never as a problem, until the invariant names the entrances it checks or says none
+  because: adopters' invariants that relied on the crossing alone lose that credit, and a loss no command names is a silent change in what the map calls controlled; it is advisory, since the credit was the over-claim and naming what a test checks is the adopter's to decide
+  crossing: project-source -> reading
+  refuted: made creditedByCrossingAlone ignore the entrances: line, so naming no longer ended the advisory -> the totality oracle went red; restored, green (2026-10-08)
   kinds: none
 - a practice is paired with its spec: A practice file stands only in a folder whose spec shares its stem; one beside no spec, under another stem, or second in its folder is a problem.
   over: every practice file under the root: beside no spec, under another stem, and paired
@@ -142,6 +177,18 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   via: a practice's edit trigger that names no file of its project is a spec problem saying what to write instead
   because: the PostHog adoption moved from one whole-repository project to registry leaves and its practices kept triggers written from the repository top, so edit posthog/auth.py inside the posthog leaf named posthog/posthog/auth.py and never fired, and nothing said so (df-b277ba29); a trigger that cannot fire is a silent skip, and the project's own file list is the one reading that decides it
   refuted: made deadTriggers pass every trigger as matching a file -> "a practice's edit trigger that names no file of its project is a spec problem saying what to write instead" went red in dead-triggers.test.ts with its two siblings; restored byte for byte, green (2026-10-08)
+  kinds: none
+- the dead-trigger check pays for its triggers: The check that an edit trigger names a file of its project asks git only for the literal paths its triggers name, in one listing, and for a pattern only the folder before its first wildcard; its listings are the same size however many other files the project holds.
+  over: one project beside 20 and beside 2000 unrelated files, a literal trigger and a pattern trigger
+  via: the dead-trigger check lists only what its triggers name, so a project ten times larger costs it nothing more
+  because: the spec model loads several times in one hook, and each load runs the check; listing the whole project at each load added half a second to PostHog's first leaf entry (4.2 s against 3.6 s, interleaved, one power state), past the 3 s latency budget it was already over
+  refuted: put back the whole-project listing the check first shipped with -> "the dead-trigger check lists only what its triggers name, so a project ten times larger costs it nothing more" went red in dead-triggers.test.ts; restored, green (2026-10-08)
+  kinds: none
+- a dead trigger is looked for outside its leaf as narrowly: When a leaf's trigger names no file of the leaf, the check looks for what it names elsewhere in the repository as it looked inside: a literal path in one pathspec listing, a pattern only under the folder before its first wildcard; never a listing of the whole repository.
+  over: a leaf whose literal and pattern triggers name a file in another folder, beside 20 and beside 2000 unrelated files
+  via: a dead trigger in a leaf is looked for outside it as narrowly, so the repository's size costs the check nothing
+  because: while a trigger stays dead, every one of a hook's model loads looks for it outside the leaf, and a listing of PostHog's whole repository at each would cost far more than the half second the narrow check saved (df-4be1892a)
+  refuted: put back the whole-repository listing for the outside lookup -> "a dead trigger in a leaf is looked for outside it as narrowly, so the repository's size costs the check nothing" went red in dead-triggers.test.ts on the listing size; restored, green (2026-10-08)
   kinds: none
 - kernel practices reach adopters: In an adopter, the practices whose reach is kernel are delivered beside the project's own with their ids led by coherence:, and an internal practice never leaves Coherence's tree.
   over: Coherence's practice files as an adopter reads them: kernel and internal

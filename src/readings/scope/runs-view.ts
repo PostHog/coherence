@@ -50,7 +50,11 @@ function renderKept(state: ShellState): Markup | null {
 
 function renderRun(state: ShellState, record: RunRecord, latest: boolean): Markup {
   const id = runId(record);
-  const counts = verdictCounts(record);
+  const held = verdictCounts(record);
+  const rest = state.runs.superseded?.[id];
+  const counts = rest === undefined ? held : { pass: held.pass + rest.pass, fail: held.fail + rest.fail, notRun: held.notRun + rest.notRun };
+  const total = counts.pass + counts.fail + counts.notRun;
+  const left = total - record.invariants.length;
   return html`<article class="entry run" id="${id}" data-latest="${latest ? "true" : "false"}" data-defects="${counts.fail > 0 ? "true" : "false"}">
     <div class="margin">
       <h3 class="headword"><a href="#${id}">${stamp(record.at)}</a></h3>
@@ -58,11 +62,12 @@ function renderRun(state: ShellState, record: RunRecord, latest: boolean): Marku
       <p class="defined-by" title="${record.session}">session <code>${shortSession(record.session)}</code></p>
     </div>
     <div class="body">
-      <p class="definition"><span class="count" data-count="pass">${counts.pass} pass</span> <span class="count${counts.fail > 0 ? " failing" : ""}" data-count="fail">${counts.fail} fail</span> <span class="count" data-count="not-run">${counts.notRun} not run</span> <span class="quiet">of ${plural(record.invariants.length, "enforcement", "enforcements")}</span></p>
+      <p class="definition"><span class="count" data-count="pass">${counts.pass} pass</span> <span class="count${counts.fail > 0 ? " failing" : ""}" data-count="fail">${counts.fail} fail</span> <span class="count" data-count="not-run">${counts.notRun} not run</span> <span class="quiet">of ${plural(total, "enforcement", "enforcements")}</span></p>
       <p class="run-facts"><span class="label">commit</span> ${record.commit === null ? html`<span class="quiet">none</span>` : html`<code>${record.commit}</code>`}${record.dirty ? html` <span class="dirty" data-dirty>dirty</span>` : html` <span class="quiet">clean</span>`}
         <span class="label">instrument</span> ${record.instrument.language} (${record.instrument.server}) <span class="label">took</span> ${ms(record.latency)}</p>
+      ${left > 0 ? html`<p class="quiet" data-field="superseded">${plural(left, "verdict", "verdicts")} later runs superseded ${left === 1 ? "is" : "are"} counted here and not listed; the run is whole under <code>.coherence/runs</code></p>` : null}
       ${record.invariants.length === 0
-        ? html`<p class="quiet">No enforcement was checked.</p>`
+        ? html`<p class="quiet">${left > 0 ? "Every verdict of this run was superseded." : "No enforcement was checked."}</p>`
         : html`<details class="record verdicts" data-field="verdicts">
           <summary>Verdicts: ${plural(record.invariants.length, "enforcement", "enforcements")}</summary>
           <ul class="run-entries">${record.invariants.map(renderRunEntry)}</ul>

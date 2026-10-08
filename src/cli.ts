@@ -24,6 +24,8 @@
  *   coherence hooks --check --host <claude|codex>   exit 1 with each event's drift from what install would write
  *   coherence hooks status             the wiring per agent host and what each event delivers for this project
  *   coherence telemetry on | off | status | show | reset-id   opt-in fleet telemetry (telemetry.ts)
+ *   coherence version (--version, -v)  the running version, where it is, and the newest published one (version.ts)
+ *   coherence help (--help, -h)        this usage, on stdout
  *   coherence decide | retract | conjecture | ... | journal   (see JOURNAL_USAGE)
  *   coherence work create | move | close | owner | inspect   (see WORK_USAGE)
  *
@@ -45,7 +47,7 @@ import { formatReport, hasFindings, recordVetter, runCheck } from "./lifecycle/c
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
 import { cliName, CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
-import { check, formatCheck, formatStatus, formatUninstall, HOME_VAR, HOSTS, install, isHost, locatedPrefix, locate, settingsFile, settingsRoots, SIBLING, status, uninstall, type SettingsRoot } from "./lifecycle/install.ts";
+import { check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, locatedPrefix, locate, settingsFile, settingsRoots, status, uninstall, type SettingsRoot } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectLexicons, PACKAGE_NAME, projectRoot } from "./lifecycle/project.ts";
 import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
 import { SCOPE_USAGE, scopeCommand } from "./readings/scope/cli.ts";
@@ -57,6 +59,7 @@ import { registryOf } from "./adapters/project-config.ts";
 import { adopt, AdoptError, adoptText } from "./lifecycle/adopt.ts";
 import { TELEMETRY_USAGE, telemetryCommand } from "./lifecycle/telemetry-cli.ts";
 import { startTelemetry } from "./lifecycle/telemetry.ts";
+import { refreshLatest, startUpdateCheck, versionText } from "./lifecycle/version.ts";
 
 type CommandResult = number | Promise<number>;
 type RootCommand = (argv: string[], io: Io) => CommandResult;
@@ -80,6 +83,8 @@ ${SCOPE_USAGE}
   coherence hooks --check --host <${HOSTS.join("|")}> [--command "<prefix>"] [--local]
   coherence hooks status
 ${TELEMETRY_USAGE}
+  coherence version   (or --version, -v) the running version and where it is, the newest published one, and when the registry was last asked
+  coherence help      (or --help, -h) this usage
 ${JOURNAL_USAGE}
 `;
 
@@ -142,8 +147,8 @@ function locateNote(root: string, sub = ""): string {
   if (real === THIS_CLI) return `the hooks reach this checkout (${dirname(dirname(THIS_CLI))})\n`;
   if (real !== undefined) return `note: the hooks will run the Coherence at ${real}, not this checkout (${THIS_CLI})\n`;
   return (
-    `note: the hooks cannot find Coherence from here; they look at $${HOME_VAR}, then ../${SIBLING} beside the project (or beside its main checkout), then the project's installed ${PACKAGE_NAME}.\n` +
-    `  Run npm install -D ${PACKAGE_NAME} in the project, clone Coherence beside it as ../${SIBLING}, or set ${HOME_VAR}=${dirname(dirname(THIS_CLI))} where your agent host starts. Until then each session start tells the agent it is missing, and the other events do nothing.\n`
+    `note: the hooks cannot find Coherence from here; they run the project's installed ${PACKAGE_NAME}.\n` +
+    `  Run npm install -D ${PACKAGE_NAME} (or pnpm add -D, yarn add -D) in the project, or its install if package.json already lists it. Until then each session start tells the agent it is missing, and the other events do nothing.\n`
   );
 }
 
@@ -200,7 +205,7 @@ async function hookCommand(args: string[], root: string): Promise<number> {
   const event = args[0];
   if (event === undefined || !isHookEvent(event)) fail(`hook: expected one of ${HOOK_EVENTS.join(", ")}\n${USAGE}`);
   const input = await readStdinJson(process.stdin);
-  const result = await runHook(event, input, root, { refresh: STRUCTURE_REFRESH, warm: WARM_UP, telemetry: startTelemetry, startedAt: Math.round(performance.timeOrigin) });
+  const result = await runHook(event, input, root, { refresh: STRUCTURE_REFRESH, warm: WARM_UP, telemetry: startTelemetry, updateCheck: startUpdateCheck, startedAt: Math.round(performance.timeOrigin) });
   if (result.stderr !== "") process.stderr.write(result.stderr);
   if (result.stdout !== "") {
     try {
@@ -302,6 +307,15 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
   return 0;
 }
 
+/** version: what runs and what is published; `--refresh` (which a session start runs detached) asks the registry first. */
+async function versionCommand(args: string[], root: string): Promise<number> {
+  const unknown = args.filter((arg) => arg !== "--refresh");
+  if (unknown.length > 0) fail(`version: unexpected ${unknown.join(" ")}\n${USAGE}`);
+  if (args.includes("--refresh")) await refreshLatest();
+  process.stdout.write(versionText(root, await isCoherenceItself(root)));
+  return 0;
+}
+
 /** The journal's check before a write: a rejected name that binds here, named with what it was rejected for. */
 async function journalVet(root: string): Promise<(record: object) => string[]> {
   const { coherence, project } = await loadProjectLexicons(root);
@@ -360,6 +374,15 @@ async function main(argv: string[]): Promise<number> {
       return hooksCommand(rest, root);
     case "telemetry":
       return telemetryCommand(rest, io);
+    case "version":
+    case "--version":
+    case "-v":
+      return versionCommand(rest, root);
+    case "help":
+    case "--help":
+    case "-h":
+      process.stdout.write(USAGE);
+      return 0;
     default:
       fail(verb === undefined ? USAGE : `unknown verb "${verb}"\n${USAGE}`);
   }
