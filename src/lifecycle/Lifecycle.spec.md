@@ -968,3 +968,21 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: the light path built each invariant's latest run without its language and with only the files the edit wrote, so a TypeScript edit spelling a protected Python symbol's name was checked in TypeScript first, grading the wrong symbol, and the wrong language then persisted in the run it recorded
   refuted: built the touched invariant's latest run without its language, the reviewer's case -> "in a project of two languages, an edit's check asks the language the last run graded the invariant in, with that run's whole file list" went red in work-meter.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-08)
   kinds: none
+- the status line reads the session's own records: Coherence's status line names the session's tool hook calls, their average time and how many passed the latency budget, and the practices that fired with no enactment since, read from the session's hook times, firings and journal file in the project the status line runs in, the repository top and every leaf its registry lists, by the names and budget the hooks keep them under; outside every project it prints nothing.
+  over: a registry of two leaves holding the session's times, firings and an enactment, another session's times beside them, a config's latency budget, a folder no project holds, and input with no session
+  via: the status line names the session's tool hook time against the budget and the practices it owes, from every leaf of a registry
+  because: hook output reaches the agent, and the one line that reached the user, regulate at a stop, came after the work and all at once; a status line is where the user sees the hooks' cost and what the session owes while it works, without the agent spending context on it
+  refuted: dropped the registry's leaves from the folders the status line reads -> "the status line names the session's tool hook time against the budget and the practices it owes, from every leaf of a registry" went red in statusline.test.ts on the call count; restored, green (2026-10-08)
+  kinds: none
+- a status line render loads no hook module: The status line command and the module it reads with import only node's built-ins, so a render, which the host runs after events and cancels when the next is due, costs node's start and the session's few files, never the modules the hooks load or a reading of the project.
+  over: the status line module and its command's entry
+  via: the status line module imports nothing but node's own, so a render never loads the hooks' modules
+  because: starting Coherence's CLI from source took 1.1 to 1.5 s against about 0.1 s for the status line alone, measured on this repository; a status line slower than the host's debounce would be cancelled before it printed
+  refuted: imported the hook latency module into the status line module -> "the status line module imports nothing but node's own, so a render never loads the hooks' modules" went red in statusline.test.ts; restored, green (2026-10-08)
+  kinds: none
+- the status line keeps the user's own: Given another status line command after --, Coherence's status line command runs it with the same session input and prints its lines first, then Coherence's, so adding Coherence's line never takes away the one a user had.
+  over: a command that reads its input and prints one line
+  via: the status line command prints the user's own status line first, from the same session input, then Coherence's
+  because: Claude Code runs one status line command, and a user who already has one would otherwise have to choose between it and Coherence's
+  refuted: skipped running the command after -- -> "the status line command prints the user's own status line first, from the same session input, then Coherence's" went red in statusline.test.ts; restored, green (2026-10-08)
+  kinds: none

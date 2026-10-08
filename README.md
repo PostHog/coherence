@@ -145,6 +145,25 @@ a command or edit outside every adopted project costs a constant: on this
 repository a tool hook takes about 0.3 s, and 0.4 to 2.4 s in the PostHog
 monorepo with two products adopted.
 
+In Claude Code, Coherence can also show its own line in the status line,
+for you rather than the agent: the version running, the session's tool hook
+time against the budget, and the practices it owes.
+
+```
+coherence 1.5.3 · hooks 0.4 s avg · 1 practice owed: close a defect
+```
+
+It reads only the session's own records, about 0.1 s a render. Add it to
+`.claude/settings.json`, or to `~/.claude/settings.json` for every project:
+
+```json
+{ "statusLine": { "type": "command", "command": "npx --no -- coherence-statusline" } }
+```
+
+If you already have a status line, keep it by passing its command after
+`--`: `npx --no -- coherence-statusline -- ~/.claude/statusline.sh` prints
+yours first, then Coherence's.
+
 ### Decisions are never buried in a transcript
 
 The **journal** compresses hundreds of thousands of session tokens into a
