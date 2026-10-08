@@ -6,7 +6,10 @@
  *
  * Structure needs the component interfaces, a language-server pass that takes
  * a minute on Coherence and three on a large adopter, so no hook ever runs
- * one. What a hook reads instead is the last complete reading, recorded
+ * one. (A reading after a spec edit, or a source edit, is far cheaper: the
+ * server's answers are kept apart from the reading, keyed to source content
+ * alone (kept-answers.ts), so only what a changed file could change is asked
+ * again; still no hook takes one.) What a hook reads instead is the last complete reading, recorded
  * under .coherence/structure (transient, like the warm server's socket)
  * whenever a reader took one (query structure, a Scope snapshot, the scaffold)
  * with the fingerprint of what it read: every source file and the config

@@ -16,7 +16,10 @@
  * output says which, and the reading is never recorded; it stands only when
  * every fact the route rule reads is settled (scopedUnsettled), and the
  * whole reading is taken otherwise. --all alone, --baseline and --whole read
- * every component interface now and record the reading.
+ * every component interface now and record the reading. Every reading reuses
+ * the language server's kept answers that no changed file could have changed
+ * (kept-answers.ts), so one after a spec edit asks the server only what no
+ * earlier reading asked, and says on stderr what it reused and asked.
  *
  * The invariant bullet prints on stdout with every absent slot as a
  * placeholder; the applicable checklist shapes print on stderr as guidance.
@@ -43,6 +46,7 @@ import { BUDGET_FLAGS, budgetFlags, readComponentInterfaces, readingAdapters } f
 import type { ScopedReading } from "../readings/scope/model.ts";
 import { scopedUnsettled } from "../readings/scope/scoped-route.ts";
 import { freshReading, gapsOf, readAndRecord, recordGapBaseline, structureState } from "../readings/scope/gaps.ts";
+import { keptLine } from "../readings/scope/kept-answers.ts";
 import { flowOf, flowPartialText } from "../readings/scope/structure-flow.ts";
 import { proposeClosures, renderAll, renderProposal, writeClosure, type Closure, type Proposal } from "./control.ts";
 import { proposeEntrances, renderEntrances, under } from "./entrances.ts";
@@ -170,6 +174,8 @@ async function controlModel(root: string, io: Io, values: ReadonlyMap<string, st
       if (asked !== undefined) {
         io.err(`reading only the component interfaces the routes of ${asked.map((e) => e.name).join(", ")} need (no recorded reading describes this tree; --whole reads and records every one)`);
         const scoped = await readComponentInterfaces(root, adapter, { budget, scope: { entrances: asked } });
+        const kept = scoped.kind === "read" ? keptLine(scoped.kept) : undefined;
+        if (kept !== undefined) io.err(kept);
         // A budget the scoped reading spent, the whole one would spend sooner: the partial reading is shown as partial.
         const state = structureState(root, scoped);
         const unsettled = scoped.kind === "read" && scoped.partial === undefined ? scopedUnsettled(state, flowOf(state)) : undefined;
@@ -179,8 +185,10 @@ async function controlModel(root: string, io: Io, values: ReadonlyMap<string, st
         } else io.err(`the scoped reading cannot settle ${unsettled} without the interfaces it did not read; reading them all`);
       }
       if (reading === undefined) {
-        io.err("reading the component interfaces through the language adapter (no recorded reading describes this tree); this can take minutes");
+        io.err("reading the component interfaces through the language adapter (no recorded reading describes this tree); a question no kept answer settles is asked of the language server, which can take minutes");
         reading = await readAndRecord(root, () => readComponentInterfaces(root, adapter, { budget }));
+        const kept = reading.kind === "read" ? keptLine(reading.kept) : undefined;
+        if (kept !== undefined) io.err(kept);
       }
     } finally {
       await adapters.close();

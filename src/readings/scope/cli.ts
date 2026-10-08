@@ -21,6 +21,7 @@ import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { DEFAULTS, projectNameOf, writeScopePage, type BuildOptions } from "./build.ts";
 import { BUDGET_FLAGS, budgetFlags, readComponentInterfaces } from "./component-interfaces.ts";
 import { readAndRecord } from "./gaps.ts";
+import { keptLine } from "./kept-answers.ts";
 
 export const SCOPE_USAGE = [
   "  scope [--root <dir>] [--no-open]   open the live Scope reading from the warm server (prints its address)",
@@ -81,6 +82,8 @@ async function snapshot(root: string, values: Map<string, string>, switches: Set
       return 64;
     }
     options.componentInterfaces = await readAndRecord(root, () => readComponentInterfaces(root, undefined, { budget }));
+    const kept = options.componentInterfaces.kind === "read" ? keptLine(options.componentInterfaces.kept) : undefined;
+    if (kept !== undefined) io.err(kept);
   }
   const domain = values.get("domain");
   if (domain !== undefined) options.domainPath = domain;
