@@ -401,7 +401,11 @@ so `command resolved df-*` fires when `resolved` is followed at once by an
 argument starting `df-`, and not when a conjecture is resolved. A shell command that writes a file
 (a redirect, a heredoc, `tee`, `sed -i`, `cp`) counts as an edit of that file, and
 its own text as the text added. Steps are numbered in the
-order written; `leaves:` under a step names the evidence it leaves. Every
+order written; `leaves:` under a step names the evidence it leaves. A
+`leaves:` line belongs to the step above it whatever its indentation: the
+four spaces shown here, the two a formatter such as oxfmt writes back, or a
+tab all parse alike, since the parser reads key lines in order and never
+measures their indent. Every
 pitfall cites the record or commit that witnessed it, and a practice that
 cites nothing is a problem. `invariants:` names invariants of the sister spec,
 or `<folder>/<name>` elsewhere. A practice file never stands without its spec.

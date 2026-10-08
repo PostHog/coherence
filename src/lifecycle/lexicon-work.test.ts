@@ -447,7 +447,7 @@ test("lexicon lifecycle uses child identities and installed roots, and advances 
       join(root, "money/model.ts"),
       "export const riskcharge = 12;\n",
     );
-    // The edit makes a new name recur in prose: that, and only that, is worth a line at the edit.
+    // The edit makes a new name recur in prose: held for the stop, never said at the edit.
     writeFileSync(
       join(root, "money/charges.md"),
       "The `riskcharge` is new.\nEach `riskcharge` is billed.\nA `riskcharge` is refunded on cancel.\n",
@@ -467,17 +467,22 @@ test("lexicon lifecycle uses child identities and installed roots, and advances 
       "time/new.ts",
     ]);
     const event = await runHook("PostToolUse", patch, root);
-    assert.match(event.stdout, /riskcharge/);
+    assert.doesNotMatch(event.stdout, /riskcharge/, "the edit holds the term for the stop");
+    event.commit?.();
+    // No stop came between: the next prompt names what the edit held, until its line reaches the host.
+    const prompt = { ...input, hook_event_name: "UserPromptSubmit", prompt: "next" };
+    const told = await runHook("UserPromptSubmit", prompt, root);
+    assert.match(told.stdout, /riskcharge/);
     assert.equal(
-      (await runHook("PostToolUse", patch, root)).stdout,
-      event.stdout,
+      (await runHook("UserPromptSubmit", prompt, root)).stdout,
+      told.stdout,
       "unprinted context is still pending",
     );
-    event.commit?.();
-    assert.equal(
-      (await runHook("PostToolUse", patch, root)).stdout,
-      "",
-      "no repeated unchanged-context notification",
+    told.commit?.();
+    assert.doesNotMatch(
+      (await runHook("UserPromptSubmit", prompt, root)).stdout,
+      /riskcharge/,
+      "no repeated notification",
     );
     const sibling = await runHook(
       "SubagentStart",

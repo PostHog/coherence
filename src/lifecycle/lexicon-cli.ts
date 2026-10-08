@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, relative } from "node:path";
@@ -177,6 +178,14 @@ export function introducedCandidates(report: Coverage, prior: Record<string, str
     .filter((term) => prior[CANDIDATE + term] !== "start");
 }
 
+/**
+ * Where an edit's held terms wait for the stop: the terms this session made
+ * recur without a definition that no stop or prompt has named yet. Apart from
+ * the baseline, so a prompt reads a few names, never the session's whole reading.
+ */
+export function pendingPath(root: string, session: string): string {
+  return baselinePath(root, session).replace(/\.json$/, ".pending.json");
+}
 export function saveBaseline(
   root: string,
   session: string,
@@ -198,20 +207,42 @@ export function saveBaseline(
     ]),
   );
 }
-/**
- * Mark terms an edit named as recurring without a definition as this
- * session's own candidates, so neither the next edit nor the next prompt
- * names them again; every other key of the baseline stands.
- */
-/** The terms a baseline already holds as candidates: an edit never names them again. */
+/** The terms a baseline already holds as candidates: an edit never finds them again. */
 export function heldCandidates(prior: Record<string, string>): Set<string> {
   return new Set(Object.keys(prior).filter((key) => key.startsWith(CANDIDATE)).map((key) => key.slice(CANDIDATE.length)));
 }
-export function markCandidates(root: string, session: string, terms: readonly string[]): void {
+/** The terms edits held that no stop or prompt has named yet, or why they could not be read. */
+export function pendingCandidates(root: string, session: string): { terms: string[]; unreadable?: string } {
+  const path = pendingPath(root, session);
+  if (!existsSync(path)) return { terms: [] };
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+    if (!Array.isArray(parsed) || !parsed.every((t) => typeof t === "string")) return { terms: [], unreadable: "it is not a list of terms" };
+    return { terms: parsed };
+  } catch (error) {
+    return { terms: [], unreadable: error instanceof Error ? error.message : String(error) };
+  }
+}
+/**
+ * Hold terms an edit found recurring without a definition: the baseline
+ * marks each as this session's own candidate, so no later edit finds it
+ * again, and the pending list keeps it until a stop or a prompt names it.
+ */
+export function holdCandidates(root: string, session: string, terms: readonly string[]): void {
   if (terms.length === 0) return;
   const path = baselinePath(root, session);
   const previous = existsSync(path) ? priorBaseline(root, session) : {};
   cleanWrite(path, { ...previous, ...Object.fromEntries(terms.map((term) => [CANDIDATE + term, previous[CANDIDATE + term] ?? "introduced"])) });
+  cleanWrite(pendingPath(root, session), [...new Set([...pendingCandidates(root, session).terms, ...terms])]);
+}
+/** These terms were named to the session: none of them is pending any more. */
+export function deliverCandidates(root: string, session: string, terms: readonly string[]): void {
+  const path = pendingPath(root, session);
+  if (terms.length === 0 || !existsSync(path)) return;
+  const named = new Set(terms);
+  const rest = pendingCandidates(root, session).terms.filter((term) => !named.has(term));
+  if (rest.length === 0) rmSync(path, { force: true });
+  else cleanWrite(path, rest);
 }
 export function priorBaseline(
   root: string,

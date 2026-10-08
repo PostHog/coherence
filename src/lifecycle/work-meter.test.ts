@@ -27,6 +27,7 @@ import { lexiconCoverage } from "./lexicon-coverage.ts";
 import { loadLexicon } from "./lexicon.ts";
 import { COHERENCE_LEXICON } from "./project.ts";
 import { cacheDir } from "./kept-parse.ts";
+import { pendingCandidates } from "./lexicon-cli.ts";
 import { appendRun, entryKey, latestByEnforcement, loadRuns, parseLine, type RunRecord } from "../enforcement/record.ts";
 import { latestSeeing, RunIndexUnavailable } from "../enforcement/run-index.ts";
 import { chokepointIndex } from "../spec/model.ts";
@@ -746,7 +747,8 @@ test("a write no hook saw is caught at the next edit, which reads in full as mai
     writeFileSync(file, readFileSync(file, "utf8") + "A `rebate` is clawed back.\n");
     const m = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
     assert.match(m.said, /Lexicon: read in full at this edit: the tree moved since its vocabulary was kept, beyond what this edit wrote \(docs\/note-1\.md\)/, "the unseen write is said");
-    assert.match(m.said, /"rebate" recur without a definition/, "and the term it made recur with this edit is named, as main names it");
+    assert.ok(pendingCandidates(project.root, SESSION).terms.includes("rebate"), "and the term it made recur with this edit is held for the stop, as main finds it");
+    assert.doesNotMatch(m.said, /recur without a definition/, "held, not said at the edit");
   } finally {
     rmSync(project.top, { recursive: true, force: true });
   }
@@ -818,6 +820,22 @@ test("a checkout, a pull or a branch switch onto a clean tree moves the tree: th
   }
 });
 
+test("an edit read through the kept vocabulary holds the term it makes recur for the stop, unsaid, as the full reading does", async () => {
+  const project = sizedProject(1);
+  try {
+    const start = await runHook("SessionStart", { session_id: SESSION, cwd: project.root }, project.root, {});
+    start.commit?.();
+    const file = join(project.root, "docs/note-0.md");
+    writeFileSync(file, readFileSync(file, "utf8") + "The `rebate` is new.\nEach `rebate` is paid.\nA `rebate` is clawed back.\n");
+    const m = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
+    assert.doesNotMatch(m.said, /read in full/, "the edit read the kept vocabulary");
+    assert.doesNotMatch(m.said, /recur without a definition|no stop has named/, "the term is not said at the edit");
+    assert.ok(pendingCandidates(project.root, SESSION).terms.includes("rebate"), "it is held for the stop");
+  } finally {
+    rmSync(project.top, { recursive: true, force: true });
+  }
+});
+
 test("an edit whose kept vocabulary was left half-written reads in full and says so", async () => {
   const project = sizedProject(1);
   try {
@@ -829,7 +847,8 @@ test("an edit whose kept vocabulary was left half-written reads in full and says
     writeFileSync(file, readFileSync(file, "utf8") + "The `rebate` is new.\nEach `rebate` is paid.\nA `rebate` is clawed back.\n");
     const m = await workOf(project, "PostToolUse", { tool_name: "Edit", tool_input: { file_path: file } });
     assert.match(m.said, /Lexicon: read in full at this edit: its kept vocabulary was left half-written/, "the fallback is said");
-    assert.match(m.said, /"rebate" recur without a definition/, "and the full reading still names what the edit introduced");
+    assert.ok(pendingCandidates(project.root, SESSION).terms.includes("rebate"), "and the full reading still holds what the edit introduced for the stop");
+    assert.doesNotMatch(m.said, /recur without a definition/, "held, not said at the edit");
     assert.ok(m.work.reads.filter((r) => r.startsWith("corpus ")).length > 1, "the corpus was read in full");
   } finally {
     rmSync(project.top, { recursive: true, force: true });

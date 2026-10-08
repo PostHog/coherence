@@ -246,7 +246,7 @@ test("no hook injection carries a total: orient names the ranked terms or says n
   }
 });
 
-test("the per-tool line is silent on an ordinary edit and names only the candidate an edit introduces", async () => {
+test("an edit is silent on the terms it makes recur: regulate names the session's together at the stop, once, with the declare-or-alias command", async () => {
   const root = project();
   try {
     writeFileSync(join(root, "books/notes.md"), "The exposure is counted in USD.\n");
@@ -258,13 +258,53 @@ test("the per-tool line is silent on an ordinary edit and names only the candida
     appendFileSync(join(root, "books/notes.md"), "The exposure is settled nightly.\nRows are appended at the end of the day.\n");
     const ordinary = await runHook("PostToolUse", tool, root);
     assert.doesNotMatch(injected(ordinary.stdout), /Lexicon/, "an ordinary edit says nothing about vocabulary");
-    // An edit that makes a new name recur: named, once.
+    ordinary.commit?.();
+    // Two edits that each make a new name recur: neither says a word of it.
     appendFileSync(join(root, "books/notes.md"), "The `rebate` is new.\nEach `rebate` is paid.\nA `rebate` is clawed back.\n");
-    const introduced = await runHook("PostToolUse", tool, root);
-    assert.match(injected(introduced.stdout), /this edit made "rebate" recur without a definition/);
-    introduced.commit?.();
-    const again = await runHook("PostToolUse", tool, root);
-    assert.doesNotMatch(injected(again.stdout), /Lexicon/, "a candidate already named is not named again");
+    const first = await runHook("PostToolUse", tool, root);
+    assert.doesNotMatch(injected(first.stdout), /Lexicon/, "the edit that made rebate recur is silent");
+    first.commit?.();
+    appendFileSync(join(root, "books/notes.md"), "The `levy` is new.\nEach `levy` is paid.\nA `levy` is waived.\n");
+    const second = await runHook("PostToolUse", tool, root);
+    assert.doesNotMatch(injected(second.stdout), /Lexicon/, "the edit that made levy recur is silent");
+    second.commit?.();
+    // The stop names both in one line, with what settles them.
+    const stop = await runHook("Stop", input, root);
+    const said = injected(stop.stdout);
+    const line = said.split("\n").filter((l) => /recurring without a definition/.test(l));
+    assert.equal(line.length, 1, `one line names them: ${said}`);
+    assert.match(line[0]!, /"rebate"/);
+    assert.match(line[0]!, /"levy"/);
+    assert.match(line[0]!, /lexicon propose declare <term> --definition "<text>" --because "<why>"\) or map it as an alias of an existing concept/);
+    stop.commit?.();
+    // The next prompt carries what the stop said, and names neither term again on its own.
+    const prompt = await runHook("UserPromptSubmit", { ...input, prompt: "next" }, root);
+    assert.match(injected(prompt.stdout), /At your last stop[\s\S]*this session left/, "the stop's line reaches the agent at the prompt");
+    assert.doesNotMatch(injected(prompt.stdout), /no stop has named/, "what the stop named is not named again");
+  } finally {
+    await stopWarmServers(root);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a term an edit held reaches the next prompt when no stop named it, once", async () => {
+  const root = project();
+  try {
+    writeFileSync(join(root, "books/notes.md"), "The exposure is counted in USD.\n");
+    const input = { session_id: "held-test", cwd: root };
+    const start = await runHook("SessionStart", input, root);
+    start.commit?.();
+    const tool = { ...input, tool_name: "Write", tool_input: { file_path: join(root, "books/notes.md") } };
+    appendFileSync(join(root, "books/notes.md"), "The `rebate` is new.\nEach `rebate` is paid.\nA `rebate` is clawed back.\n");
+    const edit = await runHook("PostToolUse", tool, root);
+    assert.doesNotMatch(injected(edit.stdout), /Lexicon/, "the edit is silent");
+    edit.commit?.();
+    // The session never stopped cleanly: the host was interrupted, and the next thing it runs is a prompt.
+    const prompt = await runHook("UserPromptSubmit", { ...input, prompt: "after an interrupt" }, root);
+    assert.match(injected(prompt.stdout), /no stop has named "rebate", which this session made recur without a definition; declare each .* or map it as an alias of an existing concept/);
+    prompt.commit?.();
+    const again = await runHook("UserPromptSubmit", { ...input, prompt: "and again" }, root);
+    assert.doesNotMatch(injected(again.stdout), /no stop has named/, "named once");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
