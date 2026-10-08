@@ -110,8 +110,11 @@ function weighed(m: Measured): Map<string, number> {
 const PRACTICES = /proj\/src\/cN\/CN\.(practice|spec)\.md|ls-files .*\*\.practice\.md/;
 const SPECS = /proj\/src\/cN\/(CN\.spec\.md|\.git|pyvenv\.cfg)$|ls-files .*\*\.spec\.md/;
 // The history families grow only in their file lists, a stat or a listed entry per file, and in the index or memo that keeps one line per
-// file, and in the run file's sites shard, whose size it spells; the bytes of the history itself are never in a budget: the index, the shard and the memo exist so that no hook reads them.
-const RUNS = /^fs (statSync|lstatSync|existsSync|readdirSync|realpathSync) .*proj\/\.coherence\/runs(\/hN\.jsonl)?$|^fs readFileSync .*proj\/\.coherence\/cache\/(run-index\.json|run-sites\/[^/]+\.jsonl\.json)$/;
+// file, and in the run file's sites shard, whose size it spells; the bytes of the history itself are never in a budget: the index, the
+// shard and the memo exist so that no hook reads them. One read of run bytes is allowed: the index's fold reads back the line the edit's
+// check just appended to the session's own file, its bytes the line's (a byte more or less as its latency's digits fall); a read of any
+// history file, by any function, is in no family.
+const RUNS = /^fs (statSync|lstatSync|existsSync|readdirSync|realpathSync) .*proj\/\.coherence\/runs(\/hN\.jsonl)?$|^fs readSync .*proj\/\.coherence\/runs\/sized\.jsonl$|^fs readFileSync .*proj\/\.coherence\/cache\/(run-index\.json|run-sites\/[^/]+\.jsonl\.json)$/;
 // The vocabulary an edit judges against: the lexicons, the session's baseline, the kept state's meta and the buckets it reads, one of 64
 // each. These grow with the vocabulary and the project's terms, never with the corpus's lines read or its history.
 const VOCABULARY = /^fs (readFileSync|promises\.readFile) .*(proj\/lexicon\.json|docs\/lexicon\.json|\.coherence\/lexicon\/sessions\/[^/]+\.json|\.coherence\/cache\/vocabulary\/(meta\.json|declared\.json|files\/\d+\.json|terms\/\d+\.json))$/;
