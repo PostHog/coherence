@@ -49,7 +49,8 @@
  */
 
 import { existsSync } from "node:fs";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
+import { readProjectTextAsync } from "./work-meter.ts";
 import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { acceptedNames, rejectedNames, type Lexicon, type RejectedName } from "./lexicon.ts";
 import { STOPLIST } from "./stoplist.ts";
@@ -314,8 +315,9 @@ export async function collectFiles(options: CheckOptions): Promise<{ files: stri
     if (rel.split("/")[0] === COHERENCE_DIR && !isRecordFile(rel)) return false;
     return exclusionOf(rel, walker.rules) === undefined;
   });
+  const kept = new Set(files);
   for (const path of walker.found) {
-    if (files.includes(path)) continue;
+    if (kept.has(path)) continue;
     const rel = relPath(root, path);
     walker.excluded.push({ file: rel, reason: outsideBounds(rel, walker.ignore) ? OUTSIDE_BOUNDS : own.has(rel) ? "lexicon, reference vocabulary, generated state, or excluded folder" : "not one of the project's files: ignored, or inside a nested checkout" });
   }
@@ -329,14 +331,22 @@ function isBinary(text: string): boolean {
 
 const NUL = String.fromCharCode(0);
 
-export async function readCorpus(options: CheckOptions): Promise<{ files: CorpusFile[]; unreadable: UnreadablePath[]; excluded: UnreadablePath[] }> {
+/**
+ * The corpus, read: every file collectFiles lists, each read through the work
+ * meter's door, or only those `only` keeps (a reading scoped to the
+ * components an edit wrote in). `listed` is every corpus file's relative
+ * path, read or not, so a scoped reading still knows every component.
+ */
+export async function readCorpus(options: CheckOptions, only?: (rel: string, listed: readonly string[]) => boolean): Promise<{ files: CorpusFile[]; listed: string[]; unreadable: UnreadablePath[]; excluded: UnreadablePath[] }> {
   const root = resolve(options.root);
   const { files, unreadable, excluded } = await collectFiles(options);
   const out: CorpusFile[] = [];
+  const listed = files.map((path) => relPath(root, path));
   for (const path of files) {
+    if (only !== undefined && !only(relPath(root, path), listed)) continue;
     let text;
     try {
-      text = await readFile(path, "utf8");
+      text = await readProjectTextAsync(path, "corpus");
     } catch (error) {
       unreadable.push({ file: relPath(root, path), reason: reasonOf(error) });
       continue;
@@ -344,7 +354,42 @@ export async function readCorpus(options: CheckOptions): Promise<{ files: Corpus
     if (isBinary(text)) { excluded.push({ file: relPath(root, path), reason: "binary content" }); continue; }
     out.push({ path, rel: relPath(root, path), kind: kindOf(root, path)!, lines: text.split(/\r?\n/) });
   }
-  return { files: out, unreadable, excluded };
+  return { files: out, listed, unreadable, excluded };
+}
+
+/**
+ * The named files of the corpus, read, without walking it: each kept only
+ * when the walk would keep it (its kind, the lexicons, the retired
+ * inventories, foreign vocabulary, generated state, an excluded or ignored
+ * folder), and read through the work meter's door. The caller has already
+ * kept only the project's own files. What an edit's reading reads.
+ */
+export async function corpusFiles(options: CheckOptions, rels: readonly string[]): Promise<CorpusFile[]> {
+  const root = resolve(options.root);
+  const excluded = new Set<string>([resolve(options.coherence.path), resolve(root, "docs", "retired.md"), resolve(root, "src", "spec", "retired-sections.json")]);
+  if (options.project !== undefined) excluded.add(resolve(options.project.path));
+  const foreignDocs = [resolve(root, "docs", "reference"), resolve(root, "docs", "reviews")];
+  const ignore = new Set(configIgnore(root));
+  const rules = walkBounds(root, [], { readHidden: true });
+  const out: CorpusFile[] = [];
+  for (const given of rels) {
+    const path = resolve(root, given);
+    const rel = relPath(root, path);
+    if (excluded.has(path) || foreignDocs.some((d) => path === d || path.startsWith(d + sep))) continue;
+    if (machineWritten(rel) || (rel.split("/")[0] === COHERENCE_DIR && !isRecordFile(rel))) continue;
+    if (outsideBounds(rel, ignore) || exclusionOf(rel, rules) !== undefined) continue;
+    const kind = kindOf(root, path);
+    if (kind === undefined) continue;
+    let text;
+    try {
+      text = await readProjectTextAsync(path, "corpus");
+    } catch {
+      continue;
+    }
+    if (isBinary(text)) continue;
+    out.push({ path, rel, kind, lines: text.split(/\r?\n/) });
+  }
+  return out;
 }
 
 /* ---------------------------------------------------------------- words */

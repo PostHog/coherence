@@ -19,7 +19,7 @@
  * this project, so it is never a bypass, never vocabulary, never mass.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "../lifecycle/work-meter.ts";
 import { existsSync, lstatSync, readdirSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { configRecord, repositoryTop } from "./project-config.ts";
@@ -130,6 +130,23 @@ export function projectFiles(root: string): string[] {
   const memo = new Map<string, boolean>();
   const listed = inRepository(base) ? gitList(base, []) : walkUnversioned(base, memo);
   return [...new Set(listed)].filter((rel) => !insideNested(base, rel, memo) && isFileOnDisk(base, rel)).sort();
+}
+
+/**
+ * The project files whose names end with `suffix` (a spec's `.spec.md`), by
+ * the same rule as projectFiles, from a git listing of those files alone: a
+ * caller that needs the specs pays for the specs, never for every file.
+ * Outside a repository, the whole walk filtered.
+ */
+export function projectFilesEnding(root: string, suffix: string): string[] {
+  const base = resolve(root);
+  if (!inRepository(base)) return projectFiles(base).filter((rel) => rel.endsWith(suffix));
+  const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", `:(glob)**/*${suffix}`], { cwd: base, encoding: "utf8", maxBuffer: GIT_LISTING_LIMIT });
+  if (listed.status !== 0) throw new Error(`the project's files are not known: git ls-files failed in ${base}: ${(listed.stderr ?? "").trim() || `exit ${listed.status}`}`);
+  const memo = new Map<string, boolean>();
+  return [...new Set(listed.stdout.split("\0").filter((entry) => entry !== "" && !entry.endsWith("/") && entry.endsWith(suffix)))]
+    .filter((rel) => !insideNested(base, rel, memo) && isFileOnDisk(base, rel))
+    .sort();
 }
 
 /** A folder as the ignore list compares it: project-relative, forward slashes, no leading "./" and no trailing "/". */

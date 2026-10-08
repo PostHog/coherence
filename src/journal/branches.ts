@@ -8,7 +8,7 @@
  * git fails, nothing is found elsewhere.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "../lifecycle/work-meter.ts";
 import { JOURNAL_DIR } from "./store.ts";
 import { WORK_DIR } from "./work.ts";
 

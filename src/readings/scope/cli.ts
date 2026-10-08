@@ -13,7 +13,7 @@
  * --out <file>` keeps working as it always has.
  */
 
-import { spawn } from "node:child_process";
+import { spawn } from "../../lifecycle/work-meter.ts";
 import { resolve } from "node:path";
 import { withWarmAdapter } from "../../enforcement/run.ts";
 import type { Io } from "../../journal/cli.ts";

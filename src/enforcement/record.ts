@@ -15,9 +15,10 @@
  * the code was restored, and the detector went green again.
  */
 
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { availableParallelism, loadavg } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
+import { noteRunAppend, runFileIdentity } from "./run-index.ts";
 
 export const RUNS_DIR = join(".coherence", "runs");
 
@@ -143,6 +144,8 @@ export interface RunEntry {
   state?: "requirement" | "invariant" | "structural defect";
   /** What this form of the bullet enforces through: its via: test titles, or its chokepoints. The floor recognizes a rename by it. */
   enforces?: string[];
+  /** Set on an edit's check, which derives no state (run.ts, grade: false): the invariant floor does not count the entry. */
+  ungraded?: true;
 }
 
 export interface RunRecord {
@@ -168,6 +171,13 @@ export interface RunRecord {
   load?: { average: number; cores: number };
   /** The one batched test invocation's milliseconds. */
   batch?: { ms: number };
+  /**
+   * True when the run checked the whole spec: no --invariant and no --form
+   * filter, from the project's own spec model; what moves the invariant
+   * floor for every bullet at once. Absent on a scoped run, an edit's check,
+   * a per-test confirmation, and a run recorded before this was written.
+   */
+  full?: true;
   invariants: RunEntry[];
 }
 
@@ -212,12 +222,26 @@ export function machineLoad(): { average: number; cores: number } {
 
 const SESSION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
+/**
+ * Append one line to a run file, then fold it into the run index the edit
+ * hook reads (run-index.ts). The fold is best effort and never throws: the
+ * line is recorded once it is appended, and an index the fold could not
+ * bring up to date no longer matches the store, so its next reader rebuilds it.
+ */
+function appendLine(root: string, file: string, line: string): void {
+  const name = basename(file);
+  const before = runFileIdentity(root, name);
+  const offset = existsSync(file) ? statSync(file).size : 0;
+  appendFileSync(file, line, "utf8");
+  noteRunAppend(root, name, before, offset, parseLine);
+}
+
 /** Append one run as one line; the file and folder are created on first write. */
 export function appendRun(root: string, record: RunRecord): string {
   if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
   mkdirSync(runsDir(root), { recursive: true });
   const file = join(runsDir(root), `${record.session}.jsonl`);
-  appendFileSync(file, `${JSON.stringify(record)}\n`, "utf8");
+  appendLine(root, file, `${JSON.stringify(record)}\n`);
   return file;
 }
 
@@ -226,7 +250,7 @@ export function appendRefutation(root: string, record: RefutationRecord): string
   if (!SESSION_TOKEN.test(record.session)) throw new Error(`session "${record.session}" cannot name a file; use letters, digits, dot, dash, or underscore`);
   mkdirSync(runsDir(root), { recursive: true });
   const file = join(runsDir(root), `${record.session}.jsonl`);
-  appendFileSync(file, `${JSON.stringify(record)}\n`, "utf8");
+  appendLine(root, file, `${JSON.stringify(record)}\n`);
   return file;
 }
 
@@ -256,7 +280,8 @@ export function loadRuns(root: string): LoadedRuns {
   return loaded;
 }
 
-function parseLine(line: string): RunRecord | RefutationRecord | string {
+/** One run-file line: a run, a refutation, or why it is neither. */
+export function parseLine(line: string): RunRecord | RefutationRecord | string {
   let value: unknown;
   try {
     value = JSON.parse(line);

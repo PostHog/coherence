@@ -41,7 +41,7 @@
  * edit wrote, so the check at an edit never runs tach over the whole tree.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "../lifecycle/work-meter.ts";
 import { createHash, randomBytes } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

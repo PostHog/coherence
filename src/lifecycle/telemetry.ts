@@ -21,7 +21,7 @@ import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, statS
 import { homedir } from "node:os";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
+import { spawn } from "./work-meter.ts";
 import { LANGUAGES } from "../adapters/index.ts";
 import { effectiveConfig, registryForLeaf } from "../adapters/project-config.ts";
 import { projectFiles } from "../adapters/project-files.ts";

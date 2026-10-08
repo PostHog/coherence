@@ -4,7 +4,7 @@
  * and the adapter; this owns the mapping and the store.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "../lifecycle/work-meter.ts";
 import { realpathSync } from "node:fs";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 import { primaryOnly } from "../readings/scope/languages-read.ts";

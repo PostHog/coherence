@@ -22,7 +22,7 @@
  * process a test spawns that does not itself load this module.
  */
 
-import { execFileSync } from "node:child_process";
+import { execFileSync } from "../lifecycle/work-meter.ts";
 import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

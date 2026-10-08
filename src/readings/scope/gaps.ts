@@ -43,10 +43,10 @@
  * Node-only; the browser bundle never imports it.
  */
 
-import { spawn } from "node:child_process";
+import { spawn } from "../../lifecycle/work-meter.ts";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync } from "../../lifecycle/work-meter.ts";
 import { dirname, join } from "node:path";
 import { configIgnore, projectFiles } from "../../adapters/project-files.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";

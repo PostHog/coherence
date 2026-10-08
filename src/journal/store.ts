@@ -8,8 +8,8 @@
  * partial last line, and the reader must say so rather than hide it.
  */
 
-import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "../lifecycle/work-meter.ts";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { JournalError } from "./args.ts";
 import { isKind, type JournalRecord } from "./record.ts";
@@ -65,15 +65,49 @@ export function compareRecords(a: JournalRecord, b: JournalRecord): number {
 }
 
 export function loadJournal(cwd: string): Loaded {
+  return loadJournalFiles(cwd);
+}
+
+/**
+ * Each session file of the journal with its identity: device, inode, size,
+ * modification and change time. An append changes it, and so does any other
+ * write, which can set back a modification time but never a change time.
+ */
+export function journalFileKeys(cwd: string): Map<string, string> {
+  const dir = journalDir(cwd);
+  const out = new Map<string, string>();
+  if (!existsSync(dir)) return out;
+  for (const name of readdirSync(dir).filter((n) => n.endsWith(".jsonl")).sort()) {
+    try {
+      const s = statSync(join(dir, name));
+      out.set(name, `${s.dev}:${s.ino}:${s.size}:${s.mtimeMs}:${s.ctimeMs}`);
+    } catch {
+      // Gone since the listing: no records to read.
+    }
+  }
+  return out;
+}
+
+/** The journal's records, from every session file or only the ones `names` lists, in one timeline. */
+export function loadJournalFiles(cwd: string, names?: readonly string[]): Loaded {
   const dir = journalDir(cwd);
   const loaded: Loaded = { records: [], damaged: [] };
   if (!existsSync(dir)) return loaded;
-  const files = readdirSync(dir)
+  const files = (names ?? readdirSync(dir))
     .filter((name) => name.endsWith(".jsonl"))
     .sort();
   for (const name of files) {
     const file = join(dir, name);
-    const lines = readFileSync(file, "utf8").split("\n");
+    let text: string;
+    try {
+      text = readFileSync(file, "utf8");
+    } catch (error) {
+      // A file listed and gone, or unreadable: said, never read as a file with no records.
+      if (names === undefined) throw error;
+      loaded.damaged.push({ file: join(JOURNAL_DIR, name), line: 0, reason: `not read: ${error instanceof Error ? error.message : String(error)}` });
+      continue;
+    }
+    const lines = text.split("\n");
     lines.forEach((line, index) => {
       if (line.trim() === "") return;
       const verdict = parseLine(line);

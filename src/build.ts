@@ -10,7 +10,7 @@
  * npm runs this as prepare, so an install from the git repository builds too.
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync } from "./lifecycle/work-meter.ts";
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";

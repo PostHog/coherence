@@ -17,7 +17,7 @@ import { TypeScriptAdapter } from "../adapters/typescript.ts";
 import { deliveryPractices } from "./practice-delivery.ts";
 import { projectPractices } from "../spec/model.ts";
 import { countingGit } from "../adapters/git-count-fixture.ts";
-import { lexiconCoverage } from "./lexicon-coverage.ts";
+import { lastHookWork } from "./work-meter.ts";
 
 function repo(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "coherence-hook-speed-"));
@@ -158,12 +158,12 @@ test("the vocabulary coverage reading runs at a tool hook only after a write, an
     const session = "cov";
     mkdirSync(join(root, ".coherence", "lexicon", "sessions"), { recursive: true });
     writeFileSync(join(root, ".coherence", "lexicon", "sessions", `${session}.json`), "{}");
+    // The work meter counts every coverage reading a hook call takes, the full reading and an edit's reading of its own files alike.
     let readings = 0;
-    const coverage = async (at: string) => {
-      readings += 1;
-      return lexiconCoverage(at);
+    const hook = async (event: "PostToolUse" | "UserPromptSubmit", extra: Record<string, unknown>) => {
+      await runHook(event, { cwd: root, session_id: session, ...extra }, root, { adapter: undefined, door: async (_r, fn) => fn(undefined, undefined, "no instrument in this test") });
+      readings += lastHookWork()?.counts["coverage reading"] ?? 0;
     };
-    const hook = (event: "PostToolUse" | "UserPromptSubmit", extra: Record<string, unknown>) => runHook(event, { cwd: root, session_id: session, ...extra }, root, { coverage, adapter: undefined, door: async (_r, fn) => fn(undefined, undefined, "no instrument in this test") });
     await hook("PostToolUse", { tool_name: "Read", tool_input: { file_path: join(root, "src/a/a.ts") } });
     await hook("PostToolUse", { tool_name: "Bash", tool_input: { command: "ls src" } });
     assert.equal(readings, 0, "a tool use that writes nothing cannot move the vocabulary");

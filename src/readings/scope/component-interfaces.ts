@@ -69,7 +69,7 @@
  * This is Node-only; the browser bundle never imports it.
  */
 
-import { execFile } from "node:child_process";
+import { execFile } from "../../lifecycle/work-meter.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { statementStartLine, type Definition, type LanguageAdapter, type ReferenceSite } from "../../adapters/adapter.ts";

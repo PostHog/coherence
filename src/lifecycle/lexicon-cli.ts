@@ -198,6 +198,21 @@ export function saveBaseline(
     ]),
   );
 }
+/**
+ * Mark terms an edit named as recurring without a definition as this
+ * session's own candidates, so neither the next edit nor the next prompt
+ * names them again; every other key of the baseline stands.
+ */
+/** The terms a baseline already holds as candidates: an edit never names them again. */
+export function heldCandidates(prior: Record<string, string>): Set<string> {
+  return new Set(Object.keys(prior).filter((key) => key.startsWith(CANDIDATE)).map((key) => key.slice(CANDIDATE.length)));
+}
+export function markCandidates(root: string, session: string, terms: readonly string[]): void {
+  if (terms.length === 0) return;
+  const path = baselinePath(root, session);
+  const previous = existsSync(path) ? priorBaseline(root, session) : {};
+  cleanWrite(path, { ...previous, ...Object.fromEntries(terms.map((term) => [CANDIDATE + term, previous[CANDIDATE + term] ?? "introduced"])) });
+}
 export function priorBaseline(
   root: string,
   session: string,

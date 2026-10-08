@@ -14,7 +14,7 @@
  * one-at-a-time path remains for runners that cannot report per test.
  */
 
-import { spawn, spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "../lifecycle/work-meter.ts";
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

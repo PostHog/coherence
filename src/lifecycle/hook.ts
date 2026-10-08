@@ -69,7 +69,7 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { execFile } from "node:child_process";
+import { closeWork, execFile, openWork, readProjectText, spawn } from "./work-meter.ts";
 import { promisify } from "node:util";
 import { failingRejected, formatReport, hasFindings, runCheck, type CheckReport } from "./check.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
@@ -80,8 +80,7 @@ import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
 import { recordReadTrace, recordWriteTrace, sessionPatch, snapshotTrace, type Snapshot } from "../economy/trace.ts";
-import { spawn } from "node:child_process";
-import { loadSpecModel, type SpecModel } from "../spec/model.ts";
+import { chokepointIndex, loadSpecModel, type ChokepointEntry, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
@@ -89,10 +88,11 @@ import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, t
 import { COHERENCE_LEXICON, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, real as realSpelling, within, type HookProject } from "./project.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
+import { editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
-import { baselinePath, coverageChanges, introducedCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
+import { baselinePath, coverageChanges, heldCandidates, introducedCandidates, markCandidates, priorBaseline, saveBaseline } from "./lexicon-cli.ts";
 import { practiceContext, practiceOrientText, practiceStopText, toolUseOf } from "./practice-delivery.ts";
 import { shellCommandOf, shellWrittenPaths } from "./shell-writes.ts";
 
@@ -211,15 +211,18 @@ function treeKeyPath(root: string, session: string): string {
 }
 
 /**
- * What the coverage reading's text depends on, cheaply: every changed or
- * untracked project file git lists, with its size and modification time. Two
- * git listings and a stat each, never a read; a commit that changes no text
- * leaves the key alone, as it leaves the reading.
+ * What the coverage reading's text depends on, cheaply: the commit HEAD
+ * names, and every changed or untracked project file git lists, with its
+ * size and modification time. A rev-parse, two git listings and a stat each,
+ * never a read. HEAD is in it because a checkout, a pull or a branch switch
+ * onto a clean tree changes files the listings never name.
  */
 async function treeKey(root: string): Promise<string | undefined> {
+  const head = headCommit(root);
+  if (head === undefined) return undefined;
   const changed = await changedFiles(root);
   if (changed.failure !== undefined) return undefined;
-  return changed.files
+  return `HEAD ${head}\n` + changed.files
     .sort()
     .map((file) => {
       try {
@@ -455,7 +458,19 @@ function specModelOrNull(root: string): SpecModel | { error: string } {
 }
 
 /** Requirements still short of invariant, and grammar problems, for orient. */
-export function specBlock(root: string): string {
+/** How long the invariant floor may go without a run that grades before orient names it. */
+export const FLOOR_QUIET_DAYS = 14;
+
+/** The orient line for a floor no full run has moved in FLOOR_QUIET_DAYS, or undefined while one has (or no run exists). */
+export function floorQuiet(runs: SpecModel["runs"], now: number): string | undefined {
+  if (runs === undefined) return undefined;
+  const since = runs.graded === undefined ? undefined : Date.parse(runs.graded);
+  if (since !== undefined && Number.isFinite(since) && now - since <= FLOOR_QUIET_DAYS * 86_400_000) return undefined;
+  const age = since === undefined || !Number.isFinite(since) ? "no full run has graded every bullet" : `the last full run that graded every bullet was ${Math.floor((now - since) / 86_400_000)} days ago (${runs.graded})`;
+  return `Invariant floor: ${age}; a scoped run moves only its own bullets and an edit's check records its entries ungraded, so the rest of the floor stands where that run left it. Run: run`;
+}
+
+export function specBlock(root: string, now: number = Date.now()): string {
   const model = specModelOrNull(root);
   if ("error" in model) return `Spec: not readable (${model.error})\n\n`;
   if (model.components.length === 0) return "";
@@ -467,6 +482,10 @@ export function specBlock(root: string): string {
     for (const { c, i } of open.slice(0, OPEN_REQUIREMENT_LINES)) lines.push(`○ ${c.folder}/${i.name} — lacks: ${i.lacks.join(", ")}`);
     if (open.length > OPEN_REQUIREMENT_LINES) lines.push(`  and ${open.length - OPEN_REQUIREMENT_LINES} more; run: spec --check`);
   }
+  // The invariant floor moves only with a run that grades: an edit's check records its entries ungraded, so a project
+  // that only edits keeps a floor as old as its last full run, and says so.
+  const quiet = floorQuiet(model.runs, now);
+  if (quiet !== undefined) lines.push(quiet);
   // A defect in a class already guarded: the protection was weaker than claimed (journal/defects.ts).
   const failures = model.defects?.guardFailures ?? [];
   if (failures.length > 0) {
@@ -611,16 +630,49 @@ export async function editContext(root: string, input: HookInput, options: HookO
   const own = keepProjectFiles(root, written);
   const files = written.filter((file) => own.has(file));
   if (files.length === 0) return "";
-  const model = specModelOrNull(root);
-  if ("error" in model || model.components.length === 0) return "";
-  const touched = model.components.flatMap((c) => c.invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint") && files.some(file=> {
-    const absolute=resolve(root,file);
-    return mayTouch(i,file,existsSync(absolute) ? readFileSync(absolute,"utf8") : undefined);
-  })).map((i) => i.name));
-  if (touched.length === 0) return "";
+  const texts = new Map(files.map((file) => {
+    const absolute = resolve(root, file);
+    return [file, existsSync(absolute) ? readProjectText(absolute, "source") : undefined] as const;
+  }));
+  // Every chokepoint invariant, read the light way (chokepointIndex): the specs and the run index, never the whole spec model or
+  // the run history. Anything that keeps that light way from answering falls back to the whole model, as before it existed, and
+  // the answer says so: an optimization of a check fails toward the slow, correct path, never toward silence.
+  let model: SpecModel;
+  let touched: string[];
+  let without: string | undefined;
+  try {
+    const entries = chokepointIndex(root, files);
+    touched = [...new Set(entries.filter((i) => files.some((file) => mayTouch(i, file, texts.get(file)))).map((i) => i.name))];
+    // The run needs only the touched invariants, their components and their enforcements: never the whole model.
+    model = chokepointModel(root, entries.filter((i) => touched.includes(i.name)));
+  } catch (error) {
+    without = `${error instanceof Error ? error.message : String(error)}; the whole spec model and run store were read instead`;
+    const whole = specModelOrNull(root);
+    if ("error" in whole) return `Coherence checked this edit without its index: ${without}, and the spec is not readable (${whole.error})\n`;
+    model = whole;
+    touched = [...new Set(whole.components.flatMap((c) => c.invariants.filter((i) => i.enforcements.some((e) => e.form === "chokepoint") && files.some((file) => mayTouch(i, file, texts.get(file)))).map((i) => i.name)))];
+  }
+  const said = without === undefined ? "" : `Coherence checked this edit without its index: ${without}.\n`;
+  if (touched.length === 0) return said;
+  return said + (await checkAtEdit(root, input, options, files, model, touched));
+}
+
+/** A model of the touched chokepoint invariants alone, which is all the run of an edit's check reads. */
+function chokepointModel(root: string, entries: readonly ChokepointEntry[]): SpecModel {
+  const folders = [...new Set(entries.map((e) => e.component))];
+  const components = folders.map((folder) => ({
+    folder,
+    invariants: entries.filter((e) => e.component === folder).map((e) => ({ name: e.name, component: folder, enforcements: e.enforcements, latest: e.latest })),
+  }));
+  return { root, components } as unknown as SpecModel;
+}
+
+/** The chokepoint check of the touched invariants at an edit, as text: what it could not check, and any structural defect it found. */
+async function checkAtEdit(root: string, input: HookInput, options: HookOptions, files: readonly string[], model: SpecModel, touched: readonly string[]): Promise<string> {
   const session = sessionOf(input) ?? "unknown-session";
   const agent = agentOf(input);
-  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: touched, model, adapter: options.adapter, refresh: files });
+  // The edit's check grades nothing: deriving a state reads the whole model and history, and the floor counts only a full run's grades.
+  const outcome = await performRun(root, { session, agent, form: "chokepoint", invariants: [...touched], model, adapter: options.adapter, refresh: [...files], grade: false });
   if (outcome.instrumentReason !== undefined) return `Coherence could not check ${touched.length} chokepoint invariant${touched.length === 1 ? "" : "s"} at this edit: ${outcome.instrumentReason}\n`;
   const failed = outcome.details.filter((d) => d.entry.verdict === "fail");
   // A check the instrument could not make is said, never silent: a quiet not-run would read as a clean edit. A value written as prose is the spec's own lack, reported by spec --check instead.
@@ -826,8 +878,6 @@ export interface HookOptions {
    * WARM_UP; absent (a test), nothing is started.
    */
   warm?: ((root: string) => void) | undefined;
-  /** The vocabulary coverage reading (tests count it); lexiconCoverage by default. */
-  coverage?: ((root: string) => Promise<Coverage>) | undefined;
   /** When the hook's process started (epoch ms), so a call's time counts loading the code; the call's own start when absent. */
   startedAt?: number | undefined;
   /**
@@ -1054,6 +1104,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
   // One spec model per event, shared by every part of its answer; the body stays inside runHook, the chokepoint for its exit codes.
   const outer = eventModels;
   eventModels = new Map();
+  // The work this call does is counted in its own scope (work-meter.ts), which a test reads once the call returns.
+  const work = openWork();
   const began = options.startedAt ?? Date.now();
   const installed = installedRoot(fallbackRoot);
   const given = typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : fallbackRoot;
@@ -1071,6 +1123,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     return timed(await answer());
   } finally {
     eventModels = outer;
+    closeWork(work);
   }
 
   /** A session start above a project it has not entered names the project in one line; every other event says nothing. Nothing is read or written. */
@@ -1125,7 +1178,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     const root = place.root;
     // The session has just entered the project, which no start or prompt warmed: its instrument starts now, before the edit that needs it.
     options.warm?.(root);
-    const reading = await lexiconCoverage(root);
+    const reading = await keptReading(root, await loadProjectLexicons(root));
     const gaps = await gapReading(root);
     const text = (await startReading(root, input, reading, gaps)).text;
     const answered = (result.stdout.trim() === "" ? {} : JSON.parse(result.stdout)) as { hookSpecificOutput?: { additionalContext?: string } };
@@ -1156,7 +1209,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
       case "SessionStart":
       case "SubagentStart": {
         if (event === "SessionStart") options.warm?.(root);
-        const reading=await lexiconCoverage(root);
+        const reading=await keptReading(root, await loadProjectLexicons(root));
         // Only a session start waits, and only for a refresh of this tree that is nearly done; a subagent starts at once.
         let gaps = await gapReading(root, event === "SessionStart" ? { waitMs: options.startWaitMs ?? START_WAIT_MS } : {});
         // A stale or absent reading starts one in the background (a no-op while one of this tree runs), then orient reads the last one, labeled.
@@ -1203,24 +1256,53 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         }
         if (event === "UserPromptSubmit") options.warm?.(root);
         const edit = event === "PostToolUse" ? await editContext(root, input, { ...options, host }) : "";
-        // The coverage reading walks the whole corpus (seconds on a real project), so it runs only when the text can have moved:
-        // after a tool use that wrote a project file, and at a prompt when the tree moved since this session's last reading.
+        // The full reading walks the whole corpus (seconds on a real project), so it runs only at a prompt when the tree moved since this
+        // session's last reading, and it keeps the vocabulary state an edit reads (vocabulary-state.ts). An edit reads the files it wrote
+        // against that state, never the corpus; with no state valid for this code and lexicon, it takes the full reading once, which keeps one.
         // A write no command line shows is read at the stop, which always reads in full.
         const tree = event === "UserPromptSubmit" && session ? await treeKey(root) : undefined;
-        const moved = event === "PostToolUse" ? written.length > 0 : tree === undefined || tree !== lastTreeKey(root, session!);
-        const reading=session && moved && existsSync(baselinePath(root,session)) ? await (options.coverage ?? lexiconCoverage)(root) : undefined;
-        if (reading && session && tree !== undefined) keepTreeKey(root, session, tree);
-        const changes=reading && session ? coverageChanges(reading,priorBaseline(root,session)) : [];
+        const baseline = session !== undefined && existsSync(baselinePath(root, session));
+        let reading: Coverage | undefined;
+        let changes: { term: string; component: string; evidence: string; state: string; reason: string }[] = [];
+        let fresh: string[] = [];
+        let keep = (): void => {};
+        let vocabularyNote = "";
+        if (baseline && event === "PostToolUse" && written.length > 0) {
+          const layers = await loadProjectLexicons(root);
+          const prior = priorBaseline(root, session!);
+          // The kept vocabulary is an optimization: anything that keeps it from answering falls back to the full reading, which says why.
+          let edited: Awaited<ReturnType<typeof editVocabulary>>;
+          try {
+            edited = await editVocabulary(root, layers, written, heldCandidates(prior));
+          } catch (error) {
+            edited = { unavailable: `its kept vocabulary could not be read (${error instanceof Error ? error.message : String(error)})` };
+          }
+          if ("changes" in edited) {
+            changes = edited.changes;
+            fresh = changes.filter((c) => c.state === "unresolved").map((c) => c.term);
+            // Nothing to say: the kept state takes the edit in now; otherwise once the line reached the host.
+            if (changes.length === 0) edited.keep();
+            else keep = edited.keep;
+          } else {
+            if (edited.unavailable !== undefined) vocabularyNote = `Lexicon: read in full at this edit: ${edited.unavailable}.`;
+            reading = await keptReading(root, layers);
+            changes = coverageChanges(reading, prior);
+          }
+        } else if (baseline && event === "UserPromptSubmit" && (tree === undefined || tree !== lastTreeKey(root, session!))) {
+          reading = await keptReading(root, await loadProjectLexicons(root));
+          if (tree !== undefined) keepTreeKey(root, session!, tree);
+          changes = coverageChanges(reading, priorBaseline(root, session!));
+        }
         const vocabulary=changes.length ? await vocabularyAtEdit(root, changes) : "";
         // What the last stop said reached only the user; the prompt that follows it is where the agent reads it.
         const fromStop = event === "UserPromptSubmit" && session ? carried(root, session) : undefined;
         const lastStop = fromStop === undefined ? "" : `At your last stop (shown to the user, not to you), ${fromStop.replace(/^Regulate \(Stop\):\n/, "regulate said:\n")}`;
-        const context = await voiced(root, input, [lastStop,feed.text,edit,vocabulary].filter(Boolean).join("\n"), voice);
+        const context = await voiced(root, input, [lastStop,feed.text,edit,vocabularyNote,vocabulary].filter(Boolean).join("\n"), voice);
         if (context === "") return { stdout: "", stderr: "", exit: 0 };
         const stdout = JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } });
         // An override took the feed's and the vocabulary line's place, so neither reached the host and neither advances.
         const delivered = voice.override === undefined && (feed.text !== "" || changes.length > 0 || lastStop !== "");
-        const commit=()=> { if(feed.text) feed.commit(); if(changes.length && reading && session) saveBaseline(root,session,reading); if(lastStop && session) dropCarry(root,session); };
+        const commit=()=> { if(feed.text) feed.commit(); if(changes.length && session) { if (reading) saveBaseline(root,session,reading); else { keep(); markCandidates(root, session, fresh); } } if(lastStop && session) dropCarry(root,session); };
         return {stdout:stdout+"\n",stderr:"",exit:0,...(delivered ? {commit} : {})};
       }
       case "Stop":
@@ -1235,7 +1317,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const spec = specStopText(root, changed.files, walls);
         const lexicon = lexiconStopText(report, walls);
         const workText = workStopText(root, input);
-        const reading=session && existsSync(baselinePath(root,session)) ? await lexiconCoverage(root) : undefined;
+        const reading=session && existsSync(baselinePath(root,session)) ? await keptReading(root, await loadProjectLexicons(root)) : undefined;
         const coverageText=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : "";
         const changedText = changed.failure === undefined ? "" : `Changed files: not known (${changed.failure}); the lexicon check ran over nothing`;
         const gapText = await gapStopText(root, input, changed.files);
