@@ -38,6 +38,54 @@ is the one way to set Coherence up, and every session start names the
 Coherence that runs, its version and where it is. A clone kept beside the
 project is no longer a way to run it: the hooks never do.
 
+## One invariant, start to finish
+
+Say every read of your session store must go through `getSession`, because
+that is where the session is checked.
+
+1. **Write it down.** In the spec beside the code,
+   `src/sessions/Sessions.spec.md`, add one bullet:
+
+   ```markdown
+   ## invariants
+   - checked session reads: Every read of the session store passes the session check.
+     protects: sessionStore in src/sessions/store.ts
+     chokepoint: getSession
+     because: a read that skips the check can return another user's session
+   ```
+
+2. **Prove the check works.** `coherence run` asks the language server for
+   every reference to `sessionStore` and flags any outside `getSession`. It
+   also plants a fake bypass, without touching your files, to prove the
+   check would see one. A check that would miss it is reported as vacuous,
+   not passing.
+3. **An agent cuts the corner.** Weeks later, an agent writes
+   `sessionStore.read(id)` straight into a route handler. In the same turn,
+   the hook names the file and line, and gives the agent two choices: go
+   through `getSession`, or escalate to a human.
+4. **Nobody has to remember.** The agent fixes the call, and the reason it
+   chose is kept in the journal. Scope shows the chokepoint as verified, and
+   every later session starts out knowing it is there.
+
+The rest of this page explains each part of that loop.
+
+## If you know Domain-Driven Design
+
+Many of Coherence's ideas come from the same place as Domain-Driven Design
+(DDD). This table maps the words, and says where they differ.
+
+| DDD | Coherence | Where it differs |
+|---|---|---|
+| Ubiquitous language | Lexicon | One lexicon per project, and each rejected name keeps the reason it was rejected. |
+| Bounded context | Component | A component is a folder with a spec. The words in it are the project's words, not its own. |
+| Aggregate root | Chokepoint | The one site every reference must pass is proven from the code by the language server. |
+| Invariant | Invariant | It counts only once its detector has been seen to fail on a planted break. |
+| Event log | Journal | Records are only ever added. A mistake is fixed with a later record, never an edit. |
+| Read model | Orient, regulate, Scope | Each is worked out from the specs and the journal, and stored nowhere. |
+| Context map | Structure view | Drawn from the references the language server finds, never by hand. |
+| Hotspot (EventStorming) | Conjecture | A puzzle written down while it is fresh, with the test that would settle it. |
+| Safe-to-fail probe | Experiment | Its success criteria are written before acting, and each needs evidence to close. |
+
 ## See the system: the Structure view
 
 `coherence scope` opens Scope, a live page that projects the whole model of
