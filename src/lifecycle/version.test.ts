@@ -13,6 +13,7 @@ import {
   isNewer,
   latestPath,
   packageManager,
+  reachNote,
   readLatest,
   refreshLatest,
   REGISTRY_LATEST,
@@ -184,6 +185,51 @@ test("a failed fetch keeps the last answer, and version says when the registry l
   assert.match(text, /\nlatest published: 1\.6\.0, as the registry said 2026-10-07T00:00:00\.000Z; update: npm install -D @posthog\/coherence@\^1\.6\.0; /);
   assert.match(text, /\nlast check: 2026-10-08T00:00:00\.000Z, which got no answer from the registry\n/);
   assert.match(versionText(project, false, { ...env, CI: "1" }, installed), /\nupdate check: off, CI is set\n$/);
+});
+
+test("a release newer than the registry's last answer is never told that answer is the latest, and the next session start asks again once", () => {
+  const project = temp("coherence-stale-");
+  const installed = coherenceAt(join(project, "node_modules", PACKAGE_NAME), "1.6.0", join("dist", "cli.js"));
+  const env = userEnv();
+  // PostHog's upgrade: the day's check had answered 1.5.2 before 1.6.0 was published, and 1.6.0 now runs.
+  keepLatest(env, { attempted: "2026-10-08T10:09:19.000Z", checked: "2026-10-08T10:09:19.268Z", latest: "1.5.2" });
+  const text = versionText(project, false, env, installed);
+  assert.doesNotMatch(text, /latest published: 1\.5\.2/, "the stale answer is not presented as the latest");
+  assert.doesNotMatch(text, /this is current/);
+  assert.match(text, /\nlatest published: not known since 1\.6\.0, which is newer than the registry's last answer, 1\.5\.2, given 2026-10-08T10:09:19\.268Z; the next session start asks again\n/);
+  assert.match(versionText(project, false, { ...env, CI: "1" }, installed), /given 2026-10-08T10:09:19\.268Z\n/, "a check that is off promises no next one");
+  assert.equal(versionBlock(project, false, env, installed).trimEnd().split("\n").length, 1, "the session start names no update from it");
+  keepLatest(env, { checked: "2026-10-08T10:09:19.268Z", latest: "1.6.0" });
+  assert.match(versionText(project, false, env, installed), /\nlatest published: 1\.6\.0, as the registry said 2026-10-08T10:09:19\.268Z; this is current\n/, "the same version is current");
+
+  // The refresh: within the day, an answer older than the running release is asked again, once for that release.
+  const { spawner, spawned } = spawnRecorder();
+  const at = new Date("2026-10-08T12:00:00.000Z");
+  keepLatest(env, { attempted: "2026-10-08T11:00:00.000Z", checked: "2026-10-08T11:00:00.000Z", latest: VERSION });
+  assert.equal(startUpdateCheck(project, "SessionStart", env, spawner, () => at), false, "an answer as new as the running release waits its day");
+  keepLatest(env, { attempted: "2026-10-08T11:00:00.000Z", checked: "2026-10-08T11:00:00.000Z", latest: "0.0.1" });
+  assert.equal(startUpdateCheck(project, "SessionStart", env, spawner, () => at), true, "an answer older than the running release is asked again");
+  assert.equal(readLatest(env).askedAs, VERSION);
+  assert.equal(startUpdateCheck(project, "SessionStart", env, spawner, () => at), false, "once per release: a registry that still answers older waits its day");
+  assert.equal(spawned.length, 1);
+});
+
+test("hooks install names the Coherence the hooks reach as the session start names it, never an installed package as a checkout", () => {
+  const parent = temp("coherence-reach-");
+  const project = join(parent, "project");
+  mkdirSync(project);
+  // pnpm's layout, as PostHog's install had it.
+  const installed = coherenceAt(join(project, "node_modules", ".pnpm", "@posthog+coherence@1.6.0", "node_modules", PACKAGE_NAME), "1.6.0", join("dist", "cli.js"));
+  const checkout = join(parent, "coherence");
+  const sibling = coherenceAt(checkout, "1.6.0", join("src", "cli.ts"));
+  const env = userEnv({ COHERENCE_NO_UPDATE_CHECK: "1" });
+  const package_ = `the installed package (node_modules/.pnpm/@posthog+coherence@1.6.0/node_modules/${PACKAGE_NAME})`;
+
+  assert.equal(reachNote(project, undefined, installed, env), undefined, "nothing found: the caller says how to fix it");
+  assert.equal(reachNote(project, installed, installed, env), `the hooks reach ${package_}, the Coherence running this install\n`);
+  assert.equal(versionBlock(project, false, env, installed), `Coherence 1.6.0 runs this session: ${package_}.\n`, "the session start says the same words");
+  assert.equal(reachNote(project, sibling, sibling, { ...env, COHERENCE_HOME: checkout }), `the hooks reach the checkout COHERENCE_HOME names (${checkout}), the Coherence running this install\n`);
+  assert.equal(reachNote(project, installed, sibling, env), `note: the hooks will run ${package_}, not a checkout at ../coherence, which runs this install\n`);
 });
 
 test("--version, -v, version, --help, -h and help answer at the top level", () => {

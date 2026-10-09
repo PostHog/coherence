@@ -63,7 +63,7 @@ import { TELEMETRY_USAGE, telemetryCommand } from "./lifecycle/telemetry-cli.ts"
 import { CI_USAGE, ciInstallCommand, ciSuggestion } from "./lifecycle/ci.ts";
 import { ciReportCommand } from "./lifecycle/ci-report.ts";
 import { startTelemetry } from "./lifecycle/telemetry.ts";
-import { refreshLatest, startUpdateCheck, versionText } from "./lifecycle/version.ts";
+import { reachNote, refreshLatest, startUpdateCheck, versionText } from "./lifecycle/version.ts";
 
 type CommandResult = number | Promise<number>;
 type RootCommand = (argv: string[], io: Io) => CommandResult;
@@ -142,15 +142,14 @@ async function defaultCommand(root: string, sub = "", local = false): Promise<st
   return (await isCoherenceItself(root)) ? `node "${dir}/src/cli.ts"` : locatedPrefix(sub, local);
 }
 
-/** This checkout's cli, as the located command would name it once resolved. */
+/** The cli running this command, as the located command would name it once resolved: an installed package, a checkout, or Coherence's own source. */
 const THIS_CLI = realpathSync(fileURLToPath(import.meta.url));
 
-/** After an adopter's install: say where the hooks will find Coherence, or how to make them find it. */
+/** After an adopter's install: say which Coherence the hooks will find, named as the session start names it, or how to make them find it. */
 function locateNote(root: string, sub = ""): string {
   const found = locate(root, process.env, sub);
-  const real = found === undefined ? undefined : realpathSync(found);
-  if (real === THIS_CLI) return `the hooks reach this checkout (${dirname(dirname(THIS_CLI))})\n`;
-  if (real !== undefined) return `note: the hooks will run the Coherence at ${real}, not this checkout (${THIS_CLI})\n`;
+  const reached = reachNote(root, found === undefined ? undefined : realpathSync(found), THIS_CLI);
+  if (reached !== undefined) return reached;
   return (
     `note: the hooks cannot find Coherence from here; they run the project's installed ${PACKAGE_NAME}.\n` +
     `  Run npm install -D ${PACKAGE_NAME} (or pnpm add -D, yarn add -D) in the project, or its install if package.json already lists it. Until then each session start tells the agent it is missing, and the other events do nothing.\n`
