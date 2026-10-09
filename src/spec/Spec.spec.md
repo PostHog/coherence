@@ -242,3 +242,9 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   crossing: record -> reading
   refuted: made the floor count a defect as a guard failure only when recorded before the guard, so a later repeat went unnamed -> "spec --check names a defect closed with neither a guard nor a decision and a defect in an already guarded class as a guard failure, without counting either as a problem" went red in defects.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-07)
   kinds: none
+- a family's guard answers only for its own defect: A defect class declared as a family (the property family <name> of the defect concept, as audience is) is accepted wherever a class is, and its guards never stand for the family: a later defect in a family is no guard failure, while a later defect in a class a resolution already guarded still is.
+  over: a family defect closed with a witnessed guard and a later one in the family, beside the same sequence in a class
+  via: a family's guard answers only for its own defect, so a later defect in the family is no guard failure, while a class keeps the rule
+  because: audience covers every message and every piece of guidance, so the guard of its first guarded defect (the CI offer) stood for the whole class and turned two unrelated wording defects into guard failures (c-5c824314); the owner chose broad classes over splitting audience into single-member classes (d-a02fd009)
+  refuted: let a family's witnessed guard stand for the family, as a class's does -> "a family's guard answers only for its own defect, so a later defect in the family is no guard failure, while a class keeps the rule" went red in src/journal/defects.test.ts; restored (cmp), green (2026-10-09)
+  kinds: none

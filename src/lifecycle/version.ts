@@ -9,7 +9,8 @@
  * which Coherence spoke.
  *
  * The newest published version is read from the npm registry, at most once
- * a day, by a detached child a session start spawns, and kept beside
+ * a day (and once more for a release newer than the kept answer, which was
+ * given before it was published), by a detached child a session start spawns, and kept beside
  * telemetry's state in the user's config directory; no hook waits on it and
  * a failed fetch keeps the last answer. COHERENCE_NO_UPDATE_CHECK=1, CI and
  * DO_NOT_TRACK=1 each turn it off. When the kept answer is newer than the
@@ -147,7 +148,8 @@ function shown(root: string, folder: string): string {
   return rel !== "" && rel.split(sep).filter((part) => part === "..").length <= 2 ? rel : folder;
 }
 
-function described(root: string, copy: { kind: CopyKind; folder: string }): string {
+/** What a copy of Coherence is, in the words every message uses: the installed package, the checkout $COHERENCE_HOME names, a checkout, or Coherence's own source. */
+export function described(root: string, copy: { kind: CopyKind; folder: string }): string {
   switch (copy.kind) {
     case "own":
       return "this repository's own source";
@@ -156,19 +158,32 @@ function described(root: string, copy: { kind: CopyKind; folder: string }): stri
     case "home":
       return `the checkout ${HOME_VAR} names (${copy.folder})`;
     case "checkout":
-      return `a checkout at ${shown(root, copy.folder)}, named by the hook command itself`;
+      return `a checkout at ${shown(root, copy.folder)}`;
   }
 }
 
 /** The session start's lines on the Coherence running: one line naming it, and one more for each reachable copy at another version. */
 export function copyLines(root: string, running: RunningCopy, others: readonly OtherCopy[]): string[] {
-  const lines = [`Coherence ${running.version} runs this session: ${described(root, running)}.`];
+  // Only a hook command that names the cli itself runs a checkout no variable chose.
+  const lines = [`Coherence ${running.version} runs this session: ${described(root, running)}${running.kind === "checkout" ? ", named by the hook command itself" : ""}.`];
   for (const other of others) {
     if (other.version === running.version) continue;
     const reach = other.kind === "installed" ? `npx --no -- coherence` : `node ${shown(root, join(other.folder, "src", "cli.ts"))}`;
     lines.push(`Another Coherence differs: ${described(root, other)} is ${other.version}, so ${reach} answers as ${other.version}, not as this session's ${running.version}; keep one, or update the other.`);
   }
   return lines;
+}
+
+/**
+ * After an adopter's hooks install: which Coherence the hooks will reach,
+ * named as the session start names it. `found` is the cli the located search
+ * finds (undefined when none), `cli` the one running the install.
+ */
+export function reachNote(root: string, found: string | undefined, cli: string = OWN_CLI, env: Env = process.env): string | undefined {
+  if (found === undefined) return undefined;
+  const reached = runningCopy(root, found, env);
+  if (real(found) === real(cli)) return `the hooks reach ${described(root, reached)}, the Coherence running this install\n`;
+  return `note: the hooks will run ${described(root, reached)}, not ${described(root, runningCopy(root, cli, env))}, which runs this install\n`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -221,6 +236,8 @@ export interface LatestCache {
   checked?: string;
   /** The newest published version, as of `checked`. */
   latest?: string;
+  /** The running version that started the last check, so an answer older than it is asked again once per release. */
+  askedAs?: string;
 }
 
 export const latestPath = (env: Env = process.env): string => join(telemetryDir(env), "latest.json");
@@ -235,6 +252,7 @@ export function readLatest(env: Env = process.env): LatestCache {
     ...(text("attempted") !== undefined ? { attempted: text("attempted")! } : {}),
     ...(text("checked") !== undefined ? { checked: text("checked")! } : {}),
     ...(latest !== undefined && SEMVER.test(latest) ? { latest } : {}),
+    ...(text("askedAs") !== undefined ? { askedAs: text("askedAs")! } : {}),
   };
 }
 
@@ -246,10 +264,17 @@ export function updateCheckRefusal(env: Env = process.env): string | undefined {
   return undefined;
 }
 
-/** Whether a session start now should ask the registry: the check is on and the last attempt is a day old, or there was none. */
-export function updateCheckDue(env: Env = process.env, now: number = Date.now()): boolean {
+/**
+ * Whether a session start now should ask the registry: the check is on and
+ * the last attempt is a day old, or there was none, or the kept answer is
+ * older than the running version and this version has not asked yet (an
+ * answer kept before this release was published says nothing about it).
+ */
+export function updateCheckDue(env: Env = process.env, now: number = Date.now(), running?: string): boolean {
   if (updateCheckRefusal(env) !== undefined) return false;
-  const attempted = Date.parse(readLatest(env).attempted ?? "");
+  const cache = readLatest(env);
+  if (running !== undefined && cache.latest !== undefined && isNewer(running, cache.latest) && cache.askedAs !== running) return true;
+  const attempted = Date.parse(cache.attempted ?? "");
   return !Number.isFinite(attempted) || now - attempted >= CHECK_INTERVAL_MS || attempted > now;
 }
 
@@ -273,7 +298,7 @@ export async function refreshLatest(env: Env = process.env, fetcher: LatestFetch
   const attempted = now().toISOString();
   writeJson(latestPath(env), { ...before, attempted }, env);
   const latest = await fetcher(REGISTRY_LATEST, LATEST_TIMEOUT_MS);
-  const next: LatestCache = latest === undefined ? { ...before, attempted } : { attempted, checked: now().toISOString(), latest };
+  const next: LatestCache = latest === undefined ? { ...before, attempted } : { ...before, attempted, checked: now().toISOString(), latest };
   writeJson(latestPath(env), next, env);
   return next;
 }
@@ -288,8 +313,10 @@ export type Spawner = (command: string, args: string[], options: { cwd: string; 
  */
 export function startUpdateCheck(root: string, event: string, env: Env = process.env, spawner: Spawner = spawn as unknown as Spawner, now: () => Date = () => new Date()): boolean {
   try {
-    if (event !== "SessionStart" || !updateCheckDue(env, now().getTime())) return false;
-    writeJson(latestPath(env), { ...readLatest(env), attempted: now().toISOString() }, env);
+    if (event !== "SessionStart") return false;
+    const running = runningCopy(root, OWN_CLI, env).version;
+    if (!updateCheckDue(env, now().getTime(), running)) return false;
+    writeJson(latestPath(env), { ...readLatest(env), attempted: now().toISOString(), askedAs: running }, env);
     const child = spawner(process.execPath, ["--disable-warning=ExperimentalWarning", OWN_CLI, "version", "--refresh"], { cwd: root, detached: true, stdio: "ignore" });
     child.on("error", () => {});
     child.unref();
@@ -384,9 +411,14 @@ export function versionText(root: string, own: boolean, env: Env = process.env, 
   lines[0] = `coherence ${running.version}: ${lines[0]!.replace(/^Coherence \S+ runs this session: /, "")}`;
   const cache = readLatest(env);
   const refusal = updateCheckRefusal(env);
-  if (cache.latest !== undefined) {
+  const said = cache.checked ?? "at an unknown time";
+  if (cache.latest !== undefined && isNewer(running.version, cache.latest)) {
+    // An answer kept before this release was published: it is not the latest, and this is not "current" by it.
+    const next = refusal !== undefined ? "" : updateCheckDue(env, Date.now(), running.version) ? "; the next session start asks again" : `; the next check is due a day after ${cache.attempted ?? "the last"}`;
+    lines.push(`latest published: not known since ${running.version}, which is newer than the registry's last answer, ${cache.latest}, given ${said}${next}`);
+  } else if (cache.latest !== undefined) {
     const newer = isNewer(cache.latest, running.version);
-    lines.push(`latest published: ${cache.latest}, as the registry said ${cache.checked ?? "at an unknown time"}${newer ? `; update: ${updateHow(root, running, cache.latest)}` : "; this is current"}`);
+    lines.push(`latest published: ${cache.latest}, as the registry said ${said}${newer ? `; update: ${updateHow(root, running, cache.latest)}` : "; this is current"}`);
   } else lines.push("latest published: never read yet");
   if (cache.attempted !== undefined && Date.parse(cache.attempted) > (cache.checked === undefined ? 0 : Date.parse(cache.checked))) lines.push(`last check: ${cache.attempted}, which got no answer from the registry`);
   lines.push(refusal === undefined ? `update check: on, at most once a day from a session start, in the background (${latestPath(env)}); COHERENCE_NO_UPDATE_CHECK=1 turns it off` : `update check: off, ${refusal}`);
