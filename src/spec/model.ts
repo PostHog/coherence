@@ -27,7 +27,7 @@ import { exclusionOf, projectFilesEnding, walkBounds, walkedProjectFiles, type W
 import { configuredName, effectiveConfig, lexiconFileOf, readConfigFile } from "../adapters/project-config.ts";
 import { PRACTICE_SUFFIX, parsePractices } from "./practice.ts";
 import { invariantFloorGaps, invariantFloorProblems, rawFloorGaps } from "./floor.ts";
-import { declaredClasses, defectFloor, defectStates, type DefectFloor, type GuardStanding } from "../journal/defects.ts";
+import { declaredClasses, declaredFamilies, defectFloor, defectStates, type DefectFloor, type GuardStanding } from "../journal/defects.ts";
 import { kernelPractices, enactmentsIn, isCoherenceTree, journalRecords, modelPractice, practiceProblems, stemOf, type ModelPractice } from "./practices.ts";
 
 export const SPEC_SUFFIX = ".spec.md";
@@ -464,7 +464,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   const counts = countModel(components, problems);
   // The journal is read for defects even where no practice file asked for it; a project with no spec reads none.
   const journal = practiceFiles.size === 0 && components.length > 0 ? journalRecords(root) : records;
-  const defects = defectFloor(defectStates(journal), guardStanding(components), declaredClasses(root));
+  const defects = defectFloor(defectStates(journal), guardStanding(components), declaredClasses(root), declaredFamilies(root));
   const crossingAlone = crossingAloneCredits(components, trustLevels);
   return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs, defects, ...(crossingAlone.length === 0 ? {} : { crossingAlone }), ...(storedName === undefined ? {} : { storedName }) };
 }
