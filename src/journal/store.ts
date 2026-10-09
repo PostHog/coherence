@@ -9,8 +9,9 @@
  */
 
 import { execFileSync } from "../lifecycle/work-meter.ts";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { appendWhole, storeLines } from "./append.ts";
 import { JournalError } from "./args.ts";
 import { isKind, type JournalRecord } from "./record.ts";
 import { SESSION_TOKEN, workBinding } from "./work.ts";
@@ -41,7 +42,7 @@ export function appendRecord(cwd: string, record: JournalRecord): JournalRecord 
   const file = sessionFile(cwd, record.session);
   const bound: JournalRecord = { ...record, ...workBinding(cwd, record.session, record.work) };
   mkdirSync(journalDir(cwd), { recursive: true });
-  appendFileSync(file, `${JSON.stringify(bound)}\n`, "utf8");
+  appendWhole(file, `${JSON.stringify(bound)}\n`);
   return bound;
 }
 
@@ -96,6 +97,7 @@ export function loadJournalFiles(cwd: string, names?: readonly string[]): Loaded
   const files = (names ?? readdirSync(dir))
     .filter((name) => name.endsWith(".jsonl"))
     .sort();
+  const seen = new Set<string>();
   for (const name of files) {
     const file = join(dir, name);
     let text: string;
@@ -107,16 +109,14 @@ export function loadJournalFiles(cwd: string, names?: readonly string[]): Loaded
       loaded.damaged.push({ file: join(JOURNAL_DIR, name), line: 0, reason: `not read: ${error instanceof Error ? error.message : String(error)}` });
       continue;
     }
-    const lines = text.split("\n");
-    lines.forEach((line, index) => {
-      if (line.trim() === "") return;
+    for (const { line, number } of storeLines(text, seen)) {
       const verdict = parseLine(line);
       if (typeof verdict === "string") {
-        loaded.damaged.push({ file: join(JOURNAL_DIR, name), line: index + 1, reason: verdict });
+        loaded.damaged.push({ file: join(JOURNAL_DIR, name), line: number, reason: verdict });
       } else {
         loaded.records.push(verdict);
       }
-    });
+    }
   }
   loaded.records.sort(compareRecords);
   return loaded;

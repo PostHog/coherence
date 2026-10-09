@@ -154,8 +154,9 @@ test("an append asks its run file's sites shard, never the file: beside ten time
       assert.equal(lines.at(-1)!["sites"], undefined, "the unchanged sites are not written again");
       assert.deepEqual(lines.at(-1)!["sitesRef"], { hash: sitesHash(lastSites), at: loadRuns(root).records.at(-2)!.at }, "but referred to, from the shard");
       const session = Object.entries(fs.paths).filter(([key]) => /^(readFileSync|readSync|promises\.readFile|readFile) .*\/runs\/long\.jsonl$/.test(key));
-      // The index's fold reads the appended line back, and only it: its bytes are the line's, at any length of the file.
-      const appended = Buffer.byteLength(readFileSync(join(root, ".coherence", "runs", "long.jsonl"), "utf8").trim().split("\n").at(-1)! + "\n");
+      // The index's fold reads the appended line back, and only it: its bytes are the line's, at any length of the file,
+      // and the one last byte the append reads first to see whether a torn line needs ending (append.ts).
+      const appended = Buffer.byteLength(readFileSync(join(root, ".coherence", "runs", "long.jsonl"), "utf8").trim().split("\n").at(-1)! + "\n") + 1;
       assert.deepEqual(session.map(([, bytes]) => bytes), session.length === 0 ? [] : [appended], "the session's run file is read for the appended line alone");
       counted.push(fs.calls);
     }

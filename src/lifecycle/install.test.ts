@@ -276,8 +276,8 @@ test("install keeps Coherence's regenerated state out of the project's git, and 
     }
     assert.deepEqual(
       gitStatus(dir),
-      [".claude/settings.json", ".coherence/.gitignore", ...[...DURABLE].map((f) => `.coherence/${f}/state.jsonl`), ".gitignore"].sort(),
-      "git sees the settings, the ignore file and the durable folders, and none of the regenerated state",
+      [".claude/settings.json", ".coherence/.gitattributes", ".coherence/.gitignore", ...[...DURABLE].map((f) => `.coherence/${f}/state.jsonl`), ".gitignore"].sort(),
+      "git sees the settings, the ignore and attributes files and the durable folders, and none of the regenerated state",
     );
     assert.equal(await readFile(join(dir, ".gitignore"), "utf8"), before, "the adopter's own .gitignore is never edited");
     assert.equal((await install({ root: dir, host: "claude", command: "npx coherence" })).ignore.action, "unchanged", "a second install writes nothing");

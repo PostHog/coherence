@@ -87,6 +87,7 @@ import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
 import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, type Lexicon } from "./lexicon.ts";
 import { COHERENCE_LEXICON, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, real as realSpelling, within, type HookProject } from "./project.ts";
+import { keepStateFiles } from "./state-files.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
 import { editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
@@ -257,7 +258,7 @@ function keepTreeKey(root: string, session: string, key: string): void {
 /** A path under .coherence outside the folders a project commits: what install's ignore file leaves out. */
 function transientState(path: string): boolean {
   const parts = path.split("/");
-  return parts[0] === ".coherence" && parts.length > 1 && parts[1] !== ".gitignore" && !DURABLE_FOLDERS.includes(parts[1]!);
+  return parts[0] === ".coherence" && parts.length > 1 && parts[1] !== ".gitignore" && parts[1] !== ".gitattributes" && !DURABLE_FOLDERS.includes(parts[1]!);
 }
 
 export async function changedFiles(root: string): Promise<ChangedFiles> {
@@ -1221,6 +1222,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
     const stdout = JSON.stringify({ ...answered, hookSpecificOutput: { ...answered.hookSpecificOutput, hookEventName: event, additionalContext: context } }) + "\n";
     const commit = (): void => {
       result.commit?.();
+      keepStateFiles(root);
       openFeed(root, session);
       saveBaseline(root, session, reading);
       const found = gaps.now ?? gaps.last;
@@ -1260,6 +1262,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         // An empty override silences the start; the session still began, so its baseline is still kept.
         const stdout = context === "" ? "" : JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }) + "\n";
         const commit = (): void => {
+          // A project that adopted an earlier release gets the attributes file its records merge by at its first session after the upgrade.
+          if (event === "SessionStart") keepStateFiles(root);
           saveBaseline(root, session!, reading);
           // A project nested below the settings is oriented once per session; this start was it.
           if (!within(root, host)) markOriented(root, session!);

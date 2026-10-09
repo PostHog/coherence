@@ -16,6 +16,7 @@ import { withWarmAdapter } from "../enforcement/run.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { TRACES_DIR, recordReadTrace, recordWriteTrace } from "../economy/trace.ts";
 import { COHERENCE_LEXICON, installedRoot, PACKAGE_NAME } from "./project.ts";
+import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, EARLIER_IGNORE_TEXTS, IGNORE_FILE, IGNORE_TEXT } from "./state-files.ts";
 import { loadLexicon, rejectedNames } from "./lexicon.ts";
 import { gapProject } from "../readings/scope/gaps-fixture.ts";
 import { undeclaredProject } from "../readings/scope/undeclared-fixture.ts";
@@ -137,6 +138,21 @@ test("Coherence's own start hooks name its source-tree journal command", async (
     }
     const block = await sessionBlock(dir, { session_id: "s-journal" });
     assert.ok(block.split(/\s+/).filter((w) => w !== "").length < 120, block);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("a session start in a project that adopted an earlier release writes the attributes file its records merge by and brings the earlier ignore file up so git commits it", async () => {
+  const dir = await freshRoot();
+  try {
+    await mkdir(join(dir, ".coherence"), { recursive: true });
+    await writeFile(join(dir, IGNORE_FILE), EARLIER_IGNORE_TEXTS[0]!);
+    const start = await runHook("SessionStart", { cwd: dir, session_id: "s-upgrade" }, dir);
+    assert.equal(start.exit, 0);
+    start.commit?.();
+    assert.equal(readFileSync(join(dir, ATTRIBUTES_FILE), "utf8"), ATTRIBUTES_TEXT, "the attributes file is in place from the first session after the upgrade");
+    assert.equal(readFileSync(join(dir, IGNORE_FILE), "utf8"), IGNORE_TEXT, "the ignore file an earlier release wrote no longer ignores it");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

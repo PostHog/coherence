@@ -618,7 +618,8 @@
         "class hand-built-path": "A file of an installed package located by a path spelled by hand (a node_modules folder joined to a root) instead of asked of the package resolver, so a package manager that lays its packages out otherwise (pnpm's store, a package's exports) leaves it naming nothing.",
         "class version-skew": "The Coherence that runs is not the one the adopter installed or meant: another copy shadows it, or a package manager resolved an older release than the project needs, and nothing says which version answers.",
         "class missing-entry-point": "A way of reaching the tool that users expect is absent or answers wrongly: a conventional flag or verb (--version, --help) that is not recognized or is taken by the program in front of it.",
-        "class false-alarm": "A check reports a problem on input that is valid, such as a config, spec or lexicon an adopter wrote correctly or an earlier release wrote for it, so it fails CI or refuses a stop for nothing; guarded by the upgrade fixture carrying what adopters write."
+        "class false-alarm": "A check reports a problem on input that is valid, such as a config, spec or lexicon an adopter wrote correctly or an earlier release wrote for it, so it fails CI or refuses a stop for nothing; guarded by the upgrade fixture carrying what adopters write.",
+        "class merge-collision": "Two branches' ordinary writes to a store Coherence commits conflict when the branches are merged or rebased, so people resolve by hand what git could have merged; guarded by the stack test that merges two branches' appends to every committed store."
       }
     },
     {
