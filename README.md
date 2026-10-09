@@ -28,6 +28,7 @@ work itself.
 ```text
 Install @posthog/coherence@^1.6 as a dev dependency (with pnpm, if minimumReleaseAge holds it back, add it to minimumReleaseAgeExclude) and run `npx --no -- coherence hooks install --host claude` (or `--host codex`).
 Then run `npx --no -- coherence query practice "adopt Coherence"`, work through it, record it with `enact`, and tell me what each step found.
+Ask me whether pull requests should fail on Coherence's findings or get a report comment, then run `npx --no -- coherence ci install --host github --mode fail` (or `--mode comment`) with `--write`.
 ```
 
 It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux. The package
@@ -275,6 +276,10 @@ Set up Coherence in this project, and report what each step found.
    docs/spec.md (the spec and practice grammar). When done, record it:
    `coherence enact "adopt Coherence" --step <n>=done|deviated:<why>|skipped:<why> ...`.
 
+4. CI. Ask me whether pull requests should fail on Coherence's findings or
+   get one report comment, then run `coherence ci install --host github
+   --mode fail` (or `--mode comment`) with `--write`.
+
 Record every non-obvious choice with `coherence decide "<chose>" --over
 "<rejected>" --because "<why>" --session <id> --agent <name>`.
 ```
@@ -345,6 +350,7 @@ Paste this into your agent to adopt one folder:
 Adopt Coherence for <folder> only. Install @posthog/coherence@^1.6 as a dev dependency (with pnpm, if minimumReleaseAge holds it back, add it to minimumReleaseAgeExclude) and run `npx --no -- coherence hooks install --host claude --local` from <folder>.
 Run `npx --no -- coherence adopt <folder>` from the repository root if this repository keeps a registry of adopted folders.
 Then run `npx --no -- coherence query practice "adopt Coherence"` from <folder>, work through it, record it with `enact`, and tell me what each step found.
+Ask me whether pull requests should fail on Coherence's findings or get a report comment, then run `npx --no -- coherence ci install --host github --mode fail` (or `--mode comment`) with `--write`.
 ```
 
 Every key is in [docs/config.md](docs/config.md).
@@ -468,6 +474,8 @@ node src/cli.ts hooks install --host claude|codex [--command "<prefix>"]
 node src/cli.ts hooks uninstall --host claude|codex   # removes only Coherence's commands; other hooks and settings stay byte for byte
 node src/cli.ts hooks --check --host claude|codex     # exit 1 naming each event missing, stale, or extra against what install would write
 node src/cli.ts hooks status                          # the wiring per agent host, and what each event delivers for this project
+node src/cli.ts ci install --host github --mode fail|comment [--write]   # the workflow that runs Coherence on every pull request; never over a file already there
+node src/cli.ts ci report --session <id>              # the pull request report as Markdown, from that session's run
 npm run spec:check                        # the spec check alone
 npm test                                  # typecheck, tests, vocabulary check, spec check; any one failing fails the tree
 ```

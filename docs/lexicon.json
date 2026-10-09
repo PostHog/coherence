@@ -1494,6 +1494,22 @@
         "owner_words": "ship the statusline script too",
         "defined_by": "owner, 2026-10-08 (session 8efd6465), asking for the status line script after the mods pitch showed what Coherence passes to Claude Code's interface (d-04037868)"
       }
+    },
+    {
+      "name": "CI check",
+      "definition": "Coherence run on every pull request by the project's CI host. It runs spec --check and the chokepoint run in one of two modes the user chooses: fail, where the check fails on a spec problem or a structural defect, or comment, where one report comment on the pull request carries the findings and the check fails only when Coherence itself breaks. ci install writes its workflow; ci report builds the comment.",
+      "status": "proposed",
+      "related": [
+        "run",
+        "spec",
+        "chokepoint",
+        "spec gap",
+        "hook"
+      ],
+      "provenance": {
+        "defined_by": "agent proposal, 2026-10-09 (session aba22a9624563d104), for an adopter's request that Coherence offer to run itself on pull requests with the mode presented to the user (df-7b885044, d-d0d83f59)",
+        "because": "ci install, ci report, the hooks install offer and the adoption step need one name for what runs on a pull request"
+      }
     }
   ],
   "metaphors": {
