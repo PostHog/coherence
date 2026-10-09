@@ -789,21 +789,27 @@ function fixtureGit(project: SizedProject, ...args: string[]): void {
   assert.equal(done.status, 0, `git ${args.join(" ")}: ${done.stderr}`);
 }
 
-test("the vocabulary tree key follows sparse checkout file membership", () => {
+test("the vocabulary tree key follows sparse checkout file membership", async () => {
   const project = sizedProject(1);
   try {
+    const start = await runHook("SessionStart", { session_id: SESSION, cwd: project.root }, project.root, {});
+    start.commit?.();
     const full = treeKeys(project.root);
     assert.ok(full !== undefined);
     fixtureGit(project, "sparse-checkout", "set", "proj/docs");
     const docs = treeKeys(project.root);
     assert.notDeepEqual(docs, full);
+    assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"], 1);
+    assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"] ?? 0, 0);
     fixtureGit(project, "sparse-checkout", "set", "proj/src");
     const source = treeKeys(project.root);
     assert.notDeepEqual(source, docs);
+    assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"], 1);
     fixtureGit(project, "sparse-checkout", "disable");
     const disabled = treeKeys(project.root);
     assert.notDeepEqual(disabled, source);
     assert.deepEqual(disabled, full);
+    assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"], 1);
   } finally {
     rmSync(project.top, { recursive: true, force: true });
   }

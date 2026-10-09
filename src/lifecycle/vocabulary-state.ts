@@ -250,7 +250,7 @@ export function treeKeys(root: string): Record<string, string> | undefined {
   const sparse = spawnSync("git", ["config", "--bool", "core.sparseCheckout"], { cwd: root, encoding: "utf8" });
   if (sparse.status !== 0 && sparse.status !== 1) return undefined;
   if (sparse.stdout.trim() === "true") {
-    const listed = spawnSync("git", ["ls-files", "--cached", "-t", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    const listed = spawnSync("git", ["ls-files", "--cached", "-t", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
     if (listed.status !== 0) return undefined;
     const skipped = listed.stdout.split("\0").filter((line) => line.startsWith("S ")).map((line) => line.slice(2));
     out[SPARSE_KEY] = createHash("sha256").update(JSON.stringify(skipped)).digest("hex");
