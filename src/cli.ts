@@ -19,6 +19,7 @@
  *   coherence query <question> ...     the agent query: what Scope shows a human, as plain text
  *   coherence scope [--no-open]        open the live Scope reading from the warm server; --snapshot [--out <file>] writes one file
  *   coherence hook <event>             answer one harness event (event JSON on stdin)
+ *   coherence hook-serve [--socket]    the warm hook process: answer events as JSON lines on stdin, and over a Unix socket (hook-serve.ts)
  *   coherence hooks install --host <claude|codex>   merge one entry per event into the agent host's settings
  *   coherence hooks uninstall --host <claude|codex> remove exactly those entries; every other hook stays
  *   coherence hooks --check --host <claude|codex>   exit 1 with each event's drift from what install would write
@@ -49,6 +50,7 @@ import { formatReport, hasFindings, recordVetter, runCheck } from "./lifecycle/c
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
 import { cliName, CONTEXT_BUDGET, isHookEvent, HOOK_EVENTS, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
+import { runHookServe } from "./lifecycle/hook-serve.ts";
 import { check, formatCheck, formatStatus, formatUninstall, HOSTS, install, isHost, locatedPrefix, locate, settingsFile, settingsRoots, status, uninstall, type SettingsRoot } from "./lifecycle/install.ts";
 import { isCoherenceItself, loadProjectLexicons, PACKAGE_NAME, projectRoot } from "./lifecycle/project.ts";
 import { QUERY_USAGE, queryCommand } from "./readings/query/cli.ts";
@@ -82,6 +84,7 @@ ${QUERY_USAGE}
 ${SCOPE_USAGE}
   coherence adopt <folder>   list the folder in the registry (projects in coherence.config.json at the repository top), creating it when absent
   coherence hook <${HOOK_EVENTS.join("|")}>
+  coherence hook-serve [--socket]   the warm hook process: {"op":"hook","event":...,"input":...} per line on stdin; --socket also over HTTP on a Unix socket
   coherence hooks install --host <${HOSTS.join("|")}> [--command "<prefix>"] [--local]   --local: the host's personal settings (.claude/settings.local.json), never committed
   coherence hooks uninstall --host <${HOSTS.join("|")}>
   coherence hooks --check --host <${HOSTS.join("|")}> [--command "<prefix>"] [--local]
@@ -223,6 +226,15 @@ async function hookCommand(args: string[], root: string): Promise<number> {
   }
   result.commit?.();
   return result.exit;
+}
+
+/** hook-serve [--socket]: the warm hook process for one agent-host session; it runs until stdin closes (or, with a socket, its parent is gone). */
+async function hookServeCommand(args: string[], root: string): Promise<number> {
+  const unknown = args.filter((arg) => arg !== "--socket");
+  if (unknown.length > 0) fail(`hook-serve: unexpected ${unknown.join(" ")}\n${USAGE}`);
+  const code = await runHookServe(root, { socket: args.includes("--socket"), hook: { refresh: STRUCTURE_REFRESH, warm: WARM_UP, telemetry: startTelemetry, updateCheck: startUpdateCheck } });
+  // Stdin and the socket hold the event loop open; the process is done once the server says so.
+  process.exit(code);
 }
 
 /** The flags each hooks verb takes; anything else is a usage error rather than silently ignored. */
@@ -377,6 +389,8 @@ async function main(argv: string[]): Promise<number> {
       return queryCommand(rest, io);
     case "hook":
       return hookCommand(rest, root);
+    case "hook-serve":
+      return hookServeCommand(rest, root);
     case "hooks":
       return hooksCommand(rest, root);
     case "telemetry":
