@@ -165,7 +165,7 @@ export async function keepVocabulary(root: string, layers: { coherence: Lexicon;
       for (const [id, b] of files) writeKept(join(aside, "files", `${id}.json`), b, false, true);
       for (const [id, b] of terms) writeKept(join(aside, "terms", `${id}.json`), b, false, true);
       writeKept(join(aside, "declared.json"), [...declared].sort(), false, true);
-      if (records !== undefined) writeKept(join(aside, "reading.json"), { version, tree, records, coverage }, false, true);
+      if (records !== undefined) writeKept(join(aside, "reading.json"), { version, tree, records, coverage, digest: createHash("sha256").update(JSON.stringify(coverage)).digest("hex") }, false, true);
       writeKept(join(aside, "meta.json"), { version, buckets: { files: [...files.keys()].sort(), terms: [...terms.keys()].sort() }, tree } satisfies Meta, false, true);
       rmSync(stateDir(root), { recursive: true, force: true });
       renameSync(aside, stateDir(root));
@@ -349,6 +349,7 @@ function recordKeys(root: string): Record<string, string> | undefined {
 }
 
 export async function currentReading(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }): Promise<Coverage> {
+  const version = await stateVersion(root, layers);
   const tree = treeKeys(root);
   const records = recordKeys(root);
   if (tree !== undefined && records !== undefined) {
@@ -358,11 +359,11 @@ export async function currentReading(root: string, layers: { coherence: Lexicon;
     } catch (error) {
       if (!(error instanceof BucketUnusable)) throw error;
     }
-    if (meta !== undefined && meta.writing !== true && meta.version === (await stateVersion(root, layers))) {
+    if (meta !== undefined && meta.writing !== true && meta.version === version) {
       const saved = readJson<unknown>(join(stateDir(root), "reading.json"));
       if (isRecord(saved) && saved["version"] === meta.version && JSON.stringify(saved["tree"]) === JSON.stringify(tree) && JSON.stringify(saved["records"]) === JSON.stringify(records)) {
         const coverage = saved["coverage"];
-        if (isRecord(coverage) && coverage["version"] === 1 && typeof coverage["fingerprint"] === "string" && Array.isArray(coverage["terms"]) && isRecord(coverage["population"]) && isRecord(coverage["totals"])) return coverage as unknown as Coverage;
+        if (isRecord(coverage) && coverage["version"] === 1 && typeof saved["digest"] === "string" && saved["digest"] === createHash("sha256").update(JSON.stringify(coverage)).digest("hex")) return coverage as unknown as Coverage;
       }
     }
   }

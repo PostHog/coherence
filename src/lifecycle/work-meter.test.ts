@@ -723,6 +723,10 @@ test("Stop reuses a complete vocabulary reading until a project file or record c
     assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"], 1);
     writeFileSync(join(cacheDir(project.root), "vocabulary", "reading.json"), "{");
     assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"], 1);
+    const snapshot = join(cacheDir(project.root), "vocabulary", "reading.json");
+    const saved = JSON.parse(readFileSync(snapshot, "utf8")) as Record<string, unknown>;
+    writeFileSync(snapshot, JSON.stringify({ ...saved, coverage: { version: 1, terms: [null] } }));
+    assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"], 1);
   } finally {
     rmSync(project.top, { recursive: true, force: true });
   }
