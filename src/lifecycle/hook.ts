@@ -90,7 +90,7 @@ import { COHERENCE_LEXICON, DURABLE_FOLDERS, hookProject, installedRoot, isCoher
 import { keepStateFiles } from "./state-files.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
-import { editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
+import { currentReading, editVocabulary, headCommit, keptReading } from "./vocabulary-state.ts";
 import { awaitRefresh, currentGaps, declaredThisSession, lastGaps, orientGapText, readGapBaseline, refreshInBackground, refreshUnderWay, regulateGapText, saveSessionGaps, sessionGaps, structureFingerprint, unreadGapText, type GapState } from "../readings/scope/gaps.ts";
 import { loadSpec } from "../readings/scope/build.ts";
 import { orientUndeclaredText, regulateUndeclaredText, undeclaredNow } from "../readings/scope/undeclared.ts";
@@ -1371,7 +1371,7 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const spec = specStopText(root, changed.files, walls);
         const lexicon = lexiconStopText(report, walls);
         const workText = workStopText(root, input);
-        const reading=session && existsSync(baselinePath(root,session)) ? await keptReading(root, await loadProjectLexicons(root)) : undefined;
+        const reading=session && existsSync(baselinePath(root,session)) ? await currentReading(root, await loadProjectLexicons(root)) : undefined;
         const coverage=reading && session ? await vocabularyAtStop(root, reading, priorBaseline(root, session)) : { text: "", named: [] };
         const coverageText=coverage.text;
         // The terms edits held reach the session in this line: once it is out (and no override took its place), no prompt names them again.

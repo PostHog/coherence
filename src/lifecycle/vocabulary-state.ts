@@ -34,6 +34,7 @@ import { cacheDir, storeVersion, withLock, writeKept } from "./kept-parse.ts";
 import { lexiconReading, singularForms, type Contribution, type Coverage } from "./lexicon-coverage.ts";
 import type { Lexicon } from "./lexicon.ts";
 import { vocabularyFacts } from "./project.ts";
+import { journalFileKeys } from "../journal/store.ts";
 
 const SHAPE = "vocabulary-1";
 /** Buckets per kind: an edit reads at most this many term buckets, whatever the project's size. */
@@ -139,7 +140,7 @@ function pluralsOf(term: string): string[] {
  * Keep the state a full reading's contributions make: written whole, aside,
  * and swapped into place under the lock.
  */
-export async function keepVocabulary(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }, contributions: ReadonlyMap<string, Contribution>, tree: Record<string, string> | undefined): Promise<void> {
+export async function keepVocabulary(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }, contributions: ReadonlyMap<string, Contribution>, tree: Record<string, string> | undefined, coverage: Coverage, records: Record<string, string> | undefined): Promise<void> {
   // A tree git cannot describe keeps no state: every edit then reads in full.
   if (tree === undefined) return;
   const version = await stateVersion(root, layers);
@@ -164,6 +165,7 @@ export async function keepVocabulary(root: string, layers: { coherence: Lexicon;
       for (const [id, b] of files) writeKept(join(aside, "files", `${id}.json`), b, false, true);
       for (const [id, b] of terms) writeKept(join(aside, "terms", `${id}.json`), b, false, true);
       writeKept(join(aside, "declared.json"), [...declared].sort(), false, true);
+      if (records !== undefined) writeKept(join(aside, "reading.json"), { version, tree, records, coverage }, false, true);
       writeKept(join(aside, "meta.json"), { version, buckets: { files: [...files.keys()].sort(), terms: [...terms.keys()].sort() }, tree } satisfies Meta, false, true);
       rmSync(stateDir(root), { recursive: true, force: true });
       renameSync(aside, stateDir(root));
@@ -323,6 +325,48 @@ function readMeta(root: string): Meta | undefined {
   const buckets = isRecord(value) ? value["buckets"] : undefined;
   if (!isRecord(value) || typeof value["version"] !== "string" || !isRecord(buckets) || !Array.isArray(buckets["files"]) || !Array.isArray(buckets["terms"]) || !isRecord(value["tree"])) throw new BucketUnusable("its kept state's meta is not in the shape it is kept in");
   return value as unknown as Meta;
+}
+
+function recordKeys(root: string): Record<string, string> | undefined {
+  try {
+    const out = Object.fromEntries([...journalFileKeys(root)].map(([name, key]) => [`journal/${name}`, key]));
+    const dir = join(root, ".coherence", "work");
+    let names: string[];
+    try {
+      names = readdirSync(dir);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") return undefined;
+      names = [];
+    }
+    for (const name of names.filter((n) => n.endsWith(".jsonl")).sort()) {
+      const stat = statSync(join(dir, name));
+      out[`work/${name}`] = `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
+    }
+    return out;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function currentReading(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }): Promise<Coverage> {
+  const tree = treeKeys(root);
+  const records = recordKeys(root);
+  if (tree !== undefined && records !== undefined) {
+    let meta: Meta | undefined;
+    try {
+      meta = readMeta(root);
+    } catch (error) {
+      if (!(error instanceof BucketUnusable)) throw error;
+    }
+    if (meta !== undefined && meta.writing !== true && meta.version === (await stateVersion(root, layers))) {
+      const saved = readJson<unknown>(join(stateDir(root), "reading.json"));
+      if (isRecord(saved) && saved["version"] === meta.version && JSON.stringify(saved["tree"]) === JSON.stringify(tree) && JSON.stringify(saved["records"]) === JSON.stringify(records)) {
+        const coverage = saved["coverage"];
+        if (isRecord(coverage) && coverage["version"] === 1 && typeof coverage["fingerprint"] === "string" && Array.isArray(coverage["terms"]) && isRecord(coverage["population"]) && isRecord(coverage["totals"])) return coverage as unknown as Coverage;
+      }
+    }
+  }
+  return keptReading(root, layers);
 }
 
 /** Whether the group counted under `canonical` is a candidate by these totals: the reading's rule, by name or by word. */
@@ -489,9 +533,10 @@ async function judgeEdit(root: string, layers: { coherence: Lexicon; project: Le
 export async function keptReading(root: string, layers: { coherence: Lexicon; project: Lexicon | undefined }): Promise<Coverage> {
   // The tree is keyed before the corpus is read: a write during the reading moves it, and the next edit reads in full.
   const tree = treeKeys(root);
+  const records = recordKeys(root);
   const { coverage, contributions } = await lexiconReading(root, layers, undefined, { contributions: true });
   try {
-    await keepVocabulary(root, layers, contributions, tree);
+    await keepVocabulary(root, layers, contributions, tree, coverage, records);
   } catch {
     // A state that cannot be kept costs the next edit a full reading of its own, never this reading.
   }
