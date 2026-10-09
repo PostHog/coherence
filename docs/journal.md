@@ -49,7 +49,10 @@ fields, which the practice close a defect asks for:
 - `class`: a short kebab-case name for the shape of the failure (path-identity,
   silent-skip, cost). Each class is declared once, as the property
   `class <name>` of the defect concept in Coherence's lexicon or the project's
-  own; the verb refuses a class declared nowhere.
+  own; the verb refuses a class declared nowhere. A class too broad for one
+  guard, such as audience (a reader told the wrong thing), is declared as a
+  family instead (`family <name>`): each of its defects closes with its own
+  guard or a decision, and a later defect in it is never a guard failure.
 - `introduced`: a commit, `PR #<n>`, `pre-existing` or `unknown`. A commit or
   pull request makes the defect fix-induced.
 - `caught`: review, ci, probe, adopter, self or test.
