@@ -15,7 +15,6 @@
  */
 
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
-import { spawnSync } from "../lifecycle/work-meter.ts";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PRACTICE_SUFFIX, RECORD_ID, globMatches, parsePractices, type Practice } from "./practice.ts";
@@ -24,6 +23,7 @@ import type { Problem } from "./grammar.ts";
 import { loadJournal } from "../journal/store.ts";
 import { loadWork } from "../journal/work.ts";
 import { recordsOnOtherBranches } from "../journal/branches.ts";
+import { missingCommits } from "../journal/commits.ts";
 import type { Decision, Enactment, JournalRecord } from "../journal/record.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -109,32 +109,6 @@ export function kernelPractices(enactments: readonly Enactment[] = []): ModelPra
   return out;
 }
 
-/**
- * The commits among the citations that this repository does not hold; undefined when git cannot be asked.
- * A shallow clone cannot tell a commit its depth cut off from no commit, so there a citation is missing
- * only when it names some other object here, or more than one.
- */
-function missingCommits(root: string, commits: readonly string[]): Set<string> | undefined {
-  if (commits.length === 0) return new Set();
-  const asCommits = batchCheck(root, commits.map((c) => `${c}^{commit}`));
-  if (asCommits === undefined) return undefined;
-  const missing = commits.filter((_, index) => / missing$| ambiguous$/.test(asCommits[index] ?? ""));
-  if (missing.length === 0 || !isShallow(root)) return new Set(missing);
-  const asObjects = batchCheck(root, missing);
-  if (asObjects === undefined) return undefined;
-  return new Set(missing.filter((_, index) => !/ missing$/.test(asObjects[index] ?? "")));
-}
-
-/** git cat-file --batch-check's answer for each name, in order; undefined when git cannot be asked. */
-function batchCheck(root: string, names: readonly string[]): string[] | undefined {
-  const result = spawnSync("git", ["cat-file", "--batch-check"], { cwd: root, input: names.join("\n") + "\n", encoding: "utf8" });
-  return result.status === 0 ? result.stdout.split("\n") : undefined;
-}
-
-function isShallow(root: string): boolean {
-  const result = spawnSync("git", ["rev-parse", "--is-shallow-repository"], { cwd: root, encoding: "utf8" });
-  return result.status === 0 && result.stdout.trim() === "true";
-}
 
 export interface PracticeChecks {
   root: string;
