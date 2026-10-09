@@ -109,7 +109,10 @@ export function kernelPractices(enactments: readonly Enactment[] = []): ModelPra
   return out;
 }
 
-/** The commits among the citations that this repository does not hold; undefined when git cannot be asked. */
+/**
+ * The commits among the citations that this repository does not hold; undefined when git cannot be asked,
+ * or when the clone is shallow and cannot tell a commit cut off by its depth from no commit.
+ */
 function missingCommits(root: string, commits: readonly string[]): Set<string> | undefined {
   if (commits.length === 0) return new Set();
   const result = spawnSync("git", ["cat-file", "--batch-check"], { cwd: root, input: commits.map((c) => `${c}^{commit}`).join("\n") + "\n", encoding: "utf8" });
@@ -118,7 +121,13 @@ function missingCommits(root: string, commits: readonly string[]): Set<string> |
   result.stdout.split("\n").forEach((line, index) => {
     if (/ missing$| ambiguous$/.test(line) && commits[index] !== undefined) missing.add(commits[index]!);
   });
+  if (missing.size > 0 && isShallow(root)) return undefined;
   return missing;
+}
+
+function isShallow(root: string): boolean {
+  const result = spawnSync("git", ["rev-parse", "--is-shallow-repository"], { cwd: root, encoding: "utf8" });
+  return result.status === 0 && result.stdout.trim() === "true";
 }
 
 export interface PracticeChecks {
