@@ -26,9 +26,10 @@
  */
 
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { availableParallelism, loadavg } from "node:os";
 import { basename, join } from "node:path";
+import { appendWhole, storeLines } from "../journal/append.ts";
 import { heldSites, noteRunAppend, noteSitesAppend, runFileIdentity, type HeldSites } from "./run-index.ts";
 
 export const RUNS_DIR = join(".coherence", "runs");
@@ -314,7 +315,7 @@ function appendLine(root: string, file: string, line: string, updates: ReadonlyM
   const name = basename(file);
   const before = runFileIdentity(root, name);
   const offset = existsSync(file) ? statSync(file).size : 0;
-  appendFileSync(file, line, "utf8");
+  appendWhole(file, line);
   noteRunAppend(root, name, before, offset, parseLine);
   noteSitesAppend(root, name, before, updates);
 }
@@ -351,18 +352,17 @@ export function loadRuns(root: string): LoadedRuns {
   const loaded: LoadedRuns = { records: [], refutations: [], damaged: [] };
   if (!existsSync(dir)) return loaded;
   const where = new Map<RunRecord, { file: string; line: number }>();
+  const seen = new Set<string>();
   for (const name of readdirSync(dir).filter((n) => n.endsWith(".jsonl")).sort()) {
-    const lines = readFileSync(join(dir, name), "utf8").split("\n");
-    lines.forEach((line, index) => {
-      if (line.trim() === "") return;
+    for (const { line, number } of storeLines(readFileSync(join(dir, name), "utf8"), seen)) {
       const parsed = parseLine(line);
-      if (typeof parsed === "string") loaded.damaged.push({ file: join(RUNS_DIR, name), line: index + 1, reason: parsed });
+      if (typeof parsed === "string") loaded.damaged.push({ file: join(RUNS_DIR, name), line: number, reason: parsed });
       else if ("kind" in parsed) loaded.refutations.push(parsed);
       else {
         loaded.records.push(parsed);
-        where.set(parsed, { file: join(RUNS_DIR, name), line: index + 1 });
+        where.set(parsed, { file: join(RUNS_DIR, name), line: number });
       }
-    });
+    }
   }
   loaded.records.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   loaded.refutations.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));

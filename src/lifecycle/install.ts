@@ -42,12 +42,14 @@
  * the project's own hook voice) and none of the state it regenerates. The
  * file sits inside Coherence's own folder, so install edits nothing the
  * adopter wrote; a file there with any other text is the adopter's and is
- * left alone. Uninstall removes it only when it is still exactly what
- * install wrote and no agent host keeps a hook of ours.
+ * left alone. Install writes `.coherence/.gitattributes` too, so two
+ * branches' records merge without a conflict (state-files.ts). Uninstall
+ * removes each only when it is still exactly what Coherence wrote and no
+ * agent host keeps a hook of ours.
  */
 
 import { spawnSync } from "./work-meter.ts";
-import { mkdir, readFile, rm, rmdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rmdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { HOOK_EVENTS, type HookEvent } from "./hook.ts";
@@ -55,6 +57,7 @@ import { DURABLE_FOLDERS, HOME_VAR, HOSTS, LOCAL_SETTINGS_FILE, PACKAGE_NAME, SE
 import { nestedFolder, repositoryTop } from "../adapters/project-files.ts";
 import { registryOf } from "../adapters/project-config.ts";
 import { EARLIER_SEARCH, searchesCheckoutFirst } from "./version.ts";
+import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, IGNORE_FILE, IGNORE_TEXT, STATE_DIR, keepAttributes, keepIgnore, removeStateFiles, type AttributesAction, type IgnoreAction } from "./state-files.ts";
 export { DURABLE_FOLDERS, HOME_VAR, SIBLING };
 export { EARLIER_SEARCH, earlierSearchLines, searchesCheckoutFirst } from "./version.ts";
 
@@ -284,46 +287,7 @@ export function mergeHooks(settings: Record<string, unknown>, options: Pick<Inst
   return { ...settings, hooks };
 }
 
-/** Coherence's own folder in a project. */
-const STATE_DIR = ".coherence";
-
-/** The ignore file install writes inside Coherence's own folder. */
-export const IGNORE_FILE = join(STATE_DIR, ".gitignore");
-
-
-/** The exact text install writes; only a file holding exactly this is Coherence's to remove. */
-export const IGNORE_TEXT = [
-  "# Written by coherence hooks install; hooks uninstall removes it.",
-  "# Commit this file and the folders it keeps: the journal, runs and work",
-  "# orders are durable records, and hooks holds the project's own hook voice.",
-  "# Everything else here is regenerated (feed cursors, read traces, practice",
-  "# firings, the warm server, structure and lexicon readings), so git ignores it.",
-  "/*",
-  "!/.gitignore",
-  ...DURABLE_FOLDERS.map((folder) => `!/${folder}/`),
-].join("\n") + "\n";
-
-/** What install did with .coherence/.gitignore: wrote it, found it already written, or kept a file of the adopter's. */
-export type IgnoreAction = "wrote" | "unchanged" | "kept";
-
-async function readText(path: string): Promise<string | undefined> {
-  try {
-    return await readFile(path, "utf8");
-  } catch {
-    return undefined;
-  }
-}
-
-/** Write .coherence/.gitignore when it is absent; a file already there is never rewritten. */
-async function writeIgnore(root: string): Promise<IgnoreAction> {
-  const path = resolve(root, IGNORE_FILE);
-  const found = await readText(path);
-  if (found === IGNORE_TEXT) return "unchanged";
-  if (found !== undefined) return "kept";
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, IGNORE_TEXT);
-  return "wrote";
-}
+export { ATTRIBUTES_FILE, ATTRIBUTES_TEXT, IGNORE_FILE, IGNORE_TEXT, type AttributesAction, type IgnoreAction };
 
 export interface InstallResult {
   path: string;
@@ -332,6 +296,8 @@ export interface InstallResult {
   changed: boolean;
   /** .coherence/.gitignore, and what install did with it. */
   ignore: { path: string; action: IgnoreAction };
+  /** .coherence/.gitattributes, and what install did with it. */
+  attributes: { path: string; action: AttributesAction };
 }
 
 export async function install(options: InstallOptions & { ignoreRoot?: string; ignoreRoots?: readonly string[]; local?: boolean }): Promise<InstallResult> {
@@ -341,14 +307,19 @@ export async function install(options: InstallOptions & { ignoreRoot?: string; i
   const read = await readSettingsFile(path);
   const merged = mergeHooks(read.value, options);
   const changed = await writeSettings(path, read, merged);
-  // Each project keeps its own ignore file: a registry's leaves each get one, and the registry's top, no project, none.
+  // Each project keeps its own ignore and attributes files: a registry's leaves each get them, and the registry's top, no project, none.
   const ignoreRoots = options.ignoreRoots ?? [options.ignoreRoot ?? options.root];
   let ignore = { path: resolve(ignoreRoots[0] ?? options.root, IGNORE_FILE), action: "unchanged" as IgnoreAction };
+  let attributes = { path: resolve(ignoreRoots[0] ?? options.root, ATTRIBUTES_FILE), action: "unchanged" as AttributesAction };
   for (const [i, dir] of ignoreRoots.entries()) {
-    const action = await writeIgnore(dir);
-    if (i === 0) ignore = { path: resolve(dir, IGNORE_FILE), action };
+    const ignored = keepIgnore(dir, true);
+    const attributed = keepAttributes(dir);
+    if (i === 0) {
+      ignore = { path: resolve(dir, IGNORE_FILE), action: ignored };
+      attributes = { path: resolve(dir, ATTRIBUTES_FILE), action: attributed };
+    }
   }
-  return { path, events: [...HOOK_EVENTS], changed, ignore };
+  return { path, events: [...HOOK_EVENTS], changed, ignore, attributes };
 }
 
 /** One folder whose host settings carry a project's hooks, with the project's folder from there ("" for the project itself). */
@@ -430,13 +401,12 @@ async function anyHostInstalled(root: string): Promise<boolean> {
   return false;
 }
 
-/** Remove .coherence/.gitignore when it is exactly what install wrote and no host keeps our hooks; the folder goes too when that left it empty. */
+/** Remove .coherence/.gitignore and .coherence/.gitattributes, each only when it is exactly what Coherence wrote, once no host keeps our hooks; the folder goes too when that left it empty. */
 async function removeIgnore(root: string): Promise<boolean> {
-  const path = resolve(root, IGNORE_FILE);
-  if ((await readText(path)) !== IGNORE_TEXT || (await anyHostInstalled(root))) return false;
-  await rm(path);
-  await rmdir(dirname(path)).catch(() => undefined);
-  return true;
+  if (await anyHostInstalled(root)) return false;
+  const removed = removeStateFiles(root);
+  await rmdir(resolve(root, STATE_DIR)).catch(() => undefined);
+  return removed;
 }
 
 /** Remove what install wrote for a host, and nothing else; a second pass changes nothing. */

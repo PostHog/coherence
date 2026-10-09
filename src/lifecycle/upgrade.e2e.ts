@@ -34,6 +34,8 @@ import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { EARLIER_SEARCH, searchesCheckoutFirst } from "./version.ts";
+import { RECORD_STORES } from "./project.ts";
+import { ATTRIBUTES_FILE, ATTRIBUTES_TEXT } from "./state-files.ts";
 
 const CHECKOUT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const PACKAGE = "@posthog/coherence";
@@ -576,6 +578,16 @@ test("an adopter of the previous release upgrades to this one with nothing it di
       if (!hookText(edit.stdout).includes("rotate a token")) fail(`PreToolUse for an edit of src/tokens/store.ts adding a token delivered no practice ${phase}: the tool hooks did not engage with the project`, edit);
     }
     for (const { what, ran } of hooksBefore) if (ran.code !== 0) fail(`${what} exited ${ran.code} under the previous release (the fixture, not the upgrade)`, ran);
+
+    // The first session after the upgrade leaves the records merging by union, with no step of the adopter's, and git commits the file that says so.
+    const attributes = join(root, ATTRIBUTES_FILE);
+    if (!existsSync(attributes) || readFileSync(attributes, "utf8") !== ATTRIBUTES_TEXT) fail(`the first session after the upgrade left ${ATTRIBUTES_FILE} ${existsSync(attributes) ? "with other text" : "absent"}`);
+    for (const store of RECORD_STORES) {
+      const attr = git(root, "check-attr", "merge", "--", `.coherence/${store}/${after}.jsonl`);
+      if (!attr.stdout.includes("merge: union")) fail(`${store}'s session files do not merge by union after the upgrade`, attr);
+    }
+    const ignored = git(root, "check-ignore", "-q", ATTRIBUTES_FILE);
+    if (ignored.code !== 1) fail(`git ignores ${ATTRIBUTES_FILE} after the upgrade, so a teammate never receives it`, ignored);
 
     // The journal, the runs and the config are still read.
     const journalAfter = coherence(root, "journal", "--json");

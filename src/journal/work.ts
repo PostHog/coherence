@@ -15,8 +15,9 @@
  * owning none or several binds nothing, and the record says which.
  */
 
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { appendWhole, storeLines } from "./append.ts";
 import { JournalError } from "./args.ts";
 import { isWorkKind, TERMINAL_STATES, type WorkRecord, type WorkState } from "./record.ts";
 
@@ -40,7 +41,7 @@ export function workFile(cwd: string, session: string): string {
 export function appendWork(cwd: string, record: WorkRecord): string {
   const file = workFile(cwd, record.session);
   mkdirSync(workDir(cwd), { recursive: true });
-  appendFileSync(file, `${JSON.stringify(record)}\n`, "utf8");
+  appendWhole(file, `${JSON.stringify(record)}\n`);
   return file;
 }
 
@@ -66,14 +67,13 @@ export function loadWork(cwd: string): LoadedWork {
   const dir = workDir(cwd);
   const loaded: LoadedWork = { records: [], damaged: [] };
   if (!existsSync(dir)) return loaded;
+  const seen = new Set<string>();
   for (const name of readdirSync(dir).filter((n) => n.endsWith(".jsonl")).sort()) {
-    const lines = readFileSync(join(dir, name), "utf8").split("\n");
-    lines.forEach((line, index) => {
-      if (line.trim() === "") return;
+    for (const { line, number } of storeLines(readFileSync(join(dir, name), "utf8"), seen)) {
       const verdict = parseWorkLine(line);
-      if (typeof verdict === "string") loaded.damaged.push({ file: join(WORK_DIR, name), line: index + 1, reason: verdict });
+      if (typeof verdict === "string") loaded.damaged.push({ file: join(WORK_DIR, name), line: number, reason: verdict });
       else loaded.records.push(verdict);
-    });
+    }
   }
   loaded.records.sort(compareWork);
   return loaded;
