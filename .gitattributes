@@ -1,7 +1,0 @@
-# Coherence's records are one JSON object per line, written by the tool: GitHub
-# folds them in a pull request's diff and leaves them out of the language stats.
-# They still travel with the code and are one click away; CI's job summary says
-# what a pull request's records hold.
-.coherence/journal/** linguist-generated=true
-.coherence/runs/** linguist-generated=true
-.coherence/work/** linguist-generated=true

@@ -171,8 +171,16 @@ export async function vocabularyFacts(root: string): Promise<VocabularyFacts> {
   return facts;
 }
 
-/** The folders under .coherence a project commits: the durable records, and the project's own hook voice. Everything else there is regenerated. */
-export const DURABLE_FOLDERS: readonly string[] = ["journal", "runs", "work", "hooks"];
+/**
+ * The record stores under .coherence: one append-only JSONL file per session,
+ * whose readers order and fold records by their content, never by line. Two
+ * branches append to the same session's file, so git merges each with the
+ * union of both sides' lines (state-files.ts).
+ */
+export const RECORD_STORES: readonly string[] = ["journal", "runs", "work"];
+
+/** The folders under .coherence a project commits: the record stores, and the project's own hook voice. Everything else there is regenerated. */
+export const DURABLE_FOLDERS: readonly string[] = [...RECORD_STORES, "hooks"];
 
 /**
  * The project a command run from `cwd` acts on: the nearest folder, up to the
