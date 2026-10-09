@@ -270,3 +270,19 @@ test("close a defect fires on resolving a defect and never a conjecture, nor on 
   for (const read of ["node src/cli.ts journal --kind defect", "coherence query defect", "coherence lexicon review defect"]) assert.equal(fires(read), undefined, `${read} reads defects and closes none`);
   assert.equal(fires(`node src/cli.ts classify df-1a2b3c4d --class overmatch --because "z"`), "command classify", "classifying one fires it");
 });
+
+test("a family's guard answers only for its own defect, so a later defect in the family is no guard failure, while a class keeps the rule", () => {
+  const root = project();
+  const j = journal(root, clock("2026-10-03T00:00:00Z"));
+  witness(root, "widget", "knob turns", "2026-10-02T00:00:00.000Z");
+  // audience is a family in Coherence's lexicon: too broad for one guard.
+  const first = idOf(j("defect", "the label named the wrong knob", "--evidence", "read it", "--class", "audience", ...WHO));
+  idOf(j("resolved", first, "--because", "renamed", "--guard", "widget/knob turns", ...WHO));
+  const later = idOf(j("defect", "the manual omits the dial", "--evidence", "read it", "--class", "audience", ...WHO));
+  // The same sequence in a class is still a guard failure.
+  const classFirst = idOf(j("defect", "the knob stuck", "--evidence", "turned it", "--class", "path-identity", ...WHO));
+  idOf(j("resolved", classFirst, "--because", "oiled", "--guard", "widget/knob turns", ...WHO));
+  const classRepeat = idOf(j("defect", "another knob stuck", "--evidence", "turned it", "--class", "path-identity", ...WHO));
+  const model = loadSpecModel(root);
+  assert.deepEqual(model.defects!.guardFailures.map((g) => g.id), [classRepeat], `a later audience defect (${later}) is no guard failure; a later path-identity one is`);
+});

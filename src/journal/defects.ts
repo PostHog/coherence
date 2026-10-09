@@ -15,7 +15,11 @@
  * A class is declared once, as the property "class <name>" of the defect
  * concept in Coherence's lexicon or the project's own. A defect recorded in a
  * class that a resolution already guarded, after that guard, is a guard
- * failure: the protection was weaker than claimed.
+ * failure: the protection was weaker than claimed. A family, declared as the
+ * property "family <name>", is a class too broad for one guard (audience: a
+ * reader told the wrong thing): each of its defects closes with its own guard
+ * or a decision, and no guard of one stands for the rest, so a later defect
+ * in a family is never a guard failure.
  */
 
 import { spawnSync } from "../lifecycle/work-meter.ts";
@@ -30,19 +34,19 @@ const COHERENCE_LEXICON = resolve(here, "..", "..", "docs", "lexicon.json");
 
 /** A class name: lowercase words joined by hyphens. */
 const CLASS_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
-/** The property key that declares a class on the defect concept. */
-const CLASS_KEY = /^class ([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/;
+/** The property key that declares a class, or a family (a class too broad for one guard), on the defect concept. */
+const CLASS_KEY = /^(class|family) ([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/;
 const COMMIT = /^[0-9a-f]{7,40}$/;
 const PULL = /^PR #(\d+)$/;
 
-/** The classes a lexicon file declares: its defect concept's properties named "class <name>". */
-function classesIn(path: string): string[] {
+/** The classes a lexicon file declares: its defect concept's properties named "class <name>", and "family <name>" when `families` is set (only those). */
+function classesIn(path: string, families = false): string[] {
   try {
     const lexicon = JSON.parse(readFileSync(path, "utf8")) as { concepts?: { name?: unknown; properties?: Record<string, unknown> }[] };
     const defect = (lexicon.concepts ?? []).find((c) => c.name === "defect");
     return Object.keys(defect?.properties ?? {}).flatMap((key) => {
       const match = CLASS_KEY.exec(key);
-      return match === null ? [] : [match[1]!];
+      return match === null || (families && match[1] !== "family") ? [] : [match[2]!];
     });
   } catch {
     return [];
@@ -61,10 +65,16 @@ function projectLexiconPath(root: string): string | undefined {
   return existsSync(fallback) ? fallback : undefined;
 }
 
-/** Every declared defect class, from Coherence's lexicon and the project's own. */
+/** Every declared defect class, families included, from Coherence's lexicon and the project's own. */
 export function declaredClasses(root: string): Set<string> {
   const project = projectLexiconPath(root);
   return new Set([...classesIn(COHERENCE_LEXICON), ...(project === undefined ? [] : classesIn(project))]);
+}
+
+/** The declared classes that are families: too broad for one guard, so none stands for the rest. */
+export function declaredFamilies(root: string): Set<string> {
+  const project = projectLexiconPath(root);
+  return new Set([...classesIn(COHERENCE_LEXICON, true), ...(project === undefined ? [] : classesIn(project, true))]);
 }
 
 /** Whether git holds a commit by this name; undefined when git cannot be asked. */
@@ -184,7 +194,7 @@ export interface DefectFloor {
  * class already guarded is a guard failure. Advisory: reported, never a
  * problem, so a session is never refused for a close it cannot reopen.
  */
-export function defectFloor(states: readonly DefectState[], standing: (guard: string) => GuardStanding, declared: ReadonlySet<string>): DefectFloor {
+export function defectFloor(states: readonly DefectState[], standing: (guard: string) => GuardStanding, declared: ReadonlySet<string>, families: ReadonlySet<string> = new Set()): DefectFloor {
   const floor: DefectFloor = { recorded: states.length, closed: 0, guarded: 0, decided: 0, unguarded: [], guardFailures: [], undeclared: [] };
   // The earliest standing guard of each class: when it was recorded, which guard, which defect it closed.
   const guards = new Map<string, { at: string; guard: string; by: string; resolution: string }>();
@@ -196,7 +206,8 @@ export function defectFloor(states: readonly DefectState[], standing: (guard: st
     const stands = r.guard === undefined ? undefined : standing(r.guard);
     if (stands === "witnessed") {
       floor.guarded += 1;
-      if (s.class !== undefined) {
+      // A family's guards each answer for their own defect, never for the family.
+      if (s.class !== undefined && !families.has(s.class)) {
         const prior = guards.get(s.class);
         if (prior === undefined || r.at < prior.at) guards.set(s.class, { at: r.at, guard: r.guard!, by: s.id, resolution: r.id });
       }
