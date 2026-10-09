@@ -50,7 +50,7 @@ export function translate(event: CoherenceEvent, answer: HookAnswer): { classic:
   const classic: Classic = {}
   const context = parsed.hookSpecificOutput?.additionalContext
   if (typeof context === 'string' && context !== '') classic.additionalContext = [context]
-  if (parsed.decision === 'block') classic.block = typeof parsed.reason === 'string' && parsed.reason !== '' ? parsed.reason : `Coherence blocked ${event}`
+  if (parsed.decision === 'block') classic.block = typeof parsed.reason === 'string' && parsed.reason !== '' ? parsed.reason : `Coherence refused ${event} without a reason`
   const user = typeof parsed.systemMessage === 'string' && parsed.systemMessage !== '' ? parsed.systemMessage : undefined
   return user === undefined ? { classic } : { classic, user }
 }

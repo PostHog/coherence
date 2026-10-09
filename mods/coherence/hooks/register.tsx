@@ -45,6 +45,8 @@ const held = {
   timesFile: undefined as string | undefined,
   setup: undefined as Promise<void> | undefined,
   ending: false,
+  /** Which warm process is the current one: a process that ended after another replaced it says nothing. */
+  generation: 0,
 }
 
 /** Set up once, by whichever comes first: the classic SessionStart fires before session.start does. */
@@ -89,6 +91,7 @@ function start($: Engine): void {
   const cli = held.cli
   if (cli === undefined) return
   held.warm = { state: 'starting' }
+  const generation = ++held.generation
   void (async () => {
     let buffer = ''
     let why = 'it exited'
@@ -105,21 +108,24 @@ function start($: Engine): void {
           buffer = buffer.slice(at + 1)
           try {
             const said = JSON.parse(line) as { ready?: { socket?: unknown } }
-            if (typeof said.ready?.socket === 'string') held.warm = { state: 'warm', socket: said.ready.socket }
+            if (typeof said.ready?.socket === 'string' && generation === held.generation) held.warm = { state: 'warm', socket: said.ready.socket }
           } catch {
             // Not a line of the protocol: the process's own output, kept for the debug log.
             $.ui.log(`coherence hook-serve: ${line}`, { to: 'debug' })
           }
         }
       }
-      // The host ends the child with SIGTERM as the session or the module ends: that is no failure to report.
+      // The host ends the child with SIGTERM as the session or the module ends, and hook-serve exits 0 only when it was asked to
+      // end (a signal, its stdin or parent gone, its code stale, which the stale answer already reported): no failure to report.
       const ended = await child.result.catch(() => undefined)
-      if (ended?.signal === 'SIGTERM') held.ending = true
+      if (ended?.signal === 'SIGTERM' || ended?.code === 0) held.ending = true
       else if (ended !== undefined) why = ended.signal === null ? `it exited with code ${ended.code}` : `it was ended by ${ended.signal}`
     } catch (error) {
       why = `it could not start (${error instanceof Error ? error.message : String(error)})`
     }
+    if (generation !== held.generation) return
     if (held.ending) {
+      held.ending = false
       held.warm = { state: 'off' }
       return
     }

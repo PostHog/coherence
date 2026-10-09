@@ -90,3 +90,22 @@ test('a refusal blocks the stop with its reason, as the settings hook exit 2 doe
   const stopped = await $.classic.Stop({ stop_hook_active: false, cwd: '/p' })
   expect(stopped.block).toBe('Regulate found what this session owes')
 })
+
+for (const surface of ['terminal', 'desktop', 'vscode'] as const) {
+  test(`an edit's verdict marks its tool row on the ${surface}, and a row without one is the engine's own`, async ($, on) => {
+    const verdict = { checked: 0, failed: [{ invariant: 'auth/one door', bypass: 'a.ts:3 in f' }], unchecked: 0 }
+    const answer = { id: 1, stdout: '', stderr: '', exit: 0, ms: 3, verdict }
+    engine(on, { fetch: () => JSON.stringify(answer) }, '')
+    on('ui.render', { component: 'ToolUse' }, ($, e) => {
+      const { Text } = $.ui.resolve(e)
+      return <Text>Edit(a.ts)</Text>
+    })
+    await started($)
+    await $.classic.PostToolUse(post)
+    const props = { tool_use_id: 't1', tool: 'Edit', input: {}, isRunning: false, isErrored: false, isInterrupted: false }
+    const marked = await $.ui.mount({ plugin: 'coherence', surface, component: 'ToolUse', props, requestId: 't1' })
+    expect((await marked.find({ text: /✗ bypass: auth\/one door \(a\.ts:3 in f\)/ })) !== undefined).toBe(true)
+    const plain = await $.ui.mount({ plugin: 'coherence', surface, component: 'ToolUse', props: { ...props, tool_use_id: 't9' }, requestId: 't9' })
+    expect(await plain.find({ text: /coherence/ })).toBe(undefined)
+  })
+}

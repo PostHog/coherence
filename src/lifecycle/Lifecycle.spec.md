@@ -1177,3 +1177,21 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: in the comment mode, findings are reported and never fail the job, while a run that never happened is never mistaken for a clean one; a report read from the latest verdicts instead of the session's run would show a pass from another branch
   refuted: buildReport read every run in each project instead of the CI session's, so another session's later pass hid the failing verdict -> "ci report carries each project's problems, chokepoint verdicts, spec gaps and guard failures as Markdown, and fails only when Coherence did not finish" went red in ci.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-09)
   kinds: none
+- the warm hook process answers as the hook does: coherence hook-serve answers each event with the stdout, stderr and exit code coherence hook <event> prints for it, in arrival order, one event at a time, and keeps the same records, committed once its answer was written.
+  over: a session's start, prompt, edit (before and after), read and stop, through one hook-serve process and through one hook process per event, in two copies of one project
+  via: the warm process answers a session's events with the per-event hook's output and keeps the same records
+  because: the Claude Code mod (mods/coherence, docs/mods-spike.md) reaches Coherence through this process to spare each event Node's start; an answer or a record that differed would make the fast path a different tool from the one Codex and the settings hooks run
+  refuted: dropped the commit after hook-serve writes its answer -> "the warm process answers a session's events with the per-event hook's output and keeps the same records" went red in hook-serve.test.ts: the warm copy lacked .coherence/.gitattributes and the session's lexicon, regulate and structure records; restored byte for byte, green (2026-10-09)
+  kinds: none
+- the warm hook process never answers from stale code: hook-serve compares Coherence's code on disk with what it loaded before every request; once they differ it answers stale, runs nothing, and exits, so its client runs the event through the command line and starts a fresh process.
+  over: a ping, then an event after the code identity changed
+  via: a warm process whose code changed on disk answers stale and runs nothing, so its client runs the event through the command line
+  because: a long-lived process outlives an edit to Coherence itself (its own repository dogfoods it) or an upgrade; the per-event hook always runs the code on disk, and the warm one must not answer differently
+  refuted: compared the code identity with itself instead of with what was loaded -> "a warm process whose code changed on disk answers stale and runs nothing, so its client runs the event through the command line" went red in hook-serve.test.ts; restored byte for byte, green (2026-10-09)
+  kinds: none
+- the warm hook process leaves with its socket: hook-serve --socket listens in a private folder of its own, prints the socket's path first, and when its host ends it with a signal it exits 0 and removes the folder, so a client's next request fails at once and the client falls back.
+  over: a ping over the socket, the host's SIGTERM, and a request after it
+  via: over its socket the warm process answers until its host ends it, and is then gone with its folder, which a client reads as a process to replace
+  because: a socket left behind would make a dead process look alive to the mod, and a folder left in the temporary directory is litter per session
+  refuted: removed the signal handlers -> "over its socket the warm process answers until its host ends it, and is then gone with its folder, which a client reads as a process to replace" went red in hook-serve.test.ts: the process ended by the signal without exiting 0; restored byte for byte, green (2026-10-09)
+  kinds: none

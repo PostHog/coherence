@@ -14,11 +14,14 @@ import { dirname, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
+import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { hookServer, type ServeAnswer } from "./hook-serve.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 const made: string[] = [];
-after(() => {
+after(async () => {
+  // A stop starts the project's warm server through the enforcement door, on both paths: it goes before its fixture does.
+  for (const dir of made) await stopWarmServers(dir);
   for (const dir of made) rmSync(dir, { recursive: true, force: true });
 });
 
