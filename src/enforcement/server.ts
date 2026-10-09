@@ -926,7 +926,7 @@ export async function connectAdapter(rootGiven: string, options: ConnectOptions 
         if (status.fingerprint === want) return { adapter: new RemoteAdapter(client, status.language, status.ladder), server: spawns > 0 || !status.warm ? "cold" : "warm" };
         if (options.spawn === false) {
           client.end();
-          throw new Error(`the warm server for ${root} (pid ${status.pid}) runs other code than this checkout; connect with spawning on to replace it`);
+          throw new Error(`the warm server for ${root} (pid ${status.pid}) runs other code than the Coherence asking; connect with spawning on to replace it`);
         }
         // Stale code: ask the server to go, and make sure it has before starting its replacement.
         try {

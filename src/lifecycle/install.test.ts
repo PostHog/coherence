@@ -670,7 +670,9 @@ test("a developer points an adopter at a local checkout through COHERENCE_HOME, 
     };
 
     // The shared hooks the project commits, with COHERENCE_HOME set in the environment the host starts with.
-    assert.equal(cli(project, "hooks", "install", "--host", "claude").status, 0);
+    const shared = spawnSync("node", ["--disable-warning=ExperimentalWarning", CLI, "hooks", "install", "--host", "claude"], { cwd: project, env: { ...process.env, CLAUDE_PROJECT_DIR: "", COHERENCE_HOME: CHECKOUT, COHERENCE_NO_WARM_UP: "1" }, encoding: "utf8" });
+    assert.equal(shared.status, 0, shared.stderr);
+    assert.match(shared.stdout, new RegExp(`\\nthe hooks reach the checkout COHERENCE_HOME names \\(${CHECKOUT.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}\\), the Coherence running this install\\n`), "install names the copy as the session start does");
     assert.match(started(await runInstalled(project, "claude", "SessionStart", { session_id: "s1" }, { COHERENCE_HOME: CHECKOUT, COHERENCE_NO_WARM_UP: "1" })), /runs this session: the checkout COHERENCE_HOME names/);
     assert.equal(cli(project, "hooks", "uninstall", "--host", "claude").status, 0);
 
