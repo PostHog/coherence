@@ -31,7 +31,7 @@ import { readdirSync, readFileSync, renameSync, rmSync, statSync } from "node:fs
 import { spawnSync } from "./work-meter.ts";
 import { basename, join } from "node:path";
 import { cacheDir, storeVersion, withLock, writeKept } from "./kept-parse.ts";
-import { lexiconReading, singularForms, type Contribution, type Coverage } from "./lexicon-coverage.ts";
+import { digest, lexiconReading, singularForms, type Contribution, type Coverage } from "./lexicon-coverage.ts";
 import type { Lexicon } from "./lexicon.ts";
 import { vocabularyFacts } from "./project.ts";
 import { journalFileKeys } from "../journal/store.ts";
@@ -165,7 +165,7 @@ export async function keepVocabulary(root: string, layers: { coherence: Lexicon;
       for (const [id, b] of files) writeKept(join(aside, "files", `${id}.json`), b, false, true);
       for (const [id, b] of terms) writeKept(join(aside, "terms", `${id}.json`), b, false, true);
       writeKept(join(aside, "declared.json"), [...declared].sort(), false, true);
-      if (records !== undefined) writeKept(join(aside, "reading.json"), { version, tree, records, coverage, digest: createHash("sha256").update(JSON.stringify(coverage)).digest("hex") }, false, true);
+      if (records !== undefined) writeKept(join(aside, "reading.json"), { version, tree, records, coverage, digest: digest(coverage) }, false, true);
       writeKept(join(aside, "meta.json"), { version, buckets: { files: [...files.keys()].sort(), terms: [...terms.keys()].sort() }, tree } satisfies Meta, false, true);
       rmSync(stateDir(root), { recursive: true, force: true });
       renameSync(aside, stateDir(root));
@@ -363,7 +363,7 @@ export async function currentReading(root: string, layers: { coherence: Lexicon;
       const saved = readJson<unknown>(join(stateDir(root), "reading.json"));
       if (isRecord(saved) && saved["version"] === meta.version && JSON.stringify(saved["tree"]) === JSON.stringify(tree) && JSON.stringify(saved["records"]) === JSON.stringify(records)) {
         const coverage = saved["coverage"];
-        if (isRecord(coverage) && coverage["version"] === 1 && typeof saved["digest"] === "string" && saved["digest"] === createHash("sha256").update(JSON.stringify(coverage)).digest("hex")) return coverage as unknown as Coverage;
+        if (isRecord(coverage) && coverage["version"] === 1 && typeof saved["digest"] === "string" && saved["digest"] === digest(coverage)) return coverage as unknown as Coverage;
       }
     }
   }
