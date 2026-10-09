@@ -23,6 +23,8 @@
  *   coherence hooks uninstall --host <claude|codex> remove exactly those entries; every other hook stays
  *   coherence hooks --check --host <claude|codex>   exit 1 with each event's drift from what install would write
  *   coherence hooks status             the wiring per agent host and what each event delivers for this project
+ *   coherence ci install --host github --mode fail|comment [--write]   the workflow that runs Coherence on every pull request (ci.ts)
+ *   coherence ci report --session <id>   the pull request report as Markdown (ci-report.ts)
  *   coherence telemetry on | off | status | show | reset-id   opt-in fleet telemetry (telemetry.ts)
  *   coherence version (--version, -v)  the running version, where it is, and the newest published one (version.ts)
  *   coherence help (--help, -h)        this usage, on stdout
@@ -58,6 +60,8 @@ import { nestedFolder, repositoryTop } from "./adapters/project-files.ts";
 import { registryOf } from "./adapters/project-config.ts";
 import { adopt, AdoptError, adoptText } from "./lifecycle/adopt.ts";
 import { TELEMETRY_USAGE, telemetryCommand } from "./lifecycle/telemetry-cli.ts";
+import { CI_USAGE, ciInstallCommand, ciSuggestion } from "./lifecycle/ci.ts";
+import { ciReportCommand } from "./lifecycle/ci-report.ts";
 import { startTelemetry } from "./lifecycle/telemetry.ts";
 import { refreshLatest, startUpdateCheck, versionText } from "./lifecycle/version.ts";
 
@@ -82,6 +86,7 @@ ${SCOPE_USAGE}
   coherence hooks uninstall --host <${HOSTS.join("|")}>
   coherence hooks --check --host <${HOSTS.join("|")}> [--command "<prefix>"] [--local]
   coherence hooks status
+${CI_USAGE}
 ${TELEMETRY_USAGE}
   coherence version   (or --version, -v) the running version and where it is, the newest published one, and when the registry was last asked
   coherence help      (or --help, -h) this usage
@@ -304,6 +309,8 @@ async function hooksCommand(args: string[], root: string): Promise<number> {
     process.stdout.write(`${result.changed ? "wrote" : "unchanged"} ${result.path}: ${result.events.join(", ")}\n`);
     if (command === locatedPrefix(place.sub, local)) process.stdout.write(locateNote(place.dir, place.sub));
   }
+  // The pull request side: offered once, only while no workflow runs Coherence.
+  process.stdout.write(await ciSuggestion(root));
   return 0;
 }
 
@@ -374,6 +381,10 @@ async function main(argv: string[]): Promise<number> {
       return hooksCommand(rest, root);
     case "telemetry":
       return telemetryCommand(rest, io);
+    case "ci":
+      if (rest[0] === "install") return ciInstallCommand(rest.slice(1), io);
+      if (rest[0] === "report") return ciReportCommand(rest.slice(1), io);
+      fail(`ci: install or report\n${CI_USAGE}`);
     case "version":
     case "--version":
     case "-v":

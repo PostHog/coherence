@@ -724,8 +724,8 @@ export const START_WAIT_MS = 15_000;
  * which a crossing may still derive) or a level outside the system's control
  * or declared nowhere. Without one, no reading is worth starting.
  */
-function mayHaveGaps(root: string): boolean {
-  const model = specModelOrNull(root);
+export function mayHaveGaps(root: string, given?: SpecModel): boolean {
+  const model = given ?? specModelOrNull(root);
   if ("error" in model) return false;
   const trusted = new Set(model.trustLevels.filter((l) => !l.outside).map((l) => l.name));
   return model.components.some((c) => c.entrances.some((e) => e.noControl === undefined && (e.trust === undefined || !trusted.has(e.trust))));

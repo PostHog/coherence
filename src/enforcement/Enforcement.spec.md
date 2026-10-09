@@ -304,3 +304,9 @@ Enforcement by detection: the chokepoint check with its grade ladder and automat
   checklist: rate-budget dismissed: no quota over time; the bound is on one append's work, whatever the rate
   checklist: memory-budget dismissed: the shard is a few hundred bytes per run file; the bound stated is on reads, not allocation
   checklist: circuit-breaker-policy dismissed: no dependency is called; a shard that cannot say is the fallback, a full write
+- run at a registry's top runs each listed project: run at the top of a repository whose config lists projects runs each listed project from its own folder, with its own config and its own run records, heads each project's printed verdicts with its folder, runs no folder the registry does not list, records nothing at the top, and exits 1 when any project's run would.
+  over: a registry of two projects, one with a bypass, beside an unlisted folder holding a spec
+  via: run at a registry's top runs each listed project from its own folder, its records in each
+  because: run at the top read the whole repository as one project with the top's keys, so it ran specs no registry lists and wrote its records at the top (df-3c6a666d); the CI check runs there for a registry, and spec --check already read each listed project there
+  refuted: runCommand never took the registry branch, so run at the top read the whole repository as one project again -> "run at a registry's top runs each listed project from its own folder, its records in each" went red in ci.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-09)
+  kinds: none

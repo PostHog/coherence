@@ -14,8 +14,10 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
+import { realpathSync } from "node:fs";
+import { relative, resolve, sep } from "node:path";
 import { adapterFor } from "../adapters/index.ts";
+import { registryOf, type Registry } from "../adapters/project-config.ts";
 import { JournalError, parseFlags } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
 import { loadSpecModel, type SpecModel } from "../spec/model.ts";
@@ -34,6 +36,7 @@ export const REFUTE_USAGE = '  refute <component>/<name> --broke "<what you chan
 export const ENFORCEMENT_USAGE = [
   "  run [--session <id>] [--agent <name>] [--form chokepoint|totality-oracle] [--invariant <name>]... [--no-server] [--observe] [--each] [--json]",
   "  run --status [--json]   the latest verdict per enforcement, derived from every run",
+  "  run at a registry's top runs each listed project from its own folder, one after another; --json is an array of each project's",
   "  run --each               after the batched pass, run each totality oracle's test in its own invocation (the config's test command), append those verdicts as a second run, and name any that passed batched but fail alone",
   "  run --observe            also record an observation: per-test coverage from the same one batched invocation (.coherence/observations)",
   REFUTE_USAGE,
@@ -144,6 +147,43 @@ export function formatStatus(root: string, model: SpecModel): string {
   return lines.join("\n");
 }
 
+function realOr(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+/**
+ * The run at a registry's top: each listed project from its own folder, with
+ * its own config, records and verdicts, one after another; never the whole
+ * repository read as one project with the top's keys, which took specs no
+ * registry lists and wrote its records at the top (df-0b68c987). The printed
+ * form heads each project's with its folder; --json is one array of each
+ * project's object. Exit 1 when any project's would, and a usage error ends it.
+ */
+async function registryRun(registry: Registry, argv: string[], io: Io, json: boolean): Promise<number> {
+  let exit = 0;
+  const objects: unknown[] = [];
+  for (const leaf of registry.leaves) {
+    const name = relative(registry.top, leaf).split(sep).join("/");
+    const lines: string[] = [];
+    const code = await runCommand(argv, { ...io, cwd: leaf, out: (line) => lines.push(line) });
+    if (code === 64) return code;
+    if (code !== 0) exit = 1;
+    if (json) {
+      for (const line of lines) objects.push({ project: name, ...(JSON.parse(line) as object) });
+    } else {
+      io.out(`project ${name}:`);
+      for (const line of lines) io.out(line.replace(/^/gm, "  "));
+    }
+  }
+  if (json) io.out(JSON.stringify(objects, null, 2));
+  else io.out(`registry ${registry.path}: ${registry.leaves.length} project${registry.leaves.length === 1 ? "" : "s"} run, each from its own folder`);
+  return exit;
+}
+
 export async function runCommand(argv: string[], io: Io): Promise<number> {
   let parsed;
   try {
@@ -160,6 +200,9 @@ export async function runCommand(argv: string[], io: Io): Promise<number> {
     return 64;
   }
   const root = io.cwd;
+  // A registry's top is no project: the run goes to each listed project in turn, as spec --check reads each there.
+  const registry = registryOf(root);
+  if (registry !== undefined && registry.top === realOr(root) && !registry.leaves.includes(registry.top)) return registryRun(registry, argv, io, parsed.switches.has("json"));
   if (parsed.switches.has("status")) {
     const model = loadSpecModel(root);
     if (parsed.switches.has("json")) {
