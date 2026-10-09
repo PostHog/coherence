@@ -44,7 +44,8 @@ Say every read of your session store must go through `getSession`, because
 that is where the session is checked.
 
 1. **Write it down.** In the spec beside the code,
-   `src/sessions/Sessions.spec.md`, add one bullet:
+   `src/sessions/Sessions.spec.md`, add one bullet. `coherence scaffold`
+   writes this shape for you, with a placeholder for each line:
 
    ```markdown
    ## invariants
@@ -52,7 +53,13 @@ that is where the session is checked.
      protects: sessionStore in src/sessions/store.ts
      chokepoint: getSession
      because: a read that skips the check can return another user's session
+     kinds: read
+     checklist: scoped-reads declared as checked session reads
+     checklist: redaction dismissed: a session is only ever returned to its own user
    ```
+
+   The `kinds` and `checklist` lines answer the decomposition checklist: for
+   this kind of rule, which known shapes apply, and is each one covered?
 
 2. **Prove the check works.** `coherence run` asks the language server for
    every reference to `sessionStore` and flags any outside `getSession`. It
@@ -63,9 +70,10 @@ that is where the session is checked.
    `sessionStore.read(id)` straight into a route handler. In the same turn,
    the hook names the file and line, and gives the agent two choices: go
    through `getSession`, or escalate to a human.
-4. **Nobody has to remember.** The agent fixes the call, and the reason it
-   chose is kept in the journal. Scope shows the chokepoint as verified, and
-   every later session starts out knowing it is there.
+4. **Nobody has to remember.** The agent fixes the call and the next run
+   passes. Scope shows the chokepoint as verified, and every later session
+   starts out knowing it is there. Had the agent escalated instead, the
+   escalation would wait in the journal until a human answered it.
 
 The rest of this page explains each part of that loop.
 
