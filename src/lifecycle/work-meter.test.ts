@@ -27,7 +27,8 @@ import { lexiconCoverage } from "./lexicon-coverage.ts";
 import { loadLexicon } from "./lexicon.ts";
 import { COHERENCE_LEXICON } from "./project.ts";
 import { cacheDir } from "./kept-parse.ts";
-import { treeKeys } from "./vocabulary-state.ts";
+import { currentReading, treeKeys } from "./vocabulary-state.ts";
+import { loadProjectLexicons } from "./project.ts";
 import { pendingCandidates } from "./lexicon-cli.ts";
 import { appendRun, entryKey, latestByEnforcement, loadRuns, parseLine, type RunRecord } from "../enforcement/record.ts";
 import { latestSeeing, RunIndexUnavailable } from "../enforcement/run-index.ts";
@@ -794,22 +795,28 @@ test("the vocabulary tree key follows sparse checkout file membership", async ()
   try {
     const start = await runHook("SessionStart", { session_id: SESSION, cwd: project.root }, project.root, {});
     start.commit?.();
+    const layers = await loadProjectLexicons(project.root);
+    const read = async (): Promise<number> => {
+      const scope = openWork();
+      await currentReading(project.root, layers);
+      return closeWork(scope).counts["coverage reading"] ?? 0;
+    };
     const full = treeKeys(project.root);
     assert.ok(full !== undefined);
     fixtureGit(project, "sparse-checkout", "set", "proj/docs");
     const docs = treeKeys(project.root);
     assert.notDeepEqual(docs, full);
-    assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"], 1);
-    assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"] ?? 0, 0);
+    assert.equal(await read(), 1);
+    assert.equal(await read(), 0);
     fixtureGit(project, "sparse-checkout", "set", "proj/src");
     const source = treeKeys(project.root);
     assert.notDeepEqual(source, docs);
-    assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"], 1);
+    assert.equal(await read(), 1);
     fixtureGit(project, "sparse-checkout", "disable");
     const disabled = treeKeys(project.root);
     assert.notDeepEqual(disabled, source);
     assert.deepEqual(disabled, full);
-    assert.equal((await workOf(project, "Stop", {})).work.counts["coverage reading"], 1);
+    assert.equal(await read(), 1);
   } finally {
     rmSync(project.top, { recursive: true, force: true });
   }
