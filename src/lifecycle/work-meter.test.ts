@@ -27,6 +27,7 @@ import { lexiconCoverage } from "./lexicon-coverage.ts";
 import { loadLexicon } from "./lexicon.ts";
 import { COHERENCE_LEXICON } from "./project.ts";
 import { cacheDir } from "./kept-parse.ts";
+import { treeKeys } from "./vocabulary-state.ts";
 import { pendingCandidates } from "./lexicon-cli.ts";
 import { appendRun, entryKey, latestByEnforcement, loadRuns, parseLine, type RunRecord } from "../enforcement/record.ts";
 import { latestSeeing, RunIndexUnavailable } from "../enforcement/run-index.ts";
@@ -787,6 +788,26 @@ function fixtureGit(project: SizedProject, ...args: string[]): void {
   const done = spawnSync("git", ["-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "commit.gpgsign=false", ...args], { cwd: project.top, encoding: "utf8" });
   assert.equal(done.status, 0, `git ${args.join(" ")}: ${done.stderr}`);
 }
+
+test("the vocabulary tree key follows sparse checkout file membership", () => {
+  const project = sizedProject(1);
+  try {
+    const full = treeKeys(project.root);
+    assert.ok(full !== undefined);
+    fixtureGit(project, "sparse-checkout", "set", "proj/docs");
+    const docs = treeKeys(project.root);
+    assert.notDeepEqual(docs, full);
+    fixtureGit(project, "sparse-checkout", "set", "proj/src");
+    const source = treeKeys(project.root);
+    assert.notDeepEqual(source, docs);
+    fixtureGit(project, "sparse-checkout", "disable");
+    const disabled = treeKeys(project.root);
+    assert.notDeepEqual(disabled, source);
+    assert.deepEqual(disabled, full);
+  } finally {
+    rmSync(project.top, { recursive: true, force: true });
+  }
+});
 
 /** Three ways HEAD moves onto a clean tree, each set up before the session starts and made after it. */
 const HEAD_MOVES: [string, (project: SizedProject) => void, (project: SizedProject) => void][] = [

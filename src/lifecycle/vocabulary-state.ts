@@ -209,6 +209,7 @@ interface Meta {
 
 /** The key the tree's HEAD is kept under: no path git lists can be spelled so. */
 export const HEAD_KEY = "\u0000HEAD";
+const SPARSE_KEY = "\u0000SPARSE";
 
 /**
  * The commit HEAD names, through the git door: one rev-parse. "unborn" for a
@@ -246,6 +247,14 @@ export function treeKeys(root: string): Record<string, string> | undefined {
     for (const f of listed.stdout.split("\0")) if (f !== "" && !f.startsWith(".coherence/")) files.add(f);
   }
   const out: Record<string, string> = { [HEAD_KEY]: head };
+  const sparse = spawnSync("git", ["config", "--bool", "core.sparseCheckout"], { cwd: root, encoding: "utf8" });
+  if (sparse.status !== 0 && sparse.status !== 1) return undefined;
+  if (sparse.stdout.trim() === "true") {
+    const listed = spawnSync("git", ["ls-files", "--cached", "-t", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+    if (listed.status !== 0) return undefined;
+    const skipped = listed.stdout.split("\0").filter((line) => line.startsWith("S ")).map((line) => line.slice(2));
+    out[SPARSE_KEY] = createHash("sha256").update(JSON.stringify(skipped)).digest("hex");
+  }
   for (const f of [...files].sort()) {
     try {
       const st = statSync(join(root, f));
