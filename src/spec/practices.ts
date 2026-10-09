@@ -109,7 +109,6 @@ export function kernelPractices(enactments: readonly Enactment[] = []): ModelPra
   return out;
 }
 
-
 export interface PracticeChecks {
   root: string;
   practices: readonly ModelPractice[];
