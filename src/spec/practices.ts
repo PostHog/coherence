@@ -110,19 +110,25 @@ export function kernelPractices(enactments: readonly Enactment[] = []): ModelPra
 }
 
 /**
- * The commits among the citations that this repository does not hold; undefined when git cannot be asked,
- * or when the clone is shallow and cannot tell a commit cut off by its depth from no commit.
+ * The commits among the citations that this repository does not hold; undefined when git cannot be asked.
+ * A shallow clone cannot tell a commit its depth cut off from no commit, so there a citation is missing
+ * only when it names some other object here, or more than one.
  */
 function missingCommits(root: string, commits: readonly string[]): Set<string> | undefined {
   if (commits.length === 0) return new Set();
-  const result = spawnSync("git", ["cat-file", "--batch-check"], { cwd: root, input: commits.map((c) => `${c}^{commit}`).join("\n") + "\n", encoding: "utf8" });
-  if (result.status !== 0) return undefined;
-  const missing = new Set<string>();
-  result.stdout.split("\n").forEach((line, index) => {
-    if (/ missing$| ambiguous$/.test(line) && commits[index] !== undefined) missing.add(commits[index]!);
-  });
-  if (missing.size > 0 && isShallow(root)) return undefined;
-  return missing;
+  const asCommits = batchCheck(root, commits.map((c) => `${c}^{commit}`));
+  if (asCommits === undefined) return undefined;
+  const missing = commits.filter((_, index) => / missing$| ambiguous$/.test(asCommits[index] ?? ""));
+  if (missing.length === 0 || !isShallow(root)) return new Set(missing);
+  const asObjects = batchCheck(root, missing);
+  if (asObjects === undefined) return undefined;
+  return new Set(missing.filter((_, index) => !/ missing$/.test(asObjects[index] ?? "")));
+}
+
+/** git cat-file --batch-check's answer for each name, in order; undefined when git cannot be asked. */
+function batchCheck(root: string, names: readonly string[]): string[] | undefined {
+  const result = spawnSync("git", ["cat-file", "--batch-check"], { cwd: root, input: names.join("\n") + "\n", encoding: "utf8" });
+  return result.status === 0 ? result.stdout.split("\n") : undefined;
 }
 
 function isShallow(root: string): boolean {
