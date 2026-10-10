@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { after, test } from "node:test";
+import { after, describe, test } from "node:test";
 import { journalVerbs, type Io } from "./cli.ts";
 import { defectStates } from "./defects.ts";
 import { convergence, convergenceText } from "./convergence.ts";
@@ -122,6 +122,24 @@ test("a defect carries a declared class, where it came in and what caught it, an
   assert.equal(loadJournal(root).records.length, before, "nothing was written");
   assert.match(j("journal", bare).out.join("\n"), /the dial was silent/);
   assert.match(j("journal", full).out.join("\n"), /class path-identity, introduced [0-9a-f]{7}, caught review/);
+});
+
+describe("a shallow clone refuses only an --introduced git can tell is no commit", () => {
+  for (const { introduced, refused } of [
+    { introduced: "an older commit its depth cut off", refused: false },
+    { introduced: "a file it holds", refused: true },
+  ] as const) {
+    test(`${introduced} is ${refused ? "refused" : "written"}`, () => {
+      const origin = project({ "knob.ts": "export const knob = 1;\n" });
+      const older = commitAll(origin, "first", "2026-10-01T10:00:00Z");
+      commitAll(origin, "second", "2026-10-02T10:00:00Z");
+      const blob = execFileSync("git", ["rev-parse", "HEAD:knob.ts"], { cwd: origin, encoding: "utf8" }).trim();
+      const root = made(mkdtempSync(join(tmpdir(), "coherence-defects-shallow-")));
+      execFileSync("git", ["clone", "-q", "--depth", "1", `file://${origin}`, root]);
+      const run = journal(root, clock("2026-10-03T00:00:00Z"))("defect", "the knob stuck", "--evidence", "turned it", "--introduced", refused ? blob : older, ...WHO);
+      assert.equal(run.code, refused ? 1 : 0, run.err.join("\n"));
+    });
+  }
 });
 
 test("classify folds into the defect without editing it: a later classification overrides, a retracted one gives nothing, and a field nobody gave stays unknown", () => {
