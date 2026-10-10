@@ -170,6 +170,7 @@ The spec grammar and the model: one bullet shape, with each bullet's state deriv
   over: a cited commit a full clone holds, one no clone holds, one a depth-1 clone cut off, and a file's hash a depth-1 clone holds
   via: a cited commit is no commit only where git can tell
   because: a hosted agent sandbox clones at depth 1, so every commit an adopter's practices cited read as no commit and Stop reported each one, though the remote held them all; a shallow clone cannot confirm a commit it lacks, so it says nothing of one, but a hash that names a file or a tree here, or several objects, is no commit at any depth (review of PR #86); a full clone, as the workflow ci install writes fetches, still catches every wrong one
+  refuted: made missingCommits in commits.ts report every missing commit without asking whether the clone is shallow, as before the fix -> "a cited commit is no commit only where git can tell" went red in practice.test.ts on the shallow clone citing an older commit; restored byte for byte, green batched and alone (2026-10-10)
   kinds: none
 - a leaves line belongs to the step above it: A leaves: line in a practice belongs to the step written above it whatever its indentation: four spaces, two or a tab parse to the same steps and the same version.
   over: one practice with leaves: under its second step at four spaces, two spaces and a tab

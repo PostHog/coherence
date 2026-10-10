@@ -192,6 +192,7 @@ Compression: one append-only file per session of attributed, durable outcomes, r
   via: a shallow clone refuses only an --introduced git can tell is no commit
   because: a hosted agent sandbox clones at depth 1, so a defect introduced by any older commit was refused as no commit, though the remote held it; the practice citation check had the same blind spot (review of PR #86), so both now ask git one way
   crossing: project-source -> record
+  refuted: made missingCommits in commits.ts report nothing in a shallow clone, so a file's hash passed as a commit its depth cut off -> "a shallow clone refuses only an --introduced git can tell is no commit" went red in defects.test.ts on the file's hash; restored byte for byte, green batched and alone (2026-10-10)
   kinds: none
 - a defect is classified by a later record, never edited: classify writes a decision citing the defect with the class, introduced and caught it gives, and every reader folds them oldest first: the defect's own fields, then each classification not retracted, then its close, a later field overriding an earlier one; a field no record gave stays absent and is read as unknown.
   over: a defect classified twice and once more by a retracted classification, a defect nobody classified, a classification with no field, and one of a record that is no defect
