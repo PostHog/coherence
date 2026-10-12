@@ -65,7 +65,8 @@
     "docs/setup.md",
     "docs/tour.md",
     "docs/telemetry.md",
-    "plugins"
+    "plugins",
+    "docs/how-coherence-works.md"
   ],
   "optionalDependencies": {
     "pyright": "^1.1.414",
