@@ -121,10 +121,10 @@ test("ci install sets up Bun for a bun lockfile: Bun beside the Node.js the CLI 
   const top = repository({ "package.json": ADOPTER_PACKAGE, "bun.lock": "{}\n" });
   const text = workflowText(planWorkflow(top, "github", "fail"));
   assertWellFormed(text);
-  assert.match(text, /- uses: oven-sh\/setup-bun@[0-9a-f]{40} # v\d.*\n\n/, "no packageManager: the action's own default Bun");
+  assert.match(text, /- uses: oven-sh\/setup-bun@[0-9a-f]{40} # v\d.*\n {8}with:\n {10}bun-version: latest\n/, "no packageManager: the newest Bun, which reads every lockfile an older one wrote");
   assert.match(text, /- uses: actions\/setup-node@[0-9a-f]{40} # v\d.*\n {8}with:\n {10}node-version: "22"\n/, "the CLI runs on Node.js, which Bun does not bring");
-  assert.deepEqual(runs(text), ["bun install --frozen-lockfile", "bunx --no-install coherence spec --check", 'bunx --no-install coherence run --form chokepoint --no-server --session "ci-${{ github.run_id }}" --agent ci']);
-  assert.doesNotMatch(text, /npm ci|npx|pnpm/);
+  assert.deepEqual(runs(text), ["bun install --frozen-lockfile", "npx --no -- coherence spec --check", 'npx --no -- coherence run --form chokepoint --no-server --session "ci-${{ github.run_id }}" --agent ci'], "the installed Coherence through Node.js, never one fetched, whatever the Bun");
+  assert.doesNotMatch(text, /npm ci|pnpm|bunx/);
 
   const binary = repository({ "package.json": ADOPTER_PACKAGE, "bun.lockb": "" });
   assert.equal(planWorkflow(binary, "github", "comment").manager, "bun", "the binary lockfile older Bun writes is Bun's too");
@@ -137,6 +137,14 @@ test("ci install sets up Bun for a bun lockfile: Bun beside the Node.js the CLI 
   const nestedText = workflowText(planWorkflow(join(nested, "apps/web"), "github", "fail"));
   assert.match(nestedText, /- uses: oven-sh\/setup-bun@.*\n {8}with:\n {10}bun-version-file: apps\/web\/package\.json\n/, "the Bun its packageManager names, read below the top");
   assert.match(nestedText, /working-directory: apps\/web\n {8}run: bun install --frozen-lockfile\n/);
+
+  const underPinnedTop = repository({
+    "package.json": JSON.stringify({ name: "top", packageManager: "bun@1.1.45" }),
+    "apps/web/package.json": ADOPTER_PACKAGE,
+    "apps/web/bun.lock": "{}\n",
+    "apps/web/coherence.config.json": "{}\n",
+  });
+  assert.match(workflowText(planWorkflow(join(underPinnedTop, "apps/web"), "github", "fail")), /- uses: oven-sh\/setup-bun@.*\n {8}with:\n {10}bun-version: latest\n/, "a pin at the top is not the Bun that wrote a lockfile below it");
 });
 
 test("ci install runs a registry's check at the repository top, covering every listed project, and a nested project in its own folder", () => {

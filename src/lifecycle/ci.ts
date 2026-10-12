@@ -62,17 +62,17 @@ const PNPM_DEFAULT = "10";
 const CI_MANAGERS = ["npm", "pnpm", "bun"] as const;
 export type PackageManager = (typeof CI_MANAGERS)[number];
 
-/** How each manager installs from its lockfile, runs the installed Coherence and never one it would fetch, and adds Coherence as a dev dependency. */
+/** How each manager installs from its lockfile, runs the installed Coherence and never one it would fetch, and adds Coherence as a dev dependency; Bun's runs through Node.js, as an older bunx has no --no-install and fetches what is missing. */
 const COMMANDS: Record<PackageManager, { install: string; cli: string; add: string }> = {
   npm: { install: "npm ci", cli: "npx --no -- coherence", add: "npm install -D" },
   pnpm: { install: "pnpm install --frozen-lockfile", cli: "pnpm exec coherence", add: "pnpm add -D" },
-  bun: { install: "bun install --frozen-lockfile", cli: "bunx --no-install coherence", add: "bun add -d" },
+  bun: { install: "bun install --frozen-lockfile", cli: "npx --no -- coherence", add: "bun add -d" },
 };
 
 /** The step a manager Node.js does not bring needs: its action, the input that reads packageManager from a package.json below the top, and the version it installs when packageManager does not name one. */
-const MANAGER_SETUP: Partial<Record<PackageManager, { action: string; packageJsonInput: string; fallback?: string }>> = {
+const MANAGER_SETUP: Partial<Record<PackageManager, { action: string; packageJsonInput: string; fallback: string }>> = {
   pnpm: { action: ACTIONS.setupPnpm, packageJsonInput: "package_json_file", fallback: `version: ${PNPM_DEFAULT}` },
-  bun: { action: ACTIONS.setupBun, packageJsonInput: "bun-version-file" },
+  bun: { action: ACTIONS.setupBun, packageJsonInput: "bun-version-file", fallback: "bun-version: latest" },
 };
 
 function setUp(manager: AnyManager): manager is PackageManager {
@@ -226,7 +226,7 @@ export function planWorkflow(root: string, host: CiHost, mode: CiMode): CiPlan {
 function managerSetup(plan: CiPlan): string[] {
   const setup = MANAGER_SETUP[plan.manager];
   if (setup === undefined) return [];
-  const withs = !plan.versionDeclared ? (setup.fallback === undefined ? [] : [setup.fallback]) : plan.installDir === "." ? [] : [`${setup.packageJsonInput}: ${plan.installDir}/package.json`];
+  const withs = !plan.versionDeclared ? [setup.fallback] : plan.installDir === "." ? [] : [`${setup.packageJsonInput}: ${plan.installDir}/package.json`];
   return [`      - uses: ${setup.action}`, ...(withs.length > 0 ? ["        with:", ...withs.map((w) => `          ${w}`)] : []), ""];
 }
 
