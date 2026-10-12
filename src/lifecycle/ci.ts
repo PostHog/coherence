@@ -112,7 +112,7 @@ export interface CiPlan {
   manager: PackageManager;
   /** The folder holding the lockfile, relative to the top ("." for the top). */
   installDir: string;
-  /** Whether the package.json at the install folder names the manager's version in packageManager. */
+  /** Whether the package.json at the install folder names the manager's version where its setup action reads one. */
   versionDeclared: boolean;
   /** The Node.js version file at the install folder (.nvmrc or .node-version), relative to the top, when there is one. */
   nodeVersionFile: string | undefined;
@@ -148,6 +148,14 @@ function declares(manifest: Record<string, unknown> | undefined, name: string): 
     const deps = manifest[key];
     return typeof deps === "object" && deps !== null && name in deps;
   });
+}
+
+/** Whether a package.json names the manager's version where its setup action reads one: packageManager, and for Bun engines.bun too. */
+function declaresVersion(manifest: Record<string, unknown> | undefined, manager: PackageManager): boolean {
+  const packageManager = manifest?.["packageManager"];
+  if (typeof packageManager === "string" && packageManager.startsWith(`${manager}@`)) return true;
+  const engines = manifest?.["engines"];
+  return manager === "bun" && typeof engines === "object" && engines !== null && typeof (engines as Record<string, unknown>)["bun"] === "string";
 }
 
 /** The folders from `from` up to `top`, both included, nearest first. */
@@ -203,8 +211,7 @@ export function planWorkflow(root: string, host: CiHost, mode: CiMode): CiPlan {
   if (!manifests.some((m) => declares(m, PACKAGE_NAME))) {
     throw new CiError(`ci install: no package.json from ${workdir} up to ${slash(relative(top, lock.dir))} lists ${PACKAGE_NAME}; add it as a dev dependency so the workflow runs the installed package`);
   }
-  const packageManager = readJson(join(lock.dir, "package.json"))?.["packageManager"];
-  const versionDeclared = typeof packageManager === "string" && packageManager.startsWith(`${lock.manager}@`);
+  const versionDeclared = declaresVersion(readJson(join(lock.dir, "package.json")), lock.manager);
   const versionFile = [".nvmrc", ".node-version"].find((name) => existsSync(join(lock.dir, name)));
   const projects = registry === undefined ? undefined : registry.leaves.map((leaf) => slash(relative(top, leaf)));
   const python = readsPython(top) || readsPython(at) || (registry?.leaves ?? []).some(readsPython);

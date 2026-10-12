@@ -126,6 +126,11 @@ test("ci install sets up Bun for a bun lockfile: Bun beside the Node.js the CLI 
   assert.deepEqual(runs(text), ["bun install --frozen-lockfile", "npx --no -- coherence spec --check", 'npx --no -- coherence run --form chokepoint --no-server --session "ci-${{ github.run_id }}" --agent ci'], "the installed Coherence through Node.js, never one fetched, whatever the Bun");
   assert.doesNotMatch(text, /npm ci|pnpm|bunx/);
 
+  for (const declares of [{ packageManager: "bun@1.4.2" }, { engines: { bun: "1.1.45" } }]) {
+    const declared = repository({ "package.json": JSON.stringify({ name: "x", ...declares, devDependencies: { "@posthog/coherence": "^1.7.0" } }), "bun.lock": "{}\n" });
+    assert.match(workflowText(planWorkflow(declared, "github", "fail")), /- uses: oven-sh\/setup-bun@[0-9a-f]{40} # v\d.*\n\n/, `${JSON.stringify(declares)} at the top: the action reads it there, and no input overrides it`);
+  }
+
   const binary = repository({ "package.json": ADOPTER_PACKAGE, "bun.lockb": "" });
   assert.equal(planWorkflow(binary, "github", "comment").manager, "bun", "the binary lockfile older Bun writes is Bun's too");
 
