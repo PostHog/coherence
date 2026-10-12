@@ -595,6 +595,28 @@ export function seal(pattern: string): string[] {
   }
 });
 
+test("a protected thing the instrument finds no reference to, not even inside the chokepoint, is not run: there was nothing to check", async () => {
+  const unreached = `export function seal(pattern: string): string[] {
+  return [pattern];
+}
+`;
+  const { dir, adapter: fresh } = await ruledTree(unreached);
+  try {
+    rmSync(join(dir, "src/api/leak.ts"));
+    rmSync(join(dir, "src/api/star.ts"));
+    const result = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS in secrets.ts", chokepoint: "seal", ...hint, root: dir });
+    assert.equal(result.verdict, "not run", result.reason);
+    assert.equal(result.grade, "reference-choked", result.reason);
+    assert.equal(result.siteEvidence, "complete", "the empty site list is a confirmed empty set");
+    assert.match(result.reason, /found no reference to SECRET_COLUMNS in secrets\.ts anywhere, not even inside seal: nothing to check/, result.reason);
+    assert.match(result.reason, /a path the instrument cannot follow/, result.reason);
+    assert.doesNotMatch(result.reason, /every reference in the project is inside the chokepoint/, "a check that saw no reference claims nothing about where they are");
+  } finally {
+    await fresh.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("the one-at-a-time totality path escapes the title before the runner reads it as a regex", async () => {
   const { escapeRegExp, runTotalityOracle } = await import("./totality.ts");
   assert.equal(escapeRegExp("returns 503 (R2 absent)"), "returns 503 \\(R2 absent\\)");

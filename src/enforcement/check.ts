@@ -332,9 +332,12 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
   const tests = counts.test > 0 ? `; ${counts.test} test reference${counts.test === 1 ? "" : "s"}` : "";
   const proved = languageRefused || checkerRefused || fired;
   const vacuous = proved ? "" : `; refutation missing: ${refutationAccount}`;
+  // The language refuses every outside reference whether or not one exists; any other rung over no reference at all checked nothing.
+  const unreached = !languageRefused && !sites.some((s) => s.of === "protected");
+  const claim = unreached ? `${nothingToCheckNote(protectedThing, chokepoint)} (${visibility.evidence})` : `${protectedThing.name} is ${graded.grade}, enforced by ${graded.enforcer}: ${graded.fact}${tests}`;
   return {
     input,
-    verdict: proved ? "pass" : "not run",
+    verdict: proved && !unreached ? "pass" : "not run",
     grade: graded.grade,
     enforcer: graded.enforcer,
     refutation: refutationState,
@@ -348,8 +351,13 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
     visibility: visibility.evidence,
     files,
     governed,
-    reason: `${protectedThing.name} is ${graded.grade}, enforced by ${graded.enforcer}: ${graded.fact}${tests}${governedClause(governed, counts.exempt)}${vacuous}`,
+    reason: `${claim}${governedClause(governed, counts.exempt)}${vacuous}`,
   };
+}
+
+/** Why a protected thing with no reference anywhere is not a pass: either nothing uses it, or what uses it does so where the instrument cannot see. */
+function nothingToCheckNote(protectedThing: Definition, chokepoint: Definition): string {
+  return `the instrument found no reference to ${protectedThing.name} anywhere, not even inside ${chokepoint.name}: nothing to check. Code that reaches it through a path the instrument cannot follow (a generated API, a registry, a name in a string) is invisible to this check, so the chokepoint is not shown to hold`;
 }
 
 /** The ladder's rungs; a warm server started before ladders carried rungs answers with none, and the check must not crash on it. */
