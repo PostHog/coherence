@@ -412,7 +412,7 @@ test("in an adopter, a kernel practice a Coherence release changed asks no amend
 
 test("every doc a kernel practice sends an adopter to ships in the package", () => {
   const shipped: string[] = JSON.parse(readFileSync(join(COHERENCE_ROOT, "package.json"), "utf8")).files;
-  const named = kernelPractices().flatMap((p) => p.steps.flatMap((s) => s.text.match(/\bdocs\/[\w.-]+\.md\b/g) ?? []));
+  const named = kernelPractices().flatMap((p) => p.steps.flatMap((s) => s.text.match(/\bdocs\/[\w./-]+\.md\b/g) ?? []));
   assert.ok(named.length > 0, "the kernel practices name the docs an adopter reads");
   assert.deepEqual([...new Set(named)].filter((doc) => !shipped.includes(doc)), []);
 });
