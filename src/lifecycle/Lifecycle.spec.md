@@ -1181,6 +1181,12 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: the adopter wanted a report comment, not a failed check (df-7b885044); a comment posted anew on every push buries the conversation, an exit that cannot tell findings from a crash would either fail on findings or pass a broken run, and a fork's read-only token failing quietly would read as a clean pull request
   refuted: the comment mode's spec check step swallowed every exit (|| true), so a crash of Coherence passed as findings -> "ci install writes the comment mode for pnpm: findings never fail the job, and one comment is posted or updated" went red in ci.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-09)
   kinds: none
+- the CI check sets up Bun for a Bun lockfile: ci install for a project whose lockfile is bun.lock or bun.lockb writes a workflow that sets up Bun (the version packageManager names, read from the package.json beside the lockfile) and Node.js, which the CLI runs on, installs with bun install --frozen-lockfile, and runs the installed Coherence with bunx --no-install, which never fetches a package of that name.
+  over: a bun.lock at the repository top with no packageManager, a bun.lockb, and a bun.lock in a nested project whose package.json names bun@1.4.2
+  via: ci install sets up Bun for a bun lockfile: Bun beside the Node.js the CLI needs, a frozen install, and the installed Coherence only
+  because: ci install refused a Bun adopter's bun.lock as a lockfile it does not set up, so adopt's CI step could not be finished in any Bun project; plain bunx, like npx without --no, would fetch the unrelated npm package named coherence wherever the install did not bring Coherence
+  refuted: the Bun workflow ran bunx coherence without --no-install -> "ci install sets up Bun for a bun lockfile: Bun beside the Node.js the CLI needs, a frozen install, and the installed Coherence only" went red in ci.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-12)
+  kinds: none
 - a registry's CI check covers every listed project: ci install in a repository with a registry runs the check at the repository top, from whichever listed project it was run in, where spec --check and the chokepoint run each cover every listed project; without a registry, a project nested below the top runs the check in its own folder; a registry whose lockfile is not at the top is refused.
   over: a registry of two projects run from one of them, a project nested below a top that holds the lockfile and a Node.js version file, and a registry whose only lockfile is in a project
   via: ci install runs a registry's check at the repository top, covering every listed project, and a nested project in its own folder
@@ -1188,7 +1194,7 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   refuted: planWorkflow ran the check in the project ci install was called from even under a registry -> "ci install runs a registry's check at the repository top, covering every listed project, and a nested project in its own folder" went red in ci.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-09)
   kinds: none
 - ci install refuses what it cannot set up: ci install refuses, naming what to do, a lockfile of a package manager its workflow does not set up, two lockfiles in one folder, and a project whose package.json does not list Coherence; and with no mode it presents both modes and assumes neither.
-  over: yarn.lock, package-lock.json beside pnpm-lock.yaml, a package.json without @posthog/coherence, and no --mode
+  over: yarn.lock, no lockfile, package-lock.json beside pnpm-lock.yaml, a package.json without @posthog/coherence, and no --mode
   via: ci install refuses what it cannot set up, and says what to do
   because: a workflow guessed for a lockfile it does not understand would fail on its first pull request for a reason nobody chose, and the mode is the user's choice to make (df-7b885044)
   refuted: yarn.lock was read as an npm lockfile, so a yarn project got a workflow running npm ci -> "ci install refuses what it cannot set up, and says what to do" went red in ci.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-09)
