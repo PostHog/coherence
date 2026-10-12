@@ -26,6 +26,13 @@ The language adapter seam: how to ask a language's server for definitions, refer
   crossing: instrument -> reading
   refuted: exempted import specifiers from the classification, as the adapter did before -> "every site the language server reports is a reference: a bypass beneath a semicolon-less bare import is a bypass, and an import outside the chokepoint is one too" went red in enforcement.test.ts with the bypass graded pass; restored, green (2026-09-18)
   kinds: none
+- a Convex function is referenced through its generated API: In a Convex project, a property chain on the api or internal object a file imports from its functions folder's _generated/api, along a module's path to one of its functions (internal.telemetry.send, api.model.telemetry.track), is a reference to that export, read under whatever name the file imports the object by; the TypeScript refutation for a Convex function stages one such reference beside the re-export.
+  over: every Convex function a chokepoint protects or is, called through the generated API from inside the chokepoint, from another function, and from a staged document
+  via: a Convex function called through the generated API outside its chokepoint is a bypass
+  because: Convex code reaches its functions only through the generated API object, whose type is computed from the modules, so the language server never links internal.telemetry.send back to send: a chokepoint over a Convex function saw 0 references, a planted direct call graded pass, and the refutation proved only a re-export the real callers never use. Staging a generated-API reference is what proves the check reads the path real callers take
+  crossing: instrument -> reading
+  refuted: dropped the generated API's sites from the TypeScript adapter's references -> "a Convex function called through the generated API outside its chokepoint is a bypass" went red in convex.test.ts with the planted call graded pass; restored byte for byte, green batched and alone (2026-10-12)
+  kinds: none
 - test paths: A path is a test when a configured folder is one of its segments or the file is named .test or .spec.
   over: every configured test folder and every file named .test or .spec
   via: a path is a test when a configured folder is a segment or the file is named .test or .spec
