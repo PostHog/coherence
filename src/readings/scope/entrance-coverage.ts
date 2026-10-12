@@ -37,6 +37,10 @@ export const CANDIDATE_RULES: Record<Language, readonly { rule: string; plural: 
     { rule: "server action", plural: "server actions", detects: "an exported function of a file that opens with 'use server'" },
     { rule: "route table", plural: "route table entries", detects: "an object literal naming a path or pattern that starts with / and a handler, on one line" },
     { rule: "route method", plural: "registered routes", detects: "a call like app.get('/path', handler) whose first argument is a path starting with /" },
+    { rule: "Convex function", plural: "Convex functions", detects: "an exported const created by the query, mutation or action a file imports from Convex's _generated/server, which any client of the deployment can call" },
+    { rule: "Convex HTTP route", plural: "Convex HTTP routes", detects: "a route on an httpRouter() from convex/server: a .route({ path or pathPrefix, method, handler }) call, or a library's routes registered with .addHttpRoutes(router)" },
+    { rule: "Convex cron", plural: "Convex crons", detects: "a function a cronJobs() table from convex/server runs on a schedule (interval, cron, hourly, daily, weekly, monthly), named by the generated API" },
+    { rule: "fetch handler", plural: "fetch handlers", detects: "a file whose default export is an object with a fetch method, which a Cloudflare Worker, Bun or Deno calls for every request" },
     { rule: "package bin", plural: "package bins", detects: "a file package.json's bin names" },
     { rule: "package script", plural: "package scripts", detects: "a project file a package.json script runs with node, tsx, ts-node, bun, deno, vite-node or python" },
     { rule: "script", plural: "scripts", detects: "a file directly under a top-level scripts/ or bin/ folder that no project file imports" },
@@ -54,7 +58,7 @@ export const CANDIDATE_RULES: Record<Language, readonly { rule: string; plural: 
 
 /** What the rules do not see, per language: said wherever the coverage is, so an absence is never read as none. */
 export const NOT_DETECTED: Record<Language, string> = {
-  typescript: "file routes outside a Next.js app/**/page without server handlers (their work enters through server functions), hand-written dispatchers, message consumers, workers and host callbacks are not detected",
+  typescript: "file routes outside a Next.js app/**/page without server handlers (their work enters through server functions), hand-written dispatchers, message consumers, a worker's other host callbacks (scheduled, queue) and a fetch handler exported as anything but an object with a fetch method are not detected; Convex's internal functions are not entrances, since only the deployment's own code (a public function, a cron, an HTTP action) can call them",
   python: "views reached only through include(), hand-written dispatchers, message consumers and signal handlers are not detected",
 };
 

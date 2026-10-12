@@ -92,6 +92,7 @@ test("scaffold entrances narrows to a folder or file inside the project, and nam
     assert.deepEqual(group!.entrances.map((e) => e.name), ["read thing in a", "read thing in b"], "never a name the spec already has, nor one proposed twice");
     assert.equal(entranceName({ file: "src/app/api/items/route.ts", symbol: "POST", rule: "route handler" }), "POST api/items/route");
     assert.equal(entranceName({ file: "scripts/sync:all.ts", symbol: "", rule: "script" }), "sync all", "never a colon, which would end the name");
+    assert.equal(entranceName({ file: "convex/player.ts", symbol: "join", rule: "Convex function" }), "player.join", "a Convex function is named as its clients call it, api.player.join");
   } finally {
     remove();
   }
