@@ -1,0 +1,826 @@
+{
+  "root": "/Users/daniloc/Documents/Dev/coherence/.claude/worktrees/agent-adbdbdb2e1f6ccb57",
+  "generatedAt": "2026-10-12T10:43:01.880Z",
+  "cap": 4,
+  "overlapThreshold": 0.3,
+  "counts": {
+    "records": 1081,
+    "workRecords": 116,
+    "commits": 591,
+    "recordsWithCommit": 1091,
+    "sessionsWithTouches": 67,
+    "firstTouches": 1148,
+    "defectsClosedByAFixDecision": 0,
+    "decisionsMarkedSuperseded": 10
+  },
+  "sets": {
+    "cc": {
+      "sources": [
+        "cc"
+      ],
+      "firstTouches": 1148,
+      "coverage": 69.1,
+      "meanItems": 39.2,
+      "precisionAt1": 3.4,
+      "precisionAtCap": 2.2,
+      "precisionUncapped": 1.5,
+      "recallAtCap": 15.7,
+      "recallUncapped": 28.3,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "3 of 39",
+        "defect": "16 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "1 of 12",
+        "unable": "0 of 1",
+        "order": "0 of 11"
+      },
+      "preemptItemsAtCap": 30,
+      "preemptPairs": [
+        "d-beedd69e -> d-edf80438 (0.30)",
+        "d-bf82754d -> d-663e28db (0.69)",
+        "d-192d3b64 -> d-2cc2f731 (0.34)",
+        "c-49baa15e -> c-5c824314 (0.33)",
+        "d-25b61fc9 -> d-618cb559 (0.57)",
+        "d-25c87b1f -> d-618cb559 (0.33)",
+        "d-9c3dc87e -> d-cd25b253 (0.32)",
+        "d-bf11cf70 -> d-047196f7 (0.30)",
+        "d-9eb564b3 -> d-98960a58 (0.51)",
+        "d-3eb04416 -> d-bde256be (0.31)",
+        "d-a3bad25d -> d-357ac3d4 (0.38)",
+        "d-a0542455 -> d-cf907449 (0.35)",
+        "d-cf1e7ee0 -> d-5e53f76f (0.39)"
+      ],
+      "deliveriesWithPreempt": 3.5,
+      "laterRecordsPreempted": 12,
+      "laterRecordsPreemptedPct": 1.9,
+      "tokensPerDelivery": 155,
+      "tokensPerSessionMedian": 1183,
+      "tokensPerSessionP90": 3511,
+      "precisionAtCapByKind": {
+        "open": "1.7% of 1898",
+        "decision": "3.1% of 1093"
+      }
+    },
+    "ex": {
+      "sources": [
+        "ex"
+      ],
+      "firstTouches": 1148,
+      "coverage": 20.1,
+      "meanItems": 2,
+      "precisionAt1": 6.1,
+      "precisionAtCap": 4.5,
+      "precisionUncapped": 4.4,
+      "recallAtCap": 11,
+      "recallUncapped": 11,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "0 of 39",
+        "defect": "14 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "0 of 12",
+        "unable": "0 of 1",
+        "order": "0 of 11"
+      },
+      "preemptItemsAtCap": 4,
+      "preemptPairs": [
+        "d-e2cff03c -> d-77431961 (0.32)",
+        "df-a0e893af -> d-7155e46f (0.35)",
+        "df-87881a8d -> d-411e5cb2 (0.33)"
+      ],
+      "deliveriesWithPreempt": 1.7,
+      "laterRecordsPreempted": 3,
+      "laterRecordsPreemptedPct": 0.5,
+      "tokensPerDelivery": 79,
+      "tokensPerSessionMedian": 287,
+      "tokensPerSessionP90": 789,
+      "precisionAtCapByKind": {
+        "open": "5.9% of 324",
+        "decision": "0.9% of 116",
+        "superseded": "0% of 3"
+      }
+    },
+    "tx": {
+      "sources": [
+        "tx"
+      ],
+      "firstTouches": 1148,
+      "coverage": 31.9,
+      "meanItems": 2.2,
+      "precisionAt1": 6.6,
+      "precisionAtCap": 5.5,
+      "precisionUncapped": 4.6,
+      "recallAtCap": 8.7,
+      "recallUncapped": 8.7,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "2 of 39",
+        "defect": "2 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "0 of 12",
+        "unable": "1 of 1",
+        "order": "6 of 11"
+      },
+      "preemptItemsAtCap": 4,
+      "preemptPairs": [
+        "d-5c22b23c -> df-5961bdb2 (0.38)",
+        "d-a5e5c691 -> d-e7900148 (0.30)",
+        "d-a5e5c691 -> d-a2c7d710 (0.35)",
+        "u-f89365e2 -> d-5c22b23c (0.33)"
+      ],
+      "deliveriesWithPreempt": 1.1,
+      "laterRecordsPreempted": 4,
+      "laterRecordsPreemptedPct": 0.6,
+      "tokensPerDelivery": 80,
+      "tokensPerSessionMedian": 343,
+      "tokensPerSessionP90": 873,
+      "precisionAtCapByKind": {
+        "open": "8.7% of 381",
+        "decision": "1.6% of 314"
+      }
+    },
+    "cp": {
+      "sources": [
+        "cp"
+      ],
+      "firstTouches": 1148,
+      "coverage": 85.5,
+      "meanItems": 6.8,
+      "precisionAt1": 2,
+      "precisionAtCap": 1.6,
+      "precisionUncapped": 1.1,
+      "recallAtCap": 5.5,
+      "recallUncapped": 5.5,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "0 of 39",
+        "defect": "7 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "0 of 12",
+        "unable": "0 of 1",
+        "order": "0 of 11"
+      },
+      "preemptItemsAtCap": 24,
+      "preemptPairs": [
+        "d-a77be28f -> d-c3ed774b (0.33)",
+        "d-a5e5c691 -> d-a2c7d710 (0.35)",
+        "u-f89365e2 -> d-5c22b23c (0.33)"
+      ],
+      "deliveriesWithPreempt": 2.4,
+      "laterRecordsPreempted": 3,
+      "laterRecordsPreemptedPct": 0.5,
+      "tokensPerDelivery": 128,
+      "tokensPerSessionMedian": 1401,
+      "tokensPerSessionP90": 3529,
+      "precisionAtCapByKind": {
+        "decision": "1.5% of 1235",
+        "open": "1.7% of 1898"
+      }
+    },
+    "ex+tx": {
+      "sources": [
+        "ex",
+        "tx"
+      ],
+      "firstTouches": 1148,
+      "coverage": 38.2,
+      "meanItems": 2.8,
+      "precisionAt1": 7.8,
+      "precisionAtCap": 5.7,
+      "precisionUncapped": 4.7,
+      "recallAtCap": 18.1,
+      "recallUncapped": 18.9,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "1 of 39",
+        "defect": "15 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "0 of 12",
+        "unable": "1 of 1",
+        "order": "6 of 11"
+      },
+      "preemptItemsAtCap": 8,
+      "preemptPairs": [
+        "d-5c22b23c -> df-5961bdb2 (0.38)",
+        "d-e2cff03c -> d-77431961 (0.32)",
+        "d-a5e5c691 -> d-e7900148 (0.30)",
+        "df-a0e893af -> d-7155e46f (0.35)",
+        "d-a5e5c691 -> d-a2c7d710 (0.35)",
+        "df-87881a8d -> d-411e5cb2 (0.33)",
+        "u-f89365e2 -> d-5c22b23c (0.33)"
+      ],
+      "deliveriesWithPreempt": 1.8,
+      "laterRecordsPreempted": 7,
+      "laterRecordsPreemptedPct": 1.1,
+      "tokensPerDelivery": 92,
+      "tokensPerSessionMedian": 485,
+      "tokensPerSessionP90": 1263,
+      "precisionAtCapByKind": {
+        "open": "7.9% of 642",
+        "decision": "1.5% of 336",
+        "superseded": "0% of 3"
+      }
+    },
+    "ex+tx+cc": {
+      "sources": [
+        "ex",
+        "tx",
+        "cc"
+      ],
+      "firstTouches": 1148,
+      "coverage": 71.3,
+      "meanItems": 39,
+      "precisionAt1": 4.9,
+      "precisionAtCap": 3.5,
+      "precisionUncapped": 1.6,
+      "recallAtCap": 29.9,
+      "recallUncapped": 43.3,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "4 of 39",
+        "defect": "26 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "1 of 12",
+        "unable": "1 of 1",
+        "order": "6 of 11"
+      },
+      "preemptItemsAtCap": 32,
+      "preemptPairs": [
+        "d-beedd69e -> d-edf80438 (0.30)",
+        "d-bf82754d -> d-663e28db (0.69)",
+        "d-192d3b64 -> d-2cc2f731 (0.34)",
+        "c-49baa15e -> c-5c824314 (0.33)",
+        "d-25b61fc9 -> d-618cb559 (0.57)",
+        "d-25c87b1f -> d-618cb559 (0.33)",
+        "df-a0e893af -> d-7155e46f (0.35)",
+        "d-9c3dc87e -> d-cd25b253 (0.32)",
+        "d-bf11cf70 -> d-047196f7 (0.30)",
+        "d-a5e5c691 -> d-a2c7d710 (0.35)",
+        "d-9eb564b3 -> d-98960a58 (0.51)",
+        "d-3eb04416 -> d-bde256be (0.31)",
+        "d-a3bad25d -> d-357ac3d4 (0.38)",
+        "d-a0542455 -> d-cf907449 (0.35)",
+        "df-87881a8d -> d-411e5cb2 (0.33)",
+        "d-cf1e7ee0 -> d-5e53f76f (0.39)",
+        "u-f89365e2 -> d-5c22b23c (0.33)"
+      ],
+      "deliveriesWithPreempt": 3.7,
+      "laterRecordsPreempted": 16,
+      "laterRecordsPreemptedPct": 2.5,
+      "tokensPerDelivery": 154,
+      "tokensPerSessionMedian": 1182,
+      "tokensPerSessionP90": 3511,
+      "precisionAtCapByKind": {
+        "open": "3.6% of 2070",
+        "decision": "3.3% of 991"
+      }
+    },
+    "cc-tight": {
+      "sources": [
+        "ct"
+      ],
+      "firstTouches": 1148,
+      "coverage": 53.6,
+      "meanItems": 9.1,
+      "precisionAt1": 1.5,
+      "precisionAtCap": 1.1,
+      "precisionUncapped": 0.9,
+      "recallAtCap": 7.1,
+      "recallUncapped": 10.2,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "0 of 39",
+        "defect": "9 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "0 of 12",
+        "unable": "0 of 1",
+        "order": "0 of 11"
+      },
+      "preemptItemsAtCap": 12,
+      "preemptPairs": [
+        "d-3c0083b8 -> df-ccecbb4a (0.42)",
+        "d-e2cff03c -> d-77431961 (0.32)",
+        "d-663e28db -> d-40086ade (0.41)",
+        "d-af51f2aa -> d-40086ade (0.56)",
+        "d-7f5b5203 -> d-bf82754d (0.73)",
+        "d-9eb564b3 -> d-98960a58 (0.51)",
+        "d-5e53f76f -> d-bde256be (0.43)",
+        "d-cf1e7ee0 -> d-bde256be (0.36)",
+        "d-cf1e7ee0 -> d-5e53f76f (0.39)"
+      ],
+      "deliveriesWithPreempt": 1.8,
+      "laterRecordsPreempted": 7,
+      "laterRecordsPreemptedPct": 1.1,
+      "tokensPerDelivery": 135,
+      "tokensPerSessionMedian": 975,
+      "tokensPerSessionP90": 3101,
+      "precisionAtCapByKind": {
+        "open": "1.9% of 593",
+        "decision": "0.8% of 1474"
+      }
+    },
+    "ex+tx+cc-tight": {
+      "sources": [
+        "ex",
+        "tx",
+        "ct"
+      ],
+      "firstTouches": 1148,
+      "coverage": 59.1,
+      "meanItems": 9.8,
+      "precisionAt1": 5.2,
+      "precisionAtCap": 3.3,
+      "precisionUncapped": 1.6,
+      "recallAtCap": 24.4,
+      "recallUncapped": 28.3,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "1 of 39",
+        "defect": "23 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "0 of 12",
+        "unable": "1 of 1",
+        "order": "6 of 11"
+      },
+      "preemptItemsAtCap": 16,
+      "preemptPairs": [
+        "d-3c0083b8 -> df-ccecbb4a (0.42)",
+        "d-5c22b23c -> df-5961bdb2 (0.38)",
+        "d-e2cff03c -> d-77431961 (0.32)",
+        "d-663e28db -> d-40086ade (0.41)",
+        "d-af51f2aa -> d-40086ade (0.56)",
+        "d-7f5b5203 -> d-bf82754d (0.73)",
+        "df-a0e893af -> d-7155e46f (0.35)",
+        "d-a5e5c691 -> d-a2c7d710 (0.35)",
+        "d-9eb564b3 -> d-98960a58 (0.51)",
+        "d-5e53f76f -> d-bde256be (0.43)",
+        "d-cf1e7ee0 -> d-bde256be (0.36)",
+        "df-87881a8d -> d-411e5cb2 (0.33)",
+        "d-cf1e7ee0 -> d-5e53f76f (0.39)",
+        "u-f89365e2 -> d-5c22b23c (0.33)"
+      ],
+      "deliveriesWithPreempt": 2.2,
+      "laterRecordsPreempted": 12,
+      "laterRecordsPreemptedPct": 1.9,
+      "tokensPerDelivery": 137,
+      "tokensPerSessionMedian": 1061,
+      "tokensPerSessionP90": 3354,
+      "precisionAtCapByKind": {
+        "open": "5.7% of 1081",
+        "decision": "1.1% of 1215",
+        "superseded": "0% of 2"
+      }
+    },
+    "all four": {
+      "sources": [
+        "ex",
+        "tx",
+        "cc",
+        "cp"
+      ],
+      "firstTouches": 1148,
+      "coverage": 92.6,
+      "meanItems": 35.4,
+      "precisionAt1": 3.9,
+      "precisionAtCap": 3,
+      "precisionUncapped": 1.5,
+      "recallAtCap": 30.7,
+      "recallUncapped": 45.7,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "3 of 39",
+        "defect": "28 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "1 of 12",
+        "unable": "1 of 1",
+        "order": "6 of 11"
+      },
+      "preemptItemsAtCap": 33,
+      "preemptPairs": [
+        "d-a77be28f -> d-c3ed774b (0.33)",
+        "d-bf82754d -> d-663e28db (0.69)",
+        "d-192d3b64 -> d-2cc2f731 (0.34)",
+        "c-49baa15e -> c-5c824314 (0.33)",
+        "d-25b61fc9 -> d-618cb559 (0.57)",
+        "df-a0e893af -> d-7155e46f (0.35)",
+        "d-9c3dc87e -> d-cd25b253 (0.32)",
+        "d-bf11cf70 -> d-047196f7 (0.30)",
+        "d-a5e5c691 -> d-a2c7d710 (0.35)",
+        "d-a0542455 -> d-cf907449 (0.35)",
+        "df-87881a8d -> d-411e5cb2 (0.33)",
+        "d-cf1e7ee0 -> d-5e53f76f (0.39)",
+        "u-f89365e2 -> d-5c22b23c (0.33)"
+      ],
+      "deliveriesWithPreempt": 3.1,
+      "laterRecordsPreempted": 13,
+      "laterRecordsPreemptedPct": 2.1,
+      "tokensPerDelivery": 150,
+      "tokensPerSessionMedian": 1893,
+      "tokensPerSessionP90": 4513,
+      "precisionAtCapByKind": {
+        "open": "3% of 3081",
+        "decision": "3.2% of 819"
+      }
+    },
+    "wt(lower)": {
+      "sources": [
+        "wt"
+      ],
+      "firstTouches": 1148,
+      "coverage": 76.5,
+      "meanItems": 9.2,
+      "precisionAt1": 2.4,
+      "precisionAtCap": 2.1,
+      "precisionUncapped": 1.9,
+      "recallAtCap": 4.7,
+      "recallUncapped": 7.9,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "6 of 39",
+        "defect": "0 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "0 of 12",
+        "unable": "0 of 1",
+        "order": "0 of 11"
+      },
+      "preemptItemsAtCap": 43,
+      "preemptPairs": [
+        "d-3c0083b8 -> df-ccecbb4a (0.42)",
+        "d-40360128 -> d-a02fd009 (0.31)",
+        "d-6d603722 -> d-618cb559 (0.36)",
+        "d-dfdf0da8 -> d-618cb559 (0.37)",
+        "d-6df8d09a -> d-ba18b0fd (0.42)",
+        "d-dfdf0da8 -> d-3753a08a (0.39)",
+        "d-e4cd0983 -> d-3753a08a (0.41)",
+        "d-79d3e589 -> d-dfdf0da8 (0.61)",
+        "d-e4cd0983 -> d-315deece (0.41)",
+        "d-9eb564b3 -> d-98960a58 (0.51)",
+        "d-5e53f76f -> d-bde256be (0.43)"
+      ],
+      "deliveriesWithPreempt": 4.4,
+      "laterRecordsPreempted": 9,
+      "laterRecordsPreemptedPct": 1.4,
+      "tokensPerDelivery": 134,
+      "tokensPerSessionMedian": 1246,
+      "tokensPerSessionP90": 3427,
+      "precisionAtCapByKind": {
+        "decision": "2.1% of 2886",
+        "superseded": "6.7% of 15"
+      }
+    },
+    "ex+tx+wt(lower)": {
+      "sources": [
+        "ex",
+        "tx",
+        "wt"
+      ],
+      "firstTouches": 1148,
+      "coverage": 77.1,
+      "meanItems": 10.4,
+      "precisionAt1": 5.3,
+      "precisionAtCap": 3.6,
+      "precisionUncapped": 2.3,
+      "recallAtCap": 22,
+      "recallUncapped": 26,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "6 of 39",
+        "defect": "15 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "0 of 12",
+        "unable": "1 of 1",
+        "order": "6 of 11"
+      },
+      "preemptItemsAtCap": 44,
+      "preemptPairs": [
+        "d-3c0083b8 -> df-ccecbb4a (0.42)",
+        "d-40360128 -> d-a02fd009 (0.31)",
+        "d-e2cff03c -> d-77431961 (0.32)",
+        "d-6d603722 -> d-618cb559 (0.36)",
+        "d-6df8d09a -> d-ba18b0fd (0.42)",
+        "df-a0e893af -> d-7155e46f (0.35)",
+        "d-dfdf0da8 -> d-3753a08a (0.39)",
+        "d-79d3e589 -> d-dfdf0da8 (0.61)",
+        "d-e4cd0983 -> d-315deece (0.41)",
+        "d-a5e5c691 -> d-a2c7d710 (0.35)",
+        "d-9eb564b3 -> d-98960a58 (0.51)",
+        "d-5e53f76f -> d-bde256be (0.43)",
+        "df-87881a8d -> d-411e5cb2 (0.33)",
+        "u-f89365e2 -> d-5c22b23c (0.33)"
+      ],
+      "deliveriesWithPreempt": 4.7,
+      "laterRecordsPreempted": 14,
+      "laterRecordsPreemptedPct": 2.2,
+      "tokensPerDelivery": 139,
+      "tokensPerSessionMedian": 1369,
+      "tokensPerSessionP90": 3651,
+      "precisionAtCapByKind": {
+        "open": "7.9% of 642",
+        "decision": "2.4% of 2375",
+        "superseded": "6.7% of 15"
+      }
+    },
+    "ex+tx+cc+wt(lower)": {
+      "sources": [
+        "ex",
+        "tx",
+        "cc",
+        "wt"
+      ],
+      "firstTouches": 1148,
+      "coverage": 78,
+      "meanItems": 39.7,
+      "precisionAt1": 5.4,
+      "precisionAtCap": 3.5,
+      "precisionUncapped": 1.6,
+      "recallAtCap": 29.9,
+      "recallUncapped": 46.5,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "4 of 39",
+        "defect": "26 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "1 of 12",
+        "unable": "1 of 1",
+        "order": "6 of 11"
+      },
+      "preemptItemsAtCap": 42,
+      "preemptPairs": [
+        "d-beedd69e -> d-edf80438 (0.30)",
+        "d-3c0083b8 -> df-ccecbb4a (0.42)",
+        "d-40360128 -> d-a02fd009 (0.31)",
+        "d-192d3b64 -> d-2cc2f731 (0.34)",
+        "c-49baa15e -> c-5c824314 (0.33)",
+        "d-6d603722 -> d-618cb559 (0.36)",
+        "d-25b61fc9 -> d-618cb559 (0.57)",
+        "d-6df8d09a -> d-ba18b0fd (0.42)",
+        "df-a0e893af -> d-7155e46f (0.35)",
+        "d-dfdf0da8 -> d-3753a08a (0.39)",
+        "d-6df8d09a -> d-3753a08a (0.30)",
+        "d-79d3e589 -> d-dfdf0da8 (0.61)",
+        "d-a5e5c691 -> d-a2c7d710 (0.35)",
+        "d-9eb564b3 -> d-98960a58 (0.51)",
+        "d-5e53f76f -> d-bde256be (0.43)",
+        "d-3eb04416 -> d-bde256be (0.31)",
+        "d-a0542455 -> d-cf907449 (0.35)",
+        "df-87881a8d -> d-411e5cb2 (0.33)",
+        "u-f89365e2 -> d-5c22b23c (0.33)"
+      ],
+      "deliveriesWithPreempt": 4.2,
+      "laterRecordsPreempted": 16,
+      "laterRecordsPreemptedPct": 2.5,
+      "tokensPerDelivery": 152,
+      "tokensPerSessionMedian": 1483,
+      "tokensPerSessionP90": 3788,
+      "precisionAtCapByKind": {
+        "open": "3.6% of 2070",
+        "decision": "3.4% of 1216",
+        "superseded": "0% of 9"
+      }
+    },
+    "wt(upper)": {
+      "sources": [
+        "wt"
+      ],
+      "firstTouches": 1148,
+      "coverage": 77.5,
+      "meanItems": 33.9,
+      "precisionAt1": 2.7,
+      "precisionAtCap": 2.3,
+      "precisionUncapped": 1.6,
+      "recallAtCap": 5.5,
+      "recallUncapped": 13.4,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "7 of 39",
+        "defect": "0 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "0 of 12",
+        "unable": "0 of 1",
+        "order": "0 of 11"
+      },
+      "preemptItemsAtCap": 53,
+      "preemptPairs": [
+        "d-beedd69e -> d-edf80438 (0.30)",
+        "d-bf82754d -> d-27c3f10e (0.75)",
+        "d-bf82754d -> d-663e28db (0.69)",
+        "d-3c0083b8 -> df-ccecbb4a (0.42)",
+        "d-192d3b64 -> d-2cc2f731 (0.34)",
+        "d-25b61fc9 -> d-618cb559 (0.57)",
+        "d-25c87b1f -> d-618cb559 (0.33)",
+        "d-af51f2aa -> d-40086ade (0.56)",
+        "d-9c3dc87e -> d-cd25b253 (0.32)",
+        "d-bf11cf70 -> d-047196f7 (0.30)",
+        "d-9eb564b3 -> d-98960a58 (0.51)",
+        "d-3eb04416 -> d-bde256be (0.31)",
+        "d-a3bad25d -> d-357ac3d4 (0.38)",
+        "d-a0542455 -> d-cf907449 (0.35)",
+        "d-cf1e7ee0 -> d-5e53f76f (0.39)"
+      ],
+      "deliveriesWithPreempt": 5.7,
+      "laterRecordsPreempted": 14,
+      "laterRecordsPreemptedPct": 2.2,
+      "tokensPerDelivery": 147,
+      "tokensPerSessionMedian": 1399,
+      "tokensPerSessionP90": 3592,
+      "precisionAtCapByKind": {
+        "decision": "2.3% of 3225",
+        "superseded": "0% of 9"
+      }
+    },
+    "ex+tx+wt(upper)": {
+      "sources": [
+        "ex",
+        "tx",
+        "wt"
+      ],
+      "firstTouches": 1148,
+      "coverage": 78,
+      "meanItems": 34.8,
+      "precisionAt1": 4.9,
+      "precisionAtCap": 3.4,
+      "precisionUncapped": 1.7,
+      "recallAtCap": 22.8,
+      "recallUncapped": 30.7,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "7 of 39",
+        "defect": "15 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "0 of 12",
+        "unable": "1 of 1",
+        "order": "6 of 11"
+      },
+      "preemptItemsAtCap": 46,
+      "preemptPairs": [
+        "d-beedd69e -> d-edf80438 (0.30)",
+        "d-bf82754d -> d-27c3f10e (0.75)",
+        "d-bf82754d -> d-663e28db (0.69)",
+        "d-3c0083b8 -> df-ccecbb4a (0.42)",
+        "d-5c22b23c -> df-5961bdb2 (0.38)",
+        "d-192d3b64 -> d-2cc2f731 (0.34)",
+        "d-e2cff03c -> d-77431961 (0.32)",
+        "d-25b61fc9 -> d-618cb559 (0.57)",
+        "d-25c87b1f -> d-618cb559 (0.33)",
+        "d-af51f2aa -> d-40086ade (0.56)",
+        "df-a0e893af -> d-7155e46f (0.35)",
+        "d-bf11cf70 -> d-047196f7 (0.30)",
+        "d-a5e5c691 -> d-a2c7d710 (0.35)",
+        "d-9eb564b3 -> d-98960a58 (0.51)",
+        "d-3eb04416 -> d-bde256be (0.31)",
+        "d-a3bad25d -> d-357ac3d4 (0.38)",
+        "d-a0542455 -> d-cf907449 (0.35)",
+        "df-87881a8d -> d-411e5cb2 (0.33)",
+        "d-cf1e7ee0 -> d-5e53f76f (0.39)",
+        "u-f89365e2 -> d-5c22b23c (0.33)"
+      ],
+      "deliveriesWithPreempt": 4.9,
+      "laterRecordsPreempted": 19,
+      "laterRecordsPreemptedPct": 3,
+      "tokensPerDelivery": 149,
+      "tokensPerSessionMedian": 1453,
+      "tokensPerSessionP90": 3783,
+      "precisionAtCapByKind": {
+        "open": "7.9% of 642",
+        "decision": "2.3% of 2626",
+        "superseded": "0% of 9"
+      }
+    },
+    "ex+tx+cc+wt(upper)": {
+      "sources": [
+        "ex",
+        "tx",
+        "cc",
+        "wt"
+      ],
+      "firstTouches": 1148,
+      "coverage": 78,
+      "meanItems": 39.8,
+      "precisionAt1": 4.5,
+      "precisionAtCap": 3.3,
+      "precisionUncapped": 1.6,
+      "recallAtCap": 30.7,
+      "recallUncapped": 46.5,
+      "recallTarget": 127,
+      "recallAtCapByKind": {
+        "decision": "5 of 39",
+        "defect": "26 of 61",
+        "escalation": "0 of 3",
+        "conjecture": "1 of 12",
+        "unable": "1 of 1",
+        "order": "6 of 11"
+      },
+      "preemptItemsAtCap": 32,
+      "preemptPairs": [
+        "d-beedd69e -> d-edf80438 (0.30)",
+        "d-bf82754d -> d-663e28db (0.69)",
+        "d-192d3b64 -> d-2cc2f731 (0.34)",
+        "c-49baa15e -> c-5c824314 (0.33)",
+        "d-25b61fc9 -> d-618cb559 (0.57)",
+        "d-25c87b1f -> d-618cb559 (0.33)",
+        "df-a0e893af -> d-7155e46f (0.35)",
+        "d-9c3dc87e -> d-cd25b253 (0.32)",
+        "d-bf11cf70 -> d-047196f7 (0.30)",
+        "d-a5e5c691 -> d-a2c7d710 (0.35)",
+        "d-9eb564b3 -> d-98960a58 (0.51)",
+        "d-3eb04416 -> d-bde256be (0.31)",
+        "d-a3bad25d -> d-357ac3d4 (0.38)",
+        "d-a0542455 -> d-cf907449 (0.35)",
+        "df-87881a8d -> d-411e5cb2 (0.33)",
+        "d-cf1e7ee0 -> d-5e53f76f (0.39)",
+        "u-f89365e2 -> d-5c22b23c (0.33)"
+      ],
+      "deliveriesWithPreempt": 3.4,
+      "laterRecordsPreempted": 16,
+      "laterRecordsPreemptedPct": 2.5,
+      "tokensPerDelivery": 152,
+      "tokensPerSessionMedian": 1483,
+      "tokensPerSessionP90": 3778,
+      "precisionAtCapByKind": {
+        "open": "3.6% of 2070",
+        "decision": "2.9% of 1216",
+        "superseded": "0% of 9"
+      }
+    }
+  },
+  "writeTime": {
+    "lower": [
+      "wt(lower)",
+      "ex+tx+wt(lower)",
+      "ex+tx+cc+wt(lower)"
+    ],
+    "upper": [
+      "wt(upper)",
+      "ex+tx+wt(upper)",
+      "ex+tx+cc+wt(upper)"
+    ]
+  },
+  "thresholdSensitivity": {
+    "0.2": 6.8,
+    "0.25": 4.4,
+    "0.3": 3.5,
+    "0.35": 2.7,
+    "0.4": 2.6,
+    "0.5": 2.6
+  },
+  "cost": {
+    "replayLoadMs": 1251,
+    "replayLinksMs": 326,
+    "liveIndexBuildMs": 864,
+    "cacheBytes": 137340,
+    "filesIndexed": 349,
+    "lookupRenderMedianMs": 0.31,
+    "lookupRenderP95Ms": 0.39,
+    "lookupRenderP99Ms": 1.07,
+    "lookupRenderMaxMs": 1.22,
+    "coldProcessLookupMedianMs": 1.92,
+    "coldProcessLookupMaxMs": 2.25
+  },
+  "calibration": {
+    "n": 45,
+    "relevant": 9,
+    "marginal": 12,
+    "noise": 24,
+    "proxyVsHand": {
+      "proxy not": {
+        "marginal": 10,
+        "noise": 24,
+        "relevant": 6
+      },
+      "proxy relevant": {
+        "marginal": 2,
+        "relevant": 3
+      }
+    },
+    "handBySource": {
+      "tx, no ex": {
+        "marginal": 4,
+        "relevant": 2,
+        "noise": 3
+      },
+      "cc only": {
+        "noise": 18,
+        "relevant": 2,
+        "marginal": 5
+      },
+      "has ex": {
+        "relevant": 5,
+        "marginal": 3,
+        "noise": 3
+      }
+    },
+    "handByKind": {
+      "decision": {
+        "marginal": 8,
+        "relevant": 2,
+        "noise": 10
+      },
+      "open item": {
+        "noise": 14,
+        "relevant": 7,
+        "marginal": 4
+      }
+    }
+  }
+}
