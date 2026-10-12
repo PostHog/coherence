@@ -7,6 +7,7 @@
 
 import { posix } from "node:path";
 import { languageOfFile } from "./language-files.ts";
+import { blankNonCode } from "./convex.ts";
 import { escape, handlerName, lineOf, NEXT_ROUTE_METHODS, REMIX_ROUTE_EXPORTS, spanOf, throughOf, type EntranceCandidate, type EntranceSyntax } from "./entrance-candidates.ts";
 
 /** The text from its first code: leading whitespace and comments skipped by a walk, never a backtracking pattern. */
@@ -24,24 +25,68 @@ function leadingCode(text: string): string {
   }
 }
 
-/** The local names a file imports from a module whose specifier matches, each mapped to the name it is exported under: `raw` -> `mutation` for `mutation as raw`. */
-function importsFrom(text: string, specifier: RegExp): Map<string, string> {
-  const names = new Map<string, string>();
-  for (const statement of text.matchAll(/\bimport\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g)) {
+/** The local names a file's code imports from a module whose specifier matches, each with the name it is exported under (`raw` -> `mutation` for `mutation as raw`) and the specifier. */
+function importsFrom(code: string, specifier: RegExp): Map<string, { exported: string; from: string }> {
+  const names = new Map<string, { exported: string; from: string }>();
+  for (const statement of code.matchAll(/\bimport\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g)) {
     if (!specifier.test(statement[2]!)) continue;
     for (const item of statement[1]!.split(",")) {
       const named = /^\s*(?:type\s+)?([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?\s*$/.exec(item);
-      if (named !== null) names.set(named[2] ?? named[1]!, named[1]!);
+      if (named !== null) names.set(named[2] ?? named[1]!, { exported: named[1]!, from: statement[2]! });
     }
   }
   return names;
 }
 
 /** The variables a file assigns from calling a factory it imports from the module: `http` for `const http = httpRouter()`. */
-function madeBy(text: string, factory: string, specifier: RegExp): string[] {
-  const local = [...importsFrom(text, specifier)].find(([, exported]) => exported === factory)?.[0];
+function madeBy(code: string, factory: string, specifier: RegExp): string[] {
+  const local = [...importsFrom(code, specifier)].find(([, imported]) => imported.exported === factory)?.[0];
   if (local === undefined) return [];
-  return [...text.matchAll(new RegExp(`\\b(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*${escape(local)}\\s*\\(\\s*\\)`, "g"))].map((m) => m[1]!);
+  return [...code.matchAll(new RegExp(`\\b(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*(?::[^=]+)?=\\s*${escape(local)}\\s*\\(\\s*\\)`, "g"))].map((m) => m[1]!);
+}
+
+/** The path a Convex client calls a function by: the file below the functions folder its _generated/server import names, then the export. */
+function convexApiPath(file: string, generatedServer: string, name: string): string {
+  const module = file.replace(/\.(ts|tsx|mts|cts|js|mjs)$/, "");
+  if (!generatedServer.startsWith(".")) return `${posix.basename(module)}.${name}`;
+  const folder = posix.normalize(posix.join(posix.dirname(file), generatedServer.replace(/\/_generated\/server(?:\.js)?$/, "")));
+  const below = folder === "." ? module : module.slice(folder.length + 1);
+  return `${below.split("/").join(".")}.${name}`;
+}
+
+/** The lines of the call that opens at line i, from its first parenthesis to the one that closes it, read on the code with comments and strings blanked: the code and the text of those lines, and the last line's index. */
+function callSpan(code: readonly string[], lines: readonly string[], i: number): { code: string; text: string; end: number } {
+  let depth = 0;
+  let opened = false;
+  for (let j = i; j < code.length; j++) {
+    for (const c of code[j]!) {
+      if (c === "(") {
+        depth += 1;
+        opened = true;
+      } else if (c === ")") depth -= 1;
+      if (opened && depth === 0) return { code: code.slice(i, j + 1).join("\n"), text: lines.slice(i, j + 1).join("\n"), end: j };
+    }
+  }
+  return { code: code.slice(i).join("\n"), text: lines.slice(i).join("\n"), end: code.length - 1 };
+}
+
+/** Whether an object literal opening in the code has a fetch method of its own: a fetch( directly inside it, after its brace or a comma, never in a nested object or a method's body. */
+function hasFetchMethod(code: string): boolean {
+  const open = code.indexOf("{");
+  if (open < 0) return false;
+  let depth = 0;
+  let previous = "";
+  for (let k = open; k < code.length; k++) {
+    const c = code[k]!;
+    if (depth === 1 && (previous === "{" || previous === ",") && /^\s*(?:async\s+)?fetch\s*\(/.test(code.slice(k))) return true;
+    if (c === "{" || c === "(" || c === "[") depth += 1;
+    else if (c === "}" || c === ")" || c === "]") {
+      depth -= 1;
+      if (depth === 0) return false;
+    }
+    if (!/\s/.test(c)) previous = c;
+  }
+  return false;
 }
 
 /** The builders Convex generates into _generated/server whose functions any client of the deployment can call; the internal* builders' functions only the deployment's own code can. */
@@ -50,9 +95,11 @@ const CONVEX_GENERATED_SERVER = /(?:^|\/)_generated\/server(?:\.js)?$/;
 const CONVEX_SERVER = /^convex\/server$/;
 const CONVEX_CRON_SCHEDULES = "interval|cron|hourly|daily|weekly|monthly";
 
-function typescriptCandidates(file: string, text: string, wrappers: readonly string[]): EntranceCandidate[] {
+function typescriptCandidates(file: string, text: string, wrappers: readonly string[], exists: (file: string) => boolean): EntranceCandidate[] {
   const out: EntranceCandidate[] = [];
   const lines = text.split("\n");
+  const code = blankNonCode(text, true).split("\n");
+  const importCode = blankNonCode(text, false);
   // The file's own top-level helpers, so a route whose handlers are a local `handle` calling the wrapper is registered through it.
   const helpers = new Map<string, number>();
   lines.forEach((line, i) => {
@@ -76,9 +123,9 @@ function typescriptCandidates(file: string, text: string, wrappers: readonly str
   // Next.js's request proxy (proxy.ts since Next.js 16, middleware.ts before it), at the project root or under src/.
   const proxyFile = /^(?:src\/)?(proxy|middleware)\.(ts|js|mjs)$/.exec(file)?.[1];
   const nextPage = /(^|\/)app\/(.+\/)?page\.(tsx|jsx|ts|js)$/.test(file) && !remixRoute;
-  const convexBuilders = importsFrom(text, CONVEX_GENERATED_SERVER);
-  const httpRouters = madeBy(text, "httpRouter", CONVEX_SERVER);
-  const cronTables = madeBy(text, "cronJobs", CONVEX_SERVER);
+  const convexBuilders = importsFrom(importCode, CONVEX_GENERATED_SERVER);
+  const httpRouters = madeBy(importCode, "httpRouter", CONVEX_SERVER);
+  const cronTables = madeBy(importCode, "cronJobs", CONVEX_SERVER);
   if (nextRoute || proxyFile !== undefined) {
     // What a route or proxy file exports by name without declaring it: an export list, re-exported or local, or a destructuring
     // (export { GET, POST } from "@/app/(auth)/auth", export { auth as proxy }, export const { GET, POST } = handlers).
@@ -107,12 +154,19 @@ function typescriptCandidates(file: string, text: string, wrappers: readonly str
   if (at >= 0) {
     add({ file, line: at + 1, symbol: "", rule: "page route", why: "the default export of a Next.js app/**/page file: renders its route on the server for every visitor" }, spanOf(lines, at, TYPESCRIPT_ENTRANCES));
   }
-  const defaultAt = lines.findIndex((l) => /^export\s+default\s*\{/.test(l));
-  if (defaultAt >= 0 && /(?:^|[{,])\s*(?:async\s+)?fetch\s*\(/m.test(spanOf(lines, defaultAt, TYPESCRIPT_ENTRANCES))) {
+  const defaultAt = code.findIndex((l) => /^export\s+default\s*\{/.test(l));
+  if (defaultAt >= 0 && hasFetchMethod(code.slice(defaultAt).join("\n"))) {
     add({ file, line: defaultAt + 1, symbol: "", rule: "fetch handler", why: "the default export is an object with a fetch method: the runtime (a Cloudflare Worker, Bun or Deno) calls it for every request" }, spanOf(lines, defaultAt, TYPESCRIPT_ENTRANCES));
   }
+  // A Convex registration's call is read whole; no other rule reads the lines inside it.
+  let consumed = -1;
   lines.forEach((line, i) => {
-    if (convexRoute(file, lines, i, httpRouters, add) || convexCron(file, lines, i, cronTables, add)) return;
+    if (i <= consumed) return;
+    const registration = convexRoute(file, code, lines, i, httpRouters, add) ?? convexCron(file, code, lines, i, cronTables, exists, add);
+    if (registration !== undefined) {
+      consumed = registration;
+      return;
+    }
     const declared = proxyFile === undefined ? null : /^export\s+(?:async\s+)?(?:function\s*\*?\s*|const\s+|let\s+|var\s+)([A-Za-z_$][\w$]*)/.exec(line);
     if (declared !== null && declared[1] === proxyFile) {
       add({ file, line: i + 1, symbol: proxyFile!, rule: "request proxy", why: `export ${proxyFile} in ${file}: Next.js runs it before every request it matches` }, spanOf(lines, i, TYPESCRIPT_ENTRANCES));
@@ -131,8 +185,8 @@ function typescriptCandidates(file: string, text: string, wrappers: readonly str
         return;
       }
       const builder = convexBuilders.get(callee);
-      if (builder !== undefined && CONVEX_PUBLIC_BUILDERS.has(builder)) {
-        add({ file, line: i + 1, symbol: name, rule: "Convex function", why: `export const ${name} = ${callee}(...), ${builder} imported from ./_generated/server: any client of the deployment can call it` }, span);
+      if (builder !== undefined && CONVEX_PUBLIC_BUILDERS.has(builder.exported) && /^export\b/.test(code[i] ?? "")) {
+        add({ file, line: i + 1, symbol: name, rule: "Convex function", why: `export const ${name} = ${callee}(...), ${builder.exported} imported from ./_generated/server: any client of the deployment can call it`, apiPath: convexApiPath(file, builder.from, name) }, span);
         return;
       }
       if (wrapperSet.has(callee)) {
@@ -168,44 +222,47 @@ function typescriptCandidates(file: string, text: string, wrappers: readonly str
 
 type Add = (c: Omit<EntranceCandidate, "through">, span: string) => void;
 
-/** A route on a Convex HTTP router at line i: a router.route({ path, method, handler }) call, or a library's routes registered with addHttpRoutes(router). */
-function convexRoute(file: string, lines: readonly string[], i: number, routers: readonly string[], add: Add): boolean {
-  const line = lines[i] ?? "";
+/** A route on a Convex HTTP router opening at line i, read on the code: a router.route({ path, method, handler }) call, or a library's routes registered with addHttpRoutes(router). The index of its last line, or undefined. */
+function convexRoute(file: string, code: readonly string[], lines: readonly string[], i: number, routers: readonly string[], add: Add): number | undefined {
+  const line = code[i] ?? "";
   for (const router of routers) {
     const library = new RegExp(`^\\s*([A-Za-z_$][\\w$]*)\\.addHttpRoutes\\(\\s*${escape(router)}\\s*\\)`).exec(line);
     if (library !== null) {
-      add({ file, line: i + 1, symbol: library[1]!, rule: "Convex HTTP route", why: `${library[1]}.addHttpRoutes(${router}): the routes ${library[1]} registers on the deployment's HTTP router`, registered: true }, line);
-      return true;
+      add({ file, line: i + 1, symbol: library[1]!, rule: "Convex HTTP route", why: `${library[1]}.addHttpRoutes(${router}): the routes ${library[1]} registers on the deployment's HTTP router`, registered: true }, lines[i] ?? "");
+      return i;
     }
     if (!new RegExp(`^\\s*${escape(router)}\\.route\\(`).test(line)) continue;
-    const span = spanOf(lines, i, TYPESCRIPT_ENTRANCES);
-    const path = /\b(path|pathPrefix)\s*:\s*["'`](\/[^"'`]*)["'`]/.exec(span);
-    const method = /\bmethod\s*:\s*["'`](\w+)["'`]/.exec(span)?.[1] ?? "any method";
-    const handler = /\bhandler\s*:\s*([A-Za-z_$][\w$.]*)\s*(\()?/.exec(span);
-    if (path === null || handler === null) continue;
-    const inline = handler[2] !== undefined;
-    const symbol = inline ? "" : handlerName(handler[1]!);
+    const call = callSpan(code, lines, i);
+    const path = /\b(path|pathPrefix)\s*:\s*["'`](\/[^"'`]*)["'`]/.exec(call.text);
+    const method = /\bmethod\s*:\s*["'`](\w+)["'`]/.exec(call.text)?.[1] ?? "any method";
+    const handler = /\bhandler\s*:\s*([A-Za-z_$][\w$.]*)\s*(\()?/.exec(call.code);
+    if (path === null || handler === null) return call.end;
+    const inline = handler[2] !== undefined && /^httpAction$|\.httpAction$/.test(handler[1]!);
+    const symbol = inline ? "" : handlerName(handler[2] === undefined ? handler[1]! : `${handler[1]}(${/\(\s*([A-Za-z_$][\w$.]*)\s*\)/.exec(call.code.slice(handler.index))?.[1] ?? ""})`);
     const where = `${method} ${path[2]}${path[1] === "pathPrefix" ? "*" : ""}`;
-    add({ file, line: i + 1, symbol, rule: "Convex HTTP route", why: `${where} routed by ${router}.route(...) ${inline ? `to an inline ${handler[1]}` : `to ${handler[1]}`}`, ...(inline ? {} : { registered: true as const }) }, span);
-    return true;
+    add({ file, line: i + 1, symbol, rule: "Convex HTTP route", why: `${where} routed by ${router}.route(...) ${inline ? `to an inline ${handler[1]}` : `to ${handler[1]}`}`, ...(symbol === "" ? {} : { registered: true as const }) }, call.text);
+    return call.end;
   }
-  return false;
+  return undefined;
 }
 
-/** A cron registered on a Convex cron table at line i: Convex runs the function the generated API names on the deployment's schedule, with no caller. */
-function convexCron(file: string, lines: readonly string[], i: number, tables: readonly string[], add: Add): boolean {
+/** A cron registered on a Convex cron table at line i: Convex runs the function the generated API names on the deployment's schedule, with no caller. The index of its last line, or undefined. */
+function convexCron(file: string, code: readonly string[], lines: readonly string[], i: number, tables: readonly string[], exists: (file: string) => boolean, add: Add): number | undefined {
   for (const table of tables) {
-    const call = new RegExp(`^\\s*${escape(table)}\\.(${CONVEX_CRON_SCHEDULES})\\(`).exec(lines[i] ?? "");
+    const call = new RegExp(`^\\s*${escape(table)}\\.(${CONVEX_CRON_SCHEDULES})\\(`).exec(code[i] ?? "");
     if (call === null) continue;
-    const span = spanOf(lines, i, TYPESCRIPT_ENTRANCES);
-    const target = /\b(?:internal|api)((?:\s*\.\s*[A-Za-z_$][\w$]*)+)/.exec(span);
-    if (target === null) continue;
-    const symbol = handlerName(target[0]);
-    const name = /["'`]([^"'`]+)["'`]/.exec(span)?.[1] ?? symbol;
-    add({ file, line: i + 1, symbol, rule: "Convex cron", why: `the cron "${name}" ${table}.${call[1]}(...) registers: Convex runs ${target[0].replace(/\s+/g, "")} on that schedule, with no caller`, registered: true }, span);
-    return true;
+    const span = callSpan(code, lines, i);
+    const target = /\b(?:internal|api)((?:\s*\.\s*[A-Za-z_$][\w$]*)+)/.exec(span.code);
+    if (target === null) return span.end;
+    const segments = target[1]!.split(".").map((s) => s.trim()).filter((s) => s !== "");
+    const symbol = segments.at(-1)!;
+    const module = posix.join(posix.dirname(file), ...segments.slice(0, -1));
+    const declaredIn = [".ts", ".tsx", ".js", ".mjs"].map((ext) => module + ext).find(exists);
+    const name = /["'`]([^"'`]+)["'`]/.exec(span.text)?.[1] ?? symbol;
+    add({ file, line: i + 1, symbol, rule: "Convex cron", why: `the cron "${name}" ${table}.${call[1]}(...) registers: Convex runs ${target[0].replace(/\s+/g, "")} on that schedule, with no caller`, registered: true, ...(declaredIn === undefined ? {} : { declaredIn }) }, span.text);
+    return span.end;
   }
-  return false;
+  return undefined;
 }
 
 const TS_IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*|^\s*import\s+)["'](\.{1,2}\/[^"']+)["']/gm;

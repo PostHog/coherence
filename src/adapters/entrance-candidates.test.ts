@@ -228,75 +228,116 @@ test("the page route rule detects the default export of a Next.js app/**/page fi
   assert.deepEqual(found.map((c) => [c.file, c.symbol, c.rule, c.line]), [["app/(chat)/chat/[id]/page.tsx", "", "page route", 3], ["app/(chat)/page.tsx", "", "page route", 1]]);
 });
 
+const CONVEX: Record<string, string> = {
+  "convex/player.ts": [
+    "import { v } from 'convex/values'",
+    "import { internalMutation, mutation, query } from './_generated/server'",
+    "",
+    "export const join = mutation({",
+    "  args: { name: v.string() },",
+    "  handler: async (ctx, args) => {},",
+    "})",
+    "",
+    "export const group = query({ args: {}, handler: async () => null })",
+    "",
+    "export const sweep = internalMutation({ args: {}, handler: async () => {} })",
+    "",
+  ].join("\n"),
+  "convex/model/players.ts": "import { query } from '../_generated/server'\nexport const list = query({ handler: async () => [] })\n",
+  "convex/mail.ts": "import { action, internalAction } from './_generated/server'\nexport const send = action({ handler: async () => {} })\nexport const deliver = internalAction({ handler: async () => {} })\n",
+  "convex/cleanup.ts": "import { internalMutation } from './_generated/server'\nexport const sweepExpiredGroups = internalMutation({ handler: async () => {} })\n",
+  "convex/archive.ts": "import { internalMutation } from './_generated/server'\nexport const sweepExpiredGroups = internalMutation({ handler: async () => {} })\n",
+  "convex/http.ts": [
+    "import { httpRouter, type HttpRouter } from 'convex/server'",
+    "import { httpAction } from './_generated/server'",
+    "import { auth } from './auth'",
+    "import { receive } from './webhooks'",
+    "",
+    "const http: HttpRouter = httpRouter()",
+    "auth.addHttpRoutes(http)",
+    "http.route({",
+    "  path: '/webhooks/mail',",
+    "  method: 'POST',",
+    "  handler: receive,",
+    "})",
+    "http.route({ pathPrefix: '/files/', method: 'GET', handler: httpAction(async () => new Response('')) })",
+    "http.route({",
+    "  path: '/hooks/a', method: 'POST', handler: httpAction(async () => new Response('')),",
+    "})",
+    "const doc = `",
+    "http.route({",
+    "  path: '/fake',",
+    "  handler: fake,",
+    "})",
+    "`",
+    "export default http",
+    "",
+  ].join("\n"),
+  "convex/crons.ts": [
+    "import { cronJobs } from 'convex/server'",
+    "import { internal } from './_generated/api'",
+    "",
+    "const crons = cronJobs()",
+    "crons.daily('expiry sweep', { hourUTC: 3, minuteUTC: 0 }, internal.cleanup.sweepExpiredGroups, {})",
+    "crons.interval(",
+    "  'digest',",
+    "  { minutes: 30 },",
+    "  internal.mail.deliver,",
+    ")",
+    "crons.cron('internal.notes.label', '0 3 * * *', internal.archive.sweepExpiredGroups)",
+    "export default crons",
+    "",
+  ].join("\n"),
+  "src/graphql.ts": "import { query } from './db'\nexport const users = query('select 1')\n",
+  "src/commented.ts": "// import { query } from './_generated/server'\nimport { query } from './db'\nexport const users = query('select 1')\n",
+  "worker/index.ts": "export default {\n  async fetch(request: Request): Promise<Response> {\n    return new Response('ok')\n  },\n} satisfies ExportedHandler\n",
+  "src/client.ts": "export default { fetch: customFetch, retries: 3 }\n",
+  "src/nested.ts": "export default {\n  client: {\n    fetch() { return 1 },\n  },\n  run() {\n    fetch('/x')\n  },\n}\n",
+};
+
 test("the Convex rules detect a deployment's public functions, HTTP routes and crons, and a fetch handler a file exports by default; internal functions and namesakes are not entrances", () => {
-  const found = nextDetected({
-    "convex/player.ts": [
-      "import { v } from 'convex/values'",
-      "import { internalMutation, mutation, query } from './_generated/server'",
-      "",
-      "export const join = mutation({",
-      "  args: { name: v.string() },",
-      "  handler: async (ctx, args) => {},",
-      "})",
-      "",
-      "export const group = query({ args: {}, handler: async () => null })",
-      "",
-      "export const sweep = internalMutation({ args: {}, handler: async () => {} })",
-      "",
-    ].join("\n"),
-    "convex/mail.ts": "import { action, internalAction } from './_generated/server'\nexport const send = action({ handler: async () => {} })\nexport const deliver = internalAction({ handler: async () => {} })\n",
-    "convex/http.ts": [
-      "import { httpRouter } from 'convex/server'",
-      "import { httpAction } from './_generated/server'",
-      "import { auth } from './auth'",
-      "import { receive } from './webhooks'",
-      "",
-      "const http = httpRouter()",
-      "auth.addHttpRoutes(http)",
-      "http.route({",
-      "  path: '/webhooks/mail',",
-      "  method: 'POST',",
-      "  handler: receive,",
-      "})",
-      "http.route({ pathPrefix: '/files/', method: 'GET', handler: httpAction(async () => new Response('')) })",
-      "export default http",
-      "",
-    ].join("\n"),
-    "convex/crons.ts": [
-      "import { cronJobs } from 'convex/server'",
-      "import { internal } from './_generated/api'",
-      "",
-      "const crons = cronJobs()",
-      "crons.daily('expiry sweep', { hourUTC: 3, minuteUTC: 0 }, internal.cleanup.sweepExpiredGroups, {})",
-      "crons.interval(",
-      "  'digest',",
-      "  { minutes: 30 },",
-      "  internal.mail.deliver,",
-      ")",
-      "export default crons",
-      "",
-    ].join("\n"),
-    "src/graphql.ts": "import { query } from './db'\nexport const users = query('select 1')\n",
-    "worker/index.ts": "export default {\n  async fetch(request: Request): Promise<Response> {\n    return new Response('ok')\n  },\n} satisfies ExportedHandler\n",
-    "src/client.ts": "export default { fetch: customFetch, retries: 3 }\n",
-  });
+  const found = nextDetected(CONVEX);
   assert.deepEqual(
     found.map((c) => [c.file, c.line, c.symbol, c.rule, c.registered ?? false]),
     [
       ["convex/crons.ts", 5, "sweepExpiredGroups", "Convex cron", true],
       ["convex/crons.ts", 6, "deliver", "Convex cron", true],
+      ["convex/crons.ts", 11, "sweepExpiredGroups", "Convex cron", true],
       ["convex/http.ts", 7, "auth", "Convex HTTP route", true],
       ["convex/http.ts", 8, "receive", "Convex HTTP route", true],
       ["convex/http.ts", 13, "", "Convex HTTP route", false],
+      ["convex/http.ts", 14, "", "Convex HTTP route", false],
       ["convex/mail.ts", 2, "send", "Convex function", false],
+      ["convex/model/players.ts", 2, "list", "Convex function", false],
       ["convex/player.ts", 4, "join", "Convex function", false],
       ["convex/player.ts", 9, "group", "Convex function", false],
       ["worker/index.ts", 1, "", "fetch handler", false],
     ],
-    "every public function, route and cron, never an internal function, a query namesake or an exported object whose fetch is no method",
+    "every public function, route and cron, once each; never an internal function, a namesake, an import or route in a comment or a string, or a fetch that is no method of the exported object",
   );
   assert.match(by(found, "convex/player.ts", "join")!.why, /mutation imported from \.\/_generated\/server: any client of the deployment can call it/);
   assert.match(by(found, "convex/http.ts", "receive")!.why, /POST \/webhooks\/mail/);
   assert.match(by(found, "convex/http.ts", "auth")!.why, /auth\.addHttpRoutes\(http\)/);
-  assert.match(by(found, "convex/crons.ts", "sweepExpiredGroups")!.why, /expiry sweep/);
+  assert.match(found.find((c) => c.line === 5)!.why, /expiry sweep/);
+  assert.deepEqual(found.filter((c) => c.rule === "Convex cron").map((c) => c.declaredIn), ["convex/cleanup.ts", "convex/mail.ts", "convex/archive.ts"], "a cron's function is declared in the module its generated API path names");
+  assert.deepEqual(found.filter((c) => c.rule === "Convex function").map((c) => c.apiPath), ["mail.send", "model.players.list", "player.join", "player.group"], "the path a client calls it by");
+});
+
+test("a Convex route's span ends with its call: a guard on the next registration is not its own", () => {
+  const { root, files, remove } = project({
+    "convex/http.ts": [
+      "import { httpRouter } from 'convex/server'",
+      "import { protect } from './guard'",
+      "const http = httpRouter()",
+      "http.route({ path: '/open', method: 'GET', handler: openRoute })",
+      "  http.route({ path: '/closed', method: 'GET', handler: protect(closedRoute) })",
+      "",
+    ].join("\n"),
+  });
+  try {
+    const found = detectEntranceCandidates(root, { language: "typescript", files, wrappers: ["protect"], testFolders: [] });
+    assert.deepEqual(found.map((c) => [c.line, c.through ?? []]), [[4, []], [5, ["protect"]]]);
+  } finally {
+    remove();
+  }
 });

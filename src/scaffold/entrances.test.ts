@@ -15,7 +15,8 @@ import { loadSpecModel } from "../spec/model.ts";
 import { undeclaredProject } from "../readings/scope/undeclared-fixture.ts";
 import { undeclaredNow } from "../readings/scope/undeclared.ts";
 import { scaffoldCommand } from "./cli.ts";
-import { MEANING_PLACEHOLDER, entranceName, proposeEntrances } from "./entrances.ts";
+import { coverageOf } from "../readings/scope/entrance-coverage.ts";
+import { MEANING_PLACEHOLDER, entranceHandler, entranceName, proposeEntrances } from "./entrances.ts";
 
 function io(root: string): Io & { lines: string[]; errors: string[] } {
   const lines: string[] = [];
@@ -92,7 +93,16 @@ test("scaffold entrances narrows to a folder or file inside the project, and nam
     assert.deepEqual(group!.entrances.map((e) => e.name), ["read thing in a", "read thing in b"], "never a name the spec already has, nor one proposed twice");
     assert.equal(entranceName({ file: "src/app/api/items/route.ts", symbol: "POST", rule: "route handler" }), "POST api/items/route");
     assert.equal(entranceName({ file: "scripts/sync:all.ts", symbol: "", rule: "script" }), "sync all", "never a colon, which would end the name");
-    assert.equal(entranceName({ file: "convex/player.ts", symbol: "join", rule: "Convex function" }), "player.join", "a Convex function is named as its clients call it, api.player.join");
+    assert.equal(entranceName({ file: "convex/model/players.ts", symbol: "list", rule: "Convex function", apiPath: "model.players.list" }), "model.players.list", "a Convex function is named as its clients call it, api.model.players.list");
+    assert.equal(entranceHandler({ file: "convex/crons.ts", symbol: "sweep", registered: true, declaredIn: "convex/cleanup.ts" }, "convex"), "sweep in cleanup.ts", "a cron's handler names the module its function is declared in");
+    const covered = coverageOf(
+      [{ folder: "convex", entrances: [{ name: "expiry sweep", handler: "sweep in cleanup.ts", file: "convex/cleanup.ts" }] as never }],
+      [
+        { file: "convex/crons.ts", line: 5, symbol: "sweep", rule: "Convex cron", why: "w", registered: true, declaredIn: "convex/cleanup.ts" },
+        { file: "convex/crons.ts", line: 6, symbol: "sweep", rule: "Convex cron", why: "w", registered: true, declaredIn: "convex/archive.ts" },
+      ],
+    );
+    assert.deepEqual(covered?.uncovered.map((c) => c.declaredIn), ["convex/archive.ts"], "a namesake's cron in another module stays uncovered");
   } finally {
     remove();
   }
