@@ -9,6 +9,7 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -129,16 +130,66 @@ test("a Convex function reached only through its chokepoint passes, and the refu
   }
 });
 
-test("a generated API reference is read through the name its file imports it by, along the module's path, and never as a prefix of a longer name", () => {
-  const lines = [
+test("under a from: line that exempts the functions folder, a client's call through the generated API is still a bypass, and the refutation stages its generated reference outside the folder", async () => {
+  const { dir, adapter } = await convexProject(GROUPS_CLEAN);
+  const from = { outside: "convex" };
+  try {
+    const clean = await checkChokepoint(adapter, { protects, chokepoint, from, ...hint, root: dir });
+    assert.equal(clean.refutation, "automatic", clean.refutationAccount);
+    assert.equal(clean.verdict, "pass", clean.reason);
+    assert.match(clean.refutationAccount, /a reference to send through the generated internal\.telemetry\.send from the unsaved document coherence-refutation-[0-9a-f]+\.ts, outside convex/, clean.refutationAccount);
+    writeFileSync(join(dir, "src-leak.ts"), `import { internal } from "./convex/_generated/api";\nexport const leaked = internal.telemetry.send;\n`, "utf8");
+    await adapter.forget(["src-leak.ts"]);
+    const leaked = await checkChokepoint(adapter, { protects, chokepoint, from, ...hint, root: dir });
+    assert.deepEqual(leaked.bypasses.map((b) => `${b.file}:${b.line}`), ["src-leak.ts:2"], leaked.reason);
+  } finally {
+    await adapter.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a client outside the project that calls a Convex function through the generated API is found under a horizon that names its folder", async () => {
+  const top = mkdtempSync(join(tmpdir(), "coherence-convex-horizon-"));
+  const put = (path: string, text: string): void => {
+    mkdirSync(dirname(join(top, path)), { recursive: true });
+    writeFileSync(join(top, path), text, "utf8");
+  };
+  put("backend/coherence.config.json", JSON.stringify({ name: "backend", language: "typescript", references: ["web"] }) + "\n");
+  put("backend/tsconfig.json", TSCONFIG);
+  put("backend/convex/_generated/api.d.ts", GENERATED_API);
+  put("backend/convex/_generated/server.d.ts", GENERATED_SERVER);
+  put("backend/convex/telemetry.ts", TELEMETRY);
+  put("backend/convex/model/telemetry.ts", MODEL_TELEMETRY);
+  put("web/leak.ts", `import { internal } from "../backend/convex/_generated/api";\nexport const leaked = internal.telemetry.send;\n`);
+  execFileSync("git", ["init", "-q"], { cwd: top });
+  const root = join(top, "backend");
+  const adapter = new TypeScriptAdapter(root);
+  try {
+    const result = await checkChokepoint(adapter, { protects, chokepoint, ...hint, root });
+    assert.deepEqual(result.bypasses.map((b) => `${b.file}:${b.line}`), ["../web/leak.ts:2"], result.reason);
+  } finally {
+    await adapter.close();
+    rmSync(top, { recursive: true, force: true });
+  }
+});
+
+test("a generated API reference is read through the name its file imports it by, along the module's path, across lines, and never as a prefix, a comment, a string or another backend's API", () => {
+  const target = { folder: "convex", path: ["model", "telemetry"], names: ["track"] };
+  const text = [
     `import { api, internal as generated } from "../_generated/api.js";`,
     `const a = api.model.telemetry.track;`,
     `const b = generated.model.telemetry.track;`,
     `const c = api.model.telemetry.trackLater;`,
     `const d = api.telemetry.track;`,
-  ];
-  const sites = generatedApiReferences(lines, ["model", "telemetry"], "track");
-  assert.deepEqual(sites, [{ line: 1, character: 10 }, { line: 2, character: 10 }]);
-  assert.deepEqual(generatedApiReferences([`const api = { model: { telemetry: { track: 1 } } };`, `const a = api.model.telemetry.track;`], ["model", "telemetry"], "track"), [], "an api the file does not import from _generated/api is not the generated API");
-  assert.deepEqual(generatedApiReferences(lines, ["model", "telemetry"], undefined).length, 3, "a protected module is referenced through any of its functions");
+    `const e = api.model`,
+    `  .telemetry.track;`,
+    `// const f = api.model.telemetry.track;`,
+    `const g = "api.model.telemetry.track";`,
+  ].join("\n");
+  assert.deepEqual(generatedApiReferences("convex/model/use.ts", text, target), [{ line: 1, character: 10 }, { line: 2, character: 10 }, { line: 5, character: 10 }]);
+  assert.deepEqual(generatedApiReferences("convex/other.ts", `const api = { model: { telemetry: { track: 1 } } };\nconst a = api.model.telemetry.track;\n`, target), [], "an api the file does not import from _generated/api is not the generated API");
+  assert.deepEqual(generatedApiReferences("convex/other.ts", `// import { api } from "./_generated/api";\nconst a = api.model.telemetry.track;\n`, target), [], "an import that is commented out imports nothing");
+  assert.deepEqual(generatedApiReferences("admin/backend/use.ts", `import { api } from "./_generated/api";\nconst a = api.model.telemetry.track;\n`, target), [], "another functions folder's generated API is another backend");
+  assert.deepEqual(generatedApiReferences("src/hooks.tsx", `import type { api } from "@/convex/_generated/api";\ntype T = typeof api.model.telemetry.track;\n`, target), [{ line: 1, character: 16 }], "a type import through a path alias is read too");
+  assert.deepEqual(generatedApiReferences("convex/use.ts", `import { api } from "./_generated/api";\nconst a = api.model.telemetry.track;\nconst b = api.model.telemetry.flush;\n`, { ...target, names: ["track", "flush"] }).length, 2, "a protected module is referenced through any function it exports");
 });
