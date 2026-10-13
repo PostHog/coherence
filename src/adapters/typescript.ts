@@ -47,7 +47,7 @@ import {
   type StagedSite,
   type Visibility,
 } from "./adapter.ts";
-import { convexBuilder, convexModule, generatedApiReferences, generatedObjectFor, type ConvexModule } from "./convex.ts";
+import { convexBuilder, convexModule, exportedNames, generatedApiReferences, generatedObjectFor, type ConvexModule } from "./convex.ts";
 import { locateServer as locateInstalled, locateTsserver, type ServerLocation } from "./installed.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
 import { horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
@@ -378,6 +378,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     this.lineCache.clear();
     this.wildcards = undefined;
     this.walked = undefined;
+    this.scripts = undefined;
     this.listing = undefined;
     this.diagnostics.clear();
     if (this.client === undefined) return;
@@ -561,9 +562,9 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private async generatedApiSites(definition: Definition): Promise<ReferenceSite[]> {
     const module = this.convexModuleOf(definition.file);
     if (module === undefined) return [];
-    const names = definition.kind === "module"
-      ? (await this.documentSymbols(definition.file)).filter((symbol) => this.exportedIn(definition.file, symbol)).map((symbol) => symbol.name)
-      : [await this.declaredName(definition)].filter((name): name is string => name !== undefined);
+    const text = this.linesOf(definition.file).join("\n");
+    const locals = definition.kind === "module" ? (await this.documentSymbols(definition.file)).map((symbol) => symbol.name) : [await this.declaredName(definition)].filter((name): name is string => name !== undefined);
+    const names = [...new Set(locals.flatMap((local) => exportedNames(text, local)))];
     const target = { folder: join(this.root, module.folder), path: module.path, names };
     const sites: ReferenceSite[] = [];
     for (const file of new Set([...this.scriptSources(), ...this.probes])) {
@@ -574,8 +575,13 @@ export class TypeScriptAdapter implements LanguageAdapter {
     return sites;
   }
 
-  /** Every TypeScript and JavaScript source of the project and its horizon, project-relative, outside generated folders and declaration files. */
+  /** Every TypeScript and JavaScript source of the project and its horizon, project-relative, outside generated folders and declaration files; taken once per forget. */
+  private scripts: string[] | undefined;
   private scriptSources(): string[] {
+    return (this.scripts ??= this.listScriptSources());
+  }
+
+  private listScriptSources(): string[] {
     const own = this.walkedNow();
     const horizon = this.horizon().flatMap((folder) => walkedFiles(folder).map((rel) => relative(this.root, join(folder, rel)).split(sep).join("/")).filter((file) => file.startsWith("../")));
     return [...own, ...horizon].filter((rel) => SCRIPT_EXTENSIONS.has(extensionOf(rel)) && !/\.d\.[mc]?ts$/.test(rel) && !rel.split("/").includes("_generated"));
@@ -835,14 +841,15 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const module = this.convexModuleOf(protectedThing.file);
     if (module === undefined) return undefined;
     const lines = this.linesOf(protectedThing.file);
-    const builder = convexBuilder(lines.join("\n"), lines.slice(protectedThing.range.start.line, protectedThing.range.start.line + 3).join("\n"));
-    if (builder === undefined) return undefined;
+    const builder = convexBuilder(lines.join("\n"), lines.slice(protectedThing.range.start.line, protectedThing.range.end.line + 1).join("\n"));
+    const exported = exportedNames(lines.join("\n"), name)[0];
+    if (builder === undefined || exported === undefined) return undefined;
     const object = generatedObjectFor(builder);
     const specifier = `./${relative(dirname(file), join(module.folder, "_generated/api")).split(sep).join("/")}`.replace(/^\.\/\.\.\//, "../");
     const before = this.lineCache.get(file) ?? [];
     const prefix = before.join("\n");
-    const text = `${prefix}import { ${object} as coherenceRefutationApi } from "${specifier}";\nexport const coherenceRefutationReference = coherenceRefutationApi.${module.path.join(".")}.${name};\n`;
-    return { file, text, line: (prefix === "" ? 0 : prefix.split("\n").length - 1) + 2, reference: `${object}.${module.path.join(".")}.${name}` };
+    const text = `${prefix}import { ${object} as coherenceRefutationApi } from "${specifier}";\nexport const coherenceRefutationReference = coherenceRefutationApi.${module.path.join(".")}.${exported};\n`;
+    return { file, text, line: (prefix === "" ? 0 : prefix.split("\n").length - 1) + 2, reference: `${object}.${module.path.join(".")}.${exported}` };
   }
 
   /**

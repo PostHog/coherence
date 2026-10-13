@@ -16,7 +16,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { checkChokepoint } from "../enforcement/check.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
-import { generatedApiReferences } from "./convex.ts";
+import { convexModule, generatedApiReferences } from "./convex.ts";
 import { TypeScriptAdapter } from "./typescript.ts";
 
 const TSCONFIG = `{ "compilerOptions": { "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler", "strict": true, "noEmit": true }, "include": ["convex/**/*.ts"] }\n`;
@@ -130,6 +130,49 @@ test("a Convex function reached only through its chokepoint passes, and the refu
   }
 });
 
+test("a call through the generated API is a bypass after a regex literal, inside a template substitution, and under the name an export list gives the function", async () => {
+  const hidden = `import { mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+
+const strip = /\`/g;
+type Ctx = { scheduler: { runAfter: (delay: number, fn: unknown, args: object) => Promise<void> } };
+export const afterRegex = mutation({
+  handler: async (ctx: Ctx) => {
+    await ctx.scheduler.runAfter(0, internal.telemetry.send, {});
+  },
+});
+export const label = \`sent by \${String(internal.telemetry.send)}\`;
+`;
+  const { dir, adapter } = await convexProject(GROUPS_CLEAN);
+  try {
+    writeFileSync(join(dir, "convex/hidden.ts"), hidden, "utf8");
+    writeFileSync(join(dir, "convex/telemetry.ts"), `import { internalAction } from "./_generated/server";\n\nconst sendLocal = internalAction({\n  handler: async () => {},\n});\nexport { sendLocal as send };\n`, "utf8");
+    await adapter.forget(["convex/hidden.ts", "convex/telemetry.ts"]);
+    const result = await checkChokepoint(adapter, { protects: "convex/telemetry.ts", chokepoint, ...hint, root: dir });
+    assert.deepEqual(result.bypasses.map((b) => `${b.file}:${b.line}`), ["convex/hidden.ts:8", "convex/hidden.ts:11"], result.reason);
+    const aliased = await checkChokepoint(adapter, { protects: "sendLocal in convex/telemetry.ts", chokepoint, ...hint, root: dir });
+    assert.doesNotMatch(aliased.refutationAccount, /through the generated|sendLocal through/, `the generated reference is staged as internal.telemetry.send, and the instrument saw it: ${aliased.refutationAccount}`);
+  } finally {
+    await adapter.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the refutation stages a generated reference for a registered function whatever its declaration's length, and never for a plain export beside one", async () => {
+  const { dir, adapter } = await convexProject(GROUPS_CLEAN);
+  try {
+    writeFileSync(join(dir, "convex/telemetry.ts"), `import { internalAction } from "./_generated/server";\n\nexport const LIMIT = 10;\nexport const flush = internalAction({ handler: async () => {} });\nexport const send: ReturnType<\n  typeof internalAction<{\n    handler: () => Promise<void>;\n  }>\n> = internalAction({\n  handler: async () => {},\n});\n`, "utf8");
+    await adapter.forget(["convex/telemetry.ts"]);
+    const registered = await checkChokepoint(adapter, { protects, chokepoint, ...hint, root: dir });
+    assert.match(registered.refutationAccount, /through the generated internal\.telemetry\.send/, registered.refutationAccount);
+    const plain = await checkChokepoint(adapter, { protects: "LIMIT in convex/telemetry.ts", chokepoint, ...hint, root: dir });
+    assert.doesNotMatch(plain.refutationAccount, /through the generated/, plain.refutationAccount);
+  } finally {
+    await adapter.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("under a from: line that exempts the functions folder, a client's call through the generated API is still a bypass, and the refutation stages its generated reference outside the folder", async () => {
   const { dir, adapter } = await convexProject(GROUPS_CLEAN);
   const from = { outside: "convex" };
@@ -192,4 +235,11 @@ test("a generated API reference is read through the name its file imports it by,
   assert.deepEqual(generatedApiReferences("admin/backend/use.ts", `import { api } from "./_generated/api";\nconst a = api.model.telemetry.track;\n`, target), [], "another functions folder's generated API is another backend");
   assert.deepEqual(generatedApiReferences("src/hooks.tsx", `import type { api } from "@/convex/_generated/api";\ntype T = typeof api.model.telemetry.track;\n`, target), [{ line: 1, character: 16 }], "a type import through a path alias is read too");
   assert.deepEqual(generatedApiReferences("convex/use.ts", `import { api } from "./_generated/api";\nconst a = api.model.telemetry.track;\nconst b = api.model.telemetry.flush;\n`, { ...target, names: ["track", "flush"] }).length, 2, "a protected module is referenced through any function it exports");
+
+});
+
+test("a functions folder is one where Convex generated both its API and its server builders", () => {
+  const generated = (files: string[]) => (path: string): boolean => files.includes(path);
+  assert.deepEqual(convexModule("convex/model/telemetry.ts", generated(["convex/_generated/api.d.ts", "convex/_generated/server.d.ts"])), { folder: "convex", path: ["model", "telemetry"] });
+  assert.equal(convexModule("src/users.ts", generated(["src/_generated/api.ts"])), undefined, "an API another generator writes is not Convex's");
 });

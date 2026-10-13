@@ -22,8 +22,9 @@
 import { posix } from "node:path";
 import { blankNonCode } from "./source-text.ts";
 
-/** Where Convex generates its API object, below the functions folder. */
+/** Where Convex generates its API object and its server builders, below the functions folder. */
 const GENERATED_API_FILES = ["_generated/api.d.ts", "_generated/api.ts", "_generated/api.js"];
+const GENERATED_SERVER_FILES = ["_generated/server.d.ts", "_generated/server.ts", "_generated/server.js"];
 
 /** The names `_generated/api` exports the function references under. */
 const GENERATED_OBJECTS = new Set(["api", "internal"]);
@@ -43,10 +44,11 @@ export interface GeneratedApiTarget extends ConvexModule {
   names: readonly string[];
 }
 
-/** The Convex module a project file is, or undefined when no folder above it holds a generated API or the file is generated itself. */
+/** The Convex module a project file is, or undefined when no folder above it holds Convex's generated API and server builders, or the file is generated itself. */
 export function convexModule(file: string, isFile: (path: string) => boolean): ConvexModule | undefined {
   for (let folder = posix.dirname(file); ; folder = posix.dirname(folder)) {
-    if (GENERATED_API_FILES.some((generated) => isFile(folder === "." ? generated : `${folder}/${generated}`))) {
+    const holds = (generated: readonly string[]): boolean => generated.some((name) => isFile(folder === "." ? name : `${folder}/${name}`));
+    if (holds(GENERATED_API_FILES) && holds(GENERATED_SERVER_FILES)) {
       const below = folder === "." ? file : file.slice(folder.length + 1);
       if (below.startsWith("_generated/")) return undefined;
       return { folder, path: below.replace(/\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/, "").split("/") };
@@ -82,7 +84,7 @@ function escape(name: string): string {
 
 /** The zero-based positions where a file reaches one of the target's functions through its folder's generated API. */
 export function generatedApiReferences(file: string, text: string, target: GeneratedApiTarget): { line: number; character: number }[] {
-  if (target.names.length === 0) return [];
+  if (target.names.length === 0 || !text.includes("_generated/api")) return [];
   const objects = generatedObjectNames(file, blankNonCode(text, false), target.folder);
   if (objects.length === 0) return [];
   const code = blankNonCode(text, true);
@@ -111,6 +113,20 @@ export function convexBuilder(text: string, declaration: string): string | undef
     }
   }
   return undefined;
+}
+
+/** The names a module exports a local declaration under, which are the names the generated API gives it: its own when declared with export, and every name an export list gives it. */
+export function exportedNames(text: string, local: string): string[] {
+  const code = blankNonCode(text, false);
+  const names = new Set<string>();
+  if (new RegExp(`^\\s*export\\s+(?:default\\s+)?(?:async\\s+)?(?:const|let|var|function\\*?|class)\\s+${escape(local)}(?![\\w$])`, "m").test(code)) names.add(local);
+  for (const list of code.matchAll(/\bexport\s*(?:type\s*)?\{([^}]*)\}(?!\s*from\b)/g)) {
+    for (const item of list[1]!.split(",")) {
+      const named = /^\s*([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?\s*$/.exec(item);
+      if (named !== null && named[1] === local) names.add(named[2] ?? named[1]);
+    }
+  }
+  return [...names];
 }
 
 /** The generated object a registered function is reached through: internal for an internal* builder, api for the others. */
