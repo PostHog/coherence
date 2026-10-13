@@ -50,6 +50,20 @@ describe("entrance coverage", () => {
     assert.deepEqual(covered?.uncovered.map((c) => c.declaredIn), ["convex/archive.ts"]);
   });
 
+  test("a file-grain entrance the deployment calls by a name is covered by the declared entrance of that name alone, and by its file when none carries it", () => {
+    const routes: EntranceCandidate[] = [
+      { file: "convex/http.ts", line: 5, symbol: "", rule: "Convex HTTP route", why: "w", calledAs: "POST /mail" },
+      { file: "convex/http.ts", line: 9, symbol: "", rule: "Convex HTTP route", why: "w", calledAs: "GET /health" },
+    ];
+    const mail = entrance("POST /mail", "http.ts", "convex/http.ts");
+    const all = entrance("http routes", "http.ts", "convex/http.ts");
+    const calledAs = (declared: SpecEntrance[]): (string | undefined)[] | undefined => coverageOf(components(declared), routes)?.uncovered.map((c) => c.calledAs);
+    assert.deepEqual(calledAs([mail]), ["GET /health"], "declaring one inline route never covers its file's other routes");
+    assert.deepEqual(calledAs([all]), [], "an entrance named for no route covers the file's routes by file");
+    const both = coverageOf(components([mail, all]), routes)!;
+    assert.deepEqual([both.individually, both.grouped, both.uncovered.length], [2, 0, 0], "the named route is its entrance's alone, so the file's entrance covers only the other");
+  });
+
   test("a detected entrance is covered by name, through the handler it is registered with, or in its handler's module; individually when its entrance covers nothing else, and by a grouped entrance otherwise", () => {
     const declared = [
       entrance("reads", "rpc in rpc.ts", "src/server/rpc.ts"),

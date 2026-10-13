@@ -9,7 +9,10 @@
  *   names it     the handler is its symbol, in its file (a symbol registered
  *                in a route table or a URL pattern is matched by name, since
  *                it is declared elsewhere); a file-grain one (a script, a
- *                package bin) is named by any handler in that file
+ *                package bin) is named by any handler in that file, unless
+ *                the deployment calls it by a name a declared entrance
+ *                carries (an inline Convex route's "POST /mail"): then only
+ *                that entrance names it, and it names nothing else
  *   or, when the handler names no detected entrance, stands for it:
  *     through    its own statement calls the handler (every server function
  *                wrapped in mutationRpc, for "server function mutations",
@@ -23,7 +26,7 @@
 
 import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 import type { Language } from "../../adapters/index.ts";
-import type { SpecComponent } from "./model.ts";
+import type { SpecComponent, SpecEntrance } from "./model.ts";
 
 /** The rules, per language, each with its plural and what it detects: the documentation the query prints and the spec states, and the one place a rule's plural is said. */
 export const CANDIDATE_RULES: Record<Language, readonly { rule: string; plural: string; detects: string }[]> = {
@@ -113,6 +116,13 @@ function coverageSameFile(a: string | undefined, b: string): boolean {
 export function coverageOf(components: readonly Pick<SpecComponent, "folder" | "entrances">[], candidates: readonly EntranceCandidate[] | undefined): EntranceCoverage | undefined {
   if (candidates === undefined) return undefined;
   const symbols = new Set(candidates.map((c) => c.symbol).filter((s) => s !== ""));
+  const calledAs = new Set(candidates.flatMap((c) => (c.calledAs === undefined ? [] : [c.calledAs])));
+  const declaredNames = new Set(components.flatMap((component) => component.entrances.map((e) => e.name)));
+  const coversFileGrain = (e: SpecEntrance, c: EntranceCandidate): boolean => {
+    if (calledAs.has(e.name)) return c.calledAs === e.name;
+    const claimedByName = c.calledAs !== undefined && declaredNames.has(c.calledAs);
+    return !claimedByName && coverageSameFile(e.file, c.file);
+  };
   const coveredBy = new Map<EntranceCandidate, number[]>();
   const groups: CoverageGroup[] = [];
   const sizes: number[] = [];
@@ -125,7 +135,7 @@ export function coverageOf(components: readonly Pick<SpecComponent, "folder" | "
       const named = COVERAGE_NAMED.exec(handler);
       const symbol = named?.[1];
       const file = e.file;
-      let set = candidates.filter((c) => (c.symbol === "" ? coverageSameFile(file, c.file) : symbol !== undefined && symbol === c.symbol && (file === undefined || coverageSameFile(file, c.declaredIn ?? c.file) || (c.registered === true && c.declaredIn === undefined))));
+      let set = candidates.filter((c) => (c.symbol === "" ? coversFileGrain(e, c) : symbol !== undefined && symbol === c.symbol && (file === undefined || coverageSameFile(file, c.declaredIn ?? c.file) || (c.registered === true && c.declaredIn === undefined))));
       if (set.length === 0) {
         // The handler names no detected entrance: it may be what they are registered through.
         const wrapper = symbol !== undefined && !symbols.has(symbol) ? symbol : undefined;
