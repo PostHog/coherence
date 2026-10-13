@@ -50,8 +50,8 @@ export interface EntranceCandidate {
   registered?: true;
   /** Where a registered symbol is declared, when the registration names its module (a Convex cron's generated API path): a handler naming it must name that file. */
   declaredIn?: string;
-  /** The path a Convex client calls a public function by: player.join for api.player.join. */
-  apiPath?: string;
+  /** The name the deployment knows it by: the path a client calls a Convex function by (player.join), a Convex route's method and path, a cron's name. */
+  calledAs?: string;
   /** The declared entrances' handlers and guards its own statement calls or is decorated with, when any. */
   through?: string[];
 }

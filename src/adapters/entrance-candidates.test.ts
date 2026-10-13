@@ -320,7 +320,7 @@ test("the Convex rules detect a deployment's public functions, HTTP routes and c
   assert.match(by(found, "convex/http.ts", "auth")!.why, /auth\.addHttpRoutes\(http\)/);
   assert.match(found.find((c) => c.line === 5)!.why, /expiry sweep/);
   assert.deepEqual(found.filter((c) => c.rule === "Convex cron").map((c) => c.declaredIn), ["convex/cleanup.ts", "convex/mail.ts", "convex/archive.ts"], "a cron's function is declared in the module its generated API path names");
-  assert.deepEqual(found.filter((c) => c.rule === "Convex function").map((c) => c.apiPath), ["mail.send", "model.players.list", "player.join", "player.group"], "the path a client calls it by");
+  assert.deepEqual(found.map((c) => c.calledAs), ["expiry sweep", "digest", "internal.notes.label", undefined, "POST /webhooks/mail", "GET /files/*", "POST /hooks/a", "mail.send", "model.players.list", "player.join", "player.group", undefined], "a function by the path a client calls it by, a route by its method and path, a cron by its name");
 });
 
 test("a Convex route's span ends with its call: a guard on the next registration is not its own", () => {
@@ -340,4 +340,45 @@ test("a Convex route's span ends with its call: a guard on the next registration
   } finally {
     remove();
   }
+});
+
+test("the Convex rules read on past a regex literal and a registration still being typed, read a cron's function through static brackets, and leave a module outside the functions folder alone", () => {
+  const found = nextDetected({
+    "convex/util.ts": "import { mutation } from './_generated/server'\nexport const trim = (s: string) => s.replace(/\\/*$/, '')\nexport const join = mutation({ handler: async () => {} })\n",
+    "convex/http.ts": [
+      "import { httpRouter } from 'convex/server'",
+      "import { httpAction } from './_generated/server'",
+      "const http = httpRouter()",
+      "http.route({ path: '/a', method: 'GET', handler: httpAction(async (_, req) => new Response(new URL(req.url).pathname.split(/\\//).join(','))) })",
+      "http.route({ path: '/b', method: 'GET', handler: httpAction(async () => new Response('b')) })",
+      "export default http",
+      "",
+    ].join("\n"),
+    "convex/edit.ts": "import { httpRouter } from 'convex/server'\nimport { mutation } from './_generated/server'\nconst http = httpRouter()\nhttp.route({ path: '/x', method: 'GET', handler:\nexport const still = mutation({ handler: async () => {} })\n",
+    "convex/crons.ts": [
+      "import { cronJobs } from 'convex/server'",
+      "import { internal } from './_generated/api'",
+      "const crons = cronJobs()",
+      "crons.daily('a', { hourUTC: 1, minuteUTC: 0 }, internal.cleanup['sweep'], {})",
+      "crons.daily('b', { hourUTC: 2, minuteUTC: 0 }, internal['group-cleanup'].sweep, {})",
+      "crons.daily('c', { hourUTC: 3, minuteUTC: 0 }, internal.cleanup, {})",
+      "export default crons",
+      "",
+    ].join("\n"),
+    "convex/cleanup.ts": "import { internalMutation } from './_generated/server'\nexport const sweep = internalMutation({ handler: async () => {} })\n",
+    "convex/group-cleanup.ts": "import { internalMutation } from './_generated/server'\nexport const sweep = internalMutation({ handler: async () => {} })\n",
+    "src/shared/fns.ts": "import { query } from '../../convex/_generated/server'\nexport const list = query({ handler: async () => [] })\n",
+  });
+  assert.deepEqual(
+    found.map((c) => [c.file, c.line, c.symbol, c.rule, c.declaredIn ?? c.calledAs]),
+    [
+      ["convex/crons.ts", 4, "sweep", "Convex cron", "convex/cleanup.ts"],
+      ["convex/crons.ts", 5, "sweep", "Convex cron", "convex/group-cleanup.ts"],
+      ["convex/edit.ts", 5, "still", "Convex function", "edit.still"],
+      ["convex/http.ts", 4, "", "Convex HTTP route", "GET /a"],
+      ["convex/http.ts", 5, "", "Convex HTTP route", "GET /b"],
+      ["convex/util.ts", 3, "join", "Convex function", "util.join"],
+    ],
+    "nothing past a regex or an unfinished call is lost, a cron naming only a module is no function, and a file Convex does not deploy is no function",
+  );
 });

@@ -39,6 +39,15 @@ function components(entrances: SpecEntrance[]): Pick<SpecComponent, "folder" | "
   return [{ folder: "src/server", entrances }];
 }
 
+test("a cron's function is covered only in the module its generated API path names, never by a namesake declared elsewhere", () => {
+  const crons: EntranceCandidate[] = [
+    { file: "convex/crons.ts", line: 5, symbol: "sweep", rule: "Convex cron", why: "w", registered: true, declaredIn: "convex/cleanup.ts" },
+    { file: "convex/crons.ts", line: 6, symbol: "sweep", rule: "Convex cron", why: "w", registered: true, declaredIn: "convex/archive.ts" },
+  ];
+  const covered = coverageOf(components([entrance("expiry sweep", "sweep in cleanup.ts", "convex/cleanup.ts")]), crons);
+  assert.deepEqual(covered?.uncovered.map((c) => c.declaredIn), ["convex/archive.ts"]);
+});
+
 // The totality oracle the spec names: every test below runs under this one title.
 describe("entrance coverage", () => {
   test("a detected entrance is covered by name, through the handler it is registered with, or in its handler's module; individually when its entrance covers nothing else, and by a grouped entrance otherwise", () => {
