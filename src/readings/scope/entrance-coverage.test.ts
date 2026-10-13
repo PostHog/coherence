@@ -64,6 +64,19 @@ describe("entrance coverage", () => {
     assert.deepEqual([both.individually, both.grouped, both.uncovered.length], [2, 0, 0], "the named route is its entrance's alone, so the file's entrance covers only the other");
   });
 
+  test("a name claims only the file-grain entrance of its own file: a namesake route elsewhere, a cron of that name and a wrapper leave it as it was", () => {
+    const routes: EntranceCandidate[] = [
+      { file: "convex/http.ts", line: 5, symbol: "", rule: "Convex HTTP route", why: "w", calledAs: "POST /mail", through: ["wrap"] },
+      { file: "convex/http.ts", line: 9, symbol: "", rule: "Convex HTTP route", why: "w", calledAs: "GET /health", through: ["wrap"] },
+      { file: "other/http.ts", line: 5, symbol: "", rule: "Convex HTTP route", why: "w", calledAs: "POST /mail" },
+      { file: "convex/crons.ts", line: 4, symbol: "run", rule: "Convex cron", why: "w", registered: true, calledAs: "backup", declaredIn: "convex/backup.ts" },
+      { file: "scripts/backup.ts", line: 1, symbol: "", rule: "script", why: "backup" },
+    ];
+    const coverage = coverageOf(components([entrance("POST /mail", "http.ts", "convex/http.ts"), entrance("backup", "backup.ts", "scripts/backup.ts"), entrance("wrapped", "wrap in wrap.ts", "convex/wrap.ts")]), routes)!;
+    assert.deepEqual(coverage.uncovered.map((c) => `${c.file} ${c.calledAs}`), ["other/http.ts POST /mail", "convex/crons.ts backup"], "the other file's namesake route and the cron stay undeclared");
+    assert.deepEqual([coverage.individually, coverage.grouped, coverage.beyond], [3, 0, 0], "the named route, the script by its file, and the health route through the wrapper, each alone");
+  });
+
   test("a detected entrance is covered by name, through the handler it is registered with, or in its handler's module; individually when its entrance covers nothing else, and by a grouped entrance otherwise", () => {
     const declared = [
       entrance("reads", "rpc in rpc.ts", "src/server/rpc.ts"),
