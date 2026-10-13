@@ -115,11 +115,14 @@ export function convexBuilder(text: string, declaration: string): string | undef
   return undefined;
 }
 
-/** The names a module exports a local declaration under, which are the names the generated API gives it: its own when declared with export, and every name an export list gives it. */
+/** The names a module exports a local declaration under, which are the names the generated API gives it: its own when an export statement declares it, as any of its declarators, and every name an export list gives it. */
 export function exportedNames(text: string, local: string): string[] {
-  const code = blankNonCode(text, false);
+  const code = blankNonCode(text, true);
   const names = new Set<string>();
-  if (new RegExp(`^\\s*export\\s+(?:default\\s+)?(?:async\\s+)?(?:const|let|var|function\\*?|class)\\s+${escape(local)}(?![\\w$])`, "m").test(code)) names.add(local);
+  if (new RegExp(`\\bexport\\s+(?:default\\s+)?(?:async\\s+)?(?:function\\*?|class)\\s+${escape(local)}(?![\\w$])`).test(code)) names.add(local);
+  for (const statement of code.matchAll(/\bexport\s+(?:const|let|var)\s+/g)) {
+    if (declaratorNames(code, statement.index + statement[0].length).includes(local)) names.add(local);
+  }
   for (const list of code.matchAll(/\bexport\s*(?:type\s*)?\{([^}]*)\}(?!\s*from\b)/g)) {
     for (const item of list[1]!.split(",")) {
       const named = /^\s*([A-Za-z_$][\w$]*)(?:\s+as\s+([A-Za-z_$][\w$]*))?\s*$/.exec(item);
@@ -127,6 +130,26 @@ export function exportedNames(text: string, local: string): string[] {
     }
   }
   return [...names];
+}
+
+/** The names a variable statement declares, read from its first declarator at `from` to the semicolon or line end that ends it outside any bracket. */
+function declaratorNames(code: string, from: number): string[] {
+  const names: string[] = [];
+  let depth = 0;
+  let expectName = true;
+  for (let k = from; k < code.length; k++) {
+    const c = code[k]!;
+    if (expectName && /\S/.test(c)) {
+      const name = /^[A-Za-z_$][\w$]*/.exec(code.slice(k))?.[0];
+      if (name !== undefined) names.push(name);
+      expectName = false;
+    }
+    if ("([{".includes(c)) depth += 1;
+    else if (")]}".includes(c)) depth -= 1;
+    else if (depth === 0 && c === ",") expectName = true;
+    else if (depth === 0 && (c === ";" || (c === "\n" && !/^\s*,/.test(code.slice(k)) && !/,\s*$/.test(code.slice(from, k))))) break;
+  }
+  return names;
 }
 
 /** The generated object a registered function is reached through: internal for an internal* builder, api for the others. */

@@ -767,7 +767,8 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const dir = dirname(protectedThing.file);
     const base = protectedThing.file.slice(dir === "." ? 0 : dir.length + 1);
     const synthetic = `${dir === "." ? "" : dir + "/"}coherence-refutation-${randomBytes(4).toString("hex")}.ts`;
-    const reExport = `export { ${name} } from "./${base}";\n`;
+    const exported = exportedNames(this.linesOf(protectedThing.file).join("\n"), name)[0] ?? name;
+    const reExport = `export { ${exported} } from "./${base}";\n`;
     client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: "typescript", version: 1, text: reExport } });
     this.lineCache.set(synthetic, reExport.split("\n"));
     this.symbolCache.set(synthetic, []);
@@ -776,7 +777,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     // A module chokepoint has no inside that is outside its own range, so there is no same-module site to stage;
     // nor is there where the exempted folder holds the chokepoint's module, which the exemption covers on purpose.
     const exempted = exempt !== undefined && chokepoint !== undefined && withinFolder(chokepoint.file, exempt);
-    const sameModule = chokepoint !== undefined && chokepoint.kind === "symbol" && !exempted ? this.editChokepointModule(chokepoint, protectedThing, name) : undefined;
+    const sameModule = chokepoint !== undefined && chokepoint.kind === "symbol" && !exempted ? this.editChokepointModule(chokepoint, protectedThing, name, exported) : undefined;
     const expected: { what: string; file: string; line: number }[] = [];
     if (sameModule !== undefined) expected.push({ what: `a use of ${name} in ${chokepoint!.file} outside ${chokepoint!.name}`, file: chokepoint!.file, line: sameModule.line });
     expected.push({ what: `a re-export of ${name} from the unsaved document ${synthetic}`, file: synthetic, line: 1 });
@@ -785,7 +786,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const outside = beside === undefined ? undefined : `${beside}coherence-refutation-${randomBytes(4).toString("hex")}.ts`;
     if (outside !== undefined) {
       const specifier = `./${relative(dirname(outside), protectedThing.file).split(sep).join("/")}`.replace(/^\.\/\.\.\//, "../");
-      const use = `import { ${name} as coherenceRefutationName } from "${specifier}";\nexport const coherenceRefutationUse = coherenceRefutationName;\n`;
+      const use = `import { ${exported} as coherenceRefutationName } from "${specifier}";\nexport const coherenceRefutationUse = coherenceRefutationName;\n`;
       client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(outside), languageId: "typescript", version: 1, text: use } });
       this.lineCache.set(outside, use.split("\n"));
       this.symbolCache.set(outside, []);
@@ -841,7 +842,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const module = this.convexModuleOf(protectedThing.file);
     if (module === undefined) return undefined;
     const lines = this.linesOf(protectedThing.file);
-    const builder = convexBuilder(lines.join("\n"), lines.slice(protectedThing.range.start.line, protectedThing.range.end.line + 1).join("\n"));
+    const builder = convexBuilder(lines.join("\n"), textWithin(lines, protectedThing.range));
     const exported = exportedNames(lines.join("\n"), name)[0];
     if (builder === undefined || exported === undefined) return undefined;
     const object = generatedObjectFor(builder);
@@ -860,7 +861,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
    * lines bring their own aliased import, so the use never collides with a
    * binding already there.
    */
-  private editChokepointModule(chokepoint: Definition, protectedThing: Definition, name: string): { line: number; restore: () => void } | undefined {
+  private editChokepointModule(chokepoint: Definition, protectedThing: Definition, name: string, exported: string): { line: number; restore: () => void } | undefined {
     let original: string;
     try {
       original = readFileSync(join(this.root, chokepoint.file), "utf8");
@@ -874,7 +875,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const added =
       chokepoint.file === protectedThing.file
         ? `const coherenceRefutationUse = ${name};\n`
-        : `import { ${name} as coherenceRefutationName } from "${specifier}";\nconst coherenceRefutationUse = coherenceRefutationName;\n`;
+        : `import { ${exported} as coherenceRefutationName } from "${specifier}";\nconst coherenceRefutationUse = coherenceRefutationName;\n`;
     const line = start + (chokepoint.file === protectedThing.file ? 1 : 2);
     this.open(chokepoint.file);
     this.change(chokepoint.file, body + added);
@@ -908,6 +909,15 @@ export class TypeScriptAdapter implements LanguageAdapter {
 interface Candidate {
   file: string;
   symbol: DocumentSymbol;
+}
+
+/** The text a range spans, from its start character to its end character. */
+function textWithin(lines: readonly string[], range: Range): string {
+  const spanned = lines.slice(range.start.line, range.end.line + 1);
+  if (spanned.length === 0) return "";
+  spanned[spanned.length - 1] = spanned.at(-1)!.slice(0, range.end.character);
+  spanned[0] = spanned[0]!.slice(range.start.character);
+  return spanned.join("\n");
 }
 
 /** One candidate: the only one, else the only one under the component, else the only one outside test folders; ambiguity is reported, never guessed. */

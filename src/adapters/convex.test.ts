@@ -16,7 +16,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { checkChokepoint } from "../enforcement/check.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
-import { convexModule, generatedApiReferences } from "./convex.ts";
+import { convexModule, exportedNames, generatedApiReferences } from "./convex.ts";
 import { TypeScriptAdapter } from "./typescript.ts";
 
 const TSCONFIG = `{ "compilerOptions": { "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler", "strict": true, "noEmit": true }, "include": ["convex/**/*.ts"] }\n`;
@@ -151,7 +151,24 @@ export const label = \`sent by \${String(internal.telemetry.send)}\`;
     const result = await checkChokepoint(adapter, { protects: "convex/telemetry.ts", chokepoint, ...hint, root: dir });
     assert.deepEqual(result.bypasses.map((b) => `${b.file}:${b.line}`), ["convex/hidden.ts:8", "convex/hidden.ts:11"], result.reason);
     const aliased = await checkChokepoint(adapter, { protects: "sendLocal in convex/telemetry.ts", chokepoint, ...hint, root: dir });
-    assert.doesNotMatch(aliased.refutationAccount, /through the generated|sendLocal through/, `the generated reference is staged as internal.telemetry.send, and the instrument saw it: ${aliased.refutationAccount}`);
+    assert.equal(aliased.refutation, "automatic", aliased.refutationAccount);
+    assert.match(aliased.refutationAccount, /a reference to sendLocal through the generated internal\.telemetry\.send from/, aliased.refutationAccount);
+  } finally {
+    await adapter.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a function declared as a later declarator, or after another statement on its line, is matched by its exported name, and its builder is read from its own declaration", async () => {
+  const { dir, adapter } = await convexProject(GROUPS_BYPASS);
+  try {
+    writeFileSync(join(dir, "convex/telemetry.ts"), `import { internalAction } from "./_generated/server";\n\nexport const LIMIT = 10, send = internalAction({\n  handler: async () => {},\n});\nexport const CAP = 5; export const flush = internalAction({ handler: async () => {} });\n`, "utf8");
+    await adapter.forget(["convex/telemetry.ts"]);
+    const declarator = await checkChokepoint(adapter, { protects, chokepoint, ...hint, root: dir });
+    assert.deepEqual(declarator.bypasses.map((b) => `${b.file}:${b.line}`), ["convex/groups.ts:13"], declarator.reason);
+    assert.match(declarator.refutationAccount, /through the generated internal\.telemetry\.send/, declarator.refutationAccount);
+    const plainBeside = await checkChokepoint(adapter, { protects: "CAP in convex/telemetry.ts", chokepoint, ...hint, root: dir });
+    assert.doesNotMatch(plainBeside.refutationAccount, /through the generated/, plainBeside.refutationAccount);
   } finally {
     await adapter.close();
     rmSync(dir, { recursive: true, force: true });
@@ -236,6 +253,13 @@ test("a generated API reference is read through the name its file imports it by,
   assert.deepEqual(generatedApiReferences("src/hooks.tsx", `import type { api } from "@/convex/_generated/api";\ntype T = typeof api.model.telemetry.track;\n`, target), [{ line: 1, character: 16 }], "a type import through a path alias is read too");
   assert.deepEqual(generatedApiReferences("convex/use.ts", `import { api } from "./_generated/api";\nconst a = api.model.telemetry.track;\nconst b = api.model.telemetry.flush;\n`, { ...target, names: ["track", "flush"] }).length, 2, "a protected module is referenced through any function it exports");
 
+});
+
+test("a declaration's exported names are every name an export statement or list gives it", () => {
+  assert.deepEqual(exportedNames(`export const other = 1, send = internalAction({ a: [1, 2] }), tail = 2;`, "send"), ["send"]);
+  assert.deepEqual(exportedNames(`export const LIMIT = 10; export const send = internalAction({});`, "send"), ["send"]);
+  assert.deepEqual(exportedNames(`const local = internalAction({});\nexport { local as send, local };`, "local"), ["send", "local"]);
+  assert.deepEqual(exportedNames(`export const other = { send: 1 };\nconst send = 2;`, "send"), [], "a property and an unexported declaration are no export");
 });
 
 test("a functions folder is one where Convex generated both its API and its server builders", () => {
