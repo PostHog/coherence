@@ -295,6 +295,8 @@ const CONVEX: Record<string, string> = {
   "src/nested.ts": "export default {\n  client: {\n    fetch() { return 1 },\n  },\n  run() {\n    fetch('/x')\n  },\n}\n",
 };
 
+// The totality oracle the Convex bullet names: every Convex detection test runs under this one title.
+describe("Convex entrance detection", () => {
 test("the Convex rules detect a deployment's public functions, HTTP routes and crons, and a fetch handler a file exports by default; internal functions and namesakes are not entrances", () => {
   const found = nextDetected(CONVEX);
   assert.deepEqual(
@@ -355,6 +357,10 @@ test("the Convex rules read on past a regex literal and a registration still bei
       "",
     ].join("\n"),
     "convex/edit.ts": "import { httpRouter } from 'convex/server'\nimport { mutation } from './_generated/server'\nconst http = httpRouter()\nhttp.route({ path: '/x', method: 'GET', handler:\nexport const still = mutation({ handler: async () => {} })\n",
+    "convex/routes.ts": "import { httpRouter } from 'convex/server'\nimport { httpAction } from './_generated/server'\nconst http = httpRouter()\nhttp.route({\n  // path: '/old', method: 'POST',\n  path: '/new',\n  method: 'GET',\n  handler: httpAction(async () => new Response('')),\n})\n",
+    "convex/_generated/server.d.ts": "export declare function query<T>(d: T): T;\n",
+    "convex/model/aliased.ts": "import { query } from '@/convex/_generated/server'\nexport const list = query({ handler: async () => [] })\n",
+    "src/shared/aliased.ts": "import { query } from '@/convex/_generated/server'\nexport const list = query({ handler: async () => [] })\n",
     "convex/crons.ts": [
       "import { cronJobs } from 'convex/server'",
       "import { internal } from './_generated/api'",
@@ -362,6 +368,8 @@ test("the Convex rules read on past a regex literal and a registration still bei
       "crons.daily('a', { hourUTC: 1, minuteUTC: 0 }, internal.cleanup['sweep'], {})",
       "crons.daily('b', { hourUTC: 2, minuteUTC: 0 }, internal['group-cleanup'].sweep, {})",
       "crons.daily('c', { hourUTC: 3, minuteUTC: 0 }, internal.cleanup, {})",
+      "crons.daily(\"user's cleanup\", { hourUTC: 4, minuteUTC: 0 }, internal.cleanup /* the module */ .sweep, {})",
+      "crons.daily(CLEANUP, { hourUTC: 5, minuteUTC: 0 }, internal.cleanup.sweep, {}) // 'not its name'",
       "export default crons",
       "",
     ].join("\n"),
@@ -370,15 +378,20 @@ test("the Convex rules read on past a regex literal and a registration still bei
     "src/shared/fns.ts": "import { query } from '../../convex/_generated/server'\nexport const list = query({ handler: async () => [] })\n",
   });
   assert.deepEqual(
-    found.map((c) => [c.file, c.line, c.symbol, c.rule, c.declaredIn ?? c.calledAs]),
+    found.map((c) => [c.file, c.line, c.symbol, c.rule, c.declaredIn ?? null, c.calledAs ?? null]),
     [
-      ["convex/crons.ts", 4, "sweep", "Convex cron", "convex/cleanup.ts"],
-      ["convex/crons.ts", 5, "sweep", "Convex cron", "convex/group-cleanup.ts"],
-      ["convex/edit.ts", 5, "still", "Convex function", "edit.still"],
-      ["convex/http.ts", 4, "", "Convex HTTP route", "GET /a"],
-      ["convex/http.ts", 5, "", "Convex HTTP route", "GET /b"],
-      ["convex/util.ts", 3, "join", "Convex function", "util.join"],
+      ["convex/crons.ts", 4, "sweep", "Convex cron", "convex/cleanup.ts", "a"],
+      ["convex/crons.ts", 5, "sweep", "Convex cron", "convex/group-cleanup.ts", "b"],
+      ["convex/crons.ts", 7, "sweep", "Convex cron", "convex/cleanup.ts", "user's cleanup"],
+      ["convex/crons.ts", 8, "sweep", "Convex cron", "convex/cleanup.ts", null],
+      ["convex/edit.ts", 5, "still", "Convex function", null, "edit.still"],
+      ["convex/http.ts", 4, "", "Convex HTTP route", null, "GET /a"],
+      ["convex/http.ts", 5, "", "Convex HTTP route", null, "GET /b"],
+      ["convex/model/aliased.ts", 2, "list", "Convex function", null, "model.aliased.list"],
+      ["convex/routes.ts", 4, "", "Convex HTTP route", null, "GET /new"],
+      ["convex/util.ts", 3, "join", "Convex function", null, "util.join"],
     ],
-    "nothing past a regex or an unfinished call is lost, a cron naming only a module is no function, and a file Convex does not deploy is no function",
+    "nothing past a regex or an unfinished call is lost, a cron naming only a module is no function, a file Convex does not deploy is no function however it imports its builders, and a name is read from code, never a comment, and only from a string literal",
   );
+});
 });

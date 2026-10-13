@@ -144,9 +144,8 @@ test("scaffold entrances on a Convex backend proposes its functions, routes and 
     const out = io(root);
     assert.equal(await scaffoldCommand(["entrances"], out), 0, out.errors.join("\n"));
     const backend = groupsOf(out.lines.join("\n")).get("convex/Backend.spec.md") ?? "";
-    for (const [name, handler] of [["auth", "auth in auth.ts"], ["POST /mail", "receive in webhooks.ts"], ["mail.POST", "POST in mail.ts"], ["expiry sweep", "sweep in cleanup.ts"], ["archive sweep", "sweep in archive.ts"]]) {
-      assert.ok(backend.includes(`- ${name}: `) && backend.includes(`  handler: ${handler}`), `${name} with handler ${handler}:\n${backend}`);
-    }
+    const bullets = new Map([...backend.matchAll(/^- (.+?): .*\n  handler: (.+)$/gm)].map((m) => [m[1]!, m[2]!]));
+    assert.deepEqual(Object.fromEntries(bullets), { auth: "auth in auth.ts", "POST /mail": "receive in webhooks.ts", "mail.POST": "POST in mail.ts", "expiry sweep": "sweep in cleanup.ts", "archive sweep": "sweep in archive.ts" }, backend);
     for (const [spec, body] of groupsOf(out.lines.join("\n"))) paste(join(root, spec), body.replaceAll(MEANING_PLACEHOLDER, "work enters").replace(/<trust level: [^>]*>/g, "visitor"));
     assert.deepEqual(loadSpecModel(root, { runs: false }).problems, [], "the filled bullets parse and every handler resolves");
     assert.equal(undeclaredNow(root)?.undeclared.length, 0, "and cover every entrance they were proposed for");

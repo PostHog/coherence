@@ -30,6 +30,18 @@ test("a regex literal is not a string, a comment or a template: the code after i
   assert.equal(kept(`return /x/.test(s) ? a : b;`), `return / /.test(s) ? a : b;`);
 });
 
+test("a slash divides after a postfix operator and a property named like a keyword, opens a regex after a control statement's condition, and closes a JSX tag", () => {
+  const reads = (text: string, code: string): void => assert.ok(kept(text).includes(code), `${code} stays code in: ${kept(text)}`);
+  reads("const half = counter++ / await run(internal.t.send) / 2;", "await run(internal.t.send) / 2");
+  reads("const r = data.in / 2; const s = '/'; run(internal.t.send);", "run(internal.t.send);");
+  reads("if (ready) /`/.test(label); run(internal.t.send);", "run(internal.t.send);");
+  reads("while (x) /'/.test(y); run(internal.t.send);", "run(internal.t.send);");
+  reads("if /* ready */ (ready) /`/.test(label); run(internal.t.send);", "run(internal.t.send);");
+  reads("const f = (a) / 2; const s = '/'; run(internal.t.send);", "run(internal.t.send);");
+  reads("return <p><b>Hi</b>{String(useQuery(api.t.send))}</p>;", "useQuery(api.t.send)");
+  reads("return <Img src={a} />{run(internal.t.send)}<i>/</i>;", "run(internal.t.send)");
+});
+
 test("a template literal's text is blanked and its substitutions stay code, nested templates and braces included", () => {
   assert.equal(kept("const t = `send ${internal.t.send} now`;"), "const t = ` ${internal.t.send} `;");
   assert.equal(kept("const t = `${ { a: internal.t.send }.a } and ${`in ${api.t.get}`}`; run();"), "const t = `${ { a: internal.t.send }.a } ${` ${api.t.get}`}`; run();");
