@@ -7,7 +7,7 @@
 
 import { posix } from "node:path";
 import { languageOfFile } from "./language-files.ts";
-import { blankNonCode } from "./convex.ts";
+import { blankNonCode } from "./source-text.ts";
 import { escape, handlerName, lineOf, NEXT_ROUTE_METHODS, REMIX_ROUTE_EXPORTS, spanOf, throughOf, type EntranceCandidate, type EntranceSyntax } from "./entrance-candidates.ts";
 
 /** The text from its first code: leading whitespace and comments skipped by a walk, never a backtracking pattern. */

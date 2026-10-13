@@ -19,7 +19,7 @@
     "Webpack", "WebGL", "WebGPU", "WebKit", "WebSocket", "Wasm", "Xcode", "XML", "YAML", "Zsh"
   ],
   "cased": [
-    "Angular", "Apple", "Babel", "Bash", "Bun", "Celery", "Chrome", "Codex", "Copilot", "Cursor",
+    "Angular", "Apple", "Babel", "Bash", "Bun", "Celery", "Chrome", "Codex", "Convex", "Copilot", "Cursor",
     "Elixir", "Flask", "Gemini", "Helm", "Java", "Linear", "Llama", "Mac", "Mermaid", "Metal",
     "Node", "Notion", "Pandas", "Prettier", "Prometheus", "Rails", "React", "Ruby", "Rust", "Safari",
     "Sentry", "Slack", "Snowflake", "Stripe", "Swift", "Temporal", "Windows", "Wrangler", "Yarn"
