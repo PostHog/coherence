@@ -31,6 +31,10 @@ Then run `npx --no -- coherence query practice "adopt Coherence"`, work through 
 Ask me whether pull requests should fail on Coherence's findings or get a report comment, then run `npx --no -- coherence ci install --host github --mode fail` (or `--mode comment`) with `--write`.
 ```
 
+Before asking you anything, your agent explains how Coherence works from
+[docs/how-coherence-works.md](docs/how-coherence-works.md): one page, with a
+diagram and the few words you will hear.
+
 It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux. The package
 is [`@posthog/coherence`](https://www.npmjs.com/package/@posthog/coherence)
 on npm, published from this repository with provenance; the dev dependency
@@ -616,6 +620,7 @@ nothing. The workflow can also be run by hand from the Actions tab.
 
 ## Further reading
 
+- `docs/how-coherence-works.md`: one page on how Coherence works and the words it uses, for a person new to it.
 - `Coherence.spec.md` and the `*.spec.md` file in each folder under `src/`: Coherence's own trust levels and invariants, in its own grammar.
 - `docs/lexicon.json`: the settled vocabulary; `docs/lexicon.md`: why the lexicon is first-class, with the evidence.
 - `docs/spec.md`, `docs/enforcement.md`, `docs/journal.md`, `docs/economy.md`, `docs/observation.md`, `docs/scope-shell.md`: how each part works.
