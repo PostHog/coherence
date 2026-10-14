@@ -65,10 +65,11 @@ function routePath(file: string): string {
   return (at === -1 ? parts : parts.slice(at + 1)).join("/") || stem(file);
 }
 
-/** The name a bullet proposes: words from the symbol; the route's path for a route export or a page; the file's for a file-grain entrance. Never a colon, which ends a name. */
-export function entranceName(c: Pick<EntranceCandidate, "file" | "symbol" | "rule">): string {
+/** The name a bullet proposes: words from the symbol; the route's path for a route export or a page; the file's for a file-grain entrance; the name the deployment knows it by when it has one (a Convex function, route or cron). Never a colon, which ends a name. */
+export function entranceName(c: Pick<EntranceCandidate, "file" | "symbol" | "rule" | "calledAs">): string {
   let name: string;
-  if (c.rule === "page route") name = `page ${routePath(c.file).replace(/(?:^|\/)page$/, "") || "/"}`;
+  if (c.calledAs !== undefined) name = c.calledAs;
+  else if (c.rule === "page route") name = `page ${routePath(c.file).replace(/(?:^|\/)page$/, "") || "/"}`;
   else if (c.symbol === "") name = symbolWords(stem(c.file)).join(" ") || stem(c.file);
   else if (ROUTE_EXPORTS.has(c.symbol)) name = `route ${routePath(c.file)}`;
   else if (METHOD_EXPORTS.has(c.symbol)) name = `${c.symbol} ${routePath(c.file)}`;
@@ -78,10 +79,11 @@ export function entranceName(c: Pick<EntranceCandidate, "file" | "symbol" | "rul
 }
 
 /** The handler line's value, as the spec resolves it: the file relative to the owning component (the spec reads it there first, then under the root). */
-export function entranceHandler(c: Pick<EntranceCandidate, "file" | "symbol" | "registered">, folder: string | undefined): string {
+export function entranceHandler(c: Pick<EntranceCandidate, "file" | "symbol" | "registered" | "declaredIn">, folder: string | undefined): string {
   const file = folder === undefined || folder === "." || !c.file.startsWith(`${folder}/`) ? c.file : c.file.slice(folder.length + 1);
   if (c.symbol === "") return isModuleHandler(file) ? file : c.file;
   // Registered here and declared elsewhere: the spec finds a bare name under the component.
+  if (c.declaredIn !== undefined) return `${c.symbol} in ${folder === undefined || folder === "." || !c.declaredIn.startsWith(`${folder}/`) ? c.declaredIn : c.declaredIn.slice(folder.length + 1)}`;
   if (c.registered === true) return c.symbol;
   return `${c.symbol} in ${file}`;
 }

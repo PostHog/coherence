@@ -48,6 +48,10 @@ export interface EntranceCandidate {
   why: string;
   /** Set when the symbol is registered here and declared elsewhere (a route table, a URL pattern): a handler naming it resolves to another file. */
   registered?: true;
+  /** Where a registered symbol is declared, when the registration names its module (a Convex cron's generated API path): a handler naming it must name that file. */
+  declaredIn?: string;
+  /** The name the deployment knows it by: the path a client calls a Convex function by (player.join), a Convex route's method and path, a cron's name. */
+  calledAs?: string;
   /** The declared entrances' handlers and guards its own statement calls or is decorated with, when any. */
   through?: string[];
 }
@@ -88,7 +92,7 @@ export interface EntranceSyntax {
   /** Whether a decorator naming a wrapper passes through it, as a call does. */
   decorates: boolean;
   /** The entrances the language's rules detect in one code file. */
-  candidates(file: string, text: string, wrappers: readonly string[]): EntranceCandidate[];
+  candidates(file: string, text: string, wrappers: readonly string[], exists: (file: string) => boolean): EntranceCandidate[];
   /** The entrances the language's own manifest names (pyproject's console scripts), besides package.json's. */
   manifestCandidates(read: (file: string) => string | undefined, exists: (file: string) => boolean): EntranceCandidate[];
   /** The entrance a code file (one isCode accepts) directly under scripts/ or bin/ (`folder`) is, or undefined when the language does not run it as a script. */
@@ -239,12 +243,13 @@ export function detectEntranceCandidates(root: string, options: DetectOptions): 
   };
   const isTest = (file: string): boolean => isTestPath(file, testFolders);
   const syntax = ENTRANCE_SYNTAX[language]();
+  const listed = new Set(files);
   const code = files.filter((f) => !isTest(f) && syntax.isCode(f));
   const found: EntranceCandidate[] = [];
   for (const file of code) {
     const text = read(file);
     if (text === undefined) continue;
-    found.push(...syntax.candidates(file, text, wrappers));
+    found.push(...syntax.candidates(file, text, wrappers, (f) => listed.has(f)));
   }
   const fileGrain = [...manifestCandidates(new Set(files), syntax, read, isTest), ...scriptCandidates(code, syntax, read, syntax.importedAmong(code, read))];
   const byFile = new Map<string, EntranceCandidate>();

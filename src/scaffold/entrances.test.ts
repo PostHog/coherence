@@ -92,8 +92,65 @@ test("scaffold entrances narrows to a folder or file inside the project, and nam
     assert.deepEqual(group!.entrances.map((e) => e.name), ["read thing in a", "read thing in b"], "never a name the spec already has, nor one proposed twice");
     assert.equal(entranceName({ file: "src/app/api/items/route.ts", symbol: "POST", rule: "route handler" }), "POST api/items/route");
     assert.equal(entranceName({ file: "scripts/sync:all.ts", symbol: "", rule: "script" }), "sync all", "never a colon, which would end the name");
+    assert.equal(entranceName({ file: "convex/mail.ts", symbol: "POST", rule: "Convex function", calledAs: "mail.POST" }), "mail.POST", "the name the deployment knows it by comes before a framework's export conventions");
   } finally {
     remove();
+  }
+});
+
+test("scaffold entrances on a Convex backend proposes its functions, routes and crons by the names the deployment knows them by, with handlers that resolve through import aliases, and the filled bullets cover them", async () => {
+  const root = mkdtempSync(join(tmpdir(), "coherence-convexapp-"));
+  const files: Record<string, string> = {
+    "coherence.config.json": JSON.stringify({ name: "Sessions", language: "typescript" }),
+    "package.json": JSON.stringify({ name: "sessions", private: true }),
+    "Sessions.spec.md": "# Sessions\n\nA scheduling app.\n\n## trust levels\n- visitor (outside): anyone on the network\n\n## invariants\n",
+    "convex/Backend.spec.md": "# Backend\n\nThe Convex backend.\n\n## invariants\n",
+    "convex/_generated/api.d.ts": "export declare const api: any;\nexport declare const internal: any;\n",
+    "convex/_generated/server.d.ts": "export declare function mutation<T>(d: T): T;\nexport declare function internalMutation<T>(d: T): T;\nexport declare function httpAction<T>(d: T): T;\n",
+    "convex/auth.ts": "export const { auth, signIn } = convexAuth({ providers: [] })\n",
+    "convex/webhooks.ts": "import { httpAction } from './_generated/server'\nexport const receive = httpAction(async () => new Response(''))\n",
+    "convex/mail.ts": "import { mutation } from './_generated/server'\nexport const POST = mutation({ handler: async () => {} })\n",
+    "convex/cleanup.ts": "import { internalMutation } from './_generated/server'\nexport const sweep = internalMutation({ handler: async () => {} })\n",
+    "convex/archive.ts": "import { internalMutation } from './_generated/server'\nexport const sweep = internalMutation({ handler: async () => {} })\n",
+    "convex/http.ts": [
+      "import { httpRouter } from 'convex/server'",
+      "import { auth as authRoutes } from './auth'",
+      "import { receive as receiveMail } from './webhooks'",
+      "const http = httpRouter()",
+      "authRoutes.addHttpRoutes(http)",
+      "http.route({ path: '/mail', method: 'POST', handler: receiveMail })",
+      "export default http",
+      "",
+    ].join("\n"),
+    "convex/crons.ts": [
+      "import { cronJobs } from 'convex/server'",
+      "import { internal } from './_generated/api'",
+      "const crons = cronJobs()",
+      "crons.daily('expiry sweep', { hourUTC: 3, minuteUTC: 0 }, internal.cleanup.sweep, {})",
+      "crons.weekly('archive sweep', { dayOfWeek: 'monday', hourUTC: 4, minuteUTC: 0 }, internal.archive.sweep, {})",
+      "export default crons",
+      "",
+    ].join("\n"),
+  };
+  for (const [file, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, file)), { recursive: true });
+    writeFileSync(join(root, file), text);
+  }
+  const git = (...args: string[]): void => void execFileSync("git", args, { cwd: root, stdio: "ignore" });
+  git("init", "-q");
+  git("add", ".");
+  git("-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-q", "-m", "seed");
+  try {
+    const out = io(root);
+    assert.equal(await scaffoldCommand(["entrances"], out), 0, out.errors.join("\n"));
+    const backend = groupsOf(out.lines.join("\n")).get("convex/Backend.spec.md") ?? "";
+    const bullets = new Map([...backend.matchAll(/^- (.+?): .*\n  handler: (.+)$/gm)].map((m) => [m[1]!, m[2]!]));
+    assert.deepEqual(Object.fromEntries(bullets), { auth: "auth in auth.ts", "POST /mail": "receive in webhooks.ts", "mail.POST": "POST in mail.ts", "expiry sweep": "sweep in cleanup.ts", "archive sweep": "sweep in archive.ts" }, backend);
+    for (const [spec, body] of groupsOf(out.lines.join("\n"))) paste(join(root, spec), body.replaceAll(MEANING_PLACEHOLDER, "work enters").replace(/<trust level: [^>]*>/g, "visitor"));
+    assert.deepEqual(loadSpecModel(root, { runs: false }).problems, [], "the filled bullets parse and every handler resolves");
+    assert.equal(undeclaredNow(root)?.undeclared.length, 0, "and cover every entrance they were proposed for");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

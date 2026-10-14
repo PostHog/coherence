@@ -9,7 +9,11 @@
  *   names it     the handler is its symbol, in its file (a symbol registered
  *                in a route table or a URL pattern is matched by name, since
  *                it is declared elsewhere); a file-grain one (a script, a
- *                package bin) is named by any handler in that file
+ *                package bin) is named by any handler in that file, unless
+ *                the deployment calls it by a name a declared entrance of
+ *                its file carries (an inline Convex route's "POST /mail"):
+ *                then only that entrance covers it, and it covers nothing
+ *                else, through a wrapper neither
  *   or, when the handler names no detected entrance, stands for it:
  *     through    its own statement calls the handler (every server function
  *                wrapped in mutationRpc, for "server function mutations",
@@ -23,7 +27,7 @@
 
 import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
 import type { Language } from "../../adapters/index.ts";
-import type { SpecComponent } from "./model.ts";
+import type { SpecComponent, SpecEntrance } from "./model.ts";
 
 /** The rules, per language, each with its plural and what it detects: the documentation the query prints and the spec states, and the one place a rule's plural is said. */
 export const CANDIDATE_RULES: Record<Language, readonly { rule: string; plural: string; detects: string }[]> = {
@@ -37,6 +41,10 @@ export const CANDIDATE_RULES: Record<Language, readonly { rule: string; plural: 
     { rule: "server action", plural: "server actions", detects: "an exported function of a file that opens with 'use server'" },
     { rule: "route table", plural: "route table entries", detects: "an object literal naming a path or pattern that starts with / and a handler, on one line" },
     { rule: "route method", plural: "registered routes", detects: "a call like app.get('/path', handler) whose first argument is a path starting with /" },
+    { rule: "Convex function", plural: "Convex functions", detects: "an exported const created by the query, mutation or action a file imports from Convex's _generated/server, which any client of the deployment can call" },
+    { rule: "Convex HTTP route", plural: "Convex HTTP routes", detects: "a route on an httpRouter() from convex/server: a .route({ path or pathPrefix, method, handler }) call, or a library's routes registered with .addHttpRoutes(router)" },
+    { rule: "Convex cron", plural: "Convex crons", detects: "a function a cronJobs() table from convex/server runs on a schedule (interval, cron, hourly, daily, weekly, monthly), named by the generated API, declared in the module that path names" },
+    { rule: "fetch handler", plural: "fetch handlers", detects: "a file whose default export is an object with a fetch method, which a Cloudflare Worker, Bun or Deno calls for every request" },
     { rule: "package bin", plural: "package bins", detects: "a file package.json's bin names" },
     { rule: "package script", plural: "package scripts", detects: "a project file a package.json script runs with node, tsx, ts-node, bun, deno, vite-node or python" },
     { rule: "script", plural: "scripts", detects: "a file directly under a top-level scripts/ or bin/ folder that no project file imports" },
@@ -54,7 +62,7 @@ export const CANDIDATE_RULES: Record<Language, readonly { rule: string; plural: 
 
 /** What the rules do not see, per language: said wherever the coverage is, so an absence is never read as none. */
 export const NOT_DETECTED: Record<Language, string> = {
-  typescript: "file routes outside a Next.js app/**/page without server handlers (their work enters through server functions), hand-written dispatchers, message consumers, workers and host callbacks are not detected",
+  typescript: "file routes outside a Next.js app/**/page without server handlers (their work enters through server functions), hand-written dispatchers, message consumers, a worker's other host callbacks (scheduled, queue), a fetch handler exported as anything but an object with a fetch method of its own (Hono's { fetch: app.fetch }), a Convex function built by a custom builder until a declared entrance names it (a wrapped export then), and the functions a library creates for a deployment (convexAuth's signIn, signOut and store) are not detected; Convex's internal functions are not entrances, since only the deployment's own code (a public function, a cron, an HTTP action) can call them",
   python: "views reached only through include(), hand-written dispatchers, message consumers and signal handlers are not detected",
 };
 
@@ -109,6 +117,10 @@ function coverageSameFile(a: string | undefined, b: string): boolean {
 export function coverageOf(components: readonly Pick<SpecComponent, "folder" | "entrances">[], candidates: readonly EntranceCandidate[] | undefined): EntranceCoverage | undefined {
   if (candidates === undefined) return undefined;
   const symbols = new Set(candidates.map((c) => c.symbol).filter((s) => s !== ""));
+  const declaredEntrances = components.flatMap((component) => component.entrances);
+  const namedAs = (e: SpecEntrance, c: EntranceCandidate): boolean => c.symbol === "" && c.calledAs === e.name && coverageSameFile(e.file, c.file);
+  const claimed = new Set(candidates.filter((c) => declaredEntrances.some((e) => namedAs(e, c))));
+  const coversFileGrain = (e: SpecEntrance, c: EntranceCandidate): boolean => (candidates.some((named) => namedAs(e, named)) ? namedAs(e, c) : !claimed.has(c) && coverageSameFile(e.file, c.file));
   const coveredBy = new Map<EntranceCandidate, number[]>();
   const groups: CoverageGroup[] = [];
   const sizes: number[] = [];
@@ -121,11 +133,11 @@ export function coverageOf(components: readonly Pick<SpecComponent, "folder" | "
       const named = COVERAGE_NAMED.exec(handler);
       const symbol = named?.[1];
       const file = e.file;
-      let set = candidates.filter((c) => (c.symbol === "" ? coverageSameFile(file, c.file) : symbol !== undefined && symbol === c.symbol && (c.registered === true || file === undefined || coverageSameFile(file, c.file))));
+      let set = candidates.filter((c) => (c.symbol === "" ? coversFileGrain(e, c) : symbol !== undefined && symbol === c.symbol && (file === undefined || coverageSameFile(file, c.declaredIn ?? c.file) || (c.registered === true && c.declaredIn === undefined))));
       if (set.length === 0) {
         // The handler names no detected entrance: it may be what they are registered through.
         const wrapper = symbol !== undefined && !symbols.has(symbol) ? symbol : undefined;
-        set = candidates.filter((c) => (wrapper !== undefined && c.through?.includes(wrapper) === true) || (file !== undefined && c.symbol !== "" && coverageSameFile(file, c.file) && (symbol === undefined || !symbols.has(symbol))));
+        set = candidates.filter((c) => !claimed.has(c) && ((wrapper !== undefined && c.through?.includes(wrapper) === true) || (file !== undefined && c.symbol !== "" && coverageSameFile(file, c.file) && (symbol === undefined || !symbols.has(symbol)))));
       }
       if (set.length === 0) {
         beyond += 1;
