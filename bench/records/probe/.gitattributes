@@ -1,0 +1,6 @@
+# The probe github-counts.ts reads: one file per attribute, the same 20 lines in each.
+generated.jsonl linguist-generated=true
+nodiff.jsonl -diff
+binary.jsonl binary
+generated-nodiff.jsonl linguist-generated=true -diff
+undriven.jsonl diff=coherence-records
