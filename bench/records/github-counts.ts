@@ -48,15 +48,18 @@ const history = merged.flatMap((pr) => {
   if (oid === undefined) return [];
   try {
     const all = shortstat(run("git", ["diff", "--shortstat", `${oid}^1`, oid]));
-    const records = shortstat(run("git", ["diff", "--shortstat", `${oid}^1`, oid, "--", ...STORE_NAMES.map((s) => storeDir(s))]));
-    return [{ pr: pr.number, githubAdditions: pr.additions, githubDeletions: pr.deletions, githubFiles: pr.changedFiles, localAdditions: all.added, recordAdditions: records.added, recordFiles: records.files, recordShareOfAdditions: all.added === 0 ? 0 : Math.round((records.added / all.added) * 100) }];
+    const folders = STORE_NAMES.map((s) => storeDir(s));
+    const records = shortstat(run("git", ["diff", "--shortstat", `${oid}^1`, oid, "--", ...folders]));
+    // Under shards sealed at each commit, a store file each of the pull request's own commits touched is one shard file.
+    const shardFiles = run("git", ["log", "--no-merges", "--format=", "--name-only", `${oid}^1..${oid}`, "--", ...folders]).split("\n").filter((l) => l.endsWith(".jsonl")).length;
+    return [{ pr: pr.number, githubAdditions: pr.additions, githubDeletions: pr.deletions, githubFiles: pr.changedFiles, localAdditions: all.added, recordAdditions: records.added, recordFiles: records.files, shardFiles, recordShareOfAdditions: all.added === 0 ? 0 : Math.round((records.added / all.added) * 100) }];
   } catch {
     return [];
   }
 });
 out["history"] = history;
 const sum = (key: keyof (typeof history)[number]): number => history.reduce((n, h) => n + Number(h[key]), 0);
-out["historyTotals"] = { prs: history.length, githubAdditions: sum("githubAdditions"), localAdditions: sum("localAdditions"), recordAdditions: sum("recordAdditions"), githubFiles: sum("githubFiles"), recordFiles: sum("recordFiles") };
+out["historyTotals"] = { prs: history.length, githubAdditions: sum("githubAdditions"), localAdditions: sum("localAdditions"), recordAdditions: sum("recordAdditions"), githubFiles: sum("githubFiles"), recordFiles: sum("recordFiles"), shardFiles: sum("shardFiles") };
 
 if (PR !== undefined) {
   const repo = (gh(["repo", "view", "--json", "nameWithOwner"]) as { nameWithOwner: string }).nameWithOwner;

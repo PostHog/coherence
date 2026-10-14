@@ -1,4 +1,5 @@
-# The probe github-counts.ts reads: one file per attribute, the same 20 lines in each.
+# The probe github-counts.ts reads: one file per attribute, the same 20 lines in each;
+# packed.jsonl holds the same 20 records on one line, each led by 0x1e.
 generated.jsonl linguist-generated=true
 nodiff.jsonl -diff
 binary.jsonl binary

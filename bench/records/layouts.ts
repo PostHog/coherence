@@ -11,6 +11,8 @@
  *   shard     (c) one file per writer and head: <session>.<token>.jsonl, appended only while
  *             HEAD, the branch and the file's size are what they were at the last append;
  *             any other state mints a new token, so a committed shard is never appended again
+ *   packed    (d) a shard whose records are each led by a record separator (0x1e), with no
+ *             newline: one line per shard file, which today's readers cannot split
  *   ref       (b) records off the branch, in a tree on refs/coherence/records
  *
  * Nothing here touches this checkout's stores: it reads them, and builds
@@ -41,7 +43,7 @@ const KEEP = args.includes("--keep");
 const SCALE = Number(args[args.indexOf("--scale") + 1] ?? 10) || 10;
 const WORK = mkdtempSync(join(tmpdir(), "coherence-records-layout-"));
 const REF = "refs/coherence/records";
-const LAYOUTS = ["session", "record", "shard"] as const;
+const LAYOUTS = ["session", "record", "shard", "packed"] as const;
 type Layout = (typeof LAYOUTS)[number];
 
 // ---------------------------------------------------------------- helpers
@@ -196,7 +198,7 @@ function writeLayout(root: string, layout: Layout, lines: Line[], resolved: Map<
   for (const l of lines) {
     const name = layout === "session" ? l.file
       : layout === "record" ? `${l.session}.${hash(l.text)}.jsonl`
-      : `${l.file.slice(0, -".jsonl".length)}.${l.commit}.jsonl`;
+      : `${l.file.slice(0, -".jsonl".length)}.${l.commit}.jsonl`; // shard and packed: one file per session file and commit
     const key = join(storeDir(l.store), name);
     const group = groups.get(key);
     if (group === undefined) groups.set(key, [l]);
@@ -207,7 +209,7 @@ function writeLayout(root: string, layout: Layout, lines: Line[], resolved: Map<
     let texts = members.map((m) => m.text);
     if (store === "runs") texts = compactRuns(members.map((m) => resolved.get(m.text) ?? m.text));
     mkdirSync(dirname(join(root, rel)), { recursive: true });
-    writeFileSync(join(root, rel), texts.join("\n") + "\n");
+    writeFileSync(join(root, rel), layout === "packed" ? texts.map((t) => `\x1e${t}`).join("") : texts.join("\n") + "\n");
   }
 }
 
@@ -238,6 +240,13 @@ function readCosts(root: string): Record<string, number> {
   const runs = timed(3, () => loadRuns(root));
   const work = timed(5, () => loadWork(root));
   const keys = timed(5, () => journalFileKeys(root));
+  // A reader that splits on the record separator as well as the newline: what packed shards need of every reader.
+  const split = timed(5, () => {
+    let n = 0;
+    const dir = join(root, storeDir("journal"));
+    for (const name of readdirSync(dir)) for (const part of readFileSync(join(dir, name), "utf8").split(/[\n\x1e]/)) if (part.trim() !== "") { JSON.parse(part); n++; }
+    return n;
+  });
   const statAll = timed(5, () => {
     let n = 0;
     for (const store of STORE_NAMES) {
@@ -250,6 +259,7 @@ function readCosts(root: string): Record<string, number> {
     journalRecords: journal.value.records.length, journalDamaged: journal.value.damaged.length, loadJournalMs: journal.ms,
     runRecords: runs.value.records.length + runs.value.refutations.length, runsDamaged: runs.value.damaged.length, loadRunsMs: runs.ms,
     workRecords: work.value.records.length, loadWorkMs: work.ms,
+    splitReaderJournalRecords: split.value, splitReaderJournalMs: split.ms,
     journalFileKeysMs: keys.ms, statEveryStoreFileMs: statAll.ms,
   };
 }
@@ -320,9 +330,11 @@ function headOf(root: string): { head: string; branch: string } {
  * the file's size is not what it was at its last append, so a commit seals a
  * shard; "branch-shard" mints only when the branch or the size changes, the
  * variant a squash or rebase merge of stacked branches defeats; "shard-spawn"
- * is "shard" asking git for HEAD with two spawns instead of reading its files.
+ * is "shard" asking git for HEAD with two spawns instead of reading its files;
+ * "packed-shard" is "shard" with each record led by a record separator (0x1e)
+ * and no newline, so a shard is one line however many records it holds.
  */
-type Mode = Layout | "branch-shard" | "shard-spawn" | "ref";
+type Mode = Layout | "branch-shard" | "shard-spawn" | "packed-shard" | "ref";
 
 /** One writer's appends under a layout, in a repository checkout. */
 class Writer {
@@ -348,7 +360,8 @@ class Writer {
       const size = held === undefined ? -1 : existsSync(join(dir, held.name)) ? statSync(join(dir, held.name)).size : -1;
       const reuse = held !== undefined && held.branch === branch && held.size === size && (this.mode === "branch-shard" || held.head === head);
       const name = reuse ? held.name : `${session}.${randomBytes(4).toString("hex")}.jsonl`;
-      appendWhole(join(dir, name), `${line}\n`);
+      if (this.mode === "packed-shard") appendFileSync(join(dir, name), `\x1e${line}`);
+      else appendWhole(join(dir, name), `${line}\n`);
       this.shards.set(key, { head, branch, name, size: statSync(join(dir, name)).size });
     } else {
       // ref: the session's file read from the ref, the line added, and a commit on the ref, under compare-and-swap.
@@ -396,7 +409,7 @@ function mainRecords(root: string, layout: Mode): number {
   const seen = new Set<string>();
   const source = layout === "ref" ? REF : "main";
   const listing = git(root, ["ls-tree", "-r", "--name-only", source]).out.split("\n").filter((p) => p.endsWith(".jsonl"));
-  for (const path of listing) for (const l of git(root, ["show", `${source}:${path}`]).out.split("\n")) if (l.trim() !== "") seen.add(l.trim());
+  for (const path of listing) for (const l of git(root, ["show", `${source}:${path}`]).out.split(/[\n\x1e]/)) if (l.trim() !== "") seen.add(l.trim());
   return seen.size;
 }
 
@@ -545,7 +558,7 @@ try {
   for (const name of ["parallel", "stacked"] as const)
     for (const method of ["merge", "squash", "rebase"] as const) {
       outcomes.push(scenario(name, "session", "merge=union (local)", method));
-      for (const layout of ["session", "record", "branch-shard", "shard", "ref"] as const) outcomes.push(scenario(name, layout, "none (GitHub)", method));
+      for (const layout of ["session", "record", "branch-shard", "shard", "packed-shard", "ref"] as const) outcomes.push(scenario(name, layout, "none (GitHub)", method));
     }
   results["merges"] = outcomes.map((o) => ({ ...o, conflicts: o.conflicts.length, conflicted: o.conflicts.join("; ") }));
   results["refMechanics"] = refMechanics();
