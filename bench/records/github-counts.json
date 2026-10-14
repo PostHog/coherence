@@ -1,5 +1,5 @@
 {
-  "at": "2026-10-14T12:33:29.094Z",
+  "at": "2026-10-14T12:36:34.527Z",
   "history": [
     {
       "pr": 120,
@@ -344,15 +344,15 @@
   "probe": {
     "pr": 121,
     "totals": {
-      "additions": 1342,
-      "changedFiles": 10,
+      "additions": 1875,
+      "changedFiles": 12,
       "deletions": 0
     },
     "files": [
       {
         "file": ".gitattributes",
         "attributes": "(none)",
-        "additions": 6,
+        "additions": 7,
         "deletions": 0,
         "patchRendered": true
       },
@@ -381,6 +381,13 @@
         "file": "nodiff.jsonl",
         "attributes": "-diff",
         "additions": 20,
+        "deletions": 0,
+        "patchRendered": true
+      },
+      {
+        "file": "packed.jsonl",
+        "attributes": "(none)",
+        "additions": 1,
         "deletions": 0,
         "patchRendered": true
       },
