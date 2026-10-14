@@ -47,8 +47,10 @@ import {
   type StagedSite,
   type Visibility,
 } from "./adapter.ts";
+import { convexBuilder, convexModule, exportedNames, generatedApiReferences, generatedObjectFor, type ConvexModule } from "./convex.ts";
 import { locateServer as locateInstalled, locateTsserver, type ServerLocation } from "./installed.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
+import { languageOfFile } from "./language-files.ts";
 import { horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
 
 const SERVER_BIN = "typescript-language-server";
@@ -376,6 +378,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     this.lineCache.clear();
     this.wildcards = undefined;
     this.walked = undefined;
+    this.scripts = undefined;
     this.listing = undefined;
     this.diagnostics.clear();
     if (this.client === undefined) return;
@@ -528,6 +531,14 @@ export class TypeScriptAdapter implements LanguageAdapter {
       const form = siteForm(this.linesOf(file), start.line);
       sites.push({ file, line: start.line + 1, character: start.character, symbol: await this.enclosingSymbol(file, start), ...(form === undefined ? {} : { form }) });
     }
+    // Convex code reaches a function through its generated API object, which the server never links back to the export.
+    for (const site of await this.generatedApiSites(definition)) {
+      const key = `${site.file}:${site.line - 1}:${site.character}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      this.touched.add(site.file);
+      sites.push(site);
+    }
     // A wildcard re-export names nothing, so the server reports no site for it; it still widens the thing's reach.
     if (definition.kind === "module" || (await this.visibility(definition)).visible) {
       for (const site of this.wildcardReExports(definition.file)) {
@@ -540,6 +551,40 @@ export class TypeScriptAdapter implements LanguageAdapter {
     }
     sites.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.character - b.character);
     return sites;
+  }
+
+  /** The Convex module a project file is, when a generated API reaches it. */
+  private convexModuleOf(file: string): ConvexModule | undefined {
+    return convexModule(file, (path) => existsSync(join(this.root, path)));
+  }
+
+  /** The sites that reach a Convex function, or any function a Convex module exports, through its folder's generated API: the project's sources, its horizon's, and any staged document. */
+  private async generatedApiSites(definition: Definition): Promise<ReferenceSite[]> {
+    const module = this.convexModuleOf(definition.file);
+    if (module === undefined) return [];
+    const text = this.linesOf(definition.file).join("\n");
+    const locals = definition.kind === "module" ? (await this.documentSymbols(definition.file)).map((symbol) => symbol.name) : [await this.declaredName(definition)].filter((name): name is string => name !== undefined);
+    const names = [...new Set(locals.flatMap((local) => exportedNames(text, local)))];
+    const target = { folder: join(this.root, module.folder), path: module.path, names };
+    const sites: ReferenceSite[] = [];
+    for (const file of new Set([...this.scriptSources(), ...this.probes])) {
+      for (const at of generatedApiReferences(join(this.root, file), this.linesOf(file).join("\n"), target)) {
+        sites.push({ file, line: at.line + 1, character: at.character, symbol: await this.enclosingSymbol(file, at) });
+      }
+    }
+    return sites;
+  }
+
+  /** Every file of the project and its horizon written in TypeScript (languageOfFile), its JavaScript included, project-relative, less generated folders and the .d.mts and .d.cts declarations the rule still claims; taken once per forget. */
+  private scripts: string[] | undefined;
+  private scriptSources(): string[] {
+    return (this.scripts ??= this.listScriptSources());
+  }
+
+  private listScriptSources(): string[] {
+    const own = this.walkedNow();
+    const horizon = this.horizon().flatMap((folder) => walkedFiles(folder).map((rel) => relative(this.root, join(folder, rel)).split(sep).join("/")).filter((file) => file.startsWith("../")));
+    return [...own, ...horizon].filter((rel) => languageOfFile(rel) === "typescript" && !/\.d\.[mc]ts$/.test(rel) && !rel.split("/").includes("_generated"));
   }
 
   /** The folders outside the project the config's `references` adds to the search, absolute; read once. */
@@ -722,7 +767,8 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const dir = dirname(protectedThing.file);
     const base = protectedThing.file.slice(dir === "." ? 0 : dir.length + 1);
     const synthetic = `${dir === "." ? "" : dir + "/"}coherence-refutation-${randomBytes(4).toString("hex")}.ts`;
-    const reExport = `export { ${name} } from "./${base}";\n`;
+    const exported = exportedNames(this.linesOf(protectedThing.file).join("\n"), name)[0] ?? name;
+    const reExport = `export { ${exported} } from "./${base}";\n`;
     client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(synthetic), languageId: "typescript", version: 1, text: reExport } });
     this.lineCache.set(synthetic, reExport.split("\n"));
     this.symbolCache.set(synthetic, []);
@@ -731,7 +777,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     // A module chokepoint has no inside that is outside its own range, so there is no same-module site to stage;
     // nor is there where the exempted folder holds the chokepoint's module, which the exemption covers on purpose.
     const exempted = exempt !== undefined && chokepoint !== undefined && withinFolder(chokepoint.file, exempt);
-    const sameModule = chokepoint !== undefined && chokepoint.kind === "symbol" && !exempted ? this.editChokepointModule(chokepoint, protectedThing, name) : undefined;
+    const sameModule = chokepoint !== undefined && chokepoint.kind === "symbol" && !exempted ? this.editChokepointModule(chokepoint, protectedThing, name, exported) : undefined;
     const expected: { what: string; file: string; line: number }[] = [];
     if (sameModule !== undefined) expected.push({ what: `a use of ${name} in ${chokepoint!.file} outside ${chokepoint!.name}`, file: chokepoint!.file, line: sameModule.line });
     expected.push({ what: `a re-export of ${name} from the unsaved document ${synthetic}`, file: synthetic, line: 1 });
@@ -740,12 +786,22 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const outside = beside === undefined ? undefined : `${beside}coherence-refutation-${randomBytes(4).toString("hex")}.ts`;
     if (outside !== undefined) {
       const specifier = `./${relative(dirname(outside), protectedThing.file).split(sep).join("/")}`.replace(/^\.\/\.\.\//, "../");
-      const use = `import { ${name} as coherenceRefutationName } from "${specifier}";\nexport const coherenceRefutationUse = coherenceRefutationName;\n`;
+      const use = `import { ${exported} as coherenceRefutationName } from "${specifier}";\nexport const coherenceRefutationUse = coherenceRefutationName;\n`;
       client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(outside), languageId: "typescript", version: 1, text: use } });
       this.lineCache.set(outside, use.split("\n"));
       this.symbolCache.set(outside, []);
       this.probes.add(outside);
       expected.push({ what: `a use of ${name} from the unsaved document ${outside}, outside ${exempt}`, file: outside, line: 2 });
+    }
+    // Convex code reaches a registered function only through the generated API, so the refutation stages that path too, where the exemption does not reach.
+    const generated = this.stagedGeneratedApiUse(protectedThing, name, outside ?? `${dirname(synthetic) === "." ? "" : dirname(synthetic) + "/"}coherence-refutation-${randomBytes(4).toString("hex")}.ts`);
+    if (generated !== undefined) {
+      if (generated.file === outside) this.change(generated.file, generated.text);
+      else client.notify("textDocument/didOpen", { textDocument: { uri: this.uri(generated.file), languageId: "typescript", version: 1, text: generated.text } });
+      this.lineCache.set(generated.file, generated.text.split("\n"));
+      this.symbolCache.set(generated.file, []);
+      this.probes.add(generated.file);
+      expected.push({ what: `a reference to ${name} through the generated ${generated.reference} from the unsaved document ${generated.file}${outside === undefined ? "" : `, outside ${exempt}`}`, file: generated.file, line: generated.line });
     }
 
     try {
@@ -765,13 +821,36 @@ export class TypeScriptAdapter implements LanguageAdapter {
       };
     } finally {
       sameModule?.restore();
-      for (const file of outside === undefined ? [synthetic] : [synthetic, outside]) {
+      for (const file of new Set([synthetic, ...(outside === undefined ? [] : [outside]), ...(generated === undefined ? [] : [generated.file])])) {
         client.notify("textDocument/didClose", { textDocument: { uri: this.uri(file) } });
         this.lineCache.delete(file);
         this.symbolCache.delete(file);
         this.probes.delete(file);
       }
     }
+  }
+
+  /**
+   * For a registered Convex function, a reference to it through the generated
+   * API the way Convex code makes one, to be staged in `file`: appended to its
+   * text when the refutation already stages that document, else alone. It is
+   * the one path the language server cannot see, so the refutation proves
+   * the check reads it.
+   */
+  private stagedGeneratedApiUse(protectedThing: Definition, name: string, file: string): { file: string; text: string; line: number; reference: string } | undefined {
+    if (protectedThing.kind !== "symbol") return undefined;
+    const module = this.convexModuleOf(protectedThing.file);
+    if (module === undefined) return undefined;
+    const lines = this.linesOf(protectedThing.file);
+    const builder = convexBuilder(lines.join("\n"), textWithin(lines, protectedThing.range));
+    const exported = exportedNames(lines.join("\n"), name)[0];
+    if (builder === undefined || exported === undefined) return undefined;
+    const object = generatedObjectFor(builder);
+    const specifier = `./${relative(dirname(file), join(module.folder, "_generated/api")).split(sep).join("/")}`.replace(/^\.\/\.\.\//, "../");
+    const before = this.lineCache.get(file) ?? [];
+    const prefix = before.join("\n");
+    const text = `${prefix}import { ${object} as coherenceRefutationApi } from "${specifier}";\nexport const coherenceRefutationReference = coherenceRefutationApi.${module.path.join(".")}.${exported};\n`;
+    return { file, text, line: (prefix === "" ? 0 : prefix.split("\n").length - 1) + 2, reference: `${object}.${module.path.join(".")}.${exported}` };
   }
 
   /**
@@ -782,7 +861,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
    * lines bring their own aliased import, so the use never collides with a
    * binding already there.
    */
-  private editChokepointModule(chokepoint: Definition, protectedThing: Definition, name: string): { line: number; restore: () => void } | undefined {
+  private editChokepointModule(chokepoint: Definition, protectedThing: Definition, name: string, exported: string): { line: number; restore: () => void } | undefined {
     let original: string;
     try {
       original = readFileSync(join(this.root, chokepoint.file), "utf8");
@@ -796,7 +875,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     const added =
       chokepoint.file === protectedThing.file
         ? `const coherenceRefutationUse = ${name};\n`
-        : `import { ${name} as coherenceRefutationName } from "${specifier}";\nconst coherenceRefutationUse = coherenceRefutationName;\n`;
+        : `import { ${exported} as coherenceRefutationName } from "${specifier}";\nconst coherenceRefutationUse = coherenceRefutationName;\n`;
     const line = start + (chokepoint.file === protectedThing.file ? 1 : 2);
     this.open(chokepoint.file);
     this.change(chokepoint.file, body + added);
@@ -830,6 +909,15 @@ export class TypeScriptAdapter implements LanguageAdapter {
 interface Candidate {
   file: string;
   symbol: DocumentSymbol;
+}
+
+/** The text a range spans, from its start character to its end character. */
+function textWithin(lines: readonly string[], range: Range): string {
+  const spanned = lines.slice(range.start.line, range.end.line + 1);
+  if (spanned.length === 0) return "";
+  spanned[spanned.length - 1] = spanned.at(-1)!.slice(0, range.end.character);
+  spanned[0] = spanned[0]!.slice(range.start.character);
+  return spanned.join("\n");
 }
 
 /** One candidate: the only one, else the only one under the component, else the only one outside test folders; ambiguity is reported, never guessed. */
