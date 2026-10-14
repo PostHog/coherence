@@ -14,6 +14,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
+import type { Definition, LanguageAdapter } from "../adapters/adapter.ts";
 import { TypeScriptAdapter, locateServer } from "../adapters/typescript.ts";
 import { runHook, specStopText } from "../lifecycle/hook.ts";
 import { loadSpecModel } from "../spec/model.ts";
@@ -591,6 +592,73 @@ export function seal(pattern: string): string[] {
     assert.match(result.refutationAccount, /the check classified each one a bypass/, result.refutationAccount);
   } finally {
     await fresh.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a protected thing the instrument finds no reference to, not even inside the chokepoint, is not run: there was nothing to check", async () => {
+  const unreached = `export function seal(pattern: string): string[] {
+  return [pattern];
+}
+`;
+  const { dir, adapter: fresh } = await ruledTree(unreached);
+  try {
+    rmSync(join(dir, "src/api/leak.ts"));
+    rmSync(join(dir, "src/api/star.ts"));
+    const result = await checkChokepoint(fresh, { protects: "SECRET_COLUMNS in secrets.ts", chokepoint: "seal", ...hint, root: dir });
+    assert.equal(result.verdict, "not run", result.reason);
+    assert.equal(result.grade, "reference-choked", result.reason);
+    assert.equal(result.siteEvidence, "complete", "both reference queries completed, and reported no site");
+    assert.match(result.reason, /found no reference to SECRET_COLUMNS in secrets\.ts anywhere, not even inside seal: nothing to check/, result.reason);
+    assert.match(result.reason, /a path the instrument cannot follow/, result.reason);
+    assert.doesNotMatch(result.reason, /every reference in the project is inside the chokepoint/, "a check that saw no reference claims nothing about where they are");
+    assert.deepEqual(result.sites.filter((s) => s.of === "protected"), [], "the instrument reported no protected site");
+    assert.equal(result.refutation, "missing", "staged sites alone witness nothing when no real reference was there to check");
+    assert.match(result.refutationAccount, /the check classified each one a bypass, but the instrument found no reference to SECRET_COLUMNS in secrets\.ts to check/, result.refutationAccount);
+  } finally {
+    await fresh.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/** An adapter whose instrument finds no reference to the protected thing, and whose rung's enforcer refuses the staged outside reference: the compiler's visibility, or a checker's module boundary. */
+function refusingAdapter(enforcer: "language" | "checker"): LanguageAdapter {
+  const at = (file: string, name: string): Definition => ({ name, kind: "symbol", file, range: { start: { line: 0, character: 0 }, end: { line: 1, character: 0 } }, selection: { line: 0, character: 0 } });
+  const definitions: Record<string, Definition> = { _SECRET: at("src/store/secrets.py", "_SECRET"), seal: at("src/store/seal.py", "seal") };
+  const rung = enforcer === "checker"
+    ? { grade: "checker-choked" as const, enforcer: "tach (tach.toml)", fact: "the src.store interface exposes seal alone" }
+    : { grade: "visibility-choked" as const, enforcer: "the compiler", fact: "_SECRET is not exported, so no other module can reference it" };
+  const visibility = enforcer === "checker"
+    ? { enforced: true, visible: true, evidence: "the src.store interface", rung, boundary: { checker: "tach", module: "src.store", owns: ["src/store/"], except: [], violations: [], scope: "." } }
+    : { enforced: true, visible: false, evidence: "src/store/secrets.py:1 declares _SECRET without export", rung };
+  return {
+    language: "python",
+    ladder: { top: enforcer === "checker" ? "reference-choked" : "visibility-choked", because: "the enforcer refuses an outside reference", rungs: [rung] },
+    ready: async () => ({ ok: true }),
+    resolve: async (name) => ({ ok: true, definition: definitions[name]! }),
+    references: async () => [],
+    visibility: async () => visibility,
+    testFilter: (via) => via,
+    refute: async () => ({ seen: true, staged: [], refused: "_SECRET is not reachable from another module", account: "an import of _SECRET staged in another module was refused" }),
+    forget: async () => {},
+    close: async () => {},
+  };
+}
+
+test("a refusal of a staged outside reference holds a chokepoint over no reference, whether the language or a checker refuses it", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "coherence-unreached-refused-"));
+  try {
+    mkdirSync(join(dir, "src/store"), { recursive: true });
+    writeFileSync(join(dir, "src/store/secrets.py"), "_SECRET = 1\n", "utf8");
+    writeFileSync(join(dir, "src/store/seal.py"), "def seal():\n    return 1\n", "utf8");
+    for (const [enforcer, grade, refutation] of [["checker", "checker-choked", "refused by the checker"], ["language", "visibility-choked", "refused by the language"]] as const) {
+      const result = await checkChokepoint(refusingAdapter(enforcer), { protects: "_SECRET", chokepoint: "seal", ...hint, root: dir });
+      assert.equal(result.refutation, refutation, `${enforcer}: ${result.refutationAccount}`);
+      assert.equal(result.verdict, "pass", `${enforcer}: ${result.reason}`);
+      assert.equal(result.grade, grade, `${enforcer}: ${result.reason}`);
+      assert.doesNotMatch(result.reason, /nothing to check/, `${enforcer}: a refusal holds whether or not a reference exists, so the reason claims the rung: ${result.reason}`);
+    }
+  } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
