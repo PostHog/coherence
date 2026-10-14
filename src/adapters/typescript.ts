@@ -50,11 +50,11 @@ import {
 import { convexBuilder, convexModule, exportedNames, generatedApiReferences, generatedObjectFor, type ConvexModule } from "./convex.ts";
 import { locateServer as locateInstalled, locateTsserver, type ServerLocation } from "./installed.ts";
 import { JsonRpcClient } from "./jsonrpc.ts";
+import { languageOfFile } from "./language-files.ts";
 import { horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
 
 const SERVER_BIN = "typescript-language-server";
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
-const SCRIPT_EXTENSIONS = new Set([...SOURCE_EXTENSIONS, ".js", ".jsx", ".mjs", ".cjs"]);
 
 export const TYPESCRIPT_LADDER: Ladder = {
   top: "visibility-choked",
@@ -575,7 +575,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
     return sites;
   }
 
-  /** Every TypeScript and JavaScript source of the project and its horizon, project-relative, outside generated folders and declaration files; taken once per forget. */
+  /** Every file of the project and its horizon written in TypeScript (languageOfFile), its JavaScript included, project-relative, less generated folders and the .d.mts and .d.cts declarations the rule still claims; taken once per forget. */
   private scripts: string[] | undefined;
   private scriptSources(): string[] {
     return (this.scripts ??= this.listScriptSources());
@@ -584,7 +584,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
   private listScriptSources(): string[] {
     const own = this.walkedNow();
     const horizon = this.horizon().flatMap((folder) => walkedFiles(folder).map((rel) => relative(this.root, join(folder, rel)).split(sep).join("/")).filter((file) => file.startsWith("../")));
-    return [...own, ...horizon].filter((rel) => SCRIPT_EXTENSIONS.has(extensionOf(rel)) && !/\.d\.[mc]?ts$/.test(rel) && !rel.split("/").includes("_generated"));
+    return [...own, ...horizon].filter((rel) => languageOfFile(rel) === "typescript" && !/\.d\.[mc]ts$/.test(rel) && !rel.split("/").includes("_generated"));
   }
 
   /** The folders outside the project the config's `references` adds to the search, absolute; read once. */
