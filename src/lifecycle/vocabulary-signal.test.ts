@@ -17,7 +17,7 @@ import { reviewLexicon } from "./lexicon-maintain.ts";
 
 const COMPONENTS = ["books", "sales", "stock", "staff"];
 
-/** A project whose lexicon knows "exposure" (with a rejected name) and "unit basis" as a property of two concepts. */
+/** A project whose lexicon knows "exposure" (with a rejected name), "unit basis" as a property of two concepts, and "adapter", a spelling Coherence's lexicon also records. */
 function project(config: Record<string, unknown> = {}): string {
   const root = mkdtempSync(join(tmpdir(), "coherence-vocabulary-"));
   writeFileSync(
@@ -36,6 +36,7 @@ function project(config: Record<string, unknown> = {}): string {
         },
         { name: "allocation", definition: "A distributed share.", aliases: [], properties: { unit_basis: "percent" } },
         { name: "agent host", definition: "The application running a session.", aliases: [], instances: ["Claude Code"] },
+        { name: "adapter", definition: "The module that imports one bank's statements.", aliases: [] },
       ],
     }),
   );
@@ -146,23 +147,31 @@ function record(root: string, id: string, chose: string): void {
 test("sense review is asked only where meaning is at risk: more than one recorded sense, a rejected name beside the use, or a Coherence concept an adopter's code declares written where Coherence's grammar speaks", async () => {
   const root = project();
   try {
+    writeFileSync(join(root, "staff/adapter.ts"), "export function adapter(): string {\n  return 'bank';\n}\n");
+    writeFileSync(join(root, "staff/banks.md"), "Each adapter imports one bank.\n");
+    appendFileSync(join(root, "stock/Stock.spec.md"), "\n## adapter\n");
     writeFileSync(join(root, "books/notes.md"), "The exposure is counted in USD.\nNothing else here.\n\n\nThe exposure is settled nightly.\n");
     writeFileSync(join(root, "sales/notes.md"), "The exposure is counted in USD.\nIt is not the hazard.\n");
     writeFileSync(join(root, "stock/notes.md"), "Each row states its unit basis.\n");
     writeFileSync(join(root, "staff/model.ts"), "export function scope(): string {\n  return 'staff';\n}\n");
     writeFileSync(join(root, "staff/notes.md"), "The scope of a shift is one day.\n");
     record(root, "d-1", "narrow the scope to one shift");
+    record(root, "d-2", "drive the python language adapter");
     const report = await lexiconCoverage(root);
     const risk = (term: string, component: string): string | undefined =>
       report.terms.find((t) => t.term === term)?.contexts.find((c) => c.component === component)?.risk;
     assert.equal(risk("exposure", "books"), undefined, "an ordinary use of a defined word asks no review");
     assert.match(risk("exposure", "sales") ?? "", /hazard/, "a name rejected for the concept beside its use puts the sense at risk");
     assert.match(risk("unit basis", "stock") ?? "", /more than one recorded sense/, "a name with two recorded senses is at risk");
+    assert.equal(risk("adapter", "staff"), undefined, "a spelling the adopter's lexicon declares is the project's sense in its code and domain prose, whatever Coherence's lexicon records");
+    assert.equal(risk("adapter", "."), undefined, "a record writing Coherence's longer name (language adapter) does not write the adopter's adapter");
+    assert.equal(report.terms.find((t) => t.term === "language adapter")?.layer, "coherence", "Coherence's own name still resolves in a record");
+    assert.match(risk("adapter", "stock") ?? "", /more than one recorded sense: language adapter, adapter/, "in a spec's grammar Coherence's sense speaks too, so the two senses meet");
     assert.equal(risk("scope", "staff"), undefined, "a Coherence concept the adopter's code declares is the project's sense in its code and its domain prose");
     assert.match(risk("scope", ".") ?? "", /declared in this project's code \(staff\/model\.ts:1\).*text Coherence reads as its own \(\.coherence\/journal\/payroll\.jsonl:1\)/, "the same name in a record, text written to Coherence, is where the two senses meet");
     const at = attention(report).senses.map((s) => `${s.term}@${s.component}`).sort();
-    assert.deepEqual(at, ["exposure@sales", "scope@.", "unit basis@stock"]);
-    assert.equal(report.totals.unreviewedContexts, 3, "only at-risk contexts await review");
+    assert.deepEqual(at, ["adapter@stock", "exposure@sales", "scope@.", "unit basis@stock"]);
+    assert.equal(report.totals.unreviewedContexts, 4, "only at-risk contexts await review");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
