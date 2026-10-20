@@ -58,7 +58,7 @@ import { isSourceFile } from "../../economy/source.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { decide } from "../../journal/verbs.ts";
 import { parseSpec } from "../../spec/grammar.ts";
-import { loadSpecModel } from "../../spec/model.ts";
+import { loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import { loadSpec } from "./build.ts";
 import { boundsOf, withinBounds } from "./component-interfaces.ts";
 import type { InterfaceReading, ShellState } from "./model.ts";
@@ -142,8 +142,8 @@ export function gapsOf(state: Pick<ShellState, "spec">, model: FlowModel): GapSt
  * a trust: line, a crossing or a totality oracle leaves it standing, and the
  * gaps derived from it show the change at once.
  */
-function specShape(root: string): string {
-  const model = loadSpecModel(root, { runs: false });
+function specShape(root: string, held?: SpecModel): string {
+  const model = held ?? loadSpecModel(root, { runs: false });
   return JSON.stringify(
     model.components.map((c) => [
       c.folder,
@@ -162,11 +162,11 @@ const MANIFESTS: ReadonlySet<string> = new Set(["coherence.config.json", "packag
  * manifests, by path and content, and the specs' shape as the reading
  * depends on it. Equal fingerprints mean the reading still describes the tree.
  */
-export function structureFingerprint(root: string): string {
+export function structureFingerprint(root: string, model?: SpecModel): string {
   const languages = readEnforcementConfig(root).languages;
   const skip = boundsOf(root, configIgnore(root));
   const hash = createHash("sha256");
-  hash.update(specShape(root)).update("\u0000");
+  hash.update(specShape(root, model)).update("\u0000");
   for (const file of projectFiles(root)) {
     // The manifests too: the entrances the reading detects include what package.json and pyproject.toml run.
     const counted = MANIFESTS.has(file) || (withinBounds(file, skip) && languages.some((language) => isSourceFile(file, language)));
@@ -243,10 +243,10 @@ export function freshReading(root: string, fingerprint: string = structureFinger
  * as they stand now. flowOf reads the spec, the runs, the reading, the zoom
  * and the journal's escalations; the views' own fields are left at rest.
  */
-export function structureState(root: string, reading: InterfaceReading): ShellState {
+export function structureState(root: string, reading: InterfaceReading, model?: SpecModel): ShellState {
   const runs = loadRuns(root);
   const state = {
-    spec: loadSpec(root),
+    spec: loadSpec(root, model),
     runs: { records: runs.records, damaged: runs.damaged },
     // Escalations only color the health strip; the gaps never read them.
     journal: { records: [], damaged: [], work: { kind: "absent", because: "not read for the gaps" } },
@@ -257,10 +257,10 @@ export function structureState(root: string, reading: InterfaceReading): ShellSt
 }
 
 /** The gaps now, from the recorded reading when it still describes the tree; undefined when the state is stale or unknown. */
-export function currentGaps(root: string, fingerprint?: string): (GapState & { at: string }) | undefined {
+export function currentGaps(root: string, fingerprint?: string, model?: SpecModel): (GapState & { at: string }) | undefined {
   const fresh = freshReading(root, fingerprint);
   if (fresh === undefined) return undefined;
-  const state = structureState(root, fresh.reading);
+  const state = structureState(root, fresh.reading, model);
   return { ...gapsOf(state, flowOf(state)), at: fresh.at };
 }
 

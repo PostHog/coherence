@@ -435,6 +435,11 @@ function specModelOrNull(root: string): SpecModel | { error: string } {
   return model;
 }
 
+function loadedSpecModel(root: string): SpecModel | undefined {
+  const model = specModelOrNull(root);
+  return "error" in model ? undefined : model;
+}
+
 /** Requirements still short of invariant, and grammar problems, for orient. */
 /** How long the invariant floor may go without a run that grades before orient names it. */
 export const FLOOR_QUIET_DAYS = 14;
@@ -726,8 +731,9 @@ export function mayHaveGaps(root: string, given?: SpecModel): boolean {
 export async function gapReading(root: string, options: { waitMs?: number } = {}): Promise<GapReading> {
   if (!mayHaveGaps(root)) return { fingerprint: undefined, now: undefined };
   try {
-    const fingerprint = structureFingerprint(root);
-    const now = currentGaps(root, fingerprint) ?? (options.waitMs ? await awaitRefresh(root, fingerprint, options.waitMs) : undefined);
+    const model = loadedSpecModel(root);
+    const fingerprint = structureFingerprint(root, model);
+    const now = currentGaps(root, fingerprint, model) ?? (options.waitMs ? await awaitRefresh(root, fingerprint, options.waitMs) : undefined);
     if (now !== undefined) return { fingerprint, now };
     return { fingerprint, now: undefined, last: lastGaps(root), refreshing: refreshUnderWay(root) !== undefined };
   } catch {
@@ -938,8 +944,9 @@ export interface EditVerdict {
 export function refreshAtStop(root: string, options: HookOptions): void {
   if (options.refresh === undefined || !mayHaveGaps(root)) return;
   try {
-    const fingerprint = structureFingerprint(root);
-    if (currentGaps(root, fingerprint) === undefined) options.refresh(root, fingerprint);
+    const model = loadedSpecModel(root);
+    const fingerprint = structureFingerprint(root, model);
+    if (currentGaps(root, fingerprint, model) === undefined) options.refresh(root, fingerprint);
   } catch {
     // A refresh that cannot start only means the next session reads the last reading, labeled.
   }
@@ -955,9 +962,10 @@ export function refreshAtStop(root: string, options: HookOptions): void {
 async function snapshotAtStop(root: string, session: string, options: HookOptions): Promise<Snapshot | undefined> {
   // The session's own patch: what its tool uses wrote, outside every ignored folder; another session's or a person's edits are not predicted for.
   const changed = sessionPatch(root, session);
-  if (options.adapter !== undefined) return snapshotTrace(root, session, { adapter: options.adapter, changed });
+  const model = loadedSpecModel(root);
+  if (options.adapter !== undefined) return snapshotTrace(root, session, { adapter: options.adapter, changed, model });
   const door = options.door ?? WARM_DOOR;
-  return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed }));
+  return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }));
 }
 
 /**
@@ -1010,10 +1018,10 @@ export async function gapStopText(root: string, input: HookInput, changed: reado
   if (changed.length === 0 || !mayHaveGaps(root)) return "";
   try {
     const session = sessionOf(input);
-    const now = currentGaps(root);
+    const model = loadedSpecModel(root);
+    const now = currentGaps(root, undefined, model);
     const start = session === undefined ? undefined : sessionGaps(root, session);
-    const model = specModelOrNull(root);
-    const spec = loadSpec(root, "error" in model ? undefined : model);
+    const spec = loadSpec(root, model);
     const declared = declaredThisSession(root, changed, spec);
     return regulateGapText({ changed, now, start, declared, spec, cli: await cliName(root) });
   } catch {
