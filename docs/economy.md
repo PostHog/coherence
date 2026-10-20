@@ -45,7 +45,10 @@ A read trace is the files a session explicitly read: one line per
 PostToolUse of a reading tool naming a file under the root, appended to
 `.coherence/traces/<session>.jsonl`. At Stop a snapshot line records the
 patch (the working tree against HEAD, plus untracked), the files read, and
-the closure predicted for the patch. Traces are not committed: per session and larger than the journal, while the labels
+the closure predicted for the patch. The stop starts it detached
+(`economy --snapshot <session>`) and never waits, so its Economy line
+reports the newest snapshot already recorded and a session's last stop
+only records one. Traces are not committed: per session and larger than the journal, while the labels
 calibrate needs come from the journal and the runs, which are.
 
 ## Calibrate

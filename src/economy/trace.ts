@@ -240,6 +240,19 @@ export function filesRead(root: string, session: string): string[] {
   return [...found].sort();
 }
 
+/** The newest snapshot a session's trace holds, or undefined when it holds none. */
+export function lastSnapshot(root: string, session: string): Snapshot | undefined {
+  const file = traceFile(root, session);
+  if (!existsSync(file)) return undefined;
+  let newest: Snapshot | undefined;
+  for (const line of readFileSync(file, "utf8").split("\n")) {
+    if (line.trim() === "") continue;
+    const parsed = parseLine(line);
+    if (typeof parsed !== "string" && parsed.kind === "snapshot") newest = parsed;
+  }
+  return newest;
+}
+
 export interface SnapshotOptions extends TraceOptions {
   adapter?: LanguageAdapter | undefined;
   server?: "cold" | "warm" | undefined;

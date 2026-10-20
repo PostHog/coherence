@@ -12,6 +12,9 @@
  *   node src/cli.ts mass [--json]
  *       total and unreached mass per component and for the project,
  *       unreached first
+ *   node src/cli.ts economy --snapshot <session>
+ *       the session's read-trace snapshot, appended to its trace: what a stop
+ *       starts detached so it never waits on the closure
  *
  * Economy reaches the language server through the warm server, as the run
  * does, and through the same door: enforcement's withWarmAdapter. There is no
@@ -21,18 +24,21 @@
 import { resolve } from "node:path";
 import { withWarmAdapter, withWarmAdapters } from "../enforcement/run.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
+import type { SpecModel } from "../spec/model.ts";
 import { ChangeError, workingChange, type WorkingChange } from "./change.ts";
 import { JournalError, parseFlags } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
 import { calibrate, formatCalibration } from "./calibrate.ts";
 import { DEFAULT_LIMIT, formatClosure, predictClosure, type Closure } from "./closure.ts";
 import { computeMass, formatMass } from "./mass.ts";
+import { sessionPatch, snapshotTrace, type Snapshot } from "./trace.ts";
 
 export const ECONOMY_USAGE = [
   "  economy <path>... [--changed [--since <commit>]] [--json] [--limit <n>]   the context closure of a change to the given files, with a token estimate",
   "      --changed   add the working change from git: staged, unstaged, and untracked files not ignored, against HEAD",
   "      --since <commit>   add everything changed from the merge base of <commit> and HEAD to the working tree (implies --changed);",
   "                         an ancestor commit is its own merge base, and --since main is the whole change set of this branch",
+  "  economy --snapshot <session>   append the session's read-trace snapshot to its trace, through the warm instrument",
   "  calibrate [--json]   read traces against the economy prediction, labeled automatically, with the aggregate by outcome",
   "  mass [--json]   total and unreached mass per component and for the project, unreached first",
 ].join("\n");
@@ -46,6 +52,16 @@ export async function economyFor(root: string, paths: readonly string[], change?
   // A multi-language project reaches each language's instrument only for the given files written in it.
   if (readEnforcementConfig(root).languages.length > 1) return withWarmAdapters(root, (open) => predictClosure(root, paths, { adapterOf: open, change }));
   return withWarmAdapter(root, (adapter, server, reason) => predictClosure(root, paths, { adapter, server, instrumentReason: reason, change }));
+}
+
+/**
+ * A session's snapshot through the warm instrument's one door, for its own
+ * patch: another session's or a person's edits are not predicted for. A door
+ * that cannot connect hands back its reason, which the snapshot records.
+ */
+export async function snapshotSession(root: string, session: string, door: typeof withWarmAdapter = withWarmAdapter, model?: SpecModel): Promise<Snapshot | undefined> {
+  const changed = sessionPatch(root, session);
+  return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }));
 }
 
 /** The closure the economy and query economy commands both ask for: named paths, the working change, or both. */
@@ -70,7 +86,7 @@ function changeRequested(root: string, parsed: { switches: Set<string>; one: Map
 export async function economyCommand(argv: string[], io: Io, economy: EconomyOf = economyFor): Promise<number> {
   let parsed;
   try {
-    parsed = parseFlags(argv, { json: "switch", limit: "one", changed: "switch", since: "one" });
+    parsed = parseFlags(argv, { json: "switch", limit: "one", changed: "switch", since: "one", snapshot: "one" });
   } catch (error) {
     if (error instanceof JournalError) {
       io.err(`economy: ${error.message}\n${ECONOMY_USAGE}`);
@@ -78,6 +94,9 @@ export async function economyCommand(argv: string[], io: Io, economy: EconomyOf 
     }
     throw error;
   }
+  const snapshotOf = parsed.one.get("snapshot");
+  const asksMoreThanSnapshot = parsed.positionals.length > 0 || parsed.switches.size > 0 || parsed.one.size > 1;
+  if (snapshotOf !== undefined) return snapshotCommand(io, snapshotOf, asksMoreThanSnapshot);
   const fromGit = parsed.switches.has("changed") || parsed.one.has("since");
   if (parsed.positionals.length === 0 && !fromGit) {
     io.err(`economy: name at least one file, or --changed for the working change\n${ECONOMY_USAGE}`);
@@ -96,6 +115,20 @@ export async function economyCommand(argv: string[], io: Io, economy: EconomyOf 
   }
   const closure = await economy(io.cwd, parsed.positionals, requested.change);
   io.out(parsed.switches.has("json") ? JSON.stringify(closure, null, 2) : formatClosure(closure, { limit }));
+  return 0;
+}
+
+async function snapshotCommand(io: Io, session: string, hasOtherArguments: boolean): Promise<number> {
+  if (hasOtherArguments) {
+    io.err(`economy: --snapshot takes a session and nothing else\n${ECONOMY_USAGE}`);
+    return 64;
+  }
+  try {
+    await snapshotSession(io.cwd, session);
+  } catch (error) {
+    io.err(`economy: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
   return 0;
 }
 

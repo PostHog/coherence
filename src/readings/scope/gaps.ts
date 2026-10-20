@@ -315,33 +315,48 @@ function refreshPath(root: string): string {
   return join(root, STRUCTURE_DIR, "refresh.json");
 }
 
-function readMark(root: string): RefreshMark | undefined {
+/** Where a background run keeps its mark, and the end of the command line that runs it: one slot per kind of run. */
+export interface RefreshSlot {
+  path: string;
+  command: RegExp;
+}
+
+// The question ends the command line, as refreshInBackground spawns it: a test runner whose name pattern merely spells it is no structure query.
+const STRUCTURE_QUERY = /(?:^|\s)query\s+structure\s*$/;
+
+function structureSlot(root: string): RefreshSlot {
+  return { path: refreshPath(root), command: STRUCTURE_QUERY };
+}
+
+function readMark(path: string): RefreshMark | undefined {
   try {
-    return JSON.parse(readFileSync(refreshPath(root), "utf8")) as RefreshMark;
+    return JSON.parse(readFileSync(path, "utf8")) as RefreshMark;
   } catch {
     return undefined;
   }
 }
 
-/** The refresh under way, when one is alive and young enough to still count; undefined otherwise. */
-export function refreshUnderWay(root: string, now: () => number = Date.now): RefreshMark | undefined {
-  const mark = readMark(root);
+function markUnderWay(mark: RefreshMark | undefined, now: () => number): RefreshMark | undefined {
   if (mark === undefined) return undefined;
   return alive(mark.pid) && now() - Date.parse(mark.at) < REFRESH_STALE_MS ? mark : undefined;
+}
+
+/** The refresh under way, when one is alive and young enough to still count; undefined otherwise. */
+export function refreshUnderWay(root: string, now: () => number = Date.now): RefreshMark | undefined {
+  return markUnderWay(readMark(refreshPath(root)), now);
 }
 
 /**
  * Stop a refresh reading a tree that is no longer the tree: its reading could
  * never be kept (recordReading refuses a tree that moved), so it only holds
- * the one slot. Only a process whose command line is a structure query is
- * signalled, so a reused pid is never touched; its whole group goes, the
- * language server with it.
+ * the one slot. Only a process whose command line ends as the slot's own
+ * run does is signalled, so a reused pid is never touched; its whole group
+ * goes, the language server with it.
  */
-function supersede(pid: number): boolean {
+function supersede(pid: number, ownCommand: RegExp): boolean {
   try {
     const command = execFileSync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 2000 });
-    // The question ends the command line, as refreshInBackground spawns it: a test runner whose name pattern merely spells it is no structure query.
-    if (!/(?:^|\s)query\s+structure\s*$/.test(command)) return false;
+    if (!ownCommand.test(command)) return false;
   } catch {
     return false;
   }
@@ -364,16 +379,17 @@ function supersede(pid: number): boolean {
  * older tree is superseded (df-84db9e4f: the tree a session leaves at its stop
  * is the one the next session starts on). Never twice for the same tree (a
  * reading that could not finish is not retried until the tree changes).
- * `command` is the argv that records a reading (the CLI's query structure).
- * Returns whether one started.
+ * `command` is the argv that records a reading (the CLI's query structure);
+ * `slot` is the structure refresh's own unless another kind of run passes its
+ * mark and command line. Returns whether one started.
  */
-export function refreshInBackground(root: string, command: readonly string[], fingerprint: string, now: () => number = Date.now): boolean {
-  const path = refreshPath(root);
+export function refreshInBackground(root: string, command: readonly string[], fingerprint: string, now: () => number = Date.now, slot: RefreshSlot = structureSlot(root)): boolean {
+  const path = slot.path;
   try {
-    const mark = readMark(root);
+    const mark = readMark(path);
     if (mark !== undefined) {
       if (mark.fingerprint === fingerprint) return false;
-      if (refreshUnderWay(root, now) !== undefined && !supersede(mark.pid)) return false;
+      if (markUnderWay(mark, now) !== undefined && !supersede(mark.pid, slot.command)) return false;
     }
     const [program, ...args] = command;
     if (program === undefined) return false;

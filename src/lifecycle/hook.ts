@@ -85,7 +85,8 @@ import { readEnforcementConfig } from "../enforcement/config.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
 import { namedLine, openEscalations } from "../journal/read.ts";
-import { recordReadTrace, recordWriteTrace, sessionPatch, snapshotTrace, type Snapshot } from "../economy/trace.ts";
+import { filesRead, lastSnapshot, recordReadTrace, recordWriteTrace, sessionPatch, snapshotTrace, traceFile, type Snapshot } from "../economy/trace.ts";
+import { snapshotSession } from "../economy/cli.ts";
 import { chokepointIndex, loadSpecModel, type ChokepointEntry, type SpecModel } from "../spec/model.ts";
 import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
@@ -918,6 +919,12 @@ export interface HookOptions {
    */
   mirrors?: ((root: string) => void) | undefined;
   /**
+   * Start the session's read-trace snapshot detached at a stop, never waited
+   * on: the stop reports the newest one already recorded. The command line
+   * passes ECONOMY_SNAPSHOT; absent (a test), the stop takes it in-process.
+   */
+  snapshot?: ((root: string, session: string, fingerprint: string) => void) | undefined;
+  /**
    * Told the verdict of an edit's chokepoint check as data, besides the text
    * the agent reads: the warm hook process (hook-serve.ts) hands it to a host
    * that marks the tool call's row for the user. Absent (the command line), nothing is told.
@@ -953,19 +960,35 @@ export function refreshAtStop(root: string, options: HookOptions): void {
 }
 
 /**
- * The read-trace snapshot at a stop, with an instrument. A test hands its own
- * adapter in; production has none of its own, so the snapshot goes through
- * enforcement's one door to the warm server and the closure it predicts is
- * computed through references rather than skipped. A door that cannot connect
- * hands back its reason, which the snapshot records as the instrument it had.
+ * What a session's snapshot would be taken from: its patch's file identities
+ * and how many files it has read. A stop whose session neither wrote nor read
+ * since the last one starts no closure.
  */
-async function snapshotAtStop(root: string, session: string, options: HookOptions): Promise<Snapshot | undefined> {
-  // The session's own patch: what its tool uses wrote, outside every ignored folder; another session's or a person's edits are not predicted for.
-  const changed = sessionPatch(root, session);
+function snapshotFingerprint(root: string, session: string): string {
+  const identities = sessionPatch(root, session).map((file) => {
+    const stats = statSync(join(root, file), { throwIfNoEntry: false });
+    return `${file}@${stats === undefined ? "gone" : `${stats.dev}:${stats.ino}:${stats.size}:${stats.mtimeMs}:${stats.ctimeMs}`}`;
+  });
+  return `${identities.join("\n")}\nread ${filesRead(root, session).length}`;
+}
+
+/**
+ * The read-trace snapshot at a stop, with an instrument. The command line
+ * starts it detached; a test takes it here, with its own adapter or through
+ * enforcement's one door to the warm server, so the closure it predicts is
+ * computed through references rather than skipped.
+ */
+async function snapshotAtStop(root: string, session: string, options: HookOptions): Promise<void> {
+  if (options.snapshot !== undefined) {
+    options.snapshot(root, session, snapshotFingerprint(root, session));
+    return;
+  }
   const model = loadedSpecModel(root);
-  if (options.adapter !== undefined) return snapshotTrace(root, session, { adapter: options.adapter, changed, model });
-  const door = options.door ?? WARM_DOOR;
-  return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }));
+  if (options.adapter === undefined) {
+    await snapshotSession(root, session, options.door ?? WARM_DOOR, model);
+    return;
+  }
+  await snapshotTrace(root, session, { adapter: options.adapter, changed: sessionPatch(root, session), model });
 }
 
 /**
@@ -1006,6 +1029,23 @@ export const WARM_UP = (root: string): void => {
 /** The refresh the command line starts: this checkout's query structure, which records the reading it takes. */
 export const STRUCTURE_REFRESH = (root: string, fingerprint: string): void => {
   refreshInBackground(root, [process.execPath, OWN_CLI, "query", "structure"], fingerprint);
+};
+
+/**
+ * The snapshot the command line starts at a stop: this checkout's economy
+ * --snapshot, one per session, a newer patch superseding an older one. It
+ * starts the warm server when none listens, so COHERENCE_NO_WARM_UP=1 starts
+ * nothing here either.
+ */
+export const ECONOMY_SNAPSHOT = (root: string, session: string, fingerprint: string): void => {
+  if (process.env["COHERENCE_NO_WARM_UP"] === "1") return;
+  try {
+    const mark = traceFile(root, session).replace(/\.jsonl$/, ".snapshot.json");
+    const ownCommand = new RegExp(`(?:^|\\s)economy\\s+--snapshot\\s+${session.replace(/\./g, "\\.")}\\s*$`);
+    refreshInBackground(root, [process.execPath, "--disable-warning=ExperimentalWarning", OWN_CLI, "economy", "--snapshot", session], fingerprint, Date.now, { path: mark, command: ownCommand });
+  } catch {
+    // A snapshot that cannot start only means the next stop reports the last one recorded.
+  }
 };
 
 /** The mirror refresh the command line starts: this checkout's query mirrors --refresh, which reads only when the kept reading is of another commit. */
@@ -1402,7 +1442,8 @@ export async function runHook(event: HookEvent, input: HookInput, fallbackRoot: 
         const changed = await changedFiles(root);
         const report = await checkChanged(root, changed.files);
         const session=sessionOf(input);
-        const snapshot = session ? await snapshotAtStop(root, session, options) : undefined;
+        if (session) await snapshotAtStop(root, session, options);
+        const snapshot = session ? lastSnapshot(root, session) : undefined;
         const walls = unableWalls(root, input);
         const spec = specStopText(root, changed.files, walls);
         const lexicon = lexiconStopText(report, walls);

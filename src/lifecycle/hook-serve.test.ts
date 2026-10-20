@@ -18,6 +18,7 @@ import { budget } from "../enforcement/test-budgets.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { cli } from "./cli-fixture.ts";
 import { hookServer, type ServeAnswer } from "./hook-serve.ts";
+import { mirrorRefreshUnderWay } from "../readings/mirrors/recorded.ts";
 
 const CLI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "cli.ts");
 const made: string[] = [];
@@ -82,6 +83,11 @@ function records(root: string): string[] {
   return out.sort();
 }
 
+/** The detached mirror reading a session start began, finished: what it writes arrives on its own time, not the hook's. */
+async function mirrorRefreshFinished(root: string): Promise<void> {
+  for (let waitedMs = 0; mirrorRefreshUnderWay(root) !== undefined && waitedMs < 15_000; waitedMs += 100) await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+}
+
 function hookTimeEvents(root: string): string[] {
   return readFileSync(join(root, ".coherence", "hook-times", "spike-parity.jsonl"), "utf8").trim().split("\n").map((line) => (JSON.parse(line) as { event: string }).event);
 }
@@ -113,6 +119,8 @@ test("the warm process answers a session's events with the per-event hook's outp
   assert.deepEqual(answers.map((a) => a.id), [0, 1, 2, 3, 4, 5], "one answer per request, in order");
   assert.deepEqual(viaServe, viaCli);
   assert.ok(viaCli[0]!.stdout.includes("additionalContext"), "the sample includes a start that says something");
+  await mirrorRefreshFinished(cold);
+  await mirrorRefreshFinished(warm);
   assert.deepEqual(records(warm), records(cold));
   assert.deepEqual(hookTimeEvents(warm), hookTimeEvents(cold));
 });
