@@ -27,6 +27,7 @@
  *              beside the built-in __tests__, test, tests
  *   latencyBudget  the latency budget: the most seconds a tool hook
  *              (PreToolUse, PostToolUse) may take; absent means 3
+ *   stopLatencyBudget  the most seconds a stop may take; absent means 10
  *   tests      a list of test setups, one per runner, in place of the single
  *              test keys: each holds test, testJson, testMatch,
  *              testFilterForm, testDir/testDirs, and optionally language (the
@@ -82,6 +83,8 @@ export interface EnforcementConfig {
   testFolders: string[];
   /** The latency budget: the most seconds a tool hook may take, or undefined for the default (src/lifecycle/hook-latency.ts). */
   latencyBudget: number | undefined;
+  /** The stop latency budget: the most seconds a stop may take, or undefined for the default (src/lifecycle/hook-latency.ts). */
+  stopLatencyBudget: number | undefined;
   /** Which references a chokepoint governs when its bullet says nothing (a from: line); undefined is anywhere. */
   chokepointFrom: ChokepointFrom | undefined;
 }
@@ -136,7 +139,7 @@ function testSetupOf(raw: Record<string, unknown>, path: string, where: string):
 }
 
 export function readEnforcementConfig(root: string): EnforcementConfig {
-  const config: EnforcementConfig = { language: "typescript", languages: ["typescript"], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined, chokepointFrom: undefined };
+  const config: EnforcementConfig = { language: "typescript", languages: ["typescript"], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined, stopLatencyBudget: undefined, chokepointFrom: undefined };
   config.tests = [{ language: undefined, files: undefined, cwd: undefined, test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS] }];
   // The project's own config over its registry's keys (project-config.ts), each inherited path rebased to the project.
   const found = effectiveConfig(root);
@@ -151,10 +154,11 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
     if (named.length > 0) config.languages = [...new Set(named)];
   }
   config.language = config.languages[0]!;
-  const budget = record["latencyBudget"];
-  if (budget !== undefined) {
-    if (typeof budget !== "number" || !Number.isFinite(budget) || budget <= 0) throw new Error(`${path}: latencyBudget is a number of seconds above 0`);
-    config.latencyBudget = budget;
+  for (const key of ["latencyBudget", "stopLatencyBudget"] as const) {
+    const budget = record[key];
+    if (budget === undefined) continue;
+    if (typeof budget !== "number" || !Number.isFinite(budget) || budget <= 0) throw new Error(`${path}: ${key} is a number of seconds above 0`);
+    config[key] = budget;
   }
   const from = record["chokepointFrom"];
   if (from !== undefined) {

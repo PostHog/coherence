@@ -139,6 +139,7 @@ yet. For now, every leaf keeps its own `lexicon.json`.
 | `interfaceBudget` | `{ "seconds": 600, "memoryMB": 12288 }` | The most time and memory the Structure reading's interface pass may take; when it runs out, the reading says it is partial. |
 | `telemetry` | none | `false` refuses fleet telemetry for this project, whatever each user chose with `coherence telemetry on`; a registry's `false` refuses for every leaf. Telemetry is off unless a user opts in; see the README's [Telemetry](../README.md#telemetry) section for what is sent. |
 | `latencyBudget` | `3` | The latency budget: the most seconds a tool hook (PreToolUse, PostToolUse) may take, counted from its process's start. A tool hook over it says so in its own answer; regulate names the session's calls over it, and orient the last week's. These hooks run around every tool call, and a call cycle that feels sluggish is how a hook gets switched off. |
+| `stopLatencyBudget` | `10` | The stop latency budget: the most seconds a stop may take, counted from its process's start. Regulate names the session's stops over it. A stop runs once a turn, so it gets more room than a tool hook, but the user waits on every one. |
 
 ## Tests: how a totality oracle is run
 
