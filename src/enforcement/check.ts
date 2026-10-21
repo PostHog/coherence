@@ -304,14 +304,18 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
   // Otherwise every staged site must be one this check's own classification calls a bypass (ruling d-7abd1ba8).
   const short = classified.filter((site) => site.class !== "bypass");
   const fired = classified.length > 0 && refutation.seen && short.length === 0;
-  const refutationState: RefutationState = languageRefused ? "refused by the language" : checkerRefused ? "refused by the checker" : fired ? "automatic" : "missing";
+  // A refusal holds whether or not a reference exists; staged sites prove the check fires, but over no real reference there was nothing for it to fire on.
+  const unreached = !languageRefused && !checkerRefused && !sites.some((s) => s.of === "protected");
+  const refutationState: RefutationState = languageRefused ? "refused by the language" : checkerRefused ? "refused by the checker" : fired && !unreached ? "automatic" : "missing";
   const refutationAccount = languageRefused || checkerRefused
     ? `${refutation.account}; the ${earned.grade} rung is enforced by ${earned.enforcer}, and its refusal is the refutation`
     : !refutation.seen || classified.length === 0
       ? refutation.account
-      : fired
-        ? `${refutation.account}, and the check classified each one a bypass`
-        : `${refutation.account}, but the check classified ${short.map((s) => `${s.what} ${nameOf(s.class)}`).join(" and ")}, not a bypass; the refutation is vacuous`;
+      : fired && unreached
+        ? `${refutation.account}, and the check classified each one a bypass, but the instrument found no reference to ${protectedThing.name} to check, so the staged sites witness nothing about the code that reaches it`
+        : fired
+          ? `${refutation.account}, and the check classified each one a bypass`
+          : `${refutation.account}, but the check classified ${short.map((s) => `${s.what} ${nameOf(s.class)}`).join(" and ")}, not a bypass; the refutation is vacuous`;
 
   if (bypasses.length > 0) {
     return {
@@ -337,8 +341,9 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
   const vacuousRung = !languageRefused && !checkerRefused && !refutation.seen && adapter.ladder.whenVacuous !== undefined ? rungsOf(adapter).find((r) => r.grade === adapter.ladder.whenVacuous) : undefined;
   const graded: Rung = vacuousRung === undefined ? earned : { ...vacuousRung, fact: `the instrument could not see the synthetic reference, so Coherence's check enforces nothing here and only the convention stands (${visibility.evidence})` };
   const tests = counts.test > 0 ? `; ${counts.test} test reference${counts.test === 1 ? "" : "s"}` : "";
-  const proved = languageRefused || checkerRefused || fired;
-  const vacuous = proved ? "" : `; refutation missing: ${refutationAccount}`;
+  const proved = refutationState !== "missing";
+  const vacuous = proved || (unreached && fired) ? "" : `; refutation missing: ${refutationAccount}`;
+  const claim = unreached ? `${nothingToCheckNote(protectedThing, chokepoint)} (${visibility.evidence})` : `${protectedThing.name} is ${graded.grade}, enforced by ${graded.enforcer}: ${graded.fact}${tests}`;
   return {
     input,
     verdict: proved ? "pass" : "not run",
@@ -355,8 +360,13 @@ async function checkWithinProject(adapter: LanguageAdapter, input: ChokepointInp
     visibility: visibility.evidence,
     files,
     governed,
-    reason: `${protectedThing.name} is ${graded.grade}, enforced by ${graded.enforcer}: ${graded.fact}${tests}${governedClause(governed, counts.exempt)}${vacuous}`,
+    reason: `${claim}${governedClause(governed, counts.exempt)}${vacuous}`,
   };
+}
+
+/** Why a protected thing with no reference anywhere is not a pass: either nothing uses it, or what uses it does so where the instrument cannot see. */
+function nothingToCheckNote(protectedThing: Definition, chokepoint: Definition): string {
+  return `the instrument found no reference to ${protectedThing.name} anywhere, not even inside ${chokepoint.name}: nothing to check. Code that reaches it through a path the instrument cannot follow (a generated API, a registry, a name in a string) is invisible to this check, so the chokepoint is not shown to hold`;
 }
 
 /** The ladder's rungs; a warm server started before ladders carried rungs answers with none, and the check must not crash on it. */

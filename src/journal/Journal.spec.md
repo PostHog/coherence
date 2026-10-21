@@ -255,6 +255,13 @@ Compression: append-only files per session of attributed, durable outcomes, a ne
   crossing: project-source -> record
   refuted: made sealedBecause reuse a writer's last shard whatever git says, removing the HEAD, branch and reflog comparison and the index search -> "a writer starts a new shard when HEAD, the branch or the size limit moved, and never appends to a shard a commit holds" went red in shards.test.ts on its own assertion, a committed journal shard appended to after the commit; restored (git checkout), green batched and alone (2026-10-14)
   kinds: none
+- the dirty check leaves git's index alone: The tree's dirty check that each record carries (journal/store.ts gitState) and observation's code check ask git with --no-optional-locks, so asking never writes git's index back; an index git rewrote would be newer than every shard and make the next append search it whole, a cost that grows with the repository (7.9 MB of index on PostHog).
+  over: a committed file rewritten with its own content, which git status otherwise refreshes and writes the index back for
+  via: the tree's dirty check never rewrites git's index, so the next record's shard check does not read it
+  because: the shard seal searches the index whenever it was written at or after the shard's last write (d-3a125a06); a status that rewrote it turned every record after such a check into a read of the whole index, and made the edit-cost test fail on a fast runner
+  crossing: project-source -> record
+  refuted: dropped --no-optional-locks from gitState's git status in store.ts -> "the tree's dirty check never rewrites git's index, so the next record's shard check does not read it" went red in shards.test.ts, the index rewritten by the check; restored, green alone (2026-10-21)
+  kinds: none
 - lost shard state never reuses a committed shard: The writer's kept shard state is a hint: a state that is missing, torn or not in its shape starts a new shard, and a state that names a shard a commit holds, with the HEAD, branch, reflog, index identity and size the writer sees now, still starts a new one, because git's index is searched whenever it was written at or after the shard's last write.
   over: a state removed, a state cut off mid-object, a state of the wrong shape, and a state rewritten after a commit to name the committed shard with everything else current; and a writer outside any git checkout
   via: a lost, torn or wrong shard state starts a new shard, and a state that names a committed shard at the current HEAD still never appends to it
