@@ -233,12 +233,15 @@ test("Rust grades: visibility-choked short of the crate, reference-choked for pu
   assert.equal(broken.verdict, "fail");
   assert.deepEqual(broken.bypasses, [{ file: "src/app.rs", line: 4, symbol: "run" }]);
 
-  // pub with no reference: reference-choked, and the staged re-export and same-module use are each a bypass.
+  // pub with no reference: reference-choked, and the staged re-export and same-module use are each a bypass; but with
+  // no reference anywhere there is nothing for the check to hold, so it is not run, never a pass (nothing to check is not a pass).
   const clean = await checkChokepoint(adapter, { ...input, protects: "public_policy" });
   assert.equal(clean.grade, "reference-choked", clean.reason);
   assert.equal(clean.enforcer, "Coherence's check at the edit and in CI");
-  assert.equal(clean.refutation, "automatic", clean.refutationAccount);
-  assert.equal(clean.verdict, "pass");
+  assert.equal(clean.refutation, "missing", clean.refutationAccount);
+  assert.match(clean.refutationAccount ?? "", /each one a bypass, but the instrument found no reference to public_policy/);
+  assert.equal(clean.verdict, "not run", clean.reason);
+  assert.match(clean.reason, /nothing to check/);
 
   // Every scope on the ladder, read through the module chain.
   const scopeOfItem = async (name: string): Promise<string> => (await adapter.visibility(definitionOf(await adapter.resolve(name, hint)))).evidence;
