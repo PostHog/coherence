@@ -8,9 +8,13 @@ author's guide.
 
 Plugins ship two ways:
 
-- **Bundled** inside `@posthog/coherence`, under `plugins/<name>`, run by
-  naming them in the config. TypeScript, Python, Rust and the generic
-  language-server adapter move there next; Convex and Quint arrive the same way.
+- **Bundled** inside `@posthog/coherence`, under `plugins/<name>`.
+  TypeScript, Python, Rust, and the generic language-server adapter that reads
+  the languages a config declares (`declared`) are bundled plugins that every
+  project runs without naming them (`plugins/defaults.json` lists them, with
+  the default language). Coherence's core names no language: everything it
+  knows of one is asked of the plugin that provides it. Convex and Quint will
+  arrive as bundled plugins a project opts into by naming them.
 - **By path**: a folder in the project (or anywhere the project names). This is
   how a project enhances a bundled plugin: copy it out, change it, and point
   the config at the copy.
@@ -39,22 +43,27 @@ that the code comes from elsewhere.
 
 ## Trust
 
-A plugin's module is code, and it runs with the project's privileges: whatever
-the user running Coherence may read, write or start, it may too. It runs in
-`coherence run` (so in CI, through the generated workflow), in `refute`, and in
-the warm adapter server that the hooks talk to. It never runs inside a hook's
-own process: a hook reads only the manifest and the lexicon layer, which are
-data. Run a plugin you would run as a dev dependency, and review a change to
-one as you would a change to the project's own code. A bundled plugin ships
-inside `@posthog/coherence` and is reviewed with it.
+A plugin's code runs with the project's privileges: whatever the user running
+Coherence may read, write or start, it may too. Its `module` (the adapter and
+the verifier) runs in `coherence run` (so in CI, through the generated
+workflow), in `refute`, and in the warm adapter server that the hooks talk to.
+The modules its `syntax` slots name run wherever a reading reads its language,
+a hook's own process included: the economy's prediction at a stop, the
+lexicon's member scan and entrance detection read languages there, and the
+core's own languages are plugins now. A slot's module is loaded only when a
+reading asks for that slot, and should be what a syntax table is: small and
+without effects. Run a plugin you would run as a dev dependency, and review a
+change to one as you would a change to the project's own code. A bundled
+plugin ships inside `@posthog/coherence` and is reviewed with it.
 
 The warm server's code fingerprint holds every plugin folder the project runs,
 so an edited plugin replaces the server as an edited Coherence does, and a
 module that fails to load is tried again once it is fixed.
 
-A project without a `plugins` key reads nothing of any plugin: no manifest, no
-lexicon layer, no bundled folder. It does exactly the work it did before
-plugins existed.
+A project without a `plugins` key reads no plugin of its own. The bundled
+plugins that provide its languages are read once per process, as the
+built-in languages' tables were compiled in before, and it does exactly the
+work it did before plugins existed.
 
 ## The folder
 
@@ -64,6 +73,9 @@ sample/
   index.ts        the module, imported only where its code runs
   lexicon.json    the lexicon layer (optional)
 ```
+
+The bundled plugins are the fullest examples: `plugins/typescript`,
+`plugins/python` (with tach), `plugins/rust` and `plugins/declared`.
 
 ### plugin.json
 
@@ -96,11 +108,25 @@ sample/
 | `ladder` | The rungs the adapter grades on. Absent, the wrapped adapter's; with none, reference-choked alone, enforced by Coherence's check. |
 | `verifiers` | The via forms it proves (below). A `command` must name `{name}`; a command that is never told what to prove is refused. An optional `match` is a regular expression its output must match for an exit 0 to pass. |
 | `lexicon` | Its lexicon layer, relative to the manifest. |
+| `syntax` | The syntax slots it fills, each `"<module beside the manifest>#<export>"` (below). |
+| `files` | The files a language is written in, as a regular expression `pattern` with an optional `except` (TypeScript, as JSON writes them: `\\.(?:[cm]?[tj]sx?)$` except `\\.d\\.ts$`); `extensions` is the short form for a plain list. |
+| `source` | `except`: of the language's files, those the plain source scan leaves out (TypeScript's JavaScript, Python's stubs). |
+| `serverExtensions` | The extensions the language server can report a site in or resolve a name to. |
+| `testFiles` | Regular expressions a test file's base name matches by the language's own naming (pytest's `^test_.*\\.py$`), beside `.test.`/`.spec.` and the test folders. |
+| `members` | How an exported type's body reads for the lexicon's member scan: `opens`, `closes`, `field`, each a regular expression. |
+| `entrances` | The entrance detection rules (`rule`, `plural`, `detects`) and `notDetected`, what they miss: printed by the query, the page and orient. |
+| `notScanned` | Why the text scans do not read the language yet (Rust's); absent when they do. |
+| `environmentFolders` | Folder names no project authors code in, wherever they sit (`node_modules`, `__pycache__`). |
+| `markedFolders` | Folders the language's tools make, left out by a `marker` inside (`pyvenv.cfg`) or by `name` beside a file (`target` beside `Cargo.toml`), each with its `reason`. |
+| `ci` | `note`: what the generated CI workflow says for a project that reads the language. |
+| `wellKnown` | Names the plugin vouches for as well known, beside Coherence's own list. |
 
 The manifest is data so that a hook that only needs to know what a plugin
-provides (the vocabulary, the spec check, which language a file is written in)
-reads one small file and runs no plugin code. The module loads in the warm
-adapter server and in a run, when a check first asks its adapter or verifier.
+provides (the vocabulary, the spec check, which language a file is written in,
+the folders a walk leaves out) reads one small file and runs no plugin code,
+and so that the Scope page, in a browser, can print a language's entrance
+rules. The module loads in the warm adapter server and in a run, when a check
+first asks its adapter or verifier.
 
 ### The module
 
@@ -108,9 +134,8 @@ adapter server and in a run, when a check first asks its adapter or verifier.
 import type { PluginModule } from "@posthog/coherence/plugin";
 
 const plugin: PluginModule = {
-  adapter: ({ root, language, base }) => /* a LanguageAdapter */,
+  adapter: ({ root, language, base, bounds }) => /* a LanguageAdapter */,
   verify: async ({ root, form, name, timeoutMs }) => ({ verdict: "pass", reason: "..." }),
-  syntax: { entrances, interfaces, source, members, lists },
 };
 export default plugin;
 ```
@@ -121,18 +146,38 @@ you do not change. The core closes `base`; your adapter closes only what it
 started. A module that fails to load makes the adapter unready with the reason,
 so every chokepoint it was asked about reads not run, never a pass.
 
-`syntax` holds one optional slot per table the readings scan by. A reading
-reads a language a plugin brings only through these. Until the readings are
-routed through them (the next step), a language a plugin brings is named not
-read by every reading, never read as another language.
+`bounds`, for a server that can narrow its workspace, is the folders the
+component interface reading leaves out.
+
+### The syntax slots
+
+The readings scan a language by the tables its plugin's manifest names under
+`syntax`, each as `"<module>#<export>"`, loaded synchronously, once, when a
+reading first asks for that slot:
+
+| Slot | Read by | Type |
+|---|---|---|
+| `entrances` | entrance detection | `EntranceSyntax` (`src/adapters/entrance-candidates.ts`) |
+| `interfaces` | the Structure reading | `InterfaceSyntax` (`src/readings/scope/component-interfaces.ts`) |
+| `kept` | the Structure reading's kept answers | `(file, text) => string[]` |
+| `source` | the economy and mass | `SourceSyntax` (`src/economy/source.ts`) |
+| `declares` | the observation's interface map | `(line) => "type" \| "value" \| "body" \| "unknown"` |
+| `notice` | the session start | `(root) => string` |
+| `lists` | declared mirrors | `(text, name) => Literal \| undefined` |
+
+A slot a plugin leaves empty reads as "not read for <language>", never as
+another language. A plugin that provides one of the bundled languages answers
+each field and slot it declares, and the bundled plugin answers the rest, so
+an enhancement of the adapter alone keeps every reading of the language.
 
 ## Roles
 
 ### A language adapter: the swap rule
 
-- A plugin that **provides** a language takes the core's place for it. With
-  `extends` naming the same language, it is handed the core's own adapter.
-  This is how an ejected, enhanced built-in replaces ours.
+- A plugin that **provides** a language takes the core's place for it: the
+  bundled plugin's. With `extends` naming the same language, it is handed the
+  bundled plugin's adapter. This is how an ejected, enhanced built-in replaces
+  ours.
 - A plugin that **extends** a language without providing it wraps whichever
   adapter answers for that language, the core's or a providing plugin's. Several
   wrap in the config's order. This is how an enhancement such as Convex layers
@@ -194,23 +239,25 @@ entry also carries `evidence`, the label its manifest gives the form.
 
 ## Not yet
 
-What the interface does not carry yet, for step 2 to start from:
+What the interface does not carry yet:
 
-- **Ladders are static.** `ladder` is JSON in the manifest, but Python's
-  checker rung depends on the project's pyright configuration, read at check
-  time. The ladder needs a way to be answered by the module (as the adapter's
-  own `ladder` already is) without loading code in a hook.
-- **testFilter before the module loads.** `testFilter` is synchronous; a
-  plugin adapter answers with the wrapped adapter's, or the name unchanged,
-  until a question has loaded its module (src/plugins/adapter.ts).
-- **Built-in extension rules.** TypeScript's rule (`[cm]?[tj]sx?`, never
-  `.d.ts`) is not expressible as a list of manifest `extensions`.
-- **Bundled plugins in TypeScript.** Node strips no types under node_modules,
-  so a bundled `.ts` plugin cannot load from an installed package: the build
-  must emit JavaScript for `plugins/`, as it does for `src/`.
-- **Syntax tables as code.** The tables are module code, and a reading that
-  runs in a hook would load plugin code there, against the manifest-as-data
-  rule (d-483262db). They need a data form, or a reading that runs outside the
-  hook process.
-- **Slots not yet defined.** Checker boundaries (tach), CI install steps, where
-  a language server is found, test-path rules, ignores, and well-known names.
+- **Eject and check.** `coherence plugin eject <name>` (copy a bundled plugin
+  into the project and point the config at it) and `coherence plugin check`
+  (the bundled plugins' own suite run against any plugin) are the next step.
+- **Language knowledge still in the core.** The spec model's check that a
+  handler or a mirror is declared at a file's top level reads TypeScript's
+  and Python's declaration forms itself (`declaresAtTop`, `src/spec/model.ts`);
+  the vocabulary's code scan reads many languages' declarations
+  (`src/lifecycle/lexicon-coverage.ts`, `src/lifecycle/check.ts`); entrance
+  detection's package-script rule names the runners it follows; `scaffold
+  import` and adoption read tach's configuration (`src/scaffold/boundaries.ts`,
+  `src/lifecycle/adopt.ts`); the mirror reading parses with the TypeScript
+  compiler; and rust-analyzer is located in `src/adapters/installed.ts`. None
+  branches on a language's name, which the structural test holds, but each is
+  a table a language plugin should own.
+- **Bullets about a plugin's code** still live in the core's specs
+  (`src/adapters/Adapters.spec.md`): a bullet's witnessed refutation is keyed
+  by its component, so moving one restages its refutation.
+- **One project per process.** A plugin a project's config names takes its
+  language's place for the rest of the process, until another project's
+  config is read; a registry run reads each project's config before running it.
