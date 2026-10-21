@@ -23,6 +23,7 @@ import { execFileSync } from "../lifecycle/work-meter.ts";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
+import { withWarmAdapter } from "../enforcement/run.ts";
 import { configIgnore, keepProjectFiles, projectListing, underIgnored } from "../adapters/project-files.ts";
 import type { HookInput } from "../lifecycle/hook.ts";
 import { readerNaming } from "../lifecycle/host-tools.ts";
@@ -289,4 +290,10 @@ export async function snapshotTrace(root: string, session: string, options: Snap
   const snapshot: Snapshot = { kind: "snapshot", at, session, commit: git(root, ["rev-parse", "--short", "HEAD"]), changed, read, predicted, tokens, instrument };
   append(root, snapshot);
   return snapshot;
+}
+
+/** A session's snapshot through the warm instrument's one door; a door that cannot connect hands back its reason, which the snapshot records. */
+export async function snapshotSession(root: string, session: string, door: typeof withWarmAdapter = withWarmAdapter, model?: SpecModel): Promise<Snapshot | undefined> {
+  const changed = sessionPatch(root, session);
+  return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }));
 }

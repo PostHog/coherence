@@ -24,14 +24,13 @@
 import { resolve } from "node:path";
 import { withWarmAdapter, withWarmAdapters } from "../enforcement/run.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
-import type { SpecModel } from "../spec/model.ts";
 import { ChangeError, workingChange, type WorkingChange } from "./change.ts";
 import { JournalError, parseFlags } from "../journal/args.ts";
 import type { Io } from "../journal/cli.ts";
 import { calibrate, formatCalibration } from "./calibrate.ts";
 import { DEFAULT_LIMIT, formatClosure, predictClosure, type Closure } from "./closure.ts";
 import { computeMass, formatMass } from "./mass.ts";
-import { sessionPatch, snapshotTrace, type Snapshot } from "./trace.ts";
+import { snapshotSession } from "./trace.ts";
 
 export const ECONOMY_USAGE = [
   "  economy <path>... [--changed [--since <commit>]] [--json] [--limit <n>]   the context closure of a change to the given files, with a token estimate",
@@ -52,12 +51,6 @@ export async function economyFor(root: string, paths: readonly string[], change?
   // A multi-language project reaches each language's instrument only for the given files written in it.
   if (readEnforcementConfig(root).languages.length > 1) return withWarmAdapters(root, (open) => predictClosure(root, paths, { adapterOf: open, change }));
   return withWarmAdapter(root, (adapter, server, reason) => predictClosure(root, paths, { adapter, server, instrumentReason: reason, change }));
-}
-
-/** A session's snapshot through the warm instrument's one door; a door that cannot connect hands back its reason, which the snapshot records. */
-export async function snapshotSession(root: string, session: string, door: typeof withWarmAdapter = withWarmAdapter, model?: SpecModel): Promise<Snapshot | undefined> {
-  const changed = sessionPatch(root, session);
-  return door(root, (adapter, server, reason) => snapshotTrace(root, session, { adapter, server, instrumentReason: reason, changed, model }));
 }
 
 /** The closure the economy and query economy commands both ask for: named paths, the working change, or both. */
