@@ -199,7 +199,7 @@ function locateNote(call: CommandCall, root: string, sub = ""): string {
   if (reached !== undefined) return reached;
   return (
     `note: the hooks cannot find Coherence from here; they run the project's installed ${PACKAGE_NAME}.\n` +
-    `  Run npm install -D ${PACKAGE_NAME} (or pnpm add -D, yarn add -D) in the project, or its install if package.json already lists it. Until then each session start tells the agent it is missing, and the other events do nothing.\n`
+    `  Run npm install -D ${PACKAGE_NAME} (or pnpm add -D, yarn add -D, bun add -d) in the project, or its install if package.json already lists it. Until then each session start tells the agent it is missing, and the other events do nothing.\n`
   );
 }
 
