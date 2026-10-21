@@ -7,7 +7,7 @@
 import { spawnSync } from "../lifecycle/work-meter.ts";
 import { realpathSync } from "node:fs";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
-import { primaryOnly } from "../readings/scope/languages-read.ts";
+import { DECLARED_NOT_READ, primaryOnly } from "../readings/scope/languages-read.ts";
 import type { EnforcementConfig } from "../enforcement/config.ts";
 import { workBinding } from "../journal/work.ts";
 import type { SpecModel } from "../spec/model.ts";
@@ -63,7 +63,9 @@ export async function recordObservation(input: RecordInput): Promise<Observation
 
   if (input.adapter !== undefined && reason === undefined) {
     const ready = await input.adapter.ready();
-    if (ready.ok) map = await readInterfaceMap(input.root, input.adapter, input.model, input.config, language);
+    // A project that names only languages its config declares has no built-in to read interfaces through: said, never skipped.
+    if (language === undefined) reason = `the project names no built-in language: ${DECLARED_NOT_READ}`;
+    else if (ready.ok) map = await readInterfaceMap(input.root, input.adapter, input.model, input.config, language);
     else reason = ready.reason;
   }
   const unread = reason ?? (input.adapter === undefined ? "no adapter" : undefined);

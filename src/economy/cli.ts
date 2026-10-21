@@ -49,7 +49,9 @@ export const ECONOMY_USAGE = [
  */
 export async function economyFor(root: string, paths: readonly string[], change?: WorkingChange): Promise<Closure> {
   // A multi-language project reaches each language's instrument only for the given files written in it.
-  if (readEnforcementConfig(root).languages.length > 1) return withWarmAdapters(root, (open) => predictClosure(root, paths, { adapterOf: open, change }));
+  // With a language the config declares, the primary may be one no scan reads: the closure asks for each built-in's instrument by name.
+  const config = readEnforcementConfig(root);
+  if (config.languages.length > 1 || config.declared.length > 0) return withWarmAdapters(root, (open) => predictClosure(root, paths, { adapterOf: open, change }));
   return withWarmAdapter(root, (adapter, server, reason) => predictClosure(root, paths, { adapter, server, instrumentReason: reason, change }));
 }
 

@@ -41,6 +41,7 @@
 
 import { isAbsolute } from "node:path";
 import { isLanguage, LANGUAGES, type Language } from "../adapters/index.ts";
+import { declaredLanguageOf, readDeclaredLanguages, type DeclaredLanguage } from "../adapters/declared.ts";
 import { languageOfFile } from "../adapters/language-files.ts";
 import { effectiveConfig, type SetupKey } from "../adapters/project-config.ts";
 import { FROM_FORM, parseFrom, type ChokepointFrom } from "../spec/grammar.ts";
@@ -52,8 +53,8 @@ export const DEFAULT_TEST_FOLDERS: readonly string[] = ["__tests__", "test", "te
 
 /** One runner's test setup: how the tests it claims run, and which test files those are. */
 export interface TestSetup {
-  /** The language whose test files this setup claims, when it names one. */
-  language: Language | undefined;
+  /** The language whose test files this setup claims, when it names one: a built-in, or one the config declares. */
+  language: string | undefined;
   /** Globs (project-relative, `*` within a folder, `**` across folders) of the test files this setup claims, when it names them. */
   files: string[] | undefined;
   /** The folder the runner is started in, relative to the root; undefined runs it at the root. */
@@ -66,10 +67,14 @@ export interface TestSetup {
 }
 
 export interface EnforcementConfig {
-  /** The primary language: the first of `languages`. */
-  language: Language;
-  /** Every language the project spans, the primary first; one for a single-language project. */
+  /** The primary language: the first of `enforced`; a built-in, or one the config declares. */
+  language: string;
+  /** Every built-in language the project spans, in the config's order; empty when the project names only languages it declares. */
   languages: Language[];
+  /** The languages the config declares (its `languages` object), each read by the generic adapter (src/adapters/declared.ts). */
+  declared: DeclaredLanguage[];
+  /** Every language a check may be written in, built-in or declared, the primary first; one for a single-language project. */
+  enforced: string[];
   /** Every test setup, the first being the one the single keys below describe. */
   tests: TestSetup[];
   /** Undefined when no test command is configured. */
@@ -111,9 +116,14 @@ export function globPattern(glob: string): RegExp {
 }
 
 /** Whether a setup claims a project-relative file as one of its test files: its globs match it, else its language is the file's. */
-export function setupClaims(setup: TestSetup, file: string): boolean {
+export function setupClaims(setup: TestSetup, file: string, declared: readonly DeclaredLanguage[] = []): boolean {
   if (setup.files !== undefined) return setup.files.some((glob) => globPattern(glob).test(file));
-  return setup.language === undefined || languageOfFile(file) === setup.language;
+  return setup.language === undefined || enforcedLanguageOf(file, { languages: [...LANGUAGES], declared }) === setup.language;
+}
+
+/** The language a file is written in among the project's: a built-in it spans by the built-in rule, else a declared one by its extensions. */
+export function enforcedLanguageOf(file: string, config: { readonly languages: readonly Language[]; readonly declared: readonly DeclaredLanguage[] }): string | undefined {
+  return languageOfFile(file, config.languages) ?? declaredLanguageOf(file, config.declared)?.name;
 }
 
 function testSetupOf(raw: Record<string, unknown>, path: string, where: string): TestSetup {
@@ -136,21 +146,27 @@ function testSetupOf(raw: Record<string, unknown>, path: string, where: string):
 }
 
 export function readEnforcementConfig(root: string): EnforcementConfig {
-  const config: EnforcementConfig = { language: "typescript", languages: ["typescript"], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined, chokepointFrom: undefined };
+  const config: EnforcementConfig = { language: "typescript", languages: ["typescript"], declared: [], enforced: ["typescript"], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined, chokepointFrom: undefined };
   config.tests = [{ language: undefined, files: undefined, cwd: undefined, test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS] }];
   // The project's own config over its registry's keys (project-config.ts), each inherited path rebased to the project.
   const found = effectiveConfig(root);
   if (found === undefined) return config;
   const { record, path } = found;
+  const declared = readDeclaredLanguages(record["languages"], path);
+  const known = [...LANGUAGES, ...declared.map((d) => d.name)];
   const language = record["language"];
-  if (typeof language === "string" && isLanguage(language)) config.languages = [language];
-  else if (Array.isArray(language)) {
-    const named = language.filter((l): l is Language => typeof l === "string" && isLanguage(l));
-    const unknown = language.filter((l) => typeof l !== "string" || !isLanguage(l));
-    if (unknown.length > 0) throw new Error(`${path}: language lists ${unknown.map((l) => JSON.stringify(l)).join(", ")}; each is one of ${LANGUAGES.join(", ")}`);
-    if (named.length > 0) config.languages = [...new Set(named)];
+  if (language !== undefined) {
+    const listed = typeof language === "string" ? [language] : Array.isArray(language) ? language : [language];
+    const unknown = listed.filter((l) => typeof l !== "string" || !known.includes(l));
+    if (unknown.length > 0 || listed.length === 0) throw new Error(`${path}: language ${listed.length === 0 ? "lists nothing" : `names ${unknown.map((l) => JSON.stringify(l)).join(", ")}`}; each is one of ${known.join(", ")}${declared.length === 0 ? " (or a language declared under languages)" : ""}`);
+    config.enforced = [...new Set(listed as string[])];
   }
-  config.language = config.languages[0]!;
+  // A declared language the language key does not name would be read by nothing: say so rather than leave it unread.
+  const unnamed = declared.filter((d) => !config.enforced.includes(d.name));
+  if (unnamed.length > 0) throw new Error(`${path}: languages declares ${unnamed.map((d) => d.name).join(", ")}, which language does not name; name each there (language: [${[...config.enforced, ...unnamed.map((d) => d.name)].map((l) => JSON.stringify(l)).join(", ")}]) or remove it`);
+  config.declared = declared;
+  config.languages = config.enforced.filter((l): l is Language => isLanguage(l));
+  config.language = config.enforced[0]!;
   const budget = record["latencyBudget"];
   if (budget !== undefined) {
     if (typeof budget !== "number" || !Number.isFinite(budget) || budget <= 0) throw new Error(`${path}: latencyBudget is a number of seconds above 0`);
@@ -171,7 +187,7 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
       if (setup.test === undefined && setup.testJson === undefined) throw new Error(`${path}: ${where.slice(0, -1)} names neither test nor testJson`);
       const lang = t["language"];
       if (lang !== undefined) {
-        if (typeof lang !== "string" || !isLanguage(lang)) throw new Error(`${path}: ${where}language is one of ${LANGUAGES.join(", ")}`);
+        if (typeof lang !== "string" || !known.includes(lang)) throw new Error(`${path}: ${where}language is one of ${known.join(", ")}`);
         setup.language = lang;
       }
       const files = t["files"];

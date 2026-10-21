@@ -17,14 +17,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isTestPath, parseName, type LanguageAdapter } from "../adapters/adapter.ts";
-import { isLanguage, type Language } from "../adapters/index.ts";
 import { projectFiles } from "../adapters/project-files.ts";
 import { gitState } from "../journal/store.ts";
 import { workBinding } from "../journal/work.ts";
 import type { ChokepointFrom } from "../spec/grammar.ts";
 import { loadSpecModel, type ModelInvariant, type SpecModel } from "../spec/model.ts";
 import { checkChokepoint, type ChokepointResult } from "./check.ts";
-import { languageOfFile, readEnforcementConfig, setupClaims, type EnforcementConfig } from "./config.ts";
+import { enforcedLanguageOf, readEnforcementConfig, setupClaims, type EnforcementConfig } from "./config.ts";
 import { appendRun, entryKey, loadRuns, machineLoad, type Form, type RunEntry, type RunRecord } from "./record.ts";
 import { enforcesOf } from "../spec/floor.ts";
 import { connectAdapter, type RemoteAdapter } from "./server.ts";
@@ -213,7 +212,7 @@ interface ChokepointPlan {
   chokepoint: string;
   /** The bullet's own from: line, when it has one. */
   from: ChokepointFrom | undefined;
-  languages: Language[];
+  languages: string[];
 }
 
 /**
@@ -224,27 +223,28 @@ interface ChokepointPlan {
  * component holds, in the config's order; else every language. A
  * single-language project has the one.
  */
-export function enforcementLanguages(config: EnforcementConfig, component: string, invariant: ModelInvariant, protects: string, chokepoint: string, files: () => readonly string[]): Language[] {
-  if (config.languages.length === 1) return [config.language];
+export function enforcementLanguages(config: EnforcementConfig, component: string, invariant: ModelInvariant, protects: string, chokepoint: string, files: () => readonly string[]): string[] {
+  if (config.enforced.length === 1) return [config.language];
+  const of = (file: string): string | undefined => enforcedLanguageOf(file, config);
   const named = [protects, chokepoint].flatMap((value) => {
     const form = parseName(value);
     const file = form.form === "symbol" ? form.fileHint : form.form === "module" ? form.path : undefined;
-    const language = file === undefined ? undefined : languageOfFile(file, config.languages);
+    const language = file === undefined ? undefined : of(file);
     return language === undefined ? [] : [language];
   });
   if (named.length > 0) return [...new Set(named)];
   const latest = invariant.latest.find((l) => l.form === "chokepoint");
-  const graded = latest?.language !== undefined && isLanguage(latest.language) && config.languages.includes(latest.language) ? [latest.language] : [];
+  const graded = latest?.language !== undefined && config.enforced.includes(latest.language) ? [latest.language] : [];
   const touched = (latest?.files ?? []).flatMap((f) => {
-    const language = languageOfFile(f, config.languages);
+    const language = of(f);
     return language === undefined ? [] : [language];
   });
   const seen = [...new Set([...graded, ...touched])];
   if (seen.length > 0) return seen;
   const prefix = component === "." ? "" : `${component}/`;
-  const held = new Set(files().filter((f) => f.startsWith(prefix)).flatMap((f) => languageOfFile(f, config.languages) ?? []));
-  const ordered = config.languages.filter((l) => held.has(l));
-  return ordered.length > 0 ? ordered : [...config.languages];
+  const held = new Set(files().filter((f) => f.startsWith(prefix)).flatMap((f) => of(f) ?? []));
+  const ordered = config.enforced.filter((l) => held.has(l));
+  return ordered.length > 0 ? ordered : [...config.enforced];
 }
 
 /**
@@ -274,7 +274,7 @@ export function setupChooser(root: string, config: EnforcementConfig): (via: str
   const claims = (): string[][] => {
     if (claimed !== undefined) return claimed;
     const all = projectFiles(root);
-    claimed = config.tests.map((setup) => all.filter((f) => isTestPath(f, setup.testFolders) && setupClaims(setup, f)));
+    claimed = config.tests.map((setup) => all.filter((f) => isTestPath(f, setup.testFolders) && setupClaims(setup, f, config.declared)));
     return claimed;
   };
   return (via) => {
@@ -298,7 +298,7 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   const wantChokepoints = options.form === undefined || options.form === "chokepoint";
   const wantTotality = options.form === undefined || options.form === "totality oracle";
   const chosen = new Set(options.invariants ?? []);
-  const multi = config.languages.length > 1;
+  const multi = config.enforced.length > 1;
   // A name is a bullet's own, or its component folder and name as refute takes it; each must name a bullet, or nothing runs.
   const isChosen = (folder: string, name: string): boolean => chosen.has(name) || chosen.has(`${folder}/${name}`);
   const unmatched = [...chosen].filter((wanted) => !model.components.some((c) => c.invariants.some((i) => wanted === i.name || wanted === `${c.folder}/${i.name}`)));

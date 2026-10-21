@@ -198,7 +198,7 @@ test("a multi-language config lists its languages and test setups; a file's lang
       writeFileSync(join(bad, "coherence.config.json"), JSON.stringify(config));
       assert.throws(() => readEnforcementConfig(bad), pattern);
     };
-    refused({ language: ["python", "go"] }, /language lists "go"; each is one of typescript, python, rust/);
+    refused({ language: ["python", "go"] }, /language names "go"; each is one of typescript, python, rust/);
     refused({ tests: [{ language: "python" }] }, /tests\[0\] names neither test nor testJson/);
     refused({ tests: [{ test: "pytest", cwd: "/abs" }] }, /tests\[0\]\.cwd is a folder relative to the project root/);
     refused({ tests: [{ test: "pytest", language: "go" }] }, /tests\[0\]\.language is one of/);

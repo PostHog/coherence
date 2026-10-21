@@ -1,7 +1,9 @@
 /**
- * Which adapter a project gets: the config's `language`, else TypeScript.
+ * Which adapter a project gets: the config's `language`, else TypeScript; a
+ * language the config declares (declared.ts) is read by the generic adapter.
  */
 
+import { DeclaredAdapter, type DeclaredLanguage } from "./declared.ts";
 import { PythonAdapter } from "./python.ts";
 import { RustAdapter } from "./rust.ts";
 import { TypeScriptAdapter } from "./typescript.ts";
@@ -30,4 +32,16 @@ export function adapterFor(language: Language, root: string, bounds?: AdapterBou
     case "rust":
       return new RustAdapter(root);
   }
+}
+
+/**
+ * The adapter for any of a project's languages: a built-in by its own
+ * adapter, a language the config declares by the generic one; a name that is
+ * neither is refused, never guessed.
+ */
+export function instrumentFor(language: string, root: string, declared: readonly DeclaredLanguage[]): LanguageAdapter {
+  if (isLanguage(language)) return adapterFor(language, root);
+  const found = declared.find((d) => d.name === language);
+  if (found === undefined) throw new Error(`${language} is neither a built-in language (${LANGUAGES.join(", ")}) nor one the config declares`);
+  return new DeclaredAdapter(root, found);
 }

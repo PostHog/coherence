@@ -85,7 +85,7 @@ import { adapterFor, type Language } from "../../adapters/index.ts";
 import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy/source.ts";
 import { languageOfFile, readEnforcementConfig } from "../../enforcement/config.ts";
 import { KeptAnswers } from "./kept-answers.ts";
-import { languagesRead, notScannedYet } from "./languages-read.ts";
+import { DECLARED_NOT_READ, languagesRead, notScannedYet } from "./languages-read.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
 import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, KeptReport, ReachReference, ScopedReading } from "./model.ts";
@@ -643,10 +643,12 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
   const languages = config.languages;
   const adapterOf = (language: Language): LanguageAdapter | undefined => (typeof given === "function" ? given(language) : language === languages[0] ? given : undefined);
   const candidates = (): EntranceCandidate[] => detectedEntrances(root, model, languages, config.testFolders, ignore);
+  // A project that names only languages its config declares has no built-in to read with: said, never an empty reading.
+  if (languages.length === 0) return { kind: "unread", because: `the project names no built-in language: ${DECLARED_NOT_READ}` };
   if (languages.length === 1) {
     // One language: the reading it always was, with the one language read.
     const reading = await readLanguage(root, languages[0]!, adapterOf(languages[0]!), options, { model, budget, started, owns: () => true });
-    return reading.kind === "read" ? { ...reading, languages: languagesRead(languages), candidates: candidates() } : reading;
+    return reading.kind === "read" ? { ...reading, languages: languagesRead(languages, new Map(), config.declared), candidates: candidates() } : reading;
   }
   // Several languages: each one's component code is read through its own adapter, started only when the language has
   // component code or an entrance handled in its files. Each language's references are its own (no language server reports a
@@ -666,7 +668,7 @@ export async function readComponentInterfaces(root: string, given?: LanguageAdap
     const reading = await readLanguage(root, language, adapterOf(language), options, { model, budget, started, owns: (_component, entrance) => owner(entrance) === language });
     parts.push({ language, reading });
   }
-  return mergeLanguages(languages, parts, model, candidates());
+  return mergeLanguages(languages, parts, model, candidates(), config.declared);
 }
 
 /** An adapter for each language a multi-language reading asks, started by the caller (who closes it); undefined lets the reading start its own. */
@@ -693,7 +695,7 @@ const OTHER_LANGUAGE = "\u0000handled in another language";
  * entrance takes the resolution of the language its handler is written in.
  * No edge is drawn across languages: each language's references are its own.
  */
-function mergeLanguages(languages: readonly Language[], parts: readonly { language: Language; reading: InterfaceReading }[], model: SpecModel, candidates: EntranceCandidate[]): InterfaceReading {
+function mergeLanguages(languages: readonly Language[], parts: readonly { language: Language; reading: InterfaceReading }[], model: SpecModel, candidates: EntranceCandidate[], declared: readonly { readonly name: string }[]): InterfaceReading {
   const read = parts.flatMap((p) => (p.reading.kind === "read" ? [{ language: p.language, reading: p.reading }] : []));
   const unread = new Map(parts.flatMap((p) => (p.reading.kind === "unread" ? [[p.language, p.reading.because] as const] : [])));
   if (read.length === 0 && unread.size > 0) return { kind: "unread", because: [...unread.values()].join("; ") };
@@ -727,7 +729,7 @@ function mergeLanguages(languages: readonly Language[], parts: readonly { langua
   return {
     kind: "read",
     language: languages[0]!,
-    languages: languagesRead(languages, unread),
+    languages: languagesRead(languages, unread, declared),
     declarations: sum((r) => r.declarations),
     symbols,
     entrances,

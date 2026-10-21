@@ -56,7 +56,7 @@ import { dirname, extname, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import type { Definition, Ladder, LanguageAdapter, Refutation, ReferenceSite, ResolveHint, Resolved, Visibility } from "../adapters/adapter.ts";
-import { adapterFor, type Language } from "../adapters/index.ts";
+import { instrumentFor } from "../adapters/index.ts";
 import { readEnforcementConfig } from "./config.ts";
 import { codeFingerprint } from "./code-fingerprint.ts";
 
@@ -438,8 +438,8 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   let adapter: LanguageAdapter;
   try {
     config = readEnforcementConfig(root);
-    if (slot !== undefined && !(config.languages as readonly string[]).includes(slot)) throw new Error(`${slot} is not one of this project's languages (${config.languages.join(", ")})`);
-    adapter = adapterFor(slot === undefined ? config.language : (slot as Language), root);
+    if (slot !== undefined && !config.enforced.includes(slot)) throw new Error(`${slot} is not one of this project's languages (${config.enforced.join(", ")})`);
+    adapter = instrumentFor(slot ?? config.language, root, config.declared);
   } catch (error) {
     if (owns()) rmSync(paths.lock, { force: true });
     heldHere.delete(paths.lock);

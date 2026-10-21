@@ -129,7 +129,8 @@ yet. For now, every leaf keeps its own `lexicon.json`.
 |---|---|---|
 | `projects` | none | At the repository root only: the folders opted in, which makes this file a registry. See [Several folders](#several-folders-a-registry). |
 | `name` | the folder's name | The project's name, as Scope and the lexicon's project layer show it. |
-| `language` | `typescript` | `typescript`, `python` or `rust`: which language server the chokepoint check asks (rust-analyzer for Rust; see [Rust](enforcement.md#rust)). A list (`["python", "typescript"]`) for a project that spans more than one; see [More than one language](#more-than-one-language). |
+| `language` | `typescript` | `typescript`, `python` or `rust`: which language server the chokepoint check asks (rust-analyzer for Rust; see [Rust](enforcement.md#rust)), or a language declared under `languages`. A list (`["python", "typescript"]`) for a project that spans more than one; see [More than one language](#more-than-one-language). Any other name is refused. |
+| `languages` | none | Languages Coherence has no adapter for, each read through its own language server; see [A language Coherence has no adapter for](#a-language-coherence-has-no-adapter-for). Each must also be named in `language`. |
 | `entryDir` | `.` | The folder holding the entry spec, the one that declares the trust levels. |
 | `ignore` | none | Folders that are not this project's code or prose: vendored code, generated output, fixtures, promo material. A name matches that folder anywhere; a path matches from the root. Every walk (the spec, the lexicon check, the reading) leaves them out. |
 | `lexicon` | `lexicon.json` | The project's lexicon file, relative to the root. |
@@ -235,7 +236,7 @@ above (`test`, `testJson`, `testMatch`, `testFilterForm`, `testDir` /
 
 | Key | Default | Meaning |
 |---|---|---|
-| `language` | none | The language whose test files this setup claims, by extension. |
+| `language` | none | The language whose test files this setup claims, by extension: a built-in, or one declared under `languages`. |
 | `files` | none | Globs of the test files this setup claims, relative to the root (`*` within a folder, `**` across folders), in place of `language`. |
 | `cwd` | the root | The folder the runner starts in, relative to the root: `../..` runs a product's tests from the repository root, against its own configuration. |
 
@@ -262,8 +263,70 @@ entrance, and merges the languages side by side over the components
 they share: no language server reports a reference from Python into
 TypeScript, so none is drawn. A language whose server does not answer is
 named as not read, with why. Mass, the entrance detection (`scaffold
-entrances`) and `scaffold control` read every language. Observation maps the
+entrances`) and `scaffold control` read TypeScript and Python; Rust has no
+text scan yet, so each of them names Rust as not read. A language declared
+under `languages` is read by none of the readings, and each names it as not
+read. Observation maps the
 first test setup's pass through the primary language alone and says so on its
 record and in the line the run prints.
+
+## A language Coherence has no adapter for
+
+A language with a language server can be checked without any code: declare it
+under `languages`, name it in `language`, and the chokepoint check asks that
+server, over stdio, through the language server protocol.
+
+```json
+{
+  "language": ["typescript", "swift"],
+  "languages": {
+    "swift": {
+      "extensions": [".swift"],
+      "server": ["sourcekit-lsp"],
+      "testFilter": "{name}",
+      "refute": "import {module}\nlet coherenceProbe = {name}\n"
+    }
+  }
+}
+```
+
+| Key | Required | Meaning |
+|---|---|---|
+| `extensions` | yes | The file extensions the language owns, each with its dot. An extension a built-in adapter reads (`.ts`, `.py`, `.rs`, ...) or another declared language owns is refused. |
+| `server` | yes | The language server's command as a list of arguments, speaking the protocol over stdio. A bare program name is found on the PATH; a relative path is the project's. |
+| `testFilter` | no | How a `via` becomes the test runner's filter: `{name}` is the via. Without it, the via is passed as written. |
+| `refute` | no | The unsaved document the refutation stages beside the protected thing. It must reference the thing: `{name}` is its name, `{module}` its file name without the extension, `{file}` its file relative to the staged document (`./secrets.swift`), `{path}` its file from the root. |
+
+The name is lowercase letters, digits and hyphens, and no built-in's
+(`typescript`, `python`, `rust`). A declared language not named in `language`
+is refused, so a declaration is never read by nothing. Each document the
+adapter opens is sent with the language's name as its language id.
+
+**What a declared language gets.** Names resolve through the server's
+`workspace/symbol` and document symbols; references come from
+`textDocument/references`, from the project's own files; a test reference is
+classified by the test folders, as for every language. A chokepoint grades
+broken with its bypasses, or reference-choked, enforced by Coherence's check at
+the edit and in CI. The refutation opens the `refute` template as an unsaved
+document (outside the exempted folder when the chokepoint governs only
+references from outside one) and passes only when the server reports the
+reference it holds. Each verdict names what answered, as
+`swift via sourcekit-lsp (declared in the config)`, and a run records the
+language as its instrument. The server runs in the warm server, as the
+built-in ones do, so an edit's check stays within the latency budget.
+
+**What it does not get.**
+
+- No rung above reference-choked: the protocol says nothing about visibility,
+  so no compiler or checker is credited, and a thing the language would refuse
+  to name from outside its module still grades reference-choked.
+- No refutation without `refute`: the chokepoint then reads not run, with
+  "no refute template declared", never pass.
+- No reading: Structure, the economy prediction, mass, entrance detection
+  and `scaffold control` do not scan its text, and each names it as not read;
+  the mirror reading counts its files among those it left unread; the
+  lexicon's member scan opens none of its type bodies.
+- No module boundary from a checker, no observation of its tests, and no
+  entrance detection.
 
 The spec grammar is in [spec.md](spec.md).

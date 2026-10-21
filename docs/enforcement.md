@@ -215,6 +215,36 @@ the workspace are unseen. Totality oracles run through `cargo test` one at a
 time (`"test": "cargo test -q -- --exact {filter}"`, `"testMatch": "test
 result: ok\\. [1-9]"`); doctests are not run as `via`s.
 
+## A declared language
+
+A language Coherence has no adapter for is declared in the config, under
+`languages`, with its file extensions and its language server's command (see
+[config.md](config.md#a-language-coherence-has-no-adapter-for)). The generic
+adapter (`src/adapters/declared.ts`) drives that server over the protocol
+alone, the way the built-in adapters drive theirs: `workspace/symbol` and the
+document symbols resolve a name, `textDocument/references` lists the sites,
+and the project's own files are the only evidence.
+
+Its ladder has one rung:
+
+- **reference-choked** (Coherence's check at the edit and in CI): every
+  reference the server reports is inside the chokepoint. The protocol says
+  nothing about visibility, and nothing declares the language's rules, so no
+  compiler or checker is credited, even where the language would refuse an
+  outside reference.
+
+The refutation stages the config's `refute` template as an unsaved document
+beside the protected thing (outside the exempted folder when the chokepoint
+governs only references from outside one) and requires the server to report
+the reference it holds; the check must then call that site a bypass. Without
+a template the refutation is not run, and says so, so the chokepoint reads not
+run, never pass. Every verdict names what answered
+(`swift via sourcekit-lsp (declared in the config)`).
+
+No reading scans a declared language's text: Structure, the economy
+prediction, mass, entrance detection and `scaffold control` name it as not
+read.
+
 ## The run and its view
 
 A run appends one record to the session's shard, `.coherence/runs/<session>.<token>.jsonl` (docs/records-layout.md): time, session,
