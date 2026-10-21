@@ -566,7 +566,7 @@ export function loadSpecModel(rootGiven: string, options: LoadOptions = {}): Spe
   const counts = countModel(components, problems);
   // The journal is read for defects even where no practice file asked for it; a project with no spec reads none.
   const journal = practiceFiles.size === 0 && components.length > 0 ? journalRecords(root) : records;
-  const defects = defectFloor(defectStates(journal), guardStanding(components), declaredClasses(root), declaredFamilies(root));
+  const defects = defectFloor(defectStates(journal), guardStanding(components), declaredClasses(root, false), declaredFamilies(root, false));
   const crossingAlone = crossingAloneCredits(components, trustLevels);
   return { root, entry: entry === undefined ? undefined : entryFolder, trustLevels, components, problems, counts, runs, defects, ...(crossingAlone.length === 0 ? {} : { crossingAlone }), ...(storedName === undefined ? {} : { storedName }) };
 }

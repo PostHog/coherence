@@ -86,6 +86,22 @@ const CLI = join(CODE_DIR, `cli${extname(fileURLToPath(import.meta.url))}`);
 
 /* ------------------------------------------------------ code fingerprint */
 
+/**
+ * The fingerprint a project's warm server answers with and a client asks
+ * for: Coherence's code and the folder of every plugin the project runs
+ * (none when the config names none or refuses them), so an edited plugin
+ * replaces the server as an edited Coherence does.
+ */
+export function serverFingerprint(root: string): string {
+  let dirs: string[] = [];
+  try {
+    dirs = readEnforcementConfig(root).plugins.map((p) => p.dir);
+  } catch {
+    // A config the server refuses starts no server; the fingerprint is Coherence's alone.
+  }
+  return codeFingerprint(dirs);
+}
+
 // The fingerprint lives beside the parses keyed by it; the server reports it and replaces a server running other code.
 export { CODE_SALT_ENV, codeFingerprint } from "./code-fingerprint.ts";
 
@@ -427,8 +443,8 @@ export async function serve(rootGiven: string, options: ServeOptions = {}): Prom
   const root = paths.root;
   const idleMs = options.idleMs ?? DEFAULT_IDLE_MS;
   const log = options.log ?? (() => {});
-  // The code this process runs, read before anything else can change it further.
-  const fingerprint = codeFingerprint();
+  // The code this process runs, read before anything else can change it further: Coherence's and every plugin's the project runs.
+  const fingerprint = serverFingerprint(root);
   // The root is taken before a language server starts: a refused server costs nothing.
   await takeRoot(paths);
   heldHere.add(paths.lock);
@@ -901,7 +917,7 @@ export async function connectAdapter(rootGiven: string, options: ConnectOptions 
   const slot = languageSlot(resolve(rootGiven), options.language);
   const paths = serverPaths(rootGiven, slot);
   const root = paths.root;
-  const want = codeFingerprint();
+  const want = serverFingerprint(root);
   let spawns = 0;
   let deadline = Date.now() + SPAWN_WAIT_MS;
   let lastError: unknown;

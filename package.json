@@ -41,6 +41,14 @@
     "coherence": "dist/cli.js",
     "coherence-statusline": "dist/statusline.js"
   },
+  "exports": {
+    "./plugin": {
+      "types": "./dist/plugins/plugin.d.ts",
+      "default": "./dist/plugins/plugin.js"
+    },
+    "./package.json": "./package.json",
+    "./dist/*": "./dist/*"
+  },
   "files": [
     "dist",
     "docs/lexicon.json",

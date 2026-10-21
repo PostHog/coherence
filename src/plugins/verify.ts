@@ -46,8 +46,8 @@ function tailOf(output: string, lines = 12): string {
   return output.split("\n").filter((l) => l.trim() !== "").slice(-lines).join("\n");
 }
 
-/** Run a manifest's command with the name in place of {name}, from the root: exit 0 is a pass. */
-function runCommand(root: string, argv: readonly string[], name: string, timeoutMs: number): Promise<TotalityResult> {
+/** Run a manifest's command with the name in place of {name}, from the root: exit 0 is a pass, and with `match`, only when its output matches too. */
+function runCommand(root: string, argv: readonly string[], name: string, timeoutMs: number, match: RegExp | undefined): Promise<TotalityResult> {
   const [command, ...args] = argv.map((a) => a.split("{name}").join(name));
   const shown = [command!, ...args].map((a) => (/\s/.test(a) ? JSON.stringify(a) : a)).join(" ");
   return new Promise((resolve) => {
@@ -78,7 +78,9 @@ function runCommand(root: string, argv: readonly string[], name: string, timeout
     });
     child.on("close", (code) => {
       clearTimeout(timer);
-      finish(code === 0 ? { verdict: "pass", reason: `${shown} exited 0`, command: shown, tail: "" } : { verdict: "fail", reason: `${shown} exited ${code}`, command: shown, tail: tailOf(output) });
+      if (code !== 0) finish({ verdict: "fail", reason: `${shown} exited ${code}`, command: shown, tail: tailOf(output) });
+      else if (match !== undefined && !match.test(output)) finish({ verdict: "fail", reason: `${shown} exited 0 but its output did not match ${match}; nothing was proved under that name`, command: shown, tail: tailOf(output) });
+      else finish({ verdict: "pass", reason: `${shown} exited 0${match === undefined ? "" : ` and its output matched ${match}`}`, command: shown, tail: "" });
     });
   });
 }
@@ -92,7 +94,7 @@ export async function proveVia(root: string, plugins: readonly LoadedPlugin[], v
   const who = { plugins: [tagOf(plugin)], evidence: verifier.evidence };
   const label = `plugin ${plugin.name} (${plugin.version}), ${verifier.evidence}`;
   if (verifier.command !== undefined) {
-    const result = await runCommand(root, verifier.command, form.name, timeoutMs);
+    const result = await runCommand(root, verifier.command, form.name, timeoutMs, verifier.match === undefined ? undefined : new RegExp(verifier.match));
     return { ...result, reason: `${label}: ${result.reason}`, ...who };
   }
   try {

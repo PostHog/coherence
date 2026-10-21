@@ -39,9 +39,16 @@ rmSync(dist, { recursive: true, force: true });
 // The compiler as the package resolver finds it from this checkout, never a path into node_modules built by hand (installed.ts).
 const tsc = spawnSync(process.execPath, [createRequire(import.meta.url).resolve("typescript/bin/tsc"), "-p", join(root, "tsconfig.build.json")], { stdio: "inherit" });
 if (tsc.status !== 0) process.exit(tsc.status ?? 1);
+// The plugin interface's types, for a plugin's author (package.json exports them as @posthog/coherence/plugin): plugin.ts and the types it names.
+const types = spawnSync(process.execPath, [createRequire(import.meta.url).resolve("typescript/bin/tsc"), "-p", join(root, "tsconfig.plugin-types.json")], { stdio: "inherit" });
+if (types.status !== 0) process.exit(types.status ?? 1);
+// A declaration keeps the source's .ts specifiers; beside the compiled .js each names its .d.ts by the .js a reader resolves.
+for (const file of files(dist).filter((f) => f.endsWith(".d.ts"))) writeFileSync(file, readFileSync(file, "utf8").replace(/(from\s+["']\.{1,2}\/[^"']+)\.ts(["'])/g, "$1.js$2"));
 
 for (const file of files(src)) {
   const at = relative(src, file);
+  // A test's fixture plugin is the tests' alone: never shipped.
+  if (at.startsWith(join("plugins", "fixtures"))) continue;
   if (/\.(json|css)$/.test(file) || dirname(at) === join(scope, "fonts")) copy(file, join(dist, at));
 }
 // The same modules the page joins, found the same way: from the entry, by what each imports at run time.

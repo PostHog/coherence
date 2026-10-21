@@ -49,8 +49,10 @@ export interface VerifierForm {
   form: string;
   /** What kind of evidence a pass is, recorded on the run entry ("model-checked", "property-tested"). */
   evidence: string;
-  /** An argv the name is substituted into ({name}), run from the project root: exit 0 is a pass. Absent, the module's `verify` answers. */
+  /** An argv that names {name}, substituted with the name to prove, run from the project root: exit 0 is a pass. Absent, the module's `verify` answers. */
   command?: string[];
+  /** A regular expression the command's output must match for its exit 0 to pass, as testMatch is for a test; an exit 0 without it is a fail naming it. */
+  match?: string;
 }
 
 /** What `plugin.json` holds. */

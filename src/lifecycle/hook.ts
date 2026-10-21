@@ -83,6 +83,9 @@ import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLi
 import { tsserverNotice } from "../adapters/installed.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { viaForm } from "../plugins/verify.ts";
+import { readPlugins } from "../plugins/registry.ts";
+import { LANGUAGES, languageOfFile } from "../adapters/language-files.ts";
+import { readConfigFile } from "../adapters/project-config.ts";
 import { escapeRegExp } from "../enforcement/totality.ts";
 import { keepProjectFiles } from "../adapters/project-files.ts";
 import { returnFeed, leaveReturn, markChildStart, openFeed, peerFeed } from "../journal/feed.ts";
@@ -93,7 +96,7 @@ import { loadJournal } from "../journal/store.ts";
 import { citesOf, type AnyRecord, type Unable } from "../journal/record.ts";
 import { loadOrders, loadWork, ownedIn, type WorkOrder } from "../journal/work.ts";
 import { loadLexicon, rejectedNames, renderCompactWithin, type InjectionLevel, type Lexicon } from "./lexicon.ts";
-import { COHERENCE_LEXICON, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, real as realSpelling, within, type HookProject } from "./project.ts";
+import { COHERENCE_LEXICON, CONFIG_FILE, DURABLE_FOLDERS, hookProject, installedRoot, isCoherenceItself, loadProjectLexicons, real as realSpelling, within, type HookProject } from "./project.ts";
 import { keepStateFiles } from "./state-files.ts";
 
 import { attentionText, lexiconCoverage, type Coverage } from "./lexicon-coverage.ts";
@@ -791,7 +794,7 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   const { coherence, project } = await loadProjectLexicons(root);
   const commands=await cliName(root);
   // The hand lists come from the last mirror reading kept, never one taken here (recorded.ts).
-  const head = escalationBlock(root) + specBlock(root) + tsserverBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + mirrorBlock(root, commands) + workBlock(root, input);
+  const head = escalationBlock(root) + pluginRefusalBlock(root) + specBlock(root) + tsserverBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + mirrorBlock(root, commands) + workBlock(root, input);
   const reading=report ?? await lexiconCoverage(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
   const signal=attentionText(reading, commands);
@@ -801,6 +804,26 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   const tail = coverage + (practices === "" ? "" : `\n${practices.trimEnd()}\n`) + `\n${await copyBlock(root)}\n${await sessionBlock(root, input)}`;
   const { text, detail } = renderCompactWithin(coherence, project, CONTEXT_BUDGET - head.length - tail.length, await cliName(root), await isCoherenceItself(root), pluginsInUse(root, coherence));
   return { text: head + text + tail, detail, coverage: reading };
+}
+
+/**
+ * The plugins the config names that the registry refuses, each by name with
+ * its reason, ahead of the spec block: a refused plugin stops every command
+ * that reads the config, so the session hears which and why before anything
+ * else. Nothing when the config names no plugins or none is refused.
+ */
+function pluginRefusalBlock(root: string): string {
+  let value: unknown;
+  try {
+    // The plugins key is the project's own (never a registry's), so its own file alone is read.
+    value = readConfigFile(join(root, CONFIG_FILE))?.["plugins"];
+  } catch {
+    return "";
+  }
+  if (value === undefined) return "";
+  const { problems } = readPlugins(root, value, CONFIG_FILE, LANGUAGES, (extension) => languageOfFile(`x${extension}`));
+  if (problems.length === 0) return "";
+  return `Plugins refused (${problems.length}); every command that reads the config stops on this until it is fixed:\n${problems.map((p) => `✕ ${p}`).join("\n")}\n\n`;
 }
 
 /**

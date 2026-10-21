@@ -17,8 +17,8 @@
  * here and does exactly the work it did before plugins.
  */
 
-import { readFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { readFileSync, statSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { MANIFEST, PLUGIN_API, type LoadedPlugin, type PluginManifest, type PluginModule, type PluginTag, type VerifierForm, tagOf } from "./plugin.ts";
 
@@ -60,8 +60,21 @@ function readManifest(name: string, dir: string, where: string): { manifest?: Pl
   for (const key of ["module", "lexicon"] as const) if (raw[key] !== undefined && (typeof raw[key] !== "string" || raw[key] === "" || isAbsolute(raw[key] as string))) problems.push(`${where}: plugin ${name}'s ${key} is a path relative to its ${MANIFEST}`);
   const verifiers = raw["verifiers"];
   if (verifiers !== undefined) {
-    const ok = Array.isArray(verifiers) && verifiers.every((v) => isRecord(v) && typeof v["form"] === "string" && /^[a-z][a-z0-9 -]*[a-z0-9]$/.test(v["form"]) && typeof v["evidence"] === "string" && v["evidence"] !== "" && (v["command"] === undefined || strings(v["command"])));
-    if (!ok) problems.push(`${where}: plugin ${name}'s verifiers is a list of { "form": "<lowercase words>", "evidence": "<label>", "command"?: [argv with {name}] }`);
+    const ok = Array.isArray(verifiers) && verifiers.every((v) => isRecord(v) && typeof v["form"] === "string" && /^[a-z][a-z0-9 -]*[a-z0-9]$/.test(v["form"]) && typeof v["evidence"] === "string" && v["evidence"] !== "" && (v["command"] === undefined || strings(v["command"])) && (v["match"] === undefined || typeof v["match"] === "string"));
+    if (!ok) problems.push(`${where}: plugin ${name}'s verifiers is a list of { "form": "<lowercase words>", "evidence": "<label>", "command"?: [argv with {name}], "match"?: "<regular expression>" }`);
+    else {
+      for (const v of verifiers as VerifierForm[]) {
+        // A command that never names what it proves passes whatever it is asked: an exit 0 would be evidence of nothing.
+        if (v.command !== undefined && !v.command.some((arg) => arg.includes("{name}"))) problems.push(`${where}: plugin ${name}'s verifier [${v.form}] runs ${JSON.stringify(v.command)}, which never names {name}; a command must be told what to prove`);
+        if (v.match !== undefined) {
+          try {
+            new RegExp(v.match);
+          } catch (error) {
+            problems.push(`${where}: plugin ${name}'s verifier [${v.form}] match is not a regular expression (${(error as Error).message})`);
+          }
+        }
+      }
+    }
   }
   const verifierForms = Array.isArray(verifiers) ? (verifiers as VerifierForm[]) : [];
   if (verifierForms.some((v) => v.command === undefined) && raw["module"] === undefined) problems.push(`${where}: plugin ${name} proves a via form with no command and has no module to verify it`);
@@ -69,6 +82,12 @@ function readManifest(name: string, dir: string, where: string): { manifest?: Pl
   if ((language !== undefined || typeof raw["extends"] === "string") && raw["module"] === undefined) problems.push(`${where}: plugin ${name} provides or extends a language adapter but names no module`);
   if (problems.length > 0) return { problems };
   return { manifest: raw as unknown as PluginManifest, problems };
+}
+
+/** Whether `path` is `root` or under it. */
+function within(root: string, path: string): boolean {
+  const from = relative(resolve(root), path);
+  return from === "" || (!from.startsWith("..") && !isAbsolute(from));
 }
 
 /** Where a config value puts a plugin's folder: the bundled one, or a path from the root. */
@@ -92,6 +111,12 @@ export function readPlugins(root: string, value: unknown, where: string, builtIn
   for (const [name, source] of Object.entries(value)) {
     if (typeof source !== "string" || source === "") {
       problems.push(`${where}: plugins.${name} is "bundled" or a path to the plugin's folder`);
+      continue;
+    }
+    // Plugin code runs with the project's privileges; a relative path that climbs out of the project is refused, and running code from
+    // elsewhere is said explicitly, by writing the absolute path out.
+    if (source !== "bundled" && !isAbsolute(source) && !within(root, resolve(root, source))) {
+      problems.push(`${where}: plugins.${name} is ${JSON.stringify(source)}, which leaves the project; a plugin's code runs with the project's privileges, so write the absolute path out to run code from outside it`);
       continue;
     }
     const dir = dirOf(root, name, source);
@@ -169,13 +194,26 @@ export function moduleOf(plugin: LoadedPlugin): Promise<PluginModule> {
   const module = plugin.manifest.module;
   if (module === undefined) return Promise.reject(new PluginRefused(`plugin ${plugin.name} has no module`));
   const path = resolve(plugin.dir, module);
-  let loading = modules.get(path);
+  // Keyed by the file as it is now: Node keeps a module it loaded under its URL for the process's life, so an edited module is a new URL.
+  let version = "missing";
+  try {
+    const s = statSync(path);
+    version = `${s.mtimeMs}-${s.size}`;
+  } catch {
+    // Missing: the import below fails and says so.
+  }
+  const key = `${path}?v=${version}`;
+  let loading = modules.get(key);
   if (loading === undefined) {
-    loading = import(pathToFileURL(path).href).then((m: { default?: unknown }) => {
+    loading = import(`${pathToFileURL(path).href}?v=${version}`).then((m: { default?: unknown }) => {
       if (!isRecord(m.default)) throw new PluginRefused(`plugin ${plugin.name}'s module ${path} has no default export of its adapter, verify or syntax`);
       return m.default as PluginModule;
     });
-    modules.set(path, loading);
+    // A failed import is never kept: the next ask tries again, so a fixed module is read once it is fixed.
+    loading.catch(() => {
+      if (modules.get(key) === loading) modules.delete(key);
+    });
+    modules.set(key, loading);
   }
   return loading;
 }

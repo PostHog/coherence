@@ -28,9 +28,29 @@ Plugins ship two ways:
 ```
 
 The key is the plugin's name, which its manifest must carry. The value is
-`"bundled"` or a path from the project root to the plugin's folder. The key is
-the project's own: a registry's `plugins` are never inherited by its leaves,
-since the paths are the writer's.
+`"bundled"` or a path to the plugin's folder. The key is the project's own: a
+registry's `plugins` are never inherited by its leaves, since the paths are the
+writer's.
+
+A relative path must stay inside the project; one that climbs out of it
+(`"../shared/plugin"`) is refused. To run a plugin from outside the project,
+write its absolute path out: that is the explicit form, and it says on the page
+that the code comes from elsewhere.
+
+## Trust
+
+A plugin's module is code, and it runs with the project's privileges: whatever
+the user running Coherence may read, write or start, it may too. It runs in
+`coherence run` (so in CI, through the generated workflow), in `refute`, and in
+the warm adapter server that the hooks talk to. It never runs inside a hook's
+own process: a hook reads only the manifest and the lexicon layer, which are
+data. Run a plugin you would run as a dev dependency, and review a change to
+one as you would a change to the project's own code. A bundled plugin ships
+inside `@posthog/coherence` and is reviewed with it.
+
+The warm server's code fingerprint holds every plugin folder the project runs,
+so an edited plugin replaces the server as an edited Coherence does, and a
+module that fails to load is tried again once it is fixed.
 
 A project without a `plugins` key reads nothing of any plugin: no manifest, no
 lexicon layer, no bundled folder. It does exactly the work it did before
@@ -59,7 +79,7 @@ sample/
   "ladder": { "top": "reference-choked", "because": "...", "rungs": [] },
   "verifiers": [
     { "form": "sample prove", "evidence": "model-checked" },
-    { "form": "sample exit", "evidence": "exit-checked", "command": ["node", "check.js", "{name}"] }
+    { "form": "sample exit", "evidence": "exit-checked", "command": ["node", "check.js", "{name}"], "match": "^proved " }
   ],
   "lexicon": "./lexicon.json"
 }
@@ -74,7 +94,7 @@ sample/
 | `extensions` | The files a new language is written in. An extension a built-in, a declared language, or another plugin owns is refused. |
 | `module` | The module, relative to the manifest. Required for an adapter, and for a verifier with no `command`. |
 | `ladder` | The rungs the adapter grades on. Absent, the wrapped adapter's; with none, reference-choked alone, enforced by Coherence's check. |
-| `verifiers` | The via forms it proves (below). |
+| `verifiers` | The via forms it proves (below). A `command` must name `{name}`; a command that is never told what to prove is refused. An optional `match` is a regular expression its output must match for an exit 0 to pass. |
 | `lexicon` | Its lexicon layer, relative to the manifest. |
 
 The manifest is data so that a hook that only needs to know what a plugin
@@ -85,7 +105,7 @@ adapter server and in a run, when a check first asks its adapter or verifier.
 ### The module
 
 ```ts
-import type { PluginModule } from "@posthog/coherence/src/plugins/plugin.ts";
+import type { PluginModule } from "@posthog/coherence/plugin";
 
 const plugin: PluginModule = {
   adapter: ({ root, language, base }) => /* a LanguageAdapter */,
@@ -132,7 +152,9 @@ A bullet proved by a plugin rather than a test writes its form in brackets:
 
 The bracketed form is one a loaded plugin declares. The plugin is asked to
 prove the name, by its `command` (the name in place of `{name}`, run from the
-project root; exit 0 is a pass) or its module's `verify`. The verdict is graded
+project root; exit 0 is a pass, and with `match` only when the output matches
+too, an exit 0 whose output does not being a fail that names the expression)
+or its module's `verify`. The verdict is graded
 as a test's is, and the run entry records the plugin and the form's evidence
 label. A bracket begins no test title, so the two never read as each other. A
 form no loaded plugin declares is a spec problem naming the forms that are,
@@ -169,3 +191,26 @@ order, then the project's.
 A run entry that a plugin's adapter graded, or a plugin's verifier proved,
 carries `plugins: [{ name, version }]`, in the order they wrapped. A verifier's
 entry also carries `evidence`, the label its manifest gives the form.
+
+## Not yet
+
+What the interface does not carry yet, for step 2 to start from:
+
+- **Ladders are static.** `ladder` is JSON in the manifest, but Python's
+  checker rung depends on the project's pyright configuration, read at check
+  time. The ladder needs a way to be answered by the module (as the adapter's
+  own `ladder` already is) without loading code in a hook.
+- **testFilter before the module loads.** `testFilter` is synchronous; a
+  plugin adapter answers with the wrapped adapter's, or the name unchanged,
+  until a question has loaded its module (src/plugins/adapter.ts).
+- **Built-in extension rules.** TypeScript's rule (`[cm]?[tj]sx?`, never
+  `.d.ts`) is not expressible as a list of manifest `extensions`.
+- **Bundled plugins in TypeScript.** Node strips no types under node_modules,
+  so a bundled `.ts` plugin cannot load from an installed package: the build
+  must emit JavaScript for `plugins/`, as it does for `src/`.
+- **Syntax tables as code.** The tables are module code, and a reading that
+  runs in a hook would load plugin code there, against the manifest-as-data
+  rule (d-483262db). They need a data form, or a reading that runs outside the
+  hook process.
+- **Slots not yet defined.** Checker boundaries (tach), CI install steps, where
+  a language server is found, test-path rules, ignores, and well-known names.

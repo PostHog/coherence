@@ -22,8 +22,9 @@ import { countingFs } from "../lifecycle/fs-count-fixture.ts";
 import { rejectedNames, renderCompact } from "../lifecycle/lexicon.ts";
 import { loadProjectLexicons } from "../lifecycle/project.ts";
 import { loadSpecModel } from "../spec/model.ts";
+import { serverFingerprint } from "../enforcement/server.ts";
 import { PluginAdapter } from "./adapter.ts";
-import { BUNDLED_DIR } from "./registry.ts";
+import { BUNDLED_DIR, moduleOf } from "./registry.ts";
 
 const SAMPLE = resolve(dirname(fileURLToPath(import.meta.url)), "fixtures", "sample");
 const roots: string[] = [];
@@ -132,7 +133,7 @@ test("a via form is proved by the plugin that declares it, graded like a test wi
   assert.deepEqual(by.get("the model holds")!.plugins, [{ name: "sample", version: "0.1.0" }]);
 });
 
-test("two plugins that provide one language are refused with both named, and so is a plugin written for another pluginApi", () => {
+test("two plugins that provide one language are refused with both named, and so is a plugin written for another pluginApi", async () => {
   const manifest = (name: string, extra: Record<string, unknown>): Record<string, string> => ({ [`plugins/${name}/plugin.json`]: JSON.stringify({ name, version: "1.0.0", pluginApi: 1, module: "./index.ts", ...extra }) });
   const twice = project({
     ...manifest("one", { provides: { language: "typescript" } }),
@@ -148,6 +149,11 @@ test("two plugins that provide one language are refused with both named, and so 
   const misnamed = project({ ...manifest("real", {}), "coherence.config.json": JSON.stringify({ plugins: { alias: "./plugins/real" } }) });
   assert.throws(() => readEnforcementConfig(misnamed), /the plugin keyed alias names itself "real"/);
   assert.ok(loadSpecModel(twice).problems.some((p) => p.file === "coherence.config.json" && /both provide language typescript/.test(p.message)), "the spec check says it too");
+  const outside = project({ "coherence.config.json": JSON.stringify({ plugins: { far: "../elsewhere/far" } }) });
+  assert.throws(() => readEnforcementConfig(outside), /plugins\.far is "\.\.\/elsewhere\/far", which leaves the project; .* write the absolute path out/, "a relative path out of the project is refused; an absolute one is the explicit form");
+  assert.throws(() => declaredClasses(twice), /defect classes cannot be read: .*both provide language typescript/, "a refused plugin is said where defect classes are read, never dropped in silence");
+  const { startReading } = await import("../lifecycle/hook.ts");
+  assert.match((await startReading(twice)).text, /Plugins refused \(1\)[^\n]*\n✕ [^\n]*plugins one and two both provide language typescript/, "the session start names the refusal and its reason");
 });
 
 test("a plugin's lexicon layer joins the stack: its terms count as declared and show their layer, its rejected names stay its own, its defect classes are read, and a clash is reported until the project settles it", async () => {
@@ -186,4 +192,39 @@ test("a session start carries a plugin's vocabulary only while its surface is in
   assert.match((await startReading(proved)).text, /Plugin sample vocabulary/, "a bullet proved by its form puts it in the way");
   const typescript = project({ "coherence.config.json": JSON.stringify({ language: "typescript", plugins: { sample: SAMPLE } }), "Demo.spec.md": "# Demo\n\n## invariants\n" });
   assert.match((await startReading(typescript)).text, /Plugin sample vocabulary/, "a language it extends puts it in the way");
+});
+
+test("a verifier's command must name what it proves, and with a match its exit 0 passes only when its output matches", async () => {
+  const blind = project({
+    "plugins/blind/plugin.json": JSON.stringify({ name: "blind", version: "1.0.0", pluginApi: 1, verifiers: [{ form: "always", evidence: "model-checked", command: ["true"] }] }),
+    "coherence.config.json": JSON.stringify({ plugins: { blind: "./plugins/blind" } }),
+  });
+  assert.throws(() => readEnforcementConfig(blind), /verifier \[always\] runs \["true"\], which never names \{name\}/, "a command told nothing of what to prove is refused");
+  const root = project({
+    "coherence.config.json": JSON.stringify({ language: "typescript", plugins: { sample: SAMPLE } }),
+    "Demo.spec.md": "# Demo\n\n## invariants\n- matched: The sample prints its proof.\n  over: the sample\n  via: [sample match] ok\n  because: an output names the proof\n  kinds: none\n- unmatched: The sample prints no proof.\n  over: the sample\n  via: [sample match] other\n  because: an exit 0 alone proves nothing\n  kinds: none\n",
+  });
+  const outcome = await performRun(root, { session: "plugins", agent: "test", form: "totality oracle", server: false });
+  const by = new Map(outcome.record.invariants.map((e) => [e.name, e]));
+  assert.equal(by.get("matched")!.verdict, "pass", by.get("matched")!.reason);
+  assert.equal(by.get("unmatched")!.verdict, "fail", "an exit 0 whose output does not match is a fail");
+  assert.match(by.get("unmatched")!.reason, /exited 0 but its output did not match \/\^proved \//);
+});
+
+test("an edited plugin replaces the warm server and a fixed module is read again: the server's fingerprint holds every plugin's folder, and a failed import is never kept", async () => {
+  const root = project({
+    "plugins/live/plugin.json": JSON.stringify({ name: "live", version: "1.0.0", pluginApi: 1, extends: "typescript", module: "./index.ts" }),
+    "plugins/live/index.ts": "export default { adapter: ( => {} };\n",
+    "coherence.config.json": JSON.stringify({ language: "typescript", plugins: { live: "./plugins/live" } }),
+  });
+  const bare = project({ "coherence.config.json": JSON.stringify({ language: "typescript" }) });
+  const before = serverFingerprint(root);
+  assert.notEqual(before, serverFingerprint(bare), "a project's plugins are part of the code its server runs");
+  const plugin = readEnforcementConfig(root).plugins[0]!;
+  await assert.rejects(moduleOf(plugin), "a module that will not load is refused");
+  writeFileSync(join(root, "plugins", "live", "index.ts"), "export default { verify: async () => ({ verdict: \"pass\", reason: \"fixed\" }) };\n");
+  const after = serverFingerprint(root);
+  assert.notEqual(after, before, "an edited plugin module changes the server's fingerprint, so a client replaces the server");
+  const fixed = await moduleOf(plugin);
+  assert.equal(typeof fixed.verify, "function", "the fixed module is imported again, never the failure kept");
 });
