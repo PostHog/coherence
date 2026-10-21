@@ -44,9 +44,10 @@ import { fileURLToPath } from "node:url";
 import type { Definition, ReferenceSite, ResolveHint, Resolved } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
 import { closureOf } from "../../enforcement/code-fingerprint.ts";
-import { resolveDotted } from "../../adapters/python.ts";
-import { resolveSpecifier } from "../../adapters/typescript.ts";
 import type { KeptReport } from "./model.ts";
+import { pythonKeptModules } from "./python-scope.ts";
+import { rustKeptModules } from "./rust-scope.ts";
+import { typescriptKeptModules } from "./typescript-scope.ts";
 
 /** Where each language's kept answers live: transient, beside the recorded reading. */
 const KEPT_DIR = join(".coherence", "structure");
@@ -57,6 +58,7 @@ const KEPT_VERSION = 1;
 const KEPT_EXTENSIONS: Record<Language, readonly string[]> = {
   typescript: [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
   python: [".py", ".pyi"],
+  rust: [".rs"],
 };
 
 /** The project files besides source that a server's answers rest on: language configuration, manifests and lockfiles, by base name. */
@@ -79,8 +81,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..", "..");
 
 const TOKEN = /[A-Za-z_$][A-Za-z0-9_$]*/g;
-const TS_WILDCARD = /^export\s+(?:type\s+)?\*(?:\s+as\s+[A-Za-z_$][A-Za-z0-9_$]*)?\s+from\s*["']([^"']+)["']/gm;
-const PY_STAR = /^from\s+(\.*)([A-Za-z0-9_.]*)\s+import\s+\*/gm;
+/** The module files a changed file star-imports or wildcard re-exports, per language, each language's in its own module: a language with none fails to compile. */
+const KEPT_MODULES: Record<Language, (file: string, text: string) => string[]> = {
+  typescript: typescriptKeptModules,
+  python: pythonKeptModules,
+  rust: rustKeptModules,
+};
 
 /** One kept answer and what it depends on: the files it names and the names that, spelled in a changed file, could change it. */
 interface Kept<T> {
@@ -197,21 +203,7 @@ function changesOf(root: string, language: Language, was: Record<string, string>
       continue;
     }
     for (const token of text.match(TOKEN) ?? []) tokens.add(token);
-    if (language === "typescript") {
-      for (const [, specifier] of text.matchAll(TS_WILDCARD)) {
-        const target = resolveSpecifier(file, specifier!);
-        if (target === undefined) continue;
-        const stripped = target.replace(/\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/, "");
-        for (const candidate of [target, `${stripped}.ts`, `${stripped}.tsx`, `${stripped}.mts`, `${stripped}.cts`, `${stripped}.js`, `${stripped}/index.ts`]) modules.add(candidate);
-      }
-    } else {
-      for (const [, dots, dotted] of text.matchAll(PY_STAR)) {
-        const target = resolveDotted(file, dots!, dotted!);
-        if (target === undefined) continue;
-        modules.add(`${target}.py`);
-        modules.add(`${target}/__init__.py`);
-      }
-    }
+    for (const module of KEPT_MODULES[language](file, text)) modules.add(module);
   }
   return { files, tokens, modules };
 }

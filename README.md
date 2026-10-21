@@ -26,7 +26,7 @@ work itself.
 ## Quick setup: paste this into your agent
 
 ```text
-Install @posthog/coherence@^1.7 as a dev dependency (with pnpm, if minimumReleaseAge holds it back, add it to minimumReleaseAgeExclude) and run `npx --no -- coherence hooks install --host claude` (or `--host codex`).
+Install @posthog/coherence@latest as a dev dependency (with pnpm, if minimumReleaseAge holds it back, add it to minimumReleaseAgeExclude) and run `npx --no -- coherence hooks install --host claude` (or `--host codex`).
 Then run `npx --no -- coherence query practice "adopt Coherence"`, work through it, record it with `enact`, and tell me what each step found.
 Ask me whether pull requests should fail on Coherence's findings or get a report comment, then run `npx --no -- coherence ci install --host github --mode fail` (or `--mode comment`) with `--write`.
 ```
@@ -157,7 +157,7 @@ for you rather than the agent: the version running, the session's tool hook
 time against the budget, and the practices it owes.
 
 ```
-coherence 1.5.3 · hooks 0.4 s avg · 1 practice owed: close a defect
+coherence <version> · hooks 0.4 s avg · 1 practice owed: close a defect
 ```
 
 It reads only the session's own records, about 0.1 s a render. Add it to
@@ -191,6 +191,15 @@ tool row with its check's verdict, and puts a `Scope ↗` button above the
 prompt (or run `/scope`). The agent still gets exactly what the settings
 hooks give it.
 
+Beside it, `Journal` (or `/journal [session]`) opens a pane that tells the
+journal as it is written: each decision, defect, conjecture and
+escalation in its own words, folded to one line, over a small tree of the
+files it touched. By default it streams the latest records live across
+every session and every git worktree of the repository, background agents'
+included, each under its agent and session; `/journal <session>` shows one
+session's and `/journal live` goes back. The agent can point you at a record
+through the `mcp__coherence__journal` tool.
+
 ```
 npx --no -- coherence hooks install --host claude --mod
 ```
@@ -219,11 +228,12 @@ record carries its session and agent. If a bad call was made along the way,
 it's right there in the history instead of buried in the code, and a later
 session can retract it and say what refuted it.
 
-The journal, the runs and the work orders are committed with the code, one
-append-only file per session under `.coherence/`. Coherence writes a
-`.coherence/.gitattributes` that merges those files by keeping both sides'
-lines, so stacked branches that recorded in the same session merge and rebase
-without a conflict. You don't have to do anything to get it.
+The journal, the runs and the work orders are committed with the code, as
+append-only files per session under `.coherence/`. A writer starts a new file
+(a sealed shard) whenever HEAD or the branch moves, so no file is ever
+written from two branches, and parallel or stacked branches that recorded in
+the same session land by merge, squash or rebase on GitHub without a
+conflict (docs/records-layout.md). You don't have to do anything to get it.
 
 Here is one decision as the Journal view shows it: what was chosen, the
 alternatives rejected, the reason, the human words that prompted it, and the
@@ -286,9 +296,9 @@ It needs Node 22.18 or newer on macOS (Apple Silicon) or Linux.
 ```text
 Set up Coherence in this project, and report what each step found.
 
-1. Install. Run `npm install -D @posthog/coherence@^1.7` (or `pnpm add -D
-   @posthog/coherence@^1.7`); an older release lacks what the steps below
-   use. If pnpm's minimumReleaseAge refuses it or resolves an older one, add
+1. Install. Run `npm install -D @posthog/coherence@latest` (or `pnpm add -D
+   @posthog/coherence@latest`); the steps below use what the latest release
+   has. If pnpm's minimumReleaseAge refuses it or resolves an older one, add
    `@posthog/coherence` to `minimumReleaseAgeExclude` in pnpm-workspace.yaml
    (bun: `minimumReleaseAgeExcludes`; Yarn: `npmPreapprovedPackages`). Install
    the package itself, never a checkout. The command is
@@ -381,7 +391,7 @@ outside the component (`from: outside the component`), and its owners from
 Paste this into your agent to adopt one folder:
 
 ```text
-Adopt Coherence for <folder> only. Install @posthog/coherence@^1.7 as a dev dependency (with pnpm, if minimumReleaseAge holds it back, add it to minimumReleaseAgeExclude) and run `npx --no -- coherence hooks install --host claude --local` from <folder>.
+Adopt Coherence for <folder> only. Install @posthog/coherence@latest as a dev dependency (with pnpm, if minimumReleaseAge holds it back, add it to minimumReleaseAgeExclude) and run `npx --no -- coherence hooks install --host claude --local` from <folder>.
 Run `npx --no -- coherence adopt <folder>` from the repository root if this repository keeps a registry of adopted folders.
 Then run `npx --no -- coherence query practice "adopt Coherence"` from <folder>, work through it, record it with `enact`, and tell me what each step found.
 Ask me whether pull requests should fail on Coherence's findings or get a report comment, then run `npx --no -- coherence ci install --host github --mode fail` (or `--mode comment`) with `--write`.
@@ -392,9 +402,12 @@ Every key is in [docs/config.md](docs/config.md).
 ## Platform
 
 Coherence runs on Node 22.18 or newer, on macOS (Apple Silicon) or Linux, and
-reads TypeScript and Python projects, and projects that span both (a Python
-backend beside a TypeScript frontend: list both languages and a test setup
-per runner, as [docs/config.md](docs/config.md#more-than-one-language) shows).
+reads TypeScript, Python and Rust projects, and projects that span more than
+one (a Python backend beside a TypeScript frontend: list both languages and a
+test setup per runner, as [docs/config.md](docs/config.md#more-than-one-language) shows).
+Rust chokepoints are graded through rust-analyzer, found on the machine rather
+than installed by npm ([docs/enforcement.md](docs/enforcement.md#rust)); the
+economy and Scope readings do not read Rust yet, and say so by name.
 It works inside Claude Code and Codex. Where the project already runs a
 checker that refuses a boundary crossing, Coherence grades by it: Pyright's
 private-usage rule, an import-linter rule, or a `tach.toml` interface
@@ -403,7 +416,7 @@ graded checker-choked by tach). Coherence's own reference search still covers
 what such a checker cannot see.
 Coherence verifies itself: every screenshot here is its own Scope reading.
 
-The language adapters ask tsserver and Pyright for references. Where a Python
+The language adapters ask tsserver, Pyright and rust-analyzer for references. Where a Python
 project runs a checker that refuses a bypass, the chokepoint is graded on that
 checker: Pyright's reportPrivateUsage, an import-linter rule, or
 [tach](https://github.com/gauge-sh/tach). When the nearest `tach.toml` declares
@@ -448,7 +461,7 @@ field is refused before it is queued:
 | `platform` | both | `darwin`, `linux`, `win32` or `other` |
 | `node` | both | Node's major version |
 | `files` | both | the project's file count as a bucket: `<1k`, `1k-10k`, `10k-100k`, `>100k` |
-| `languages` | session | the configured languages: `typescript`, `python` |
+| `languages` | session | the configured languages: `typescript`, `python`, `rust` |
 | `components` | session | the spec's component count as a bucket: `<10`, `10-100`, `100-1k`, `>1k` |
 | `registry` | session | whether the project is a leaf of a registry |
 | `<event>_count`, `<event>_p50_ms`, `<event>_p95_ms`, `<event>_max_ms` | session | for each hook event the session ran (`SessionStart`, `PostToolUse`, ...): how many calls, and their median, 95th percentile and slowest milliseconds |
@@ -564,11 +577,13 @@ observations and unresolved questions; it is not a semantic-completeness score.
 
 ## Test setup
 
-Use Node 22.18 or newer and Python 3.10 or newer. From the checkout root:
+Use Node 22.18 or newer, Python 3.10 or newer, and a Rust toolchain with
+rust-analyzer. From the checkout root:
 
 ```sh
 npm ci
 npm run test:setup
+rustup component add rust-analyzer rust-src
 npm test
 ```
 
@@ -581,7 +596,9 @@ never install dependencies or need a network connection.
 
 `npm test` includes the real pytest integration, not just its report reader.
 A missing interpreter or pytest is a failure with setup instructions, not a
-skip. `npm run test:python` runs the Python adapter tests alone.
+skip. `npm run test:python` runs the Python adapter tests alone. The Rust
+adapter tests (`src/adapters/rust.test.ts`) drive a real rust-analyzer the same
+way: a missing one fails them, with the rustup command to install it.
 
 The tests find `.venv/bin/python` relative to this checkout, even when their
 working directory differs. Set `COHERENCE_PYTHON` to use another interpreter

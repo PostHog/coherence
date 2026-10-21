@@ -507,6 +507,9 @@
       "provenance": {
         "reference_note": "The reference split one invariant across four sections (invariants, works when, refutations, why) and let works-when hold claims with no invariant behind them. Here the invariant is the unit and the sections collapse into it.",
         "defined_by": "owner, 2026-09-17 (assembled from settled decisions)"
+      },
+      "properties": {
+        "mirror": "A hand list a spec declares under ## mirrors beside what it must equal: the value-import closure of some files, the keys of an object literal, or another literal. The hook reads both again at an edit to a file they span and names a disagreement as advice, never a block; a list or partner that is gone is a spec problem."
       }
     },
     {
@@ -550,6 +553,9 @@
       "provenance": {
         "owner_words": "the journal exists as COMPRESSION, not just memory. it is compression of possibly millions of subagent session tokens into a handful of durable, comprehensible outcomes. it is a signaling system so that subagents can compare notes. and it is a means of escalation for humans.",
         "defined_by": "owner, 2026-09-17"
+      },
+      "properties": {
+        "shard": "One of a session's files in a record store, <session>.<token>.jsonl, or .jsonseq when packed on one line. A writer starts a new shard whenever HEAD or the branch moves, so a commit seals it and no file is written from two branches."
       }
     },
     {

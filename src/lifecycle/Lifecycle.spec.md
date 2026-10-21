@@ -22,6 +22,10 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   handler: runHook in hook.ts
   trust: harness
 
+## mirrors
+- STATUS_TOOL_HOOKS in statusline.ts: the tool hooks the status line holds to the latency budget, kept apart because the status line imports nothing of Coherence's
+  mirrors: TOOL_HOOKS in hook-events.ts
+
 ## invariants
 - a subagent is told its own session: A subagent's start names its own session for every journal write and names its coordinator's session as one it never writes under; the main thread's start names no coordinator.
   over: a subagent start carrying the host's agent id beside its coordinator's session, and a main-thread start
@@ -284,17 +288,24 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   checklist: graceful-drain dismissed: nothing is shut down by an install or an uninstall
   checklist: readiness-evidence dismissed: install and uninstall report what they wrote or removed and claim nothing about a running process
   checklist: declared-target-coverage dismissed: one ignore file in one folder per project, not a registry of targets
-- record stores merge by union: Two branches that append different records to the same session's file in every record store (journal, runs, work) merge and rebase with no conflict, and every record of both branches loads afterwards, in time order, with nothing damaged; the attributes Coherence writes cover every record store.
-  over: the journal, the runs and the work orders, each written through its own appender under one session on a base and two branches from it, merged one way and rebased the other, against the same stack with no attributes file, which conflicts in every store
+- record stores merge with no driver: Two checkouts of one session, on parallel and on stacked branches, each writing every record store (journal, runs, work) through its own writer, land on main by merge, by squash and by rebase in a repository with no attributes file, as GitHub's merge does, with no conflict, and every record of both loads afterwards.
+  over: one session's records on a base, then on a branch A in one checkout and a branch B in a second, B beside A and B on A, A writing again after B forked, each landed by merge, squash and rebase with no .coherence/.gitattributes
+  via: two checkouts of one session on parallel and stacked branches, landed by merge, squash and rebase with no attributes file, conflict nowhere, and every record of both loads
+  because: GitHub's merge does not honour merge=union (d-44ee2214), so two branches of one session appending to one session file conflicted on GitHub, CI ran none of its jobs, and every pull request had to be brought up to date locally; sealed shards put every file on one side of a merge (d-3a125a06), and only sealing when HEAD moves survives a stacked branch landed after its parent was squashed (d-fe8a26f3)
+  crossing: project-source -> record
+  refuted: replaced the seal rule with the branch-only rule, a writer reusing its last shard while the branch and the size held whatever HEAD, the reflog or git's index said -> "two checkouts of one session on parallel and stacked branches, landed by merge, squash and rebase with no attributes file, conflict nowhere, and every record of both loads" went red in shards.test.ts on a conflict in the journal's, the runs' and the work orders' shards when the stacked branch landed by squash, and 21 of 30 records on main; restored (git checkout), green batched and alone (2026-10-14)
+  kinds: none
+- record stores merge by union: Two branches that append different records to the same legacy session file, `<session>.jsonl`, in every record store (journal, runs, work), as a release before sealed shards appends them, merge and rebase locally with no conflict, and every record of both branches loads afterwards, in time order, with nothing damaged; the attributes Coherence writes cover every record store.
+  over: the journal, the runs and the work orders, each appended to its legacy session file under one session on a base and two branches from it, merged one way and rebased the other, against the same stack with no attributes file, which conflicts in every store
   via: two branches that append different records to one session's file in every record store merge and rebase with no conflict, and every record of both loads
-  because: every restack of an adopter's stacked branches conflicted on the journal's and the runs' session files, which both branches append to, and Coherence's own pull requests hit the same conflict (df-f5c1983d); the stores are append-only and their readers order records by content, so the union of both sides' lines is the right merge, and git applies it only when an attributes file says so
-  refuted: made the attributes Coherence writes set each record store's session files to text instead of merge=union -> "two branches that append different records to one session's file in every record store merge and rebase with no conflict, and every record of both loads" went red in state-files.test.ts on a conflict in the journal's, the runs' and the work orders' session files; restored, green (2026-10-09)
+  because: every restack of an adopter's stacked branches conflicted on the journal's and the runs' session files, which both branches append to, and Coherence's own pull requests hit the same conflict (df-f5c1983d); a release before sealed shards still appends to those files, its readers order records by content, so the union of both sides' lines is the right local merge, and git applies it only when an attributes file says so; GitHub's merge applies no driver at all, which record stores merge with no driver answers
+  refuted: made the attributes Coherence writes set each record store's legacy session files to merge=text instead of merge=union -> "two branches that append different records to one session's file in every record store merge and rebase with no conflict, and every record of both loads" went red in state-files.test.ts on a conflict in the journal's legacy session file; restored (git checkout), green batched and alone (2026-10-14)
   kinds: none
 - record readers tolerate what a union merge keeps: A record store's last line left without its newline (a crashed write, or one side's unterminated line that a union merge kept) is ended before the next record is appended, so it stays one damaged line and the record after it reads whole; and a line a union merge kept twice is read once, by the journal's, the work orders' and the runs' readers alike.
   over: the journal, the work orders and the runs, each with a line doubled and a torn last line, then a record appended through its own appender
   via: a torn last line a union merge keeps stays one damaged line, the record appended after it reads whole, and a line kept twice is read once
   because: a union merge keeps both sides' lines as they are, so a torn last line can end the merged file and the next append ran on into it, losing a whole record to a damaged line; and lines identical on both sides can be kept twice, which a reader that counted lines would read as two records
-  refuted: made appendWhole append after a torn last line without ending it first -> "a torn last line a union merge keeps stays one damaged line, the record appended after it reads whole, and a line kept twice is read once" went red in state-files.test.ts; restored, green; reading every doubled line again also turned it red (2026-10-09)
+  refuted: made appendWhole append after a torn last line without ending it first -> "a torn last line a union merge keeps stays one damaged line, the record appended after it reads whole, and a line kept twice is read once" went red in state-files.test.ts; restored, green; reading every doubled line again also turned it red (2026-10-09); witnessed again once the test appended to legacy session files directly: made appendWhole append to a line file after a torn last line without ending it first -> red on its own assertion; restored (git checkout), green batched and alone (2026-10-14)
   kinds: none
 - every session start keeps the attributes file: Install and every session start write .coherence/.gitattributes where it is absent and add to one the adopter wrote only the attributes it does not set for that pattern, keeping every line of theirs; a .coherence/.gitignore holding exactly an earlier release's text, which ignored the attributes file, is brought up to this release's, so git commits the attributes file; a session start creates no ignore file install did not write and never rewrites the adopter's.
   over: a fresh git project, an adopter's attributes file setting one attribute of Coherence's for the same pattern and another for a different one, an earlier release's ignore file, a project with no ignore file, and an ignore file of the adopter's
@@ -403,11 +414,10 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: --help printed "unknown verb" and there was no --version, so an adopter had no way to ask which Coherence they had; the usage names npx --no -- coherence, since npx takes a --version given before -- as its own
   refuted: dropped -v from the version spellings -> "--version, -v, version, --help, -h and help answer at the top level" went red in version.test.ts on its own assertion (-v: unknown verb "-v"); restored byte for byte, green batched and alone (2026-10-08)
   kinds: none
-- the README's version floor is the current release: Every @posthog/coherence@^<major.minor> the README's setup prompts carry is package.json's major.minor, the prompts invoke Coherence as npx --no -- coherence and never as npx --no coherence, and they name pnpm's minimumReleaseAgeExclude.
-  over: the README's quick, full and monorepo setup prompts against package.json's version
-  via: the README's setup asks for at least the current major.minor of Coherence, invoked through npx --no --
-  because: a setup prompt with no floor let a release-age setting install 1.1.1, which lacks practices, with nothing failing; a floor written by hand drifts at the next minor release, so the test holds it to package.json
-  refuted: set the quick setup's floor to ^1.4 -> "the README's setup asks for at least the current major.minor of Coherence, invoked through npx --no --" went red in version.test.ts on its own assertion (every floor is package.json's major.minor); restored byte for byte, green batched and alone (2026-10-08)
+- the README's setup installs the latest release: Every install of @posthog/coherence the README's setup prompts carry asks for @latest, never a version or a range, no example in the README shows a version of Coherence, the prompts invoke Coherence as npx --no -- coherence and never as npx --no coherence, and they name pnpm's minimumReleaseAgeExclude.
+  over: the README's quick, full and monorepo setup prompts and its examples
+  via: the README's setup installs Coherence's latest release and names no version, invoked through npx --no --
+  because: a version written into the README goes stale at the next release unless someone bumps it by hand, and the floor it held (a release-age setting once installed 1.1.1, which lacks practices, with nothing failing) is kept another way: @latest names the newest release, the prompt has pnpm's release-age setting exempt Coherence, and a session start says when a newer release is published than the one running
   kinds: none
 - feed injects subjects only: At prompt and tool boundaries the peer feed injects the subjects of records other sessions wrote since this session's cursor, twelve at most with a count of the rest and the command that shows them whole; a full record is never injected.
   over: every record another session wrote after the cursor, at every UserPromptSubmit and PostToolUse
@@ -1217,6 +1227,40 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   because: in the comment mode, findings are reported and never fail the job, while a run that never happened is never mistaken for a clean one; a report read from the latest verdicts instead of the session's run would show a pass from another branch
   refuted: buildReport read every run in each project instead of the CI session's, so another session's later pass hid the failing verdict -> "ci report carries each project's problems, chokepoint verdicts, spec gaps and guard failures as Markdown, and fails only when Coherence did not finish" went red in ci.test.ts on its own assertion; restored byte for byte, green batched and alone (2026-10-09)
   kinds: none
+- a closure mirror is named at the edit that breaks it: At PostToolUse, a write to a file in the value-import closure a declared mirror names is read again, and each file the closure now reaches that the list does not name is added to the edit's context as advice, never a block, naming the file that imports it and the list's file and line; a type-only import adds nothing, and the file the closure grew by is watched from then on.
+  over: a fixture of the b37627e shape: a list of the page's modules, the closure of page.ts, a type-only import added to a closure file, then a value import of a file the list omits
+  via: an edit that gives a closure file a value import its mirror omits names the file and the list's line, as advice
+  because: BROWSER_SOURCES was a hand list of the Scope page's modules; b37627e made structure-flow.ts import languages-read.ts without adding it, and releases 1.6.0 to 1.7.1 shipped a page stuck on Connecting; the edit that broke it was the one moment the mismatch was cheap to see (d-f1ff87d6)
+  crossing: project-source -> reading
+  refuted: made the closure check count only the closure's starting files as missing -> "an edit that gives a closure file a value import its mirror omits names the file and the list's line, as advice" went red in mirrors.test.ts on its own assertion (the import of languages-read.ts went unnamed); restored byte for byte, green (2026-10-12)
+  kinds: none
+- a literal mirror is named at the edit that breaks it: At PostToolUse, a write to a declared mirror's list or to its partner literal reads both again, and when their members differ (another literal's members, or an object's keys) the edit's context names what each side holds alone and both files and lines, as advice; the same disagreement is said once per session, and agreeing again is silent and forgets it.
+  over: a list and its partner literal, and a set and an object's keys, changed on either side, an unrelated change to a file that still disagrees, and a fix
+  via: an edit that makes a list and its partner literal disagree names what each side holds alone, once per session
+  because: two literals kept equal by hand drift without failing anything (defect family hand-list); naming the drift at the edit that made it is the cheap moment, and saying a standing drift at every later edit of a busy file would train a reader to skip the line
+  crossing: project-source -> reading
+  refuted: said every disagreement at every watched edit, ignoring what the session was told -> "an edit that makes a list and its partner literal disagree names what each side holds alone, once per session" went red in mirrors.test.ts on its own assertion; restored byte for byte, green (2026-10-12)
+  kinds: none
+- a gone mirror is said at the edit: A write to a file a declared mirror spans, after which its list or partner literal is no longer declared as a literal there, adds a line to the edit's context saying the mirror cannot be checked and why, and the spec model names the same mirror as a problem; a mirror is never skipped in silence.
+  over: a mirror whose list is removed from its file by an edit
+  via: a mirror whose list is gone is said at the edit and is a spec problem, never skipped
+  because: a check that skips what it cannot find reads as a clean edit; a hand list derived away leaves a declaration that names nothing, and both the edit and spec --check must say so
+  crossing: project-source -> reading
+  refuted: read a list no longer declared as a literal as agreeing -> "a mirror whose list is gone is said at the edit and is a spec problem, never skipped" went red in mirrors.test.ts on its own assertion (the edit said nothing); restored byte for byte, green (2026-10-12)
+  kinds: none
+- the mirror alarm costs an unwatched edit one lookup: At PostToolUse, an edit to no file a declared mirror spans costs the alarm one read of the kept index and a lookup, and reads no source file; a watched edit reads the list, its partner, and only the closure files whose size or modification time changed, never loading the TypeScript compiler.
+  over: an edit to a file no mirror spans and an edit to a closure file, timed and counted by the work meter
+  via: an edit no mirror watches costs the alarm one lookup and reads no source
+  because: the tool hooks share a 3 s budget around every tool call; the spike measured 155 ms to load TypeScript and 29 ms to parse one file, where a regex over the literal and the imports takes under a millisecond (d-164b52ef)
+  crossing: project-source -> reading
+  refuted: read every declared mirror again at every edit, whatever file it wrote -> "an edit no mirror watches costs the alarm one lookup and reads no source" went red in mirrors.test.ts on its own assertion (an unwatched edit read the fixture's sources); restored byte for byte, green (2026-10-12)
+  kinds: budget
+  checklist: bounded-admission dismissed: nothing is admitted; the bound is on what one edit reads
+  checklist: execution-budget declared as the mirror alarm costs an unwatched edit one lookup
+  checklist: fair-admission dismissed: there are no contenders for the budget
+  checklist: rate-budget dismissed: nothing is counted against a time window
+  checklist: memory-budget dismissed: the bound is on reads, not on allocation
+  checklist: circuit-breaker-policy dismissed: the alarm has no dependency to fail
 - the warm hook process answers as the hook does: coherence hook-serve answers each event with the stdout, stderr and exit code coherence hook <event> prints for it, in arrival order, one event at a time, and keeps the same records, committed once its answer was written.
   over: a session's start, prompt, edit (before and after), read and stop, through one hook-serve process and through one hook process per event, in two copies of one project
   via: the warm process answers a session's events with the per-event hook's output and keeps the same records
@@ -1234,6 +1278,18 @@ The gyroscope delivered through harness events: orient at start, regulate at sto
   via: over its socket the warm process answers until its host ends it, and is then gone with its folder, which a client reads as a process to replace
   because: a socket left behind would make a dead process look alive to the mod, and a folder left in the temporary directory is litter per session
   refuted: removed the signal handlers -> "over its socket the warm process answers until its host ends it, and is then gone with its folder, which a client reads as a process to replace" went red in hook-serve.test.ts: the process ended by the signal without exiting 0; restored byte for byte, green (2026-10-09)
+  kinds: none
+- a command run in-process answers as the binary does: cli(args, { cwd, env, stdin }) runs a command through cli.ts's own main in the test file's process, over buffers for its output, the given stdin, folder and environment, and answers with the exit code, stdout and stderr the spawned node src/cli.ts prints for the same command, keeping the same records; a usage error or a throw ends the call with the binary's code and message, and the binary itself exits as it always did.
+  over: help, version and an unknown verb; a decision written and the journal read; spec --check and scaffold component; lexicon --check and work inspect; a SessionStart hook event from stdin and an unknown event; hooks install and status; query status and run --status; ci install, telemetry status and adopt, each through a spawned process in one copy of a project and through cli() in another
+  via: cli() answers each command family as the spawned command line does: the same exit, stdout, stderr and records
+  because: tests spawned node src/cli.ts once per call, so each call paid Node's start and Coherence's load, about a second, and 23 test files did it (df-608d319a); a test that runs the command in its own process pays the load once per file, and only a comparison with the binary itself shows the cheap path is the same command
+  refuted: made cli() drop the message a call that ends at once (a usage error, a throw) writes to stderr, keeping only its exit code -> "cli() answers each command family as the spawned command line does: the same exit, stdout, stderr and records" went red in cli.e2e.ts on its own assertion (3 of its 9 tests: the usage error, the unknown hook event, and the suite); restored byte for byte (cmp), green batched and alone (2026-10-13)
+  kinds: none
+- a call in-process never inherits the last call's answers: Before each cli() call every per-process cache a module keeps about a project (whether a folder is a repository, its registry, the projects below it, the files a root owns, the code identity under a salt) is forgotten, so each call answers as a fresh process would however the project changed since the last.
+  over: spec --check in a folder outside git and again after git init and an ignore file, beside a fresh spawned process
+  via: cli() answers a second call as a fresh process would after the project changed under it: a folder made a repository that ignores a component
+  because: a process that runs many commands holds what modules cached in the first (c-5bebbd18 names two), so a test that runs git init or ignores a file between two calls would read the first call's answer
+  refuted: made cli() no longer forget the per-process caches before each call -> "cli() answers a second call as a fresh process would after the project changed under it: a folder made a repository that ignores a component" went red in cli-fixture.test.ts on its own assertion (the second call still listed the ignored component); restored byte for byte (cmp), green batched and alone (2026-10-13)
   kinds: none
 - the mod is Coherence's own: Coherence's repository is the marketplace for its Claude Code mod and lists it at the package's version, and the tools whose PreToolUse the mod answers are generated from host-tools.ts's writers, never kept by hand.
   over: package.json's version, the mod's manifest, the marketplace file, and the mod's writers file against host-tools.ts
