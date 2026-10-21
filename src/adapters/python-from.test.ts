@@ -12,7 +12,7 @@ import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
 import { checkChokepoint } from "../enforcement/check.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
-import { PythonAdapter } from "./python.ts";
+import { PythonAdapter } from "../../plugins/python/python.ts";
 
 let root: string;
 let adapter: PythonAdapter;

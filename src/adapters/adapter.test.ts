@@ -6,9 +6,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isTestPath, parseName, rangeContains } from "./adapter.ts";
-import { PYTHON_LADDER, PythonAdapter, ruleCovers, rulesNaming, type CheckerFacts } from "./python.ts";
-import { RUST_LADDER } from "./rust.ts";
-import { TYPESCRIPT_LADDER } from "./typescript.ts";
+import { PYTHON_LADDER, PythonAdapter, ruleCovers, rulesNaming, type CheckerFacts } from "../../plugins/python/python.ts";
+import { RUST_LADDER } from "../../plugins/rust/rust.ts";
+import { TYPESCRIPT_LADDER } from "../../plugins/typescript/typescript.ts";
 
 test("a spec value reads as a bare symbol, a symbol in a file, a module path, or prose", () => {
   assert.deepEqual(parseName("writeClass"), { form: "symbol", name: "writeClass", fileHint: undefined });

@@ -13,7 +13,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
 import { instrumentFor } from "../adapters/index.ts";
-import { locateServer } from "../adapters/typescript.ts";
+import { locateServer } from "../../plugins/typescript/typescript.ts";
 import { checkChokepoint } from "../enforcement/check.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { performRun } from "../enforcement/run.ts";

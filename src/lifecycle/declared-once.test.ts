@@ -97,7 +97,7 @@ test("every list the hooks, telemetry, ci, the update line and the lexicon verbs
     [BUDGET_FLAG_NAMES, "src/readings/scope/component-interfaces.ts"],
   ];
   const held = new Set(["src/lifecycle/statusline.ts"]); // imports nothing of Coherence's; its copy of the tool hooks is held equal by its own test
-  for (const file of [...sources(join(REPO, "src")), ...sources(join(REPO, ".github")), ...sources(join(REPO, "bench"))]) {
+  for (const file of [...sources(join(REPO, "src")), ...sources(join(REPO, "plugins")), ...sources(join(REPO, ".github")), ...sources(join(REPO, "bench"))]) {
     const at = relative(REPO, file);
     const code = readFileSync(file, "utf8");
     for (const [values, home] of declaredIn) if (at !== home) assert.deepEqual(copiesOf(values, code), [], `${at} writes ${values.join("|")} out by hand; import it from ${home}`);

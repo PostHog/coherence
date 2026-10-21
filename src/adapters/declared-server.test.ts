@@ -16,8 +16,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
-import { DeclaredAdapter } from "./declared.ts";
-import { locateServer } from "./typescript.ts";
+import { DeclaredAdapter } from "../../plugins/declared/declared.ts";
+import { locateServer } from "../../plugins/typescript/typescript.ts";
 import { checkChokepoint } from "../enforcement/check.ts";
 import { DEFAULT_TEST_FOLDERS } from "../enforcement/config.ts";
 

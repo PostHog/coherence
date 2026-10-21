@@ -86,17 +86,16 @@ import { componentOf, declarationsOf, isSourceFile, isTest } from "../../economy
 import { languageOfFile, readEnforcementConfig } from "../../enforcement/config.ts";
 import { KeptAnswers } from "./kept-answers.ts";
 import { DECLARED_NOT_READ, languagesRead, notScannedYet, unscannedOf } from "./languages-read.ts";
+import { serverExtensions, syntaxOf } from "../../plugins/languages.ts";
 import { isModuleHandler } from "../../spec/grammar.ts";
 import { declaresAtTop, loadSpecModel, type SpecModel } from "../../spec/model.ts";
 import type { EntranceGuard, EntranceResolution, InterfaceReading, InterfaceSymbol, KeptReport, ReachReference, ScopedReading } from "./model.ts";
-import { PYTHON_INTERFACES } from "./python-scope.ts";
-import { RUST_INTERFACES } from "./rust-scope.ts";
-import { TYPESCRIPT_INTERFACES } from "./typescript-scope.ts";
 
 /**
  * What the reading knows of one language's syntax without its server, each
- * language's in its own module (typescript-scope.ts, python-scope.ts, rust-scope.ts): a
- * language INTERFACE_SYNTAX lacks fails to compile, never reads as another
+ * language's in its plugin's module (the `interfaces` slot of its manifest's
+ * syntax): a language whose plugin fills no such slot is named not read
+ * (notScannedYet) before the reading reaches it, never read as another
  * language.
  */
 export interface InterfaceSyntax {
@@ -114,16 +113,16 @@ export interface InterfaceSyntax {
   wildcardModules(file: string, text: string): string[];
 }
 
-/** Each language's syntax for the reading: one key per language, so a new one is one module and one key here. */
-const INTERFACE_SYNTAX: Record<Language, InterfaceSyntax> = {
-  typescript: TYPESCRIPT_INTERFACES,
-  python: PYTHON_INTERFACES,
-  rust: RUST_INTERFACES,
-};
+/** A language's syntax for the reading, from its plugin; one that reads nothing for a language whose plugin fills no interfaces slot. */
+function interfaceSyntax(language: Language): InterfaceSyntax {
+  return syntaxOf(language, "interfaces") ?? NO_INTERFACES;
+}
+
+const NO_INTERFACES: InterfaceSyntax = { isTypeDeclaration: () => false, isDefaultExport: () => false, serverBounds: false, importLists: () => [], defaultNames: () => [], wildcardModules: () => [] };
 
 /** Whether a declaration line declares a type only (an interface or a type alias): a route never follows one. */
 export function isTypeDeclaration(line: string, language: Language): boolean {
-  return INTERFACE_SYNTAX[language].isTypeDeclaration(line);
+  return interfaceSyntax(language).isTypeDeclaration(line);
 }
 
 interface ReachNode {
@@ -233,12 +232,6 @@ export function guardsOf(start: string, nodes: ReadonlyMap<string, ReachNode>, c
 
 /* ------------------------------------------------------------ the bounds */
 
-/** The extensions a language server can report a reference site in; a site in any of them is component code when it lies in a component. */
-const SITE_EXTENSIONS: Record<Language, readonly string[]> = {
-  typescript: [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
-  python: [".py", ".pyi"],
-  rust: [".rs"],
-};
 
 /** Whether a project-relative file lies inside the bounds: no rule of the walk (exclusionOf) leaves it out. */
 export function withinBounds(file: string, skip: Bounds): boolean {
@@ -266,7 +259,7 @@ export const HEAP_HEADROOM_MB = 2048;
  */
 export function interfaceAdapter(root: string, language: Language): { adapter: LanguageAdapter; bounds: string } | undefined {
   const ignore = configIgnore(root);
-  if (!INTERFACE_SYNTAX[language].serverBounds || ignore.length === 0) return undefined;
+  if (!interfaceSyntax(language).serverBounds || ignore.length === 0) return undefined;
   return { adapter: boundedAdapter(language, root, ignore, configuredBudget(root).memoryMB), bounds: ignore.join("\n") };
 }
 
@@ -286,7 +279,7 @@ export function boundsOf(root: string, ignore: readonly string[]): Bounds {
  * bounds; otherwise undefined, and a reference site there is outside.
  */
 function componentCodeOf(model: SpecModel, file: string, language: Language, skip: Bounds, testFolders: readonly string[]): string | undefined {
-  if (!SITE_EXTENSIONS[language].some((ext) => file.endsWith(ext)) || isTest(file, testFolders) || !withinBounds(file, skip)) return undefined;
+  if (!serverExtensions(language).some((ext) => file.endsWith(ext)) || isTest(file, testFolders) || !withinBounds(file, skip)) return undefined;
   return componentOf(model, file)?.folder;
 }
 
@@ -319,7 +312,7 @@ export interface WordIndex {
 /** The word index over the component code, each file with the component it belongs to. */
 export function wordIndex(root: string, code: ReadonlyMap<string, string>, language: Language, read: (file: string) => string = (file) => readFileSync(join(root, file), "utf8")): WordIndex {
   const files = [...code.keys()].sort();
-  const syntax = INTERFACE_SYNTAX[language];
+  const syntax = interfaceSyntax(language);
   const owners = new Map<string, Set<string>>();
   const where = new Map<string, Map<number, number>>();
   const direct = new Map<string, Set<string>>();
@@ -873,7 +866,7 @@ async function readLanguage(root: string, language: Language, given: LanguageAda
         const line = lines[declaration.line - 1] ?? "";
         const type = isTypeDeclaration(line, language);
         const id = `${file}#${declaration.name}`;
-        const isDefault = INTERFACE_SYNTAX[language].isDefaultExport(line);
+        const isDefault = interfaceSyntax(language).isDefaultExport(line);
         declared.push({ id, component: owner, name: declaration.name, file, type, exported: declaration.exported, isDefault });
         nodes.set(id, { component: owner, name: declaration.name, file, type });
         if (declaration.exported) declarations += 1;

@@ -22,8 +22,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import type { Definition, LanguageAdapter, ReferenceSite, Resolved } from "../../adapters/adapter.ts";
-import { PythonAdapter } from "../../adapters/python.ts";
-import { TypeScriptAdapter } from "../../adapters/typescript.ts";
+import { PythonAdapter } from "../../../plugins/python/python.ts";
+import { TypeScriptAdapter } from "../../../plugins/typescript/typescript.ts";
 import { projectFiles } from "../../adapters/project-files.ts";
 import { COHERENCE_LEXICON } from "../../lifecycle/project.ts";
 import { answerStructure } from "../query/query.ts";
@@ -427,5 +427,5 @@ test("the kept answers rest on every module the language adapters reach: their e
       assert.ok(held.has(target), `${file} imports ${specifier}, so a change to it may change an answer`);
     }
   }
-  for (const reached of ["adapters/installed.ts", "adapters/tach.ts", "adapters/toml.ts", "adapters/project-config.ts", "lifecycle/work-meter.ts"]) assert.ok(held.has(join(src, reached)), reached);
+  for (const reached of ["adapters/installed.ts", "../plugins/python/tach.ts", "adapters/toml.ts", "adapters/project-config.ts", "lifecycle/work-meter.ts"]) assert.ok(held.has(join(src, reached)), reached);
 });

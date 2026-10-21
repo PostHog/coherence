@@ -38,6 +38,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { exclusionOf, projectFilesEnding, walkBounds } from "../adapters/project-files.ts";
 import type { Language } from "../adapters/index.ts";
 import { languageOfFile } from "../adapters/language-files.ts";
+import { memberScanOf } from "../plugins/languages.ts";
 import { readFile } from "node:fs/promises";
 import { createHash, type Hash } from "node:crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -312,20 +313,12 @@ function declaredName(line: string): string | undefined {
   return undefined;
 }
 
-/** How a code file's exported type bodies read, per adapter language (languageOfFile): the line that opens a body, the line that closes it, and a field inside. A file no language claims has no type bodies read. */
+/** How a code file's exported type bodies read, per language (languageOfFile), as its plugin's manifest says: the line that opens a body, the line that closes it, and a field inside. A file no language claims, or whose plugin says nothing, has no type bodies read. */
 export interface MemberScan {
   opens: RegExp;
   closes: RegExp;
   field: RegExp;
 }
-
-/** Keyed by language, so a language an adapter adds must say how its type bodies read. */
-const MEMBER_SCANS: Record<Language, MemberScan> = {
-  typescript: { opens: /^export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:interface|type|class)\s.*\{\s*$/, closes: /^[}\]]/, field: /^\s+(?:readonly\s+)?([a-z][A-Za-z0-9]*)\??:\s*[^=]/ },
-  python: { opens: /^class\s/, closes: /^\S/, field: /^ {4}([a-z][A-Za-z0-9_]*)\s*:\s*[A-Za-z"'[]/ },
-  // Rust is not read by this reading yet: no line opens a body, so a .rs file's struct fields are not read as TypeScript's.
-  rust: { opens: /(?!)/, closes: /^[}\]]/, field: /(?!)/ },
-};
 
 /**
  * A field an exported type declares: a member of an exported TypeScript
@@ -666,7 +659,7 @@ export async function lexiconReading(
     let fenced = false;
     let exported = false;
     const language = languageOfFile(f.rel);
-    const scan = language === undefined ? undefined : MEMBER_SCANS[language];
+    const scan = language === undefined ? undefined : memberScanOf(language);
     for (let n = 0; n < f.lines.length; n++) {
       const source = f.lines[n]!;
       // Review/maintenance decisions are outcomes, not fresh source-language observations of themselves.

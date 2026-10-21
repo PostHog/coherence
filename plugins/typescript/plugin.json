@@ -1,0 +1,123 @@
+{
+  "name": "typescript",
+  "version": "1.8.0",
+  "pluginApi": 1,
+  "provides": {
+    "language": "typescript"
+  },
+  "files": {
+    "pattern": "\\.(?:[cm]?[tj]sx?)$",
+    "except": "\\.d\\.ts$"
+  },
+  "source": {
+    "except": "\\.[cm]?jsx?$"
+  },
+  "serverExtensions": [
+    ".ts",
+    ".tsx",
+    ".mts",
+    ".cts",
+    ".js",
+    ".jsx",
+    ".mjs",
+    ".cjs"
+  ],
+  "members": {
+    "opens": "^export\\s+(?:default\\s+)?(?:declare\\s+)?(?:abstract\\s+)?(?:interface|type|class)\\s.*\\{\\s*$",
+    "closes": "^[}\\]]",
+    "field": "^\\s+(?:readonly\\s+)?([a-z][A-Za-z0-9]*)\\??:\\s*[^=]"
+  },
+  "entrances": {
+    "rules": [
+      {
+        "rule": "server function",
+        "plural": "server functions",
+        "detects": "an exported const created by createServerFn (TanStack Start)"
+      },
+      {
+        "rule": "wrapped export",
+        "plural": "wrapped exports",
+        "detects": "an exported const created by calling a symbol a declared entrance names as its handler or guard"
+      },
+      {
+        "rule": "server route",
+        "plural": "server routes",
+        "detects": "an exported route created by createFileRoute with server handlers, createServerFileRoute or createAPIFileRoute"
+      },
+      {
+        "rule": "route handler",
+        "plural": "route handlers",
+        "detects": "a GET, POST, PUT, PATCH, DELETE, HEAD or OPTIONS a Next.js app/**/route file exports, declared there, in an export list or re-export, or destructured; a default export under pages/api; or an exported loader or action under app/routes"
+      },
+      {
+        "rule": "request proxy",
+        "plural": "request proxies",
+        "detects": "the proxy a Next.js proxy.ts exports, or the middleware a middleware.ts exports, at the root or under src/: declared, in an export list or re-export, or as the default export"
+      },
+      {
+        "rule": "page route",
+        "plural": "page routes",
+        "detects": "the default export of a Next.js app/**/page file, the page as a whole"
+      },
+      {
+        "rule": "server action",
+        "plural": "server actions",
+        "detects": "an exported function of a file that opens with 'use server'"
+      },
+      {
+        "rule": "route table",
+        "plural": "route table entries",
+        "detects": "an object literal naming a path or pattern that starts with / and a handler, on one line"
+      },
+      {
+        "rule": "route method",
+        "plural": "registered routes",
+        "detects": "a call like app.get('/path', handler) whose first argument is a path starting with /"
+      },
+      {
+        "rule": "package bin",
+        "plural": "package bins",
+        "detects": "a file package.json's bin names"
+      },
+      {
+        "rule": "package script",
+        "plural": "package scripts",
+        "detects": "a project file a package.json script runs with node, tsx, ts-node, bun, deno, vite-node or python"
+      },
+      {
+        "rule": "script",
+        "plural": "scripts",
+        "detects": "a file directly under a top-level scripts/ or bin/ folder that no project file imports"
+      }
+    ],
+    "notDetected": "file routes outside a Next.js app/**/page without server handlers (their work enters through server functions), hand-written dispatchers, message consumers, workers and host callbacks are not detected"
+  },
+  "environmentFolders": [
+    "node_modules"
+  ],
+  "ladder": {
+    "top": "visibility-choked",
+    "because": "a symbol not exported from its module cannot be referenced from another module; the compiler refuses it",
+    "rungs": [
+      {
+        "grade": "visibility-choked",
+        "enforcer": "the compiler",
+        "fact": "the protected thing is not exported from its module, so no other module can reference it"
+      },
+      {
+        "grade": "reference-choked",
+        "enforcer": "Coherence's check at the edit and in CI",
+        "fact": "the protected thing is exported, and every resolved reference in the project is inside the chokepoint"
+      }
+    ]
+  },
+  "module": "index.ts",
+  "syntax": {
+    "entrances": "typescript-entrances.ts#TYPESCRIPT_ENTRANCES",
+    "interfaces": "typescript-scope.ts#TYPESCRIPT_INTERFACES",
+    "kept": "typescript-scope.ts#typescriptKeptModules",
+    "source": "typescript-source.ts#TYPESCRIPT_SOURCE",
+    "declares": "typescript-interfaces.ts#typescriptDeclares",
+    "notice": "tsserver.ts#tsserverNotice"
+  }
+}

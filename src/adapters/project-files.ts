@@ -25,6 +25,7 @@ import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { configRecord, repositoryTop } from "./project-config.ts";
 import { HOST_FOLDER } from "../lifecycle/hosts.ts";
+import { environmentFolders, markedFolders } from "../plugins/languages.ts";
 export { repositoryTop };
 
 export function fileIdentity(path: string): string | undefined {
@@ -224,13 +225,6 @@ export function boundedProjectFiles(root: string, ignore: readonly string[] = co
 /* ------------------------------------------------------------ the walks */
 
 /**
- * Folder names no project authors its code in, wherever they sit: a package
- * manager's install and an interpreter's cache. Nothing else is left out by
- * its name alone: a folder named public, dist or build may hold the
- * project's own code (billing's api/public held five routes no walk read),
- * and a generated one is already left out by the project's git ignore rules.
- */
-const ENVIRONMENT_FOLDERS: ReadonlySet<string> = new Set(["node_modules", "__pycache__", "site-packages"]);
 
 /** The agent hosts' folders, as hosts.ts declares them, and git's own: never the project's words, even for a walk that reads hidden folders. */
 const HOST_FOLDERS: ReadonlySet<string> = new Set([".git", ...Object.values(HOST_FOLDER)]);
@@ -261,23 +255,26 @@ export function walkBounds(root: string, ignore: readonly string[] = configIgnor
   return { root: resolve(root), ignore: new Set(ignore.map(folderKey).filter((f) => f !== "")), readHidden: options.readHidden ?? false, memo: new Map() };
 }
 
-/** Whether a folder on disk is a Python virtual environment. */
-export function isVirtualEnvironment(dir: string): boolean {
-  return existsSync(join(dir, "pyvenv.cfg"));
-}
-
 /**
- * Whether a folder on disk is Cargo's build output: a folder named target
- * beside a Cargo.toml. Named by its place, never by its name alone, since a
- * folder called target elsewhere may hold the project's own code.
+ * Why a folder on disk is one a language's tools made, by its plugin's
+ * markedFolders (a virtual environment holds pyvenv.cfg; Cargo's build
+ * output is a folder named target beside a Cargo.toml, named by its place,
+ * never by its name alone, since a folder called target elsewhere may hold
+ * the project's own code); undefined when none marks it.
  */
-export function isCargoTarget(dir: string): boolean {
-  return basename(dir) === "target" && existsSync(join(dirname(dir), "Cargo.toml"));
+export function markedFolderReason(dir: string): string | undefined {
+  for (const mark of markedFolders()) {
+    if (mark.name !== undefined && basename(dir) !== mark.name) continue;
+    if (mark.marker !== undefined && !existsSync(join(dir, mark.marker))) continue;
+    if (mark.beside !== undefined && !existsSync(join(dirname(dir), mark.beside))) continue;
+    return mark.reason;
+  }
+  return undefined;
 }
 
 /** Whether a disk walk looking for folders (virtual environments, nested checkouts) may skip descending into one by its name: hidden, a host's, or an environment folder. */
 export function neverWalkedName(name: string): boolean {
-  return name.startsWith(".") || HOST_FOLDERS.has(name) || ENVIRONMENT_FOLDERS.has(name);
+  return name.startsWith(".") || HOST_FOLDERS.has(name) || environmentFolders().has(name);
 }
 
 /** Why one folder (project-relative) is left out, or "" when the walk enters it. */
@@ -288,10 +285,11 @@ function folderReason(bounds: Bounds, folder: string): string {
   if (bounds.ignore.has(folder) || bounds.ignore.has(name)) reason = `config ignore: ${bounds.ignore.has(folder) ? folder : name}`;
   else if (HOST_FOLDERS.has(name)) reason = `host folder: ${folder}`;
   else if (name.startsWith(".") && !bounds.readHidden) reason = `hidden folder: ${folder}`;
-  else if (ENVIRONMENT_FOLDERS.has(name)) reason = `environment folder: ${folder}`;
-  else if (isVirtualEnvironment(join(bounds.root, folder))) reason = `virtual environment: ${folder}`;
-  else if (isCargoTarget(join(bounds.root, folder))) reason = `Cargo build folder: ${folder}`;
-  else reason = "";
+  else if (environmentFolders().has(name)) reason = `environment folder: ${folder}`;
+  else {
+    const marked = markedFolderReason(join(bounds.root, folder));
+    reason = marked === undefined ? "" : `${marked}: ${folder}`;
+  }
   bounds.memo.set(folder, reason);
   return reason;
 }

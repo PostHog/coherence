@@ -79,7 +79,7 @@ test("every record store is committed, merged by union, followed live, read for 
 
   // No second list: every module takes a store's folder from the table.
   const found: string[] = [];
-  for (const file of [...sources(join(REPO, "src")), ...sources(join(REPO, ".github", "scripts"))]) {
+  for (const file of [...sources(join(REPO, "src")), ...sources(join(REPO, "plugins")), ...sources(join(REPO, ".github", "scripts"))]) {
     if (file === join(REPO, "src", "journal", "stores.ts")) continue;
     // The status line imports nothing but node's own, so it spells the journal's folder itself; statusline.test.ts holds it equal to JOURNAL_DIR, which is the table's.
     if (file === join(REPO, "src", "lifecycle", "statusline.ts")) continue;

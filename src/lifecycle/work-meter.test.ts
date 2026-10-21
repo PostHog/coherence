@@ -38,7 +38,7 @@ import { chokepointIndex } from "../spec/model.ts";
 import { peerFeed, writeCursor } from "../journal/feed.ts";
 import { appendRecord } from "../journal/store.ts";
 import type { JournalRecord } from "../journal/record.ts";
-import { TypeScriptAdapter } from "../adapters/typescript.ts";
+import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import type { LanguageAdapter } from "../adapters/adapter.ts";
 
 const SESSION = "sized";

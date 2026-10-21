@@ -29,6 +29,7 @@ import { stripTypeScriptTypes } from "node:module";
 import { dirname, extname, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { instrumentFor } from "../../adapters/index.ts";
+import { languageDataTable } from "../../plugins/languages.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
 import type { LoadedPlugin } from "../../plugins/plugin.ts";
 import { loadRuns } from "../../enforcement/record.ts";
@@ -159,6 +160,7 @@ export function loadSpec(root: string, held?: SpecModel): SpecData {
     problems: model.problems,
     counts: model.counts,
     ladder: ladderFor(root),
+    languages: languageDataTable(),
   };
   return JSON.parse(JSON.stringify(data)) as SpecData;
 }

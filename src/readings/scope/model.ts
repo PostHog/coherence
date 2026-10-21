@@ -341,6 +341,8 @@ export interface SpecData {
   problems: SpecProblem[];
   counts: SpecCounts;
   ladder: Ladder;
+  /** What the readings say of each language without its code (language-data.ts): the page reads its entrance rules from here. */
+  languages?: Record<string, LanguageData>;
 }
 
 
@@ -426,6 +428,7 @@ export type JournalStepOutcome = { result: "done"; evidence?: string } | { resul
  */
 import type { WorkOrder } from "../../journal/work.ts";
 import type { EntranceCandidate } from "../../adapters/entrance-candidates.ts";
+import type { LanguageData } from "./language-data.ts";
 import type { LanguagesRead } from "./languages-read.ts";
 export type { WorkOrder };
 

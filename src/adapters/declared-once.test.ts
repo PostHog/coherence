@@ -85,7 +85,7 @@ test("the config's key groups, the hosts' folders and the route exports are each
 
   // No other module writes the route exports or the host folders out again.
   const methods = [...NEXT_ROUTE_METHODS].map((m) => `["'\`]${m}["'\`]`).join("\\s*,\\s*");
-  for (const file of sources(join(REPO, "src"))) {
+  for (const file of [...sources(join(REPO, "src")), ...sources(join(REPO, "plugins"))]) {
     const at = relative(REPO, file);
     const code = readFileSync(file, "utf8");
     if (at !== "src/adapters/entrance-candidates.ts") assert.doesNotMatch(code, new RegExp(methods), `${at} writes the route methods out by hand`);

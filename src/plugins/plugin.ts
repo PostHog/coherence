@@ -19,9 +19,16 @@
  *                     that language's adapter to wrap, so an enhancement
  *                     reuses what it does not change. A plugin that extends
  *                     without providing wraps the provider in config order.
- *   syntax tables     the module's `syntax`: one optional slot per table the
- *                     readings scan by. A slot a plugin leaves empty is read
- *                     as "not read for <language>", never as another language.
+ *   syntax tables     the manifest's `syntax`: one optional slot per table
+ *                     the readings scan by, each naming the export of a
+ *                     module beside the manifest that holds it
+ *                     ("typescript-source.ts#TYPESCRIPT_SOURCE"). A reading
+ *                     loads only the module of the slot it reads, at the
+ *                     moment it reads it; a slot a plugin leaves empty is
+ *                     read as "not read for <language>", never as another
+ *                     language. What a reading needs without code (which
+ *                     files are the language's, the rules' descriptions, the
+ *                     member scan) is data in the manifest itself.
  *   verifier          verifiers[]: a via form, written `via: [<form>] <name>`,
  *                     that the plugin proves, graded like a test, with an
  *                     evidence label the run entry records.
@@ -29,11 +36,12 @@
  *                     layer of the stack between Coherence's and the project's.
  */
 
-import type { LanguageAdapter, Ladder } from "../adapters/adapter.ts";
+import type { AdapterBounds, LanguageAdapter, Ladder } from "../adapters/adapter.ts";
+import type { DeclaredLanguage } from "../adapters/declared-config.ts";
 import type { EntranceSyntax } from "../adapters/entrance-candidates.ts";
 import type { SourceSyntax } from "../economy/source.ts";
-import type { MemberScan } from "../lifecycle/lexicon-coverage.ts";
 import type { Literal } from "../lifecycle/mirrors.ts";
+import type { InterfaceSymbol } from "../observation/interfaces.ts";
 import type { InterfaceSyntax } from "../readings/scope/component-interfaces.ts";
 import type { Verdict } from "../enforcement/record.ts";
 
@@ -55,19 +63,62 @@ export interface VerifierForm {
   match?: string;
 }
 
+/** One entrance detection rule as the readings print it: its name, its plural, and what it detects. */
+export interface EntranceRule {
+  rule: string;
+  plural: string;
+  detects: string;
+}
+
+/** A folder the walks leave out because the language's tools made it: by a marker file inside it, or by its name beside a marker file. */
+export interface MarkedFolder {
+  /** A file inside the folder that marks it (pyvenv.cfg). */
+  marker?: string;
+  /** The folder's name (target), with `beside`. */
+  name?: string;
+  /** A file beside the folder that marks it (Cargo.toml). */
+  beside?: string;
+  /** What the walk says it left out ("virtual environment"). */
+  reason: string;
+}
+
 /** What `plugin.json` holds. */
 export interface PluginManifest {
   name: string;
   version: string;
   pluginApi: number;
-  /** The language the plugin's adapter is the provider for. */
-  provides?: { language?: string };
+  /** The language the plugin's adapter is the provider for, or the languages a config declares (the bundled declared plugin). */
+  provides?: { language?: string; declaredLanguages?: true };
   /** The language whose adapter the plugin's adapter is handed to wrap. */
   extends?: string;
   /** For a language no built-in owns: the file extensions it is written in (".swift"). */
   extensions?: string[];
+  /** The files the language is written in, as data: a regular expression a project-relative path matches, and one that takes a match back (".d.ts"). */
+  files?: { pattern: string; except?: string };
+  /** Of the language's files, those the plain source scan leaves out (TypeScript's JavaScript, Python's stubs), as a regular expression. */
+  source?: { except: string };
+  /** The extensions a language server can report a site in or resolve a name to. */
+  serverExtensions?: string[];
+  /** Regular expressions a file's base name matches when it is a test by the language's own naming (pytest's test_*.py). */
+  testFiles?: string[];
+  /** How an exported type's body reads, for the lexicon's member scan: the line that opens it, the one that closes it, a field inside; regular expressions. */
+  members?: { opens: string; closes: string; field: string };
+  /** The language's entrance detection rules and what they do not see. */
+  entrances?: { rules: EntranceRule[]; notDetected: string };
+  /** Why the readings that scan text (declarations, imports, entrance rules) do not read the language yet; absent when they do. */
+  notScanned?: string;
+  /** Folder names no project authors code in, wherever they sit: the language's install and cache folders. */
+  environmentFolders?: string[];
+  /** Folders the language's tools made, left out by a marker. */
+  markedFolders?: MarkedFolder[];
+  /** What the CI workflow says when a project reads the language. */
+  ci?: { note: string };
+  /** Names a plugin vouches for as well known, beside well-known.json. */
+  wellKnown?: string[];
   /** The module, relative to the manifest, whose default export is a PluginModule. */
   module?: string;
+  /** Each syntax slot the plugin fills: "<module beside the manifest>#<export>". */
+  syntax?: Partial<Record<SyntaxSlot, string>>;
   /** The rungs the plugin's adapter grades on; absent, the wrapped adapter's, else reference-choked alone. */
   ladder?: Ladder;
   verifiers?: VerifierForm[];
@@ -89,18 +140,23 @@ export interface VerifyResult {
   reason: string;
 }
 
-/** The syntax tables a plugin may supply for the readings, each optional. */
+/** The syntax tables a plugin may supply for the readings, each optional, each loaded from the module its manifest names. */
 export interface SyntaxTables {
   entrances?: EntranceSyntax;
   interfaces?: InterfaceSyntax;
   source?: SourceSyntax;
-  members?: MemberScan;
+  /** The module files a file star-imports or wildcard re-exports, for the Structure reading's kept answers. */
+  kept?: (file: string, text: string) => string[];
+  /** What a declaration line's keyword says can execute, for the observation's interface reading. */
+  declares?: (line: string) => InterfaceSymbol["declares"];
+  /** One line a session start says about the language's instrument at this root, or "" (TypeScript 7 ships no tsserver). */
+  notice?: (root: string) => string;
   /** The mirror reader: the literal a list named `name` is set to in a file's text. */
   lists?: (text: string, name: string) => Literal | undefined;
 }
 
 /** The slots by name, so a reading can say which one a plugin left empty. */
-export const SYNTAX_SLOTS = ["entrances", "interfaces", "source", "members", "lists"] as const;
+export const SYNTAX_SLOTS = ["entrances", "interfaces", "source", "kept", "declares", "notice", "lists"] as const;
 export type SyntaxSlot = (typeof SYNTAX_SLOTS)[number];
 
 /** What the adapter factory is handed. */
@@ -109,13 +165,16 @@ export interface AdapterContext {
   language: string;
   /** The adapter of the language the manifest extends, when it extends one. */
   base?: LanguageAdapter;
+  /** The folders a reading's bounded server leaves out, for the component interface reading alone. */
+  bounds?: AdapterBounds;
+  /** For the declared plugin: the language the config declares, which its adapter reads. */
+  declared?: DeclaredLanguage;
 }
 
 /** The module's default export. */
 export interface PluginModule {
   adapter?: (context: AdapterContext) => LanguageAdapter;
   verify?: (request: VerifyRequest) => Promise<VerifyResult>;
-  syntax?: SyntaxTables;
 }
 
 /** A plugin as the registry holds it: its manifest and where it lives. */

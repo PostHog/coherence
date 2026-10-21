@@ -1,0 +1,9 @@
+{
+  "name": "declared",
+  "version": "1.8.0",
+  "pluginApi": 1,
+  "provides": {
+    "declaredLanguages": true
+  },
+  "module": "index.ts"
+}

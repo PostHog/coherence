@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
-import { TypeScriptAdapter, locateServer } from "../adapters/typescript.ts";
+import { TypeScriptAdapter, locateServer } from "../../plugins/typescript/typescript.ts";
 import { appendRun, type RunRecord } from "../enforcement/record.ts";
 import type { Defect } from "../journal/record.ts";
 import { appendRecord } from "../journal/store.ts";

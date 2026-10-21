@@ -46,10 +46,12 @@ import {
   type SiteForm,
   type StagedSite,
   type Visibility,
-} from "./adapter.ts";
-import { locateServer as locateInstalled, locateTsserver, type ServerLocation } from "./installed.ts";
-import { JsonRpcClient } from "./jsonrpc.ts";
-import { fileIdentity, horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "./project-files.ts";
+} from "../../src/adapters/adapter.ts";
+import { locateServer as locateInstalled, type ServerLocation } from "../../src/adapters/installed.ts";
+import { locateTsserver } from "./tsserver.ts";
+import manifest from "./plugin.json" with { type: "json" };
+import { JsonRpcClient } from "../../src/adapters/jsonrpc.ts";
+import { fileIdentity, horizonFolders, keepHorizonFiles, keepProjectFiles, projectListing, walkBounds, walkedProjectFiles, type ProjectListing } from "../../src/adapters/project-files.ts";
 
 const SERVER_BIN = "typescript-language-server";
 const TYPESCRIPT_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts"]);
@@ -87,14 +89,8 @@ function syntheticExtensionBeside(file: string): string {
   return JAVASCRIPT_EXTENSIONS.has(extension) ? extension : ".ts";
 }
 
-export const TYPESCRIPT_LADDER: Ladder = {
-  top: "visibility-choked",
-  because: "a symbol not exported from its module cannot be referenced from another module; the compiler refuses it",
-  rungs: [
-    { grade: "visibility-choked", enforcer: "the compiler", fact: "the protected thing is not exported from its module, so no other module can reference it" },
-    { grade: "reference-choked", enforcer: "Coherence's check at the edit and in CI", fact: "the protected thing is exported, and every resolved reference in the project is inside the chokepoint" },
-  ],
-};
+/** The ladder, as this plugin's manifest declares it for the core to read without loading this module. */
+export const TYPESCRIPT_LADDER: Ladder = manifest.ladder as Ladder;
 
 /** Where the language server binary is, with every place looked. */
 export function locateServer(root: string): ServerLocation {

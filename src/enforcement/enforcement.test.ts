@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, before, test } from "node:test";
 import type { Definition, LanguageAdapter, ReferenceSite } from "../adapters/adapter.ts";
-import { TypeScriptAdapter, locateServer } from "../adapters/typescript.ts";
+import { TypeScriptAdapter, locateServer } from "../../plugins/typescript/typescript.ts";
 import { runHook, specStopText } from "../lifecycle/hook.ts";
 import { loadSpecModel } from "../spec/model.ts";
 import { deriveState } from "../spec/state.ts";

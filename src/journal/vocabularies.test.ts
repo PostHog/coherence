@@ -116,7 +116,7 @@ test("every closed list the journal verbs take is read from the record model, an
   // No source module writes one of these lists out again, as an array or an alternation.
   const declared = new Set(["src/journal/record.ts", "src/journal/kinds.ts"]);
   const lists = [...VOCABULARIES.map((v) => v.values), [...Object.values(KINDS), ...Object.values(WORK_KINDS)]];
-  for (const file of [...sources(join(REPO, "src")), ...sources(join(REPO, ".github"))]) {
+  for (const file of [...sources(join(REPO, "src")), ...sources(join(REPO, "plugins")), ...sources(join(REPO, ".github"))]) {
     const at = relative(REPO, file);
     if (declared.has(at)) continue;
     const code = readFileSync(file, "utf8");

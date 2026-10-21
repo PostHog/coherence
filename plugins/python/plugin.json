@@ -1,0 +1,115 @@
+{
+  "name": "python",
+  "version": "1.8.0",
+  "pluginApi": 1,
+  "provides": {
+    "language": "python"
+  },
+  "files": {
+    "pattern": "\\.pyi?$"
+  },
+  "source": {
+    "except": "\\.pyi$"
+  },
+  "serverExtensions": [
+    ".py",
+    ".pyi"
+  ],
+  "testFiles": [
+    "^test_.*\\.py$",
+    "_test\\.py$"
+  ],
+  "members": {
+    "opens": "^class\\s",
+    "closes": "^\\S",
+    "field": "^ {4}([a-z][A-Za-z0-9_]*)\\s*:\\s*[A-Za-z\"'[]"
+  },
+  "entrances": {
+    "rules": [
+      {
+        "rule": "url pattern",
+        "plural": "URL patterns",
+        "detects": "a path(), re_path() or url() in a urls.py that routes to a view (include() is delegation, not an entrance)"
+      },
+      {
+        "rule": "viewset",
+        "plural": "viewsets",
+        "detects": "a router.register('prefix', ViewSet) registration"
+      },
+      {
+        "rule": "route decorator",
+        "plural": "decorated routes",
+        "detects": "a function decorated @x.get/post/put/patch/delete/route/api_route/websocket('/path')"
+      },
+      {
+        "rule": "management command",
+        "plural": "management commands",
+        "detects": "a Command class in a management/commands/ module"
+      },
+      {
+        "rule": "task",
+        "plural": "tasks",
+        "detects": "a function decorated @shared_task or @<app>.task (Celery), or @activity.defn / @workflow.defn (Temporal)"
+      },
+      {
+        "rule": "console script",
+        "plural": "console scripts",
+        "detects": "a function pyproject.toml's [project.scripts] or [tool.poetry.scripts] names"
+      },
+      {
+        "rule": "script",
+        "plural": "scripts",
+        "detects": "a file directly under a top-level scripts/ folder with an if __name__ == \"__main__\" block"
+      }
+    ],
+    "notDetected": "views reached only through include(), hand-written dispatchers, message consumers and signal handlers are not detected"
+  },
+  "environmentFolders": [
+    "__pycache__",
+    "site-packages"
+  ],
+  "markedFolders": [
+    {
+      "marker": "pyvenv.cfg",
+      "reason": "virtual environment"
+    }
+  ],
+  "ci": {
+    "note": "A chokepoint graded by a Python checker the project runs (tach, import-linter) needs that checker here: install the project's Python tools before the check."
+  },
+  "ladder": {
+    "top": "reference-choked",
+    "because": "Python enforces no visibility: an underscore prefix and a module's __all__ list are conventions the interpreter does not enforce, so a module attribute can be imported from anywhere and only a name that never becomes a module attribute is refused",
+    "rungs": [
+      {
+        "grade": "closure-choked",
+        "enforcer": "the interpreter",
+        "fact": "the protected thing is never a module attribute: defined inside the chokepoint function's body, so nothing outside can import or name it"
+      },
+      {
+        "grade": "checker-choked",
+        "enforcer": "a checker the project runs",
+        "fact": "the name is underscore-prefixed and the project's Pyright configuration makes reportPrivateUsage an error, an import-linter rule names the protected module, or a tach interface exposes the chokepoint and not the protected thing"
+      },
+      {
+        "grade": "reference-choked",
+        "enforcer": "Coherence's check at the edit and in CI",
+        "fact": "no bypass among resolved references; the top rung when neither the interpreter nor a checker refuses one"
+      },
+      {
+        "grade": "convention",
+        "enforcer": "nobody",
+        "fact": "an underscore prefix or __all__ exclusion alone"
+      }
+    ],
+    "whenVacuous": "convention"
+  },
+  "module": "index.ts",
+  "syntax": {
+    "entrances": "python-entrances.ts#PYTHON_ENTRANCES",
+    "interfaces": "python-scope.ts#PYTHON_INTERFACES",
+    "kept": "python-scope.ts#pythonKeptModules",
+    "source": "python-source.ts#PYTHON_SOURCE",
+    "declares": "python-interfaces.ts#pythonDeclares"
+  }
+}

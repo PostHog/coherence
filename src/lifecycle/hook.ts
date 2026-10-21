@@ -80,7 +80,7 @@ import { mayTouch, performRun, withWarmAdapter } from "../enforcement/run.ts";
 import { carried, dropCarry, rememberSaid, unsaid } from "./regulate-memory.ts";
 import { HOOK_EVENTS, TOOL_HOOKS, isHookEvent, type HookEvent } from "./hook-events.ts";
 import { hookLatencyOrientText, hookLatencyStopText, latencyBudget, overBudgetLine, recordHookTime } from "./hook-latency.ts";
-import { tsserverNotice } from "../adapters/installed.ts";
+import { syntaxOf } from "../plugins/languages.ts";
 import { readEnforcementConfig } from "../enforcement/config.ts";
 import { viaForm } from "../plugins/verify.ts";
 import { readPlugins } from "../plugins/registry.ts";
@@ -459,21 +459,20 @@ export function floorQuiet(runs: SpecModel["runs"], now: number): string | undef
 }
 
 /**
- * The one line orient carries when the project's TypeScript ships no
- * tsserver (TypeScript 7 and later) and Coherence reads with its own: said
- * once, at the start, where the agent reads, so a reading made by another
- * compiler than the project's is never a surprise.
+ * The lines orient carries about the project's languages' instruments, each
+ * from its language plugin's notice slot (TypeScript's: the project's
+ * TypeScript ships no tsserver, from 7 on, and Coherence reads with its own):
+ * said once, at the start, where the agent reads, so a reading made by
+ * another compiler than the project's is never a surprise.
  */
-export function tsserverBlock(root: string): string {
+export function languageNoticeBlock(root: string): string {
   let languages: readonly string[];
   try {
     languages = readEnforcementConfig(root).languages;
   } catch {
     return "";
   }
-  if (!languages.includes("typescript")) return "";
-  const notice = tsserverNotice(root);
-  return notice === "" ? "" : `${notice}\n\n`;
+  return languages.map((language) => syntaxOf(language, "notice")?.(root) ?? "").filter((notice) => notice !== "").map((notice) => `${notice}\n\n`).join("");
 }
 
 export function specBlock(root: string, now: number = Date.now()): string {
@@ -794,7 +793,7 @@ export async function startReading(root: string, input: HookInput = {}, report?:
   const { coherence, project } = await loadProjectLexicons(root);
   const commands=await cliName(root);
   // The hand lists come from the last mirror reading kept, never one taken here (recorded.ts).
-  const head = escalationBlock(root) + pluginRefusalBlock(root) + specBlock(root) + tsserverBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + mirrorBlock(root, commands) + workBlock(root, input);
+  const head = escalationBlock(root) + pluginRefusalBlock(root) + specBlock(root) + languageNoticeBlock(root) + hookLatencyOrientText(root) + (await gapBlock(root, gaps)) + mirrorBlock(root, commands) + workBlock(root, input);
   const reading=report ?? await lexiconCoverage(root);
   // The ranked short list, or nothing: a total nobody can act on trains a reader to skip the line.
   const signal=attentionText(reading, commands);

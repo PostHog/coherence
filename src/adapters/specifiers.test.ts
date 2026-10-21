@@ -7,7 +7,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { projectSources, resolveSpecifier, seedFile, specifierCandidates } from "./typescript.ts";
+import { projectSources, resolveSpecifier, seedFile, specifierCandidates } from "../../plugins/typescript/typescript.ts";
 
 test("a NodeNext specifier written with .js names the TypeScript source first, and the JavaScript file only where that is what exists", () => {
   const candidates = specifierCandidates("src/index.ts", "./foo.js");

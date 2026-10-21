@@ -44,22 +44,13 @@ import { fileURLToPath } from "node:url";
 import type { Definition, ReferenceSite, ResolveHint, Resolved } from "../../adapters/adapter.ts";
 import type { Language } from "../../adapters/index.ts";
 import { closureOf } from "../../enforcement/code-fingerprint.ts";
+import { languageCode, serverExtensions, syntaxOf } from "../../plugins/languages.ts";
 import type { KeptReport } from "./model.ts";
-import { pythonKeptModules } from "./python-scope.ts";
-import { rustKeptModules } from "./rust-scope.ts";
-import { typescriptKeptModules } from "./typescript-scope.ts";
 
 /** Where each language's kept answers live: transient, beside the recorded reading. */
 const KEPT_DIR = join(".coherence", "structure");
 
 const KEPT_VERSION = 1;
-
-/** The extensions a server can report a site in or resolve a name to, per language: the files whose change an answer can depend on. */
-const KEPT_EXTENSIONS: Record<Language, readonly string[]> = {
-  typescript: [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
-  python: [".py", ".pyi"],
-  rust: [".rs"],
-};
 
 /** The project files besides source that a server's answers rest on: language configuration, manifests and lockfiles, by base name. */
 const BASIS_FILE = /^(?:tsconfig(?:\.[\w-]+)*\.json|jsconfig\.json|package\.json|pnpm-lock\.yaml|package-lock\.json|yarn\.lock|bun\.lockb?|pyproject\.toml|pyrightconfig\.json|setup\.cfg|uv\.lock|poetry\.lock|requirements[\w.-]*\.txt|coherence\.config\.json)$/;
@@ -69,24 +60,23 @@ const ADAPTER_ENTRY = "adapters/index.ts";
 
 /**
  * The adapter code an answer comes from, a change to any of which may change
- * any answer: every module the adapters' entry imports, followed to the end,
- * as this installation holds them (the sources in a checkout, the compiled
- * modules in the published package, which ships no sources).
+ * any answer: every module the adapters' entry imports and every module the
+ * language plugins answer from, followed to the end, as this installation
+ * holds them (the sources in a checkout, the compiled modules in the
+ * published package, which ships no sources).
  */
 export function adapterCode(): string[] {
-  return closureOf([ADAPTER_ENTRY]);
+  return closureOf([ADAPTER_ENTRY, ...languageCode()]);
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
 const COHERENCE_ROOT = resolve(here, "..", "..", "..");
 
 const TOKEN = /[A-Za-z_$][A-Za-z0-9_$]*/g;
-/** The module files a changed file star-imports or wildcard re-exports, per language, each language's in its own module: a language with none fails to compile. */
-const KEPT_MODULES: Record<Language, (file: string, text: string) => string[]> = {
-  typescript: typescriptKeptModules,
-  python: pythonKeptModules,
-  rust: rustKeptModules,
-};
+/** The module files a changed file star-imports or wildcard re-exports: each language's plugin says (its kept slot); a language whose plugin says nothing has none. */
+function keptModules(language: Language, file: string, text: string): string[] {
+  return syntaxOf(language, "kept")?.(file, text) ?? [];
+}
 
 /** One kept answer and what it depends on: the files it names and the names that, spelled in a changed file, could change it. */
 interface Kept<T> {
@@ -203,7 +193,7 @@ function changesOf(root: string, language: Language, was: Record<string, string>
       continue;
     }
     for (const token of text.match(TOKEN) ?? []) tokens.add(token);
-    for (const module of KEPT_MODULES[language](file, text)) modules.add(module);
+    for (const module of keptModules(language, file, text)) modules.add(module);
   }
   return { files, tokens, modules };
 }
@@ -240,7 +230,7 @@ export class KeptAnswers {
   private constructor(root: string, language: Language, files: readonly string[], ignore: readonly string[], testFolders: readonly string[]) {
     this.root = root;
     this.language = language;
-    const extensions = KEPT_EXTENSIONS[language];
+    const extensions = serverExtensions(language);
     this.hashes = {};
     for (const file of files) {
       if (!extensions.some((ext) => file.endsWith(ext))) continue;

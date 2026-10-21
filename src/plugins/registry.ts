@@ -17,15 +17,20 @@
  * here and does exactly the work it did before plugins.
  */
 
-import { readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { MANIFEST, PLUGIN_API, type LoadedPlugin, type PluginManifest, type PluginModule, type PluginTag, type VerifierForm, tagOf } from "./plugin.ts";
+import { MANIFEST, PLUGIN_API, SYNTAX_SLOTS, type LoadedPlugin, type PluginManifest, type PluginModule, type PluginTag, type VerifierForm, tagOf } from "./plugin.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-/** The package's own plugins: beside src (and beside dist once built). */
-export const BUNDLED_DIR = resolve(here, "..", "..", "plugins");
+/**
+ * The package's own plugins: in a checkout, the plugins folder beside src;
+ * in the published package, the JavaScript the build compiles from it into
+ * dist/bundled, since Node strips no types under node_modules.
+ */
+export const BUNDLED_DIR = existsSync(resolve(here, "..", "bundled")) ? resolve(here, "..", "bundled") : resolve(here, "..", "..", "plugins");
 
 /** A refusal the registry found, as one sentence naming what to change. */
 export class PluginRefused extends Error {}
@@ -38,8 +43,52 @@ function strings(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((v) => typeof v === "string" && v !== "");
 }
 
+/** Whether a value compiles as a regular expression. */
+function compiles(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  try {
+    new RegExp(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The faults in a manifest's data fields: the readings read them in a hook, so each is checked as the reading will use it. */
+function dataProblems(raw: Record<string, unknown>, who: string): string[] {
+  const problems: string[] = [];
+  const files = raw["files"];
+  if (files !== undefined && (!isRecord(files) || !compiles(files["pattern"]) || (files["except"] !== undefined && !compiles(files["except"])))) problems.push(`${who}'s files is { "pattern": "<regular expression>", "except"?: "<regular expression>" }`);
+  const source = raw["source"];
+  if (source !== undefined && (!isRecord(source) || !compiles(source["except"]))) problems.push(`${who}'s source is { "except": "<regular expression>" }`);
+  for (const key of ["serverExtensions", "environmentFolders", "wellKnown"] as const) if (raw[key] !== undefined && !strings(raw[key])) problems.push(`${who}'s ${key} is a list of names`);
+  const tests = raw["testFiles"];
+  if (tests !== undefined && !(Array.isArray(tests) && tests.every(compiles))) problems.push(`${who}'s testFiles is a list of regular expressions a test file's base name matches`);
+  const members = raw["members"];
+  if (members !== undefined && (!isRecord(members) || !(["opens", "closes", "field"] as const).every((k) => compiles(members[k])))) problems.push(`${who}'s members is { "opens", "closes", "field" }, each a regular expression`);
+  const entrances = raw["entrances"];
+  const rule = (r: unknown): boolean => isRecord(r) && (["rule", "plural", "detects"] as const).every((k) => typeof r[k] === "string" && r[k] !== "");
+  if (entrances !== undefined && (!isRecord(entrances) || !Array.isArray(entrances["rules"]) || !entrances["rules"].every(rule) || typeof entrances["notDetected"] !== "string")) problems.push(`${who}'s entrances is { "rules": [{ "rule", "plural", "detects" }], "notDetected": "<what the rules do not see>" }`);
+  if (raw["notScanned"] !== undefined && (typeof raw["notScanned"] !== "string" || raw["notScanned"] === "")) problems.push(`${who}'s notScanned is the reason the text scans do not read the language`);
+  const marked = raw["markedFolders"];
+  const mark = (m: unknown): boolean => isRecord(m) && typeof m["reason"] === "string" && m["reason"] !== "" && (typeof m["marker"] === "string" || (typeof m["name"] === "string" && typeof m["beside"] === "string"));
+  if (marked !== undefined && !(Array.isArray(marked) && marked.every(mark))) problems.push(`${who}'s markedFolders is a list of { "marker" } or { "name", "beside" }, each with its "reason"`);
+  const ci = raw["ci"];
+  if (ci !== undefined && (!isRecord(ci) || typeof ci["note"] !== "string" || ci["note"] === "")) problems.push(`${who}'s ci is { "note": "<what the workflow says>" }`);
+  const syntax = raw["syntax"];
+  if (syntax !== undefined) {
+    if (!isRecord(syntax)) problems.push(`${who}'s syntax maps each slot to "<module>#<export>"`);
+    else
+      for (const [slot, at] of Object.entries(syntax)) {
+        if (!(SYNTAX_SLOTS as readonly string[]).includes(slot)) problems.push(`${who}'s syntax names ${slot}, which is no slot (${SYNTAX_SLOTS.join(", ")})`);
+        else if (typeof at !== "string" || !/^[^#/][^#]*#[A-Za-z_$][\w$]*$/.test(at) || isAbsolute(at)) problems.push(`${who}'s syntax.${slot} is "<module beside the manifest>#<export>"`);
+      }
+  }
+  return problems;
+}
+
 /** The manifest at `dir`, checked against the interface; every fault named. */
-function readManifest(name: string, dir: string, where: string): { manifest?: PluginManifest; problems: string[] } {
+export function readManifest(name: string, dir: string, where: string): { manifest?: PluginManifest; problems: string[] } {
   const file = join(dir, MANIFEST);
   let raw: unknown;
   try {
@@ -54,7 +103,8 @@ function readManifest(name: string, dir: string, where: string): { manifest?: Pl
   if (typeof raw["version"] !== "string" || raw["version"] === "") problems.push(`${where}: plugin ${name} carries no version in ${file}`);
   if (raw["pluginApi"] !== PLUGIN_API) problems.push(`${where}: plugin ${name} was written for pluginApi ${JSON.stringify(raw["pluginApi"])}; this Coherence runs pluginApi ${PLUGIN_API}`);
   const provides = raw["provides"];
-  if (provides !== undefined && (!isRecord(provides) || (provides["language"] !== undefined && (typeof provides["language"] !== "string" || provides["language"] === "")))) problems.push(`${where}: plugin ${name}'s provides is { "language": "<name>" }`);
+  if (provides !== undefined && (!isRecord(provides) || (provides["language"] !== undefined && (typeof provides["language"] !== "string" || provides["language"] === "")) || (provides["declaredLanguages"] !== undefined && provides["declaredLanguages"] !== true))) problems.push(`${where}: plugin ${name}'s provides is { "language": "<name>" }`);
+  problems.push(...dataProblems(raw, `${where}: plugin ${name}`));
   if (raw["extends"] !== undefined && (typeof raw["extends"] !== "string" || raw["extends"] === "")) problems.push(`${where}: plugin ${name}'s extends names one language`);
   if (raw["extensions"] !== undefined && (!strings(raw["extensions"]) || !(raw["extensions"] as string[]).every((e) => /^\.[A-Za-z0-9.+-]+$/.test(e)))) problems.push(`${where}: plugin ${name}'s extensions is a list like [".swift"]`);
   for (const key of ["module", "lexicon"] as const) if (raw[key] !== undefined && (typeof raw[key] !== "string" || raw[key] === "" || isAbsolute(raw[key] as string))) problems.push(`${where}: plugin ${name}'s ${key} is a path relative to its ${MANIFEST}`);
@@ -79,7 +129,7 @@ function readManifest(name: string, dir: string, where: string): { manifest?: Pl
   const verifierForms = Array.isArray(verifiers) ? (verifiers as VerifierForm[]) : [];
   if (verifierForms.some((v) => v.command === undefined) && raw["module"] === undefined) problems.push(`${where}: plugin ${name} proves a via form with no command and has no module to verify it`);
   const language = isRecord(provides) && typeof provides["language"] === "string" ? provides["language"] : undefined;
-  if ((language !== undefined || typeof raw["extends"] === "string") && raw["module"] === undefined) problems.push(`${where}: plugin ${name} provides or extends a language adapter but names no module`);
+  if ((language !== undefined || typeof raw["extends"] === "string" || isRecord(provides) && provides["declaredLanguages"] === true) && raw["module"] === undefined) problems.push(`${where}: plugin ${name} provides or extends a language adapter but names no module`);
   if (problems.length > 0) return { problems };
   return { manifest: raw as unknown as PluginManifest, problems };
 }
@@ -216,4 +266,23 @@ export function moduleOf(plugin: LoadedPlugin): Promise<PluginModule> {
     modules.set(key, loading);
   }
   return loading;
+}
+
+const load = createRequire(import.meta.url);
+
+/**
+ * The plugin's module, loaded synchronously: what a question that cannot
+ * wait (an adapter's ladder or test filter, the core's own adapters) is
+ * answered from. Node keeps a module it loaded for the process's life and
+ * loads again one that failed, so a fixed module is read once it is fixed;
+ * an edited one reaches a long-lived process through the warm server's
+ * fingerprint, which replaces the server.
+ */
+export function moduleSyncOf(plugin: LoadedPlugin): PluginModule {
+  const module = plugin.manifest.module;
+  if (module === undefined) throw new PluginRefused(`plugin ${plugin.name} has no module`);
+  const path = resolve(plugin.dir, module);
+  const loaded = load(path) as { default?: unknown };
+  if (!isRecord(loaded.default)) throw new PluginRefused(`plugin ${plugin.name}'s module ${path} has no default export of its adapter or verify`);
+  return loaded.default as PluginModule;
 }

@@ -17,7 +17,7 @@ import { projectRoot } from "./project.ts";
 import { patchFiles } from "../economy/trace.ts";
 import { changedSince } from "../observation/observed.ts";
 import { checkChokepoint } from "../enforcement/check.ts";
-import { TypeScriptAdapter } from "../adapters/typescript.ts";
+import { TypeScriptAdapter } from "../../plugins/typescript/typescript.ts";
 import { stopWarmServers } from "../enforcement/server-fixture.ts";
 import { cli as inProcess } from "./cli-fixture.ts";
 
@@ -252,7 +252,7 @@ test("a chokepoint verdict over a nested project says its reference search cover
 });
 
 test("a nested Python project's imports written from the repository top resolve, so a bypass inside the project through one is found", { timeout: 120_000 }, async () => {
-  const { PythonAdapter } = await import("../adapters/python.ts");
+  const { PythonAdapter } = await import("../../plugins/python/python.ts");
   const { top } = monorepo({
     "apps/nb/coherence.config.json": JSON.stringify({ name: "nb", language: "python" }) + "\n",
     "apps/nb/query.py": "_KINDS = {\"a\"}\n\n\ndef normalize(q):\n    return q in _KINDS\n",
@@ -288,7 +288,7 @@ async function underHorizon(language: "typescript" | "python", references: unkno
         }),
   });
   const root = join(top, "apps/nb");
-  const { PythonAdapter } = await import("../adapters/python.ts");
+  const { PythonAdapter } = await import("../../plugins/python/python.ts");
   const adapter = ts ? new TypeScriptAdapter(root) : new PythonAdapter(root);
   try {
     const result = await checkChokepoint(adapter, { protects: "KINDS", chokepoint: "normalize", component: ".", testFolders: [], root });
