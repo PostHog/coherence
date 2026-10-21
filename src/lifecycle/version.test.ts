@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { cli } from "./cli-fixture.ts";
 import { runHook } from "./hook.ts";
 import { PACKAGE_NAME } from "./project.ts";
 import type { Env } from "./telemetry.ts";
@@ -24,7 +24,6 @@ import {
 } from "./version.ts";
 
 const CHECKOUT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const CLI = join(CHECKOUT, "src", "cli.ts");
 const VERSION = (JSON.parse(readFileSync(join(CHECKOUT, "package.json"), "utf8")) as { version: string }).version;
 
 /** `text` as a regular expression that matches it literally. */
@@ -232,27 +231,27 @@ test("hooks install names the Coherence the hooks reach as the session start nam
   assert.equal(reachNote(project, installed, sibling, env), `note: the hooks will run ${package_}, not a checkout at ../coherence, which runs this install\n`);
 });
 
-test("--version, -v, version, --help, -h and help answer at the top level", () => {
+test("--version, -v, version, --help, -h and help answer at the top level", async () => {
   const env = { ...process.env, ...userEnv({ COHERENCE_NO_UPDATE_CHECK: "1" }) };
   for (const flag of ["--version", "-v", "version"]) {
-    const run = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, flag], { cwd: CHECKOUT, env, encoding: "utf8" });
+    const run = await cli([flag], { cwd: CHECKOUT, env });
     assert.equal(run.status, 0, `${flag}: ${run.stderr}`);
     assert.match(run.stdout, new RegExp(`^coherence ${escaped(VERSION)}: this repository's own source\\.\\n`), flag);
   }
   for (const flag of ["--help", "-h", "help"]) {
-    const run = spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", CLI, flag], { cwd: CHECKOUT, env, encoding: "utf8" });
+    const run = await cli([flag], { cwd: CHECKOUT, env });
     assert.equal(run.status, 0, `${flag}: ${run.stderr}`);
     assert.match(run.stdout, /^usage:\n/, flag);
     assert.match(run.stdout, /coherence version {3}\(or --version, -v\)/, flag);
   }
 });
 
-test("the README's setup asks for at least the current major.minor of Coherence, invoked through npx --no --", () => {
+test("the README's setup installs Coherence's latest release and names no version, invoked through npx --no --", () => {
   const readme = readFileSync(join(CHECKOUT, "README.md"), "utf8");
-  const [major, minor] = VERSION.split(".");
-  const floors = [...readme.matchAll(/@posthog\/coherence@\^(\d+\.\d+)\b/g)].map((m) => m[1]);
-  assert.ok(floors.length >= 2, "the quick and the full setup each carry a floor");
-  assert.deepEqual([...new Set(floors)], [`${major}.${minor}`], "every floor is package.json's major.minor");
+  const installs = [...readme.matchAll(/@posthog\/coherence@(\S+?)[`\s)]/g)].map((m) => m[1]);
+  assert.ok(installs.length >= 3, "the quick, full and monorepo setups each install it");
+  assert.deepEqual([...new Set(installs)], ["latest"], "every install asks for the latest release, never a version or a range that the next release leaves behind");
+  assert.doesNotMatch(readme, /\bcoherence \d+\.\d+(\.\d+)?\b/, "no example shows a version that goes stale");
   assert.doesNotMatch(readme, /npx --no coherence/, "npx eats a flag such as --version unless -- ends its own");
   assert.match(readme, /npx --no -- coherence/);
   assert.match(readme, /minimumReleaseAgeExclude/);

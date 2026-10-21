@@ -266,6 +266,20 @@ function isLexiconDecision(line: string): boolean {
  */
 const ELIGIBLE = /^[a-z]{2,}(?: [a-z]{2,}){0,2}$/;
 
+/**
+ * Normalized, space-padded text with every occurrence of each phrase blanked,
+ * so a shorter name inside a longer one is not read as itself. A pass splits on
+ * the phrase with its spaces, so two occurrences sharing a space leave the
+ * second standing; masking repeats until none is left.
+ */
+function maskPhrases(text: string, phrases: readonly string[]): string {
+  return phrases.reduce((line, p) => {
+    let masked = line;
+    while (masked.includes(" " + p + " ")) masked = masked.split(" " + p + " ").join("   ");
+    return masked;
+  }, text);
+}
+
 function allCommon(term: string): boolean {
   return term.split(" ").every((w) => STOPLIST.has(w) || singular(w).some((s) => STOPLIST.has(s)));
 }
@@ -304,6 +318,8 @@ interface MemberScan {
 const MEMBER_SCANS: Record<Language, MemberScan> = {
   typescript: { opens: /^export\s+(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:interface|type|class)\s.*\{\s*$/, closes: /^[}\]]/, field: /^\s+(?:readonly\s+)?([a-z][A-Za-z0-9]*)\??:\s*[^=]/ },
   python: { opens: /^class\s/, closes: /^\S/, field: /^ {4}([a-z][A-Za-z0-9_]*)\s*:\s*[A-Za-z"'[]/ },
+  // Rust is not read by this reading yet: no line opens a body, so a .rs file's struct fields are not read as TypeScript's.
+  rust: { opens: /(?!)/, closes: /^[}\]]/, field: /(?!)/ },
 };
 
 /**
@@ -533,14 +549,15 @@ export async function lexiconReading(
       ? { files: await corpusFiles({ root, coherence, project }, scope.files), listed: [] as string[], unreadable: [] as UnreadablePath[], excluded: [] as UnreadablePath[] }
       : await readCorpus({ root, coherence, project }, select);
   const known = new Map<string, KnownMeaning>();
-  const senses = new Map<string, Set<string>>();
+  const coherenceSenses = new Map<string, Set<string>>();
+  const projectSenses = new Map<string, Set<string>>();
   const propertyOwners = new Map<string, { concept: Concept; layer: "coherence" | "project" }[]>();
-  table(coherence, "coherence", known, propertyOwners, senses);
+  table(coherence, "coherence", known, propertyOwners, coherenceSenses);
   const rejected = new Map(
     rejectedNames(coherence).map((r) => [clean(r.name), r]),
   );
   if (project) {
-    table(project, "project", known, propertyOwners, senses);
+    table(project, "project", known, propertyOwners, projectSenses);
     for (const r of rejectedNames(project)) rejected.set(clean(r.name), r);
   }
   for (const [name, owners] of propertyOwners) {
@@ -697,9 +714,7 @@ export async function lexiconReading(
       // Only prose a person can still edit puts a sense at risk: code shares words with the language (Promise), and a record is history.
       if (refused.length && f.kind === "prose") {
         // A rejected word inside a longer known name on the same line is that name, not the refusal.
-        const masked = spans
-          .filter((p) => !rejected.has(p))
-          .reduce((line, p) => line.split(" " + p + " ").join("   "), normalized);
+        const masked = maskPhrases(normalized, spans.filter((p) => !rejected.has(p)));
         const standing = refused.filter((p) => masked.includes(" " + p + " "));
         if (standing.length) {
           const byLine = rejectedLines.get(f.rel) ?? new Map<number, string[]>();
@@ -882,17 +897,30 @@ export async function lexiconReading(
         propertyOwners: alternatives ?? null,
         rejected: refused ?? null,
       });
-      const recorded = senses.get(term);
-      const multiple =
-        alternatives && alternatives.length > 1
-          ? `more than one recorded sense: ${alternatives.map((a) => `${a.concept} (${a.layer})`).join(", ")}`
-          : recorded && recorded.size > 1
-            ? `more than one recorded sense: ${[...recorded].join(", ")}`
-            : undefined;
+      const projectSense = own ? undefined : projectSenses.get(term);
+      const toolSense = coherenceSenses.get(term);
+      // A longer known name holding this one ("language adapter" holding "adapter") is that name where it is written, not this one.
+      const holders = projectSense && toolSense ? phrases.filter((p) => p !== term && (" " + p + " ").includes(" " + term + " ")) : [];
+      const writesInGrammar = (u: VocabularyUse): boolean => {
+        const grammar = grammarOf.get(u);
+        if (grammar === undefined) return false;
+        return maskPhrases(grammar, holders).includes(" " + term + " ");
+      };
+      const multiple = (here: VocabularyUse[]): { risk: string; declared: boolean } | undefined => {
+        if (alternatives && alternatives.length > 1)
+          return { risk: `more than one recorded sense: ${alternatives.map((a) => `${a.concept} (${a.layer})`).join(", ")}`, declared: false };
+        // In an adopter, a name its lexicon declares is the project's sense; Coherence's sense of the same spelling counts only where Coherence's grammar speaks.
+        const toolSpeaks = projectSense === undefined || here.some(writesInGrammar);
+        const recorded = new Set([...(toolSpeaks ? (toolSense ?? []) : []), ...(projectSense ?? [])]);
+        if (recorded.size <= 1) return undefined;
+        // Senses that meet only because Coherence's grammar writes the project's one-sense name are one question per term and component, as a code-declared name's are.
+        return { risk: `more than one recorded sense: ${[...recorded].join(", ")}`, declared: projectSense !== undefined && projectSense.size === 1 };
+      };
       // Why a context's sense is at risk, and whether that reason is the declared sense alone, whose ruling is keyed to the term and component.
       const atRisk = (here: VocabularyUse[]): { risk: string; declared: boolean } | undefined => {
         if (candidate || refused || !item || (!item.concept && !alternatives?.length)) return undefined;
-        if (multiple) return { risk: multiple, declared: false };
+        const several = multiple(here);
+        if (several) return several;
         const beside = item.concept ? near(here, item.concept.name) : undefined;
         if (beside) return { risk: beside, declared: false };
         // In an adopter a Coherence name its code declares is the project's sense: at risk only where Coherence's grammar writes it too.

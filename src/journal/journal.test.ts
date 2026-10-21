@@ -13,9 +13,10 @@ import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { cli } from "../lifecycle/cli-fixture.ts";
 import { journalVerbs, type Io } from "./cli.ts";
 import { INSTRUMENT_IS_WRONG, type JournalRecord } from "./record.ts";
+import { onlyFile, sessionText } from "./shard-fixture.ts";
 import { JOURNAL_DIR, loadJournal } from "./store.ts";
 
 interface Run {
@@ -59,7 +60,7 @@ function idOf(run: Run): string {
 }
 
 function lines(cwd: string, session: string): string[] {
-  return readFileSync(join(cwd, JOURNAL_DIR, `${session}.jsonl`), "utf8").split("\n").filter((line) => line !== "");
+  return sessionText(join(cwd, JOURNAL_DIR), session).split("\n").filter((line) => line !== "");
 }
 
 function records(cwd: string): JournalRecord[] {
@@ -282,15 +283,15 @@ test("a damaged line is reported with its file and line number, skipped, and cou
   try {
     const run = runIn(cwd, clock());
     idOf(run("decide", "before", "--because", "b", ...WHO));
-    appendFileSync(join(cwd, JOURNAL_DIR, "s1.jsonl"), '{"id":"d-truncated","kind":"decision","at":"2026-09-17T10:00:0\n');
-    appendFileSync(join(cwd, JOURNAL_DIR, "s1.jsonl"), '{"id":"z-1","kind":"mystery","at":"2026-09-17T10:00:05.000Z","session":"s1","agent":"alpha"}\n');
+    appendFileSync(onlyFile(join(cwd, JOURNAL_DIR), "s1"), '{"id":"d-truncated","kind":"decision","at":"2026-09-17T10:00:0\n');
+    appendFileSync(onlyFile(join(cwd, JOURNAL_DIR), "s1"), '{"id":"z-1","kind":"mystery","at":"2026-09-17T10:00:05.000Z","session":"s1","agent":"alpha"}\n');
     idOf(run("decide", "after", "--because", "b", ...WHO));
     const read = run("journal");
     assert.equal(read.code, 0);
     assert.equal(records(cwd).length, 2, "the readable records survive");
     assert.match(read.out.join("\n"), /before[\s\S]*after/);
-    assert.match(read.err[0] ?? "", /^damaged: \.coherence\/journal\/s1\.jsonl:2 not JSON/);
-    assert.match(read.err[1] ?? "", /^damaged: \.coherence\/journal\/s1\.jsonl:3 unknown kind "mystery"/);
+    assert.match(read.err[0] ?? "", /^damaged: \.coherence\/journal\/s1\.[0-9a-f]{8}\.jsonl:2 not JSON/);
+    assert.match(read.err[1] ?? "", /^damaged: \.coherence\/journal\/s1\.[0-9a-f]{8}\.jsonl:3 unknown kind "mystery"/);
     assert.equal(read.err.at(-1), "damaged lines: 2");
     const json = JSON.parse(run("journal", "--json").out.join("\n")) as { damaged: unknown[] };
     assert.equal(json.damaged.length, 2);
@@ -381,7 +382,7 @@ test("work orders: create, move, close, owner, inspect; terminal orders do not m
     assert.match(id, /^w-[0-9a-f]{8}$/);
     assert.match(created.out[0] ?? "", /owner s1; state open/);
     assert.match(created.out[1] ?? "", new RegExp(`work move ${id} active --because`), "create prints the activation command");
-    const [line] = readFileSync(join(cwd, ".coherence", "work", "s1.jsonl"), "utf8").split("\n");
+    const [line] = sessionText(join(cwd, ".coherence", "work"), "s1").split("\n");
     const record = JSON.parse(line ?? "{}") as Record<string, unknown>;
     assert.deepEqual(
       { kind: record["kind"], objective: record["objective"], success: record["success"], boundary: record["boundary"], owner: record["owner"], session: record["session"], agent: record["agent"], at: record["at"], dirty: typeof record["dirty"] },
@@ -430,7 +431,7 @@ test("work orders: create, move, close, owner, inspect; terminal orders do not m
     assert.equal(run("work", "inspect", "w-00000000").code, 1);
     assert.equal(run("work", "bogus").code, 1);
 
-    const files = readFileSync(join(cwd, ".coherence", "work", "s1.jsonl"), "utf8").split("\n").filter((l) => l !== "");
+    const files = sessionText(join(cwd, ".coherence", "work"), "s1").split("\n").filter((l) => l !== "");
     assert.equal(files[0], line, "the store is append only: the order line never changes");
   } finally {
     rmSync(cwd, { recursive: true, force: true });
@@ -620,16 +621,16 @@ test("the timeline after a cursor shows whole records", () => {
   }
 });
 
-test("the command line dispatches to the journal verbs", () => {
+test("the command line dispatches to the journal verbs", async () => {
   const cwd = scratch();
   try {
-    const cli = fileURLToPath(new URL("../cli.ts", import.meta.url));
-    const node = process.execPath;
-    const write = execFileSync(node, ["--disable-warning=ExperimentalWarning", cli, "decide", "via cli", "--because", "b", ...WHO], { cwd, encoding: "utf8" });
-    assert.match(write, /^d-[0-9a-f]{8}  decision recorded in \.coherence\/journal\/s1\.jsonl/);
-    const read = execFileSync(node, ["--disable-warning=ExperimentalWarning", cli, "journal"], { cwd, encoding: "utf8" });
-    assert.match(read, /via cli/);
-    assert.throws(() => execFileSync(node, [cli, "decide", "x", "--because", "b"], { cwd, encoding: "utf8", stdio: "pipe" }));
+    const write = await cli(["decide", "via cli", "--because", "b", ...WHO], { cwd });
+    assert.equal(write.status, 0, write.stderr);
+    assert.match(write.stdout, /^d-[0-9a-f]{8}  decision recorded in \.coherence\/journal\/s1\.[0-9a-f]{8}\.jsonl/);
+    const read = await cli(["journal"], { cwd });
+    assert.equal(read.status, 0, read.stderr);
+    assert.match(read.stdout, /via cli/);
+    assert.notEqual((await cli(["decide", "x", "--because", "b"], { cwd })).status, 0);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
@@ -676,7 +677,7 @@ test("a record the vet stands against is refused before anything is written", ()
   }
 });
 
-test("the command line acts on the project from any subfolder, and vets a record against the project's rejected names", () => {
+test("the command line acts on the project from any subfolder, and vets a record against the project's rejected names", async () => {
   const root = scratch();
   try {
     execFileSync("git", ["init", "-q"], { cwd: root });
@@ -684,24 +685,19 @@ test("the command line acts on the project from any subfolder, and vets a record
     writeFileSync(join(root, "lexicon.json"), JSON.stringify({ version: 1, project: "widgetry", concepts: [{ name: "widget", definition: "A thing with a knob." }], rejected: [{ concept: "doohickey", because: "retired surface" }] }));
     const sub = join(root, "src", "deep");
     mkdirSync(sub, { recursive: true });
-    const cli = fileURLToPath(new URL("../cli.ts", import.meta.url));
-    const node = (...argv: string[]) => {
-      try {
-        return { code: 0, out: execFileSync("node", ["--disable-warning=ExperimentalWarning", cli, ...argv], { cwd: sub, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }), err: "" };
-      } catch (error) {
-        const e = error as { status: number; stdout: string; stderr: string };
-        return { code: e.status, out: e.stdout, err: e.stderr };
-      }
+    const node = async (...argv: string[]) => {
+      const ran = await cli(argv, { cwd: sub });
+      return { code: ran.status, out: ran.stdout, err: ran.stderr };
     };
-    const written = node("decide", "from a subfolder", "--because", "b", "--session", "s1", "--agent", "main");
+    const written = await node("decide", "from a subfolder", "--because", "b", "--session", "s1", "--agent", "main");
     assert.equal(written.code, 0, written.err);
     assert.equal(loadJournal(root).records.length, 1, "the record is the project's");
     assert.ok(!existsSync(join(sub, ".coherence")) && !existsSync(join(root, "src", ".coherence")), "no second store where the command stood");
-    const refused = node("decide", "keep the doohickey", "--because", "b", "--session", "s1", "--agent", "main");
+    const refused = await node("decide", "keep the doohickey", "--because", "b", "--session", "s1", "--agent", "main");
     assert.equal(refused.code, 1);
     assert.match(refused.err, /"doohickey" is rejected for widgetry: retired surface/);
     assert.equal(loadJournal(root).records.length, 1, "the refused record never reached the store");
-    const quoted = node("decide", "keep the widget", "--over", "the doohickey", "--because", "b", "--session", "s1", "--agent", "main");
+    const quoted = await node("decide", "keep the widget", "--over", "the doohickey", "--because", "b", "--session", "s1", "--agent", "main");
     assert.equal(quoted.code, 0, "a name a decision turns away, in its over, is the record doing its job");
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -729,7 +725,7 @@ test("a record committed on another branch may be cited and read, and says where
     const read = runIn(root, clock())("journal", away);
     assert.equal(read.code, 0, read.err.join("\n"));
     assert.match(read.out.join("\n"), /chosen on the side branch/);
-    assert.match(read.out.join("\n"), /on branch side \(\.coherence\/journal\/side-1\.jsonl\), not in this checkout/);
+    assert.match(read.out.join("\n"), /on branch side \(\.coherence\/journal\/side-1\.[0-9a-f]{8}\.jsonl\), not in this checkout/);
     const citer = idOf(citing);
     assert.match(runIn(root, clock())("journal", citer).out.join("\n"), new RegExp(`${away} {2}\\(on branch side, not in this checkout\\)`), "a citation of it names the branch");
 
