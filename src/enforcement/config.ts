@@ -37,6 +37,9 @@
  *   chokepointFrom  which references a chokepoint governs when its bullet
  *              has no from: line: "anywhere" (default), "outside the
  *              component", or "outside <folder>"
+ *   plugins    the plugins the project runs, each name mapped to "bundled"
+ *              or a path to its folder (src/plugins, docs/plugins.md); the
+ *              project's own key, never inherited from a registry
  */
 
 import { isAbsolute } from "node:path";
@@ -45,6 +48,8 @@ import { declaredLanguageOf, readDeclaredLanguages, type DeclaredLanguage } from
 import { languageOfFile } from "../adapters/language-files.ts";
 import { effectiveConfig, type SetupKey } from "../adapters/project-config.ts";
 import { FROM_FORM, parseFrom, type ChokepointFrom } from "../spec/grammar.ts";
+import type { LoadedPlugin } from "../plugins/plugin.ts";
+import { pluginLanguages, readPlugins } from "../plugins/registry.ts";
 
 export { languageOfFile } from "../adapters/language-files.ts";
 
@@ -73,8 +78,12 @@ export interface EnforcementConfig {
   languages: Language[];
   /** The languages the config declares (its `languages` object), each read by the generic adapter (src/adapters/declared.ts). */
   declared: DeclaredLanguage[];
-  /** Every language a check may be written in, built-in or declared, the primary first; one for a single-language project. */
+  /** Every language a check may be written in, built-in, declared or a plugin's, the primary first; one for a single-language project. */
   enforced: string[];
+  /** The plugins the project runs, in its config's order (src/plugins/registry.ts); empty without a plugins key. */
+  plugins: LoadedPlugin[];
+  /** The languages plugins provide that no built-in owns, each with the extensions its files are written in. */
+  provided: { name: string; extensions: string[]; plugin: string }[];
   /** Every test setup, the first being the one the single keys below describe. */
   tests: TestSetup[];
   /** Undefined when no test command is configured. */
@@ -116,14 +125,14 @@ export function globPattern(glob: string): RegExp {
 }
 
 /** Whether a setup claims a project-relative file as one of its test files: its globs match it, else its language is the file's. */
-export function setupClaims(setup: TestSetup, file: string, declared: readonly DeclaredLanguage[] = []): boolean {
+export function setupClaims(setup: TestSetup, file: string, declared: readonly DeclaredLanguage[] = [], provided: EnforcementConfig["provided"] = []): boolean {
   if (setup.files !== undefined) return setup.files.some((glob) => globPattern(glob).test(file));
-  return setup.language === undefined || enforcedLanguageOf(file, { languages: [...LANGUAGES], declared }) === setup.language;
+  return setup.language === undefined || enforcedLanguageOf(file, { languages: [...LANGUAGES], declared, provided }) === setup.language;
 }
 
-/** The language a file is written in among the project's: a built-in it spans by the built-in rule, else a declared one by its extensions. */
-export function enforcedLanguageOf(file: string, config: { readonly languages: readonly Language[]; readonly declared: readonly DeclaredLanguage[] }): string | undefined {
-  return languageOfFile(file, config.languages) ?? declaredLanguageOf(file, config.declared)?.name;
+/** The language a file is written in among the project's: a built-in it spans by the built-in rule, else a declared one or a plugin's by its extensions. */
+export function enforcedLanguageOf(file: string, config: { readonly languages: readonly Language[]; readonly declared: readonly DeclaredLanguage[]; readonly provided?: EnforcementConfig["provided"] }): string | undefined {
+  return languageOfFile(file, config.languages) ?? declaredLanguageOf(file, config.declared)?.name ?? config.provided?.find((p) => p.extensions.some((e) => file.endsWith(e)))?.name;
 }
 
 function testSetupOf(raw: Record<string, unknown>, path: string, where: string): TestSetup {
@@ -146,14 +155,22 @@ function testSetupOf(raw: Record<string, unknown>, path: string, where: string):
 }
 
 export function readEnforcementConfig(root: string): EnforcementConfig {
-  const config: EnforcementConfig = { language: "typescript", languages: ["typescript"], declared: [], enforced: ["typescript"], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined, chokepointFrom: undefined };
+  const config: EnforcementConfig = { language: "typescript", languages: ["typescript"], declared: [], enforced: ["typescript"], plugins: [], provided: [], tests: [], test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS], latencyBudget: undefined, chokepointFrom: undefined };
   config.tests = [{ language: undefined, files: undefined, cwd: undefined, test: undefined, testMatch: undefined, testJson: undefined, testFilterForm: "regex", testFolders: [...DEFAULT_TEST_FOLDERS] }];
   // The project's own config over its registry's keys (project-config.ts), each inherited path rebased to the project.
   const found = effectiveConfig(root);
   if (found === undefined) return config;
   const { record, path } = found;
   const declared = readDeclaredLanguages(record["languages"], path);
-  const known = [...LANGUAGES, ...declared.map((d) => d.name)];
+  // The plugins first: a language a plugin provides is one the language key may name.
+  const read = readPlugins(root, record["plugins"], path, LANGUAGES, (extension) => languageOfFile(`x${extension}`) ?? declaredLanguageOf(`x${extension}`, declared)?.name);
+  if (read.problems.length > 0) throw new Error(read.problems.join("; "));
+  const provided = pluginLanguages(read.plugins, LANGUAGES);
+  const twice = provided.filter((p) => declared.some((d) => d.name === p.name));
+  if (twice.length > 0) throw new Error(`${path}: ${twice.map((p) => `${p.name} is both declared under languages and provided by plugin ${p.plugin}`).join("; ")}; keep one`);
+  config.plugins = read.plugins;
+  config.provided = provided;
+  const known = [...LANGUAGES, ...declared.map((d) => d.name), ...provided.map((p) => p.name)];
   const language = record["language"];
   if (language !== undefined) {
     const listed = typeof language === "string" ? [language] : Array.isArray(language) ? language : [language];
@@ -166,6 +183,9 @@ export function readEnforcementConfig(root: string): EnforcementConfig {
   // A declared language the language key does not name would be read by nothing: say so rather than leave it unread.
   const unnamed = declared.filter((d) => !config.enforced.includes(d.name));
   if (unnamed.length > 0) throw new Error(`${path}: languages declares ${unnamed.map((d) => d.name).join(", ")}, which language does not name; name each there (language: [${[...config.enforced, ...unnamed.map((d) => d.name)].map((l) => JSON.stringify(l)).join(", ")}]) or remove it`);
+  // So with a language a plugin brings: named in language, or the plugin's adapter would read nothing.
+  const unlisted = provided.filter((p) => !config.enforced.includes(p.name));
+  if (unlisted.length > 0) throw new Error(`${path}: ${unlisted.map((p) => `plugin ${p.plugin} provides ${p.name}`).join(", ")}, which language does not name; name each there (language: [${[...config.enforced, ...unlisted.map((p) => p.name)].map((l) => JSON.stringify(l)).join(", ")}]) or remove the plugin`);
   config.declared = declared;
   config.languages = config.enforced.filter((l): l is Language => isLanguage(l));
   config.language = config.enforced[0]!;

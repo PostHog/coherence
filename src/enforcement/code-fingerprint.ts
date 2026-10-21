@@ -44,8 +44,14 @@ function salted(hash: ReturnType<typeof createHash>): string {
   return hash.digest("hex").slice(0, 16);
 }
 
-/** The fingerprint, read from disk each time, so a client compares a running server with the code as it is now. */
-export function codeFingerprint(): string {
+/**
+ * The fingerprint, read from disk each time, so a client compares a running
+ * server with the code as it is now. `pluginDirs` are the folders of the
+ * plugins the project runs (src/plugins): their manifests and modules are
+ * code the server runs too, so an edited plugin replaces the server as an
+ * edited Coherence does. A project with no plugins hashes what it always did.
+ */
+export function codeFingerprint(pluginDirs: readonly string[] = []): string {
   const hash = createHash("sha256");
   for (const file of allCodeFiles()) {
     hash.update(relative(CODE_DIR, file)).update("\0");
@@ -55,6 +61,24 @@ export function codeFingerprint(): string {
       hash.update("<unreadable>");
     }
     hash.update("\0");
+  }
+  for (const dir of [...pluginDirs].sort()) {
+    hash.update(`plugin\0${dir}\0`);
+    let files: string[] = [];
+    try {
+      files = codeFiles(dir, []).sort();
+    } catch {
+      hash.update("<unreadable>");
+    }
+    for (const file of files) {
+      hash.update(relative(dir, file)).update("\0");
+      try {
+        hash.update(readFileSync(file));
+      } catch {
+        hash.update("<unreadable>");
+      }
+      hash.update("\0");
+    }
   }
   return salted(hash);
 }

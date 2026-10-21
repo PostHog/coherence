@@ -48,6 +48,7 @@ import { warmInstrument } from "./enforcement/run.ts";
 import { JOURNAL_USAGE, journalVerbs, type Io } from "./journal/cli.ts";
 import { formatReport, hasFindings, recordVetter, runCheck } from "./lifecycle/check.ts";
 import { renderCompact, renderCompactWithin, tokenEstimate } from "./lifecycle/lexicon.ts";
+import { clashText } from "./plugins/lexicon.ts";
 import { cliName, CONTEXT_BUDGET, ECONOMY_SNAPSHOT, isHookEvent, HOOK_EVENTS, MIRROR_REFRESH, readStdinJson, runHook, STRUCTURE_REFRESH, WARM_UP } from "./lifecycle/hook.ts";
 import { deliveries, formatDeliveries } from "./lifecycle/delivery.ts";
 import { runHookServe } from "./lifecycle/hook-serve.ts";
@@ -217,7 +218,9 @@ async function lexiconCommand(call: CommandCall, args: string[], root: string): 
     call.stderr.write(`lexicon: unknown flag --${unknown}\n`);
     return 1;
   }
-  const { coherence, project } = await loadProjectLexicons(root);
+  const { coherence, project, clashes = [] } = await loadProjectLexicons(root);
+  // A plugin concept another layer already names stays out of the stack until the project settles it: said here, as spec --check says it.
+  for (const clash of clashes) call.stderr.write(`lexicon stack: ${clashText(clash)}\n`);
   if (flags.has("check")) {
     const report = await runCheck({ root, paths: positionals, coherence, project });
     call.stdout.write(flags.has("json") ? JSON.stringify(report, null, 2) + "\n" : formatReport(report));

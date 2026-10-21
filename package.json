@@ -41,13 +41,23 @@
     "coherence": "dist/cli.js",
     "coherence-statusline": "dist/statusline.js"
   },
+  "exports": {
+    "./plugin": {
+      "types": "./dist/plugins/plugin.d.ts",
+      "default": "./dist/plugins/plugin.js"
+    },
+    "./package.json": "./package.json",
+    "./dist/*": "./dist/*"
+  },
   "files": [
     "dist",
     "docs/lexicon.json",
     "docs/checklist-seed.json",
     "src/*/*.practice.md",
     "docs/config.md",
-    "docs/spec.md"
+    "docs/spec.md",
+    "docs/plugins.md",
+    "plugins"
   ],
   "optionalDependencies": {
     "pyright": "^1.1.414",

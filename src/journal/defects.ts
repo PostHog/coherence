@@ -26,6 +26,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JournalError } from "./args.ts";
+import { LANGUAGES, languageOfFile } from "../adapters/language-files.ts";
+import { readPlugins } from "../plugins/registry.ts";
+import { effectiveConfig } from "../adapters/project-config.ts";
 import { missingCommits } from "./commits.ts";
 import { CAUGHT, type Caught, type Decision, type Defect, type DefectOrigin, type JournalRecord, type Resolution } from "./record.ts";
 
@@ -53,28 +56,42 @@ function classesIn(path: string, families = false): string[] {
   }
 }
 
-/** The project's own lexicon: the config's lexicon key, else lexicon.json at the root. */
-function projectLexiconPath(root: string): string | undefined {
+/**
+ * The lexicon stack's files, in order: Coherence's, each plugin's layer
+ * (src/plugins/lexicon.ts), then the project's own (the config's lexicon key,
+ * else lexicon.json at the root). The config is read once for both keys.
+ */
+function stackFiles(root: string, strict: boolean): string[] {
+  let config: Record<string, unknown> = {};
   try {
-    const config = JSON.parse(readFileSync(join(root, "coherence.config.json"), "utf8")) as { lexicon?: unknown };
-    if (typeof config.lexicon === "string") return isAbsolute(config.lexicon) ? config.lexicon : join(root, config.lexicon);
+    // Through the registry merge every other reader of the config takes; lexicon and plugins are the project's own keys there.
+    config = effectiveConfig(root)?.record ?? {};
   } catch {
-    // No config, or one that cannot be read: the default place.
+    // A config that will not parse: the default place, and no plugins; the commands that read the config say why.
   }
   const fallback = join(root, "lexicon.json");
-  return existsSync(fallback) ? fallback : undefined;
+  const named = config["lexicon"];
+  const project = typeof named === "string" ? (isAbsolute(named) ? named : join(root, named)) : existsSync(fallback) ? fallback : undefined;
+  const { plugins, problems } = readPlugins(root, config["plugins"], "coherence.config.json", LANGUAGES, (extension) => languageOfFile(`x${extension}`));
+  // A refused plugin is said, never dropped with every other plugin's classes in silence: by a refusal here, or by the reader that already reports it.
+  if (problems.length > 0 && strict) throw new JournalError(`the lexicon stack's defect classes cannot be read: ${problems.join("; ")}`);
+  const layers = plugins.flatMap((p) => (p.manifest.lexicon === undefined ? [] : [resolve(p.dir, p.manifest.lexicon)]));
+  return [COHERENCE_LEXICON, ...layers, ...(project === undefined ? [] : [project])];
 }
 
-/** Every declared defect class, families included, from Coherence's lexicon and the project's own. */
-export function declaredClasses(root: string): Set<string> {
-  const project = projectLexiconPath(root);
-  return new Set([...classesIn(COHERENCE_LEXICON), ...(project === undefined ? [] : classesIn(project))]);
+/**
+ * Every declared defect class, families included, from every layer of the
+ * lexicon stack. With plugins the config refuses, a write that takes a class
+ * is refused naming why (strict, the default); the spec model, which reports
+ * the refusal as its own problem, reads the layers it can (strict false).
+ */
+export function declaredClasses(root: string, strict = true): Set<string> {
+  return new Set(stackFiles(root, strict).flatMap((path) => classesIn(path)));
 }
 
 /** The declared classes that are families: too broad for one guard, so none stands for the rest. */
-export function declaredFamilies(root: string): Set<string> {
-  const project = projectLexiconPath(root);
-  return new Set([...classesIn(COHERENCE_LEXICON, true), ...(project === undefined ? [] : classesIn(project, true))]);
+export function declaredFamilies(root: string, strict = true): Set<string> {
+  return new Set(stackFiles(root, strict).flatMap((path) => classesIn(path, true)));
 }
 
 /**

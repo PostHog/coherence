@@ -27,7 +27,9 @@ import { enforcedLanguageOf, readEnforcementConfig, setupClaims, type Enforcemen
 import { appendRun, entryKey, loadRuns, machineLoad, type Form, type RunEntry, type RunRecord } from "./record.ts";
 import { enforcesOf } from "../spec/floor.ts";
 import { connectAdapter, type RemoteAdapter } from "./server.ts";
-import { escapeRegExp, runTotalityBatch, runTotalityOracle, type TotalityResult } from "./totality.ts";
+import { escapeRegExp, runTotalityBatch, runTotalityOracle, TOTALITY_TIMEOUT_MS, type TotalityResult } from "./totality.ts";
+import { answeringFor } from "../plugins/registry.ts";
+import { proveVia, viaForm } from "../plugins/verify.ts";
 import { readLatency, type LatencyReading } from "./latency.ts";
 import { createObserver, recordObservation, type ObservationOutcome, type TotalityVia } from "../observation/index.ts";
 
@@ -274,7 +276,7 @@ export function setupChooser(root: string, config: EnforcementConfig): (via: str
   const claims = (): string[][] => {
     if (claimed !== undefined) return claimed;
     const all = projectFiles(root);
-    claimed = config.tests.map((setup) => all.filter((f) => isTestPath(f, setup.testFolders) && setupClaims(setup, f, config.declared)));
+    claimed = config.tests.map((setup) => all.filter((f) => isTestPath(f, setup.testFolders) && setupClaims(setup, f, config.declared, config.provided)));
     return claimed;
   };
   return (via) => {
@@ -336,7 +338,8 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
   const observing = options.observe === true && wantTotality && config.testJson !== undefined ? createObserver(root, config) : undefined;
   // An observed pass reads through the primary language's instrument after it, so that one is reached first and kept awake.
   if (observing !== undefined) await instruments.open(config.language);
-  const allVias = selected.flatMap(({ component, invariant }) => totalityEnforcements(invariant).map(({ via }) => ({ component, name: invariant.name, filter: primary?.testFilter(via) ?? via, setup: chooseSetup(via) })));
+  // A via a plugin proves ([form] name) never joins a test runner's invocation: its plugin answers it below.
+  const allVias = selected.flatMap(({ component, invariant }) => totalityEnforcements(invariant).filter(({ via }) => viaForm(via) === undefined).map(({ via }) => ({ component, name: invariant.name, filter: primary?.testFilter(via) ?? via, setup: chooseSetup(via) })));
   const vias: TotalityVia[] = allVias.filter((v) => v.setup === 0).map(({ component, name, filter }) => ({ component, name, filter }));
   if (wantTotality) {
     // The test suite can outlast a warm server's idle timeout, and its timer only resets on a request line.
@@ -381,7 +384,8 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
         let firstReason: string | undefined;
         for (const [i, language] of plan.languages.entries()) {
           const last = i === plan.languages.length - 1;
-          const tag = multi ? { language } : {};
+          const answering = answeringFor(config.plugins, language);
+          const tag = { ...(multi ? { language } : {}), ...(answering.length === 0 ? {} : { plugins: answering }) };
           const door = await instruments.ready(language);
           if (door.adapter === undefined || door.reason !== undefined) {
             firstReason ??= door.reason ?? "no adapter";
@@ -460,6 +464,28 @@ export async function performRun(root: string, options: RunOptions): Promise<Run
     if (wantTotality) {
       for (const { via } of totalityEnforcements(invariant)) {
         const t0 = Date.now();
+        if (viaForm(via) !== undefined) {
+          // Proved by the plugin that declares the form, graded as a test is, with the plugin and its evidence on the entry.
+          const proved = await proveVia(root, config.plugins, via, options.timeoutMs ?? TOTALITY_TIMEOUT_MS);
+          details.push({
+            entry: {
+              ...entryOf(component, invariant.name, "totality oracle", {
+                verdict: proved.verdict,
+                grade: undefined,
+                refutation: recorded.has(entryKey(component, invariant.name, "totality oracle")) ? "witnessed" : "missing",
+                bypasses: [],
+                testReferences: 0,
+                files: [],
+                latency: Date.now() - t0,
+                reason: proved.reason,
+                ...(proved.plugins.length === 0 ? {} : { plugins: proved.plugins, evidence: proved.evidence }),
+              }),
+              mode: "one-at-a-time",
+            },
+            totality: proved,
+          });
+          continue;
+        }
         const filter = primary?.testFilter(via) ?? via;
         const index = chooseSetup(via);
         const setup = config.tests[index]!;

@@ -1,0 +1,35 @@
+{
+  "name": "sample",
+  "version": "0.1.0",
+  "pluginApi": 1,
+  "extends": "typescript",
+  "module": "./index.ts",
+  "verifiers": [
+    {
+      "form": "sample prove",
+      "evidence": "model-checked"
+    },
+    {
+      "form": "sample exit",
+      "evidence": "exit-checked",
+      "command": [
+        "node",
+        "-e",
+        "process.exit(process.argv[1] === 'ok' ? 0 : 1)",
+        "{name}"
+      ]
+    },
+    {
+      "form": "sample match",
+      "evidence": "output-checked",
+      "command": [
+        "node",
+        "-e",
+        "console.log(process.argv[1] === 'ok' ? 'proved ' + process.argv[1] : 'nothing here')",
+        "{name}"
+      ],
+      "match": "^proved "
+    }
+  ],
+  "lexicon": "./lexicon.json"
+}

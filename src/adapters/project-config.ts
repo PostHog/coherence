@@ -58,7 +58,7 @@ export interface Registry {
 }
 
 /** The keys a leaf never inherits. */
-export const OWN_KEYS: ReadonlySet<string> = new Set(["name", "entryDir", "lexicon", "projects"]);
+export const OWN_KEYS: ReadonlySet<string> = new Set(["name", "entryDir", "lexicon", "projects", "plugins"]);
 /** The keys a leaf's own value adds to the registry's rather than replaces. */
 export const CONCATENATED: ReadonlySet<string> = new Set(["ignore", "wellKnown"]);
 /** The keys one test setup reads, top level or in each entry of tests; enforcement/config.ts reads a setup through these alone, so a key it reads is one this names. */

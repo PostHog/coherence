@@ -30,6 +30,7 @@ import { dirname, extname, posix, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { instrumentFor } from "../../adapters/index.ts";
 import { readEnforcementConfig } from "../../enforcement/config.ts";
+import type { LoadedPlugin } from "../../plugins/plugin.ts";
 import { loadRuns } from "../../enforcement/record.ts";
 import { loadJournal } from "../../journal/store.ts";
 import { WORK_DIR, foldOrders, loadWork as loadWorkRecords, workDir } from "../../journal/work.ts";
@@ -111,7 +112,7 @@ function domainTitle(options: BuildOptions, lexicon: Lexicon | undefined): strin
 export function ladderFor(root: string): Ladder {
   const config = readEnforcementConfig(root);
   const language = config.language;
-  const adapter = instrumentFor(language, root, config.declared).ladder;
+  const adapter = instrumentFor(language, root, config).ladder;
   const rungs: LadderRung[] = [];
   if (adapter.top === "visibility-choked") {
     rungs.push({ grade: "visibility-choked", enforcedBy: `the language itself: ${adapter.because}` });
@@ -219,6 +220,27 @@ async function domainPathFor(options: BuildOptions, root: string): Promise<strin
   return located;
 }
 
+/**
+ * The plugin layers of the lexicon stack (src/plugins/lexicon.ts), between
+ * Coherence's and the project's, each titled with its plugin: what the view
+ * shows is whose each concept is. None when the config runs no plugin with a
+ * lexicon layer, or names plugins it refuses (the spec says why).
+ */
+async function pluginLexiconLayers(root: string): Promise<Layer[]> {
+  let plugins: LoadedPlugin[] = [];
+  try {
+    plugins = readEnforcementConfig(root).plugins;
+  } catch {
+    return [];
+  }
+  const layers: Layer[] = [];
+  for (const plugin of plugins) {
+    if (plugin.manifest.lexicon === undefined) continue;
+    layers.push({ kind: "present", id: `plugin ${plugin.name}`, title: `Plugin ${plugin.name} lexicon (${plugin.version})`, lexicon: await readLexicon(resolve(plugin.dir, plugin.manifest.lexicon)) });
+  }
+  return layers;
+}
+
 /** Load every truth into the shell's state. Absence of the domain layer is a rendered fact. */
 export async function loadState(options: BuildOptions): Promise<ShellState> {
   const root = resolve(options.root ?? process.cwd());
@@ -265,7 +287,7 @@ export async function loadState(options: BuildOptions): Promise<ShellState> {
     project: options.project,
     views: VIEWS.map((v) => ({ id: v.id, label: v.label })),
     activeView: options.structurePreview === undefined || options.structurePreview.length === 0 ? DEFAULT_VIEW : "structure",
-    lexicon: { layers: [coherence, domain], query: "", coverage: projectLexiconCoverage(await lexiconCoverage(root)) },
+    lexicon: { layers: [coherence, ...(await pluginLexiconLayers(root)), domain], query: "", coverage: projectLexiconCoverage(await lexiconCoverage(root)) },
     spec,
     runs: { records: runs.records, damaged: runs.damaged },
     journal: { records: journal.records, damaged: journal.damaged, work: loadWork(root) },
